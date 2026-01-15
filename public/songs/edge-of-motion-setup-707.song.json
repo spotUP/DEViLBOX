@@ -1,0 +1,104 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "edge-of-motion-setup-707",
+    "name": "Set Up 707 - Edge Of Motion",
+    "author": "Edge Of Motion",
+    "description": "Two-part 303 bassline using just C notes at different octaves.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 130,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "sawtooth" },
+        "filter": { "cutoff": 600, "resonance": 70 },
+        "filterEnvelope": { "envMod": 70, "decay": 300 },
+        "accent": { "amount": 75 },
+        "slide": { "time": 60, "mode": "exponential" }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-setup707-part1",
+      "name": "Set Up 707 - Part 1",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#f59e0b",
+          "rows": [
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-setup707-part2",
+      "name": "Set Up 707 - Part 2",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#f59e0b",
+          "rows": [
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-setup707-part1", "pattern-setup707-part2"]
+}

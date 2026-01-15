@@ -1,0 +1,158 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "hardfloor-funalogue",
+    "name": "Funalogue - Hardfloor",
+    "author": "Hardfloor",
+    "description": "1994 German acid techno. Four patterns chained together with heavy slides and accents.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 130,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "sawtooth" },
+        "filter": { "cutoff": 700, "resonance": 80 },
+        "filterEnvelope": { "envMod": 85, "decay": 200 },
+        "accent": { "amount": 85 },
+        "slide": { "time": 60, "mode": "exponential" }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-funalogue-1a",
+      "name": "Funalogue 1A",
+      "length": 12,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#06b6d4",
+          "rows": [
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "E-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-funalogue-1b",
+      "name": "Funalogue 1B",
+      "length": 12,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#06b6d4",
+          "rows": [
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D#3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D#3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-funalogue-2a",
+      "name": "Funalogue 2A",
+      "length": 12,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#06b6d4",
+          "rows": [
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-funalogue-2b",
+      "name": "Funalogue 2B",
+      "length": 12,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#06b6d4",
+          "rows": [
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-funalogue-1a", "pattern-funalogue-1b", "pattern-funalogue-2a", "pattern-funalogue-2b"]
+}

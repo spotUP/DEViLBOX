@@ -1,0 +1,69 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "dj-tim-misjah-access",
+    "name": "Access - DJ Tim & Misjah",
+    "author": "DJ Tim & Misjah",
+    "description": "Classic Dutch acid track. BPM 134, square wave, high resonance.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 134,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "square" },
+        "filter": { "cutoff": 660, "resonance": 100 },
+        "filterEnvelope": { "envMod": 66, "decay": 330 },
+        "accent": { "amount": 20 },
+        "slide": { "time": 60, "mode": "exponential" }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-access",
+      "name": "Access",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#8b5cf6",
+          "rows": [
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-access"]
+}

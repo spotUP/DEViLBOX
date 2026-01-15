@@ -1,0 +1,69 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "fast-eddie-acid-thunder",
+    "name": "Acid Thunder - Fast Eddie",
+    "author": "Fast Eddie",
+    "description": "1988 Chicago acid house classic. Real TB-303 recording.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 125,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "sawtooth" },
+        "filter": { "cutoff": 700, "resonance": 75 },
+        "filterEnvelope": { "envMod": 75, "decay": 250 },
+        "accent": { "amount": 80 },
+        "slide": { "time": 50, "mode": "exponential" }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-acid-thunder",
+      "name": "Acid Thunder",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#eab308",
+          "rows": [
+            { "note": "D#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F#2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "E-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "B-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-acid-thunder"]
+}

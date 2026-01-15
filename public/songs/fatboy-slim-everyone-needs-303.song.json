@@ -1,0 +1,70 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "fatboy-slim-everyone-needs-303",
+    "name": "Everybody Needs a 303 - Fatboy Slim",
+    "author": "Fatboy Slim",
+    "description": "1996 big beat classic. All notes accented with octave variations.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 130,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "sawtooth" },
+        "filter": { "cutoff": 800, "resonance": 70 },
+        "filterEnvelope": { "envMod": 80, "decay": 200 },
+        "accent": { "amount": 85 },
+        "slide": { "time": 50, "mode": "exponential" },
+        "overdrive": { "amount": 25 }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-everybody-303",
+      "name": "Everybody Needs a 303",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#ec4899",
+          "rows": [
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C#3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C#4", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "F#3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "A#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C#4", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "G-4", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-everybody-303"]
+}

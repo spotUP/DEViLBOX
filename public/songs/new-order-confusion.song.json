@@ -1,0 +1,69 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "new-order-confusion",
+    "name": "Confusion (Pump Panel Reconstruction) - New Order",
+    "author": "New Order",
+    "description": "Classic 303 line from the Pump Panel reconstruction. BPM 134, square wave.",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 134,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acid Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "square" },
+        "filter": { "cutoff": 750, "resonance": 66 },
+        "filterEnvelope": { "envMod": 66, "decay": 660 },
+        "accent": { "amount": 0 },
+        "slide": { "time": 60, "mode": "exponential" }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-confusion",
+      "name": "Confusion",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#3b82f6",
+          "rows": [
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "A#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": null, "instrument": null, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "A#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-confusion"]
+}

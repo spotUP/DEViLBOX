@@ -1,0 +1,183 @@
+{
+  "format": "scribbleton-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "dittytoy-303",
+    "name": "DT303 (Dittytoy Clone)",
+    "author": "srtuss (original), Scribbleton (port)",
+    "description": "Port of the classic dittytoy DT303 acid synth demo. Original: https://dittytoy.net/ditty/0029103012",
+    "createdAt": "2026-01-14T00:00:00.000Z",
+    "modifiedAt": "2026-01-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 138,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "DT303 Acid",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": { "type": "sawtooth" },
+        "filter": { "cutoff": 600, "resonance": 67 },
+        "filterEnvelope": { "envMod": 13, "decay": 2300 },
+        "accent": { "amount": 85 },
+        "slide": { "time": 60, "mode": "exponential" },
+        "overdrive": { "amount": 73 }
+      },
+      "effects": [
+        {
+          "id": "delay-dt303",
+          "type": "PingPongDelay",
+          "enabled": true,
+          "wet": 45,
+          "parameters": { "delayTime": 0.217, "feedback": 0.45 }
+        }
+      ],
+      "volume": -8,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-dt303-1",
+      "name": "DT303 Pattern 1 (Synthetic)",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-acid",
+          "name": "Acid Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "F-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "F-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "F-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "F-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-dt303-0",
+      "name": "DT303 Pattern 0 (Bad Square)",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-acid-0",
+          "name": "Acid Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "B-0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-dt303-2",
+      "name": "DT303 Pattern 2 (Chainsaw)",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-acid-2",
+          "name": "Acid Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#0", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-dt303-3",
+      "name": "DT303 Pattern 3 (Flying)",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-acid-3",
+          "name": "Acid Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G#2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-dt303-1", "pattern-dt303-0", "pattern-dt303-2", "pattern-dt303-3"]
+}

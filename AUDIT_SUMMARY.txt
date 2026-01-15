@@ -1,0 +1,264 @@
+================================================================================
+CODEBASE AUDIT SUMMARY - Hardcoded Problems
+================================================================================
+
+Date: 2026-01-13
+Auditor: Claude Sonnet 4.5
+Project: scribbleton-react (Music Tracker Application)
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+The audit identified 8 major categories of hardcoded problems affecting
+maintainability, scalability, and code quality:
+
+1. Hardcoded Sequential IDs in Presets (36 instances)
+2. Duplicate TB-303 Presets Across Files (8 presets)
+3. Magic Numbers in Audio Engine (30+ instances)
+4. Duplicate Code Patterns (4 instances)
+5. Timestamp-Based ID Generation (6 patterns)
+6. Duplicate Default Values (88 instances)
+7. Hardcoded Console Messages (58 instances)
+8. Misconfigured Constant Imports (3 instances)
+
+TOTAL ISSUES FOUND: 200+ instances across 15+ files
+
+================================================================================
+PRIORITY BREAKDOWN
+================================================================================
+
+HIGH PRIORITY (6 issues):
+  - Hardcoded preset IDs (36 instances)
+  - Duplicate TB-303 presets (8 duplicates)
+  - Magic numbers in audio engine (30+ instances)
+  - Duplicate instrument ID generation (2 code blocks)
+  - BPM constant import issue (prevents using defined constants)
+  - Centralized ID generator needed (6 patterns)
+
+MEDIUM PRIORITY (3 issues):
+  - Duplicate default values in presets (88 instances)
+  - Hardcoded console messages (58 instances)
+  - Pattern defaults (2 instances)
+
+LOW PRIORITY (2 issues):
+  - Synth type arrays for runtime validation
+  - Structured logging
+
+================================================================================
+FILES REQUIRING CHANGES
+================================================================================
+
+HIGH IMPACT:
+  src/constants/factoryPresets.ts     - 36 hardcoded IDs, 88 duplicate defaults
+  src/constants/tb303Presets.ts       - 8 duplicate presets
+  src/engine/EffectCommands.ts        - 10+ magic numbers
+  src/engine/AutomationPlayer.ts      - 10+ magic numbers
+  src/stores/useInstrumentStore.ts    - Duplicate code, magic numbers
+  src/stores/useTransportStore.ts     - Misconfigured imports
+
+MEDIUM IMPACT:
+  src/stores/useProjectStore.ts       - ID generation pattern
+  src/stores/useTrackerStore.ts       - ID generation, defaults
+  src/stores/useAutomationStore.ts    - ID generation pattern
+  src/stores/useHistoryStore.ts       - ID generation pattern
+  src/engine/ToneEngine.ts            - Magic numbers
+
+NEW FILES NEEDED:
+  src/constants/audioConstants.ts     - Centralize magic numbers
+  src/utils/idGenerator.ts            - Centralized ID generation
+  src/constants/messages.ts           - Error/log messages (optional)
+
+================================================================================
+DETAILED FINDINGS
+================================================================================
+
+1. HARDCODED PRESET IDs (36 instances)
+   Location: src/constants/factoryPresets.ts
+   Problem: Manual sequential ID assignment (id: 0, id: 1, ...)
+   Impact: Error-prone maintenance, manual renumbering needed
+   Fix: Auto-generate IDs using array indices
+
+2. DUPLICATE TB-303 PRESETS (8 presets)
+   Locations: 
+     - src/constants/tb303Presets.ts (without IDs)
+     - src/constants/factoryPresets.ts (with IDs)
+   Problem: Same presets defined twice with minor differences
+   Impact: Code duplication, risk of divergence
+   Fix: Single source of truth, import TB-303 presets into factory
+
+3. MAGIC NUMBERS (30+ instances)
+   Locations: EffectCommands.ts, AutomationPlayer.ts, ToneEngine.ts
+   Examples:
+     - Volume: 0x40, -40, 40
+     - Pan: 255, -1, 1
+     - Filter: 200, 100, 20000
+     - Portamento: 1200
+     - Instruments: 256
+   Fix: Create audioConstants.ts with all magic numbers
+
+4. DUPLICATE CODE (4 instances)
+   Location: src/stores/useInstrumentStore.ts
+   Problem: Identical instrument ID generation in 2 methods
+   Impact: Maintenance burden, bug fix must be applied twice
+   Fix: Extract to shared helper function
+
+5. TIMESTAMP ID GENERATION (6 patterns)
+   Locations: 5 store files
+   Patterns: project-*, effect-*, preset-*, pattern-*, curve-*, action-*
+   Problem: Inconsistent, collision-prone, scattered
+   Fix: Centralized ID generator utility
+
+6. DUPLICATE DEFAULTS (88 instances)
+   Location: src/constants/factoryPresets.ts
+   Pattern: "effects: [], volume: -12, pan: 0" repeated 36+ times
+   Impact: Bulk updates needed for default changes
+   Fix: Extract to PRESET_DEFAULTS object
+
+7. CONSOLE MESSAGES (58 instances)
+   Locations: Throughout codebase
+   Problem: Hardcoded strings, inconsistent logging
+   Fix: Message constants, structured logging (optional)
+
+8. BPM IMPORTS (3 instances)
+   Location: src/stores/useTransportStore.ts
+   Problem: Constants imported as types, preventing use
+   Fix: Remove 'type' keyword from constant imports
+
+================================================================================
+RECOMMENDED SOLUTION ARCHITECTURE
+================================================================================
+
+NEW FILE STRUCTURE:
+
+src/
+├── constants/
+│   ├── audioConstants.ts      [NEW] - All magic numbers
+│   ├── messages.ts            [NEW] - Console messages (optional)
+│   ├── factoryPresets.ts      [REFACTOR] - Remove hardcoded IDs/defaults
+│   └── tb303Presets.ts        [KEEP] - Single source of truth
+├── utils/
+│   └── idGenerator.ts         [NEW] - Centralized ID generation
+└── stores/
+    ├── useInstrumentStore.ts  [REFACTOR] - Use constants, remove duplicates
+    ├── useTransportStore.ts   [REFACTOR] - Fix imports
+    └── [other stores]         [REFACTOR] - Use ID generator
+
+CONSTANTS TO DEFINE:
+
+audioConstants.ts:
+  - MAX_INSTRUMENTS: 256
+  - VOLUME: { MAX_VALUE: 0x40, MIN_DB: -40, MAX_DB: 0 }
+  - PAN: { MIN: -1, MAX: 1, SCALE: 255 }
+  - FILTER: { MIN_CUTOFF_HZ: 200, MAX_CUTOFF_HZ: 20000, EXP_BASE: 100 }
+  - PORTAMENTO: { CENTS_PER_OCTAVE: 1200 }
+  - EFFECT: { ARPEGGIO_REFRESH_MS: 20, ARPEGGIO_REFRESH_HZ: 50 }
+
+idGenerator.ts:
+  - generateId(type: EntityType): string
+  - Collision-resistant, sequential counter-based
+
+================================================================================
+IMPLEMENTATION ROADMAP
+================================================================================
+
+PHASE 1 - Foundation (Day 1)
+  1. Create src/constants/audioConstants.ts
+  2. Create src/utils/idGenerator.ts
+  3. Update src/types/audio.ts exports (remove type keyword where needed)
+
+PHASE 2 - Audio Engine (Day 2)
+  4. Refactor src/engine/EffectCommands.ts (use audioConstants)
+  5. Refactor src/engine/AutomationPlayer.ts (use audioConstants)
+  6. Refactor src/engine/ToneEngine.ts (use audioConstants)
+
+PHASE 3 - Stores (Day 3)
+  7. Refactor src/stores/useInstrumentStore.ts
+     - Extract findNextInstrumentId() helper
+     - Use MAX_INSTRUMENTS constant
+     - Use idGenerator for effects/presets
+  8. Refactor src/stores/useTransportStore.ts (fix BPM imports)
+  9. Update all stores to use idGenerator
+
+PHASE 4 - Presets (Day 4)
+  10. Refactor src/constants/factoryPresets.ts
+      - Remove hardcoded IDs (use array indices)
+      - Import TB-303 presets instead of duplicating
+      - Extract PRESET_DEFAULTS
+  11. Verify src/constants/tb303Presets.ts is canonical
+  12. Update src/stores/useInstrumentStore.ts to handle new preset structure
+
+PHASE 5 - Testing & Documentation (Day 5)
+  13. Test all refactored modules
+  14. Update documentation
+  15. Create migration guide for existing projects
+
+================================================================================
+ESTIMATED EFFORT
+================================================================================
+
+Total Effort: 3-5 days (1 developer)
+
+Breakdown:
+  - Phase 1 (Foundation):           4 hours
+  - Phase 2 (Audio Engine):         8 hours
+  - Phase 3 (Stores):              12 hours
+  - Phase 4 (Presets):              8 hours
+  - Phase 5 (Testing/Docs):         8 hours
+  
+Total: 40 hours (5 days @ 8 hours/day)
+
+Risk Level: LOW-MEDIUM
+  - Changes are mostly mechanical
+  - Existing tests should catch regressions
+  - No breaking changes to public API
+
+================================================================================
+BENEFITS
+================================================================================
+
+CODE QUALITY:
+  + Eliminate 200+ instances of hardcoded values
+  + Reduce code duplication by ~100 lines
+  + Single source of truth for constants
+  + Improved maintainability
+
+DEVELOPER EXPERIENCE:
+  + Easier to add/modify presets
+  + Centralized constants for quick reference
+  + Consistent ID generation patterns
+  + Better code documentation
+
+SCALABILITY:
+  + Easy to adjust limits (e.g., MAX_INSTRUMENTS)
+  + Simplified preset management
+  + Reduced risk of bugs from manual edits
+
+================================================================================
+DOCUMENTATION FILES
+================================================================================
+
+This audit generated 3 documents:
+
+1. AUDIT_REPORT.md       - Comprehensive analysis with recommendations
+2. AUDIT_EXAMPLES.md     - Before/after code examples
+3. AUDIT_SUMMARY.txt     - This executive summary
+
+All files located in:
+  /Users/spot/Code/scribbleton-live-master/scribbleton-react/
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Review audit findings with team
+2. Prioritize fixes based on impact
+3. Create GitHub issues for each phase
+4. Begin Phase 1 implementation
+5. Test incrementally after each phase
+
+For questions or clarifications, refer to AUDIT_REPORT.md and AUDIT_EXAMPLES.md
+
+================================================================================
+END OF AUDIT
+================================================================================
