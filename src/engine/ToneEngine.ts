@@ -247,6 +247,32 @@ export class ToneEngine {
   }
 
   /**
+   * Get a safe time value for scheduling audio events
+   * Returns null if audio context is not ready
+   */
+  private getSafeTime(time?: number): number | null {
+    // Check if audio context is running
+    if (Tone.context.state !== 'running') {
+      return null;
+    }
+
+    // Get current time from Tone.js
+    const now = Tone.now();
+    if (now === undefined || now === null || isNaN(now)) {
+      return null;
+    }
+
+    // If time is provided and valid (> 0), use it
+    // Time of 0 means "play immediately" so we use now()
+    if (time !== undefined && time !== null && !isNaN(time) && time > 0) {
+      return time;
+    }
+
+    // Use current time with a small offset to ensure it's scheduled properly
+    return now + 0.001;
+  }
+
+  /**
    * Create or get instrument (per-channel to avoid automation conflicts)
    */
   public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.PolySynth | Tone.Synth | any {
@@ -610,6 +636,12 @@ export class ToneEngine {
    * Apply automation to a specific instrument instance
    */
   private applyAutomationToInstrument(instrument: any, parameter: string, value: number): void {
+    // Get safe time for automation - skip if context not ready
+    const now = this.getSafeTime();
+    if (now === null) {
+      return;
+    }
+
     try {
       switch (parameter) {
         case 'cutoff':
@@ -619,7 +651,7 @@ export class ToneEngine {
             instrument.setCutoff(cutoffHz);
           } else if (instrument.filter) {
             const cutoffHz = 200 * Math.pow(100, value);
-            instrument.filter.frequency.setValueAtTime(cutoffHz, Tone.now());
+            instrument.filter.frequency.setValueAtTime(cutoffHz, now);
           }
           break;
 
@@ -628,7 +660,7 @@ export class ToneEngine {
           if (instrument instanceof TB303Synth) {
             instrument.setResonance(value * 100);
           } else if (instrument.filter) {
-            instrument.filter.Q.setValueAtTime(value * 10, Tone.now());
+            instrument.filter.Q.setValueAtTime(value * 10, now);
           }
           break;
 
@@ -642,14 +674,14 @@ export class ToneEngine {
         case 'volume':
           // Map 0-1 to -40dB to 0dB
           const volumeDb = -40 + value * 40;
-          instrument.volume.setValueAtTime(volumeDb, Tone.now());
+          instrument.volume.setValueAtTime(volumeDb, now);
           break;
 
         case 'pan':
           // Map 0-1 to -1 to +1 (left to right)
           const panValue = value * 2 - 1;
           if (instrument.pan) {
-            instrument.pan.setValueAtTime(panValue, Tone.now());
+            instrument.pan.setValueAtTime(panValue, now);
           }
           break;
 
@@ -713,12 +745,18 @@ export class ToneEngine {
       return;
     }
 
+    // Get safe time for the attack
+    const safeTime = this.getSafeTime(time);
+    if (safeTime === null) {
+      return; // Audio context not ready
+    }
+
     try {
       if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
-        (instrument as Tone.NoiseSynth).triggerAttack(time, velocity);
+        (instrument as Tone.NoiseSynth).triggerAttack(safeTime, velocity);
       } else {
-        instrument.triggerAttack(note, time, velocity);
+        instrument.triggerAttack(note, safeTime, velocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteAttack for ${config.synthType}:`, error);
@@ -740,12 +778,18 @@ export class ToneEngine {
       return;
     }
 
+    // Ensure we have a valid time - Tone.now() can return null if context isn't ready
+    const safeTime = this.getSafeTime(time);
+    if (safeTime === null) {
+      return; // Audio context not ready, skip release
+    }
+
     try {
       if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerRelease(time) - no note
-        (instrument as Tone.NoiseSynth).triggerRelease(time);
+        (instrument as Tone.NoiseSynth).triggerRelease(safeTime);
       } else {
-        instrument.triggerRelease(note, time);
+        instrument.triggerRelease(note, safeTime);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteRelease for ${config.synthType}:`, error);
@@ -765,7 +809,17 @@ export class ToneEngine {
     }
 
     if (instrument && instrument.triggerRelease) {
-      instrument.triggerRelease(note, time || Tone.now());
+      // Ensure we have a valid time
+      const safeTime = this.getSafeTime(time);
+      if (safeTime === null) {
+        return; // Audio context not ready, skip release
+      }
+
+      try {
+        instrument.triggerRelease(note, safeTime);
+      } catch (error) {
+        // Silently ignore release errors - note may have already been released
+      }
     }
   }
 
@@ -789,21 +843,27 @@ export class ToneEngine {
       return;
     }
 
+    // Get safe time for the note
+    const safeTime = this.getSafeTime(time);
+    if (safeTime === null) {
+      return; // Audio context not ready
+    }
+
     try {
       // Handle different synth types with their specific APIs
       if (instrument instanceof TB303Synth) {
         // TB-303 has accent/slide support
-        instrument.triggerAttackRelease(note, duration, time, velocity, accent, slide);
+        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
-        (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, time, velocity);
+        (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
       } else if (config.synthType === 'MetalSynth') {
         // MetalSynth: triggerAttackRelease(note, duration, time, velocity)
         // Note controls the frequency, use time properly
-        (instrument as Tone.MetalSynth).triggerAttackRelease(note, duration, time, velocity);
+        (instrument as Tone.MetalSynth).triggerAttackRelease(note, duration, safeTime, velocity);
       } else if (config.synthType === 'MembraneSynth') {
         // MembraneSynth: triggerAttackRelease(note, duration, time, velocity)
-        (instrument as Tone.MembraneSynth).triggerAttackRelease(note, duration, time, velocity);
+        (instrument as Tone.MembraneSynth).triggerAttackRelease(note, duration, safeTime, velocity);
       } else if (config.synthType === 'GranularSynth') {
         // GrainPlayer uses start/stop instead of triggerAttackRelease
         const grainPlayer = instrument as Tone.GrainPlayer;
@@ -813,14 +873,14 @@ export class ToneEngine {
           const targetFreq = Tone.Frequency(note).toFrequency();
           const playbackRate = targetFreq / baseNote;
           grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
-          grainPlayer.start(time);
-          grainPlayer.stop(time + duration);
+          grainPlayer.start(safeTime);
+          grainPlayer.stop(safeTime + duration);
         }
       } else if (config.synthType === 'Player') {
         // Player uses start instead of triggerAttackRelease
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
-          player.start(time);
+          player.start(safeTime);
         }
       } else if (
         config.synthType === 'SuperSaw' ||
@@ -833,16 +893,16 @@ export class ToneEngine {
       ) {
         // New synths with triggerAttackRelease interface
         if (instrument.triggerAttackRelease) {
-          instrument.triggerAttackRelease(note, duration, time, velocity);
+          instrument.triggerAttackRelease(note, duration, safeTime, velocity);
         }
       } else if (config.synthType === 'DrumMachine') {
         // DrumMachine - some drum types don't take note parameter
         if (instrument.triggerAttackRelease) {
-          instrument.triggerAttackRelease(note, duration, time, velocity);
+          instrument.triggerAttackRelease(note, duration, safeTime, velocity);
         }
       } else if (instrument.triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)
-        instrument.triggerAttackRelease(note, duration, time, velocity);
+        instrument.triggerAttackRelease(note, duration, safeTime, velocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error triggering note for ${config.synthType}:`, error);
