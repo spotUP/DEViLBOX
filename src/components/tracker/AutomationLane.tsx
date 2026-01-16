@@ -5,9 +5,8 @@
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useAutomationStore } from '@stores/useAutomationStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
-import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Trash2 } from 'lucide-react';
+import type { AutomationParameter } from '@typedefs/automation';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 // Automatable parameters with their display settings
 const AUTOMATION_PARAMETERS: {
@@ -41,18 +40,16 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   patternId,
   channelIndex,
   patternLength,
-  rowHeight = 20,
+  rowHeight: _rowHeight = 20,
   compact = false,
   onAutomationChange,
 }) => {
+  void _rowHeight; // Available for future use
   const {
     getCurvesForPattern,
     addCurve,
     addPoint,
-    updatePoint,
-    removePoint,
     removeCurve,
-    getValueAtRow,
   } = useAutomationStore();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);

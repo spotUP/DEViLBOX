@@ -851,8 +851,6 @@ export const useTrackerStore = create<TrackerStore>()(
         state.selection = null;
         state.clipboard = null;
         state.currentOctave = 4;
-        state.editStep = 1;
-        state.recordMode = false;
         state.columnVisibility = { ...DEFAULT_COLUMN_VISIBILITY };
       }),
   }))

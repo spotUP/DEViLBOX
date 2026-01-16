@@ -3,14 +3,14 @@
  * Shows current sound, quick controls, and preset carousel
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { usePresetStore } from '@stores/usePresetStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Settings2, ChevronLeft, ChevronRight, Sparkles, Save } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
+import type { InstrumentConfig } from '@typedefs/instrument';
 
 interface QuickViewProps {
   /** Callback to switch to Sound tab */

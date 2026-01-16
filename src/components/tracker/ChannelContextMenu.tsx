@@ -3,7 +3,7 @@
  * Shows different options based on Live vs Edit mode
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   Music,
   Trash2,
@@ -52,7 +52,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   channelIndex,
   channel,
   patternId,
-  patternLength,
+  patternLength: _patternLength,
   onFillPattern,
   onClearChannel,
   onCopyChannel,

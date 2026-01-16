@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo, type SynthCategory } from '@constants/synthCategories';
+import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
 import type { SynthType } from '@typedefs/instrument';
 import * as LucideIcons from 'lucide-react';
 import { Check, ChevronRight } from 'lucide-react';
@@ -49,7 +49,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   // Render a single synth card
   const renderSynthCard = (synth: SynthInfo, isSelected: boolean) => {
     const IconComponent = getIcon(synth.icon);
-    const isHovered = hoveredSynth === synth.type;
+    void hoveredSynth; // Used for future hover effects
 
     return (
       <div

@@ -36,7 +36,6 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
 
   // Current instrument info
   const currentInstrument = instruments.find((i) => i.id === currentInstrumentId);
-  const synthInfo = currentInstrument ? getSynthInfo(currentInstrument.synthType) : null;
 
   // Close dropdown when clicking outside
   useEffect(() => {

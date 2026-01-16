@@ -9,16 +9,13 @@ import {
   FileAudio,
   Upload,
   Play,
-  Pause,
   Square,
-  RefreshCw,
   Scissors,
   Volume2,
   Repeat,
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Download,
 } from 'lucide-react';
 import * as Tone from 'tone';
 
@@ -56,7 +53,7 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollOffset] = useState(0);
   const [loopSettings, setLoopSettings] = useState<LoopSettings>({
     enabled: false,
     start: 0,
@@ -264,7 +261,6 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const normalized = x / canvas.width;
 
     // Check if clicking near a marker
     const startX = loopSettings.start * canvas.width;

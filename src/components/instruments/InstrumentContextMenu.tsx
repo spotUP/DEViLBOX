@@ -199,7 +199,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   const {
     instruments,
     setCurrentInstrument,
-    duplicateInstrument,
+    cloneInstrument,
     deleteInstrument,
     updateInstrument,
   } = useInstrumentStore();
@@ -219,9 +219,9 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   const handleReset = useCallback(() => {
     updateInstrument(instrumentId, {
       synthType: 'Synth',
-      oscillator: { type: 'sawtooth' },
+      oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 },
-      filter: { type: 'lowpass', frequency: 2000, Q: 1 },
+      filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -12 },
       effects: [],
       volume: -6,
       pan: 0,
@@ -248,7 +248,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
         id: 'duplicate',
         label: 'Duplicate',
         icon: <Copy size={14} />,
-        onClick: () => duplicateInstrument(instrumentId),
+        onClick: () => cloneInstrument(instrumentId),
       },
       // Delete
       {
@@ -321,7 +321,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
     instrumentId,
     canDelete,
     setCurrentInstrument,
-    duplicateInstrument,
+    cloneInstrument,
     deleteInstrument,
     updateInstrument,
     onEdit,

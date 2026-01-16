@@ -7,7 +7,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { usePresetStore } from '@stores/usePresetStore';
 import { InstrumentList } from './InstrumentList';
 import { QuickView } from './QuickView';
 import { CategorizedSynthSelector } from './CategorizedSynthSelector';
@@ -36,11 +35,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   mode = 'modal',
   showInstrumentList = true,
   showKeyboard: initialShowKeyboard = true,
-  onClose,
+  onClose: _onClose,
 }) => {
+  void _onClose; // Prop available for future use
   const {
-    instruments,
-    currentInstrumentId,
     currentInstrument,
     updateInstrument,
     createInstrument,
@@ -78,7 +76,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleGoToBrowse = useCallback(() => setActiveTab('browse'), []);
 
   // Handle synth type change from Browse
-  const handleSynthTypeChange = useCallback((synthType: SynthType) => {
+  const handleSynthTypeChange = useCallback((_synthType: SynthType) => {
     // Switch to Sound tab after selecting new type
     setActiveTab('sound');
   }, []);
@@ -216,7 +214,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
           {activeTab === 'effects' && (
             <div className="p-4">
-              <EffectChain instrumentId={currentInstrument.id} />
+              <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
             </div>
           )}
 
