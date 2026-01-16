@@ -53,6 +53,8 @@ interface TrackerStore {
   followPlayback: boolean;
   columnVisibility: ColumnVisibility;
   currentOctave: number; // FT2: F1-F7 selects octave 1-7
+  recordMode: boolean; // When true, entering notes advances cursor by editStep
+  editStep: number; // Rows to advance after entering a note (1-16)
 
   // Actions
   setCurrentPattern: (index: number) => void;
@@ -65,6 +67,8 @@ interface TrackerStore {
   setFollowPlayback: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
   setCurrentOctave: (octave: number) => void;
+  toggleRecordMode: () => void;
+  setEditStep: (step: number) => void;
 
   // Block operations
   startSelection: () => void;
@@ -144,6 +148,8 @@ export const useTrackerStore = create<TrackerStore>()(
     followPlayback: false,
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
     currentOctave: 4, // Default octave (F4)
+    recordMode: false, // Start with record mode off
+    editStep: 1, // Default edit step (advance 1 row after note entry)
 
     // Actions
     setCurrentPattern: (index) =>
@@ -284,6 +290,17 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         // Clamp octave to valid range 1-7 (FT2 style)
         state.currentOctave = Math.max(1, Math.min(7, octave));
+      }),
+
+    toggleRecordMode: () =>
+      set((state) => {
+        state.recordMode = !state.recordMode;
+      }),
+
+    setEditStep: (step) =>
+      set((state) => {
+        // Clamp edit step to valid range 0-16
+        state.editStep = Math.max(0, Math.min(16, step));
       }),
 
     startSelection: () =>
@@ -851,6 +868,8 @@ export const useTrackerStore = create<TrackerStore>()(
         state.selection = null;
         state.clipboard = null;
         state.currentOctave = 4;
+        state.recordMode = false;
+        state.editStep = 1;
         state.columnVisibility = { ...DEFAULT_COLUMN_VISIBILITY };
       }),
   }))

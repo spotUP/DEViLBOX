@@ -132,6 +132,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     expandPattern,
     shrinkPattern,
     loadPatterns,
+    recordMode,
+    editStep,
+    toggleRecordMode,
+    setEditStep,
   } = useTrackerStore();
 
   const {
@@ -449,6 +453,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           >
             {isPlayingPattern ? 'Stop' : 'Play Pattern'}
           </FT2Button>
+          <FT2Button
+            onClick={toggleRecordMode}
+            active={recordMode}
+            colorAccent={recordMode ? 'red' : undefined}
+            title={recordMode ? 'Disable record mode' : 'Enable record mode (cursor advances after note entry)'}
+          >
+            {recordMode ? '● Rec' : 'Rec'}
+          </FT2Button>
         </div>
       </div>
 
@@ -508,12 +520,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             />
           </div>
 
-          {/* Add Step */}
+          {/* Edit Step (rows to advance after note entry in record mode) */}
           <div className="ft2-section ft2-section-tempo">
             <FT2NumericInput
-              label="Add"
-              value={1}
-              onChange={() => {}}
+              label="Edit Step"
+              value={editStep}
+              onChange={setEditStep}
               min={0}
               max={16}
               format="hex"

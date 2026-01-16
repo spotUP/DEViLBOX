@@ -87,6 +87,8 @@ export const useTrackerInput = () => {
     transposeSelection,
     interpolateSelection,
     humanizeSelection,
+    recordMode,
+    editStep,
   } = useTrackerStore();
 
   const {
@@ -160,10 +162,13 @@ export const useTrackerInput = () => {
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
-      // Move cursor down after entry
-      moveCursor('down');
+      // Move cursor down by editStep if record mode is enabled
+      if (recordMode && editStep > 0) {
+        const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+        moveCursorToRow(newRow);
+      }
     },
-    [cursor, currentInstrumentId, setCell, moveCursor]
+    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow]
   );
 
   // Insert empty row at cursor, shift rows down
@@ -531,7 +536,11 @@ export const useTrackerInput = () => {
         e.preventDefault();
         if (cursor.columnType === 'note') {
           setCell(cursor.channelIndex, cursor.rowIndex, { note: '===' });
-          moveCursor('down');
+          // Move cursor down by editStep if record mode is enabled
+          if (recordMode && editStep > 0) {
+            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+            moveCursorToRow(newRow);
+          }
         }
         return;
       }
@@ -663,6 +672,8 @@ export const useTrackerInput = () => {
       currentInstrumentId,
       instruments,
       selection,
+      recordMode,
+      editStep,
       moveCursor,
       moveCursorToRow,
       moveCursorToChannel,
