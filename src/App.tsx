@@ -2,7 +2,7 @@
  * App - Main application component
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
 import { InstrumentModal } from '@components/instruments/InstrumentModal';
@@ -34,6 +34,7 @@ function App() {
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
+  const automationPanelRef = useRef<HTMLDivElement>(null);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
   const { applyAutoCompact } = useUIStore();
@@ -47,6 +48,26 @@ function App() {
   useEffect(() => {
     applyAutoCompact();
   }, [applyAutoCompact]);
+
+  // Close automation panel when clicking outside
+  useEffect(() => {
+    if (!showAutomation) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Check if click is outside the automation panel and toggle button
+      if (
+        automationPanelRef.current &&
+        !automationPanelRef.current.contains(target) &&
+        !target.closest('[data-automation-toggle]')
+      ) {
+        setShowAutomation(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAutomation]);
   const { save: saveProject } = useProjectPersistence();
 
   useEffect(() => {
@@ -366,13 +387,17 @@ function App() {
 
         {/* Bottom: Automation Panel (toggleable) */}
         {showAutomation && (
-          <div className="h-80 flex-shrink-0 border-t border-dark-border overflow-y-auto scrollbar-modern animate-fade-in">
+          <div
+            ref={automationPanelRef}
+            className="h-80 flex-shrink-0 border-t border-dark-border overflow-y-auto scrollbar-modern animate-fade-in"
+          >
             <AutomationPanel />
           </div>
         )}
 
         {/* Automation Toggle Button */}
         <button
+          data-automation-toggle
           onClick={() => setShowAutomation(!showAutomation)}
           className={`
             w-full px-4 py-2 flex items-center justify-between text-sm font-medium

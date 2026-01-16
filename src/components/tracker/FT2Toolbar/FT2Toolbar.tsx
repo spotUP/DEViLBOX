@@ -14,6 +14,7 @@ import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore } from '@stores';
+import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -216,6 +217,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDemoMenu]);
+
+  // Save handler with feedback
+  const handleSave = () => {
+    const success = saveProject();
+    if (success) {
+      notify.success('Project saved to browser storage', 2000);
+    } else {
+      notify.error('Failed to save project');
+    }
+  };
 
   // File load handler (like NavBar)
   const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -574,7 +585,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             )}
           </div>
 
-          <FT2Button onClick={saveProject} small title="Save project (Ctrl+S)">
+          <FT2Button onClick={handleSave} small title="Save project (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
           </FT2Button>
           <FT2Button onClick={onImport} small title="Import module dialog">
