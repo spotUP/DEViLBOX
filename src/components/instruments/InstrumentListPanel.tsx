@@ -10,6 +10,7 @@ import * as LucideIcons from 'lucide-react';
 import { Plus, FolderOpen, Wand2, Pencil, Trash2, Copy } from 'lucide-react';
 import { CreateInstrumentModal } from './CreateInstrumentModal';
 import { LoadPresetModal } from './LoadPresetModal';
+import { BASS_PRESETS } from '@constants/factoryPresets';
 
 interface InstrumentListPanelProps {
   onEditInstrument?: (id: number) => void;
@@ -24,6 +25,13 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
     deleteInstrument,
     cloneInstrument,
   } = useInstrumentStore();
+
+  // Create a new instrument with a good starting preset
+  const handleAddInstrument = () => {
+    // Use '303 Classic' as the starting point - a good versatile preset
+    const startingPreset = BASS_PRESETS[0]; // '303 Classic'
+    createInstrument(startingPreset);
+  };
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
@@ -45,9 +53,9 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
       <div className="px-2 py-2 bg-ft2-header border-b border-ft2-border">
         <div className="grid grid-cols-4 gap-1">
           <button
-            onClick={() => createInstrument()}
+            onClick={handleAddInstrument}
             className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
-            title="Add blank instrument"
+            title="Add new instrument (303 Classic)"
           >
             <Plus size={14} />
             <span className="text-[9px] font-bold">ADD</span>

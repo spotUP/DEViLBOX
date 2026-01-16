@@ -33,6 +33,7 @@ interface InstrumentStore {
   addInstrument: (config: InstrumentConfig) => void;
   deleteInstrument: (id: number) => void;
   cloneInstrument: (id: number) => number;
+  resetInstrument: (id: number) => void;
 
   // Effects
   addEffect: (instrumentId: number, effectType: EffectConfig['type']) => void;
@@ -196,6 +197,26 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
       return newId;
+    },
+
+    resetInstrument: (id) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === id);
+        if (instrument) {
+          // Reset to default TB-303 preset
+          const defaultInst = createDefaultInstrument(id);
+          Object.assign(instrument, defaultInst);
+        }
+      });
+
+      // Invalidate the cached Tone.js instrument so it gets recreated
+      try {
+        const engine = getToneEngine();
+        engine.invalidateInstrument(id);
+        console.log('[InstrumentStore] Reset instrument', id, 'to default');
+      } catch (error) {
+        console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+      }
     },
 
     // Effects

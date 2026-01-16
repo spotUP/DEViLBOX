@@ -8,7 +8,7 @@ import { useInstrumentStore } from '../../stores';
 import { VisualTB303Editor } from './VisualTB303Editor';
 import { VisualSynthEditor } from './VisualSynthEditor';
 import { TestKeyboard } from './TestKeyboard';
-import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
+import { PRESET_CATEGORIES, BASS_PRESETS, type PresetCategory } from '@constants/factoryPresets';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 import {
@@ -20,6 +20,7 @@ import {
   FolderOpen,
   Search,
   ChevronRight,
+  RotateCcw,
 } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
@@ -36,7 +37,14 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
     deleteInstrument,
     cloneInstrument,
     setCurrentInstrument,
+    resetInstrument,
   } = useInstrumentStore();
+
+  // Create a new instrument with a good starting preset
+  const handleAddInstrument = () => {
+    const startingPreset = BASS_PRESETS[0]; // '303 Classic'
+    createInstrument(startingPreset);
+  };
 
   const [showInstrumentList, setShowInstrumentList] = useState(false);
   const [showPresetBrowser, setShowPresetBrowser] = useState(false);
@@ -186,11 +194,18 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
                 <Maximize2 size={18} />
               </button>
             )}
-            <button onClick={() => createInstrument()} className="btn-icon" title="New Instrument">
+            <button onClick={handleAddInstrument} className="btn-icon" title="New Instrument">
               <Plus size={18} />
             </button>
             <button onClick={() => cloneInstrument(currentInstrument.id)} className="btn-icon" title="Duplicate">
               <Copy size={18} />
+            </button>
+            <button
+              onClick={() => resetInstrument(currentInstrument.id)}
+              className="btn-icon hover:text-amber-500"
+              title="Reset to Default"
+            >
+              <RotateCcw size={18} />
             </button>
             <button
               onClick={() => instruments.length > 1 && deleteInstrument(currentInstrument.id)}
