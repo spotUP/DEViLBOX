@@ -5,8 +5,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useInstrumentStore } from '../../stores';
-import { TB303Editor } from './TB303Editor';
-import { GenericSynthEditor } from './GenericSynthEditor';
+import { VisualTB303Editor } from './VisualTB303Editor';
+import { VisualSynthEditor } from './VisualSynthEditor';
 import { TestKeyboard } from './TestKeyboard';
 import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
@@ -381,9 +381,9 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
         {/* Parameters Section */}
         <div>
           {currentInstrument.synthType === 'TB303' && currentInstrument.tb303 ? (
-            <TB303Editor config={currentInstrument.tb303} onChange={handleTB303Change} />
+            <VisualTB303Editor config={currentInstrument.tb303} onChange={handleTB303Change} />
           ) : (
-            <GenericSynthEditor
+            <VisualSynthEditor
               instrument={currentInstrument}
               onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
             />
