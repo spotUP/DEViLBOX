@@ -93,6 +93,7 @@ export const useTrackerInput = () => {
 
   const {
     isPlaying,
+    currentRow: playbackRow,
     stop,
     play,
     togglePlayPause: _togglePlayPause,
@@ -157,18 +158,23 @@ export const useTrackerInput = () => {
     (note: string, octave: number) => {
       // Format note as "C-4" (with dash) for storage
       const fullNote = `${note}-${octave}`;
-      setCell(cursor.channelIndex, cursor.rowIndex, {
+
+      // When recording during playback, enter at the current playback row
+      // Otherwise enter at the cursor position
+      const targetRow = (recordMode && isPlaying) ? playbackRow : cursor.rowIndex;
+
+      setCell(cursor.channelIndex, targetRow, {
         note: fullNote,
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
-      // Move cursor down by editStep if record mode is enabled
-      if (recordMode && editStep > 0) {
+      // Move cursor down by editStep if record mode is enabled (but not during playback)
+      if (recordMode && editStep > 0 && !isPlaying) {
         const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
         moveCursorToRow(newRow);
       }
     },
-    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow]
+    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow, isPlaying, playbackRow]
   );
 
   // Insert empty row at cursor, shift rows down
@@ -535,9 +541,11 @@ export const useTrackerInput = () => {
       if (key === 'CapsLock') {
         e.preventDefault();
         if (cursor.columnType === 'note') {
-          setCell(cursor.channelIndex, cursor.rowIndex, { note: '===' });
-          // Move cursor down by editStep if record mode is enabled
-          if (recordMode && editStep > 0) {
+          // When recording during playback, enter at the current playback row
+          const targetRow = (recordMode && isPlaying) ? playbackRow : cursor.rowIndex;
+          setCell(cursor.channelIndex, targetRow, { note: '===' });
+          // Move cursor down by editStep if record mode is enabled (but not during playback)
+          if (recordMode && editStep > 0 && !isPlaying) {
             const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
             moveCursorToRow(newRow);
           }
@@ -668,6 +676,7 @@ export const useTrackerInput = () => {
       patterns,
       currentPatternIndex,
       isPlaying,
+      playbackRow,
       currentOctave,
       currentInstrumentId,
       instruments,
