@@ -3,7 +3,7 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import { Upload, Trash2, Music, Play, Square, AlertCircle } from 'lucide-react';
+import { Upload, Trash2, Music, Play, Square, AlertCircle, ArrowRight, ArrowLeft, Repeat } from 'lucide-react';
 import { useInstrumentStore } from '../../stores';
 import type { InstrumentConfig } from '../../types/instrument';
 
@@ -29,6 +29,17 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
   // Get sample info from instrument parameters
   const sampleInfo: SampleInfo | null = instrument.parameters?.sampleInfo || null;
   const sampleUrl: string | null = instrument.parameters?.sampleUrl || null;
+  const reverseMode: 'forward' | 'reverse' | 'pingpong' = instrument.parameters?.reverseMode || 'forward';
+
+  // Handle reverse mode change
+  const handleReverseModeChange = useCallback((mode: 'forward' | 'reverse' | 'pingpong') => {
+    updateInstrument(instrument.id, {
+      parameters: {
+        ...instrument.parameters,
+        reverseMode: mode,
+      },
+    });
+  }, [instrument.id, instrument.parameters, updateInstrument]);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,6 +250,49 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
                   }}
                 />
               ))}
+            </div>
+          </div>
+
+          {/* Playback Mode */}
+          <div className="px-4 pb-3">
+            <div className="text-xs text-text-muted mb-2">Playback Mode</div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleReverseModeChange('forward')}
+                className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center gap-1.5 transition-all ${
+                  reverseMode === 'forward'
+                    ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                    : 'bg-dark-bg text-text-muted border-dark-border hover:border-dark-borderLight'
+                }`}
+                title="Play sample forward"
+              >
+                <ArrowRight size={14} />
+                Forward
+              </button>
+              <button
+                onClick={() => handleReverseModeChange('reverse')}
+                className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center gap-1.5 transition-all ${
+                  reverseMode === 'reverse'
+                    ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                    : 'bg-dark-bg text-text-muted border-dark-border hover:border-dark-borderLight'
+                }`}
+                title="Play sample in reverse"
+              >
+                <ArrowLeft size={14} />
+                Reverse
+              </button>
+              <button
+                onClick={() => handleReverseModeChange('pingpong')}
+                className={`flex-1 px-3 py-2 text-xs rounded border flex items-center justify-center gap-1.5 transition-all ${
+                  reverseMode === 'pingpong'
+                    ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                    : 'bg-dark-bg text-text-muted border-dark-border hover:border-dark-borderLight'
+                }`}
+                title="Play forward then reverse"
+              >
+                <Repeat size={14} />
+                Ping-Pong
+              </button>
             </div>
           </div>
 

@@ -263,6 +263,41 @@ function writeString(view: DataView, offset: number, str: string): void {
 }
 
 /**
+ * Concatenate multiple AudioBuffers into a single buffer
+ */
+function concatenateAudioBuffers(
+  buffers: AudioBuffer[],
+  sampleRate: number
+): AudioBuffer {
+  if (buffers.length === 0) {
+    throw new Error('No buffers to concatenate');
+  }
+  if (buffers.length === 1) {
+    return buffers[0];
+  }
+
+  const numChannels = buffers[0].numberOfChannels;
+  const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
+
+  // Create offline context to generate the combined buffer
+  const offlineCtx = new OfflineAudioContext(numChannels, totalLength, sampleRate);
+  const combinedBuffer = offlineCtx.createBuffer(numChannels, totalLength, sampleRate);
+
+  // Copy each buffer's data
+  let offset = 0;
+  for (const buffer of buffers) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const channelData = combinedBuffer.getChannelData(channel);
+      const sourceData = buffer.getChannelData(channel);
+      channelData.set(sourceData, offset);
+    }
+    offset += buffer.length;
+  }
+
+  return combinedBuffer;
+}
+
+/**
  * Export pattern as WAV file
  */
 export async function exportPatternAsWav(
@@ -287,22 +322,66 @@ export async function exportPatternAsWav(
 }
 
 /**
- * Export all patterns as a single WAV file
+ * Export all patterns as a single WAV file following the sequence order
  */
 export async function exportSongAsWav(
   patterns: Pattern[],
-  _sequence: string[], // TODO: Use sequence for proper song export
+  sequence: number[],
   instruments: InstrumentConfig[],
   bpm: number,
   filename: string,
   onProgress?: (progress: number) => void
 ): Promise<void> {
-  // For now, just export the first pattern
-  // Full song export would concatenate patterns based on _sequence
-  const pattern = patterns[0];
-  if (!pattern) {
-    throw new Error('No patterns to export');
+  if (sequence.length === 0) {
+    throw new Error('No patterns in sequence to export');
   }
 
-  await exportPatternAsWav(pattern, instruments, bpm, filename, onProgress);
+  const sampleRate = 44100;
+  const buffers: AudioBuffer[] = [];
+  const totalSteps = sequence.length;
+
+  // Render each pattern in sequence order
+  for (let i = 0; i < sequence.length; i++) {
+    const patternIndex = sequence[i];
+    const pattern = patterns[patternIndex];
+
+    if (!pattern) {
+      console.warn(`Pattern ${patternIndex} not found in sequence, skipping`);
+      continue;
+    }
+
+    // Calculate progress: each pattern contributes equally to total progress
+    const patternProgress = (progress: number) => {
+      const baseProgress = (i / totalSteps) * 100;
+      const stepProgress = (progress / 100) * (100 / totalSteps);
+      onProgress?.(Math.round(baseProgress + stepProgress));
+    };
+
+    const buffer = await renderPatternToAudio(pattern, instruments, bpm, {
+      sampleRate,
+      onProgress: patternProgress,
+    });
+
+    buffers.push(buffer);
+  }
+
+  if (buffers.length === 0) {
+    throw new Error('No valid patterns to export');
+  }
+
+  // Concatenate all pattern buffers
+  const combinedBuffer = concatenateAudioBuffers(buffers, sampleRate);
+  const wavBlob = audioBufferToWav(combinedBuffer);
+
+  // Download the file
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith('.wav') ? filename : `${filename}.wav`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  onProgress?.(100);
 }

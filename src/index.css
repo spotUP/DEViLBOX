@@ -45,6 +45,17 @@
     --color-cell-accent: #ef4444;
     --color-cell-slide: #fb7185;
     --color-cell-empty: #484040;
+
+    /* Synth control group colors (for knobs/controls semantic grouping) */
+    --color-synth-filter: #00d4aa;      /* Filter cutoff, resonance */
+    --color-synth-envelope: #7c3aed;    /* Envelope mod, decay, attack */
+    --color-synth-accent: #f59e0b;      /* Accent amount, sweep */
+    --color-synth-drive: #ef4444;       /* Overdrive, distortion */
+    --color-synth-modulation: #3b82f6;  /* FM, tracking, modulation */
+    --color-synth-volume: #22c55e;      /* Volume controls */
+    --color-synth-pan: #3b82f6;         /* Pan controls */
+    --color-synth-effects: #8b5cf6;     /* Effects (delay, reverb) */
+    --color-tracker-cursor: #00ffff;    /* Current playback position */
   }
 
   body {
@@ -534,6 +545,7 @@
 
   /* TB303 Knob Panel */
   .tb303-knob-panel {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -543,6 +555,13 @@
     border-bottom: 1px solid var(--color-border);
   }
 
+  .tb303-knob-panel-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
   .tb303-knob-panel-label {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -550,9 +569,279 @@
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
+  }
+
+  .tb303-preset-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tb303-synth-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .tb303-synth-select {
+    padding: 3px 6px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--color-text-primary);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.15s ease;
+  }
+
+  .tb303-synth-select:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-accent-primary);
+  }
+
+  .tb303-synth-select:focus {
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  }
+
+  .tb303-preset-dropdown {
+    position: relative;
+  }
+
+  .tb303-preset-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .tb303-preset-button:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+
+  .tb303-preset-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    min-width: 180px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 4px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .tb303-preset-category {
+    padding: 6px 10px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--color-bg-tertiary);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tb303-preset-item {
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .tb303-preset-item:hover {
+    background: var(--color-accent-primary);
+    color: white;
+  }
+
+  .tb303-preset-item-user {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .tb303-preset-item-user span {
+    flex: 1;
+  }
+
+  .tb303-preset-delete {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.1s ease;
+  }
+
+  .tb303-preset-item-user:hover .tb303-preset-delete {
+    opacity: 1;
+  }
+
+  .tb303-preset-delete:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+  }
+
+  .tb303-preset-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 4px 0;
+  }
+
+  .tb303-save-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    color: var(--color-text-muted);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .tb303-save-button:hover {
+    background: var(--color-accent-primary);
+    color: white;
+    border-color: var(--color-accent-primary);
+  }
+
+  .tb303-save-dialog {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1001;
+    display: flex;
+    gap: 4px;
+    padding: 8px;
+    margin-top: 4px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .tb303-save-dialog input {
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--color-text-primary);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .tb303-save-dialog input:focus {
+    border-color: var(--color-accent-primary);
+  }
+
+  .tb303-save-dialog button {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .tb303-save-dialog button:first-of-type {
+    background: var(--color-accent-primary);
+    color: white;
+    border-color: var(--color-accent-primary);
+  }
+
+  .tb303-save-dialog button:hover {
+    opacity: 0.9;
+  }
+
+  /* TB-303 Collapsed Mode Styles */
+  .tb303-knob-panel-collapsed {
+    padding: 6px 16px;
+    gap: 12px;
+  }
+
+  /* Consistent panel collapse toggle - used across all collapsible sections */
+  .panel-collapse-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    z-index: 10;
+  }
+
+  .panel-collapse-toggle:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-text-muted);
+  }
+
+  .tb303-collapsed-values {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .tb303-param-inline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .tb303-expanded-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .tb303-knobs-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
   }
 
   /* Toggle switch styles */
@@ -706,6 +995,52 @@
     gap: 16px;
     align-items: flex-start;
   }
+
+  /* Devil Fish badge in header */
+  .devilfish-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    color: #ef4444;
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+  }
+
+  /* Devil Fish section to the right of TB-303 knobs */
+  .devilfish-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 16px;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .devilfish-row-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .devilfish-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: #ef4444;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+  }
+
+  .devilfish-knobs {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .devilfish-extras {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 
 @layer utilities {
@@ -782,11 +1117,17 @@
   border-bottom: 1px solid #1a1a1e;
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
+  position: relative;
+}
+
+.ft2-toolbar-compact {
+  gap: 2px;
+  padding: 4px 14px;
 }
 
 .ft2-toolbar-row {
   display: grid;
-  grid-template-columns: 220px 130px 140px auto;
+  grid-template-columns: 220px 130px 140px min-content auto;
   align-items: center;
   gap: 0;
   height: 30px;
@@ -842,14 +1183,16 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 500;
-  padding: 5px 14px;
-  min-width: 68px;
+  padding: 5px 8px;
+  width: 88px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   /* 3D button effect */
   background: linear-gradient(180deg, #505058 0%, #404048 100%);
@@ -875,8 +1218,8 @@
 }
 
 .ft2-btn-small {
-  min-width: 44px;
-  padding: 5px 8px;
+  width: 60px;
+  padding: 5px 6px;
 }
 
 .ft2-btn-disabled {

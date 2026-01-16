@@ -215,10 +215,10 @@ export const VirtualizedTrackerView: React.FC = () => {
           right: 0,
           height: `${ROW_HEIGHT}px`,
           transform: 'translateY(-50%)',
-          backgroundColor: 'rgba(0, 255, 255, 0.3)',
-          borderTop: '3px solid #00ffff',
-          borderBottom: '3px solid #00ffff',
-          boxShadow: '0 0 20px rgba(0, 255, 255, 0.5)',
+          backgroundColor: 'color-mix(in srgb, var(--color-tracker-cursor) 30%, transparent)',
+          borderTop: '3px solid var(--color-tracker-cursor)',
+          borderBottom: '3px solid var(--color-tracker-cursor)',
+          boxShadow: '0 0 20px color-mix(in srgb, var(--color-tracker-cursor) 50%, transparent)',
         }}
       />
 

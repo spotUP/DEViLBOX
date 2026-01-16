@@ -114,6 +114,53 @@ export const Knob: React.FC<KnobProps> = ({
     }
   }, [defaultValue, onChange]);
 
+  // Handle keyboard navigation for accessibility
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    let newValue = value;
+    const step = logarithmic ? (max - min) / 100 : (max - min) / 50;
+    const largeStep = step * 10;
+
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        e.preventDefault();
+        newValue = Math.min(max, value + (e.shiftKey ? largeStep : step));
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        e.preventDefault();
+        newValue = Math.max(min, value - (e.shiftKey ? largeStep : step));
+        break;
+      case 'Home':
+        e.preventDefault();
+        newValue = min;
+        break;
+      case 'End':
+        e.preventDefault();
+        newValue = max;
+        break;
+      case 'PageUp':
+        e.preventDefault();
+        newValue = Math.min(max, value + largeStep);
+        break;
+      case 'PageDown':
+        e.preventDefault();
+        newValue = Math.max(min, value - largeStep);
+        break;
+      default:
+        return;
+    }
+
+    // Round to reasonable precision
+    if (max - min > 100) {
+      newValue = Math.round(newValue);
+    } else {
+      newValue = Math.round(newValue * 10) / 10;
+    }
+
+    onChange(newValue);
+  }, [value, min, max, logarithmic, onChange]);
+
   // Handle mouse move (global)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -122,7 +169,7 @@ export const Knob: React.FC<KnobProps> = ({
       const deltaY = startY.current - e.clientY;
       const sensitivity = 200; // pixels for full range
       const deltaNorm = deltaY / sensitivity;
-      let newNorm = Math.max(0, Math.min(1, startValue.current + deltaNorm));
+      const newNorm = Math.max(0, Math.min(1, startValue.current + deltaNorm));
 
       let newValue: number;
       if (logarithmic) {
@@ -177,6 +224,14 @@ export const Knob: React.FC<KnobProps> = ({
         }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
+        onKeyDown={handleKeyDown}
+        role="slider"
+        aria-label={`${label}${unit ? ` (${unit})` : ''}`}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={Math.round(value * 10) / 10}
+        aria-valuetext={`${formatValue(value)}${unit}`}
+        tabIndex={0}
       >
         {/* Background ring with tick marks */}
         <svg

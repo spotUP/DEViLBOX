@@ -35,6 +35,12 @@ export class ToneEngine {
   // Channel mute/solo state for quick lookup during playback
   private channelMuteStates: Map<number, boolean> = new Map(); // true = should be muted
 
+  // Metronome synth and state
+  private metronomeSynth: Tone.MembraneSynth | null = null;
+  private metronomeVolume: Tone.Gain | null = null;
+  private metronomeEnabled: boolean = false;
+  private metronomePart: Tone.Part | null = null;
+
   // Per-instrument effect chains (keyed by composite string "instrumentId-channelIndex")
   private instrumentEffectChains: Map<string | number, {
     effects: Tone.ToneAudioNode[];
@@ -205,6 +211,8 @@ export class ToneEngine {
    * Stop transport
    */
   public stop(): void {
+    // Release all active notes before stopping to prevent hanging notes
+    this.releaseAll();
     Tone.getTransport().stop();
     console.log('[ToneEngine] Transport stopped');
   }
@@ -811,7 +819,7 @@ export class ToneEngine {
         try {
           instrument.disconnect();
           instrument.dispose();
-        } catch (e) {
+        } catch {
           // May already be disposed
         }
         keysToDelete.push(key);
@@ -913,6 +921,110 @@ export class ToneEngine {
     console.log('[ToneEngine] Updated TB303 parameters for', synths.length, 'instances of instrument', instrumentId);
   }
 
+  // ============================================================================
+  // METRONOME
+  // ============================================================================
+
+  /**
+   * Initialize metronome synth (lazy initialization)
+   */
+  private initMetronome(): void {
+    if (this.metronomeSynth) return;
+
+    // Create a percussive click synth
+    this.metronomeSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.008,
+      octaves: 2,
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.001,
+        decay: 0.1,
+        sustain: 0,
+        release: 0.1,
+      },
+    });
+
+    // Create volume control for metronome
+    this.metronomeVolume = new Tone.Gain(0.5);
+
+    // Route through volume to master (bypassing master input to keep it separate)
+    this.metronomeSynth.connect(this.metronomeVolume);
+    this.metronomeVolume.connect(this.masterChannel);
+
+    console.log('[ToneEngine] Metronome initialized');
+  }
+
+  /**
+   * Set metronome enabled state
+   */
+  public setMetronomeEnabled(enabled: boolean): void {
+    this.metronomeEnabled = enabled;
+    if (enabled) {
+      this.initMetronome();
+    }
+    console.log(`[ToneEngine] Metronome ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * Check if metronome is enabled
+   */
+  public isMetronomeEnabled(): boolean {
+    return this.metronomeEnabled;
+  }
+
+  /**
+   * Set metronome volume (0-100)
+   */
+  public setMetronomeVolume(volume: number): void {
+    if (!this.metronomeVolume) {
+      this.initMetronome();
+    }
+    // Convert 0-100 to gain (0-1)
+    const gain = Math.max(0, Math.min(1, volume / 100));
+    this.metronomeVolume?.set({ gain });
+  }
+
+  /**
+   * Trigger a metronome click at precise time
+   * @param time Transport time for the click
+   * @param isDownbeat True for accented beat (beat 1), false for regular beat
+   */
+  public triggerMetronomeClick(time: number, isDownbeat: boolean = false): void {
+    if (!this.metronomeEnabled || !this.metronomeSynth) return;
+
+    // Use different pitch for downbeat vs regular beat
+    const note = isDownbeat ? 'C5' : 'C4';
+    const velocity = isDownbeat ? 0.8 : 0.5;
+
+    this.metronomeSynth.triggerAttackRelease(note, '32n', time, velocity);
+  }
+
+  /**
+   * Stop and dispose metronome part
+   */
+  public stopMetronome(): void {
+    if (this.metronomePart) {
+      this.metronomePart.stop();
+      this.metronomePart.dispose();
+      this.metronomePart = null;
+    }
+  }
+
+  /**
+   * Dispose metronome resources
+   */
+  private disposeMetronome(): void {
+    this.stopMetronome();
+    if (this.metronomeSynth) {
+      this.metronomeSynth.dispose();
+      this.metronomeSynth = null;
+    }
+    if (this.metronomeVolume) {
+      this.metronomeVolume.dispose();
+      this.metronomeVolume = null;
+    }
+  }
+
   /**
    * Dispose of all resources
    */
@@ -920,18 +1032,33 @@ export class ToneEngine {
     this.stop();
     this.clearSchedule();
 
+    // Dispose metronome
+    this.disposeMetronome();
+
     // Dispose all instrument effect chains
     this.instrumentEffectChains.forEach((chain, instrumentId) => {
       chain.effects.forEach((fx) => {
-        try { fx.dispose(); } catch (e) {}
+        try {
+          fx.dispose();
+        } catch {
+          console.warn(`[ToneEngine] Failed to dispose effect for instrument ${instrumentId}:`, e);
+        }
       });
-      try { chain.output.dispose(); } catch (e) {}
+      try {
+        chain.output.dispose();
+      } catch {
+        console.warn(`[ToneEngine] Failed to dispose effect chain output for instrument ${instrumentId}:`, e);
+      }
     });
     this.instrumentEffectChains.clear();
 
     // Dispose all instruments
-    this.instruments.forEach((instrument) => {
-      try { instrument.dispose(); } catch (e) {}
+    this.instruments.forEach((instrument, key) => {
+      try {
+        instrument.dispose();
+      } catch {
+        console.warn(`[ToneEngine] Failed to dispose instrument ${key}:`, e);
+      }
     });
     this.instruments.clear();
 
@@ -942,7 +1069,7 @@ export class ToneEngine {
     this.masterEffectsNodes.forEach((node) => {
       try {
         node.dispose();
-      } catch (e) {
+      } catch {
         // Node may already be disposed
       }
     });
@@ -979,7 +1106,7 @@ export class ToneEngine {
         try {
           fx.disconnect();
           fx.dispose();
-        } catch (e) {
+        } catch {
           // Node may already be disposed
         }
       });
@@ -1033,7 +1160,7 @@ export class ToneEngine {
     // Disconnect instrument from current chain
     try {
       instrument.disconnect();
-    } catch (e) {
+    } catch {
       // May not be connected
     }
 
@@ -1050,13 +1177,13 @@ export class ToneEngine {
       chain.effects.forEach((fx) => {
         try {
           fx.dispose();
-        } catch (e) {
+        } catch {
           // Node may already be disposed
         }
       });
       try {
         chain.output.dispose();
-      } catch (e) {
+      } catch {
         // Node may already be disposed
       }
       this.instrumentEffectChains.delete(key);
@@ -1080,7 +1207,7 @@ export class ToneEngine {
       try {
         node.disconnect();
         node.dispose();
-      } catch (e) {
+      } catch {
         // Node may already be disposed
       }
     });
@@ -1370,10 +1497,22 @@ export class ToneEngine {
    * Dispose channel outputs
    */
   private disposeChannelOutputs(): void {
-    this.channelOutputs.forEach((channelOutput) => {
-      try { channelOutput.meter.dispose(); } catch (e) {}
-      try { channelOutput.channel.dispose(); } catch (e) {}
-      try { channelOutput.input.dispose(); } catch (e) {}
+    this.channelOutputs.forEach((channelOutput, channelIndex) => {
+      try {
+        channelOutput.meter.dispose();
+      } catch {
+        console.warn(`[ToneEngine] Failed to dispose meter for channel ${channelIndex}:`, e);
+      }
+      try {
+        channelOutput.channel.dispose();
+      } catch {
+        console.warn(`[ToneEngine] Failed to dispose channel ${channelIndex}:`, e);
+      }
+      try {
+        channelOutput.input.dispose();
+      } catch {
+        console.warn(`[ToneEngine] Failed to dispose input for channel ${channelIndex}:`, e);
+      }
     });
     this.channelOutputs.clear();
   }

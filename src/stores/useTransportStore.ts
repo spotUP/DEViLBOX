@@ -15,6 +15,11 @@ interface TransportStore extends TransportState {
   currentPatternIndex: number;
   // Loop tracking for smooth scrolling (continuous row counter that doesn't reset on loop)
   continuousRow: number;
+  // Smooth scrolling preference (true = smooth like DAW, false = stepped like classic tracker)
+  smoothScrolling: boolean;
+  // Metronome state
+  metronomeEnabled: boolean;
+  metronomeVolume: number; // 0-100
 
   // Actions
   setBPM: (bpm: number) => void;
@@ -28,6 +33,11 @@ interface TransportStore extends TransportState {
   setIsLooping: (looping: boolean) => void;
   setCurrentRow: (row: number, patternLength?: number) => void;
   setCurrentPattern: (index: number) => void;
+  setSmoothScrolling: (smooth: boolean) => void;
+  setMetronomeEnabled: (enabled: boolean) => void;
+  setMetronomeVolume: (volume: number) => void;
+  toggleMetronome: () => void;
+  reset: () => void;
 }
 
 export const useTransportStore = create<TransportStore>()(
@@ -43,6 +53,9 @@ export const useTransportStore = create<TransportStore>()(
     currentRow: 0,
     currentPatternIndex: 0,
     continuousRow: 0,
+    smoothScrolling: true, // Default to smooth scrolling (can be toggled by user)
+    metronomeEnabled: false,
+    metronomeVolume: 75, // Default to 75%
 
     // Actions
     setBPM: (bpm) =>
@@ -138,6 +151,41 @@ export const useTransportStore = create<TransportStore>()(
     setCurrentPattern: (index) =>
       set((state) => {
         state.currentPatternIndex = index;
+      }),
+
+    setSmoothScrolling: (smooth) =>
+      set((state) => {
+        state.smoothScrolling = smooth;
+      }),
+
+    setMetronomeEnabled: (enabled) =>
+      set((state) => {
+        state.metronomeEnabled = enabled;
+      }),
+
+    setMetronomeVolume: (volume) =>
+      set((state) => {
+        state.metronomeVolume = Math.max(0, Math.min(100, volume));
+      }),
+
+    toggleMetronome: () =>
+      set((state) => {
+        state.metronomeEnabled = !state.metronomeEnabled;
+      }),
+
+    // Reset to initial state (for new project/tab)
+    reset: () =>
+      set((state) => {
+        state.bpm = 125;
+        state.timeSignature = [4, 4];
+        state.swing = 0;
+        state.position = '0:0:0';
+        state.isPlaying = false;
+        state.isPaused = false;
+        state.isLooping = true;
+        state.currentRow = 0;
+        state.currentPatternIndex = 0;
+        state.continuousRow = 0;
       }),
   }))
 );

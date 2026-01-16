@@ -10,13 +10,18 @@ import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { HelpModal } from '@components/help/HelpModal';
 import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
-import { MasterEffectsPanel, EffectParameterEditor } from '@components/effects';
-import { useAudioStore, useTrackerStore } from './stores';
+import { MasterEffectsModal, EffectParameterEditor } from '@components/effects';
+import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
+import { useAudioStore, useTrackerStore, useUIStore } from './stores';
+import { useMIDIStore } from './stores/useMIDIStore';
 import { useHistoryStore } from './stores/useHistoryStore';
+import { useLiveModeStore } from './stores/useLiveModeStore';
+import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
 import { ChevronDown, ChevronUp, Zap, Music, Sliders, Download, List } from 'lucide-react';
+import { ToastNotification } from '@components/ui/ToastNotification';
 
 function App() {
   const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore();
@@ -30,7 +35,18 @@ function App() {
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
 
+  const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
+  const { applyAutoCompact } = useUIStore();
+
+  // Register MIDI button mappings for transport/navigation control
+  useButtonMappings();
+
   const { updateMasterEffect } = useAudioStore();
+
+  // Apply auto-compact mode on small screens (runs once on mount)
+  useEffect(() => {
+    applyAutoCompact();
+  }, [applyAutoCompact]);
   const { save: saveProject } = useProjectPersistence();
 
   useEffect(() => {
@@ -139,16 +155,35 @@ function App() {
         setShowPatterns(!showPatterns);
         return;
       }
+
+      // L: Toggle Live Mode
+      if (e.key === 'l' || e.key === 'L') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          useLiveModeStore.getState().toggleLiveMode();
+          return;
+        }
+      }
+
+      // 1-9: Queue patterns in Live Mode
+      const keyNum = parseInt(e.key);
+      if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
+        const liveModeState = useLiveModeStore.getState();
+        if (liveModeState.isLiveMode && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          const patternIndex = keyNum - 1; // 1 = pattern 0, 9 = pattern 8
+          const patterns = useTrackerStore.getState().patterns;
+          if (patternIndex < patterns.length) {
+            liveModeState.queuePattern(patternIndex);
+          }
+          return;
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPatterns, showHelp, showExport, handleUndo, handleRedo, saveProject]);
-
-  // Handlers for effect editing
-  const handleEditMasterEffect = (effect: EffectConfig) => {
-    setEditingEffect({ effect, channelIndex: null });
-  };
 
   const handleUpdateEffectParameter = (key: string, value: number) => {
     if (!editingEffect) return;
@@ -313,12 +348,6 @@ function App() {
                 <PatternManagement />
               </div>
             )}
-            {/* Master Effects Panel (optional) */}
-            {showMasterFX && (
-              <div className="max-h-80 overflow-y-auto border-b border-dark-border animate-fade-in scrollbar-modern p-4">
-                <MasterEffectsPanel onEditEffect={handleEditMasterEffect} />
-              </div>
-            )}
             {/* Pattern Editor */}
             <div className="flex-1 min-h-0">
               <TrackerView
@@ -366,6 +395,8 @@ function App() {
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />
       <InstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
+      <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
+      <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
 
       {/* Effect Parameter Editor Modal */}
       {editingEffect && (
@@ -380,6 +411,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <ToastNotification />
     </AppLayout>
   );
 }

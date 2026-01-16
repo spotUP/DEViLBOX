@@ -85,6 +85,7 @@ interface TrackerStore {
   clonePattern: (index: number) => void;
   duplicatePattern: (index: number) => void;
   resizePattern: (index: number, newLength: number) => void;
+  resizeAllPatterns: (newLength: number) => void;
   expandPattern: (index: number) => void;
   shrinkPattern: (index: number) => void;
   reorderPatterns: (oldIndex: number, newIndex: number) => void;
@@ -105,6 +106,9 @@ interface TrackerStore {
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
+
+  // Reset to initial state
+  reset: () => void;
 }
 
 const createEmptyPattern = (length: number = 64, numChannels: number = 4): Pattern => ({
@@ -558,6 +562,28 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
+    resizeAllPatterns: (newLength) =>
+      set((state) => {
+        if (newLength > 0) {
+          state.patterns.forEach((pattern) => {
+            const oldLength = pattern.length;
+            pattern.length = newLength;
+
+            pattern.channels.forEach((channel) => {
+              if (newLength > oldLength) {
+                // Add empty rows
+                for (let i = oldLength; i < newLength; i++) {
+                  channel.rows.push({ ...EMPTY_CELL });
+                }
+              } else {
+                // Trim rows
+                channel.rows.splice(newLength);
+              }
+            });
+          });
+        }
+      }),
+
     duplicatePattern: (index) =>
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
@@ -809,6 +835,25 @@ export const useTrackerStore = create<TrackerStore>()(
           // Deep clone the pattern to avoid reference issues
           state.patterns[index] = JSON.parse(JSON.stringify(pattern));
         }
+      }),
+
+    // Reset to initial state (for new project/tab)
+    reset: () =>
+      set((state) => {
+        state.patterns = [createEmptyPattern()];
+        state.currentPatternIndex = 0;
+        state.cursor = {
+          channelIndex: 0,
+          rowIndex: 0,
+          columnType: 'note',
+          digitIndex: 0,
+        };
+        state.selection = null;
+        state.clipboard = null;
+        state.currentOctave = 4;
+        state.editStep = 1;
+        state.recordMode = false;
+        state.columnVisibility = { ...DEFAULT_COLUMN_VISIBILITY };
       }),
   }))
 );

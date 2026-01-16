@@ -7,6 +7,8 @@ import type { Pattern } from '@typedefs';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { ProjectMetadata } from '@typedefs/project';
 
+import type { AutomationCurve } from '@typedefs/automation';
+
 // Export Format Types
 export interface SongExport {
   format: 'scribbleton-song';
@@ -16,7 +18,8 @@ export interface SongExport {
   instruments: InstrumentConfig[];
   patterns: Pattern[];
   sequence: string[]; // Pattern IDs in playback order
-  automation?: Record<string, any>;
+  automation?: Record<string, any>; // Legacy nested format or array of curves
+  automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
 }
 
@@ -52,6 +55,7 @@ export function exportSong(
   sequence: string[],
   automation: Record<string, any> | undefined,
   masterEffects: EffectConfig[] | undefined,
+  automationCurves: AutomationCurve[] | undefined,
   options: ExportOptions = {}
 ): void {
   const songData: SongExport = {
@@ -62,7 +66,9 @@ export function exportSong(
     instruments,
     patterns,
     sequence,
-    ...(options.includeAutomation && automation ? { automation } : {}),
+    // Always include automation data (both formats for compatibility)
+    ...(automation && Object.keys(automation).length > 0 ? { automation } : {}),
+    ...(automationCurves && automationCurves.length > 0 ? { automationCurves } : {}),
     ...(masterEffects && masterEffects.length > 0 ? { masterEffects } : {}),
   };
 

@@ -12,9 +12,11 @@
 import React, { useRef, useState } from 'react';
 import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore } from '@stores';
+import { InstrumentSelector } from './InstrumentSelector';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore } from '@stores';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { importSong } from '@lib/export/exporters';
 import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -140,12 +142,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     play,
     stop,
     currentRow,
+    smoothScrolling,
+    setSmoothScrolling,
   } = useTransportStore();
 
   const { isDirty, setMetadata } = useProjectStore();
   const { save: saveProject } = useProjectPersistence();
   const { loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute } = useAudioStore();
+  const { compactToolbar, toggleCompactToolbar } = useUIStore();
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +160,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // CRITICAL: Stop playback before loading new song to prevent audio glitches
+    if (isPlaying) {
+      stop();
+      engine.releaseAll(); // Release any held notes
+    }
 
     setIsLoading(true);
     try {
@@ -248,30 +259,36 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     handlePositionChange(newPat);
   };
 
-  // Playback controls
+  // Playback controls - dual state buttons
   const handlePlaySong = async () => {
-    if (isPlaying) {
+    if (isPlaying && !isLooping) {
+      // Currently playing song - stop
       stop();
     } else {
-      // Ensure looping is OFF for song playback (advances through patterns)
-      if (isLooping) setIsLooping(false);
+      // Start song playback (non-looping)
+      if (isPlaying) stop(); // Stop pattern playback first
+      setIsLooping(false);
       await engine.init();
       play();
     }
   };
 
   const handlePlayPattern = async () => {
-    // Set looping mode and play current pattern
-    if (!isLooping) setIsLooping(true);
-    if (!isPlaying) {
+    if (isPlaying && isLooping) {
+      // Currently playing pattern - stop
+      stop();
+    } else {
+      // Start pattern playback (looping)
+      if (isPlaying) stop(); // Stop song playback first
+      setIsLooping(true);
       await engine.init();
       play();
     }
   };
 
-  const handleStop = () => {
-    stop();
-  };
+  // Derived state for button labels
+  const isPlayingSong = isPlaying && !isLooping;
+  const isPlayingPattern = isPlaying && isLooping;
 
   // Pattern edit controls
   const handleExpand = () => {
@@ -283,7 +300,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   return (
-    <div className="ft2-toolbar">
+    <div className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}>
+      {/* Toolbar Compact Toggle - consistent right-side position */}
+      <button
+        className="panel-collapse-toggle"
+        onClick={toggleCompactToolbar}
+        title={compactToolbar ? 'Expand toolbar' : 'Collapse toolbar'}
+      >
+        {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+      </button>
+
       {/* Row 1: Position/BPM/Pattern/Playback */}
       <div className="ft2-toolbar-row">
         {/* Position Section */}
@@ -328,106 +354,118 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           />
         </div>
 
+        {/* Instrument Selector (FT2-style) */}
+        <div className="ft2-section">
+          <InstrumentSelector />
+        </div>
+
         {/* Playback Section */}
         <div className="ft2-section ft2-section-playback">
-          <FT2Button onClick={handlePlaySong} active={isPlaying && !isLooping} colorAccent="green" title="Play song from start">
-            Play Song
+          <FT2Button
+            onClick={handlePlaySong}
+            active={isPlayingSong}
+            colorAccent={isPlayingSong ? 'red' : 'green'}
+            title={isPlayingSong ? 'Stop playback' : 'Play song from start'}
+          >
+            {isPlayingSong ? 'Stop' : 'Play Song'}
           </FT2Button>
-          <FT2Button onClick={handlePlayPattern} active={isPlaying && isLooping} colorAccent="green" title="Play/loop current pattern">
-            Play Pattern
-          </FT2Button>
-        </div>
-      </div>
-
-      {/* Row 2: Pattern/Speed/Length/Stop-Record */}
-      <div className="ft2-toolbar-row">
-        {/* Pattern display */}
-        <div className="ft2-section ft2-section-pos">
-          <FT2NumericInput
-            label="Pattern"
-            value={currentPatternIndex}
-            onChange={handlePatternChange}
-            min={0}
-            max={songLength - 1}
-            format="hex"
-          />
-        </div>
-
-        {/* Speed Section */}
-        <div className="ft2-section ft2-section-tempo">
-          <FT2NumericInput
-            label="Speed"
-            value={6}
-            onChange={() => {}}
-            min={1}
-            max={31}
-            format="hex"
-          />
-        </div>
-
-        {/* Length Section */}
-        <div className="ft2-section ft2-section-pattern">
-          <FT2NumericInput
-            label="Length"
-            value={patternLength}
-            onChange={() => {}}
-            min={1}
-            max={256}
-            format="hex"
-          />
-        </div>
-
-        {/* Stop */}
-        <div className="ft2-section ft2-section-playback">
-          <FT2Button onClick={handleStop} colorAccent="red" title="Stop playback">
-            Stop
+          <FT2Button
+            onClick={handlePlayPattern}
+            active={isPlayingPattern}
+            colorAccent={isPlayingPattern ? 'red' : 'green'}
+            title={isPlayingPattern ? 'Stop playback' : 'Play/loop current pattern'}
+          >
+            {isPlayingPattern ? 'Stop' : 'Play Pattern'}
           </FT2Button>
         </div>
       </div>
 
-      {/* Row 3: Song Length/Add/Expand-Shrink */}
-      <div className="ft2-toolbar-row">
-        {/* Song Length */}
-        <div className="ft2-section ft2-section-pos">
-          <FT2NumericInput
-            label="Song Len"
-            value={songLength}
-            onChange={() => {}}
-            min={1}
-            max={256}
-            format="hex"
-          />
-        </div>
+      {/* Row 2: Pattern/Speed/Length/Stop-Record (hidden in compact mode) */}
+      {!compactToolbar && (
+        <div className="ft2-toolbar-row">
+          {/* Pattern display */}
+          <div className="ft2-section ft2-section-pos">
+            <FT2NumericInput
+              label="Pattern"
+              value={currentPatternIndex}
+              onChange={handlePatternChange}
+              min={0}
+              max={songLength - 1}
+              format="hex"
+            />
+          </div>
 
-        {/* Add Step */}
-        <div className="ft2-section ft2-section-tempo">
-          <FT2NumericInput
-            label="Add"
-            value={1}
-            onChange={() => {}}
-            min={0}
-            max={16}
-            format="hex"
-          />
-        </div>
+          {/* Speed Section */}
+          <div className="ft2-section ft2-section-tempo">
+            <FT2NumericInput
+              label="Speed"
+              value={6}
+              onChange={() => {}}
+              min={1}
+              max={31}
+              format="hex"
+            />
+          </div>
 
-        {/* Expand/Shrink */}
-        <div className="ft2-section ft2-section-pattern">
-          <FT2Button onClick={handleExpand} small title="Expand pattern (double rows)">
-            Expand
-          </FT2Button>
-          <FT2Button onClick={handleShrink} small title="Shrink pattern (halve rows)">
-            Shrink
-          </FT2Button>
+          {/* Length Section */}
+          <div className="ft2-section ft2-section-pattern">
+            <FT2NumericInput
+              label="Length"
+              value={patternLength}
+              onChange={() => {}}
+              min={1}
+              max={256}
+              format="hex"
+            />
+          </div>
         </div>
+      )}
 
-        {/* Row indicator */}
-        <div className="ft2-section ft2-section-playback">
-          <span className="ft2-row-display">
-            Row: <span className="ft2-row-value">{currentRow.toString(16).toUpperCase().padStart(2, '0')}</span>
-          </span>
+      {/* Row 3: Song Length/Add/Expand-Shrink (hidden in compact mode) */}
+      {!compactToolbar && (
+        <div className="ft2-toolbar-row">
+          {/* Song Length */}
+          <div className="ft2-section ft2-section-pos">
+            <FT2NumericInput
+              label="Song Len"
+              value={songLength}
+              onChange={() => {}}
+              min={1}
+              max={256}
+              format="hex"
+            />
+          </div>
+
+          {/* Add Step */}
+          <div className="ft2-section ft2-section-tempo">
+            <FT2NumericInput
+              label="Add"
+              value={1}
+              onChange={() => {}}
+              min={0}
+              max={16}
+              format="hex"
+            />
+          </div>
+
+          {/* Expand/Shrink */}
+          <div className="ft2-section ft2-section-pattern">
+            <FT2Button onClick={handleExpand} small title="Expand pattern (double rows)">
+              Expand
+            </FT2Button>
+            <FT2Button onClick={handleShrink} small title="Shrink pattern (halve rows)">
+              Shrink
+            </FT2Button>
+          </div>
+
+          {/* Row indicator */}
+          <div className="ft2-section ft2-section-playback">
+            <span className="ft2-row-display">
+              Row: <span className="ft2-row-value">{currentRow.toString(16).toUpperCase().padStart(2, '0')}</span>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Row 4: File/Menu buttons */}
       <div className="ft2-toolbar-row ft2-toolbar-row-menu">
@@ -471,6 +509,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
           <FT2Button onClick={toggleMasterMute} small active={masterMuted} title="Toggle master mute">
             {masterMuted ? 'Unmute' : 'Mute'}
+          </FT2Button>
+          <FT2Button
+            onClick={() => setSmoothScrolling(!smoothScrolling)}
+            small
+            active={smoothScrolling}
+            title={smoothScrolling ? 'Switch to stepped scrolling (classic tracker)' : 'Switch to smooth scrolling (DAW-style)'}
+          >
+            {smoothScrolling ? 'Smooth' : 'Stepped'}
           </FT2Button>
         </div>
       </div>

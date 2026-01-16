@@ -3,7 +3,7 @@
  * Responsive design with proper cell sizing
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { NoteCell } from './NoteCell';
 import { InstrumentCell } from './InstrumentCell';
 import { VolumeCell } from './VolumeCell';

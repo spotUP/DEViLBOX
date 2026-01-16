@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { persist } from 'zustand/middleware';
 import type { ThemeType, PanelType } from '@typedefs/project';
 
 interface UIStore {
@@ -15,6 +16,12 @@ interface UIStore {
   modalOpen: string | null;
   sidebarCollapsed: boolean;
 
+  // Responsive layout state
+  tb303Collapsed: boolean;
+  oscilloscopeVisible: boolean;
+  compactToolbar: boolean;
+  autoCompactApplied: boolean; // Track if we've already auto-compacted this session
+
   // Actions
   setTheme: (theme: ThemeType) => void;
   togglePanel: (panel: PanelType) => void;
@@ -24,66 +31,141 @@ interface UIStore {
   closeModal: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+
+  // Responsive layout actions
+  toggleTB303Collapsed: () => void;
+  setTB303Collapsed: (collapsed: boolean) => void;
+  toggleOscilloscopeVisible: () => void;
+  setOscilloscopeVisible: (visible: boolean) => void;
+  toggleCompactToolbar: () => void;
+  setCompactToolbar: (compact: boolean) => void;
+  applyAutoCompact: () => void; // Auto-collapse panels on small screens
 }
 
 export const useUIStore = create<UIStore>()(
-  immer((set, _get) => ({
-    // Initial state
-    theme: 'ft2-blue',
-    visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
-    trackerZoom: 100,
-    activePanel: 'tracker',
-    modalOpen: null,
-    sidebarCollapsed: false,
+  persist(
+    immer((set, _get) => ({
+      // Initial state
+      theme: 'ft2-blue',
+      visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
+      trackerZoom: 100,
+      activePanel: 'tracker',
+      modalOpen: null,
+      sidebarCollapsed: false,
 
-    // Actions
-    setTheme: (theme) =>
-      set((state) => {
-        state.theme = theme;
-      }),
+      // Responsive layout state (default to expanded/visible)
+      tb303Collapsed: false,
+      oscilloscopeVisible: true,
+      compactToolbar: false,
+      autoCompactApplied: false,
 
-    togglePanel: (panel) =>
-      set((state) => {
-        const index = state.visiblePanels.indexOf(panel);
-        if (index !== -1) {
-          state.visiblePanels.splice(index, 1);
-        } else {
-          state.visiblePanels.push(panel);
-        }
-      }),
+      // Actions
+      setTheme: (theme) =>
+        set((state) => {
+          state.theme = theme;
+        }),
 
-    setActivePanel: (panel) =>
-      set((state) => {
-        state.activePanel = panel;
-        if (!state.visiblePanels.includes(panel)) {
-          state.visiblePanels.push(panel);
-        }
-      }),
+      togglePanel: (panel) =>
+        set((state) => {
+          const index = state.visiblePanels.indexOf(panel);
+          if (index !== -1) {
+            state.visiblePanels.splice(index, 1);
+          } else {
+            state.visiblePanels.push(panel);
+          }
+        }),
 
-    setTrackerZoom: (zoom) =>
-      set((state) => {
-        // Clamp between 80-200%
-        state.trackerZoom = Math.max(80, Math.min(200, zoom));
-      }),
+      setActivePanel: (panel) =>
+        set((state) => {
+          state.activePanel = panel;
+          if (!state.visiblePanels.includes(panel)) {
+            state.visiblePanels.push(panel);
+          }
+        }),
 
-    openModal: (modalId) =>
-      set((state) => {
-        state.modalOpen = modalId;
-      }),
+      setTrackerZoom: (zoom) =>
+        set((state) => {
+          // Clamp between 80-200%
+          state.trackerZoom = Math.max(80, Math.min(200, zoom));
+        }),
 
-    closeModal: () =>
-      set((state) => {
-        state.modalOpen = null;
-      }),
+      openModal: (modalId) =>
+        set((state) => {
+          state.modalOpen = modalId;
+        }),
 
-    toggleSidebar: () =>
-      set((state) => {
-        state.sidebarCollapsed = !state.sidebarCollapsed;
-      }),
+      closeModal: () =>
+        set((state) => {
+          state.modalOpen = null;
+        }),
 
-    setSidebarCollapsed: (collapsed) =>
-      set((state) => {
-        state.sidebarCollapsed = collapsed;
+      toggleSidebar: () =>
+        set((state) => {
+          state.sidebarCollapsed = !state.sidebarCollapsed;
+        }),
+
+      setSidebarCollapsed: (collapsed) =>
+        set((state) => {
+          state.sidebarCollapsed = collapsed;
+        }),
+
+      // Responsive layout actions
+      toggleTB303Collapsed: () =>
+        set((state) => {
+          state.tb303Collapsed = !state.tb303Collapsed;
+        }),
+
+      setTB303Collapsed: (collapsed) =>
+        set((state) => {
+          state.tb303Collapsed = collapsed;
+        }),
+
+      toggleOscilloscopeVisible: () =>
+        set((state) => {
+          state.oscilloscopeVisible = !state.oscilloscopeVisible;
+        }),
+
+      setOscilloscopeVisible: (visible) =>
+        set((state) => {
+          state.oscilloscopeVisible = visible;
+        }),
+
+      toggleCompactToolbar: () =>
+        set((state) => {
+          state.compactToolbar = !state.compactToolbar;
+        }),
+
+      setCompactToolbar: (compact) =>
+        set((state) => {
+          state.compactToolbar = compact;
+        }),
+
+      applyAutoCompact: () =>
+        set((state) => {
+          // Only apply once per session and only if screen is small
+          if (state.autoCompactApplied) return;
+          state.autoCompactApplied = true;
+
+          const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+
+          // If screen height is less than 800px, enable compact mode
+          if (screenHeight < 800) {
+            state.tb303Collapsed = true;
+            state.oscilloscopeVisible = false;
+            state.compactToolbar = true;
+          }
+        }),
+    })),
+    {
+      name: 'devilbox-ui-settings',
+      partialize: (state) => ({
+        // Only persist layout preferences, not transient UI state
+        tb303Collapsed: state.tb303Collapsed,
+        oscilloscopeVisible: state.oscilloscopeVisible,
+        compactToolbar: state.compactToolbar,
+        sidebarCollapsed: state.sidebarCollapsed,
+        trackerZoom: state.trackerZoom,
       }),
-  }))
+    }
+  )
 );

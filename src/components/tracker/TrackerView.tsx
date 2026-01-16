@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditor } from './PatternEditor';
+import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
@@ -13,7 +14,9 @@ import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
-import { DevilFishPanel } from './DevilFishPanel';
+import { List, Grid3X3, Piano, Radio } from 'lucide-react';
+import { useLiveModeStore } from '@stores/useLiveModeStore';
+import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
@@ -127,16 +130,29 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   showPatterns,
   showMasterFX,
 }) => {
-  const { patterns, currentPatternIndex, currentOctave, loadPatterns } = useTrackerStore();
+  const { patterns, currentPatternIndex, currentOctave, loadPatterns, cursor } = useTrackerStore();
   const { loadInstruments } = useInstrumentStore();
   const { setMetadata } = useProjectStore();
   const { setBPM } = useTransportStore();
+  const { isLiveMode, toggleLiveMode } = useLiveModeStore();
+
+  // View mode state
+  type ViewMode = 'tracker' | 'grid' | 'pianoroll';
+  const [viewMode, setViewMode] = useState<ViewMode>('tracker');
+  const [gridChannelIndex, setGridChannelIndex] = useState(0);
 
   // Dialog state
   const [showInterpolate, setShowInterpolate] = useState(false);
   const [showHumanize, setShowHumanize] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showImportModule, setShowImportModule] = useState(false);
+
+  // Sync grid channel with tracker cursor when switching views
+  useEffect(() => {
+    if (viewMode === 'grid') {
+      setGridChannelIndex(cursor.channelIndex);
+    }
+  }, [viewMode, cursor.channelIndex]);
 
   // Keyboard shortcuts for dialogs
   const handleDialogShortcuts = useCallback((e: KeyboardEvent) => {
@@ -212,6 +228,93 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </div>
         </div>
 
+        {/* View Mode Toggle + Channel Selector */}
+        <div className="flex items-center gap-3">
+          {/* Channel Selector (grid view only) */}
+          {viewMode === 'grid' && pattern && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted">CH</span>
+              <select
+                value={gridChannelIndex}
+                onChange={(e) => setGridChannelIndex(Number(e.target.value))}
+                className="px-2 py-1 text-xs bg-dark-bgTertiary border border-dark-border rounded text-text-primary"
+              >
+                {pattern.channels.map((_, idx) => (
+                  <option key={idx} value={idx}>
+                    {(idx + 1).toString().padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Separator */}
+          {viewMode === 'grid' && <div className="w-px h-4 bg-dark-border" />}
+
+          {/* Live Mode Toggle - Dual state button */}
+          <div className="flex items-center bg-dark-bgTertiary rounded-md p-0.5 mr-2">
+            <button
+              onClick={toggleLiveMode}
+              className={`
+                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                ${isLiveMode
+                  ? 'bg-accent-error text-white animate-pulse'
+                  : 'bg-accent-primary/80 text-white hover:bg-accent-primary'
+                }
+              `}
+              title={isLiveMode ? 'Exit Live Mode (L)' : 'Enter Live Mode (L)'}
+            >
+              <Radio size={14} />
+              <span className="hidden sm:inline">Live</span>
+            </button>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center bg-dark-bgTertiary rounded-md p-0.5">
+            <button
+              onClick={() => setViewMode('tracker')}
+              className={`
+                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                ${viewMode === 'tracker'
+                  ? 'bg-accent-primary text-text-inverse'
+                  : 'text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title="Tracker View"
+            >
+              <List size={14} />
+              <span className="hidden sm:inline">Tracker</span>
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`
+                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                ${viewMode === 'grid'
+                  ? 'bg-accent-primary text-text-inverse'
+                  : 'text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title="Grid View (303-style)"
+            >
+              <Grid3X3 size={14} />
+              <span className="hidden sm:inline">Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('pianoroll')}
+              className={`
+                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                ${viewMode === 'pianoroll'
+                  ? 'bg-accent-primary text-text-inverse'
+                  : 'text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title="Piano Roll View"
+            >
+              <Piano size={14} />
+              <span className="hidden sm:inline">Piano</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* FT2 Style Toolbar */}
@@ -226,14 +329,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         showMasterFX={showMasterFX}
       />
 
-      {/* TB-303 Live Knobs */}
+      {/* TB-303 Live Knobs (includes Devil Fish controls) */}
       <TB303KnobPanel />
 
-      {/* Devil Fish Mod Controls */}
-      <DevilFishPanel />
-
-      {/* Pattern Editor - Takes remaining space (includes VU meters overlay) */}
-      <PatternEditor />
+      {/* Pattern Editor / Grid Sequencer / Piano Roll - Takes remaining space */}
+      {viewMode === 'tracker' ? (
+        <PatternEditor />
+      ) : viewMode === 'grid' ? (
+        <GridSequencer channelIndex={gridChannelIndex} />
+      ) : (
+        <PianoRoll channelIndex={gridChannelIndex} />
+      )}
 
       {/* Keyboard Shortcuts Help - Collapsible on mobile */}
       <div className="flex-shrink-0 hidden md:flex px-4 py-1.5 bg-dark-bgTertiary border-t border-dark-border text-[10px] text-text-muted font-mono items-center justify-center gap-4 flex-wrap">

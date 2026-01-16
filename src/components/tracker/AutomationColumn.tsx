@@ -55,31 +55,29 @@ const getInterpolatedValue = (
   return null;
 };
 
-// Get color based on parameter type
+// Get color based on parameter type (uses CSS variables for theming)
 const getParameterColor = (parameter: string): string => {
   switch (parameter) {
     case 'cutoff':
-      return '#00d4aa'; // Teal
     case 'resonance':
-      return '#00d4aa';
+      return 'var(--color-synth-filter)';
     case 'envMod':
-      return '#7c3aed'; // Purple
     case 'decay':
-      return '#7c3aed';
+      return 'var(--color-synth-envelope)';
     case 'accent':
-      return '#f59e0b'; // Orange
+      return 'var(--color-synth-accent)';
     case 'overdrive':
     case 'distortion':
-      return '#ef4444'; // Red
+      return 'var(--color-synth-drive)';
     case 'volume':
-      return '#22c55e'; // Green
+      return 'var(--color-synth-volume)';
     case 'pan':
-      return '#3b82f6'; // Blue
+      return 'var(--color-synth-pan)';
     case 'delay':
     case 'reverb':
-      return '#8b5cf6'; // Violet
+      return 'var(--color-synth-effects)';
     default:
-      return '#00d4aa';
+      return 'var(--color-synth-filter)';
   }
 };
 
@@ -163,7 +161,7 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
         width: 24,
         height: patternLength * rowHeight,
         position: 'relative',
-        background: '#0d0d0f',
+        background: 'var(--color-bg)',
         borderRight: '1px solid var(--color-border)',
       }}
     >
@@ -225,7 +223,7 @@ export const AutomationColumnHeader: React.FC<{
       style={{
         width: 24,
         height: '100%',
-        background: '#111113',
+        background: 'var(--color-bg-secondary)',
         borderRight: '1px solid var(--color-border)',
         color: color,
         writingMode: 'vertical-rl',

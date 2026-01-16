@@ -20,6 +20,11 @@ interface AutomationData {
   };
 }
 
+interface ChannelLaneState {
+  activeParameter: AutomationParameter;
+  showLane: boolean;
+}
+
 interface AutomationStore {
   // State
   curves: AutomationCurve[];
@@ -27,6 +32,7 @@ interface AutomationStore {
   editMode: 'pencil' | 'line' | 'curve' | 'select';
   presets: AutomationPreset[];
   automation: AutomationData;
+  channelLanes: Map<number, ChannelLaneState>;
 
   // Actions
   addCurve: (
@@ -59,6 +65,19 @@ interface AutomationStore {
     curve: AutomationCurve
   ) => void;
   buildAutomationData: () => AutomationData;
+
+  // Import/Export
+  loadCurves: (curves: AutomationCurve[]) => void;
+  getCurves: () => AutomationCurve[];
+
+  // Channel lane UI state
+  setActiveParameter: (channelIndex: number, parameter: AutomationParameter) => void;
+  getActiveParameter: (channelIndex: number) => AutomationParameter;
+  setShowLane: (channelIndex: number, show: boolean) => void;
+  getShowLane: (channelIndex: number) => boolean;
+
+  // Reset to initial state
+  reset: () => void;
 }
 
 export const useAutomationStore = create<AutomationStore>()(
@@ -69,6 +88,7 @@ export const useAutomationStore = create<AutomationStore>()(
     editMode: 'pencil',
     presets: [...AUTOMATION_PRESETS],
     automation: {},
+    channelLanes: new Map(),
 
     // Actions
     addCurve: (patternId, channelIndex, parameter) =>
@@ -390,5 +410,57 @@ export const useAutomationStore = create<AutomationStore>()(
 
       return data;
     },
+
+    // Import/Export
+    loadCurves: (newCurves) =>
+      set((state) => {
+        state.curves = newCurves;
+        state.selectedCurveId = null;
+
+        // Rebuild automation data
+        state.automation = {};
+        newCurves.forEach((c) => {
+          if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
+          if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
+          state.automation[c.patternId][c.channelIndex][c.parameter] = c;
+        });
+
+        console.log('[AutomationStore] Loaded', newCurves.length, 'automation curves');
+      }),
+
+    getCurves: () => get().curves,
+
+    // Channel lane UI state
+    setActiveParameter: (channelIndex, parameter) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: 'cutoff', showLane: false };
+        state.channelLanes.set(channelIndex, { ...existing, activeParameter: parameter });
+      }),
+
+    getActiveParameter: (channelIndex) => {
+      const state = get();
+      return state.channelLanes.get(channelIndex)?.activeParameter || 'cutoff';
+    },
+
+    setShowLane: (channelIndex, show) =>
+      set((state) => {
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: 'cutoff', showLane: false };
+        state.channelLanes.set(channelIndex, { ...existing, showLane: show });
+      }),
+
+    getShowLane: (channelIndex) => {
+      const state = get();
+      return state.channelLanes.get(channelIndex)?.showLane || false;
+    },
+
+    // Reset to initial state (for new project/tab)
+    reset: () =>
+      set((state) => {
+        state.curves = [];
+        state.selectedCurveId = null;
+        state.editMode = 'pencil';
+        state.automation = {};
+        state.channelLanes = new Map();
+      }),
   }))
 );

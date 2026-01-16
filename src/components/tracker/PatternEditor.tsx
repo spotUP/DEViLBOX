@@ -9,8 +9,10 @@ import { TrackerRow } from './TrackerRow';
 import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
+import { ChannelContextMenu } from './ChannelContextMenu';
 import { AutomationLanes } from './AutomationLanes';
 import { useTrackerStore, useTransportStore } from '@stores';
+import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { useShallow } from 'zustand/react/shallow';
 import { Plus, Minus, Volume2, VolumeX, Headphones } from 'lucide-react';
 import type { TrackerCell } from '@typedefs';
@@ -56,8 +58,9 @@ const StatusBar: React.FC<{
     </div>
   );
 });
+StatusBar.displayName = 'StatusBar';
 
-export const PatternEditor: React.FC = () => {
+const PatternEditorComponent: React.FC = () => {
   const {
     patterns,
     currentPatternIndex,
@@ -67,12 +70,19 @@ export const PatternEditor: React.FC = () => {
     toggleChannelMute,
     toggleChannelSolo,
     setChannelColor,
+    setCell,
   } = useTrackerStore();
   // Use selectors to minimize re-renders during playback
   // Only subscribe to isPlaying and continuousRow - NOT currentRow
   // currentRow updates frequently and is only needed by the StatusBar component
-  const { isPlaying, continuousRow, isLooping } = useTransportStore(
-    useShallow((state) => ({ isPlaying: state.isPlaying, continuousRow: state.continuousRow, isLooping: state.isLooping }))
+  const { isPlaying, continuousRow, isLooping, smoothScrolling, currentRow } = useTransportStore(
+    useShallow((state) => ({
+      isPlaying: state.isPlaying,
+      continuousRow: state.continuousRow,
+      isLooping: state.isLooping,
+      smoothScrolling: state.smoothScrolling,
+      currentRow: state.currentRow, // Needed for stepped scrolling mode
+    }))
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -152,8 +162,9 @@ export const PatternEditor: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Smooth scroll animation during playback
-  // Directly updates DOM transform for 60fps performance (bypasses React re-renders)
+  // Scroll animation during playback
+  // Smooth mode: Directly updates DOM transform for 60fps performance (bypasses React re-renders)
+  // Stepped mode: Updates transform on row changes for classic tracker feel
   useEffect(() => {
     if (!isPlaying || !pattern || !contentRef.current) {
       // Stop animation when not playing
@@ -164,9 +175,26 @@ export const PatternEditor: React.FC = () => {
       return;
     }
 
-    const transport = Tone.getTransport();
     const contentEl = contentRef.current;
     const patternLength = pattern.length;
+
+    // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
+    if (!smoothScrolling) {
+      // Cancel any running animation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      // Update transform based on currentRow (stepped)
+      const currentHeight = containerRef.current?.clientHeight || containerHeight;
+      const halfContainer = currentHeight / 2;
+      const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
+      contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+      return;
+    }
+
+    // SMOOTH SCROLLING MODE: DAW-style continuous scroll
+    const transport = Tone.getTransport();
 
     // Record start time and starting row for continuous tracking
     playbackStartTimeRef.current = performance.now();
@@ -208,7 +236,7 @@ export const PatternEditor: React.FC = () => {
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, pattern, continuousRow, containerHeight]);
+  }, [isPlaying, pattern, continuousRow, containerHeight, smoothScrolling, currentRow]);
 
   // Calculate the scroll offset for the pattern
   // Active row is ALWAYS centered at the edit bar, pattern wraps seamlessly
@@ -335,6 +363,87 @@ export const PatternEditor: React.FC = () => {
     return opacity;
   }, [scrollOffset, isPlaying, containerHeight, isReady]);
 
+  // Channel context menu handlers
+  const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
+    if (!pattern) return;
+    const generator = GENERATORS[generatorType];
+    if (!generator) return;
+
+    const channel = pattern.channels[channelIndex];
+    const instrumentId = channel.instrumentId ?? 1;
+    const cells = generator.generate({
+      patternLength: pattern.length,
+      instrumentId,
+      note: 'C-4', // Default note
+      velocity: 0x40,
+    });
+
+    cells.forEach((cell, row) => {
+      setCell(channelIndex, row, cell);
+    });
+  }, [pattern, setCell]);
+
+  const handleClearChannel = useCallback((channelIndex: number) => {
+    if (!pattern) return;
+    for (let row = 0; row < pattern.length; row++) {
+      setCell(channelIndex, row, {
+        note: null,
+        instrument: null,
+        volume: null,
+        effect: null,
+      });
+    }
+  }, [pattern, setCell]);
+
+  const handleCopyChannel = useCallback((channelIndex: number) => {
+    // TODO: Implement channel clipboard
+    console.log('Copy channel', channelIndex);
+  }, []);
+
+  const handlePasteChannel = useCallback((channelIndex: number) => {
+    // TODO: Implement channel clipboard
+    console.log('Paste channel', channelIndex);
+  }, []);
+
+  const handleTranspose = useCallback((channelIndex: number, semitones: number) => {
+    if (!pattern) return;
+    const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+    for (let row = 0; row < pattern.length; row++) {
+      const cell = pattern.channels[channelIndex].rows[row];
+      if (cell.note && cell.note !== '===' && cell.note !== '...') {
+        const noteName = cell.note.substring(0, 2);
+        const octave = parseInt(cell.note.substring(2));
+        const noteIndex = noteNames.indexOf(noteName);
+        if (noteIndex === -1) continue;
+
+        const newNoteIndex = (noteIndex + semitones + 120) % 12;
+        const octaveOffset = Math.floor((noteIndex + semitones) / 12);
+        const newOctave = Math.max(0, Math.min(9, octave + octaveOffset));
+        const newNote = `${noteNames[newNoteIndex]}${newOctave}`;
+
+        setCell(channelIndex, row, { ...cell, note: newNote as any });
+      }
+    }
+  }, [pattern, setCell]);
+
+  const handleHumanize = useCallback((channelIndex: number) => {
+    if (!pattern) return;
+    for (let row = 0; row < pattern.length; row++) {
+      const cell = pattern.channels[channelIndex].rows[row];
+      if (cell.volume !== null) {
+        const variation = Math.floor(Math.random() * 8) - 4; // ±4
+        const newVolume = Math.max(0x10, Math.min(0x40, cell.volume + variation));
+        setCell(channelIndex, row, { ...cell, volume: newVolume });
+      }
+    }
+  }, [pattern, setCell]);
+
+  const handleInterpolate = useCallback((channelIndex: number) => {
+    // TODO: Open interpolate dialog
+    console.log('Interpolate channel', channelIndex);
+  }, []);
+
   // Handle manual scroll to allow user override
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!isPlaying) {
@@ -433,6 +542,20 @@ export const PatternEditor: React.FC = () => {
 
                     {/* Channel controls */}
                     <div className="flex items-center gap-1">
+                      {/* Channel context menu dropdown */}
+                      <ChannelContextMenu
+                        channelIndex={idx}
+                        channel={channel}
+                        patternId={pattern.id}
+                        patternLength={pattern.length}
+                        onFillPattern={handleFillPattern}
+                        onClearChannel={handleClearChannel}
+                        onCopyChannel={handleCopyChannel}
+                        onPasteChannel={handlePasteChannel}
+                        onTranspose={handleTranspose}
+                        onHumanize={handleHumanize}
+                        onInterpolate={handleInterpolate}
+                      />
                       <ChannelColorPicker
                         currentColor={channel.color}
                         onColorSelect={(color) => setChannelColor(idx, color)}
@@ -445,6 +568,8 @@ export const PatternEditor: React.FC = () => {
                             : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
                         }`}
                         title={channel.muted ? 'Unmute' : 'Mute'}
+                        aria-pressed={channel.muted}
+                        aria-label={`${channel.muted ? 'Unmute' : 'Mute'} channel ${idx + 1}`}
                       >
                         {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
                       </button>
@@ -456,6 +581,8 @@ export const PatternEditor: React.FC = () => {
                             : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
                         }`}
                         title={channel.solo ? 'Unsolo' : 'Solo'}
+                        aria-pressed={channel.solo}
+                        aria-label={`${channel.solo ? 'Unsolo' : 'Solo'} channel ${idx + 1}`}
                       >
                         <Headphones size={12} />
                       </button>
@@ -637,3 +764,7 @@ export const PatternEditor: React.FC = () => {
     </div>
   );
 };
+
+// Memoize to prevent unnecessary re-renders from parent component updates
+export const PatternEditor = React.memo(PatternEditorComponent);
+PatternEditor.displayName = 'PatternEditor';

@@ -1,54 +1,19 @@
 /**
  * InstrumentModal - Full-screen modal for instrument editing
- * Provides more space for TB303 + Devil Fish parameters in a 2-column layout
+ * Now uses UnifiedInstrumentEditor for a consistent, modern UI
  */
 
-import React, { useState } from 'react';
-import { X, ChevronDown, Music, Waves } from 'lucide-react';
-import { useInstrumentStore } from '@stores';
-// TB303Editor imported but currently using GenericSynthEditor for all types
-// import { TB303Editor } from './TB303Editor';
-import { GenericSynthEditor } from './GenericSynthEditor';
-import { SynthTypeSelector } from './SynthTypeSelector';
-import { PresetBrowser } from './PresetBrowser';
-import type { InstrumentConfig } from '@typedefs/instrument';
+import React from 'react';
+import { X } from 'lucide-react';
+import { UnifiedInstrumentEditor } from './UnifiedInstrumentEditor';
 
 interface InstrumentModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type ModalTab = 'edit' | 'type' | 'presets';
-
 export const InstrumentModal: React.FC<InstrumentModalProps> = ({ isOpen, onClose }) => {
-  const {
-    instruments,
-    currentInstrumentId,
-    updateInstrument,
-    setCurrentInstrument,
-  } = useInstrumentStore();
-
-  const [activeTab, setActiveTab] = useState<ModalTab>('edit');
-  const [showInstrumentDropdown, setShowInstrumentDropdown] = useState(false);
-
-  const currentInstrument = instruments.find((i) => i.id === currentInstrumentId);
-
-  if (!isOpen || !currentInstrument) return null;
-
-  const handleTB303Change = (config: Partial<typeof currentInstrument.tb303>) => {
-    if (!currentInstrument.tb303) return;
-    updateInstrument(currentInstrument.id, {
-      tb303: {
-        ...currentInstrument.tb303,
-        ...config,
-      },
-    });
-  };
-
-  const handleSelectInstrument = (id: number) => {
-    setCurrentInstrument(id);
-    setShowInstrumentDropdown(false);
-  };
+  if (!isOpen) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -62,129 +27,30 @@ export const InstrumentModal: React.FC<InstrumentModalProps> = ({ isOpen, onClos
       onClick={handleBackdropClick}
     >
       <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-[1400px] flex flex-col overflow-hidden animate-scale-in">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">
-          <div className="flex items-center gap-6">
-            {/* Instrument Selector */}
-            <div className="relative">
-              <button
-                onClick={() => setShowInstrumentDropdown(!showInstrumentDropdown)}
-                className="flex items-center gap-3 px-4 py-2 rounded-lg bg-dark-bgTertiary hover:bg-dark-bgHover transition-colors"
-              >
-                <Music size={18} className="text-accent-primary" />
-                <span className="font-mono text-accent-primary font-bold">
-                  {currentInstrument.id.toString(16).toUpperCase().padStart(2, '0')}
-                </span>
-                <span className="text-text-primary font-medium">{currentInstrument.name}</span>
-                <ChevronDown size={16} className="text-text-muted" />
-              </button>
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary"
+        >
+          <X size={24} />
+        </button>
 
-              {showInstrumentDropdown && (
-                <div className="absolute top-full left-0 mt-2 bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-50 min-w-[280px] max-h-[400px] overflow-y-auto scrollbar-modern">
-                  {instruments
-                    .slice()
-                    .sort((a, b) => a.id - b.id)
-                    .map((inst) => (
-                      <button
-                        key={inst.id}
-                        onClick={() => handleSelectInstrument(inst.id)}
-                        className={`w-full px-4 py-3 font-mono text-sm text-left hover:bg-dark-bgHover transition-colors flex items-center gap-3 ${
-                          inst.id === currentInstrumentId
-                            ? 'bg-dark-bgActive text-accent-primary'
-                            : 'text-text-primary'
-                        }`}
-                      >
-                        <span className="text-accent-primary font-bold">
-                          {inst.id.toString(16).toUpperCase().padStart(2, '0')}
-                        </span>
-                        <span className="truncate flex-1">{inst.name}</span>
-                        <span className="text-xs text-text-muted">{inst.synthType}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('edit')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'edit'
-                    ? 'bg-accent-primary text-white'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                Edit Parameters
-              </button>
-              <button
-                onClick={() => setActiveTab('type')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'type'
-                    ? 'bg-accent-primary text-white'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                Synth Type
-              </button>
-              <button
-                onClick={() => setActiveTab('presets')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'presets'
-                    ? 'bg-accent-primary text-white'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                Presets
-              </button>
-            </div>
-          </div>
-
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Modal Content */}
-        <div className="flex-1 overflow-hidden">
-          {activeTab === 'edit' && (
-            <div className="h-full overflow-y-auto scrollbar-modern">
-              {currentInstrument.synthType === 'TB303' && currentInstrument.tb303 ? (
-                <TB303ModalEditor
-                  config={currentInstrument.tb303}
-                  onChange={handleTB303Change}
-                />
-              ) : (
-                <div className="p-6">
-                  <GenericSynthEditor
-                    instrument={currentInstrument}
-                    onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'type' && (
-            <div className="h-full overflow-y-auto scrollbar-modern p-6">
-              <SynthTypeSelector instrument={currentInstrument} />
-            </div>
-          )}
-
-          {activeTab === 'presets' && (
-            <div className="h-full overflow-y-auto scrollbar-modern">
-              <PresetBrowser instrumentId={currentInstrument.id} />
-            </div>
-          )}
-        </div>
+        {/* Unified Instrument Editor */}
+        <UnifiedInstrumentEditor
+          mode="modal"
+          showInstrumentList={true}
+          showKeyboard={true}
+          onClose={onClose}
+        />
       </div>
     </div>
   );
 };
+
+// ============================================================================
+// Legacy TB303ModalEditor - Kept for reference, no longer used in modal
+// The Devil Fish controls are now accessed via the TB303KnobPanel
+// ============================================================================
 
 /**
  * TB303ModalEditor - 2-column layout for TB303 parameters

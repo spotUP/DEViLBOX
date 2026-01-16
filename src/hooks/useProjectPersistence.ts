@@ -3,7 +3,9 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
+import type { AutomationCurve } from '@typedefs/automation';
+import type { EffectConfig } from '@typedefs/instrument';
 
 const STORAGE_KEY = 'scribbleton-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
@@ -15,6 +17,8 @@ interface SavedProject {
   bpm: number;
   patterns: ReturnType<typeof useTrackerStore.getState>['patterns'];
   instruments: ReturnType<typeof useInstrumentStore.getState>['instruments'];
+  automation?: AutomationCurve[];
+  masterEffects?: EffectConfig[];
 }
 
 /**
@@ -26,6 +30,8 @@ export function saveProjectToStorage(): boolean {
     const instrumentState = useInstrumentStore.getState();
     const projectState = useProjectStore.getState();
     const transportState = useTransportStore.getState();
+    const automationState = useAutomationStore.getState();
+    const audioState = useAudioStore.getState();
 
     const savedProject: SavedProject = {
       version: '1.0.0',
@@ -34,11 +40,13 @@ export function saveProjectToStorage(): boolean {
       bpm: transportState.bpm,
       patterns: trackerState.patterns,
       instruments: instrumentState.instruments,
+      automation: automationState.curves,
+      masterEffects: audioState.masterEffects,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
     projectState.markAsSaved();
-    console.log('[Persistence] Project saved to localStorage');
+    console.log('[Persistence] Project saved to localStorage (including automation and master effects)');
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to save project:', error);
@@ -70,7 +78,8 @@ export function loadProjectFromStorage(): boolean {
     const instrumentStore = useInstrumentStore.getState();
     const projectStore = useProjectStore.getState();
     const transportStore = useTransportStore.getState();
-    // Note: automationStore.loadCurves would be called here once implemented
+    const automationStore = useAutomationStore.getState();
+    const audioStore = useAudioStore.getState();
 
     // Load patterns
     trackerStore.loadPatterns(project.patterns);
@@ -84,7 +93,15 @@ export function loadProjectFromStorage(): boolean {
     // Load BPM
     transportStore.setBPM(project.bpm);
 
-    // TODO: Add automation curve persistence once loadCurves method is available
+    // Load automation curves
+    if (project.automation && project.automation.length > 0) {
+      automationStore.loadCurves(project.automation);
+    }
+
+    // Load master effects
+    if (project.masterEffects && project.masterEffects.length > 0) {
+      audioStore.setMasterEffects(project.masterEffects);
+    }
 
     projectStore.markAsSaved();
     console.log('[Persistence] Project loaded from localStorage:', project.metadata.name);
@@ -168,6 +185,28 @@ export function useProjectPersistence() {
   useEffect(() => {
     const unsubscribe = useTransportStore.subscribe((state, prevState) => {
       if (state.bpm !== prevState.bpm) {
+        markAsModified();
+      }
+    });
+
+    return unsubscribe;
+  }, [markAsModified]);
+
+  // Subscribe to automation store changes
+  useEffect(() => {
+    const unsubscribe = useAutomationStore.subscribe((state, prevState) => {
+      if (state.curves !== prevState.curves) {
+        markAsModified();
+      }
+    });
+
+    return unsubscribe;
+  }, [markAsModified]);
+
+  // Subscribe to audio store changes (master effects)
+  useEffect(() => {
+    const unsubscribe = useAudioStore.subscribe((state, prevState) => {
+      if (state.masterEffects !== prevState.masterEffects) {
         markAsModified();
       }
     });

@@ -14,7 +14,8 @@ export type SynthType =
   | 'NoiseSynth'
   | 'TB303'
   | 'Sampler'
-  | 'Player';
+  | 'Player'
+  | 'Wavetable';
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -105,6 +106,62 @@ export interface TB303Config {
   devilFish?: DevilFishConfig;
 }
 
+/**
+ * Wavetable Synthesizer Configuration
+ * Multi-voice wavetable synth with morphing and unison
+ */
+export interface WavetableConfig {
+  wavetableId: string;              // Preset wavetable ID
+  morphPosition: number;            // 0-100% - position in wavetable
+  morphModSource: 'none' | 'lfo' | 'envelope';
+  morphModAmount: number;           // 0-100%
+  morphLFORate: number;             // 0.1-20 Hz
+  unison: {
+    voices: number;                 // 1-8 voices
+    detune: number;                 // 0-100 cents spread
+    stereoSpread: number;           // 0-100% panning spread
+  };
+  envelope: EnvelopeConfig;
+  filter: {
+    type: FilterType;
+    cutoff: number;                 // 20-20000 Hz
+    resonance: number;              // 0-100%
+    envelopeAmount: number;         // -100 to 100%
+  };
+  filterEnvelope: EnvelopeConfig;
+}
+
+export const DEFAULT_WAVETABLE: WavetableConfig = {
+  wavetableId: 'basic-saw',
+  morphPosition: 0,
+  morphModSource: 'none',
+  morphModAmount: 50,
+  morphLFORate: 2,
+  unison: {
+    voices: 1,
+    detune: 10,
+    stereoSpread: 50,
+  },
+  envelope: {
+    attack: 10,
+    decay: 100,
+    sustain: 80,
+    release: 500,
+  },
+  filter: {
+    type: 'lowpass',
+    cutoff: 8000,
+    resonance: 20,
+    envelopeAmount: 0,
+  },
+  filterEnvelope: {
+    attack: 10,
+    decay: 200,
+    sustain: 30,
+    release: 500,
+  },
+};
+
 export type EffectType =
   | 'Distortion'
   | 'Reverb'
@@ -126,7 +183,9 @@ export type EffectType =
   | 'AutoWah'
   | 'FeedbackDelay'
   | 'JCReverb'
-  | 'StereoWidener';
+  | 'StereoWidener'
+  | 'TapeSaturation'
+  | 'SidechainCompressor';
 
 export interface EffectConfig {
   id: string;
@@ -145,6 +204,7 @@ export interface InstrumentConfig {
   filter?: FilterConfig;
   filterEnvelope?: FilterEnvelopeConfig;
   tb303?: TB303Config;
+  wavetable?: WavetableConfig;
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100

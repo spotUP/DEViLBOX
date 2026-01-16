@@ -55,22 +55,22 @@ const getInterpolatedValue = (
   return null;
 };
 
-// Get color based on parameter
+// Get color based on parameter (uses CSS variables for theming)
 const getParameterColor = (parameter: string): string => {
   const colors: Record<string, string> = {
-    cutoff: '#00d4aa',
-    resonance: '#00d4aa',
-    envMod: '#7c3aed',
-    decay: '#7c3aed',
-    accent: '#f59e0b',
-    overdrive: '#ef4444',
-    distortion: '#ef4444',
-    volume: '#22c55e',
-    pan: '#3b82f6',
-    delay: '#8b5cf6',
-    reverb: '#8b5cf6',
+    cutoff: 'var(--color-synth-filter)',
+    resonance: 'var(--color-synth-filter)',
+    envMod: 'var(--color-synth-envelope)',
+    decay: 'var(--color-synth-envelope)',
+    accent: 'var(--color-synth-accent)',
+    overdrive: 'var(--color-synth-drive)',
+    distortion: 'var(--color-synth-drive)',
+    volume: 'var(--color-synth-volume)',
+    pan: 'var(--color-synth-pan)',
+    delay: 'var(--color-synth-effects)',
+    reverb: 'var(--color-synth-effects)',
   };
-  return colors[parameter] || '#00d4aa';
+  return colors[parameter] || 'var(--color-synth-filter)';
 };
 
 const LANE_WIDTH = 20;

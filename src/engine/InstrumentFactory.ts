@@ -7,6 +7,10 @@
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { TB303Synth } from './TB303Engine';
+import { TapeSaturation } from './effects/TapeSaturation';
+import { SidechainCompressor } from './effects/SidechainCompressor';
+import { WavetableSynth } from './WavetableSynth';
+import { DEFAULT_WAVETABLE } from '../types/instrument';
 
 export class InstrumentFactory {
   /**
@@ -62,6 +66,10 @@ export class InstrumentFactory {
 
       case 'Player':
         instrument = this.createPlayer(config);
+        break;
+
+      case 'Wavetable':
+        instrument = this.createWavetable(config);
         break;
 
       default:
@@ -262,6 +270,24 @@ export class InstrumentFactory {
       case 'StereoWidener':
         return new Tone.StereoWidener({
           width: config.parameters.width || 0.5,
+        });
+
+      case 'TapeSaturation':
+        return new TapeSaturation({
+          drive: (config.parameters.drive || 50) / 100,   // 0-100 -> 0-1
+          tone: config.parameters.tone || 12000,          // Hz
+          wet: wetValue,
+        });
+
+      case 'SidechainCompressor':
+        return new SidechainCompressor({
+          threshold: config.parameters.threshold ?? -24,
+          ratio: config.parameters.ratio ?? 4,
+          attack: config.parameters.attack ?? 0.003,
+          release: config.parameters.release ?? 0.25,
+          knee: config.parameters.knee ?? 6,
+          sidechainGain: (config.parameters.sidechainGain ?? 100) / 100,
+          wet: wetValue,
         });
 
       default:
@@ -486,6 +512,11 @@ export class InstrumentFactory {
     return synth;
   }
 
+  private static createWavetable(config: InstrumentConfig): WavetableSynth {
+    const wavetableConfig = config.wavetable || DEFAULT_WAVETABLE;
+    return new WavetableSynth(wavetableConfig);
+  }
+
   private static createSampler(config: InstrumentConfig): Tone.Sampler {
     // Get sample URL from parameters (base64 data URL from user upload)
     const sampleUrl = config.parameters?.sampleUrl;
@@ -509,17 +540,41 @@ export class InstrumentFactory {
   private static createPlayer(config: InstrumentConfig): Tone.Player {
     // Get sample URL from parameters (base64 data URL from user upload)
     const sampleUrl = config.parameters?.sampleUrl;
+    const reverseMode = config.parameters?.reverseMode || 'forward';
 
     if (sampleUrl) {
-      return new Tone.Player({
+      const player = new Tone.Player({
         url: sampleUrl,
         volume: config.volume || -12,
+        reverse: reverseMode === 'reverse',
       });
+      return player;
     }
 
     // No sample loaded - create empty player
     return new Tone.Player({
       volume: config.volume || -12,
     });
+  }
+
+  /**
+   * Reverse an AudioBuffer by copying samples in reverse order
+   */
+  private static reverseAudioBuffer(buffer: AudioBuffer): AudioBuffer {
+    const audioContext = Tone.getContext().rawContext;
+    const reversed = audioContext.createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const src = buffer.getChannelData(ch);
+      const dst = reversed.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) {
+        dst[i] = src[src.length - 1 - i];
+      }
+    }
+    return reversed;
   }
 }

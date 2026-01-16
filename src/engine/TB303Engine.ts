@@ -26,6 +26,7 @@ import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
 export class TB303Synth {
   // Oscillator
   private oscillator: Tone.Oscillator;
+  private oscillatorAsymmetry: Tone.WaveShaper; // Adds authentic 303 waveform character
 
   // Cascaded filters for authentic 4-pole response (2x 2-pole = 4-pole)
   private filter1: Tone.Filter;
@@ -36,6 +37,12 @@ export class TB303Synth {
   private vca: Tone.Gain;
   private accentGain: Tone.Gain; // Separate gain for accent boost
   private vcaEnvelope: Tone.AmplitudeEnvelope;
+  private vcaBleed: Tone.Gain; // Subtle signal bleed like real 303
+  private accentClick: Tone.Gain; // Transient click for accented notes
+
+  // Diode Ladder Filter Saturation
+  // Simulates the soft saturation of the real 303's transistor/diode filter
+  private filterSaturation: Tone.WaveShaper;
 
   // Overdrive/Saturation
   private overdrive: Tone.WaveShaper;
@@ -90,6 +97,19 @@ export class TB303Synth {
       frequency: 440,
     });
 
+    // === OSCILLATOR ASYMMETRY ===
+    // Real 303 sawtooth has slight DC offset and asymmetry from analog circuitry
+    // This adds warmth and character - subtle but audible
+    this.oscillatorAsymmetry = new Tone.WaveShaper((x) => {
+      // Add slight DC offset (real 303 has DC coupling issues)
+      const dcOffset = 0.02;
+      // Subtle asymmetric soft clipping - positive peaks slightly softer
+      const asymmetry = x >= 0
+        ? x * 0.98 + Math.tanh(x * 0.5) * 0.02
+        : x * 1.0;
+      return asymmetry + dcOffset;
+    }, 4096);
+
     // === CASCADED FILTERS ===
     // Two 2-pole filters in series = 4-pole (24dB/oct) response
     // This gives a more authentic 303 filter sound
@@ -109,9 +129,10 @@ export class TB303Synth {
       Q: filterQ * 0.7, // Slightly lower Q on second stage
     });
 
-    // Filter envelope with very fast attack (0.5ms like dittytoy)
+    // TB-303 MEG (Main Envelope Generator) - Filter Envelope
+    // Real 303: ~3ms attack, 200ms-2000ms decay depending on DECAY knob
     this.filterEnvelope = new Tone.FrequencyEnvelope({
-      attack: 0.0005, // 0.5ms attack (instant, like dittytoy)
+      attack: 0.003, // 3ms attack (authentic 303)
       decay: this.config.filterEnvelope.decay / 1000,
       sustain: 0,
       release: 0.01,
@@ -124,12 +145,43 @@ export class TB303Synth {
     this.vca = new Tone.Gain(1);
     this.accentGain = new Tone.Gain(1); // For accent volume boost
 
+    // TB-303 VEG (Volume Envelope Generator)
+    // Real 303: ~3ms attack, ~3000ms decay, decays to zero (no sustain)
+    // VEG decay is FIXED - independent of filter decay knob
     this.vcaEnvelope = new Tone.AmplitudeEnvelope({
-      attack: 0.0005, // 0.5ms attack
-      decay: this.config.filterEnvelope.decay / 1000,
-      sustain: 0.001,
+      attack: 0.003, // 3ms attack (authentic 303)
+      decay: 3.0, // ~3000ms decay (fixed, like real 303)
+      sustain: 0, // Decays fully to zero
       release: 0.05,
     });
+
+    // === VCA BLEED ===
+    // Real 303 has very slight signal bleed even when VCA is "closed"
+    // This prevents complete silence and adds warmth between notes
+    // Typically -60dB to -50dB below full signal
+    this.vcaBleed = new Tone.Gain(0.002); // ~-54dB bleed
+
+    // === ACCENT CLICK ===
+    // Real 303 accents have a characteristic percussive "click" at attack
+    // Caused by the envelope driving the VCA hard with a fast transient
+    this.accentClick = new Tone.Gain(0);
+
+    // === DIODE LADDER FILTER SATURATION ===
+    // Real 303 filter uses transistors/diodes that have soft saturation
+    // This creates warmth and prevents harsh resonance peaks
+    // Subtle asymmetric soft clipping to simulate diode nonlinearity
+    this.filterSaturation = new Tone.WaveShaper((x) => {
+      // Asymmetric soft saturation like real diodes
+      // Positive side has slightly more headroom than negative
+      const threshold = 0.7;
+      if (Math.abs(x) < threshold) {
+        return x;
+      }
+      const sign = x >= 0 ? 1 : -1;
+      const asymmetry = x >= 0 ? 1.0 : 0.95; // Slight asymmetry
+      const excess = Math.abs(x) - threshold;
+      return sign * (threshold + Math.tanh(excess * 2.5) * (1 - threshold) * asymmetry);
+    }, 4096);
 
     // === OVERDRIVE ===
     // Soft clipping with adjustable drive (inspired by dittytoy's approach)
@@ -157,16 +209,25 @@ export class TB303Synth {
     this.output = new Tone.Gain(1);
 
     // === CONNECT SIGNAL CHAIN ===
-    // Oscillator → Filter1 → Filter2 → Overdrive → VCA → Accent → Envelope → Muffler → Output
-    this.oscillator.connect(this.filter1);
+    // Oscillator → Asymmetry → Filter1 → Filter2 → FilterSaturation → Overdrive → VCA → Accent → Click → Envelope → Muffler → Output
+    //                                                                                      ↓
+    //                                                                                    Bleed → Output (parallel path)
+    this.oscillator.connect(this.oscillatorAsymmetry);
+    this.oscillatorAsymmetry.connect(this.filter1);
     this.filter1.connect(this.filter2);
-    this.filter2.connect(this.overdriveGain);
+    this.filter2.connect(this.filterSaturation);
+    this.filterSaturation.connect(this.overdriveGain);
     this.overdriveGain.connect(this.overdrive);
     this.overdrive.connect(this.vca);
     this.vca.connect(this.accentGain);
-    this.accentGain.connect(this.vcaEnvelope);
+    this.accentGain.connect(this.accentClick);
+    this.accentClick.connect(this.vcaEnvelope);
     this.vcaEnvelope.connect(this.muffler);
     this.muffler.connect(this.output);
+
+    // VCA bleed path - bypasses envelope for subtle constant signal
+    this.vca.connect(this.vcaBleed);
+    this.vcaBleed.connect(this.output);
 
     // Connect filter envelope to BOTH filters for cascaded sweep
     this.filterEnvelope.connect(this.filter1.frequency);
@@ -199,12 +260,30 @@ export class TB303Synth {
    * Convert resonance percentage (0-100) to filter Q value
    * Based on dittytoy: kq = 1 - resonance * 0.9
    * Inverted and mapped to Tone.js Q range
+   *
+   * TB-303 AUTHENTIC RESONANCE CURVE:
+   * Real 303 filter has a characteristic resonance response where:
+   * - Low resonance: Gentle peak, warm sound
+   * - Mid resonance: Strong "acid" character, not yet self-oscillating
+   * - High resonance (>80%): Approaches self-oscillation, filter "sings"
+   * - Max resonance: Clean sine wave at cutoff frequency
    */
   private resonanceToQ(resonance: number): number {
     const normalized = resonance / 100;
-    // Higher resonance = higher Q, exponential curve for self-oscillation at high values
-    // Range: 0.5 (no resonance) to 25 (near self-oscillation)
-    return 0.5 + Math.pow(normalized, 1.5) * 24.5;
+
+    // Use a curve that stays musical through the range but allows
+    // self-oscillation at very high values (>90%)
+    // Real 303 has a "sweet spot" around 60-80% that sounds very acid
+    if (normalized < 0.8) {
+      // 0-80%: Musical range, exponential curve
+      // Range: 0.7 to ~15 (strong resonance but not oscillating)
+      return 0.7 + Math.pow(normalized / 0.8, 1.8) * 14.3;
+    } else {
+      // 80-100%: Transition to self-oscillation range
+      // Steeper curve to reach oscillation threshold
+      const highNorm = (normalized - 0.8) / 0.2; // 0-1 for 80-100%
+      return 15 + Math.pow(highNorm, 1.5) * 20; // 15 to 35
+    }
   }
 
   /**
@@ -266,10 +345,24 @@ export class TB303Synth {
     // Handle slide (portamento to new note without retriggering envelopes)
     // In tracker notation: slide flag on current note means "slide FROM previous note TO this note"
     // The previous note does NOT need a slide flag - only the target note does
+    //
+    // TB-303 AUTHENTIC SLIDE: Real 303 uses RC circuit with ~60ms time constant
+    // The slide time is FIXED regardless of interval (C2→C3 same time as C2→C4)
+    // This is different from typical portamento which uses V/oct exponential ramps
     if (slide && this.currentNote && this.currentNote !== note) {
       console.log('[TB303] SLIDE to', note, 'from', this.currentNote);
-      const slideTime = this.config.slide.time / 1000;
-      this.oscillator.frequency.exponentialRampTo(targetFreq, slideTime, now);
+      // Fixed ~60ms RC time constant like real 303 (can be adjusted with slide.time knob)
+      const slideTimeMs = this.config.slide.time; // Default 60ms
+      const slideTimeSec = slideTimeMs / 1000;
+
+      // Use linear ramp for authentic RC circuit behavior
+      // RC circuits slew voltage linearly in Hz (not exponentially in V/oct)
+      // This makes the slide sound consistent regardless of interval size
+      const currentFreq = this.oscillator.frequency.value;
+      this.oscillator.frequency.cancelScheduledValues(now);
+      this.oscillator.frequency.setValueAtTime(currentFreq, now);
+      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
+
       this.currentNote = note;
       this.isSliding = true; // Mark that we're in a slide
       // Update filter tracking for new note during slide
@@ -288,7 +381,12 @@ export class TB303Synth {
     this.currentNote = note;
     this.isSliding = slide;
 
-    // Set oscillator frequency
+    // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
+    // This creates the characteristic "staccato" attack feel
+    // Only applies to non-slide notes (slide notes don't retrigger)
+    const triggerDelay = 0.004; // 4ms like real 303
+
+    // Set oscillator frequency (immediate, before envelopes start)
     this.oscillator.frequency.setValueAtTime(targetFreq, now);
 
     // === DEVIL FISH: Apply filter tracking (LINEAR Hz response per manual) ===
@@ -314,8 +412,8 @@ export class TB303Synth {
       // VEG decay time
       vegDecayTime = this.devilFish.vegDecay / 1000;
 
-      // Soft attack for non-accented notes (accented notes always have fast attack)
-      attackTime = accent ? 0.0005 : this.devilFish.softAttack / 1000;
+      // Soft attack for non-accented notes, authentic 3ms attack for accented notes
+      attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
 
       // Apply VEG sustain (0% = normal decay, 100% = infinite notes)
       this.vcaEnvelope.sustain = this.devilFish.vegSustain / 100;
@@ -329,17 +427,22 @@ export class TB303Synth {
       }
     } else {
       // === STANDARD TB-303 MODE ===
+      // MEG decay: controlled by Decay knob (200ms-2000ms)
       filterDecayTime = this.config.filterEnvelope.decay / 1000;
-      vegDecayTime = filterDecayTime;
-      attackTime = 0.0005; // 0.5ms attack
-      this.vcaEnvelope.sustain = 0.001;
+      // VEG decay: FIXED at ~3000ms (independent of Decay knob, like real 303)
+      vegDecayTime = 3.0;
+      // Attack: ~3ms (authentic 303)
+      attackTime = 0.003;
+      // Sustain: 0 (decays fully to zero)
+      this.vcaEnvelope.sustain = 0;
 
       if (accent) {
         const accentAmount = this.config.accent.amount / 100;
         accentMultiplier = 1 + accentAmount;
         cutoffBoost = accentAmount * 0.4;
         envMod *= (1 + accentAmount * 0.5);
-        filterDecayTime = Math.min(filterDecayTime, 0.2); // ~200ms for accent
+        // Accent forces MEG decay to ~200ms (authentic behavior)
+        filterDecayTime = Math.min(filterDecayTime, 0.2);
       }
     }
 
@@ -359,6 +462,37 @@ export class TB303Synth {
     // Start ramp slightly after setValueAtTime to avoid timing conflicts
     if (accent) {
       this.accentGain.gain.exponentialRampTo(1, 0.5, now + 0.001);
+
+      // TB-303 ACCENT CLICK: Characteristic percussive transient
+      // Real 303 accents have a brief "click" caused by the VCA being driven hard
+      // This adds punch and attack to accented notes
+      const clickIntensity = 1.0 + (this.config.accent.amount / 100) * 0.8; // 1.0 to 1.8x
+      this.accentClick.gain.cancelScheduledValues(now);
+      this.accentClick.gain.setValueAtTime(clickIntensity, now);
+      // Very fast decay (~8ms) for the click transient
+      this.accentClick.gain.exponentialRampToValueAtTime(1.0, now + 0.008);
+    } else {
+      // Non-accented: ensure click gain is at unity
+      this.accentClick.gain.setValueAtTime(1.0, now);
+    }
+
+    // TB-303 ACCENT RESONANCE MODULATION
+    // Real 303 boosts filter Q during accent for that characteristic "squelch"
+    // The accent circuit feeds into the resonance control, increasing Q
+    if (accent) {
+      const accentAmount = this.config.accent.amount / 100;
+      const baseQ = this.resonanceToQ(this.config.filter.resonance);
+      // Boost Q by up to 50% during accent (creates the squelch)
+      const accentQBoost = baseQ * accentAmount * 0.5;
+      const accentQ = Math.min(baseQ + accentQBoost, 35); // Cap at 35 to prevent instability
+
+      // Set boosted Q immediately
+      this.filter1.Q.setValueAtTime(accentQ, now);
+      this.filter2.Q.setValueAtTime(accentQ * 0.7, now);
+
+      // Decay Q back to base over ~200ms (matches MEG accent decay)
+      this.filter1.Q.exponentialRampToValueAtTime(baseQ, now + 0.2);
+      this.filter2.Q.exponentialRampToValueAtTime(baseQ * 0.7, now + 0.2);
     }
 
     // Track envelope state for visualization
@@ -367,9 +501,10 @@ export class TB303Synth {
     this.lastEnvOctaves = octaves;
     this.lastFilterDecay = this.filterEnvelope.decay;
 
-    // Trigger envelopes
-    this.vcaEnvelope.triggerAttackRelease(duration, now, velocity);
-    this.filterEnvelope.triggerAttackRelease(duration, now);
+    // Trigger envelopes with 4ms delay (characteristic 303 feel)
+    const envelopeTime = now + triggerDelay;
+    this.vcaEnvelope.triggerAttackRelease(duration, envelopeTime, velocity);
+    this.filterEnvelope.triggerAttackRelease(duration, envelopeTime);
   }
 
   /**
@@ -388,9 +523,17 @@ export class TB303Synth {
     this.currentNoteFreq = targetFreq;
 
     // Slide: portamento from previous note without retriggering envelopes
+    // TB-303 AUTHENTIC SLIDE: Fixed RC time constant (~60ms)
     if (slide && this.currentNote && this.currentNote !== note) {
-      const slideTime = this.config.slide.time / 1000;
-      this.oscillator.frequency.exponentialRampTo(targetFreq, slideTime, now);
+      const slideTimeMs = this.config.slide.time;
+      const slideTimeSec = slideTimeMs / 1000;
+
+      // Linear ramp for authentic RC circuit behavior
+      const currentFreq = this.oscillator.frequency.value;
+      this.oscillator.frequency.cancelScheduledValues(now);
+      this.oscillator.frequency.setValueAtTime(currentFreq, now);
+      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
+
       this.currentNote = note;
       this.isSliding = true;
       if (this.devilFish.enabled && this.devilFish.filterTracking > 0) {
@@ -401,6 +544,10 @@ export class TB303Synth {
 
     this.currentNote = note;
     this.isSliding = slide;
+
+    // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
+    const triggerDelay = 0.004; // 4ms like real 303
+
     this.oscillator.frequency.setValueAtTime(targetFreq, now);
 
     // Apply filter tracking
@@ -420,7 +567,7 @@ export class TB303Synth {
         ? this.devilFish.accentDecay / 1000
         : this.devilFish.normalDecay / 1000;
       vegDecayTime = this.devilFish.vegDecay / 1000;
-      attackTime = accent ? 0.0005 : this.devilFish.softAttack / 1000;
+      attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
       this.vcaEnvelope.sustain = this.devilFish.vegSustain / 100;
 
       if (accent && this.devilFish.accentSweepEnabled) {
@@ -429,10 +576,11 @@ export class TB303Synth {
         accentMultiplier = 1 + (this.config.accent.amount / 100);
       }
     } else {
+      // === STANDARD TB-303 MODE ===
       filterDecayTime = this.config.filterEnvelope.decay / 1000;
-      vegDecayTime = filterDecayTime;
-      attackTime = 0.0005;
-      this.vcaEnvelope.sustain = 0.001;
+      vegDecayTime = 3.0; // Fixed ~3000ms VEG decay
+      attackTime = 0.003; // 3ms attack
+      this.vcaEnvelope.sustain = 0;
 
       if (accent) {
         const accentAmount = this.config.accent.amount / 100;
@@ -453,6 +601,28 @@ export class TB303Synth {
     // Start ramp slightly after setValueAtTime to avoid timing conflicts
     if (accent) {
       this.accentGain.gain.exponentialRampTo(1, 0.5, now + 0.001);
+
+      // TB-303 ACCENT CLICK: Characteristic percussive transient
+      const clickIntensity = 1.0 + (this.config.accent.amount / 100) * 0.8;
+      this.accentClick.gain.cancelScheduledValues(now);
+      this.accentClick.gain.setValueAtTime(clickIntensity, now);
+      this.accentClick.gain.exponentialRampToValueAtTime(1.0, now + 0.008);
+    } else {
+      this.accentClick.gain.setValueAtTime(1.0, now);
+    }
+
+    // TB-303 ACCENT RESONANCE MODULATION
+    // Real 303 boosts filter Q during accent for that characteristic "squelch"
+    if (accent) {
+      const accentAmount = this.config.accent.amount / 100;
+      const baseQ = this.resonanceToQ(this.config.filter.resonance);
+      const accentQBoost = baseQ * accentAmount * 0.5;
+      const accentQ = Math.min(baseQ + accentQBoost, 35);
+
+      this.filter1.Q.setValueAtTime(accentQ, now);
+      this.filter2.Q.setValueAtTime(accentQ * 0.7, now);
+      this.filter1.Q.exponentialRampToValueAtTime(baseQ, now + 0.2);
+      this.filter2.Q.exponentialRampToValueAtTime(baseQ * 0.7, now + 0.2);
     }
 
     // Track envelope state for visualization
@@ -461,8 +631,10 @@ export class TB303Synth {
     this.lastEnvOctaves = this.filterEnvelope.octaves;
     this.lastFilterDecay = filterDecayTime;
 
-    this.vcaEnvelope.triggerAttack(now, velocity);
-    this.filterEnvelope.triggerAttack(now);
+    // Trigger envelopes with 4ms delay (characteristic 303 feel)
+    const envelopeTime = now + triggerDelay;
+    this.vcaEnvelope.triggerAttack(envelopeTime, velocity);
+    this.filterEnvelope.triggerAttack(envelopeTime);
   }
 
   /**
@@ -1045,12 +1217,16 @@ export class TB303Synth {
 
     // Dispose all audio nodes
     this.oscillator.dispose();
+    this.oscillatorAsymmetry.dispose();
     this.filter1.dispose();
     this.filter2.dispose();
+    this.filterSaturation.dispose();
     this.filterEnvelope.dispose();
     this.vca.dispose();
     this.accentGain.dispose();
+    this.accentClick.dispose();
     this.vcaEnvelope.dispose();
+    this.vcaBleed.dispose();
     this.overdrive.dispose();
     this.overdriveGain.dispose();
 

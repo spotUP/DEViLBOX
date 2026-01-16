@@ -4,4 +4,5 @@
  */
 
 export { MasterEffectsPanel } from './MasterEffectsPanel';
+export { MasterEffectsModal } from './MasterEffectsModal';
 export { EffectParameterEditor } from './EffectParameterEditor';

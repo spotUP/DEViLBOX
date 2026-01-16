@@ -4,6 +4,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAutomationStore, useAudioStore } from '@stores';
+import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getPatternScheduler } from '@engine/PatternScheduler';
 
@@ -20,12 +21,24 @@ export const usePatternPlayback = () => {
 
   // Use ref to track if we're currently advancing to avoid race conditions
   const isAdvancingRef = useRef(false);
+  // Track timeout IDs for cleanup to prevent memory leaks
+  const advancingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use ref to track current pattern index for callbacks (avoids stale closure)
   const currentPatternIndexRef = useRef(currentPatternIndex);
   useEffect(() => {
     currentPatternIndexRef.current = currentPatternIndex;
   }, [currentPatternIndex]);
+
+  // Cleanup advancing timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (advancingTimeoutRef.current) {
+        clearTimeout(advancingTimeoutRef.current);
+        advancingTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle pattern advancement when current pattern ends
   const handlePatternEnd = useCallback(() => {
@@ -38,7 +51,26 @@ export const usePatternPlayback = () => {
     // Use ref to get CURRENT pattern index (not stale closure value)
     const actualCurrentIndex = currentPatternIndexRef.current;
 
-    if (isLooping) {
+    // Check for queued pattern from live mode
+    const liveModeState = useLiveModeStore.getState();
+    const pendingPatternIndex = liveModeState.pendingPatternIndex;
+    const isLiveMode = liveModeState.isLiveMode;
+
+    // If there's a queued pattern in live mode, switch to it
+    if (isLiveMode && pendingPatternIndex !== null && pendingPatternIndex < patterns.length) {
+      console.log(`[Playback] Live mode: Switching to queued pattern ${pendingPatternIndex} at time ${patternEndTime}s`);
+
+      const queuedPattern = patterns[pendingPatternIndex];
+      scheduler.schedulePattern(queuedPattern, instruments, (row) => {
+        setCurrentRow(row, queuedPattern.length);
+        if (row === 0) {
+          setCurrentPattern(pendingPatternIndex);
+        }
+      }, patternEndTime);
+
+      // Clear the queue
+      liveModeState.clearQueue();
+    } else if (isLooping) {
       // Loop current pattern - re-schedule the same pattern
       console.log(`[Playback] Looping current pattern ${actualCurrentIndex} at time ${patternEndTime}s`);
 
@@ -58,24 +90,30 @@ export const usePatternPlayback = () => {
         const nextPattern = patterns[nextIndex];
         scheduler.schedulePattern(nextPattern, instruments, (row) => {
           setCurrentRow(row, nextPattern.length);
+          // Update UI state when first row of new pattern plays
+          if (row === 0) {
+            setCurrentPattern(nextIndex);
+          }
         }, patternEndTime);
-
-        // Update UI state
-        setCurrentPattern(nextIndex);
       } else {
         // End of song - loop back to beginning
         console.log('[Playback] End of song, looping to beginning');
         const firstPattern = patterns[0];
         scheduler.schedulePattern(firstPattern, instruments, (row) => {
           setCurrentRow(row, firstPattern.length);
+          // Update UI state when first row of new pattern plays
+          if (row === 0) {
+            setCurrentPattern(0);
+          }
         }, patternEndTime);
-        setCurrentPattern(0);
       }
     }
 
-    // Reset advancing flag after a short delay
-    setTimeout(() => {
+    // Reset advancing flag after a short delay (with cleanup tracking)
+    if (advancingTimeoutRef.current) clearTimeout(advancingTimeoutRef.current);
+    advancingTimeoutRef.current = setTimeout(() => {
       isAdvancingRef.current = false;
+      advancingTimeoutRef.current = null;
     }, 100);
   }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
 
@@ -94,21 +132,23 @@ export const usePatternPlayback = () => {
       const nextPattern = patterns[nextIndex];
       scheduler.schedulePattern(nextPattern, instruments, (row) => {
         setCurrentRow(row, nextPattern.length);
+        if (row === 0) setCurrentPattern(nextIndex);
       }, patternEndTime);
-      setCurrentPattern(nextIndex);
     } else if (isLooping) {
       const firstPattern = patterns[0];
       scheduler.schedulePattern(firstPattern, instruments, (row) => {
         setCurrentRow(row, firstPattern.length);
+        if (row === 0) setCurrentPattern(0);
       }, patternEndTime);
-      setCurrentPattern(0);
     } else {
       engine.stop();
       scheduler.clearSchedule();
     }
 
-    setTimeout(() => {
+    if (advancingTimeoutRef.current) clearTimeout(advancingTimeoutRef.current);
+    advancingTimeoutRef.current = setTimeout(() => {
       isAdvancingRef.current = false;
+      advancingTimeoutRef.current = null;
     }, 100);
   }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
 
@@ -124,21 +164,23 @@ export const usePatternPlayback = () => {
       const targetPattern = patterns[position];
       scheduler.schedulePattern(targetPattern, instruments, (row) => {
         setCurrentRow(row, targetPattern.length);
+        if (row === 0) setCurrentPattern(position);
       }, patternEndTime);
-      setCurrentPattern(position);
     } else if (isLooping) {
       const firstPattern = patterns[0];
       scheduler.schedulePattern(firstPattern, instruments, (row) => {
         setCurrentRow(row, firstPattern.length);
+        if (row === 0) setCurrentPattern(0);
       }, patternEndTime);
-      setCurrentPattern(0);
     } else {
       engine.stop();
       scheduler.clearSchedule();
     }
 
-    setTimeout(() => {
+    if (advancingTimeoutRef.current) clearTimeout(advancingTimeoutRef.current);
+    advancingTimeoutRef.current = setTimeout(() => {
       isAdvancingRef.current = false;
+      advancingTimeoutRef.current = null;
     }, 100);
   }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
 

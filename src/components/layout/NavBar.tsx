@@ -3,15 +3,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
-import { Plus, X, Palette } from 'lucide-react';
+import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
+import { Plus, X, Palette, ChevronUp, ChevronDown } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
+import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 
 export const NavBar: React.FC = () => {
   const { metadata, isDirty } = useProjectStore();
   const { masterVolume, setMasterVolume } = useAudioStore();
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, updateTabName, markTabDirty } = useTabsStore();
   const { currentThemeId, setTheme, getCurrentTheme } = useThemeStore();
+  const { oscilloscopeVisible, toggleOscilloscopeVisible } = useUIStore();
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
@@ -72,8 +74,11 @@ export const NavBar: React.FC = () => {
           </span>
         </div>
 
-        {/* Right: Theme Switcher and Master Volume */}
+        {/* Right: MIDI, Theme Switcher and Master Volume */}
         <div className="flex items-center gap-4">
+          {/* MIDI Settings */}
+          <MIDIToolbarDropdown />
+
           {/* Theme Switcher */}
           <div className="relative" data-theme-menu>
             <button
@@ -172,13 +177,26 @@ export const NavBar: React.FC = () => {
         </button>
       </div>
 
-      {/* Bottom Bar: Oscilloscope (click to toggle mode) */}
-      <div
-        className="px-2 py-1 cursor-pointer"
-        onClick={() => setVizMode(vizMode === 'waveform' ? 'spectrum' : 'waveform')}
-        title={`Click to switch to ${vizMode === 'waveform' ? 'spectrum' : 'waveform'} view`}
-      >
-        <Oscilloscope width="auto" height={60} mode={vizMode} />
+      {/* Bottom Bar: Oscilloscope with consistent collapse toggle */}
+      <div className={`relative ${oscilloscopeVisible ? 'px-2 py-1' : 'h-6'}`}>
+        {/* Collapse toggle - consistent right-side position */}
+        <button
+          className="panel-collapse-toggle"
+          onClick={toggleOscilloscopeVisible}
+          title={oscilloscopeVisible ? 'Hide oscilloscope' : 'Show oscilloscope'}
+        >
+          {oscilloscopeVisible ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+
+        {oscilloscopeVisible && (
+          <div
+            className="cursor-pointer"
+            onClick={() => setVizMode(vizMode === 'waveform' ? 'spectrum' : 'waveform')}
+            title={`Click to switch to ${vizMode === 'waveform' ? 'spectrum' : 'waveform'} view`}
+          >
+            <Oscilloscope width="auto" height={60} mode={vizMode} />
+          </div>
+        )}
       </div>
     </div>
   );

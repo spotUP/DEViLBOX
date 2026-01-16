@@ -12,6 +12,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { getEffectProcessor } from './EffectCommands';
 import { getAutomationPlayer } from './AutomationPlayer';
+import { useTransportStore } from '@stores/useTransportStore';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
@@ -152,17 +153,47 @@ export class PatternScheduler {
   }
 
   /**
+   * Calculate swing offset for a given row
+   * Swing delays off-beat rows by a percentage of the row duration
+   * @param row The row number
+   * @param swingAmount Swing amount (0-100, where 50 = no swing, 100 = full triplet feel)
+   * @returns Time offset in seconds
+   */
+  private getSwingOffset(row: number, swingAmount: number): number {
+    // No swing at 0 or 50 (neutral)
+    if (swingAmount === 0 || swingAmount === 50) return 0;
+
+    // Swing affects every other row (odd rows in 2-row groupings)
+    // In standard 4-row beat: rows 1, 3 get swing; rows 0, 2 are on-beat
+    const rowsPerSwingGroup = 2;
+    const isSwungRow = (row % rowsPerSwingGroup) === 1;
+
+    if (!isSwungRow) return 0;
+
+    // Calculate swing ratio (50 = no swing, 100 = full delay, 0 = early)
+    // swing > 50: delay the off-beat
+    // swing < 50: play off-beat earlier (less common but supported)
+    const secondsPerRow = this.getSecondsPerRow();
+
+    // Max swing is half a row's duration (creates triplet feel at 100)
+    const maxSwingOffset = secondsPerRow * 0.5;
+
+    // Normalize swing from 0-100 to -1 to 1 (50 = 0)
+    const normalizedSwing = (swingAmount - 50) / 50;
+
+    return normalizedSwing * maxSwingOffset;
+  }
+
+  /**
    * Apply tick effect results to a channel
    * Note: Some effects (frequency changes) require synth-level support
    * that may not be fully implemented in ToneEngine yet.
    * @param channelIndex The channel to apply effects to
    * @param tickResult The result from the effect processor
-   * @param time Optional precise transport time for sample-accurate scheduling
    */
   private applyTickEffects(
     channelIndex: number,
-    tickResult: ReturnType<typeof this.effectProcessor.processTick>,
-    time?: number
+    tickResult: ReturnType<typeof this.effectProcessor.processTick>
   ): void {
     const engine = getToneEngine();
     const instrumentId = this.channelActiveInstruments.get(channelIndex);
@@ -243,13 +274,26 @@ export class PatternScheduler {
     const secondsPerRow = this.getSecondsPerRow();
 
     // Schedule each row - use seconds directly (Tone.js accepts numbers as seconds)
+    // Rows per beat for metronome (4 rows = 1 beat in standard tracker timing)
+    const rowsPerBeat = 4;
+
+    // Get swing amount from transport store
+    const swingAmount = useTransportStore.getState().swing;
+
     for (let row = 0; row < pattern.length; row++) {
-      const time = startOffset + row * secondsPerRow; // Time in seconds from start + offset
+      // Apply swing offset to off-beat rows
+      const swingOffset = this.getSwingOffset(row, swingAmount);
+      const time = startOffset + row * secondsPerRow + swingOffset; // Time in seconds with swing
 
       events.push({
         time,
         // Audio callback receives precise Transport time for sample-accurate scheduling
         audioCallback: (transportTime: number) => {
+          // Trigger metronome click on beat boundaries
+          if (row % rowsPerBeat === 0 && engine.isMetronomeEnabled()) {
+            const isDownbeat = row === 0; // First row of pattern is downbeat
+            engine.triggerMetronomeClick(transportTime, isDownbeat);
+          }
           // Process automation for all channels at this row
           this.automationPlayer.processPatternRow(row);
 
@@ -418,7 +462,9 @@ export class PatternScheduler {
     const ticksPerRow = this.getTicksPerRow();
 
     for (let row = 0; row < pattern.length; row++) {
-      const rowStartTime = startOffset + row * secondsPerRow;
+      // Apply swing offset to tick events too
+      const swingOffset = this.getSwingOffset(row, swingAmount);
+      const rowStartTime = startOffset + row * secondsPerRow + swingOffset;
 
       // Schedule ticks 1 through ticksPerRow-1
       for (let tick = 1; tick < ticksPerRow; tick++) {
@@ -426,11 +472,12 @@ export class PatternScheduler {
 
         tickEvents.push({
           time: tickTime,
-          callback: (transportTime: number) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          callback: (_transportTime: number) => {
             // Process tick effects for all channels at precise transport time
             pattern.channels.forEach((_, channelIndex) => {
               const tickResult = this.effectProcessor.processTick(channelIndex, tick);
-              this.applyTickEffects(channelIndex, tickResult, transportTime);
+              this.applyTickEffects(channelIndex, tickResult);
             });
           },
         });
@@ -548,6 +595,14 @@ export class PatternScheduler {
    * Clear current schedule
    */
   public clearSchedule(): void {
+    // CRITICAL: Release all active notes to prevent hanging notes
+    try {
+      const engine = getToneEngine();
+      engine.releaseAll();
+    } catch (e) {
+      console.warn('[PatternScheduler] Could not release notes:', e);
+    }
+
     if (this.currentPart) {
       this.currentPart.stop();
       this.currentPart.dispose();

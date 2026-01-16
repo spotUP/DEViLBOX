@@ -46,6 +46,9 @@ interface InstrumentStore {
 
   // Import
   loadInstruments: (instruments: InstrumentConfig[]) => void;
+
+  // Reset to initial state
+  reset: () => void;
 }
 
 const createDefaultInstrument = (id: number): InstrumentConfig => ({
@@ -357,6 +360,27 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
       console.log('[InstrumentStore] Loaded', newInstruments.length, 'instruments');
+    },
+
+    // Reset to initial state (for new project/tab)
+    reset: () => {
+      // First invalidate all existing instruments in the engine
+      const engine = getToneEngine();
+      get().instruments.forEach((inst) => {
+        try {
+          engine.invalidateInstrument(inst.id);
+        } catch (e) {
+          // Ignore errors during invalidation
+        }
+      });
+
+      set((state) => {
+        state.instruments = [{ ...TB303_PRESETS[0], id: 0 } as InstrumentConfig];
+        state.currentInstrumentId = 0;
+        state.presets = [];
+      });
+
+      console.log('[InstrumentStore] Reset to initial state');
     },
   }))
 );
