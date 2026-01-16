@@ -8,6 +8,10 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import { OscillatorEditor } from './OscillatorEditor';
 import { EnvelopeEditor } from './EnvelopeEditor';
 import { FilterEditor } from './FilterEditor';
+import { SampleEditor } from './SampleEditor';
+
+// Sample-based synth types
+const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
 
 interface GenericSynthEditorProps {
   instrument: InstrumentConfig;
@@ -18,6 +22,8 @@ export const GenericSynthEditor: React.FC<GenericSynthEditorProps> = ({
   instrument,
   onChange,
 }) => {
+  const isSampleBased = SAMPLE_SYNTH_TYPES.includes(instrument.synthType);
+
   return (
     <div className="p-4 space-y-6">
       {/* Synth Type Info */}
@@ -30,8 +36,15 @@ export const GenericSynthEditor: React.FC<GenericSynthEditorProps> = ({
         </div>
       </div>
 
-      {/* Oscillator Section (if applicable) */}
-      {instrument.oscillator && (
+      {/* Sample Editor for sample-based instruments */}
+      {isSampleBased && (
+        <div className="space-y-3">
+          <SampleEditor instrument={instrument} />
+        </div>
+      )}
+
+      {/* Oscillator Section (if applicable and not sample-based) */}
+      {instrument.oscillator && !isSampleBased && (
         <div className="space-y-3">
           <h3 className="font-mono text-text-primary text-sm font-bold border-b border-dark-border pb-2">
             OSCILLATOR
@@ -137,8 +150,18 @@ function getSynthDescription(synthType: string): string {
     MetalSynth: 'Inharmonic FM synthesis for metallic percussion',
     MembraneSynth: 'Physical modeling for drum-like sounds',
     NoiseSynth: 'Filtered noise generator for percussion and effects',
-    Sampler: 'Sample-based playback instrument',
-    Player: 'Audio file playback',
+    Sampler: 'Sample-based instrument - load any audio file and play it chromatically',
+    Player: 'One-shot audio playback - triggers the full sample on each note',
+    GranularSynth: 'Granular synthesis - breaks samples into tiny grains for evolving textures',
+    Wavetable: 'Wavetable synthesizer with morphing capabilities',
+    SuperSaw: 'Massive detuned sawtooth waves for trance and EDM',
+    PolySynth: 'True polyphonic synthesizer with voice management',
+    Organ: 'Hammond-style drawbar organ simulation',
+    DrumMachine: '808/909 style analog drum synthesis',
+    ChipSynth: '8-bit video game console sounds',
+    PWMSynth: 'Pulse width modulation for rich analog tones',
+    StringMachine: 'Vintage ensemble string synthesizer',
+    FormantSynth: 'Vowel/formant synthesis for vocal sounds',
   };
   return descriptions[synthType] || 'Synthesizer';
 }
