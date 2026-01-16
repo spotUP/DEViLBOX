@@ -67,13 +67,16 @@ export const useLiveModeStore = create<LiveModeStore>()(
 
     // Mode control
     toggleLiveMode: () => {
+      const currentMode = get().isLiveMode;
+      const newMode = !currentMode;
+      console.log('[LiveMode] Toggling:', currentMode, '->', newMode);
       set((state) => {
-        state.isLiveMode = !state.isLiveMode;
-        // Clear queues when switching modes
-        if (!state.isLiveMode) {
+        state.isLiveMode = newMode;
+        // Clear queues when switching to edit mode
+        if (!newMode) {
           state.pendingPatternIndex = null;
           state.pendingPositionIndex = null;
-          state.channelQueues.clear();
+          state.channelQueues = new Map();
         }
       });
     },

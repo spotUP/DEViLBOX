@@ -301,7 +301,7 @@ function App() {
                   <div className="p-2 rounded-md bg-accent-primary/20 text-accent-primary">
                     <Music size={18} />
                   </div>
-                  <h3 className="font-semibold text-text-primary">12 Synth Engines</h3>
+                  <h3 className="font-semibold text-text-primary">22 Synth Engines</h3>
                 </div>
                 <p className="text-sm text-text-secondary">
                   Including authentic TB-303 with accent and slide

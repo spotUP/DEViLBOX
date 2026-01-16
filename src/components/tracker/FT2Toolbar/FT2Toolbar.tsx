@@ -13,13 +13,13 @@ import React, { useRef, useState } from 'react';
 import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { importSong } from '@lib/export/exporters';
+import { importSong, exportSong } from '@lib/export/exporters';
 import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
@@ -152,12 +152,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setSmoothScrolling,
   } = useTransportStore();
 
-  const { isDirty, setMetadata } = useProjectStore();
+  const { isDirty, setMetadata, metadata } = useProjectStore();
   const { save: saveProject } = useProjectPersistence();
-  const { loadInstruments } = useInstrumentStore();
-  const { masterMuted, toggleMasterMute } = useAudioStore();
+  const { instruments, loadInstruments } = useInstrumentStore();
+  const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar } = useUIStore();
   const { isLiveMode, toggleLiveMode, pendingPatternIndex } = useLiveModeStore();
+  const { curves } = useAutomationStore();
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,13 +225,57 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDemoMenu]);
 
-  // Save handler with feedback
+  // Save handler with feedback (browser storage)
   const handleSave = () => {
     const success = saveProject();
     if (success) {
       notify.success('Project saved to browser storage', 2000);
     } else {
       notify.error('Failed to save project');
+    }
+  };
+
+  // Save to file handler (download to computer)
+  const handleSaveFile = () => {
+    try {
+      const sequence = patterns.map((p) => p.id);
+      // Convert automation curves to export format
+      const automationData: Record<string, any> = {};
+      patterns.forEach((pattern) => {
+        pattern.channels.forEach((_channel, channelIndex) => {
+          const channelCurves = curves.filter(
+            (c) => c.patternId === pattern.id && c.channelIndex === channelIndex
+          );
+          if (channelCurves.length > 0) {
+            if (!automationData[pattern.id]) {
+              automationData[pattern.id] = {};
+            }
+            automationData[pattern.id][channelIndex] = channelCurves.reduce(
+              (acc, curve) => {
+                acc[curve.parameter] = curve;
+                return acc;
+              },
+              {} as Record<string, any>
+            );
+          }
+        });
+      });
+
+      exportSong(
+        metadata,
+        bpm,
+        instruments,
+        patterns,
+        sequence,
+        Object.keys(automationData).length > 0 ? automationData : undefined,
+        masterEffects.length > 0 ? masterEffects : undefined,
+        curves.length > 0 ? curves : undefined,
+        { prettify: true }
+      );
+      notify.success('Song downloaded!', 2000);
+    } catch (error) {
+      console.error('Failed to save file:', error);
+      notify.error('Failed to download file');
     }
   };
 
@@ -613,8 +658,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             )}
           </div>
 
-          <FT2Button onClick={handleSave} small title="Save project (Ctrl+S)">
+          <FT2Button onClick={handleSave} small title="Save to browser storage (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
+          </FT2Button>
+          <FT2Button onClick={handleSaveFile} small title="Download song file to computer">
+            Download
           </FT2Button>
           <FT2Button onClick={onImport} small title="Import module dialog">
             Import
