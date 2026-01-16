@@ -532,6 +532,20 @@ export class ToneEngine {
         break;
       }
 
+      // New synths - use InstrumentFactory for complex synths
+      case 'SuperSaw':
+      case 'PolySynth':
+      case 'Organ':
+      case 'DrumMachine':
+      case 'ChipSynth':
+      case 'PWMSynth':
+      case 'StringMachine':
+      case 'FormantSynth': {
+        console.log(`[ToneEngine] Creating ${config.synthType} instrument via InstrumentFactory`, { instrumentId });
+        instrument = InstrumentFactory.createInstrument(config);
+        break;
+      }
+
       default:
         // Default to basic synth
         instrument = new Tone.PolySynth(Tone.Synth, {
@@ -807,6 +821,24 @@ export class ToneEngine {
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
           player.start(time);
+        }
+      } else if (
+        config.synthType === 'SuperSaw' ||
+        config.synthType === 'PolySynth' ||
+        config.synthType === 'Organ' ||
+        config.synthType === 'ChipSynth' ||
+        config.synthType === 'PWMSynth' ||
+        config.synthType === 'StringMachine' ||
+        config.synthType === 'FormantSynth'
+      ) {
+        // New synths with triggerAttackRelease interface
+        if (instrument.triggerAttackRelease) {
+          instrument.triggerAttackRelease(note, duration, time, velocity);
+        }
+      } else if (config.synthType === 'DrumMachine') {
+        // DrumMachine - some drum types don't take note parameter
+        if (instrument.triggerAttackRelease) {
+          instrument.triggerAttackRelease(note, duration, time, velocity);
         }
       } else if (instrument.triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)

@@ -16,7 +16,16 @@ export type SynthType =
   | 'Sampler'
   | 'Player'
   | 'Wavetable'
-  | 'GranularSynth';
+  | 'GranularSynth'
+  // New synths
+  | 'SuperSaw'
+  | 'PolySynth'
+  | 'Organ'
+  | 'DrumMachine'
+  | 'ChipSynth'
+  | 'PWMSynth'
+  | 'StringMachine'
+  | 'FormantSynth';
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -213,6 +222,361 @@ export const DEFAULT_GRANULAR: GranularConfig = {
   },
 };
 
+/**
+ * SuperSaw Synthesizer Configuration
+ * Multiple detuned sawtooth oscillators for massive trance/EDM sounds
+ */
+export interface SuperSawConfig {
+  voices: number;               // 3-9 oscillators (default 7)
+  detune: number;               // 0-100 cents spread between voices
+  mix: number;                  // 0-100% center vs side voices
+  stereoSpread: number;         // 0-100% panning width
+  envelope: EnvelopeConfig;
+  filter: {
+    type: FilterType;
+    cutoff: number;             // 20-20000 Hz
+    resonance: number;          // 0-100%
+    envelopeAmount: number;     // -100 to 100%
+  };
+  filterEnvelope: EnvelopeConfig;
+}
+
+export const DEFAULT_SUPERSAW: SuperSawConfig = {
+  voices: 7,
+  detune: 30,
+  mix: 50,
+  stereoSpread: 80,
+  envelope: {
+    attack: 10,
+    decay: 100,
+    sustain: 80,
+    release: 300,
+  },
+  filter: {
+    type: 'lowpass',
+    cutoff: 8000,
+    resonance: 20,
+    envelopeAmount: 0,
+  },
+  filterEnvelope: {
+    attack: 10,
+    decay: 200,
+    sustain: 30,
+    release: 500,
+  },
+};
+
+/**
+ * PolySynth Configuration
+ * True polyphonic synth with voice management
+ */
+export interface PolySynthConfig {
+  voiceCount: number;           // 1-16 max simultaneous voices
+  voiceType: 'Synth' | 'FMSynth' | 'AMSynth';
+  stealMode: 'oldest' | 'lowest' | 'highest';
+  oscillator: OscillatorConfig;
+  envelope: EnvelopeConfig;
+  filter?: FilterConfig;
+  filterEnvelope?: FilterEnvelopeConfig;
+  portamento: number;           // 0-1000ms glide between notes
+}
+
+export const DEFAULT_POLYSYNTH: PolySynthConfig = {
+  voiceCount: 8,
+  voiceType: 'Synth',
+  stealMode: 'oldest',
+  oscillator: {
+    type: 'sawtooth',
+    detune: 0,
+    octave: 0,
+  },
+  envelope: {
+    attack: 50,
+    decay: 200,
+    sustain: 70,
+    release: 500,
+  },
+  portamento: 0,
+};
+
+/**
+ * Organ (Hammond Drawbar) Configuration
+ */
+export interface OrganConfig {
+  drawbars: [number, number, number, number, number, number, number, number, number];
+  // 16', 5⅓', 8', 4', 2⅔', 2', 1⅗', 1⅓', 1' (0-8 each)
+  percussion: {
+    enabled: boolean;
+    volume: number;             // 0-100%
+    decay: 'fast' | 'slow';
+    harmonic: 'second' | 'third';
+  };
+  keyClick: number;             // 0-100%
+  vibrato: {
+    type: 'V1' | 'V2' | 'V3' | 'C1' | 'C2' | 'C3';
+    depth: number;              // 0-100%
+  };
+  rotary: {
+    enabled: boolean;
+    speed: 'slow' | 'fast';
+  };
+}
+
+export const DEFAULT_ORGAN: OrganConfig = {
+  drawbars: [8, 8, 8, 0, 0, 0, 0, 0, 0], // Classic rock organ
+  percussion: {
+    enabled: false,
+    volume: 50,
+    decay: 'fast',
+    harmonic: 'third',
+  },
+  keyClick: 30,
+  vibrato: {
+    type: 'C3',
+    depth: 50,
+  },
+  rotary: {
+    enabled: true,
+    speed: 'slow',
+  },
+};
+
+/**
+ * DrumMachine Configuration (808/909 style)
+ */
+export type DrumType = 'kick' | 'snare' | 'clap' | 'hihat' | 'tom' | 'cymbal' | 'cowbell' | 'rimshot';
+
+export interface DrumMachineConfig {
+  drumType: DrumType;
+  kick?: {
+    pitch: number;              // 30-80 Hz
+    pitchDecay: number;         // 0-500ms
+    tone: number;               // 0-100% click/thump balance
+    decay: number;              // 50-2000ms
+    drive: number;              // 0-100% saturation
+  };
+  snare?: {
+    pitch: number;              // 100-300 Hz
+    tone: number;               // 0-100% body/snap
+    snappy: number;             // 0-100% noise amount
+    decay: number;              // 50-500ms
+  };
+  hihat?: {
+    tone: number;               // 0-100% dark/bright
+    decay: number;              // 10-1000ms
+    metallic: number;           // 0-100%
+  };
+  clap?: {
+    tone: number;               // 0-100%
+    decay: number;              // 50-500ms
+    spread: number;             // 0-100% multiple hit spread
+  };
+}
+
+export const DEFAULT_DRUM_MACHINE: DrumMachineConfig = {
+  drumType: 'kick',
+  kick: {
+    pitch: 50,
+    pitchDecay: 100,
+    tone: 50,
+    decay: 500,
+    drive: 0,
+  },
+};
+
+/**
+ * ChipSynth Configuration (8-bit)
+ */
+export interface ChipSynthConfig {
+  channel: 'pulse1' | 'pulse2' | 'triangle' | 'noise';
+  pulse?: {
+    duty: 12.5 | 25 | 50;       // Duty cycle percentage
+  };
+  noise?: {
+    mode: 'white' | 'periodic';
+    period: number;             // For periodic noise
+  };
+  bitDepth: number;             // 4-16 bits
+  sampleRate: number;           // 4000-44100 Hz
+  arpeggio?: {
+    enabled: boolean;
+    speed: number;              // Hz
+    pattern: number[];          // Semitone offsets
+  };
+  envelope: EnvelopeConfig;
+  vibrato: {
+    speed: number;              // 0-20 Hz
+    depth: number;              // 0-100%
+    delay: number;              // ms before vibrato starts
+  };
+}
+
+export const DEFAULT_CHIP_SYNTH: ChipSynthConfig = {
+  channel: 'pulse1',
+  pulse: {
+    duty: 50,
+  },
+  bitDepth: 8,
+  sampleRate: 22050,
+  envelope: {
+    attack: 5,
+    decay: 100,
+    sustain: 70,
+    release: 200,
+  },
+  vibrato: {
+    speed: 6,
+    depth: 0,
+    delay: 200,
+  },
+};
+
+/**
+ * PWMSynth Configuration (Pulse Width Modulation)
+ */
+export interface PWMSynthConfig {
+  pulseWidth: number;           // 0-100% (50% = square)
+  pwmDepth: number;             // 0-100% modulation depth
+  pwmRate: number;              // 0.1-20 Hz LFO rate
+  pwmWaveform: 'sine' | 'triangle' | 'sawtooth';
+  oscillators: number;          // 1-3 oscillators
+  detune: number;               // 0-50 cents between oscillators
+  envelope: EnvelopeConfig;
+  filter: {
+    type: FilterType;
+    cutoff: number;
+    resonance: number;
+    envelopeAmount: number;
+    keyTracking: number;        // 0-100%
+  };
+  filterEnvelope: EnvelopeConfig;
+}
+
+export const DEFAULT_PWM_SYNTH: PWMSynthConfig = {
+  pulseWidth: 50,
+  pwmDepth: 30,
+  pwmRate: 2,
+  pwmWaveform: 'sine',
+  oscillators: 2,
+  detune: 10,
+  envelope: {
+    attack: 50,
+    decay: 200,
+    sustain: 70,
+    release: 500,
+  },
+  filter: {
+    type: 'lowpass',
+    cutoff: 4000,
+    resonance: 20,
+    envelopeAmount: 30,
+    keyTracking: 50,
+  },
+  filterEnvelope: {
+    attack: 10,
+    decay: 300,
+    sustain: 30,
+    release: 500,
+  },
+};
+
+/**
+ * StringMachine Configuration (Ensemble Strings)
+ */
+export interface StringMachineConfig {
+  sections: {
+    violin: number;             // 0-100% level
+    viola: number;
+    cello: number;
+    bass: number;
+  };
+  ensemble: {
+    depth: number;              // 0-100% chorus depth
+    rate: number;               // 0.5-6 Hz
+    voices: number;             // 2-6 chorus voices
+  };
+  attack: number;               // 10-2000ms
+  release: number;              // 100-5000ms
+  brightness: number;           // 0-100% high frequency content
+}
+
+export const DEFAULT_STRING_MACHINE: StringMachineConfig = {
+  sections: {
+    violin: 100,
+    viola: 70,
+    cello: 50,
+    bass: 30,
+  },
+  ensemble: {
+    depth: 60,
+    rate: 3,
+    voices: 4,
+  },
+  attack: 200,
+  release: 1000,
+  brightness: 60,
+};
+
+/**
+ * FormantSynth Configuration (Vocal Synthesis)
+ */
+export type VowelType = 'A' | 'E' | 'I' | 'O' | 'U';
+
+export interface FormantSynthConfig {
+  vowel: VowelType;
+  vowelMorph: {
+    target: VowelType;
+    amount: number;             // 0-100% blend
+    rate: number;               // 0-5 Hz morph speed
+    mode: 'manual' | 'lfo' | 'envelope';
+  };
+  oscillator: {
+    type: WaveformType;
+    pulseWidth?: number;        // For pulse wave
+  };
+  formants: {
+    f1: number;                 // First formant Hz (override)
+    f2: number;                 // Second formant Hz
+    f3: number;                 // Third formant Hz
+    bandwidth: number;          // 50-200 Hz
+  };
+  envelope: EnvelopeConfig;
+  brightness: number;           // 0-100%
+}
+
+// Formant frequency presets for vowels
+export const VOWEL_FORMANTS: Record<VowelType, { f1: number; f2: number; f3: number }> = {
+  A: { f1: 800, f2: 1200, f3: 2500 },
+  E: { f1: 400, f2: 2000, f3: 2600 },
+  I: { f1: 300, f2: 2300, f3: 3000 },
+  O: { f1: 500, f2: 800, f3: 2500 },
+  U: { f1: 350, f2: 600, f3: 2400 },
+};
+
+export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
+  vowel: 'A',
+  vowelMorph: {
+    target: 'O',
+    amount: 0,
+    rate: 1,
+    mode: 'manual',
+  },
+  oscillator: {
+    type: 'sawtooth',
+  },
+  formants: {
+    ...VOWEL_FORMANTS.A,
+    bandwidth: 100,
+  },
+  envelope: {
+    attack: 50,
+    decay: 200,
+    sustain: 70,
+    release: 500,
+  },
+  brightness: 70,
+};
+
 export type EffectType =
   | 'Distortion'
   | 'Reverb'
@@ -257,6 +621,15 @@ export interface InstrumentConfig {
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
   granular?: GranularConfig;
+  // New synth configs
+  superSaw?: SuperSawConfig;
+  polySynth?: PolySynthConfig;
+  organ?: OrganConfig;
+  drumMachine?: DrumMachineConfig;
+  chipSynth?: ChipSynthConfig;
+  pwmSynth?: PWMSynthConfig;
+  stringMachine?: StringMachineConfig;
+  formantSynth?: FormantSynthConfig;
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100

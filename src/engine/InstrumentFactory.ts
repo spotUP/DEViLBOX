@@ -6,11 +6,22 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import {
+  DEFAULT_WAVETABLE,
+  DEFAULT_SUPERSAW,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_ORGAN,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_FORMANT_SYNTH,
+  VOWEL_FORMANTS,
+} from '../types/instrument';
 import { TB303Synth } from './TB303Engine';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { WavetableSynth } from './WavetableSynth';
-import { DEFAULT_WAVETABLE } from '../types/instrument';
 
 export class InstrumentFactory {
   /**
@@ -74,6 +85,39 @@ export class InstrumentFactory {
 
       case 'GranularSynth':
         instrument = this.createGranularSynth(config);
+        break;
+
+      // New synths
+      case 'SuperSaw':
+        instrument = this.createSuperSaw(config);
+        break;
+
+      case 'PolySynth':
+        instrument = this.createPolySynth(config);
+        break;
+
+      case 'Organ':
+        instrument = this.createOrgan(config);
+        break;
+
+      case 'DrumMachine':
+        instrument = this.createDrumMachine(config);
+        break;
+
+      case 'ChipSynth':
+        instrument = this.createChipSynth(config);
+        break;
+
+      case 'PWMSynth':
+        instrument = this.createPWMSynth(config);
+        break;
+
+      case 'StringMachine':
+        instrument = this.createStringMachine(config);
+        break;
+
+      case 'FormantSynth':
+        instrument = this.createFormantSynth(config);
         break;
 
       default:
@@ -590,6 +634,625 @@ export class InstrumentFactory {
       loop: true,
       volume: config.volume || -12,
     });
+  }
+
+  // ============================================================================
+  // NEW SYNTH CREATORS
+  // ============================================================================
+
+  /**
+   * SuperSaw - Multiple detuned sawtooth oscillators for massive trance/EDM sound
+   */
+  private static createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
+    const ssConfig = config.superSaw || DEFAULT_SUPERSAW;
+    const detuneSpread = ssConfig.detune;
+
+    // Create a PolySynth with sawtooth and add unison effect via chorus
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 16,
+      oscillator: {
+        type: 'sawtooth',
+      },
+      envelope: {
+        attack: (ssConfig.envelope.attack || 10) / 1000,
+        decay: (ssConfig.envelope.decay || 100) / 1000,
+        sustain: (ssConfig.envelope.sustain || 80) / 100,
+        release: (ssConfig.envelope.release || 300) / 1000,
+      },
+      volume: config.volume || -12,
+    });
+
+    // Apply filter
+    const filter = new Tone.Filter({
+      type: ssConfig.filter.type,
+      frequency: ssConfig.filter.cutoff,
+      Q: ssConfig.filter.resonance / 10,
+      rolloff: -24,
+    });
+
+    // Add chorus for the supersaw detuning effect (simulates multiple detuned oscillators)
+    const chorus = new Tone.Chorus({
+      frequency: 4,
+      delayTime: 2.5,
+      depth: Math.min(1, detuneSpread / 50), // Map 0-100 to 0-2, capped at 1
+      wet: 0.8,
+    });
+    chorus.start();
+
+    // Connect synth -> filter -> chorus
+    synth.connect(filter);
+    filter.connect(chorus);
+
+    // Return a wrapper object
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => chorus.connect(dest),
+      disconnect: () => chorus.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        filter.dispose();
+        chorus.dispose();
+      },
+      volume: synth.volume,
+    } as any;
+  }
+
+  /**
+   * PolySynth - True polyphonic synth with voice management
+   */
+  private static createPolySynth(config: InstrumentConfig): Tone.PolySynth {
+    const psConfig = config.polySynth || DEFAULT_POLYSYNTH;
+
+    // Select voice type
+    let VoiceClass: typeof Tone.Synth | typeof Tone.FMSynth | typeof Tone.AMSynth = Tone.Synth;
+    if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
+    else if (psConfig.voiceType === 'AMSynth') VoiceClass = Tone.AMSynth;
+
+    return new Tone.PolySynth(VoiceClass, {
+      maxPolyphony: psConfig.voiceCount,
+      oscillator: {
+        type: psConfig.oscillator.type || 'sawtooth',
+      },
+      envelope: {
+        attack: (psConfig.envelope.attack || 50) / 1000,
+        decay: (psConfig.envelope.decay || 200) / 1000,
+        sustain: (psConfig.envelope.sustain || 70) / 100,
+        release: (psConfig.envelope.release || 500) / 1000,
+      },
+      volume: config.volume || -12,
+    });
+  }
+
+  /**
+   * Organ - Hammond-style tonewheel organ with 9 drawbars
+   * Note: Full drawbar implementation would require 9 oscillators per voice.
+   * This simplified version uses a sine wave with rotary effect.
+   */
+  private static createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
+    const orgConfig = config.organ || DEFAULT_ORGAN;
+    const output = new Tone.Gain(1);
+
+    // Create polyphonic sine synth for organ tone
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: 'sine',
+      },
+      envelope: {
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.9,
+        release: 0.3,
+      },
+      volume: config.volume || -12,
+    });
+
+    // Add Leslie/rotary effect
+    let rotary: Tone.Tremolo | null = null;
+    if (orgConfig.rotary?.enabled) {
+      rotary = new Tone.Tremolo({
+        frequency: orgConfig.rotary.speed === 'fast' ? 6 : 1,
+        depth: 0.3,
+        wet: 0.5,
+      });
+      rotary.start();
+      synth.connect(rotary);
+      rotary.connect(output);
+    } else {
+      synth.connect(output);
+    }
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => output.connect(dest),
+      disconnect: () => output.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        rotary?.dispose();
+        output.dispose();
+      },
+      volume: synth.volume,
+    } as any;
+  }
+
+  /**
+   * DrumMachine - 808/909 style drum synthesis
+   */
+  private static createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {
+    const dmConfig = config.drumMachine || DEFAULT_DRUM_MACHINE;
+
+    switch (dmConfig.drumType) {
+      case 'kick': {
+        const kickConfig = dmConfig.kick || DEFAULT_DRUM_MACHINE.kick!;
+        // 808 kick: pitched sine with pitch envelope
+        return new Tone.MembraneSynth({
+          pitchDecay: (kickConfig.pitchDecay || 100) / 1000,
+          octaves: 6,
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.001,
+            decay: (kickConfig.decay || 500) / 1000,
+            sustain: 0,
+            release: 0.1,
+          },
+          volume: config.volume || -12,
+        });
+      }
+
+      case 'snare': {
+        const snareConfig = dmConfig.snare || { pitch: 200, tone: 50, snappy: 70, decay: 200 };
+        // Snare: pitched oscillator + noise
+        const body = new Tone.MembraneSynth({
+          pitchDecay: 0.05,
+          octaves: 4,
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.001,
+            decay: snareConfig.decay / 1000,
+            sustain: 0,
+            release: 0.1,
+          },
+          volume: config.volume || -12,
+        });
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: {
+            attack: 0.001,
+            decay: snareConfig.decay / 1500,
+            sustain: 0,
+            release: 0.05,
+          },
+          volume: (config.volume || -12) + (snareConfig.snappy / 10 - 5),
+        });
+
+        const output = new Tone.Gain(1);
+        body.connect(output);
+        noise.connect(output);
+
+        return {
+          triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+            body.triggerAttackRelease(note, duration, time, velocity);
+            noise.triggerAttackRelease(duration, time, velocity);
+          },
+          triggerAttack: (note: string, time?: number, velocity?: number) => {
+            body.triggerAttack(note, time, velocity);
+            noise.triggerAttack(time, velocity);
+          },
+          triggerRelease: (note: string, time?: number) => {
+            body.triggerRelease(time);
+            noise.triggerRelease(time);
+          },
+          releaseAll: () => {
+            try { body.triggerRelease(); } catch { /* ignore */ }
+            try { noise.triggerRelease(); } catch { /* ignore */ }
+          },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            body.dispose();
+            noise.dispose();
+            output.dispose();
+          },
+          volume: body.volume,
+        } as any;
+      }
+
+      case 'hihat': {
+        const hhConfig = dmConfig.hihat || { tone: 50, decay: 100, metallic: 50 };
+        // Hi-hat: metal synth with short decay
+        return new Tone.MetalSynth({
+          frequency: 200 + hhConfig.tone * 2,
+          envelope: {
+            attack: 0.001,
+            decay: hhConfig.decay / 1000,
+            release: 0.01,
+          },
+          harmonicity: 5.1,
+          modulationIndex: 32 + hhConfig.metallic / 3,
+          resonance: 4000 + hhConfig.tone * 40,
+          octaves: 1.5,
+          volume: config.volume || -12,
+        });
+      }
+
+      case 'clap': {
+        const clapConfig = dmConfig.clap || { tone: 50, decay: 200, spread: 50 };
+        // Clap: filtered noise with multiple triggers
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: {
+            attack: 0.001,
+            decay: clapConfig.decay / 1000,
+            sustain: 0,
+            release: 0.05,
+          },
+          volume: config.volume || -12,
+        });
+
+        const filter = new Tone.Filter({
+          type: 'bandpass',
+          frequency: 1000 + clapConfig.tone * 20,
+          Q: 2,
+        });
+        noise.connect(filter);
+
+        return {
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            noise.triggerAttackRelease(duration, time, velocity);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            noise.triggerAttack(time, velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            noise.triggerRelease(time);
+          },
+          releaseAll: () => {
+            try { noise.triggerRelease(); } catch { /* ignore */ }
+          },
+          connect: (dest: Tone.InputNode) => filter.connect(dest),
+          disconnect: () => filter.disconnect(),
+          dispose: () => {
+            noise.dispose();
+            filter.dispose();
+          },
+          volume: noise.volume,
+        } as any;
+      }
+
+      default:
+        // Default to kick
+        return new Tone.MembraneSynth({
+          pitchDecay: 0.05,
+          octaves: 10,
+          envelope: {
+            attack: 0.001,
+            decay: 0.4,
+            sustain: 0.01,
+            release: 0.1,
+          },
+          volume: config.volume || -12,
+        });
+    }
+  }
+
+  /**
+   * ChipSynth - 8-bit video game console sounds
+   * Uses square/triangle waves with bit crushing for authentic lo-fi character
+   */
+  private static createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const chipConfig = config.chipSynth || DEFAULT_CHIP_SYNTH;
+
+    // Create base oscillator based on channel type
+    // Note: 'pulse' channels use 'square' since Tone.Synth doesn't support pulse width
+    let oscillatorType: 'square' | 'triangle' = 'square';
+    if (chipConfig.channel === 'triangle') {
+      oscillatorType = 'triangle';
+    }
+
+    if (chipConfig.channel === 'noise') {
+      // Noise channel uses NoiseSynth
+      const noise = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: {
+          attack: chipConfig.envelope.attack / 1000,
+          decay: chipConfig.envelope.decay / 1000,
+          sustain: chipConfig.envelope.sustain / 100,
+          release: chipConfig.envelope.release / 1000,
+        },
+        volume: config.volume || -12,
+      });
+
+      // Add bit crusher for 8-bit sound
+      const bitCrusher = new Tone.BitCrusher({
+        bits: chipConfig.bitDepth,
+        wet: 1,
+      });
+      noise.connect(bitCrusher);
+
+      return {
+        triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+          noise.triggerAttackRelease(duration, time, velocity);
+        },
+        triggerAttack: (_note: string, time?: number, velocity?: number) => {
+          noise.triggerAttack(time, velocity);
+        },
+        triggerRelease: (_note: string, time?: number) => {
+          noise.triggerRelease(time);
+        },
+        releaseAll: () => {
+          // NoiseSynth doesn't have releaseAll, just release current note
+          try { noise.triggerRelease(); } catch { /* ignore */ }
+        },
+        connect: (dest: Tone.InputNode) => bitCrusher.connect(dest),
+        disconnect: () => bitCrusher.disconnect(),
+        dispose: () => {
+          noise.dispose();
+          bitCrusher.dispose();
+        },
+        volume: noise.volume,
+      } as any;
+    }
+
+    // Square/Triangle channels
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: oscillatorType,
+      },
+      envelope: {
+        attack: chipConfig.envelope.attack / 1000,
+        decay: chipConfig.envelope.decay / 1000,
+        sustain: chipConfig.envelope.sustain / 100,
+        release: chipConfig.envelope.release / 1000,
+      },
+      volume: config.volume || -12,
+    });
+
+    // Add bit crusher for 8-bit character
+    const bitCrusher = new Tone.BitCrusher({
+      bits: chipConfig.bitDepth,
+      wet: 1,
+    });
+    synth.connect(bitCrusher);
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => bitCrusher.connect(dest),
+      disconnect: () => bitCrusher.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        bitCrusher.dispose();
+      },
+      volume: synth.volume,
+    } as any;
+  }
+
+  /**
+   * PWMSynth - Pulse width modulation synth
+   * Uses square wave with vibrato to simulate PWM effect
+   * Note: True PWM would require custom oscillator implementation
+   */
+  private static createPWMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const pwmConfig = config.pwmSynth || DEFAULT_PWM_SYNTH;
+
+    // Use square wave (Tone.Synth doesn't support true pulse width control)
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: 'square',
+      },
+      envelope: {
+        attack: pwmConfig.envelope.attack / 1000,
+        decay: pwmConfig.envelope.decay / 1000,
+        sustain: pwmConfig.envelope.sustain / 100,
+        release: pwmConfig.envelope.release / 1000,
+      },
+      volume: config.volume || -12,
+    });
+
+    // Add filter
+    const filter = new Tone.Filter({
+      type: pwmConfig.filter.type,
+      frequency: pwmConfig.filter.cutoff,
+      Q: pwmConfig.filter.resonance / 10,
+      rolloff: -24,
+    });
+
+    // Add chorus to simulate PWM modulation effect (richer than vibrato)
+    const chorus = new Tone.Chorus({
+      frequency: pwmConfig.pwmRate,
+      delayTime: 2,
+      depth: pwmConfig.pwmDepth / 100,
+      wet: 0.6,
+    });
+    chorus.start();
+
+    synth.connect(filter);
+    filter.connect(chorus);
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => chorus.connect(dest),
+      disconnect: () => chorus.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        filter.dispose();
+        chorus.dispose();
+      },
+      volume: synth.volume,
+    } as any;
+  }
+
+  /**
+   * StringMachine - Vintage ensemble strings (Solina-style)
+   */
+  private static createStringMachine(config: InstrumentConfig): Tone.ToneAudioNode {
+    const strConfig = config.stringMachine || DEFAULT_STRING_MACHINE;
+
+    // Create polyphonic sawtooth synth
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: 'sawtooth',
+      },
+      envelope: {
+        attack: strConfig.attack / 1000,
+        decay: 0.2,
+        sustain: 0.9,
+        release: strConfig.release / 1000,
+      },
+      volume: config.volume || -12,
+    });
+
+    // Rich chorus effect for ensemble character
+    const chorus = new Tone.Chorus({
+      frequency: strConfig.ensemble.rate,
+      delayTime: 3.5,
+      depth: strConfig.ensemble.depth / 100,
+      wet: 0.8,
+    });
+    chorus.start();
+
+    // Low-pass filter for warmth
+    const filter = new Tone.Filter({
+      type: 'lowpass',
+      frequency: 2000 + (strConfig.brightness * 80),
+      Q: 0.5,
+      rolloff: -12,
+    });
+
+    synth.connect(filter);
+    filter.connect(chorus);
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => chorus.connect(dest),
+      disconnect: () => chorus.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        chorus.dispose();
+        filter.dispose();
+      },
+      volume: synth.volume,
+    } as any;
+  }
+
+  /**
+   * FormantSynth - Vowel synthesis using parallel bandpass filters
+   */
+  private static createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const fmtConfig = config.formantSynth || DEFAULT_FORMANT_SYNTH;
+    const formants = VOWEL_FORMANTS[fmtConfig.vowel];
+
+    // Create source oscillator
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: fmtConfig.oscillator.type,
+      },
+      envelope: {
+        attack: fmtConfig.envelope.attack / 1000,
+        decay: fmtConfig.envelope.decay / 1000,
+        sustain: fmtConfig.envelope.sustain / 100,
+        release: fmtConfig.envelope.release / 1000,
+      },
+      volume: config.volume || -6, // Boost because we're splitting
+    });
+
+    // Create 3 parallel bandpass filters for formants
+    const f1 = new Tone.Filter({
+      type: 'bandpass',
+      frequency: formants.f1,
+      Q: 5,
+    });
+    const f2 = new Tone.Filter({
+      type: 'bandpass',
+      frequency: formants.f2,
+      Q: 5,
+    });
+    const f3 = new Tone.Filter({
+      type: 'bandpass',
+      frequency: formants.f3,
+      Q: 5,
+    });
+
+    // Mix formants together
+    const output = new Tone.Gain(0.5);
+
+    synth.connect(f1);
+    synth.connect(f2);
+    synth.connect(f3);
+    f1.connect(output);
+    f2.connect(output);
+    f3.connect(output);
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
+      },
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => output.connect(dest),
+      disconnect: () => output.disconnect(),
+      dispose: () => {
+        synth.dispose();
+        f1.dispose();
+        f2.dispose();
+        f3.dispose();
+        output.dispose();
+      },
+      volume: synth.volume,
+    } as any;
   }
 
   /**
