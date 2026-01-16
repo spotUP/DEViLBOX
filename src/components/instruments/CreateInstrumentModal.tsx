@@ -1,16 +1,16 @@
 /**
- * CreateInstrumentModal - Full-screen modal for creating new instruments
- * Step 1: Pick synth type, Step 2: Edit parameters, Step 3: Name and save
+ * CreateInstrumentModal - Compact modal for creating new instruments
+ * Single view with synth selection, parameters preview, and name input
  */
 
 import React, { useState, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
-import { TB303Editor } from './TB303Editor';
-import { GenericSynthEditor } from './GenericSynthEditor';
+import { VisualTB303Editor } from './VisualTB303Editor';
+import { VisualSynthEditor } from './VisualSynthEditor';
 import { TestKeyboard } from './TestKeyboard';
 import * as LucideIcons from 'lucide-react';
-import { X, ChevronRight, ChevronLeft, Check, Search } from 'lucide-react';
+import { X, Check, Search } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
@@ -23,18 +23,15 @@ interface CreateInstrumentModalProps {
   onClose: () => void;
 }
 
-type Step = 'select-synth' | 'edit-params' | 'name-save';
-
 export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ onClose }) => {
   const { createInstrument, updateInstrument } = useInstrumentStore();
 
-  const [step, setStep] = useState<Step>('select-synth');
-  const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('Synth');
+  const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('TB303');
   const [synthSearch, setSynthSearch] = useState('');
-  const [instrumentName, setInstrumentName] = useState('New Instrument');
+  const [instrumentName, setInstrumentName] = useState('303 Classic');
 
   // Create a temporary instrument config for editing
-  const [tempInstrument, setTempInstrument] = useState<InstrumentConfig>(() => createTempInstrument('Synth'));
+  const [tempInstrument, setTempInstrument] = useState<InstrumentConfig>(() => createTempInstrument('TB303'));
 
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
@@ -60,11 +57,6 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
     setSelectedSynthType(synthType);
     setTempInstrument(createTempInstrument(synthType));
     setInstrumentName(getSynthInfo(synthType).name);
-  };
-
-  // Handle moving to edit step
-  const handleContinueToEdit = () => {
-    setStep('edit-params');
   };
 
   // Handle saving the instrument
@@ -99,219 +91,118 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
   const IconComponent = getIcon(synthInfo.icon);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="w-[90vw] max-w-4xl h-[85vh] bg-ft2-bg border-2 border-ft2-border rounded-lg flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-6xl h-[90vh] max-h-[700px] bg-dark-bg border border-dark-border rounded-xl flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
+        <div className="flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded ${synthInfo.color} bg-ft2-bg`}>
-              <IconComponent size={20} />
+            <div className={`p-1.5 rounded ${synthInfo.color} bg-dark-bgTertiary`}>
+              <IconComponent size={18} />
             </div>
-            <div>
-              <h2 className="text-ft2-highlight font-bold text-sm">CREATE NEW INSTRUMENT</h2>
-              <p className="text-ft2-textDim text-xs">
-                {step === 'select-synth' && 'Step 1: Choose a synth engine'}
-                {step === 'edit-params' && 'Step 2: Customize your sound'}
-                {step === 'name-save' && 'Step 3: Name and save'}
-              </p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-text-primary font-bold text-sm">CREATE INSTRUMENT</h2>
+              <input
+                type="text"
+                value={instrumentName}
+                onChange={(e) => setInstrumentName(e.target.value)}
+                className="px-3 py-1 text-sm bg-dark-bg border border-dark-border text-text-primary rounded focus:border-accent-primary focus:outline-none font-mono"
+                placeholder="Instrument name..."
+              />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSave}
+              disabled={!instrumentName.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-bold hover:bg-green-500 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Check size={14} />
+              Create
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Step 1: Select Synth */}
-          {step === 'select-synth' && (
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* Search */}
-              <div className="relative mb-4">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ft2-textDim" />
+        {/* Main Content - Two Column Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Synth Selection */}
+          <div className="w-64 shrink-0 bg-dark-bgSecondary border-r border-dark-border flex flex-col">
+            {/* Search */}
+            <div className="p-2 border-b border-dark-border">
+              <div className="relative">
+                <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
                 <input
                   type="text"
                   value={synthSearch}
                   onChange={(e) => setSynthSearch(e.target.value)}
-                  placeholder="Search synths... (bass, pad, 808, lead)"
-                  className="w-full pl-10 pr-4 py-2 bg-ft2-header border border-ft2-border text-ft2-text rounded focus:border-ft2-highlight focus:outline-none"
-                  autoFocus
+                  placeholder="Search synths..."
+                  className="w-full pl-7 pr-2 py-1.5 text-xs bg-dark-bg border border-dark-border text-text-primary rounded focus:border-accent-primary focus:outline-none"
                 />
               </div>
+            </div>
 
-              {/* Synth Grid */}
-              <div className="grid grid-cols-4 gap-2">
-                {filteredSynths.map((synthType) => {
-                  const synth = SYNTH_INFO[synthType];
-                  const SynthIcon = getIcon(synth.icon);
-                  const isSelected = selectedSynthType === synthType;
+            {/* Synth List */}
+            <div className="flex-1 overflow-y-auto scrollbar-modern">
+              {filteredSynths.map((synthType) => {
+                const synth = SYNTH_INFO[synthType];
+                const SynthIcon = getIcon(synth.icon);
+                const isSelected = selectedSynthType === synthType;
 
-                  return (
-                    <button
-                      key={synthType}
-                      onClick={() => handleSelectSynth(synthType)}
-                      className={`
-                        p-3 rounded border-2 text-left transition-all
-                        ${isSelected
-                          ? 'bg-ft2-cursor text-ft2-bg border-ft2-cursor'
-                          : 'bg-ft2-header border-ft2-border hover:border-ft2-highlight'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <SynthIcon size={16} className={isSelected ? 'text-ft2-bg' : synth.color} />
-                        <span className={`font-bold text-sm ${isSelected ? 'text-ft2-bg' : 'text-ft2-text'}`}>
-                          {synth.shortName}
-                        </span>
+                return (
+                  <button
+                    key={synthType}
+                    onClick={() => handleSelectSynth(synthType)}
+                    className={`
+                      w-full px-2 py-1.5 text-left transition-all flex items-center gap-2 border-b border-dark-border
+                      ${isSelected
+                        ? 'bg-accent-primary text-dark-bg'
+                        : 'hover:bg-dark-bgTertiary'
+                      }
+                    `}
+                  >
+                    <SynthIcon size={14} className={isSelected ? 'text-dark-bg' : synth.color} />
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-bold text-xs truncate ${isSelected ? 'text-dark-bg' : 'text-text-primary'}`}>
+                        {synth.shortName}
                       </div>
-                      <p className={`text-xs ${isSelected ? 'text-ft2-bg/80' : 'text-ft2-textDim'}`}>
-                        {synth.bestFor.slice(0, 2).join(', ')}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-
+                      <div className={`text-[10px] truncate ${isSelected ? 'text-dark-bg/70' : 'text-text-muted'}`}>
+                        {synth.bestFor[0]}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
               {filteredSynths.length === 0 && (
-                <div className="text-center py-8 text-ft2-textDim">
-                  No synths match "{synthSearch}"
+                <div className="text-center py-4 text-text-muted text-xs">
+                  No synths found
                 </div>
               )}
-
-              {/* Selected Synth Info */}
-              <div className="mt-4 p-4 bg-ft2-header border border-ft2-border rounded">
-                <div className="flex items-center gap-3 mb-2">
-                  <IconComponent size={24} className={synthInfo.color} />
-                  <div>
-                    <h3 className="font-bold text-ft2-text">{synthInfo.name}</h3>
-                    <p className="text-xs text-ft2-textDim">{synthInfo.description}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {synthInfo.bestFor.map((tag) => (
-                    <span key={tag} className="px-2 py-0.5 text-xs rounded bg-ft2-bg text-ft2-textDim">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
-          )}
+          </div>
 
-          {/* Step 2: Edit Parameters */}
-          {step === 'edit-params' && (
-            <div className="flex-1 overflow-y-auto">
+          {/* Right: Editor + Keyboard */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Editor */}
+            <div className="flex-1 overflow-y-auto scrollbar-modern">
               {tempInstrument.synthType === 'TB303' && tempInstrument.tb303 ? (
-                <TB303Editor config={tempInstrument.tb303} onChange={handleTB303Change} />
+                <VisualTB303Editor config={tempInstrument.tb303} onChange={handleTB303Change} />
               ) : (
-                <GenericSynthEditor
+                <VisualSynthEditor
                   instrument={tempInstrument}
                   onChange={handleUpdateInstrument}
                 />
               )}
-
-              {/* Test Keyboard */}
-              <div className="p-4 border-t border-ft2-border bg-ft2-header">
-                <TestKeyboard instrument={tempInstrument} />
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Name and Save */}
-          {step === 'name-save' && (
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="w-full max-w-md space-y-6">
-                <div className="text-center">
-                  <div className={`inline-flex p-4 rounded-full bg-ft2-header ${synthInfo.color} mb-4`}>
-                    <IconComponent size={48} />
-                  </div>
-                  <h3 className="text-xl font-bold text-ft2-text mb-2">Name Your Instrument</h3>
-                  <p className="text-ft2-textDim text-sm">Give your {synthInfo.name} a memorable name</p>
-                </div>
-
-                <input
-                  type="text"
-                  value={instrumentName}
-                  onChange={(e) => setInstrumentName(e.target.value)}
-                  className="w-full px-4 py-3 text-lg bg-ft2-header border-2 border-ft2-border text-ft2-text rounded focus:border-ft2-cursor focus:outline-none text-center font-bold"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && instrumentName.trim()) {
-                      handleSave();
-                    }
-                  }}
-                />
-
-                <div className="p-4 bg-ft2-header border border-ft2-border rounded">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-ft2-textDim">Synth Type:</span>
-                    <span className="text-ft2-text font-bold">{synthInfo.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm mt-1">
-                    <span className="text-ft2-textDim">Best for:</span>
-                    <span className="text-ft2-text">{synthInfo.bestFor.slice(0, 2).join(', ')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer - Navigation */}
-        <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-t-2 border-ft2-border">
-          <div>
-            {step !== 'select-synth' && (
-              <button
-                onClick={() => setStep(step === 'name-save' ? 'edit-params' : 'select-synth')}
-                className="flex items-center gap-2 px-4 py-2 bg-ft2-bg border border-ft2-border text-ft2-text hover:border-ft2-highlight transition-colors rounded"
-              >
-                <ChevronLeft size={16} />
-                Back
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Step indicators */}
-            <div className="flex items-center gap-1 mr-4">
-              <div className={`w-2 h-2 rounded-full ${step === 'select-synth' ? 'bg-ft2-cursor' : 'bg-ft2-border'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'edit-params' ? 'bg-ft2-cursor' : 'bg-ft2-border'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'name-save' ? 'bg-ft2-cursor' : 'bg-ft2-border'}`} />
             </div>
 
-            {step === 'select-synth' && (
-              <button
-                onClick={handleContinueToEdit}
-                className="flex items-center gap-2 px-4 py-2 bg-ft2-cursor text-ft2-bg font-bold hover:bg-ft2-highlight transition-colors rounded"
-              >
-                Continue
-                <ChevronRight size={16} />
-              </button>
-            )}
-
-            {step === 'edit-params' && (
-              <button
-                onClick={() => setStep('name-save')}
-                className="flex items-center gap-2 px-4 py-2 bg-ft2-cursor text-ft2-bg font-bold hover:bg-ft2-highlight transition-colors rounded"
-              >
-                Continue
-                <ChevronRight size={16} />
-              </button>
-            )}
-
-            {step === 'name-save' && (
-              <button
-                onClick={handleSave}
-                disabled={!instrumentName.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold hover:bg-green-500 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Check size={16} />
-                Create Instrument
-              </button>
-            )}
+            {/* Test Keyboard */}
+            <div className="p-2 border-t border-dark-border bg-dark-bgSecondary shrink-0">
+              <TestKeyboard instrument={tempInstrument} />
+            </div>
           </div>
         </div>
       </div>
