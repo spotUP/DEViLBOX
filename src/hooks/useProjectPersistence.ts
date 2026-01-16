@@ -7,7 +7,7 @@ import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 
-const STORAGE_KEY = 'scribbleton-project';
+const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
 interface SavedProject {

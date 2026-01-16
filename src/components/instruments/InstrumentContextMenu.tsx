@@ -275,7 +275,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
         icon: <ClipboardCopy size={14} />,
         onClick: () => {
           // Store in localStorage for clipboard
-          localStorage.setItem('scribbleton-instrument-clipboard', JSON.stringify(instrument));
+          localStorage.setItem('devilbox-instrument-clipboard', JSON.stringify(instrument));
         },
       },
       // Paste Settings
@@ -284,7 +284,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
         label: 'Paste Settings',
         icon: <ClipboardPaste size={14} />,
         onClick: () => {
-          const clipboardData = localStorage.getItem('scribbleton-instrument-clipboard');
+          const clipboardData = localStorage.getItem('devilbox-instrument-clipboard');
           if (clipboardData) {
             try {
               const sourceInstrument = JSON.parse(clipboardData);

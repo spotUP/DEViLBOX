@@ -170,7 +170,7 @@ export const usePresetStore = create<PresetStore>()(
       },
     })),
     {
-      name: 'scribbleton-user-presets',
+      name: 'devilbox-user-presets',
       version: 1,
     }
   )

@@ -11,7 +11,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 
 // Export Format Types
 export interface SongExport {
-  format: 'scribbleton-song';
+  format: 'devilbox-song';
   version: '1.0.0';
   metadata: ProjectMetadata;
   bpm: number;
@@ -24,7 +24,7 @@ export interface SongExport {
 }
 
 export interface SFXExport {
-  format: 'scribbleton-sfx';
+  format: 'devilbox-sfx';
   version: '1.0.0';
   name: string;
   instrument: InstrumentConfig;
@@ -33,7 +33,7 @@ export interface SFXExport {
 }
 
 export interface InstrumentExport {
-  format: 'scribbleton-instrument';
+  format: 'devilbox-instrument';
   version: '1.0.0';
   instrument: InstrumentConfig;
 }
@@ -59,7 +59,7 @@ export function exportSong(
   options: ExportOptions = {}
 ): void {
   const songData: SongExport = {
-    format: 'scribbleton-song',
+    format: 'devilbox-song',
     version: '1.0.0',
     metadata,
     bpm,
@@ -93,7 +93,7 @@ export function exportSFX(
   options: ExportOptions = {}
 ): void {
   const sfxData: SFXExport = {
-    format: 'scribbleton-sfx',
+    format: 'devilbox-sfx',
     version: '1.0.0',
     name,
     instrument,
@@ -119,7 +119,7 @@ export function exportInstrument(
   options: ExportOptions = {}
 ): void {
   const instrumentData: InstrumentExport = {
-    format: 'scribbleton-instrument',
+    format: 'devilbox-instrument',
     version: '1.0.0',
     instrument,
   };
@@ -142,7 +142,7 @@ export async function importSong(file: File): Promise<SongExport | null> {
     const text = await file.text();
     const data = JSON.parse(text) as SongExport;
 
-    if (data.format !== 'scribbleton-song') {
+    if (data.format !== 'devilbox-song') {
       throw new Error('Invalid song format');
     }
 
@@ -161,7 +161,7 @@ export async function importSFX(file: File): Promise<SFXExport | null> {
     const text = await file.text();
     const data = JSON.parse(text) as SFXExport;
 
-    if (data.format !== 'scribbleton-sfx') {
+    if (data.format !== 'devilbox-sfx') {
       throw new Error('Invalid SFX format');
     }
 
@@ -180,7 +180,7 @@ export async function importInstrument(file: File): Promise<InstrumentExport | n
     const text = await file.text();
     const data = JSON.parse(text) as InstrumentExport;
 
-    if (data.format !== 'scribbleton-instrument') {
+    if (data.format !== 'devilbox-instrument') {
       throw new Error('Invalid instrument format');
     }
 
@@ -199,9 +199,9 @@ export async function detectFileFormat(file: File): Promise<'song' | 'sfx' | 'in
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (data.format === 'scribbleton-song') return 'song';
-    if (data.format === 'scribbleton-sfx') return 'sfx';
-    if (data.format === 'scribbleton-instrument') return 'instrument';
+    if (data.format === 'devilbox-song') return 'song';
+    if (data.format === 'devilbox-sfx') return 'sfx';
+    if (data.format === 'devilbox-instrument') return 'instrument';
 
     return 'unknown';
   } catch {
@@ -225,7 +225,7 @@ function sanitizeFilename(name: string): string {
 export function validateSongExport(data: any): data is SongExport {
   return (
     data &&
-    data.format === 'scribbleton-song' &&
+    data.format === 'devilbox-song' &&
     data.version === '1.0.0' &&
     Array.isArray(data.instruments) &&
     Array.isArray(data.patterns) &&
@@ -236,7 +236,7 @@ export function validateSongExport(data: any): data is SongExport {
 export function validateSFXExport(data: any): data is SFXExport {
   return (
     data &&
-    data.format === 'scribbleton-sfx' &&
+    data.format === 'devilbox-sfx' &&
     data.version === '1.0.0' &&
     data.instrument &&
     data.pattern
@@ -246,7 +246,7 @@ export function validateSFXExport(data: any): data is SFXExport {
 export function validateInstrumentExport(data: any): data is InstrumentExport {
   return (
     data &&
-    data.format === 'scribbleton-instrument' &&
+    data.format === 'devilbox-instrument' &&
     data.version === '1.0.0' &&
     data.instrument
   );

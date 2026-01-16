@@ -49,7 +49,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   const handleCopy = useCallback(() => {
     if (!pattern) return;
     const cell = pattern.channels[channelIndex].rows[rowIndex];
-    localStorage.setItem('scribbleton-cell-clipboard', JSON.stringify(cell));
+    localStorage.setItem('devilbox-cell-clipboard', JSON.stringify(cell));
   }, [pattern, channelIndex, rowIndex]);
 
   // Cut cell
@@ -65,7 +65,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
   // Paste cell
   const handlePaste = useCallback(() => {
-    const clipboardData = localStorage.getItem('scribbleton-cell-clipboard');
+    const clipboardData = localStorage.getItem('devilbox-cell-clipboard');
     if (clipboardData) {
       try {
         const cell = JSON.parse(clipboardData);

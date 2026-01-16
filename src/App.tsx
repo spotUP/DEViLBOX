@@ -253,10 +253,10 @@ function App() {
             {/* Logo */}
             <div className="mb-8">
               <h1 className="text-5xl font-bold text-text-primary mb-2 tracking-tight">
-                Scribbleton
+                DEViLBOX
               </h1>
               <p className="text-lg text-text-secondary">
-                Modern tracker with TB-303 acid bass emulation
+                TB-303 Acid Tracker with Devil Fish Mod
               </p>
             </div>
 

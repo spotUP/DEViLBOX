@@ -371,9 +371,9 @@ const EFFECT_COMMANDS: EffectCommand[] = [
 const TUTORIAL_STEPS = [
   {
     step: 1,
-    title: 'Welcome to Scribbleton',
+    title: 'Welcome to DEViLBOX',
     content: [
-      'Scribbleton is a FastTracker 2 style tracker for creating chip music and acid basslines.',
+      'DEViLBOX is a TB-303 acid tracker with Devil Fish mod for creating acid basslines.',
       'This tutorial will guide you through creating your first pattern.',
     ],
   },
