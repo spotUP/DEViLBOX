@@ -19,9 +19,7 @@ import {
   Maximize2,
   FolderOpen,
   Search,
-  X,
   ChevronRight,
-  Music,
 } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
