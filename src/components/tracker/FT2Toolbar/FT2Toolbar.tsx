@@ -155,6 +155,67 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const demoMenuRef = useRef<HTMLDivElement>(null);
+
+  // Demo songs available on the server
+  const DEMO_SONGS = [
+    { file: 'acid-banger.song.json', name: 'Acid Banger' },
+    { file: 'phuture-acid-tracks.song.json', name: 'Phuture - Acid Tracks' },
+    { file: 'hardfloor-funalogue.song.json', name: 'Hardfloor - Funalogue' },
+    { file: 'josh-wink-higher-state.song.json', name: 'Josh Wink - Higher State' },
+    { file: 'dittytoy-303.song.json', name: 'Dittytoy 303' },
+    { file: 'new-order-confusion.song.json', name: 'New Order - Confusion' },
+    { file: 'fatboy-slim-everyone-needs-303.song.json', name: 'Fatboy Slim - Everyone Needs a 303' },
+    { file: 'fast-eddie-acid-thunder.song.json', name: 'Fast Eddie - Acid Thunder' },
+    { file: 'dj-tim-misjah-access.song.json', name: 'DJ Tim & Misjah - Access' },
+    { file: 'edge-of-motion-setup-707.song.json', name: 'Edge of Motion - 707 Setup' },
+  ];
+
+  // Load demo song from server
+  const handleLoadDemo = async (filename: string) => {
+    setShowDemoMenu(false);
+
+    // Stop playback before loading
+    if (isPlaying) {
+      stop();
+      engine.releaseAll();
+    }
+
+    setIsLoading(true);
+    try {
+      // Use import.meta.env.BASE_URL for correct path on GitHub Pages
+      const basePath = import.meta.env.BASE_URL || '/';
+      const response = await fetch(`${basePath}songs/${filename}`);
+      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+
+      const songData = await response.json();
+
+      if (songData.patterns) loadPatterns(songData.patterns);
+      if (songData.instruments) loadInstruments(songData.instruments);
+      if (songData.metadata) setMetadata(songData.metadata);
+      if (songData.bpm) setBPM(songData.bpm);
+
+      console.log(`[Demo] Loaded: ${filename}`);
+    } catch (error) {
+      console.error('Failed to load demo:', error);
+      alert(`Failed to load demo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Close demo menu when clicking outside
+  React.useEffect(() => {
+    if (!showDemoMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (demoMenuRef.current && !demoMenuRef.current.contains(e.target as Node)) {
+        setShowDemoMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDemoMenu]);
 
   // File load handler (like NavBar)
   const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,6 +547,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           >
             {isLoading ? 'Loading...' : 'Load'}
           </FT2Button>
+
+          {/* Demo Songs Dropdown */}
+          <div className="relative" ref={demoMenuRef}>
+            <FT2Button
+              onClick={() => setShowDemoMenu(!showDemoMenu)}
+              small
+              active={showDemoMenu}
+              disabled={isLoading}
+              title="Load example songs"
+            >
+              Demos ▾
+            </FT2Button>
+            {showDemoMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-50 min-w-[220px] max-h-[300px] overflow-y-auto">
+                {DEMO_SONGS.map((demo) => (
+                  <button
+                    key={demo.file}
+                    onClick={() => handleLoadDemo(demo.file)}
+                    className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                  >
+                    {demo.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <FT2Button onClick={saveProject} small title="Save project (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
           </FT2Button>
