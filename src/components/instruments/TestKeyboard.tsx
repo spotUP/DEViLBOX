@@ -2,7 +2,7 @@
  * TestKeyboard - On-screen piano keyboard for testing sounds
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Music } from 'lucide-react';
 import type { InstrumentConfig } from '../../types/instrument';
 import { ToneEngine } from '../../engine/ToneEngine';
@@ -34,22 +34,46 @@ const KEYS: Key[] = [
   { note: 'C5', label: 'C', isBlack: false, keyboardKey: 'k' },
 ];
 
+// Set of keyboard keys used for piano
+const PIANO_KEYS = new Set(KEYS.map(k => k.keyboardKey).filter(Boolean));
+
 export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
-  const [engine] = useState(() => ToneEngine.getInstance());
+  const engineRef = useRef(ToneEngine.getInstance());
+  const activeNotesRef = useRef<Set<string>>(new Set());
+  const instrumentRef = useRef(instrument);
+  const isInitializedRef = useRef(false);
 
-  const playNote = async (note: string) => {
-    // Ensure audio context is started
-    await engine.init();
+  // Keep refs in sync
+  useEffect(() => {
+    instrumentRef.current = instrument;
+  }, [instrument]);
 
-    // Trigger the note
+  useEffect(() => {
+    activeNotesRef.current = activeNotes;
+  }, [activeNotes]);
+
+  // Initialize engine once
+  useEffect(() => {
+    if (!isInitializedRef.current) {
+      engineRef.current.init().then(() => {
+        isInitializedRef.current = true;
+      });
+    }
+  }, []);
+
+  const playNote = useCallback((note: string) => {
+    const engine = engineRef.current;
+    const inst = instrumentRef.current;
+
+    // Trigger the note immediately (engine should already be initialized)
     engine.triggerNote(
-      instrument.id,
+      inst.id,
       note,
       0.2, // Duration - 200ms
       0, // time - play now
       0.8, // velocity
-      instrument
+      inst
     );
 
     // Visual feedback
@@ -61,38 +85,62 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
         return next;
       });
     }, 200);
-  };
+  }, []);
 
-  const stopNote = (note: string) => {
-    engine.triggerNoteRelease(instrument.id, note, 0, instrument);
-  };
+  const stopNote = useCallback((note: string) => {
+    const engine = engineRef.current;
+    const inst = instrumentRef.current;
+    engine.triggerNoteRelease(inst.id, note, 0, inst);
+  }, []);
 
-  // Keyboard event handlers
+  // Keyboard event handlers - stable reference, no dependencies that change frequently
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Skip repeats
       if (e.repeat) return;
 
-      const key = KEYS.find((k) => k.keyboardKey === e.key.toLowerCase());
-      if (key && !activeNotes.has(key.note)) {
-        playNote(key.note);
+      const keyLower = e.key.toLowerCase();
+
+      // Check if this is a piano key
+      if (PIANO_KEYS.has(keyLower)) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const key = KEYS.find((k) => k.keyboardKey === keyLower);
+        if (key && !activeNotesRef.current.has(key.note)) {
+          playNote(key.note);
+        }
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      const key = KEYS.find((k) => k.keyboardKey === e.key.toLowerCase());
-      if (key) {
-        stopNote(key.note);
+      const keyLower = e.key.toLowerCase();
+
+      if (PIANO_KEYS.has(keyLower)) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const key = KEYS.find((k) => k.keyboardKey === keyLower);
+        if (key) {
+          stopNote(key.note);
+        }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Use capture phase to get events before other handlers
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [activeNotes, instrument]);
+  }, [playNote, stopNote]);
 
   return (
     <div className="space-y-3">
@@ -117,12 +165,26 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
               return (
                 <button
                   key={key.note}
-                  onMouseDown={() => playNote(key.note)}
-                  onMouseUp={() => stopNote(key.note)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    playNote(key.note);
+                  }}
+                  onMouseUp={(e) => {
+                    e.preventDefault();
+                    stopNote(key.note);
+                  }}
                   onMouseLeave={() => stopNote(key.note)}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    playNote(key.note);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    stopNote(key.note);
+                  }}
                   className={`
                     relative w-12 h-32 border-2 border-ft2-border rounded-b
-                    transition-all cursor-pointer select-none
+                    transition-all cursor-pointer select-none touch-none
                     ${
                       isActive
                         ? 'bg-ft2-cursor shadow-lg shadow-ft2-cursor/50'
@@ -149,12 +211,26 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
               return (
                 <button
                   key={key.note}
-                  onMouseDown={() => playNote(key.note)}
-                  onMouseUp={() => stopNote(key.note)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    playNote(key.note);
+                  }}
+                  onMouseUp={(e) => {
+                    e.preventDefault();
+                    stopNote(key.note);
+                  }}
                   onMouseLeave={() => stopNote(key.note)}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    playNote(key.note);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    stopNote(key.note);
+                  }}
                   className={`
                     absolute w-8 h-20 border-2 border-ft2-border rounded-b
-                    transition-all cursor-pointer select-none z-10
+                    transition-all cursor-pointer select-none touch-none z-10
                     ${
                       isActive
                         ? 'bg-ft2-highlight shadow-lg shadow-ft2-highlight/50'
