@@ -72,6 +72,10 @@ export class InstrumentFactory {
         instrument = this.createWavetable(config);
         break;
 
+      case 'GranularSynth':
+        instrument = this.createGranularSynth(config);
+        break;
+
       default:
         console.warn(`Unknown synth type: ${config.synthType}, defaulting to Synth`);
         instrument = this.createSynth(config);
@@ -553,6 +557,37 @@ export class InstrumentFactory {
 
     // No sample loaded - create empty player
     return new Tone.Player({
+      volume: config.volume || -12,
+    });
+  }
+
+  private static createGranularSynth(config: InstrumentConfig): Tone.GrainPlayer {
+    // Get sample URL and granular config
+    const sampleUrl = config.granular?.sampleUrl || config.parameters?.sampleUrl;
+    const granularConfig = config.granular;
+
+    if (sampleUrl) {
+      const grainPlayer = new Tone.GrainPlayer({
+        url: sampleUrl,
+        grainSize: (granularConfig?.grainSize || 100) / 1000, // ms to seconds
+        overlap: (granularConfig?.grainOverlap || 50) / 100, // percentage to ratio
+        playbackRate: granularConfig?.playbackRate || 1,
+        detune: granularConfig?.detune || 0,
+        reverse: granularConfig?.reverse || false,
+        loop: true,
+        loopStart: 0,
+        loopEnd: 0, // 0 = end of buffer
+        volume: config.volume || -12,
+      });
+      return grainPlayer;
+    }
+
+    // No sample loaded - create with placeholder
+    return new Tone.GrainPlayer({
+      grainSize: 0.1,
+      overlap: 0.5,
+      playbackRate: 1,
+      loop: true,
       volume: config.volume || -12,
     });
   }

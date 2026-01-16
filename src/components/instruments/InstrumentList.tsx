@@ -8,6 +8,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { Plus, Trash2, Copy } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
+import { InstrumentContextMenu } from './InstrumentContextMenu';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -108,18 +109,18 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
           const IconComponent = getIcon(synthInfo.icon);
 
           return (
-            <div
-              key={instrument.id}
-              ref={isSelected ? selectedRef : undefined}
-              onClick={() => handleSelect(instrument.id)}
-              className={`
-                group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all
-                ${isSelected
-                  ? 'bg-accent-primary/20 border-l-2 border-accent-primary'
-                  : 'hover:bg-dark-bgHover border-l-2 border-transparent'
-                }
-              `}
-            >
+            <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id}>
+              <div
+                ref={isSelected ? selectedRef : undefined}
+                onClick={() => handleSelect(instrument.id)}
+                className={`
+                  group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all
+                  ${isSelected
+                    ? 'bg-accent-primary/20 border-l-2 border-accent-primary'
+                    : 'hover:bg-dark-bgHover border-l-2 border-transparent'
+                  }
+                `}
+              >
               {/* Instrument number */}
               <span
                 className={`
@@ -174,7 +175,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            </InstrumentContextMenu>
           );
         })}
       </div>

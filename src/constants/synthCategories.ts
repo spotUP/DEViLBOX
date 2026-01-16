@@ -140,6 +140,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Play',
     color: 'text-lime-400',
   },
+  GranularSynth: {
+    type: 'GranularSynth',
+    name: 'Granular Synth',
+    shortName: 'Granular',
+    description: 'Sample-based granular synthesis with grain manipulation',
+    bestFor: ['Textures', 'Pads', 'Ambient', 'Sound design', 'Glitch'],
+    icon: 'Sparkles',
+    color: 'text-violet-400',
+  },
 };
 
 // Organized categories
@@ -172,13 +181,13 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'pads',
     name: 'Pads',
     description: 'Evolving textures and pads',
-    synths: [SYNTH_INFO.Synth, SYNTH_INFO.DuoSynth, SYNTH_INFO.Wavetable],
+    synths: [SYNTH_INFO.Synth, SYNTH_INFO.DuoSynth, SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth],
   },
   {
     id: 'samples',
     name: 'Samples',
     description: 'Sample-based instruments',
-    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player],
+    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player, SYNTH_INFO.GranularSynth],
   },
 ];
 

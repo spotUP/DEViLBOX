@@ -498,6 +498,40 @@ export class ToneEngine {
         break;
       }
 
+      case 'GranularSynth': {
+        // Granular synthesis from sample
+        const granularUrl = config.granular?.sampleUrl || config.parameters?.sampleUrl;
+        const granularConfig = config.granular;
+        console.log('[ToneEngine] Creating GranularSynth instrument', { instrumentId, hasSample: !!granularUrl });
+
+        if (granularUrl) {
+          instrument = new Tone.GrainPlayer({
+            url: granularUrl,
+            grainSize: (granularConfig?.grainSize || 100) / 1000, // ms to seconds
+            overlap: (granularConfig?.grainOverlap || 50) / 100, // percentage to ratio
+            playbackRate: granularConfig?.playbackRate || 1,
+            detune: granularConfig?.detune || 0,
+            reverse: granularConfig?.reverse || false,
+            loop: true,
+            volume: config.volume || -12,
+            onload: () => {
+              console.log(`[ToneEngine] GranularSynth ${instrumentId} sample loaded successfully`);
+            },
+            onerror: (err: Error) => {
+              console.error(`[ToneEngine] GranularSynth ${instrumentId} failed to load sample:`, err);
+            },
+          });
+        } else {
+          instrument = new Tone.GrainPlayer({
+            grainSize: 0.1,
+            overlap: 0.5,
+            loop: true,
+            volume: config.volume || -12,
+          });
+        }
+        break;
+      }
+
       default:
         // Default to basic synth
         instrument = new Tone.PolySynth(Tone.Synth, {
@@ -737,7 +771,7 @@ export class ToneEngine {
   ): void {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
-    if (!instrument || !instrument.triggerAttackRelease) {
+    if (!instrument) {
       return;
     }
 
@@ -756,7 +790,25 @@ export class ToneEngine {
       } else if (config.synthType === 'MembraneSynth') {
         // MembraneSynth: triggerAttackRelease(note, duration, time, velocity)
         (instrument as Tone.MembraneSynth).triggerAttackRelease(note, duration, time, velocity);
-      } else {
+      } else if (config.synthType === 'GranularSynth') {
+        // GrainPlayer uses start/stop instead of triggerAttackRelease
+        const grainPlayer = instrument as Tone.GrainPlayer;
+        if (grainPlayer.buffer && grainPlayer.buffer.loaded) {
+          // Calculate pitch shift from note (C4 = base pitch)
+          const baseNote = Tone.Frequency('C4').toFrequency();
+          const targetFreq = Tone.Frequency(note).toFrequency();
+          const playbackRate = targetFreq / baseNote;
+          grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+          grainPlayer.start(time);
+          grainPlayer.stop(time + duration);
+        }
+      } else if (config.synthType === 'Player') {
+        // Player uses start instead of triggerAttackRelease
+        const player = instrument as Tone.Player;
+        if (player.buffer && player.buffer.loaded) {
+          player.start(time);
+        }
+      } else if (instrument.triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)
         instrument.triggerAttackRelease(note, duration, time, velocity);
       }

@@ -10,6 +10,7 @@ import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
+import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { AutomationLanes } from './AutomationLanes';
 import { useTrackerStore, useTransportStore } from '@stores';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
@@ -94,6 +95,9 @@ const PatternEditorComponent: React.FC = () => {
   const [channelTriggers, setChannelTriggers] = useState<ChannelTrigger[]>([]);
   const lastTriggerRowRef = useRef<number>(-1);
   const isScrollSyncing = useRef(false);
+
+  // Cell context menu
+  const cellContextMenu = useCellContextMenu();
 
   // Smooth scroll - use ref for direct DOM updates (avoids React re-render overhead)
   const animationFrameRef = useRef<number | null>(null);
@@ -739,6 +743,14 @@ const PatternEditorComponent: React.FC = () => {
                     transition: isReady ? 'opacity 0.08s linear' : 'none',
                     contain: 'layout style paint',
                   }}
+                  onContextMenu={(e) => {
+                    // Determine which channel was clicked based on x position
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left - 40; // 40px for row number
+                    const channelWidth = 180; // approximate channel width
+                    const channelIndex = Math.max(0, Math.min(pattern.channels.length - 1, Math.floor(x / channelWidth)));
+                    cellContextMenu.openMenu(e, actualIndex, channelIndex);
+                  }}
                 >
                   <TrackerRow
                     rowIndex={actualIndex}
@@ -760,6 +772,14 @@ const PatternEditorComponent: React.FC = () => {
         patternLength={pattern.length}
         channelCount={pattern.channels.length}
         cursorChannel={cursor.channelIndex}
+      />
+
+      {/* Cell context menu */}
+      <CellContextMenu
+        position={cellContextMenu.position}
+        onClose={cellContextMenu.closeMenu}
+        rowIndex={cellContextMenu.rowIndex}
+        channelIndex={cellContextMenu.channelIndex}
       />
     </div>
   );

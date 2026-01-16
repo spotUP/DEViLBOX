@@ -5,11 +5,13 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
+import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Play, Plus, Copy, Trash2, Edit2, Check, X, GripVertical } from 'lucide-react';
+import { PatternContextMenu } from './PatternContextMenu';
 
 interface SortablePatternItemProps {
   pattern: {
@@ -19,6 +21,7 @@ interface SortablePatternItemProps {
   };
   index: number;
   isActive: boolean;
+  isQueued: boolean;
   isEditing: boolean;
   editName: string;
   onSelect: () => void;
@@ -34,6 +37,7 @@ const SortablePatternItem: React.FC<SortablePatternItemProps> = ({
   pattern,
   index,
   isActive,
+  isQueued,
   isEditing,
   editName,
   onSelect,
@@ -60,15 +64,17 @@ const SortablePatternItem: React.FC<SortablePatternItemProps> = ({
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`
-        flex items-center gap-2 px-3 py-2 border-b border-dark-border
-        ${isActive ? 'bg-accent-primary text-text-inverse' : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover'}
-        transition-colors cursor-pointer
-      `}
-    >
+    <PatternContextMenu patternIndex={index}>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`
+          flex items-center gap-2 px-3 py-2 border-b border-dark-border
+          ${isActive ? 'bg-accent-primary text-text-inverse' : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover'}
+          ${isQueued ? 'ring-2 ring-orange-500 ring-inset animate-pulse' : ''}
+          transition-colors cursor-pointer
+        `}
+      >
       {/* Drag Handle */}
       <div
         {...attributes}
@@ -142,6 +148,9 @@ const SortablePatternItem: React.FC<SortablePatternItemProps> = ({
       {/* Action Buttons */}
       {!isEditing && (
         <div className="flex items-center gap-1">
+          {isQueued && (
+            <span className="text-orange-500 text-xs mr-1" title="Queued">⏳</span>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -174,7 +183,8 @@ const SortablePatternItem: React.FC<SortablePatternItemProps> = ({
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </PatternContextMenu>
   );
 };
 
@@ -190,6 +200,8 @@ export const PatternManagement: React.FC = () => {
     reorderPatterns,
     updatePatternName,
   } = useTrackerStore();
+
+  const { pendingPatternIndex } = useLiveModeStore();
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
@@ -335,6 +347,7 @@ export const PatternManagement: React.FC = () => {
                 pattern={pattern}
                 index={index}
                 isActive={index === currentPatternIndex}
+                isQueued={pendingPatternIndex === index}
                 isEditing={editingIndex === index}
                 editName={editName}
                 onSelect={() => setCurrentPattern(index)}

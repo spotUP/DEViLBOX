@@ -1174,6 +1174,18 @@
   border-right: none;
 }
 
+/* Live mode queue indicator */
+.ft2-queue-indicator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(251, 146, 60, 0.2);
+  color: #fb923c;
+  border: 1px solid #fb923c;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
 .ft2-separator {
   display: none;
 }

@@ -15,7 +15,8 @@ export type SynthType =
   | 'TB303'
   | 'Sampler'
   | 'Player'
-  | 'Wavetable';
+  | 'Wavetable'
+  | 'GranularSynth';
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -162,6 +163,56 @@ export const DEFAULT_WAVETABLE: WavetableConfig = {
   },
 };
 
+/**
+ * Granular Synthesizer Configuration
+ * Sample-based granular synth with grain manipulation
+ */
+export interface GranularConfig {
+  sampleUrl: string;                // URL or base64 of source sample
+  grainSize: number;                // 10-500ms - duration of each grain
+  grainOverlap: number;             // 0-100% - overlap between grains
+  playbackRate: number;             // 0.25-4x - playback speed
+  detune: number;                   // -1200 to 1200 cents
+  randomPitch: number;              // 0-100% - random pitch variation per grain
+  randomPosition: number;           // 0-100% - random position variation in sample
+  scanPosition: number;             // 0-100% - position in sample to read grains from
+  scanSpeed: number;                // -100 to 100% - speed of scanning through sample
+  density: number;                  // 1-16 - number of overlapping grain streams
+  reverse: boolean;                 // Play grains in reverse
+  envelope: {
+    attack: number;                 // Grain attack (ms)
+    release: number;                // Grain release (ms)
+  };
+  filter: {
+    type: FilterType;
+    cutoff: number;
+    resonance: number;
+  };
+}
+
+export const DEFAULT_GRANULAR: GranularConfig = {
+  sampleUrl: '',
+  grainSize: 100,
+  grainOverlap: 50,
+  playbackRate: 1,
+  detune: 0,
+  randomPitch: 0,
+  randomPosition: 0,
+  scanPosition: 0,
+  scanSpeed: 0,
+  density: 4,
+  reverse: false,
+  envelope: {
+    attack: 10,
+    release: 50,
+  },
+  filter: {
+    type: 'lowpass',
+    cutoff: 20000,
+    resonance: 0,
+  },
+};
+
 export type EffectType =
   | 'Distortion'
   | 'Reverb'
@@ -205,6 +256,7 @@ export interface InstrumentConfig {
   filterEnvelope?: FilterEnvelopeConfig;
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
+  granular?: GranularConfig;
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100

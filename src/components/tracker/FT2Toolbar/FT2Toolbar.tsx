@@ -14,6 +14,7 @@ import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore } from '@stores';
+import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -156,6 +157,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar } = useUIStore();
+  const { isLiveMode, toggleLiveMode, pendingPatternIndex } = useLiveModeStore();
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -461,6 +463,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           >
             {recordMode ? '● Rec' : 'Rec'}
           </FT2Button>
+          <FT2Button
+            onClick={toggleLiveMode}
+            active={isLiveMode}
+            colorAccent={isLiveMode ? 'yellow' : undefined}
+            title={isLiveMode ? 'Switch to Edit mode' : 'Switch to Live mode (pattern queueing, L key)'}
+          >
+            {isLiveMode ? '● LIVE' : 'Live'}
+          </FT2Button>
+          {/* Show queued pattern indicator */}
+          {isLiveMode && pendingPatternIndex !== null && (
+            <span className="ft2-queue-indicator animate-pulse">
+              ⏳ {pendingPatternIndex.toString(16).toUpperCase().padStart(2, '0')}
+            </span>
+          )}
         </div>
       </div>
 
