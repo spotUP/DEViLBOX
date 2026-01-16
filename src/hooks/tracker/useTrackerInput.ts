@@ -168,8 +168,8 @@ export const useTrackerInput = () => {
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
-      // Move cursor down by editStep if record mode is enabled (but not during playback)
-      if (recordMode && editStep > 0 && !isPlaying) {
+      // Always advance cursor by editStep after note entry (unless during playback)
+      if (editStep > 0 && !isPlaying) {
         const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
         moveCursorToRow(newRow);
       }
@@ -544,8 +544,8 @@ export const useTrackerInput = () => {
           // When recording during playback, enter at the current playback row
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursor.rowIndex;
           setCell(cursor.channelIndex, targetRow, { note: '===' });
-          // Move cursor down by editStep if record mode is enabled (but not during playback)
-          if (recordMode && editStep > 0 && !isPlaying) {
+          // Always advance cursor by editStep after note entry (unless during playback)
+          if (editStep > 0 && !isPlaying) {
             const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
             moveCursorToRow(newRow);
           }

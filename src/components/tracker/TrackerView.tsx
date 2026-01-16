@@ -14,8 +14,7 @@ import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
-import { List, Grid3X3, Piano, Radio } from 'lucide-react';
-import { useLiveModeStore } from '@stores/useLiveModeStore';
+import { List, Grid3X3, Piano } from 'lucide-react';
 import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -134,7 +133,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const { loadInstruments } = useInstrumentStore();
   const { setMetadata } = useProjectStore();
   const { setBPM } = useTransportStore();
-  const { isLiveMode, toggleLiveMode } = useLiveModeStore();
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll';
@@ -250,24 +248,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Separator */}
           {viewMode === 'grid' && <div className="w-px h-4 bg-dark-border" />}
-
-          {/* Live Mode Toggle - Dual state button */}
-          <div className="flex items-center bg-dark-bgTertiary rounded-md p-0.5 mr-2">
-            <button
-              onClick={toggleLiveMode}
-              className={`
-                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
-                ${isLiveMode
-                  ? 'bg-accent-error text-white animate-pulse'
-                  : 'bg-accent-primary/80 text-white hover:bg-accent-primary'
-                }
-              `}
-              title={isLiveMode ? 'Exit Live Mode (L)' : 'Enter Live Mode (L)'}
-            >
-              <Radio size={14} />
-              <span className="hidden sm:inline">Live</span>
-            </button>
-          </div>
 
           {/* View Toggle */}
           <div className="flex items-center bg-dark-bgTertiary rounded-md p-0.5">

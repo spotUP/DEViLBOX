@@ -504,7 +504,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onClick={toggleRecordMode}
             active={recordMode}
             colorAccent={recordMode ? 'red' : undefined}
-            title={recordMode ? 'Disable record mode' : 'Enable record mode (cursor advances after note entry)'}
+            title={recordMode ? 'Disable record mode' : 'Enable record mode (enter notes at playback position during playback)'}
           >
             {recordMode ? '● Rec' : 'Rec'}
           </FT2Button>
