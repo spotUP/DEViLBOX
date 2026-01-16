@@ -719,9 +719,8 @@ const PatternEditorComponent: React.FC = () => {
                   ? (nextRowCellsData[actualIndex] || [])
                   : (rowCellsData[actualIndex] || []);
 
-              // During playback, the fixed edit bar overlay marks the current position
-              // Skip per-row highlighting during playback to avoid re-renders/flicker
-              const isCursorRow = !isPlaying && patternType === 'current' && actualIndex === cursor.rowIndex;
+              // Show cursor on current row - either playback position (when playing) or edit position (when stopped)
+              const isCursorRow = patternType === 'current' && actualIndex === (isPlaying ? currentRow : cursor.rowIndex);
 
               // Base opacity from viewport position
               let opacity = getRowOpacity(virtualIndex);
