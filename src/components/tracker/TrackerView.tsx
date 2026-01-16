@@ -14,7 +14,8 @@ import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
-import { List, Grid3X3, Piano } from 'lucide-react';
+import { List, Grid3X3, Piano, Music2 } from 'lucide-react';
+import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -144,6 +145,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showHumanize, setShowHumanize] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showImportModule, setShowImportModule] = useState(false);
+
+  // Instrument panel state
+  const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
 
   // Sync grid channel with tracker cursor when switching views
   useEffect(() => {
@@ -312,14 +316,40 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       {/* TB-303 Live Knobs (includes Devil Fish controls) */}
       <TB303KnobPanel />
 
-      {/* Pattern Editor / Grid Sequencer / Piano Roll - Takes remaining space */}
-      {viewMode === 'tracker' ? (
-        <PatternEditor />
-      ) : viewMode === 'grid' ? (
-        <GridSequencer channelIndex={gridChannelIndex} />
-      ) : (
-        <PianoRoll channelIndex={gridChannelIndex} />
-      )}
+      {/* Main Content Area with Pattern Editor and Instrument Panel */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Pattern Editor / Grid Sequencer / Piano Roll - Takes remaining space */}
+        <div className="flex-1 min-w-0">
+          {viewMode === 'tracker' ? (
+            <PatternEditor />
+          ) : viewMode === 'grid' ? (
+            <GridSequencer channelIndex={gridChannelIndex} />
+          ) : (
+            <PianoRoll channelIndex={gridChannelIndex} />
+          )}
+        </div>
+
+        {/* Instrument Panel Toggle Button */}
+        <button
+          onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
+          className={`
+            flex-shrink-0 w-6 flex items-center justify-center
+            bg-ft2-header border-l border-ft2-border
+            hover:bg-ft2-border transition-colors
+            ${showInstrumentPanel ? 'text-ft2-highlight' : 'text-ft2-textDim'}
+          `}
+          title={showInstrumentPanel ? 'Hide Instruments' : 'Show Instruments'}
+        >
+          <Music2 size={14} className={showInstrumentPanel ? '' : 'rotate-180'} />
+        </button>
+
+        {/* Instrument List Panel */}
+        {showInstrumentPanel && (
+          <div className="flex-shrink-0 w-64 border-l border-ft2-border animate-fade-in">
+            <InstrumentListPanel onEditInstrument={onShowInstruments} />
+          </div>
+        )}
+      </div>
 
       {/* Keyboard Shortcuts Help - Collapsible on mobile */}
       <div className="flex-shrink-0 hidden md:flex px-4 py-1.5 bg-dark-bgTertiary border-t border-dark-border text-[10px] text-text-muted font-mono items-center justify-center gap-4 flex-wrap">
