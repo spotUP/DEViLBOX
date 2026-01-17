@@ -817,7 +817,6 @@ const PatternEditorComponent: React.FC = () => {
           const VOLUME_WIDTH = 28; // 2ch
           const EFFECT_WIDTH = 42; // 3ch
           const ACCENT_WIDTH = 24;
-          const SLIDE_WIDTH = 24;
 
           // Base position: row number + channel offset
           const channelIndex = isMobile ? 0 : cursor.channelIndex; // Mobile always shows channel at index 0

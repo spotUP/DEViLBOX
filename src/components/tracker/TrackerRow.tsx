@@ -26,7 +26,7 @@ interface TrackerRowProps {
 }
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
-  ({ rowIndex, cells, channelColors, cursor, isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
+  ({ rowIndex, cells, channelColors, cursor, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
     const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const rowNumber = useHexNumbers

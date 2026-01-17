@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-17T20:52:59.251Z
+ * Generated: 2026-01-17T21:02:22.402Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '26';
-export const BUILD_HASH = '4788ebb';
+export const BUILD_NUMBER = '27';
+export const BUILD_HASH = '5cc69c1';
 export const BUILD_DATE = '2026-01-17';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.0',
     date: '2026-01-17',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix FT2 toolbar arrow buttons and add speed commands to demo songs'
+      },
       {
         type: 'improvement',
         description: 'Refactor components for consistency and reusability'

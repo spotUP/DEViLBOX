@@ -707,7 +707,7 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         const maxChannels = 16;
         // Get available colors (excluding null)
-        const availableColors = CHANNEL_COLORS.filter((c): c is string => c !== null);
+        const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
         // Pick a random color for the new channel
         const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
 

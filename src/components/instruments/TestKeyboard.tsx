@@ -22,7 +22,6 @@ interface Key {
 
 // Note names in an octave
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const WHITE_NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
 // FastTracker II keyboard layout mapping (2 octaves worth of keys)
 const FT2_KEYBOARD_MAP: Record<string, string> = {
