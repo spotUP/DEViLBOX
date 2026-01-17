@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useThemeStore } from '@stores';
 
 interface ToggleProps {
   label: string;
@@ -16,9 +17,14 @@ export const Toggle: React.FC<ToggleProps> = ({
   label,
   value,
   onChange,
-  color = '#00d4aa',
+  color: colorProp = '#00d4aa',
   size = 'md',
 }) => {
+  // Theme-aware color: use cyan for cyan-lineart theme
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const color = isCyanTheme ? '#00ffff' : colorProp;
+
   const sizes = {
     sm: { width: 36, height: 18, fontSize: 9 },
     md: { width: 44, height: 22, fontSize: 10 },

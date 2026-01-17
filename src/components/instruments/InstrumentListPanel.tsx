@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 import { Plus, FolderOpen, Wand2, Pencil, Trash2, Copy } from 'lucide-react';
@@ -25,6 +26,8 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
     deleteInstrument,
     cloneInstrument,
   } = useInstrumentStore();
+
+  const { useHexNumbers } = useUIStore();
 
   // Create a new instrument with a good starting preset
   const handleAddInstrument = () => {
@@ -102,6 +105,7 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
                 key={inst.id}
                 onClick={() => setCurrentInstrument(inst.id)}
                 className={`
+                  instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer border-b border-ft2-border
                   transition-colors group
                   ${isSelected
@@ -112,7 +116,10 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
               >
                 {/* ID */}
                 <span className={`font-mono text-xs font-bold w-6 ${isSelected ? 'text-ft2-bg' : 'text-ft2-highlight'}`}>
-                  {inst.id.toString(16).toUpperCase().padStart(2, '0')}
+                  {useHexNumbers
+                    ? inst.id.toString(16).toUpperCase().padStart(2, '0')
+                    : inst.id.toString(10).padStart(2, '0')
+                  }
                 </span>
 
                 {/* Icon */}
@@ -128,8 +135,8 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
                   {synthInfo.shortName}
                 </span>
 
-                {/* Actions (visible on hover) */}
-                <div className={`flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                {/* Actions (visible on hover, always visible on mobile) */}
+                <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

@@ -5,10 +5,13 @@
   "description": "DEViLBOX - TB-303 Acid Tracker with Devil Fish Mod",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/generate-changelog.cjs",
+    "predev": "node scripts/generate-changelog.cjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "changelog": "node scripts/generate-changelog.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

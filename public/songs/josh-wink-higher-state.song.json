@@ -17,11 +17,24 @@
       "name": "DF Acid Low",
       "synthType": "TB303",
       "tb303": {
-        "oscillator": { "type": "square" },
-        "filter": { "cutoff": 2000, "resonance": 78 },
-        "filterEnvelope": { "envMod": 55, "decay": 180 },
-        "accent": { "amount": 70 },
-        "slide": { "time": 55, "mode": "exponential" },
+        "oscillator": {
+          "type": "square"
+        },
+        "filter": {
+          "cutoff": 2000,
+          "resonance": 78
+        },
+        "filterEnvelope": {
+          "envMod": 55,
+          "decay": 180
+        },
+        "accent": {
+          "amount": 70
+        },
+        "slide": {
+          "time": 55,
+          "mode": "exponential"
+        },
         "devilFish": {
           "enabled": true,
           "normalDecay": 250,
@@ -46,18 +59,31 @@
       "name": "DF Acid High",
       "synthType": "TB303",
       "tb303": {
-        "oscillator": { "type": "square" },
-        "filter": { "cutoff": 3500, "resonance": 82 },
-        "filterEnvelope": { "envMod": 60, "decay": 200 },
-        "accent": { "amount": 75 },
-        "slide": { "time": 50, "mode": "exponential" },
+        "oscillator": {
+          "type": "square"
+        },
+        "filter": {
+          "cutoff": 3500,
+          "resonance": 82
+        },
+        "filterEnvelope": {
+          "envMod": 60,
+          "decay": 200
+        },
+        "accent": {
+          "amount": 75
+        },
+        "slide": {
+          "time": 50,
+          "mode": "exponential"
+        },
         "devilFish": {
           "enabled": true,
           "normalDecay": 200,
           "accentDecay": 100,
           "vegDecay": 600,
           "vegSustain": 10,
-          "softAttack": 1.0,
+          "softAttack": 1,
           "filterTracking": 60,
           "filterFM": 30,
           "sweepSpeed": "fast",
@@ -68,6 +94,69 @@
       },
       "effects": [],
       "volume": -9,
+      "pan": 0
+    },
+    {
+      "id": 3,
+      "name": "909 Kick",
+      "synthType": "MembraneSynth",
+      "envelope": {
+        "attack": 2,
+        "decay": 400,
+        "sustain": 0,
+        "release": 100
+      },
+      "effects": [],
+      "volume": -3,
+      "pan": 0,
+      "parameters": {
+        "pitchDecay": 0.05,
+        "octaves": 6
+      }
+    },
+    {
+      "id": 4,
+      "name": "909 Snare",
+      "synthType": "NoiseSynth",
+      "envelope": {
+        "attack": 2,
+        "decay": 120,
+        "sustain": 0,
+        "release": 50
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0,
+      "parameters": {
+        "type": "pink"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Closed Hat",
+      "synthType": "MetalSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 50,
+        "sustain": 0,
+        "release": 20
+      },
+      "effects": [],
+      "volume": -12,
+      "pan": 0
+    },
+    {
+      "id": 6,
+      "name": "Open Hat",
+      "synthType": "MetalSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 200,
+        "sustain": 0,
+        "release": 100
+      },
+      "effects": [],
+      "volume": -14,
       "pan": 0
     }
   ],
@@ -87,22 +176,566 @@
           "instrumentId": 1,
           "color": "#ef4444",
           "rows": [
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false }
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            }
+          ]
+        },
+        {
+          "id": "ch-kick",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 3,
+          "color": "#f97316",
+          "rows": [
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-snare",
+          "name": "Snare",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#a855f7",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-hihat",
+          "name": "Hi-Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 5,
+          "color": "#eab308",
+          "rows": [
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-openhat",
+          "name": "Open Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 6,
+          "color": "#10b981",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
           ]
         }
       ]
@@ -122,22 +755,134 @@
           "instrumentId": 1,
           "color": "#ef4444",
           "rows": [
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false }
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            }
           ]
         },
         {
@@ -150,22 +895,566 @@
           "instrumentId": 2,
           "color": "#f97316",
           "rows": [
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-2", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false }
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-2",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            }
+          ]
+        },
+        {
+          "id": "ch-kick",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 3,
+          "color": "#f97316",
+          "rows": [
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-snare",
+          "name": "Snare",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#a855f7",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-hihat",
+          "name": "Hi-Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 5,
+          "color": "#eab308",
+          "rows": [
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-openhat",
+          "name": "Open Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 6,
+          "color": "#10b981",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
           ]
         }
       ]
@@ -185,22 +1474,134 @@
           "instrumentId": 1,
           "color": "#ef4444",
           "rows": [
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false }
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-1",
+              "instrument": 1,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            }
           ]
         },
         {
@@ -213,26 +1614,579 @@
           "instrumentId": 2,
           "color": "#f97316",
           "rows": [
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-4", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": true },
-            { "note": "G-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false },
-            { "note": "B-3", "instrument": 2, "volume": null, "effect": null, "accent": true, "slide": false }
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-4",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "G-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "B-3",
+              "instrument": 2,
+              "volume": null,
+              "effect": null,
+              "accent": true,
+              "slide": false
+            }
+          ]
+        },
+        {
+          "id": "ch-kick",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 3,
+          "color": "#f97316",
+          "rows": [
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-1",
+              "instrument": 3,
+              "volume": 50,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-snare",
+          "name": "Snare",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#a855f7",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 4,
+              "volume": 48,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-hihat",
+          "name": "Hi-Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 5,
+          "color": "#eab308",
+          "rows": [
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 5,
+              "volume": 35,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
+          ]
+        },
+        {
+          "id": "ch-openhat",
+          "name": "Open Hat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 6,
+          "color": "#10b981",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            },
+            {
+              "note": "C-4",
+              "instrument": 6,
+              "volume": 40,
+              "effect": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null
+            }
           ]
         }
       ]
     }
   ],
-  "sequence": ["pattern-higher-state-intro", "pattern-higher-state-intro", "pattern-higher-state-main", "pattern-higher-state-main", "pattern-higher-state-peak", "pattern-higher-state-peak", "pattern-higher-state-main", "pattern-higher-state-peak"]
+  "sequence": [
+    "pattern-higher-state-intro",
+    "pattern-higher-state-intro",
+    "pattern-higher-state-main",
+    "pattern-higher-state-main",
+    "pattern-higher-state-peak",
+    "pattern-higher-state-peak",
+    "pattern-higher-state-main",
+    "pattern-higher-state-peak"
+  ]
 }

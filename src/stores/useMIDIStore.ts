@@ -9,6 +9,9 @@ import type { MIDIDeviceInfo, CCMapping, TB303Parameter } from '../midi/types';
 import { getMIDIManager } from '../midi/MIDIManager';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
+import { midiToTrackerNote } from '../midi/types';
+import { getToneEngine } from '../engine/ToneEngine';
+import { useInstrumentStore } from './useInstrumentStore';
 
 interface MIDIStore {
   // Status
@@ -78,6 +81,9 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
 // CC handlers stored outside Zustand state (Map doesn't work well with immer)
 const ccHandlersMap = new Map<TB303Parameter, (value: number) => void>();
 
+// Track active MIDI notes for proper release
+const activeMidiNotes = new Map<number, string>();
+
 export const useMIDIStore = create<MIDIStore>()(
   persist(
     immer((set, get) => ({
@@ -116,12 +122,51 @@ export const useMIDIStore = create<MIDIStore>()(
           const success = await manager.init();
 
           if (success) {
-            // Set up message handler for CC
+            // Set up message handler for notes and CC
             manager.addMessageHandler((message) => {
               const store = get();
 
               // Update activity timestamp
               store.updateActivity();
+
+              // Handle Note On messages
+              if (message.type === 'noteOn' && message.note !== undefined && message.velocity !== undefined) {
+                const trackerNote = midiToTrackerNote(message.note);
+                // Convert tracker format (C-4) to Tone.js format (C4)
+                const toneNote = trackerNote.replace('-', '');
+
+                // Get the instrument to play - use previewInstrument if set (for modal previews),
+                // otherwise fall back to currentInstrument
+                const instrumentStore = useInstrumentStore.getState();
+                const targetInstrument = instrumentStore.previewInstrument || instrumentStore.currentInstrument;
+
+                if (targetInstrument) {
+                  activeMidiNotes.set(message.note, toneNote);
+
+                  const engine = getToneEngine();
+                  const velocity = message.velocity / 127;
+                  engine.triggerNoteAttack(targetInstrument.id, toneNote, 0, velocity, targetInstrument);
+                }
+                return;
+              }
+
+              // Handle Note Off messages
+              if (message.type === 'noteOff' && message.note !== undefined) {
+                const toneNote = activeMidiNotes.get(message.note);
+                if (toneNote) {
+                  activeMidiNotes.delete(message.note);
+
+                  // Get the instrument - use previewInstrument if set, otherwise currentInstrument
+                  const instrumentStore = useInstrumentStore.getState();
+                  const targetInstrument = instrumentStore.previewInstrument || instrumentStore.currentInstrument;
+
+                  if (targetInstrument) {
+                    const engine = getToneEngine();
+                    engine.triggerNoteRelease(targetInstrument.id, toneNote, 0, targetInstrument);
+                  }
+                }
+                return;
+              }
 
               // Handle CC messages
               if (message.type === 'cc' && message.cc !== undefined && message.value !== undefined) {

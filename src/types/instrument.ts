@@ -154,9 +154,9 @@ export const DEFAULT_WAVETABLE: WavetableConfig = {
   },
   envelope: {
     attack: 10,
-    decay: 100,
-    sustain: 80,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 100,
   },
   filter: {
     type: 'lowpass',
@@ -166,9 +166,9 @@ export const DEFAULT_WAVETABLE: WavetableConfig = {
   },
   filterEnvelope: {
     attack: 10,
-    decay: 200,
-    sustain: 30,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence
+    release: 100,
   },
 };
 
@@ -248,9 +248,9 @@ export const DEFAULT_SUPERSAW: SuperSawConfig = {
   stereoSpread: 80,
   envelope: {
     attack: 10,
-    decay: 100,
-    sustain: 80,
-    release: 300,
+    decay: 500,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 100,
   },
   filter: {
     type: 'lowpass',
@@ -260,9 +260,9 @@ export const DEFAULT_SUPERSAW: SuperSawConfig = {
   },
   filterEnvelope: {
     attack: 10,
-    decay: 200,
-    sustain: 30,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence
+    release: 100,
   },
 };
 
@@ -292,9 +292,9 @@ export const DEFAULT_POLYSYNTH: PolySynthConfig = {
   },
   envelope: {
     attack: 50,
-    decay: 200,
-    sustain: 70,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 100,
   },
   portamento: 0,
 };
@@ -382,6 +382,22 @@ export const DEFAULT_DRUM_MACHINE: DrumMachineConfig = {
     decay: 500,
     drive: 0,
   },
+  snare: {
+    pitch: 200,
+    tone: 50,
+    snappy: 70,
+    decay: 200,
+  },
+  hihat: {
+    tone: 50,
+    decay: 100,
+    metallic: 50,
+  },
+  clap: {
+    tone: 50,
+    decay: 200,
+    spread: 50,
+  },
 };
 
 /**
@@ -420,14 +436,19 @@ export const DEFAULT_CHIP_SYNTH: ChipSynthConfig = {
   sampleRate: 22050,
   envelope: {
     attack: 5,
-    decay: 100,
-    sustain: 70,
-    release: 200,
+    decay: 300,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 50,
   },
   vibrato: {
     speed: 6,
     depth: 0,
     delay: 200,
+  },
+  arpeggio: {
+    enabled: false,
+    speed: 15,           // 15 Hz (typical chiptune arpeggio speed)
+    pattern: [0, 4, 7],  // Major chord (root, major third, fifth)
   },
 };
 
@@ -461,9 +482,9 @@ export const DEFAULT_PWM_SYNTH: PWMSynthConfig = {
   detune: 10,
   envelope: {
     attack: 50,
-    decay: 200,
-    sustain: 70,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 100,
   },
   filter: {
     type: 'lowpass',
@@ -474,9 +495,9 @@ export const DEFAULT_PWM_SYNTH: PWMSynthConfig = {
   },
   filterEnvelope: {
     attack: 10,
-    decay: 300,
-    sustain: 30,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence
+    release: 100,
   },
 };
 
@@ -570,9 +591,9 @@ export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   },
   envelope: {
     attack: 50,
-    decay: 200,
-    sustain: 70,
-    release: 500,
+    decay: 500,
+    sustain: 0,  // Decay to silence (tracker-style)
+    release: 100,
   },
   brightness: 70,
 };
@@ -659,9 +680,9 @@ export const DEFAULT_OSCILLATOR: OscillatorConfig = {
 
 export const DEFAULT_ENVELOPE: EnvelopeConfig = {
   attack: 10,
-  decay: 200,
-  sustain: 50,
-  release: 1000,
+  decay: 500,
+  sustain: 0,  // Decay to silence (tracker-style)
+  release: 100,
 };
 
 export const DEFAULT_FILTER: FilterConfig = {

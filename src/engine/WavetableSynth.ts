@@ -79,8 +79,8 @@ export class WavetableSynth extends Tone.ToneAudioNode {
       release: config.filterEnvelope.release / 1000,
     });
 
-    // Output gain
-    this.outputGain = new Tone.Gain(1);
+    // Output gain with volume boost (wavetable tends to be quiet)
+    this.outputGain = new Tone.Gain(2);
 
     // Connect filter -> output
     this.filter.connect(this.outputGain);

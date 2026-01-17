@@ -37,7 +37,9 @@
       "@typedefs/*": ["./src/types/*"],
       "@utils/*": ["./src/utils/*"],
       "@constants/*": ["./src/constants/*"],
-      "@lib/*": ["./src/lib/*"]
+      "@lib/*": ["./src/lib/*"],
+      "@generated/*": ["./src/generated/*"],
+      "@contexts/*": ["./src/contexts/*"]
     }
   },
   "include": ["src"]

@@ -15,6 +15,7 @@ import * as Tone from 'tone';
 
 interface SampleEditorProps {
   instrument: InstrumentConfig;
+  onChange?: (updates: Partial<InstrumentConfig>) => void;
 }
 
 interface SampleInfo {
@@ -29,8 +30,17 @@ interface SampleInfo {
 const NOTE_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const OCTAVE_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
-export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
-  const { updateInstrument } = useInstrumentStore();
+export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
+  const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
+
+  // Use onChange prop if provided (for temp instruments), otherwise use store
+  const updateInstrument = useCallback((id: number, updates: Partial<InstrumentConfig>) => {
+    if (onChange) {
+      onChange(updates);
+    } else {
+      storeUpdateInstrument(id, updates);
+    }
+  }, [onChange, storeUpdateInstrument]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -155,14 +165,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
     ctx.stroke();
 
     if (!audioBuffer) {
-      // Draw placeholder
-      ctx.fillStyle = '#686060';
-      ctx.font = '13px "JetBrains Mono", monospace';
+      // Draw placeholder with larger, clearer text
+      ctx.fillStyle = '#888080';
+      ctx.font = 'bold 24px "JetBrains Mono", "Consolas", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('Drop audio file here or click to upload', width / 2, midY - 10);
-      ctx.fillStyle = '#484040';
-      ctx.font = '11px "JetBrains Mono", monospace';
-      ctx.fillText('WAV, MP3, OGG, FLAC supported', width / 2, midY + 15);
+      ctx.fillText('Drop audio file here or click to upload', width / 2, midY - 15);
+      ctx.fillStyle = '#585050';
+      ctx.font = '18px "JetBrains Mono", "Consolas", monospace';
+      ctx.fillText('WAV, MP3, OGG, FLAC supported', width / 2, midY + 25);
       return;
     }
 
@@ -390,6 +400,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
 
   // Canvas click to set markers
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.stopPropagation(); // Prevent double file picker from parent onClick
     if (!audioBuffer) {
       fileInputRef.current?.click();
       return;
@@ -522,9 +533,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument }) => {
       >
         <canvas
           ref={canvasRef}
-          width={560}
-          height={100}
-          className="w-full h-[100px] cursor-crosshair"
+          width={1120}
+          height={300}
+          className="w-full h-[150px] cursor-crosshair"
+          style={{ imageRendering: 'pixelated' }}
           onClick={handleCanvasClick}
         />
 

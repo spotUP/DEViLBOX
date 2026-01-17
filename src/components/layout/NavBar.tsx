@@ -83,7 +83,7 @@ export const NavBar: React.FC = () => {
           <div className="relative" data-theme-menu>
             <button
               onClick={() => setShowThemeMenu(!showThemeMenu)}
-              className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+              className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors whitespace-nowrap"
               title="Change theme"
             >
               <Palette size={16} />

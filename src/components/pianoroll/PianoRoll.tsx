@@ -2,7 +2,7 @@
  * PianoRoll - Main piano roll editor container
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PianoKeyboard } from './PianoKeyboard';
 import { PianoRollGrid } from './PianoRollGrid';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
@@ -17,6 +17,8 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 interface PianoRollProps {
@@ -29,6 +31,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     selection,
     tool,
     setHorizontalZoom,
+    setVerticalZoom,
     scrollBy,
     setSnapToGrid,
     setGridDivision,
@@ -47,6 +50,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   );
   const { isPlaying, continuousRow } = useTransportStore();
 
+  // Container ref for measuring height
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(400);
+
   // Sync channel index from props
   useEffect(() => {
     if (channelIndex !== undefined) {
@@ -54,10 +61,36 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     }
   }, [channelIndex, setChannelIndex]);
 
-  // Calculate visible notes range
+  // Measure container height on mount and resize
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        // Subtract toolbar height (approx 44px)
+        const height = containerRef.current.clientHeight - 44;
+        setContainerHeight(Math.max(200, height));
+      }
+    };
+
+    updateHeight();
+
+    // Use ResizeObserver for responsive updates
+    const resizeObserver = new ResizeObserver(updateHeight);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Calculate visible notes range based on actual container height
   const visibleNotes = useMemo(() => {
-    return Math.ceil(600 / view.verticalZoom); // Approximate container height
-  }, [view.verticalZoom]);
+    return Math.ceil(containerHeight / view.verticalZoom) + 2;
+  }, [containerHeight, view.verticalZoom]);
+
+  // Calculate how many octaves are visible
+  const visibleOctaves = useMemo(() => {
+    return Math.floor(visibleNotes / 12);
+  }, [visibleNotes]);
 
   // Handle note selection
   const handleNoteSelect = useCallback(
@@ -166,9 +199,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const patternLength = pattern?.length || 64;
 
   return (
-    <div className="flex flex-col h-full bg-dark-bgSecondary">
+    <div ref={containerRef} className="flex flex-col h-full bg-dark-bgSecondary">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgTertiary">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgTertiary shrink-0">
         {/* Tool buttons */}
         <div className="flex items-center bg-dark-bg rounded-md p-0.5">
           <button
@@ -208,8 +241,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
         <div className="w-px h-4 bg-dark-border" />
 
-        {/* Zoom controls */}
+        {/* Horizontal Zoom controls */}
         <div className="flex items-center gap-1">
+          <span className="text-[10px] text-text-muted">H</span>
           <button
             onClick={() => setHorizontalZoom(view.horizontalZoom * 0.8)}
             className="p-1 text-text-muted hover:text-text-primary"
@@ -217,8 +251,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           >
             <ZoomOut size={14} />
           </button>
-          <span className="text-xs text-text-muted w-8 text-center">
-            {Math.round(view.horizontalZoom)}x
+          <span className="text-xs text-text-muted w-6 text-center">
+            {Math.round(view.horizontalZoom)}
           </span>
           <button
             onClick={() => setHorizontalZoom(view.horizontalZoom * 1.25)}
@@ -226,6 +260,28 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             title="Zoom in horizontally"
           >
             <ZoomIn size={14} />
+          </button>
+        </div>
+
+        {/* Vertical Zoom controls */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-text-muted">V</span>
+          <button
+            onClick={() => setVerticalZoom(view.verticalZoom - 2)}
+            className="p-1 text-text-muted hover:text-text-primary"
+            title="Zoom out vertically (show more octaves)"
+          >
+            <Minimize2 size={14} />
+          </button>
+          <span className="text-xs text-text-muted w-10 text-center" title={`${visibleOctaves} octaves visible`}>
+            {visibleOctaves}oct
+          </span>
+          <button
+            onClick={() => setVerticalZoom(view.verticalZoom + 2)}
+            className="p-1 text-text-muted hover:text-text-primary"
+            title="Zoom in vertically (show fewer octaves)"
+          >
+            <Maximize2 size={14} />
           </button>
         </div>
 
@@ -299,12 +355,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       </div>
 
       {/* Main editor area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Piano keyboard */}
         <PianoKeyboard
           verticalZoom={view.verticalZoom}
           scrollY={view.scrollY}
           visibleNotes={visibleNotes}
+          containerHeight={containerHeight}
         />
 
         {/* Grid and notes */}
@@ -319,6 +376,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           showVelocity={view.showVelocity}
           selectedNotes={selection.notes}
           playheadRow={isPlaying ? continuousRow : null}
+          containerHeight={containerHeight}
           onNoteSelect={handleNoteSelect}
           onNoteDragStart={handleNoteDragStart}
           onGridClick={handleGridClick}

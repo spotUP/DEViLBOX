@@ -5,10 +5,12 @@
 
 import React from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { DEFAULT_CHIP_SYNTH } from '@typedefs/instrument';
 import { OscillatorEditor } from './OscillatorEditor';
 import { EnvelopeEditor } from './EnvelopeEditor';
 import { FilterEditor } from './FilterEditor';
 import { SampleEditor } from './SampleEditor';
+import { ArpeggioEditor } from './ArpeggioEditor';
 
 // Sample-based synth types
 const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
@@ -372,6 +374,27 @@ function renderSpecialParameters(
               </select>
             </div>
           </div>
+        </div>
+      );
+
+    case 'ChipSynth':
+      return (
+        <div className="space-y-3">
+          <h3 className="font-mono text-text-primary text-sm font-bold border-b border-dark-border pb-2">
+            ARPEGGIO
+          </h3>
+          <ArpeggioEditor
+            config={instrument.chipSynth?.arpeggio || { enabled: false, speed: 15, pattern: [0, 4, 7] }}
+            onChange={(arpeggio) => {
+              const currentChip = instrument.chipSynth || DEFAULT_CHIP_SYNTH;
+              onChange({
+                chipSynth: {
+                  ...currentChip,
+                  arpeggio,
+                },
+              });
+            }}
+          />
         </div>
       );
 

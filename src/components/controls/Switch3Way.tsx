@@ -2,6 +2,8 @@
  * Switch3Way - 3-position switch control styled like hardware toggles
  */
 
+import { useThemeStore } from '@stores';
+
 interface Switch3WayProps<T extends string> {
   label: string;
   value: T;
@@ -17,8 +19,13 @@ export function Switch3Way<T extends string>({
   options,
   labels,
   onChange,
-  color = '#00d4aa',
+  color: colorProp = '#00d4aa',
 }: Switch3WayProps<T>) {
+  // Theme-aware color: use cyan for cyan-lineart theme
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const color = isCyanTheme ? '#00ffff' : colorProp;
+
   const currentIndex = options.indexOf(value);
   const position = currentIndex === -1 ? 1 : currentIndex; // Default to center
 

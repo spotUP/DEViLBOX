@@ -1,20 +1,20 @@
 /**
- * UI Store - Panel Visibility, Theme, UI State
+ * UI Store - Panel Visibility, UI State
  */
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
-import type { ThemeType, PanelType } from '@typedefs/project';
+import type { PanelType } from '@typedefs/project';
 
 interface UIStore {
   // State
-  theme: ThemeType;
   visiblePanels: PanelType[];
   trackerZoom: number; // 80-200%
   activePanel: PanelType;
   modalOpen: string | null;
   sidebarCollapsed: boolean;
+  useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
 
   // Responsive layout state
   tb303Collapsed: boolean;
@@ -23,7 +23,6 @@ interface UIStore {
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
 
   // Actions
-  setTheme: (theme: ThemeType) => void;
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
   setTrackerZoom: (zoom: number) => void;
@@ -31,6 +30,7 @@ interface UIStore {
   closeModal: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setUseHexNumbers: (useHex: boolean) => void;
 
   // Responsive layout actions
   toggleTB303Collapsed: () => void;
@@ -46,12 +46,12 @@ export const useUIStore = create<UIStore>()(
   persist(
     immer((set, _get) => ({
       // Initial state
-      theme: 'ft2-blue',
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
       activePanel: 'tracker',
       modalOpen: null,
       sidebarCollapsed: false,
+      useHexNumbers: true, // Default to hex numbers (FT2 style)
 
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: false,
@@ -60,11 +60,6 @@ export const useUIStore = create<UIStore>()(
       autoCompactApplied: false,
 
       // Actions
-      setTheme: (theme) =>
-        set((state) => {
-          state.theme = theme;
-        }),
-
       togglePanel: (panel) =>
         set((state) => {
           const index = state.visiblePanels.indexOf(panel);
@@ -107,6 +102,11 @@ export const useUIStore = create<UIStore>()(
       setSidebarCollapsed: (collapsed) =>
         set((state) => {
           state.sidebarCollapsed = collapsed;
+        }),
+
+      setUseHexNumbers: (useHex) =>
+        set((state) => {
+          state.useHexNumbers = useHex;
         }),
 
       // Responsive layout actions
@@ -165,6 +165,7 @@ export const useUIStore = create<UIStore>()(
         compactToolbar: state.compactToolbar,
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,
+        useHexNumbers: state.useHexNumbers,
       }),
     }
   )

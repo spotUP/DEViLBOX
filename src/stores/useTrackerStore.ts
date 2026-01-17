@@ -12,7 +12,7 @@ import type {
   ClipboardData,
   ColumnVisibility,
 } from '@typedefs';
-import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL } from '@typedefs';
+import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getToneEngine } from '@engine/ToneEngine';
 
 // Note names for transpose operations
@@ -51,6 +51,7 @@ interface TrackerStore {
   selection: BlockSelection | null;
   clipboard: ClipboardData | null;
   followPlayback: boolean;
+  showGhostPatterns: boolean; // Show previous/next patterns as ghosts
   columnVisibility: ColumnVisibility;
   currentOctave: number; // FT2: F1-F7 selects octave 1-7
   recordMode: boolean; // When true, entering notes advances cursor by editStep
@@ -65,6 +66,7 @@ interface TrackerStore {
   setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>) => void;
   clearCell: (channelIndex: number, rowIndex: number) => void;
   setFollowPlayback: (enabled: boolean) => void;
+  setShowGhostPatterns: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
   setCurrentOctave: (octave: number) => void;
   toggleRecordMode: () => void;
@@ -146,6 +148,7 @@ export const useTrackerStore = create<TrackerStore>()(
     selection: null,
     clipboard: null,
     followPlayback: false,
+    showGhostPatterns: true, // Show ghost patterns by default
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
     currentOctave: 4, // Default octave (F4)
     recordMode: false, // Start with record mode off
@@ -279,6 +282,11 @@ export const useTrackerStore = create<TrackerStore>()(
     setFollowPlayback: (enabled) =>
       set((state) => {
         state.followPlayback = enabled;
+      }),
+
+    setShowGhostPatterns: (enabled) =>
+      set((state) => {
+        state.showGhostPatterns = enabled;
       }),
 
     setColumnVisibility: (visibility) =>
@@ -698,6 +706,11 @@ export const useTrackerStore = create<TrackerStore>()(
     addChannel: () =>
       set((state) => {
         const maxChannels = 16;
+        // Get available colors (excluding null)
+        const availableColors = CHANNEL_COLORS.filter((c): c is string => c !== null);
+        // Pick a random color for the new channel
+        const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+
         state.patterns.forEach((pattern) => {
           if (pattern.channels.length < maxChannels) {
             const newChannelIndex = pattern.channels.length;
@@ -710,7 +723,7 @@ export const useTrackerStore = create<TrackerStore>()(
               volume: 80,
               pan: 0,
               instrumentId: null,
-              color: null,
+              color: randomColor,
             });
           }
         });

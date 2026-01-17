@@ -19,6 +19,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -156,7 +157,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { save: saveProject } = useProjectPersistence();
   const { instruments, loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
-  const { compactToolbar, toggleCompactToolbar } = useUIStore();
+  const { compactToolbar, toggleCompactToolbar, useHexNumbers } = useUIStore();
   const { isLiveMode, toggleLiveMode, pendingPatternIndex } = useLiveModeStore();
   const { curves } = useAutomationStore();
 
@@ -164,11 +165,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const demoMenuRef = useRef<HTMLDivElement>(null);
 
   // Demo songs available on the server
   const DEMO_SONGS = [
-    { file: 'acid-banger.song.json', name: 'Acid Banger' },
     { file: 'phuture-acid-tracks.song.json', name: 'Phuture - Acid Tracks' },
     { file: 'hardfloor-funalogue.song.json', name: 'Hardfloor - Funalogue' },
     { file: 'josh-wink-higher-state.song.json', name: 'Josh Wink - Higher State' },
@@ -445,7 +446,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             max={songLength - 1}
             format="hex"
           />
-          <FT2Button onClick={handleInsertPosition} small title="Insert position">
+          <FT2Button onClick={handleInsertPosition} small title="Insert position (duplicate current)">
             Ins
           </FT2Button>
           <FT2Button onClick={handleDeletePosition} small title="Delete position" disabled={songLength <= 1}>
@@ -488,7 +489,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onClick={handlePlaySong}
             active={isPlayingSong}
             colorAccent={isPlayingSong ? 'red' : 'green'}
-            title={isPlayingSong ? 'Stop playback' : 'Play song from start'}
+            title={isPlayingSong ? 'Stop playback (F8 / Esc)' : 'Play song from start (F5)'}
           >
             {isPlayingSong ? 'Stop' : 'Play Song'}
           </FT2Button>
@@ -496,7 +497,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onClick={handlePlayPattern}
             active={isPlayingPattern}
             colorAccent={isPlayingPattern ? 'red' : 'green'}
-            title={isPlayingPattern ? 'Stop playback' : 'Play/loop current pattern'}
+            title={isPlayingPattern ? 'Stop playback (F8 / Esc)' : 'Play/loop current pattern (F6)'}
           >
             {isPlayingPattern ? 'Stop' : 'Play Pattern'}
           </FT2Button>
@@ -504,7 +505,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onClick={toggleRecordMode}
             active={recordMode}
             colorAccent={recordMode ? 'red' : undefined}
-            title={recordMode ? 'Disable record mode' : 'Enable record mode (enter notes at playback position during playback)'}
+            title={recordMode ? 'Disable record mode (Enter)' : 'Enable record mode - enter notes at playback position (Enter)'}
           >
             {recordMode ? '● Rec' : 'Rec'}
           </FT2Button>
@@ -512,7 +513,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onClick={toggleLiveMode}
             active={isLiveMode}
             colorAccent={isLiveMode ? 'yellow' : undefined}
-            title={isLiveMode ? 'Switch to Edit mode' : 'Switch to Live mode (pattern queueing, L key)'}
+            title={isLiveMode ? 'Switch to Edit mode (L)' : 'Switch to Live mode - pattern queueing (L)'}
           >
             {isLiveMode ? '● LIVE' : 'Live'}
           </FT2Button>
@@ -606,7 +607,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           {/* Row indicator */}
           <div className="ft2-section ft2-section-playback">
             <span className="ft2-row-display">
-              Row: <span className="ft2-row-value">{currentRow.toString(16).toUpperCase().padStart(2, '0')}</span>
+              Row: <span className="ft2-row-value">
+                {useHexNumbers
+                  ? currentRow.toString(16).toUpperCase().padStart(2, '0')
+                  : currentRow.toString(10).padStart(2, '0')
+                }
+              </span>
             </span>
           </div>
         </div>
@@ -667,34 +673,40 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           <FT2Button onClick={onImport} small title="Import module dialog">
             Import
           </FT2Button>
-          <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list">
+          <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list (Ctrl+Shift+P)">
             Patterns
           </FT2Button>
-          <FT2Button onClick={onShowInstruments} small title="Instrument editor">
+          <FT2Button onClick={onShowInstruments} small title="Instrument editor (Ctrl+I)">
             Instr
           </FT2Button>
-          <FT2Button onClick={onShowExport} small title="Export (Ctrl+Shift+E)">
+          <FT2Button onClick={onShowExport} small title="Export dialog (Ctrl+Shift+E)">
             Export
           </FT2Button>
-          <FT2Button onClick={onShowMasterFX} small active={showMasterFX} title="Master effects">
+          <FT2Button onClick={onShowMasterFX} small active={showMasterFX} title="Master effects (Ctrl+M)">
             Master FX
           </FT2Button>
-          <FT2Button onClick={onShowHelp} small title="Help (?)">
+          <FT2Button onClick={onShowHelp} small title="Help & shortcuts (?)">
             Help
           </FT2Button>
-          <FT2Button onClick={toggleMasterMute} small active={masterMuted} title="Toggle master mute">
+          <FT2Button onClick={() => setShowSettings(true)} small title="Application settings">
+            Settings
+          </FT2Button>
+          <FT2Button onClick={toggleMasterMute} small active={masterMuted} title="Toggle master mute (Ctrl+Shift+M)">
             {masterMuted ? 'Unmute' : 'Mute'}
           </FT2Button>
           <FT2Button
             onClick={() => setSmoothScrolling(!smoothScrolling)}
             small
             active={smoothScrolling}
-            title={smoothScrolling ? 'Switch to stepped scrolling (classic tracker)' : 'Switch to smooth scrolling (DAW-style)'}
+            title={smoothScrolling ? 'Classic stepped scrolling' : 'Smooth DAW-style scrolling'}
           >
             {smoothScrolling ? 'Smooth' : 'Stepped'}
           </FT2Button>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 };

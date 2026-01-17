@@ -4,8 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { useTrackerStore } from '@stores';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
+import { ModalFooter } from '@components/ui/ModalFooter';
+import { Button } from '@components/ui/Button';
 
 interface InterpolateDialogProps {
   isOpen: boolean;
@@ -53,93 +57,89 @@ export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, on
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-80">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
-          <h2 className="text-sm font-semibold text-text-primary">Interpolate Selection</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      theme="modern"
+      backdropOpacity="medium"
+      closeOnBackdropClick={true}
+      closeOnEscape={true}
+    >
+      <ModalHeader
+        title="Interpolate Selection"
+        icon={<TrendingUp size={18} />}
+        onClose={onClose}
+        theme="modern"
+      />
+
+      {/* Body */}
+      <div className="p-4 space-y-4">
+        {/* Column selector */}
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Column</label>
+          <select
+            value={column}
+            onChange={(e) => handleColumnChange(e.target.value as InterpolateColumn)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
           >
-            <X size={16} />
-          </button>
+            {COLUMN_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Body */}
-        <div className="p-4 space-y-4">
-          {/* Column selector */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">Column</label>
-            <select
-              value={column}
-              onChange={(e) => handleColumnChange(e.target.value as InterpolateColumn)}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-            >
-              {COLUMN_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Start value */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">
-              Start Value ({selectedColumnInfo.min} - {selectedColumnInfo.max})
-            </label>
-            <input
-              type="number"
-              value={startValue}
-              onChange={(e) => setStartValue(Math.max(selectedColumnInfo.min, Math.min(selectedColumnInfo.max, parseInt(e.target.value) || 0)))}
-              min={selectedColumnInfo.min}
-              max={selectedColumnInfo.max}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
-            />
-          </div>
-
-          {/* End value */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">
-              End Value ({selectedColumnInfo.min} - {selectedColumnInfo.max})
-            </label>
-            <input
-              type="number"
-              value={endValue}
-              onChange={(e) => setEndValue(Math.max(selectedColumnInfo.min, Math.min(selectedColumnInfo.max, parseInt(e.target.value) || 0)))}
-              min={selectedColumnInfo.min}
-              max={selectedColumnInfo.max}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
-            />
-          </div>
-
-          {/* Selection info */}
-          {!selection && (
-            <p className="text-xs text-accent-warning">
-              No selection active. Use Alt+Arrow keys to select a region.
-            </p>
-          )}
+        {/* Start value */}
+        <div>
+          <label className="block text-xs text-text-muted mb-1">
+            Start Value ({selectedColumnInfo.min} - {selectedColumnInfo.max})
+          </label>
+          <input
+            type="number"
+            value={startValue}
+            onChange={(e) => setStartValue(Math.max(selectedColumnInfo.min, Math.min(selectedColumnInfo.max, parseInt(e.target.value) || 0)))}
+            min={selectedColumnInfo.min}
+            max={selectedColumnInfo.max}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
+          />
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleApply}
-            disabled={!selection}
-            className="px-4 py-2 text-sm bg-accent-primary text-white rounded hover:bg-accent-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Apply
-          </button>
+        {/* End value */}
+        <div>
+          <label className="block text-xs text-text-muted mb-1">
+            End Value ({selectedColumnInfo.min} - {selectedColumnInfo.max})
+          </label>
+          <input
+            type="number"
+            value={endValue}
+            onChange={(e) => setEndValue(Math.max(selectedColumnInfo.min, Math.min(selectedColumnInfo.max, parseInt(e.target.value) || 0)))}
+            min={selectedColumnInfo.min}
+            max={selectedColumnInfo.max}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
+          />
         </div>
+
+        {/* Selection info */}
+        {!selection && (
+          <p className="text-xs text-accent-warning">
+            No selection active. Use Alt+Arrow keys to select a region.
+          </p>
+        )}
       </div>
-    </div>
+
+      <ModalFooter theme="modern" align="right">
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleApply}
+          disabled={!selection}
+        >
+          Apply
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 };

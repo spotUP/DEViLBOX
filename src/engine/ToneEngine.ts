@@ -20,6 +20,8 @@ export class ToneEngine {
   public fft: Tone.FFT;
   // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
   public instruments: Map<string, Tone.PolySynth | Tone.Synth | any>;
+  // Track synth types for proper release handling
+  private instrumentSynthTypes: Map<string, string> = new Map();
 
   // Master effects chain
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
@@ -246,9 +248,13 @@ export class ToneEngine {
     return `${instrumentId}-${channelIndex ?? -1}`;
   }
 
+  // Track the last trigger time to ensure strictly increasing times
+  private lastTriggerTime: number = 0;
+
   /**
    * Get a safe time value for scheduling audio events
    * Returns null if audio context is not ready
+   * Ensures each returned time is strictly greater than the previous one
    */
   private getSafeTime(time?: number): number | null {
     // Check if audio context is running
@@ -262,14 +268,25 @@ export class ToneEngine {
       return null;
     }
 
-    // If time is provided and valid (> 0), use it
+    // If time is provided and valid (> 0), use it as base
     // Time of 0 means "play immediately" so we use now()
+    let targetTime: number;
     if (time !== undefined && time !== null && !isNaN(time) && time > 0) {
-      return time;
+      targetTime = time;
+    } else {
+      // Use current time with a small offset to ensure it's scheduled properly
+      targetTime = now + 0.001;
     }
 
-    // Use current time with a small offset to ensure it's scheduled properly
-    return now + 0.001;
+    // Ensure this time is strictly greater than the last trigger time
+    // This prevents "Start time must be strictly greater than previous start time" errors
+    // especially for rapid MIDI input or drum machines
+    if (targetTime <= this.lastTriggerTime) {
+      targetTime = this.lastTriggerTime + 0.001;
+    }
+
+    this.lastTriggerTime = targetTime;
+    return targetTime;
   }
 
   /**
@@ -294,10 +311,10 @@ export class ToneEngine {
             type: config.oscillator?.type || 'sawtooth',
           },
           envelope: {
-            attack: (config.envelope?.attack || 10) / 1000,
-            decay: (config.envelope?.decay || 200) / 1000,
-            sustain: (config.envelope?.sustain || 50) / 100,
-            release: (config.envelope?.release || 1000) / 1000,
+            attack: (config.envelope?.attack ?? 10) / 1000,
+            decay: (config.envelope?.decay ?? 200) / 1000,
+            sustain: (config.envelope?.sustain ?? 50) / 100,
+            release: (config.envelope?.release ?? 1000) / 1000,
           },
           volume: config.volume || -12,
         });
@@ -309,10 +326,10 @@ export class ToneEngine {
             type: config.oscillator?.type || 'sawtooth',
           },
           envelope: {
-            attack: (config.envelope?.attack || 10) / 1000,
-            decay: (config.envelope?.decay || 200) / 1000,
-            sustain: (config.envelope?.sustain || 50) / 100,
-            release: (config.envelope?.release || 1000) / 1000,
+            attack: (config.envelope?.attack ?? 10) / 1000,
+            decay: (config.envelope?.decay ?? 200) / 1000,
+            sustain: (config.envelope?.sustain ?? 50) / 100,
+            release: (config.envelope?.release ?? 1000) / 1000,
           },
           volume: config.volume || -12,
         });
@@ -323,19 +340,19 @@ export class ToneEngine {
           voice0: {
             oscillator: { type: config.oscillator?.type || 'sawtooth' },
             envelope: {
-              attack: (config.envelope?.attack || 10) / 1000,
-              decay: (config.envelope?.decay || 200) / 1000,
-              sustain: (config.envelope?.sustain || 50) / 100,
-              release: (config.envelope?.release || 1000) / 1000,
+              attack: (config.envelope?.attack ?? 10) / 1000,
+              decay: (config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.envelope?.sustain ?? 50) / 100,
+              release: (config.envelope?.release ?? 1000) / 1000,
             },
           },
           voice1: {
             oscillator: { type: config.oscillator?.type || 'sawtooth' },
             envelope: {
-              attack: (config.envelope?.attack || 10) / 1000,
-              decay: (config.envelope?.decay || 200) / 1000,
-              sustain: (config.envelope?.sustain || 50) / 100,
-              release: (config.envelope?.release || 1000) / 1000,
+              attack: (config.envelope?.attack ?? 10) / 1000,
+              decay: (config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.envelope?.sustain ?? 50) / 100,
+              release: (config.envelope?.release ?? 1000) / 1000,
             },
           },
           vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
@@ -349,10 +366,10 @@ export class ToneEngine {
           maxPolyphony: 16, // Increased for high BPM playback
           oscillator: { type: config.oscillator?.type || 'sine' },
           envelope: {
-            attack: (config.envelope?.attack || 10) / 1000,
-            decay: (config.envelope?.decay || 200) / 1000,
-            sustain: (config.envelope?.sustain || 50) / 100,
-            release: (config.envelope?.release || 1000) / 1000,
+            attack: (config.envelope?.attack ?? 10) / 1000,
+            decay: (config.envelope?.decay ?? 200) / 1000,
+            sustain: (config.envelope?.sustain ?? 50) / 100,
+            release: (config.envelope?.release ?? 1000) / 1000,
           },
           modulationIndex: 10,
           volume: config.volume || -12,
@@ -364,10 +381,10 @@ export class ToneEngine {
           maxPolyphony: 16, // Increased for high BPM playback
           oscillator: { type: config.oscillator?.type || 'sine' },
           envelope: {
-            attack: (config.envelope?.attack || 10) / 1000,
-            decay: (config.envelope?.decay || 200) / 1000,
-            sustain: (config.envelope?.sustain || 50) / 100,
-            release: (config.envelope?.release || 1000) / 1000,
+            attack: (config.envelope?.attack ?? 10) / 1000,
+            decay: (config.envelope?.decay ?? 200) / 1000,
+            sustain: (config.envelope?.sustain ?? 50) / 100,
+            release: (config.envelope?.release ?? 1000) / 1000,
           },
           volume: config.volume || -12,
         });
@@ -386,9 +403,9 @@ export class ToneEngine {
       case 'MetalSynth':
         instrument = new Tone.MetalSynth({
           envelope: {
-            attack: (config.envelope?.attack || 1) / 1000,
-            decay: (config.envelope?.decay || 100) / 1000,
-            release: (config.envelope?.release || 100) / 1000,
+            attack: (config.envelope?.attack ?? 1) / 1000,
+            decay: (config.envelope?.decay ?? 100) / 1000,
+            release: (config.envelope?.release ?? 100) / 1000,
           },
           volume: config.volume || -12,
         });
@@ -400,10 +417,10 @@ export class ToneEngine {
           octaves: 10,
           oscillator: { type: config.oscillator?.type || 'sine' },
           envelope: {
-            attack: (config.envelope?.attack || 1) / 1000,
-            decay: (config.envelope?.decay || 400) / 1000,
+            attack: (config.envelope?.attack ?? 1) / 1000,
+            decay: (config.envelope?.decay ?? 400) / 1000,
             sustain: 0.01,
-            release: (config.envelope?.release || 100) / 1000,
+            release: (config.envelope?.release ?? 100) / 1000,
           },
           volume: config.volume || -12,
         });
@@ -416,12 +433,12 @@ export class ToneEngine {
             type: 'white',
           },
           envelope: {
-            attack: (config.envelope?.attack || 10) / 1000,
-            decay: (config.envelope?.decay || 200) / 1000,
-            sustain: (config.envelope?.sustain || 50) / 100,
-            release: (config.envelope?.release || 1000) / 1000,
+            attack: (config.envelope?.attack ?? 10) / 1000,
+            decay: (config.envelope?.decay ?? 200) / 1000,
+            sustain: (config.envelope?.sustain ?? 50) / 100,
+            release: (config.envelope?.release ?? 1000) / 1000,
           },
-          volume: config.volume || -12,
+          volume: config.volume ?? -12,
         });
 
         // If filter is specified, route through filter
@@ -589,6 +606,8 @@ export class ToneEngine {
 
     // Store instrument with composite key (per-channel)
     this.instruments.set(key, instrument);
+    // Track the synth type for proper release handling
+    this.instrumentSynthTypes.set(key, config.synthType);
 
     // Create instrument effect chain and connect (use composite key to avoid disconnecting other channels)
     this.buildInstrumentEffectChain(key, config.effects || [], instrument);
@@ -755,6 +774,22 @@ export class ToneEngine {
       if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
         (instrument as Tone.NoiseSynth).triggerAttack(safeTime, velocity);
+      } else if (config.synthType === 'Sampler') {
+        // Check if Sampler has any loaded samples before triggering
+        const sampler = instrument as Tone.Sampler;
+        if (!sampler.loaded) {
+          // Silently skip - no sample loaded yet
+          return;
+        }
+        sampler.triggerAttack(note, safeTime, velocity);
+      } else if (config.synthType === 'Player' || config.synthType === 'GranularSynth') {
+        // Player/GranularSynth need a buffer loaded
+        const player = instrument as Tone.Player | Tone.GrainPlayer;
+        if (!player.buffer || !player.buffer.loaded) {
+          // Silently skip - no sample loaded yet
+          return;
+        }
+        player.start(safeTime);
       } else {
         instrument.triggerAttack(note, safeTime, velocity);
       }
@@ -785,10 +820,36 @@ export class ToneEngine {
     }
 
     try {
-      if (config.synthType === 'NoiseSynth') {
-        // NoiseSynth.triggerRelease(time) - no note
-        (instrument as Tone.NoiseSynth).triggerRelease(safeTime);
+      // Handle sample-based instruments
+      if (config.synthType === 'Sampler') {
+        const sampler = instrument as Tone.Sampler;
+        if (!sampler.loaded) return; // No sample loaded
+        sampler.triggerRelease(note, safeTime);
+        return;
+      }
+
+      if (config.synthType === 'Player' || config.synthType === 'GranularSynth') {
+        // Player/GranularSynth use stop() instead of triggerRelease
+        const player = instrument as Tone.Player | Tone.GrainPlayer;
+        if (player.state === 'started') {
+          player.stop(safeTime);
+        }
+        return;
+      }
+
+      // Some synths don't take a note parameter for release
+      if (
+        config.synthType === 'NoiseSynth' ||
+        config.synthType === 'MonoSynth' ||
+        config.synthType === 'DuoSynth' ||
+        config.synthType === 'MetalSynth' ||
+        config.synthType === 'MembraneSynth' ||
+        config.synthType === 'TB303'
+      ) {
+        // These synths use triggerRelease(time) - no note parameter
+        instrument.triggerRelease(safeTime);
       } else {
+        // PolySynth and others use triggerRelease(note, time)
         instrument.triggerRelease(note, safeTime);
       }
     } catch (error) {
@@ -808,17 +869,63 @@ export class ToneEngine {
       instrument = this.instruments.get(this.getInstrumentKey(instrumentId, -1));
     }
 
-    if (instrument && instrument.triggerRelease) {
-      // Ensure we have a valid time
-      const safeTime = this.getSafeTime(time);
-      if (safeTime === null) {
-        return; // Audio context not ready, skip release
-      }
+    if (!instrument) return;
 
-      try {
+    // Ensure we have a valid time
+    const safeTime = this.getSafeTime(time);
+    if (safeTime === null) {
+      return; // Audio context not ready, skip release
+    }
+
+    // Check the stored synth type to determine release method
+    const synthType = this.instrumentSynthTypes.get(key) ||
+                      this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, -1));
+
+    // Handle sample-based instruments
+    if (synthType === 'Sampler') {
+      const sampler = instrument as Tone.Sampler;
+      if (sampler.loaded && sampler.triggerRelease) {
+        try {
+          sampler.triggerRelease(note, safeTime);
+        } catch { /* Silently ignore */ }
+      }
+      return;
+    }
+
+    if (synthType === 'Player' || synthType === 'GranularSynth') {
+      // Player/GranularSynth use stop() instead of triggerRelease
+      const player = instrument as Tone.Player | Tone.GrainPlayer;
+      if (player.state === 'started') {
+        try {
+          player.stop(safeTime);
+        } catch { /* Silently ignore */ }
+      }
+      return;
+    }
+
+    if (!instrument.triggerRelease) return;
+
+    // Mono-style synths use triggerRelease(time) - no note parameter
+    const isMonoStyle = synthType === 'MonoSynth' ||
+                        synthType === 'DuoSynth' ||
+                        synthType === 'MetalSynth' ||
+                        synthType === 'MembraneSynth' ||
+                        synthType === 'NoiseSynth' ||
+                        synthType === 'TB303';
+
+    try {
+      if (isMonoStyle) {
+        instrument.triggerRelease(safeTime);
+      } else {
+        // PolySynth and others take note parameter
         instrument.triggerRelease(note, safeTime);
-      } catch (error) {
-        // Silently ignore release errors - note may have already been released
+      }
+    } catch {
+      // Fallback: try without note if with note fails
+      try {
+        instrument.triggerRelease(safeTime);
+      } catch {
+        // Silently ignore - note may have already been released
       }
     }
   }
@@ -881,6 +988,12 @@ export class ToneEngine {
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
           player.start(safeTime);
+        }
+      } else if (config.synthType === 'Sampler') {
+        // Sampler needs loaded samples
+        const sampler = instrument as Tone.Sampler;
+        if (sampler.loaded) {
+          sampler.triggerAttackRelease(note, duration, safeTime, velocity);
         }
       } else if (
         config.synthType === 'SuperSaw' ||
@@ -971,7 +1084,10 @@ export class ToneEngine {
     });
 
     // Delete the keys after iteration
-    keysToDelete.forEach(key => this.instruments.delete(key));
+    keysToDelete.forEach(key => {
+      this.instruments.delete(key);
+      this.instrumentSynthTypes.delete(key);
+    });
 
     if (keysToDelete.length > 0) {
       console.log(`[ToneEngine] Disposed ${keysToDelete.length} channel instances for instrument ${instrumentId}`);

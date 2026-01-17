@@ -200,6 +200,11 @@ export const useTrackerInput = () => {
         return;
       }
 
+      // Ignore if a modal is open (z-50 is modal z-index)
+      if (document.querySelector('.fixed.inset-0.z-50')) {
+        return;
+      }
+
       const key = e.key;
       const keyLower = key.toLowerCase();
 

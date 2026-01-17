@@ -220,9 +220,6 @@ class MIDIManager {
       const prevInput = this.inputs.get(this.selectedInputId);
       if (prevInput) {
         prevInput.onmidimessage = null;
-        if (this.boundMessageHandler) {
-          prevInput.removeEventListener('midimessage', this.boundMessageHandler as EventListener);
-        }
         try {
           await prevInput.close();
         } catch {
@@ -242,10 +239,9 @@ class MIDIManager {
           await input.open();
           console.log(`[MIDI] Input opened: ${input.name} (state: ${input.state}, connection: ${input.connection})`);
 
-          // Attach message handler using both methods for compatibility
+          // Attach message handler (use onmidimessage for simplicity)
           this.boundMessageHandler = this.handleMIDIMessage.bind(this);
           input.onmidimessage = this.boundMessageHandler;
-          input.addEventListener('midimessage', this.boundMessageHandler as EventListener);
 
           console.log(`[MIDI] Handler attached to ${input.name}`);
         } catch (error) {

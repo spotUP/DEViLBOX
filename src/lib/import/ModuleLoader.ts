@@ -68,10 +68,30 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           repeatCount: 0, // Don't loop
         });
 
-        // Wait for player initialization
-        await new Promise<void>((initResolve) => {
-          player.onInitialized(() => initResolve());
+        // Wait for player initialization with timeout and error handling
+        const initSuccess = await new Promise<boolean>((initResolve) => {
+          const timeout = setTimeout(() => {
+            console.warn('[ModuleLoader] ChiptunePlayer initialization timed out');
+            initResolve(false);
+          }, 10000);
+
+          player.onInitialized(() => {
+            clearTimeout(timeout);
+            initResolve(true);
+          });
+
+          player.onError((err: any) => {
+            if (err.type === 'init') {
+              clearTimeout(timeout);
+              initResolve(false);
+            }
+          });
         });
+
+        if (!initSuccess) {
+          reject(new Error('Module player not available. The audio worklet failed to load. Module file import (.mod, .xm, .it, etc.) is not supported in this browser/configuration.'));
+          return;
+        }
 
         // Set up metadata handler
         const metadataPromise = new Promise<ModuleMetadata>((metaResolve, metaReject) => {
@@ -111,12 +131,12 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 
           player.onError((err: any) => {
             clearTimeout(timeout);
-            metaReject(new Error(`Failed to load module: ${err.type}`));
+            metaReject(new Error(`Failed to load module: ${err.type || err.message || 'unknown error'}`));
           });
         });
 
         // Load the file
-        player.play(arrayBuffer);
+        await player.play(arrayBuffer);
 
         // Wait for metadata
         const metadata = await metadataPromise;
@@ -143,8 +163,8 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 /**
  * Preview a loaded module (play audio)
  */
-export function previewModule(info: ModuleInfo): void {
-  info.player.play(info.arrayBuffer);
+export async function previewModule(info: ModuleInfo): Promise<void> {
+  await info.player.play(info.arrayBuffer);
 }
 
 /**

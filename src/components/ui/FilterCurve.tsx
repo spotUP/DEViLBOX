@@ -13,7 +13,6 @@ interface FilterCurveProps {
   type: FilterType;
   onCutoffChange: (value: number) => void;
   onResonanceChange: (value: number) => void;
-  width?: number;
   height?: number;
   color?: string;
 }
@@ -24,12 +23,31 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   type,
   onCutoffChange,
   onResonanceChange,
-  width = 280,
   height = 140,
   color = '#ff6b6b',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [width, setWidth] = useState(280);
+
+  // ResizeObserver for dynamic width
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newWidth = entry.contentRect.width - 24; // Account for padding
+        if (newWidth > 0) {
+          setWidth(newWidth);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const padding = { top: 10, right: 10, bottom: 25, left: 35 };
   const graphWidth = width - padding.left - padding.right;
@@ -167,12 +185,12 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   const fillPath = `${filterPath} L ${width - padding.right} ${dbToY(minDb)} L ${padding.left} ${dbToY(minDb)} Z`;
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700">
+    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700 w-full">
       <svg
         ref={svgRef}
         width={width}
         height={height}
-        className={`select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`select-none w-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         onMouseDown={handleMouseDown}
       >
         {/* Grid */}

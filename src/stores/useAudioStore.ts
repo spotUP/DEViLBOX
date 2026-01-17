@@ -66,16 +66,34 @@ export const useAudioStore = create<AudioStore>()(
       set((state) => {
         // Clamp between -60 and 0 dB
         state.masterVolume = Math.max(-60, Math.min(0, volume));
+
+        // Apply to ToneEngine
+        const engine = get().toneEngineInstance;
+        if (engine) {
+          engine.setMasterVolume(state.masterVolume);
+        }
       }),
 
     setMasterMuted: (muted) =>
       set((state) => {
         state.masterMuted = muted;
+
+        // Apply to ToneEngine
+        const engine = get().toneEngineInstance;
+        if (engine) {
+          engine.setMasterMute(muted);
+        }
       }),
 
     toggleMasterMute: () =>
       set((state) => {
         state.masterMuted = !state.masterMuted;
+
+        // Apply to ToneEngine
+        const engine = get().toneEngineInstance;
+        if (engine) {
+          engine.setMasterMute(state.masterMuted);
+        }
       }),
 
     setAnalyserNode: (node) =>

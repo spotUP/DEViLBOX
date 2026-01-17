@@ -1,24 +1,32 @@
 /**
- * Knob - Rotary knob control with click-drag interaction
+ * Knob - Unified rotary knob control with click-drag interaction
+ * Supports automation, bipolar mode, logarithmic scaling, touch input, and more
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { useThemeStore } from '@stores';
 
 interface KnobProps {
+  // Core (both versions)
   value: number;
   min: number;
   max: number;
-  label: string;
-  unit?: string;
   onChange: (value: number) => void;
-  logarithmic?: boolean;
-  defaultValue?: number;
+  label?: string;
+  unit?: string;
   size?: 'sm' | 'md' | 'lg';
   color?: string;
-  /** Optional display value for visual feedback (e.g., live modulation). If provided, the knob rotates to this value while the control value remains separate. */
+
+  // From controls/Knob (TB303 automation)
+  logarithmic?: boolean;
   displayValue?: number;
-  /** When true, shows a subtle animation/glow to indicate activity */
   isActive?: boolean;
+  defaultValue?: number;
+
+  // From ui/Knob (instrument editing)
+  bipolar?: boolean;
+  formatValue?: (value: number) => string;
+  step?: number;
 }
 
 // Convert linear 0-1 to logarithmic value
@@ -45,22 +53,30 @@ export const Knob: React.FC<KnobProps> = ({
   logarithmic = false,
   defaultValue,
   size = 'md',
-  color = '#00d4aa',
+  color: colorProp = '#00d4aa',
   displayValue,
   isActive = false,
+  bipolar = false,
+  formatValue: customFormatValue,
+  step,
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startY = useRef(0);
-  const startValue = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartY = useRef(0);
+  const dragStartValue = useRef(0);
+
+  // Theme-aware color: use cyan for cyan-lineart theme
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const color = isCyanTheme ? '#00ffff' : colorProp;
 
   // Size configurations
   const sizes = {
-    sm: { knob: 40, fontSize: 10 },
-    md: { knob: 56, fontSize: 11 },
-    lg: { knob: 72, fontSize: 12 },
+    sm: { knob: 40, fontSize: 10, stroke: 3 },
+    md: { knob: 56, fontSize: 11, stroke: 4 },
+    lg: { knob: 72, fontSize: 12, stroke: 5 },
   };
-  const { knob: knobSize, fontSize } = sizes[size];
+  const { knob: knobSize, fontSize, stroke } = sizes[size];
 
   // Calculate normalized value (0-1) for control purposes
   const getNormalized = useCallback(() => {
@@ -84,8 +100,8 @@ export const Knob: React.FC<KnobProps> = ({
   const displayNorm = getDisplayNormalized();
   const rotation = displayNorm * 270 - 135;
 
-  // Format display value
-  const formatValue = (val: number): string => {
+  // Default value formatting
+  const defaultFormatValue = (val: number): string => {
     if (isNaN(val) || val === undefined || val === null) {
       return '0';
     }
@@ -98,12 +114,40 @@ export const Knob: React.FC<KnobProps> = ({
     return Math.round(val).toString();
   };
 
-  // Handle mouse down
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  // Use custom format function if provided, otherwise default
+  const formatValueDisplay = customFormatValue || defaultFormatValue;
+
+  // For bipolar mode
+  const centerAngle = bipolar ? 0 : -135;
+  const valueAngle = rotation;
+
+  // SVG arc calculations
+  const radius = (knobSize - stroke * 2) / 2;
+  const center = knobSize / 2;
+
+  const polarToCartesian = (angle: number) => {
+    const rad = ((angle - 90) * Math.PI) / 180;
+    return {
+      x: center + radius * Math.cos(rad),
+      y: center + radius * Math.sin(rad),
+    };
+  };
+
+  const describeArc = (start: number, end: number) => {
+    const startPoint = polarToCartesian(start);
+    const endPoint = polarToCartesian(end);
+    const largeArcFlag = Math.abs(end - start) > 180 ? 1 : 0;
+    const sweepFlag = end > start ? 1 : 0;
+    return `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endPoint.x} ${endPoint.y}`;
+  };
+
+  // Handle mouse/touch down
+  const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    isDragging.current = true;
-    startY.current = e.clientY;
-    startValue.current = getNormalized();
+    setIsDragging(true);
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragStartY.current = clientY;
+    dragStartValue.current = getNormalized();
     document.body.style.cursor = 'ns-resize';
   }, [getNormalized]);
 
@@ -111,25 +155,31 @@ export const Knob: React.FC<KnobProps> = ({
   const handleDoubleClick = useCallback(() => {
     if (defaultValue !== undefined) {
       onChange(defaultValue);
+    } else if (bipolar) {
+      // Reset to center for bipolar
+      onChange((max + min) / 2);
+    } else {
+      // Reset to min for unipolar
+      onChange(min);
     }
-  }, [defaultValue, onChange]);
+  }, [defaultValue, bipolar, min, max, onChange]);
 
   // Handle keyboard navigation for accessibility
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     let newValue = value;
-    const step = logarithmic ? (max - min) / 100 : (max - min) / 50;
-    const largeStep = step * 10;
+    const stepSize = step || (logarithmic ? (max - min) / 100 : (max - min) / 50);
+    const largeStep = stepSize * 10;
 
     switch (e.key) {
       case 'ArrowUp':
       case 'ArrowRight':
         e.preventDefault();
-        newValue = Math.min(max, value + (e.shiftKey ? largeStep : step));
+        newValue = Math.min(max, value + (e.shiftKey ? largeStep : stepSize));
         break;
       case 'ArrowDown':
       case 'ArrowLeft':
         e.preventDefault();
-        newValue = Math.max(min, value - (e.shiftKey ? largeStep : step));
+        newValue = Math.max(min, value - (e.shiftKey ? largeStep : stepSize));
         break;
       case 'Home':
         e.preventDefault();
@@ -151,25 +201,28 @@ export const Knob: React.FC<KnobProps> = ({
         return;
     }
 
-    // Round to reasonable precision
-    if (max - min > 100) {
+    // Round to reasonable precision or apply step
+    if (step !== undefined && step > 0) {
+      newValue = Math.round(newValue / step) * step;
+    } else if (max - min > 100) {
       newValue = Math.round(newValue);
     } else {
       newValue = Math.round(newValue * 10) / 10;
     }
 
     onChange(newValue);
-  }, [value, min, max, logarithmic, onChange]);
+  }, [value, min, max, logarithmic, step, onChange]);
 
-  // Handle mouse move (global)
+  // Handle mouse/touch move (global)
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
 
-      const deltaY = startY.current - e.clientY;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const deltaY = dragStartY.current - clientY;
       const sensitivity = 200; // pixels for full range
       const deltaNorm = deltaY / sensitivity;
-      const newNorm = Math.max(0, Math.min(1, startValue.current + deltaNorm));
+      const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
 
       let newValue: number;
       if (logarithmic) {
@@ -178,8 +231,10 @@ export const Knob: React.FC<KnobProps> = ({
         newValue = min + newNorm * (max - min);
       }
 
-      // Round to reasonable precision
-      if (max - min > 100) {
+      // Apply step if specified
+      if (step !== undefined && step > 0) {
+        newValue = Math.round(newValue / step) * step;
+      } else if (max - min > 100) {
         newValue = Math.round(newValue);
       } else {
         newValue = Math.round(newValue * 10) / 10;
@@ -189,106 +244,144 @@ export const Knob: React.FC<KnobProps> = ({
     };
 
     const handleMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false;
+      if (isDragging) {
+        setIsDragging(false);
         document.body.style.cursor = '';
       }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleMouseMove);
+      document.addEventListener('touchend', handleMouseUp);
+    }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
     };
-  }, [min, max, logarithmic, onChange]);
+  }, [isDragging, min, max, logarithmic, step, onChange]);
+
+  // Indicator line position
+  const indicatorEnd = polarToCartesian(rotation);
+  const indicatorStart = {
+    x: center + (radius - 8) * Math.cos(((rotation - 90) * Math.PI) / 180),
+    y: center + (radius - 8) * Math.sin(((rotation - 90) * Math.PI) / 180),
+  };
 
   return (
     <div className="knob-container" style={{ width: knobSize + 20 }}>
       {/* Label */}
-      <div
-        className="knob-label"
-        style={{ fontSize: fontSize - 1 }}
-      >
-        {label}
-      </div>
+      {label && (
+        <div
+          className="knob-label"
+          style={{ fontSize: fontSize - 1 }}
+        >
+          {label}
+        </div>
+      )}
 
       {/* Knob */}
       <div
         ref={knobRef}
-        className="knob-body"
+        className={`knob-body ${isDragging ? 'cursor-grabbing' : ''}`}
         style={{
           width: knobSize,
           height: knobSize,
         }}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleMouseDown}
         onDoubleClick={handleDoubleClick}
         onKeyDown={handleKeyDown}
         role="slider"
-        aria-label={`${label}${unit ? ` (${unit})` : ''}`}
+        aria-label={`${label || 'Knob'}${unit ? ` (${unit})` : ''}`}
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={Math.round(value * 10) / 10}
-        aria-valuetext={`${formatValue(value)}${unit}`}
+        aria-valuetext={`${formatValueDisplay(displayValue !== undefined ? displayValue : value)}${unit}`}
         tabIndex={0}
       >
-        {/* Background ring with tick marks */}
-        <svg
-          width={knobSize}
-          height={knobSize}
-          viewBox="0 0 100 100"
-          className="knob-ring"
-        >
-          {/* Background arc */}
-          <circle
-            cx="50"
-            cy="50"
-            r="42"
+        <svg width={knobSize} height={knobSize} viewBox={`0 0 ${knobSize} ${knobSize}`}>
+          {/* Background track */}
+          <path
+            d={describeArc(-135, 135)}
             fill="none"
-            stroke="#1a1a1f"
-            strokeWidth="8"
+            stroke="#2a2a2a"
+            strokeWidth={stroke}
             strokeLinecap="round"
-            strokeDasharray="198 66"
-            transform="rotate(135 50 50)"
           />
-          {/* Value arc */}
-          <circle
-            cx="50"
-            cy="50"
-            r="42"
-            fill="none"
-            stroke={color}
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeDasharray={`${displayNorm * 198} 264`}
-            transform="rotate(135 50 50)"
-            style={{
-              transition: displayValue !== undefined ? 'none' : 'stroke-dasharray 0.05s ease-out',
-              filter: isActive ? `drop-shadow(0 0 4px ${color})` : 'none',
-            }}
-          />
-        </svg>
 
-        {/* Inner knob with indicator */}
-        <div
-          className="knob-inner"
-          style={{
-            width: knobSize * 0.6,
-            height: knobSize * 0.6,
-            transform: `rotate(${rotation}deg)`,
-            boxShadow: isActive ? `0 0 8px ${color}40` : 'none',
-            transition: displayValue !== undefined ? 'transform 0.016s linear' : 'transform 0.1s ease-out',
-          }}
-        >
-          <div
-            className="knob-indicator"
+          {/* Value arc */}
+          {bipolar ? (
+            // Bipolar: draw from center to value
+            displayNorm !== 0.5 && (
+              <path
+                d={describeArc(
+                  displayNorm > 0.5 ? centerAngle : valueAngle,
+                  displayNorm > 0.5 ? valueAngle : centerAngle
+                )}
+                fill="none"
+                stroke={color}
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                style={{
+                  filter: isActive ? `drop-shadow(0 0 4px ${color})` : `drop-shadow(0 0 2px ${color})`,
+                  transition: displayValue !== undefined ? 'none' : 'stroke-dasharray 0.05s ease-out',
+                }}
+              />
+            )
+          ) : (
+            // Unipolar: draw from start to value
+            <path
+              d={describeArc(-135, rotation)}
+              fill="none"
+              stroke={color}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              style={{
+                filter: isActive ? `drop-shadow(0 0 4px ${color})` : `drop-shadow(0 0 2px ${color})`,
+                transition: displayValue !== undefined ? 'none' : 'stroke-dasharray 0.05s ease-out',
+              }}
+            />
+          )}
+
+          {/* Knob body */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius - stroke - 4}
+            fill="url(#knobGradient)"
+            stroke="#444"
+            strokeWidth="1"
+          />
+
+          {/* Indicator line */}
+          <line
+            x1={indicatorStart.x}
+            y1={indicatorStart.y}
+            x2={indicatorEnd.x}
+            y2={indicatorEnd.y}
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
             style={{
-              backgroundColor: color,
-              boxShadow: isActive ? `0 0 4px ${color}` : 'none',
+              filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
+              transition: displayValue !== undefined ? 'transform 0.016s linear' : 'transform 0.1s ease-out',
             }}
           />
-        </div>
+
+          {/* Gradient definitions */}
+          <defs>
+            <linearGradient id="knobGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#4a4a4a" />
+              <stop offset="50%" stopColor="#3a3a3a" />
+              <stop offset="100%" stopColor="#2a2a2a" />
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
 
       {/* Value display */}
@@ -300,7 +393,7 @@ export const Knob: React.FC<KnobProps> = ({
           textShadow: isActive ? `0 0 4px ${color}80` : 'none',
         }}
       >
-        {formatValue(displayValue !== undefined ? displayValue : value)}{unit}
+        {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
       </div>
     </div>
   );

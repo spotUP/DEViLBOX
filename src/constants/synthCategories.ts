@@ -274,8 +274,10 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
   },
 ];
 
-// Get all synth types as a flat list
-export const ALL_SYNTH_TYPES: SynthType[] = Object.keys(SYNTH_INFO) as SynthType[];
+// Get all synth types as a flat list (sorted A-Z by short name)
+export const ALL_SYNTH_TYPES: SynthType[] = (Object.keys(SYNTH_INFO) as SynthType[]).sort((a, b) =>
+  SYNTH_INFO[a].shortName.localeCompare(SYNTH_INFO[b].shortName)
+);
 
 // Helper to get category for a synth type (returns primary category)
 export function getCategoryForSynth(synthType: SynthType): SynthCategory | undefined {

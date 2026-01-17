@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import { ResponsiveProvider } from './contexts/ResponsiveContext.tsx'
 
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
@@ -18,7 +19,9 @@ window.addEventListener('unhandledrejection', (event) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <ResponsiveProvider>
+        <App />
+      </ResponsiveProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

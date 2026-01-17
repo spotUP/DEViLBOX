@@ -93,6 +93,56 @@ const neoDarkTheme: Theme = {
   },
 };
 
+// Cyan Lineart Theme - Monochrome wireframe style
+const cyanLineartTheme: Theme = {
+  id: 'cyan-lineart',
+  name: 'Cyan Lineart',
+  colors: {
+    // Very dark cyan backgrounds instead of pure black
+    bg: '#030808',
+    bgSecondary: '#051010',
+    bgTertiary: '#071414',
+    bgHover: '#0a1a1a',
+    bgActive: '#0c2020',
+
+    // Cyan borders for wireframe look
+    border: '#00808080',      // Semi-transparent cyan
+    borderLight: '#00b8b8',   // Brighter cyan for emphasis
+
+    // All accents are cyan
+    accent: '#00ffff',
+    accentSecondary: '#00e0e0',
+    accentGlow: 'rgba(0, 255, 255, 0.12)',
+
+    // Monochrome text - all cyan variants
+    text: '#00ffff',          // Primary text - bright cyan
+    textSecondary: '#00c8c8', // Secondary - slightly dimmer
+    textMuted: '#006060',     // Muted - dark cyan
+    textInverse: '#030808',   // Inverse for active states
+
+    // Status colors - all cyan based
+    error: '#ff4080',         // Pink-red for errors (stands out from cyan)
+    success: '#00ff88',       // Green-cyan for success
+    warning: '#00ffaa',       // Cyan-green for warnings
+
+    // Tracker rows - very subtle dark cyan distinctions
+    trackerRowEven: '#030808',
+    trackerRowOdd: '#041010',
+    trackerRowHighlight: '#061414',
+    trackerRowCurrent: '#081818',
+    trackerRowCursor: '#0a1c1c',
+
+    // Cell colors - monochrome cyan palette
+    cellNote: '#00ffff',      // Bright cyan
+    cellInstrument: '#00e8e8', // Slightly different cyan
+    cellVolume: '#00d0d0',    // Volume
+    cellEffect: '#00b8b8',    // Effect
+    cellAccent: '#00ffff',    // Accent bright
+    cellSlide: '#00a0a0',     // Slide dimmer
+    cellEmpty: '#003838',     // Empty very dim
+  },
+};
+
 // DEViLBOX Theme - Red-tinted dark theme
 const devilboxTheme: Theme = {
   id: 'devilbox',
@@ -130,7 +180,7 @@ const devilboxTheme: Theme = {
   },
 };
 
-export const themes: Theme[] = [devilboxTheme, neoDarkTheme];
+export const themes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme];
 
 interface ThemeStore {
   currentThemeId: string;
@@ -142,6 +192,9 @@ interface ThemeStore {
 const applyTheme = (theme: Theme) => {
   const root = document.documentElement;
   const { colors } = theme;
+
+  // Set data-theme attribute for theme-specific CSS
+  root.setAttribute('data-theme', theme.id);
 
   root.style.setProperty('--color-bg', colors.bg);
   root.style.setProperty('--color-bg-secondary', colors.bgSecondary);

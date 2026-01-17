@@ -14,7 +14,9 @@ import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
-import { List, Grid3X3, Piano, Music2 } from 'lucide-react';
+import { MobileTrackerView } from './MobileTrackerView';
+import { useResponsive } from '@contexts/ResponsiveContext';
+import { List, Grid3X3, Piano, Music2, Eye, EyeOff } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
@@ -130,7 +132,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   showPatterns,
   showMasterFX,
 }) => {
-  const { patterns, currentPatternIndex, currentOctave, loadPatterns, cursor } = useTrackerStore();
+  const { isMobile } = useResponsive();
+  const { patterns, currentPatternIndex, currentOctave, loadPatterns, cursor, showGhostPatterns, setShowGhostPatterns } = useTrackerStore();
   const { loadInstruments } = useInstrumentStore();
   const { setMetadata } = useProjectStore();
   const { setBPM } = useTransportStore();
@@ -201,8 +204,115 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Enable pattern playback
   usePatternPlayback();
 
+  // Module import handler - used by both mobile and desktop views
+  const handleModuleImport = useCallback(async (info: ModuleInfo) => {
+    if (!info.metadata.song) {
+      alert(`Module "${info.metadata.title}" loaded but no pattern data found.\n\nThe module metadata was extracted but pattern data is not available.`);
+      return;
+    }
+
+    // Convert the module data to our pattern format
+    const result = convertModule(info.metadata.song);
+
+    if (result.patterns.length === 0) {
+      alert(`Module "${info.metadata.title}" contains no patterns to import.`);
+      return;
+    }
+
+    // Try to extract samples if the original file is available
+    let sampleUrls: Map<number, string> | undefined;
+    if (info.file && canExtractSamples(info.file.name)) {
+      try {
+        console.log('[Import] Extracting samples from module...');
+        const extraction = await extractSamples(info.file);
+        sampleUrls = new Map();
+
+        for (let i = 0; i < extraction.samples.length; i++) {
+          const sample = extraction.samples[i];
+          if (sample.pcmData.length > 0) {
+            const wavUrl = encodeWav(sample);
+            sampleUrls.set(i + 1, wavUrl);
+            console.log(`[Import] Sample ${i + 1}: ${sample.name} (${sample.pcmData.length} samples)`);
+          }
+        }
+        console.log(`[Import] Extracted ${sampleUrls.size} samples`);
+      } catch (err) {
+        console.warn('[Import] Could not extract samples, using synth fallback:', err);
+      }
+    }
+
+    // Create instruments for the module (with samples if available)
+    const instruments = createInstrumentsForModule(
+      result.patterns,
+      result.instrumentNames,
+      sampleUrls
+    );
+
+    // Load instruments first, then patterns
+    loadInstruments(instruments);
+    loadPatterns(result.patterns);
+
+    // Update project metadata
+    setMetadata({
+      name: info.metadata.title,
+      author: '',
+      description: `Imported from ${info.file?.name || 'module'}`,
+    });
+
+    // Set ProTracker default tempo (125 BPM)
+    setBPM(125);
+
+    const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
+    console.log('Imported module:', info.metadata.title, {
+      patterns: result.patterns.length,
+      channels: result.channelCount,
+      instruments: instruments.length,
+      samplers: samplerCount,
+    });
+
+    // Pre-load all instruments (especially samplers) to ensure they're ready
+    if (samplerCount > 0) {
+      console.log('[Import] Preloading samples...');
+      await getToneEngine().preloadInstruments(instruments);
+      console.log('[Import] Samples ready for playback');
+    }
+
+    alert(`Module "${info.metadata.title}" imported!\n\n` +
+      `Patterns: ${result.patterns.length}\n` +
+      `Channels: ${result.channelCount}\n` +
+      `Instruments: ${instruments.length}\n` +
+      `Samplers: ${samplerCount}`);
+  }, [loadInstruments, loadPatterns, setMetadata, setBPM]);
+
   const pattern = patterns[currentPatternIndex];
 
+  // Mobile view with tabbed interface
+  if (isMobile) {
+    return (
+      <>
+        <MobileTrackerView
+          onShowPatterns={onShowPatterns}
+          onShowExport={onShowExport}
+          onShowHelp={onShowHelp}
+          onShowMasterFX={onShowMasterFX}
+          onShowInstruments={onShowInstruments}
+          showPatterns={showPatterns}
+          showMasterFX={showMasterFX}
+        />
+        {/* Dialogs still need to render */}
+        <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
+        <HumanizeDialog isOpen={showHumanize} onClose={() => setShowHumanize(false)} />
+        <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
+        <ImportModuleDialog
+          isOpen={showImportModule}
+          onClose={() => setShowImportModule(false)}
+          onImport={handleModuleImport}
+        />
+      </>
+    );
+  }
+
+  // Desktop view
   return (
     <div className="flex-1 flex flex-col bg-dark-bg overflow-hidden">
       {/* Top Control Bar */}
@@ -298,6 +408,27 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <span className="hidden sm:inline">Piano</span>
             </button>
           </div>
+
+          {/* Ghost Patterns Toggle (tracker view only) */}
+          {viewMode === 'tracker' && (
+            <>
+              <div className="w-px h-4 bg-dark-border" />
+              <button
+                onClick={() => setShowGhostPatterns(!showGhostPatterns)}
+                className={`
+                  flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                  ${showGhostPatterns
+                    ? 'bg-accent-primary/20 text-accent-primary'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
+                  }
+                `}
+                title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
+              >
+                {showGhostPatterns ? <Eye size={14} /> : <EyeOff size={14} />}
+                <span className="hidden sm:inline">Ghosts</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -370,84 +501,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <ImportModuleDialog
         isOpen={showImportModule}
         onClose={() => setShowImportModule(false)}
-        onImport={async (info: ModuleInfo) => {
-          if (!info.metadata.song) {
-            alert(`Module "${info.metadata.title}" loaded but no pattern data found.\n\nThe module metadata was extracted but pattern data is not available.`);
-            return;
-          }
-
-          // Convert the module data to our pattern format
-          const result = convertModule(info.metadata.song);
-
-          if (result.patterns.length === 0) {
-            alert(`Module "${info.metadata.title}" contains no patterns to import.`);
-            return;
-          }
-
-          // Try to extract samples if the original file is available
-          let sampleUrls: Map<number, string> | undefined;
-          if (info.file && canExtractSamples(info.file.name)) {
-            try {
-              console.log('[Import] Extracting samples from module...');
-              const extraction = await extractSamples(info.file);
-              sampleUrls = new Map();
-
-              for (let i = 0; i < extraction.samples.length; i++) {
-                const sample = extraction.samples[i];
-                if (sample.pcmData.length > 0) {
-                  const wavUrl = encodeWav(sample);
-                  sampleUrls.set(i + 1, wavUrl);
-                  console.log(`[Import] Sample ${i + 1}: ${sample.name} (${sample.pcmData.length} samples)`);
-                }
-              }
-              console.log(`[Import] Extracted ${sampleUrls.size} samples`);
-            } catch (err) {
-              console.warn('[Import] Could not extract samples, using synth fallback:', err);
-            }
-          }
-
-          // Create instruments for the module (with samples if available)
-          const instruments = createInstrumentsForModule(
-            result.patterns,
-            result.instrumentNames,
-            sampleUrls
-          );
-
-          // Load instruments first, then patterns
-          loadInstruments(instruments);
-          loadPatterns(result.patterns);
-
-          // Update project metadata
-          setMetadata({
-            name: info.metadata.title,
-            author: '',
-            description: `Imported from ${info.file?.name || 'module'}`,
-          });
-
-          // Set ProTracker default tempo (125 BPM)
-          setBPM(125);
-
-          const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-          console.log('Imported module:', info.metadata.title, {
-            patterns: result.patterns.length,
-            channels: result.channelCount,
-            instruments: instruments.length,
-            samplers: samplerCount,
-          });
-
-          // Pre-load all instruments (especially samplers) to ensure they're ready
-          if (samplerCount > 0) {
-            console.log('[Import] Preloading samples...');
-            await getToneEngine().preloadInstruments(instruments);
-            console.log('[Import] Samples ready for playback');
-          }
-
-          alert(`Module "${info.metadata.title}" imported!\n\n` +
-            `Patterns: ${result.patterns.length}\n` +
-            `Channels: ${result.channelCount}\n` +
-            `Instruments: ${instruments.length}\n` +
-            `Samplers: ${samplerCount}`);
-        }}
+        onImport={handleModuleImport}
       />
     </div>
   );

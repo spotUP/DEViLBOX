@@ -18,6 +18,7 @@ interface PianoRollGridProps {
   showVelocity: boolean;
   selectedNotes: Set<string>;
   playheadRow: number | null;
+  containerHeight?: number;  // Actual container height for proper sizing
   onNoteSelect: (noteId: string, addToSelection: boolean) => void;
   onNoteDragStart: (noteId: string, mode: 'move' | 'resize-end', e: React.MouseEvent) => void;
   onGridClick: (row: number, midiNote: number) => void;
@@ -35,6 +36,7 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   showVelocity,
   selectedNotes,
   playheadRow,
+  containerHeight,
   onNoteSelect,
   onNoteDragStart,
   onGridClick,
@@ -49,9 +51,10 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   }, [horizontalZoom]);
 
   const visibleNotes = useMemo(() => {
-    if (!containerRef.current) return 40;
-    return Math.ceil(containerRef.current.clientHeight / verticalZoom) + 2;
-  }, [verticalZoom]);
+    // Use passed containerHeight if available, otherwise measure
+    const height = containerHeight || containerRef.current?.clientHeight || 400;
+    return Math.ceil(height / verticalZoom) + 2;
+  }, [verticalZoom, containerHeight]);
 
   // Handle wheel scroll
   const handleWheel = useCallback(

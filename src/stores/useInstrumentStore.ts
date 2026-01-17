@@ -23,10 +23,12 @@ interface InstrumentStore {
   instruments: InstrumentConfig[];
   currentInstrumentId: number | null;
   currentInstrument: InstrumentConfig | null;
+  previewInstrument: InstrumentConfig | null; // For modal previews (CreateInstrumentModal)
   presets: InstrumentPreset[];
 
   // Actions
   setCurrentInstrument: (id: number) => void;
+  setPreviewInstrument: (instrument: InstrumentConfig | null) => void;
   getInstrument: (id: number) => InstrumentConfig | undefined;
   updateInstrument: (id: number, updates: Partial<InstrumentConfig>) => void;
   createInstrument: (config?: Partial<InstrumentConfig>) => number;
@@ -85,6 +87,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const state = get();
       return state.instruments.find((inst) => inst.id === state.currentInstrumentId) || null;
     },
+    previewInstrument: null, // For modal previews (MIDI will use this when set)
     presets: [],
 
     // Actions
@@ -95,36 +98,63 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       }),
 
+    setPreviewInstrument: (instrument) =>
+      set((state) => {
+        state.previewInstrument = instrument;
+      }),
+
     getInstrument: (id) => {
       return get().instruments.find((inst) => inst.id === id);
     },
 
     updateInstrument: (id, updates) => {
-      // Check if synthType is changing - need to invalidate audio engine
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
+
+      // Check what's changing
       const synthTypeChanging = currentInstrument && updates.synthType && updates.synthType !== currentInstrument.synthType;
       const isPresetLoad = updates.name && updates.synthType; // Loading a preset has both name and synthType
+      const isTB303Update = updates.tb303 && currentInstrument?.synthType === 'TB303' && !synthTypeChanging;
+
+      // Check if any sound-affecting parameters are changing (not just name/volume/pan)
+      const soundParamsChanging = !!(
+        updates.oscillator ||
+        updates.envelope ||
+        updates.filter ||
+        updates.filterEnvelope ||
+        updates.superSaw ||
+        updates.polySynth ||
+        updates.organ ||
+        updates.drumMachine ||
+        updates.chipSynth ||
+        updates.pwmSynth ||
+        updates.stringMachine ||
+        updates.formantSynth ||
+        updates.wavetable ||
+        updates.granular
+      );
 
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === id);
         if (instrument) {
           // Explicitly exclude 'id' from updates to prevent ID from being changed
           const { id: _ignoredId, ...safeUpdates } = updates as any;
-          Object.assign(instrument, safeUpdates);
+
+          // Deep merge nested objects to preserve existing fields
+          Object.keys(safeUpdates).forEach(key => {
+            const value = safeUpdates[key];
+            if (value && typeof value === 'object' && !Array.isArray(value) && instrument[key as keyof InstrumentConfig]) {
+              // Merge nested objects (oscillator, envelope, filter, etc.)
+              Object.assign(instrument[key as keyof InstrumentConfig] as any, value);
+            } else {
+              // Direct assignment for primitives and new objects
+              (instrument as any)[key] = value;
+            }
+          });
         }
       });
 
-      // Invalidate the cached Tone.js instrument so it gets recreated with new config
-      if (synthTypeChanging || isPresetLoad) {
-        try {
-          const engine = getToneEngine();
-          engine.invalidateInstrument(id);
-          console.log('[InstrumentStore] Invalidated instrument', id, 'synthType changed:', synthTypeChanging, 'preset load:', isPresetLoad);
-        } catch (error) {
-          console.warn('[InstrumentStore] Could not invalidate instrument:', error);
-        }
-      } else if (updates.tb303 && currentInstrument?.synthType === 'TB303') {
-        // Real-time TB303 parameter update (without recreating the synth)
+      // Handle TB303 real-time updates specially (without recreating)
+      if (isTB303Update && !soundParamsChanging) {
         try {
           const engine = getToneEngine();
           const updatedInstrument = get().instruments.find((inst) => inst.id === id);
@@ -133,6 +163,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
           }
         } catch (error) {
           console.warn('[InstrumentStore] Could not update TB303 parameters:', error);
+        }
+        return;
+      }
+
+      // Invalidate the cached Tone.js instrument for any sound-affecting changes
+      if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
+        try {
+          const engine = getToneEngine();
+          engine.invalidateInstrument(id);
+          console.log('[InstrumentStore] Invalidated instrument', id, {
+            synthTypeChanging,
+            isPresetLoad,
+            soundParamsChanging
+          });
+        } catch (error) {
+          console.warn('[InstrumentStore] Could not invalidate instrument:', error);
         }
       }
     },

@@ -1,8 +1,9 @@
 /**
  * TestKeyboard - On-screen piano keyboard for testing sounds
+ * Responsive full-width design that shows as many octaves as fit
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Music } from 'lucide-react';
 import type { InstrumentConfig } from '../../types/instrument';
 import { ToneEngine } from '../../engine/ToneEngine';
@@ -16,29 +17,88 @@ interface Key {
   label: string;
   isBlack: boolean;
   keyboardKey?: string;
+  octave: number;
 }
 
-const KEYS: Key[] = [
-  { note: 'C4', label: 'C', isBlack: false, keyboardKey: 'a' },
-  { note: 'C#4', label: 'C#', isBlack: true, keyboardKey: 'w' },
-  { note: 'D4', label: 'D', isBlack: false, keyboardKey: 's' },
-  { note: 'D#4', label: 'D#', isBlack: true, keyboardKey: 'e' },
-  { note: 'E4', label: 'E', isBlack: false, keyboardKey: 'd' },
-  { note: 'F4', label: 'F', isBlack: false, keyboardKey: 'f' },
-  { note: 'F#4', label: 'F#', isBlack: true, keyboardKey: 't' },
-  { note: 'G4', label: 'G', isBlack: false, keyboardKey: 'g' },
-  { note: 'G#4', label: 'G#', isBlack: true, keyboardKey: 'y' },
-  { note: 'A4', label: 'A', isBlack: false, keyboardKey: 'h' },
-  { note: 'A#4', label: 'A#', isBlack: true, keyboardKey: 'u' },
-  { note: 'B4', label: 'B', isBlack: false, keyboardKey: 'j' },
-  { note: 'C5', label: 'C', isBlack: false, keyboardKey: 'k' },
-];
+// Note names in an octave
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const WHITE_NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+// FastTracker II keyboard layout mapping (2 octaves worth of keys)
+const FT2_KEYBOARD_MAP: Record<string, string> = {
+  // Lower octave row (Z-M)
+  'z': 'C', 's': 'C#', 'x': 'D', 'd': 'D#', 'c': 'E',
+  'v': 'F', 'g': 'F#', 'b': 'G', 'h': 'G#', 'n': 'A', 'j': 'A#', 'm': 'B',
+  // Upper octave row (Q-I)
+  'q': 'C+', '2': 'C#+', 'w': 'D+', '3': 'D#+', 'e': 'E+',
+  'r': 'F+', '5': 'F#+', 't': 'G+', '6': 'G#+', 'y': 'A+', '7': 'A#+', 'u': 'B+',
+  'i': 'C++',
+};
+
+// Generate keys for a given range of octaves
+function generateKeys(startOctave: number, numOctaves: number): Key[] {
+  const keys: Key[] = [];
+
+  // Keyboard mapping - we map to octaves 3 and 4 by default
+  const keyboardOctaveOffset = startOctave <= 3 ? 3 - startOctave : 0;
+
+  for (let oct = 0; oct < numOctaves; oct++) {
+    const octave = startOctave + oct;
+    for (const noteName of NOTE_NAMES) {
+      const isBlack = noteName.includes('#');
+      const note = `${noteName}${octave}`;
+
+      // Find keyboard mapping
+      let keyboardKey: string | undefined;
+      const mappedOctave = oct - keyboardOctaveOffset;
+      if (mappedOctave === 0) {
+        // Lower octave keys
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName);
+        if (entry) keyboardKey = entry[0];
+      } else if (mappedOctave === 1) {
+        // Upper octave keys
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName + '+');
+        if (entry) keyboardKey = entry[0];
+      } else if (mappedOctave === 2 && noteName === 'C') {
+        // Top C
+        keyboardKey = 'i';
+      }
+
+      keys.push({
+        note,
+        label: noteName.replace('#', ''),
+        isBlack,
+        keyboardKey,
+        octave,
+      });
+    }
+  }
+
+  // Add final C of the last octave
+  const lastOctave = startOctave + numOctaves;
+  keys.push({
+    note: `C${lastOctave}`,
+    label: 'C',
+    isBlack: false,
+    keyboardKey: numOctaves <= 2 ? 'i' : undefined,
+    octave: lastOctave,
+  });
+
+  return keys;
+}
 
 // Set of keyboard keys used for piano
-const PIANO_KEYS = new Set(KEYS.map(k => k.keyboardKey).filter(Boolean));
+const ALL_PIANO_KEYS = new Set(Object.keys(FT2_KEYBOARD_MAP));
+
+// Minimum white key width in pixels
+const MIN_WHITE_KEY_WIDTH = 24;
+const MAX_WHITE_KEY_WIDTH = 40;
+const WHITE_KEYS_PER_OCTAVE = 7;
 
 export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
+  const [containerWidth, setContainerWidth] = useState(400);
+  const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(ToneEngine.getInstance());
   const activeNotesRef = useRef<Set<string>>(new Set());
   const instrumentRef = useRef(instrument);
@@ -53,6 +113,62 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     activeNotesRef.current = activeNotes;
   }, [activeNotes]);
 
+  // ResizeObserver for responsive width
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width - 24; // Account for padding
+        if (width > 0) {
+          setContainerWidth(width);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Calculate number of octaves that fit
+  const { numOctaves, whiteKeyWidth, keys } = useMemo(() => {
+    // Calculate how many octaves fit
+    // Each octave has 7 white keys, plus we need 1 extra for the final C
+    const availableWidth = containerWidth - 8; // Some margin
+
+    // Start with max octaves and work down
+    let octaves = 6; // Max 6 octaves (C1-C7)
+    let keyWidth = MAX_WHITE_KEY_WIDTH;
+
+    while (octaves >= 2) {
+      const totalWhiteKeys = octaves * WHITE_KEYS_PER_OCTAVE + 1;
+      keyWidth = availableWidth / totalWhiteKeys;
+
+      if (keyWidth >= MIN_WHITE_KEY_WIDTH) {
+        // This many octaves fit with acceptable key size
+        keyWidth = Math.min(keyWidth, MAX_WHITE_KEY_WIDTH);
+        break;
+      }
+      octaves--;
+    }
+
+    // Ensure minimum of 2 octaves
+    octaves = Math.max(2, octaves);
+    const totalWhiteKeys = octaves * WHITE_KEYS_PER_OCTAVE + 1;
+    keyWidth = Math.min(availableWidth / totalWhiteKeys, MAX_WHITE_KEY_WIDTH);
+
+    // Center octaves around middle C (C4)
+    // For 2 octaves: C3-C5, for 4 octaves: C2-C6, etc.
+    const startOctave = Math.max(1, 4 - Math.floor(octaves / 2));
+
+    return {
+      numOctaves: octaves,
+      whiteKeyWidth: keyWidth,
+      keys: generateKeys(startOctave, octaves),
+    };
+  }, [containerWidth]);
+
   // Initialize engine once
   useEffect(() => {
     if (!isInitializedRef.current) {
@@ -62,58 +178,48 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     }
   }, []);
 
-  const playNote = useCallback((note: string) => {
+  // Attack note - starts playing and sustains until release
+  const attackNote = useCallback((note: string) => {
+    // Don't retrigger if already playing
+    if (activeNotesRef.current.has(note)) return;
+
     const engine = engineRef.current;
-    const inst = instrumentRef.current;
+    const inst = instrument;
 
-    // Trigger the note immediately (engine should already be initialized)
-    engine.triggerNote(
-      inst.id,
-      note,
-      0.2, // Duration - 200ms
-      0, // time - play now
-      0.8, // velocity
-      inst
-    );
-
-    // Visual feedback
+    engine.triggerNoteAttack(inst.id, note, 0, 0.8, inst);
     setActiveNotes((prev) => new Set(prev).add(note));
-    setTimeout(() => {
-      setActiveNotes((prev) => {
-        const next = new Set(prev);
-        next.delete(note);
-        return next;
-      });
-    }, 200);
-  }, []);
+  }, [instrument]);
 
-  const stopNote = useCallback((note: string) => {
+  // Release note - stops the sustained note
+  const releaseNote = useCallback((note: string) => {
     const engine = engineRef.current;
-    const inst = instrumentRef.current;
-    engine.triggerNoteRelease(inst.id, note, 0, inst);
-  }, []);
+    const inst = instrument;
 
-  // Keyboard event handlers - stable reference, no dependencies that change frequently
+    engine.triggerNoteRelease(inst.id, note, 0, inst);
+    setActiveNotes((prev) => {
+      const next = new Set(prev);
+      next.delete(note);
+      return next;
+    });
+  }, [instrument]);
+
+  // Keyboard event handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if typing in input fields
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-
-      // Skip repeats
       if (e.repeat) return;
 
       const keyLower = e.key.toLowerCase();
 
-      // Check if this is a piano key
-      if (PIANO_KEYS.has(keyLower)) {
+      if (ALL_PIANO_KEYS.has(keyLower)) {
         e.preventDefault();
         e.stopPropagation();
 
-        const key = KEYS.find((k) => k.keyboardKey === keyLower);
-        if (key && !activeNotesRef.current.has(key.note)) {
-          playNote(key.note);
+        const key = keys.find((k) => k.keyboardKey === keyLower);
+        if (key) {
+          attackNote(key.note);
         }
       }
     };
@@ -121,18 +227,17 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     const handleKeyUp = (e: KeyboardEvent) => {
       const keyLower = e.key.toLowerCase();
 
-      if (PIANO_KEYS.has(keyLower)) {
+      if (ALL_PIANO_KEYS.has(keyLower)) {
         e.preventDefault();
         e.stopPropagation();
 
-        const key = KEYS.find((k) => k.keyboardKey === keyLower);
+        const key = keys.find((k) => k.keyboardKey === keyLower);
         if (key) {
-          stopNote(key.note);
+          releaseNote(key.note);
         }
       }
     };
 
-    // Use capture phase to get events before other handlers
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp, true);
 
@@ -140,10 +245,26 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [playNote, stopNote]);
+  }, [attackNote, releaseNote, keys]);
+
+  // Separate white and black keys
+  const whiteKeys = keys.filter((k) => !k.isBlack);
+  const blackKeys = keys.filter((k) => k.isBlack);
+
+  // Calculate black key positioning
+  const getBlackKeyPosition = (key: Key) => {
+    const keyIndex = keys.findIndex((k) => k.note === key.note);
+    const whiteKeysBefore = keys.slice(0, keyIndex).filter((k) => !k.isBlack).length;
+    // Position black key between white keys
+    return whiteKeysBefore * whiteKeyWidth - (whiteKeyWidth * 0.3) / 2;
+  };
+
+  const blackKeyWidth = whiteKeyWidth * 0.6;
+  const keyHeight = 96;
+  const blackKeyHeight = keyHeight * 0.6;
 
   return (
-    <div className="space-y-3">
+    <div ref={containerRef} className="space-y-3 w-full">
       {/* Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-bold text-ft2-highlight">
@@ -151,97 +272,127 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
           <span>TEST KEYBOARD</span>
         </div>
         <div className="text-xs text-ft2-textDim font-mono">
-          Use keyboard: A-K keys or click
+          {numOctaves} octaves · FT2 layout
         </div>
       </div>
 
       {/* Piano Keyboard */}
-      <div className="bg-ft2-header rounded border-2 border-ft2-border p-4">
-        <div className="relative h-32 flex items-end justify-center">
-          <div className="flex gap-0.5 relative">
+      <div className="bg-ft2-header rounded border-2 border-ft2-border p-3">
+        <div
+          className="relative flex items-end justify-center"
+          style={{ height: keyHeight }}
+        >
+          <div className="relative flex">
             {/* White keys */}
-            {KEYS.filter((k) => !k.isBlack).map((key) => {
+            {whiteKeys.map((key, index) => {
               const isActive = activeNotes.has(key.note);
+              const isOctaveStart = key.label === 'C';
               return (
                 <button
                   key={key.note}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    playNote(key.note);
+                    attackNote(key.note);
                   }}
                   onMouseUp={(e) => {
                     e.preventDefault();
-                    stopNote(key.note);
+                    releaseNote(key.note);
                   }}
-                  onMouseLeave={() => stopNote(key.note)}
+                  onMouseLeave={() => {
+                    if (activeNotes.has(key.note)) releaseNote(key.note);
+                  }}
                   onTouchStart={(e) => {
                     e.preventDefault();
-                    playNote(key.note);
+                    attackNote(key.note);
                   }}
                   onTouchEnd={(e) => {
                     e.preventDefault();
-                    stopNote(key.note);
+                    releaseNote(key.note);
                   }}
                   className={`
-                    relative w-12 h-32 border-2 border-ft2-border rounded-b
-                    transition-all cursor-pointer select-none touch-none
-                    ${
-                      isActive
-                        ? 'bg-ft2-cursor shadow-lg shadow-ft2-cursor/50'
-                        : 'bg-white hover:bg-gray-100 active:bg-ft2-cursor'
+                    relative border border-ft2-border rounded-b
+                    transition-colors duration-75 cursor-pointer select-none touch-none
+                    ${isActive
+                      ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50'
+                      : 'bg-white hover:bg-gray-100'
                     }
+                    ${isOctaveStart && index > 0 ? 'border-l-2 border-l-gray-300' : ''}
                   `}
+                  style={{
+                    width: whiteKeyWidth,
+                    height: keyHeight,
+                    marginRight: index < whiteKeys.length - 1 ? 1 : 0,
+                  }}
                 >
-                  <div className="absolute bottom-2 left-0 right-0 text-center">
-                    <div className="text-xs font-bold text-gray-700">{key.label}</div>
-                    <div className="text-xs text-gray-500 font-mono">{key.keyboardKey}</div>
+                  <div className="absolute bottom-1 left-0 right-0 text-center">
+                    {isOctaveStart && (
+                      <div className="text-[8px] text-gray-400 font-mono">{key.octave}</div>
+                    )}
+                    <div
+                      className="font-bold text-gray-700"
+                      style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px' }}
+                    >
+                      {key.label}
+                    </div>
+                    {key.keyboardKey && (
+                      <div className="text-[8px] text-gray-400 font-mono uppercase">
+                        {key.keyboardKey}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
             })}
 
             {/* Black keys overlay */}
-            {KEYS.filter((k) => k.isBlack).map((key) => {
+            {blackKeys.map((key) => {
               const isActive = activeNotes.has(key.note);
-              // Position black keys between white keys - calculate based on note position
-              const keyIndex = KEYS.findIndex((k) => k.note === key.note);
-              const whiteKeysBefore = KEYS.slice(0, keyIndex).filter((k) => !k.isBlack).length;
-              const leftPosition = whiteKeysBefore * 48 + 36; // 48px width + 0.5px gap, offset by 3/4 of white key
+              const leftPosition = getBlackKeyPosition(key);
 
               return (
                 <button
                   key={key.note}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    playNote(key.note);
+                    attackNote(key.note);
                   }}
                   onMouseUp={(e) => {
                     e.preventDefault();
-                    stopNote(key.note);
+                    releaseNote(key.note);
                   }}
-                  onMouseLeave={() => stopNote(key.note)}
+                  onMouseLeave={() => {
+                    if (activeNotes.has(key.note)) releaseNote(key.note);
+                  }}
                   onTouchStart={(e) => {
                     e.preventDefault();
-                    playNote(key.note);
+                    attackNote(key.note);
                   }}
                   onTouchEnd={(e) => {
                     e.preventDefault();
-                    stopNote(key.note);
+                    releaseNote(key.note);
                   }}
                   className={`
-                    absolute w-8 h-20 border-2 border-ft2-border rounded-b
-                    transition-all cursor-pointer select-none touch-none z-10
-                    ${
-                      isActive
-                        ? 'bg-ft2-highlight shadow-lg shadow-ft2-highlight/50'
-                        : 'bg-gray-900 hover:bg-gray-700 active:bg-ft2-highlight'
+                    absolute border border-ft2-border rounded-b
+                    transition-colors duration-75 cursor-pointer select-none touch-none z-10
+                    ${isActive
+                      ? 'bg-amber-500 shadow-lg shadow-amber-500/50'
+                      : 'bg-gray-900 hover:bg-gray-700'
                     }
                   `}
-                  style={{ left: `${leftPosition}px` }}
+                  style={{
+                    left: leftPosition,
+                    width: blackKeyWidth,
+                    height: blackKeyHeight,
+                  }}
                 >
-                  <div className="absolute bottom-1 left-0 right-0 text-center">
-                    <div className="text-xs text-white font-mono">{key.keyboardKey}</div>
-                  </div>
+                  {key.keyboardKey && (
+                    <div
+                      className="absolute bottom-1 left-0 right-0 text-center text-gray-400 font-mono uppercase"
+                      style={{ fontSize: '7px' }}
+                    >
+                      {key.keyboardKey}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -260,11 +411,6 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
           className="flex-1 h-1 bg-ft2-bg rounded-lg appearance-none cursor-pointer accent-ft2-cursor"
         />
         <span className="text-xs font-mono text-ft2-text">80%</span>
-      </div>
-
-      {/* Info */}
-      <div className="text-xs text-ft2-textDim bg-ft2-header p-2 rounded border border-ft2-border">
-        <span className="font-bold">Keyboard shortcuts:</span> A S D F G H J K (white keys), W E T Y U (black keys)
       </div>
     </div>
   );

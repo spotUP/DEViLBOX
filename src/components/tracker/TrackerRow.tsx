@@ -11,6 +11,7 @@ import { EffectCell } from './EffectCell';
 import { AccentCell } from './AccentCell';
 import { SlideCell } from './SlideCell';
 import { useTrackerStore } from '@stores';
+import { useUIStore } from '@stores/useUIStore';
 import type { TrackerCell, CursorPosition } from '@typedefs';
 
 interface TrackerRowProps {
@@ -20,12 +21,18 @@ interface TrackerRowProps {
   cursor: CursorPosition;
   isCursorRow: boolean;
   isCurrentPlaybackRow: boolean;
+  channelWidth?: number; // Optional width per channel (mobile uses full width)
+  baseChannelIndex?: number; // Base channel index offset (for mobile single-channel view)
 }
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
-  ({ rowIndex, cells, channelColors, cursor, isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow }) => {
+  ({ rowIndex, cells, channelColors, cursor, isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
     const setCell = useTrackerStore((state) => state.setCell);
-    const rowNumberHex = rowIndex.toString(16).toUpperCase().padStart(2, '0');
+    const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+    const rowNumber = useHexNumbers
+      ? rowIndex.toString(16).toUpperCase().padStart(2, '0')
+      : rowIndex.toString(10).padStart(2, '0');
+    const effectiveChannelWidth = channelWidth || 260;
 
     // Row background styling - Modern dark theme
     // Only beat highlight and alternating colors - NO cursor/playback row highlighting
@@ -47,26 +54,29 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
             ${rowIndex % 4 === 0 ? 'text-text-secondary font-bold' : 'text-text-muted'}
           `}
         >
-          {rowNumberHex}
+          {rowNumber}
         </div>
 
         {/* Channels */}
-        {cells.map((cell, channelIndex) => {
-          // Cursor only shows on the edit bar row (isCursorRow) at the selected channel
-          const isChannelActive = isCursorRow && cursor.channelIndex === channelIndex;
+        {cells.map((cell, localIndex) => {
+          // The actual channel index in the pattern (for cursor matching)
+          const actualChannelIndex = baseChannelIndex + localIndex;
+          // Cursor is now a fixed overlay - cells don't need active state
+          const isChannelActive = false;
           const isNoteOff = cell.note === '===';
-          const channelColor = channelColors[channelIndex];
+          const channelColor = channelColors[localIndex];
 
           return (
             <div
-              key={channelIndex}
+              key={localIndex}
               className={`
-                flex-shrink-0 min-w-[260px] h-full
+                flex-shrink-0 h-full
                 flex items-center gap-1 px-2
                 border-r border-dark-border
                 ${isChannelActive ? 'bg-accent-primary/10' : ''}
               `}
               style={{
+                minWidth: effectiveChannelWidth,
                 backgroundColor: channelColor && !isChannelActive ? `${channelColor}10` : undefined,
                 boxShadow: channelColor ? `inset 2px 0 0 ${channelColor}40` : undefined,
               }}
@@ -104,14 +114,14 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               <AccentCell
                 value={cell.accent}
                 isActive={isChannelActive && cursor.columnType === 'accent'}
-                onToggle={() => setCell(channelIndex, rowIndex, { accent: !cell.accent })}
+                onToggle={() => setCell(actualChannelIndex, rowIndex, { accent: !cell.accent })}
               />
 
               {/* Slide */}
               <SlideCell
                 value={cell.slide}
                 isActive={isChannelActive && cursor.columnType === 'slide'}
-                onToggle={() => setCell(channelIndex, rowIndex, { slide: !cell.slide })}
+                onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
               />
             </div>
           );
@@ -121,11 +131,7 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
   },
   (prevProps, nextProps) => {
     // Custom comparison for performance
-    // Cursor only matters when isCursorRow is true
-    const cursorChanged = prevProps.isCursorRow || nextProps.isCursorRow
-      ? (prevProps.cursor.channelIndex !== nextProps.cursor.channelIndex ||
-         prevProps.cursor.columnType !== nextProps.cursor.columnType)
-      : false;
+    // Cursor is now a fixed overlay, so we don't need to track it here
 
     // Check if channel colors changed
     const colorsChanged = prevProps.channelColors.length !== nextProps.channelColors.length ||
@@ -133,9 +139,8 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
 
     return (
       prevProps.rowIndex === nextProps.rowIndex &&
-      prevProps.isCursorRow === nextProps.isCursorRow &&
-      prevProps.isCurrentPlaybackRow === nextProps.isCurrentPlaybackRow &&
-      !cursorChanged &&
+      prevProps.channelWidth === nextProps.channelWidth &&
+      prevProps.baseChannelIndex === nextProps.baseChannelIndex &&
       !colorsChanged &&
       prevProps.cells === nextProps.cells
     );

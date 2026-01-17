@@ -31,12 +31,14 @@ interface ChiptuneConfig {
 type EventHandler<T = void> = (data: T) => void;
 
 export class ChiptunePlayer {
-  private context: AudioContext;
-  private gain: GainNode;
+  private context: AudioContext | null = null;
+  private gain: GainNode | null = null;
   private processNode: AudioWorkletNode | null = null;
   private config: ChiptuneConfig;
   private handlers: Map<string, EventHandler<any>[]> = new Map();
   private initialized = false;
+  private initError: string | null = null;
+  private initPromise: Promise<void> | null = null;
 
   public meta: ChiptuneMetadata | null = null;
   public duration = 0;
@@ -53,17 +55,41 @@ export class ChiptunePlayer {
       ...config,
     };
 
-    this.context = new AudioContext();
-    this.gain = this.context.createGain();
-    this.gain.gain.value = 1;
-
-    this.initWorklet();
+    // Lazy initialization - don't create AudioContext until needed
+    // This prevents errors on browsers/configs where worklet loading fails
   }
 
-  private async initWorklet() {
+  /**
+   * Initialize the audio context and worklet (lazy, called on first use)
+   */
+  private async ensureInitialized(): Promise<boolean> {
+    // Already initialized
+    if (this.initialized) return true;
+
+    // Already failed
+    if (this.initError) return false;
+
+    // Already initializing - wait for it
+    if (this.initPromise) {
+      await this.initPromise;
+      return this.initialized;
+    }
+
+    // Start initialization
+    this.initPromise = this.initWorklet();
+    await this.initPromise;
+    return this.initialized;
+  }
+
+  private async initWorklet(): Promise<void> {
     try {
-      // Load worklet from public folder
-      await this.context.audioWorklet.addModule('/chiptune3/chiptune3.worklet.js');
+      this.context = new AudioContext();
+      this.gain = this.context.createGain();
+      this.gain.gain.value = 1;
+
+      // Load worklet from public folder (use BASE_URL for proper path in dev/prod)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/chiptune3.worklet.js`);
 
       this.processNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
         numberOfInputs: 0,
@@ -81,8 +107,11 @@ export class ChiptunePlayer {
       this.initialized = true;
       this.fireEvent('onInitialized');
     } catch (error) {
-      console.error('[ChiptunePlayer] Failed to initialize worklet:', error);
-      this.fireEvent('onError', { type: 'init' });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.initError = errorMessage;
+      console.warn('[ChiptunePlayer] Failed to initialize worklet:', errorMessage);
+      console.warn('[ChiptunePlayer] Module file import (.mod, .xm, .it, etc.) will not be available.');
+      this.fireEvent('onError', { type: 'init', message: errorMessage });
     }
   }
 
@@ -129,8 +158,13 @@ export class ChiptunePlayer {
   onInitialized(handler: EventHandler): void {
     if (this.initialized) {
       handler();
+    } else if (this.initError) {
+      // Already failed - fire error handler instead
+      this.fireEvent('onError', { type: 'init', message: this.initError });
     } else {
       this.addHandler('onInitialized', handler);
+      // Trigger lazy initialization
+      this.ensureInitialized();
     }
   }
 
@@ -151,14 +185,16 @@ export class ChiptunePlayer {
   }
 
   // Playback controls
-  play(buffer: ArrayBuffer): void {
-    if (!this.processNode) {
-      console.error('[ChiptunePlayer] Not initialized');
+  async play(buffer: ArrayBuffer): Promise<void> {
+    const ready = await this.ensureInitialized();
+    if (!ready || !this.processNode || !this.context) {
+      console.error('[ChiptunePlayer] Not initialized - worklet loading failed');
+      this.fireEvent('onError', { type: 'not_initialized' });
       return;
     }
     // Resume context if suspended (required by browsers)
     if (this.context.state === 'suspended') {
-      this.context.resume();
+      await this.context.resume();
     }
     this.processNode.port.postMessage({ cmd: 'play', val: buffer });
   }
@@ -176,7 +212,9 @@ export class ChiptunePlayer {
   }
 
   setVol(volume: number): void {
-    this.gain.gain.value = volume;
+    if (this.gain) {
+      this.gain.gain.value = volume;
+    }
   }
 
   setPos(seconds: number): void {
@@ -185,5 +223,19 @@ export class ChiptunePlayer {
 
   setRepeatCount(count: number): void {
     this.processNode?.port.postMessage({ cmd: 'repeatCount', val: count });
+  }
+
+  /**
+   * Check if player is available (worklet loaded successfully)
+   */
+  isAvailable(): boolean {
+    return this.initialized && !this.initError;
+  }
+
+  /**
+   * Get the initialization error if any
+   */
+  getInitError(): string | null {
+    return this.initError;
   }
 }

@@ -52,14 +52,15 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       Leads: 'text-yellow-400',
       Pads: 'text-purple-400',
       Drums: 'text-red-400',
+      Chip: 'text-cyan-400',
       FX: 'text-green-400',
     };
     return colors[category] || 'text-ft2-highlight';
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="w-[80vw] max-w-3xl h-[70vh] bg-ft2-bg border-2 border-ft2-border rounded-lg flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
           <div>
@@ -118,7 +119,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
               No presets found matching "{searchQuery}"
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {filteredPresets.map((preset) => {
                 const synthInfo = getSynthInfo(preset.synthType);
                 const IconComponent = getIcon(synthInfo.icon);

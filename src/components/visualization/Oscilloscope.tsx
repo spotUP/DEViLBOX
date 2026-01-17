@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useAudioStore } from '@stores';
+import { useThemeStore } from '@stores/useThemeStore';
 
 interface OscilloscopeProps {
   width?: number | 'auto';
@@ -46,6 +47,9 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
     return () => resizeObserver.disconnect();
   }, [width]);
 
+  const { currentThemeId } = useThemeStore();
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -59,15 +63,22 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
 
     let isRunning = true;
 
+    // Theme-aware colors
+    const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
+    const gridColor = isCyanTheme ? 'rgba(0, 255, 255, 0.08)' : '#1a1a1d';
+    const waveColor1 = isCyanTheme ? '#00ffff' : '#00d4aa';
+    const waveColor2 = isCyanTheme ? '#00ffff' : '#7c3aed';
+    const centerLineColor = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(0, 212, 170, 0.2)';
+
     const draw = () => {
       if (!isRunning || !canvas || !ctx) return;
 
       // Clear canvas with dark background
-      ctx.fillStyle = '#0a0a0b';
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, actualWidth, height);
 
       // Draw subtle grid
-      ctx.strokeStyle = '#1a1a1d';
+      ctx.strokeStyle = gridColor;
       ctx.lineWidth = 1;
 
       // Vertical grid lines
@@ -90,11 +101,11 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         // Draw waveform
         const waveform = analyserNode.getValue() as Float32Array;
 
-        // Gradient stroke
+        // Gradient stroke (monochrome cyan for cyan theme)
         const gradient = ctx.createLinearGradient(0, 0, actualWidth, 0);
-        gradient.addColorStop(0, '#00d4aa');
-        gradient.addColorStop(0.5, '#00d4aa');
-        gradient.addColorStop(1, '#7c3aed');
+        gradient.addColorStop(0, waveColor1);
+        gradient.addColorStop(0.5, waveColor1);
+        gradient.addColorStop(1, waveColor2);
 
         ctx.strokeStyle = gradient;
         ctx.lineWidth = 2;
@@ -119,7 +130,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         ctx.stroke();
 
         // Draw center line
-        ctx.strokeStyle = 'rgba(0, 212, 170, 0.2)';
+        ctx.strokeStyle = centerLineColor;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, height / 2);
@@ -139,9 +150,14 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
           const normalized = (db + 100) / 100;
           const barHeight = normalized * height;
 
-          // Gradient based on frequency
-          const hue = 160 + (i / spectrum.length) * 120; // Teal to purple
-          ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+          // Gradient based on frequency (monochrome cyan for cyan theme)
+          if (isCyanTheme) {
+            const alpha = 0.5 + (normalized * 0.5);
+            ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+          } else {
+            const hue = 160 + (i / spectrum.length) * 120; // Teal to purple
+            ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+          }
 
           ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
 
@@ -160,7 +176,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [actualWidth, height, mode, analyserNode, fftNode]);
+  }, [actualWidth, height, mode, analyserNode, fftNode, isCyanTheme]);
 
   return (
     <div ref={containerRef} className={width === 'auto' ? 'w-full' : ''}>

@@ -46,7 +46,7 @@ export function saveProjectToStorage(): boolean {
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
     projectState.markAsSaved();
-    console.log('[Persistence] Project saved to localStorage (including automation and master effects)');
+    console.log('[Persistence] Project saved to localStorage');
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to save project:', error);
@@ -94,12 +94,12 @@ export function loadProjectFromStorage(): boolean {
     transportStore.setBPM(project.bpm);
 
     // Load automation curves
-    if (project.automation && project.automation.length > 0) {
+    if (project.automation) {
       automationStore.loadCurves(project.automation);
     }
 
     // Load master effects
-    if (project.masterEffects && project.masterEffects.length > 0) {
+    if (project.masterEffects) {
       audioStore.setMasterEffects(project.masterEffects);
     }
 
@@ -192,27 +192,27 @@ export function useProjectPersistence() {
     return unsubscribe;
   }, [markAsModified]);
 
-  // Subscribe to automation store changes
-  useEffect(() => {
-    const unsubscribe = useAutomationStore.subscribe((state, prevState) => {
-      if (state.curves !== prevState.curves) {
-        markAsModified();
-      }
-    });
+  // Don't subscribe to automation store changes - we're not saving automation
+  // useEffect(() => {
+  //   const unsubscribe = useAutomationStore.subscribe((state, prevState) => {
+  //     if (state.curves !== prevState.curves) {
+  //       markAsModified();
+  //     }
+  //   });
+  //
+  //   return unsubscribe;
+  // }, [markAsModified]);
 
-    return unsubscribe;
-  }, [markAsModified]);
-
-  // Subscribe to audio store changes (master effects)
-  useEffect(() => {
-    const unsubscribe = useAudioStore.subscribe((state, prevState) => {
-      if (state.masterEffects !== prevState.masterEffects) {
-        markAsModified();
-      }
-    });
-
-    return unsubscribe;
-  }, [markAsModified]);
+  // Don't subscribe to audio store changes (master effects) - we're not saving master effects
+  // useEffect(() => {
+  //   const unsubscribe = useAudioStore.subscribe((state, prevState) => {
+  //     if (state.masterEffects !== prevState.masterEffects) {
+  //       markAsModified();
+  //     }
+  //   });
+  //
+  //   return unsubscribe;
+  // }, [markAsModified]);
 
   // Auto-save when dirty
   const scheduleAutoSave = useCallback(() => {

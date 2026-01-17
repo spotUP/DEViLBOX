@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useUIStore } from '@stores/useUIStore';
 import type { InstrumentValue } from '@typedefs';
 
 interface InstrumentCellProps {
@@ -13,7 +14,12 @@ interface InstrumentCellProps {
 
 export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
   ({ value, isActive, isEmpty }) => {
-    const displayValue = value !== null ? value.toString(16).toUpperCase().padStart(2, '0') : '..';
+    const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+    const displayValue = value !== null
+      ? useHexNumbers
+        ? value.toString(16).toUpperCase().padStart(2, '0')
+        : value.toString(10).padStart(2, '0')
+      : '..';
 
     const colorClass = isEmpty ? 'text-text-muted' : 'text-amber-400';
 

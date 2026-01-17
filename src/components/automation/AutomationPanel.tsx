@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { useTrackerStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useAutomationStore, useThemeStore } from '@stores';
 import { AutomationCurveCanvas } from './AutomationCurve';
 
 import type { AutomationParameter } from '@typedefs/automation';
@@ -53,6 +53,15 @@ export const AutomationPanel: React.FC = () => {
   const { getAutomation, setAutomation } = useAutomationStore();
   const [selectedParameter, setSelectedParameter] = useState<AutomationParameter>('cutoff');
   const [selectedChannel, setSelectedChannel] = useState<number>(0);
+
+  // Theme-aware colors for "has data" indicator
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const hasDataBg = isCyanTheme ? 'bg-cyan-500/20' : 'bg-orange-500/20';
+  const hasDataText = isCyanTheme ? 'text-cyan-400' : 'text-orange-400';
+  const hasDataBorder = isCyanTheme ? 'border-cyan-500' : 'border-orange-500';
+  const hasDataHover = isCyanTheme ? 'hover:bg-cyan-500/30' : 'hover:bg-orange-500/30';
+  const hasDataDot = isCyanTheme ? 'bg-cyan-500' : 'bg-orange-500';
 
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
@@ -143,7 +152,7 @@ export const AutomationPanel: React.FC = () => {
                           isSelected
                             ? 'bg-accent-primary text-text-inverse border-accent-primary shadow-glow-sm'
                             : hasData
-                              ? 'bg-orange-500/20 text-orange-400 border-orange-500 hover:bg-orange-500/30'
+                              ? `${hasDataBg} ${hasDataText} ${hasDataBorder} ${hasDataHover}`
                               : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight hover:text-text-primary'
                         }
                       `}
@@ -152,7 +161,7 @@ export const AutomationPanel: React.FC = () => {
                       {param.name}
                       {/* Active indicator dot */}
                       {hasData && !isSelected && (
-                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full" />
+                        <span className={`absolute -top-1 -right-1 w-2 h-2 ${hasDataDot} rounded-full`} />
                       )}
                     </button>
                   );

@@ -12,10 +12,12 @@ import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { AutomationLanes } from './AutomationLanes';
-import { useTrackerStore, useTransportStore } from '@stores';
+import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { useShallow } from 'zustand/react/shallow';
-import { Plus, Minus, Volume2, VolumeX, Headphones } from 'lucide-react';
+import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useResponsiveSafe } from '@contexts/ResponsiveContext';
+import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import type { TrackerCell } from '@typedefs';
 
 interface ChannelTrigger {
@@ -62,16 +64,19 @@ const StatusBar: React.FC<{
 StatusBar.displayName = 'StatusBar';
 
 const PatternEditorComponent: React.FC = () => {
+  const { isMobile } = useResponsiveSafe();
   const {
     patterns,
     currentPatternIndex,
     cursor,
+    showGhostPatterns,
     addChannel,
     removeChannel,
     toggleChannelMute,
     toggleChannelSolo,
     setChannelColor,
     setCell,
+    moveCursorToChannel,
   } = useTrackerStore();
   // Use selectors to minimize re-renders during playback
   // Only subscribe to isPlaying and continuousRow - NOT currentRow
@@ -85,6 +90,10 @@ const PatternEditorComponent: React.FC = () => {
       currentRow: state.currentRow, // Needed for stepped scrolling mode
     }))
   );
+
+  // Get current theme for ghost row visibility adjustments
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -105,6 +114,32 @@ const PatternEditorComponent: React.FC = () => {
   const playbackStartRowRef = useRef(0);
 
   const pattern = patterns[currentPatternIndex];
+
+  // Mobile: Track which channel is currently visible (synced with cursor)
+  const mobileChannelIndex = cursor.channelIndex;
+
+  // Mobile: Swipe gesture handlers
+  const handleSwipeLeft = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
+    if (nextChannel !== mobileChannelIndex) {
+      moveCursorToChannel(nextChannel);
+    }
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+
+  const handleSwipeRight = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const prevChannel = Math.max(0, mobileChannelIndex - 1);
+    if (prevChannel !== mobileChannelIndex) {
+      moveCursorToChannel(prevChannel);
+    }
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+
+  const swipeHandlers = useSwipeGesture({
+    threshold: 50,
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
+  });
 
   // Debug logging for pattern data
   useEffect(() => {
@@ -166,12 +201,41 @@ const PatternEditorComponent: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Scroll animation during playback
-  // Smooth mode: Directly updates DOM transform for 60fps performance (bypasses React re-renders)
-  // Stepped mode: Updates transform on row changes for classic tracker feel
+  // Initialize animation when playback starts (only once per playback session)
+  const isPlayingRef = useRef(isPlaying);
+  const smoothScrollingRef = useRef(smoothScrolling);
+
   useEffect(() => {
-    if (!isPlaying || !pattern || !contentRef.current) {
-      // Stop animation when not playing
+    const wasPlaying = isPlayingRef.current;
+    const wasSmoothScrolling = smoothScrollingRef.current;
+    isPlayingRef.current = isPlaying;
+    smoothScrollingRef.current = smoothScrolling;
+
+    // Initialize refs when playback starts or when switching to smooth mode during playback
+    if (isPlaying && smoothScrolling && (!wasPlaying || !wasSmoothScrolling)) {
+      playbackStartTimeRef.current = performance.now();
+      playbackStartRowRef.current = continuousRow;
+    }
+  }, [isPlaying, smoothScrolling, continuousRow]);
+
+  // Stepped scrolling effect (updates on row changes)
+  useEffect(() => {
+    if (!isPlaying || !pattern || !contentRef.current || smoothScrolling) {
+      return;
+    }
+
+    const contentEl = contentRef.current;
+    // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
+    const currentHeight = containerRef.current?.clientHeight || containerHeight;
+    const halfContainer = currentHeight / 2;
+    const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
+    contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+  }, [isPlaying, pattern, smoothScrolling, currentRow, containerHeight]);
+
+  // Smooth scrolling animation (continuous, doesn't restart on row changes)
+  useEffect(() => {
+    if (!isPlaying || !pattern || !contentRef.current || !smoothScrolling) {
+      // Stop animation when not playing or not in smooth mode
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -181,28 +245,7 @@ const PatternEditorComponent: React.FC = () => {
 
     const contentEl = contentRef.current;
     const patternLength = pattern.length;
-
-    // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
-    if (!smoothScrolling) {
-      // Cancel any running animation
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      // Update transform based on currentRow (stepped)
-      const currentHeight = containerRef.current?.clientHeight || containerHeight;
-      const halfContainer = currentHeight / 2;
-      const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
-      contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
-      return;
-    }
-
-    // SMOOTH SCROLLING MODE: DAW-style continuous scroll
     const transport = Tone.getTransport();
-
-    // Record start time and starting row for continuous tracking
-    playbackStartTimeRef.current = performance.now();
-    playbackStartRowRef.current = continuousRow;
 
     const animate = () => {
       if (!contentEl || !containerRef.current) return;
@@ -232,7 +275,10 @@ const PatternEditorComponent: React.FC = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animationFrameRef.current = requestAnimationFrame(animate);
+    // Start animation loop (only if not already running)
+    if (!animationFrameRef.current) {
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
 
     return () => {
       if (animationFrameRef.current) {
@@ -240,7 +286,8 @@ const PatternEditorComponent: React.FC = () => {
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, pattern, continuousRow, containerHeight, smoothScrolling, currentRow]);
+    // Only restart when playback state or pattern changes, NOT on row updates
+  }, [isPlaying, pattern, smoothScrolling]);
 
   // Calculate the scroll offset for the pattern
   // Active row is ALWAYS centered at the edit bar, pattern wraps seamlessly
@@ -287,23 +334,26 @@ const PatternEditorComponent: React.FC = () => {
     const patternLength = pattern?.length || 64;
 
     // During playback, render current pattern plus adjacent pattern rows for preview
-    // Negative virtualIndex = previous pattern, >= patternLength = next pattern
     if (isPlaying) {
       const rows: Array<{ virtualIndex: number; actualIndex: number; patternType: 'prev' | 'current' | 'next' }> = [];
       const prevLen = prevPattern?.length || patternLength;
       const nextLen = nextPattern?.length || patternLength;
 
-      // Add rows from previous pattern (shown above current, dimmed)
-      for (let i = 0; i < prevLen; i++) {
-        rows.push({ virtualIndex: i - prevLen, actualIndex: i, patternType: 'prev' });
+      // Add rows from previous pattern (shown above current, dimmed) - only if ghosts enabled
+      if (showGhostPatterns) {
+        for (let i = 0; i < prevLen; i++) {
+          rows.push({ virtualIndex: i - prevLen, actualIndex: i, patternType: 'prev' });
+        }
       }
       // Add rows from current pattern
       for (let i = 0; i < patternLength; i++) {
         rows.push({ virtualIndex: i, actualIndex: i, patternType: 'current' });
       }
-      // Add rows from next pattern (shown below current, dimmed)
-      for (let i = 0; i < nextLen; i++) {
-        rows.push({ virtualIndex: patternLength + i, actualIndex: i, patternType: 'next' });
+      // Add rows from next pattern (shown below current, dimmed) - only if ghosts enabled
+      if (showGhostPatterns) {
+        for (let i = 0; i < nextLen; i++) {
+          rows.push({ virtualIndex: patternLength + i, actualIndex: i, patternType: 'next' });
+        }
       }
       return rows;
     }
@@ -322,7 +372,7 @@ const PatternEditorComponent: React.FC = () => {
     }
 
     return rows;
-  }, [scrollOffset, isPlaying, containerHeight, pattern?.length, prevPattern?.length, nextPattern?.length]);
+  }, [scrollOffset, isPlaying, containerHeight, pattern?.length, prevPattern?.length, nextPattern?.length, showGhostPatterns]);
 
   // Memoize channel colors - same for all rows, only changes when pattern changes
   const channelColors = useMemo(() => {
@@ -481,8 +531,31 @@ const PatternEditorComponent: React.FC = () => {
   const CHANNEL_WIDTH = 260;
   const ROW_NUM_WIDTH = 48;
   const ADD_BTN_WIDTH = 48;
-  const totalContentWidth = ROW_NUM_WIDTH + (pattern?.channels.length || 0) * CHANNEL_WIDTH +
-    ((pattern?.channels.length || 0) < 16 ? ADD_BTN_WIDTH : 0);
+
+  // Mobile: Use full width minus row numbers for single channel
+  const [containerWidth, setContainerWidth] = useState(0);
+  const mobileChannelWidth = Math.max(260, containerWidth - ROW_NUM_WIDTH - 16); // 16px padding
+
+  const totalContentWidth = isMobile
+    ? ROW_NUM_WIDTH + mobileChannelWidth
+    : ROW_NUM_WIDTH + (pattern?.channels.length || 0) * CHANNEL_WIDTH +
+      ((pattern?.channels.length || 0) < 16 ? ADD_BTN_WIDTH : 0);
+
+  // Track container width for mobile
+  useEffect(() => {
+    if (!containerRef.current || !isMobile) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    setContainerWidth(containerRef.current.clientWidth);
+
+    return () => resizeObserver.disconnect();
+  }, [isMobile]);
 
   if (!pattern) {
     return (
@@ -495,24 +568,118 @@ const PatternEditorComponent: React.FC = () => {
     );
   }
 
+  // Mobile channel for header display
+  const mobileChannel = pattern.channels[mobileChannelIndex];
+  const mobileTrigger = channelTriggers[mobileChannelIndex] || { level: 0, triggered: false };
+
   return (
-    <div className="flex-1 flex flex-col bg-dark-bg overflow-hidden">
-      {/* Channel Header - Sticky with controls */}
-      <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
-        <div className="flex">
-          {/* Row number column header */}
-          <div className="flex-shrink-0 w-12 px-2 py-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center">
-            ROW
+    <div
+      className="flex-1 flex flex-col bg-dark-bg overflow-hidden min-w-0"
+      {...(isMobile ? swipeHandlers : {})}
+    >
+      {/* Mobile Channel Header */}
+      {isMobile && (
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
+          <div className="flex items-center justify-between px-3 py-2">
+            {/* Left nav button */}
+            <button
+              onClick={handleSwipeRight}
+              disabled={mobileChannelIndex === 0}
+              className={`
+                p-2 rounded-lg transition-colors touch-target
+                ${mobileChannelIndex === 0
+                  ? 'text-text-muted opacity-30'
+                  : 'text-text-secondary hover:bg-dark-bgHover active:bg-dark-bgTertiary'
+                }
+              `}
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            {/* Channel info */}
+            <div className="flex items-center gap-3">
+              <span
+                className="font-bold font-mono text-lg"
+                style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
+              >
+                CH {(mobileChannelIndex + 1).toString().padStart(2, '0')}
+              </span>
+              <span className="text-xs text-text-muted">
+                / {pattern.channels.length.toString().padStart(2, '0')}
+              </span>
+              <ChannelVUMeter
+                level={mobileTrigger.level}
+                isActive={mobileTrigger.triggered}
+              />
+            </div>
+
+            {/* Right nav button */}
+            <button
+              onClick={handleSwipeLeft}
+              disabled={mobileChannelIndex >= pattern.channels.length - 1}
+              className={`
+                p-2 rounded-lg transition-colors touch-target
+                ${mobileChannelIndex >= pattern.channels.length - 1
+                  ? 'text-text-muted opacity-30'
+                  : 'text-text-secondary hover:bg-dark-bgHover active:bg-dark-bgTertiary'
+                }
+              `}
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
 
-          {/* Scrollable channel headers - scrollbar hidden, synced with content */}
-          <div
-            ref={headerScrollRef}
-            onScroll={handleHeaderScroll}
-            className="flex-1 overflow-x-auto scrollbar-hidden"
-          >
-            <div className="flex" style={{ minWidth: totalContentWidth - ROW_NUM_WIDTH }}>
-              {pattern.channels.map((channel, idx) => {
+          {/* Channel controls bar */}
+          <div className="flex items-center justify-center gap-2 px-3 py-1 border-t border-dark-border/50">
+            <button
+              onClick={() => toggleChannelMute(mobileChannelIndex)}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-colors touch-target
+                ${mobileChannel?.muted
+                  ? 'bg-accent-error/20 text-accent-error'
+                  : 'text-text-muted hover:bg-dark-bgHover'
+                }
+              `}
+            >
+              {mobileChannel?.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            </button>
+            <button
+              onClick={() => toggleChannelSolo(mobileChannelIndex)}
+              className={`
+                px-3 py-1 rounded text-xs font-medium transition-colors touch-target
+                ${mobileChannel?.solo
+                  ? 'bg-accent-primary/20 text-accent-primary'
+                  : 'text-text-muted hover:bg-dark-bgHover'
+                }
+              `}
+            >
+              <Headphones size={14} />
+            </button>
+            <ChannelColorPicker
+              currentColor={mobileChannel?.color}
+              onColorSelect={(color) => setChannelColor(mobileChannelIndex, color)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Channel Header - Sticky with controls */}
+      {!isMobile && (
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20 min-w-0">
+          <div className="flex min-w-0">
+            {/* Row number column header */}
+            <div className="flex-shrink-0 w-12 px-2 py-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center">
+              ROW
+            </div>
+
+            {/* Scrollable channel headers - scrollbar hidden, synced with content */}
+            <div
+              ref={headerScrollRef}
+              onScroll={handleHeaderScroll}
+              className="flex-1 min-w-0 overflow-x-auto scrollbar-hidden"
+            >
+              <div className="flex" style={{ minWidth: totalContentWidth - ROW_NUM_WIDTH }}>
+                {pattern.channels.map((channel, idx) => {
                 const trigger = channelTriggers[idx] || { level: 0, triggered: false };
                 return (
                   <div
@@ -619,6 +786,7 @@ const PatternEditorComponent: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Pattern Grid with smooth scrolling */}
       <div
@@ -628,20 +796,90 @@ const PatternEditorComponent: React.FC = () => {
       >
         {/* Fixed center edit bar - always vertically centered using CSS */}
         <div
-          className="absolute left-0 right-0 pointer-events-none z-30"
+          className="absolute left-0 right-0 pointer-events-none z-40"
           style={{
             top: '50%',
             transform: 'translateY(-50%)',
             height: ROW_HEIGHT,
+            backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)',
           }}
-        >
-          {/* Simple background tint */}
-          <div className="absolute inset-0 bg-accent-primary/20" />
-          {/* Top line */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-accent-primary" />
-          {/* Bottom line */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-accent-primary" />
-        </div>
+        />
+
+        {/* Fixed caret overlay - never moves vertically, only horizontally */}
+        {!isPlaying && pattern && (() => {
+          const ROW_NUM_WIDTH = 48; // Width of row number column
+          const CHANNEL_WIDTH = isMobile ? mobileChannelWidth : 260;
+          const CELL_GAP = 4; // gap-1 = 4px
+
+          // Calculate cell widths (approximate from TrackerRow)
+          const NOTE_WIDTH = 42; // 3ch ~ 42px for monospace
+          const INSTRUMENT_WIDTH = 28; // 2ch
+          const VOLUME_WIDTH = 28; // 2ch
+          const EFFECT_WIDTH = 42; // 3ch
+          const ACCENT_WIDTH = 24;
+          const SLIDE_WIDTH = 24;
+
+          // Base position: row number + channel offset
+          const channelIndex = isMobile ? 0 : cursor.channelIndex; // Mobile always shows channel at index 0
+          let caretX = ROW_NUM_WIDTH + (channelIndex * CHANNEL_WIDTH) + 8; // +8 for channel padding
+
+          // Add offset based on column type
+          switch (cursor.columnType) {
+            case 'note':
+              // caretX stays at start
+              break;
+            case 'instrument':
+              caretX += NOTE_WIDTH + CELL_GAP;
+              break;
+            case 'volume':
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP;
+              break;
+            case 'effect':
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
+              break;
+            case 'accent':
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
+              break;
+            case 'slide':
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
+              break;
+          }
+
+          // Get cell width for the current column
+          let caretWidth = NOTE_WIDTH;
+          switch (cursor.columnType) {
+            case 'instrument':
+              caretWidth = INSTRUMENT_WIDTH;
+              break;
+            case 'volume':
+              caretWidth = VOLUME_WIDTH;
+              break;
+            case 'effect':
+              caretWidth = EFFECT_WIDTH;
+              break;
+            case 'accent':
+            case 'slide':
+              caretWidth = ACCENT_WIDTH;
+              break;
+          }
+
+          return (
+            <div
+              className="absolute pointer-events-none z-50"
+              style={{
+                top: '50%',
+                transform: 'translateY(-50%)',
+                left: caretX,
+                width: caretWidth,
+                height: ROW_HEIGHT,
+                border: `2px solid ${isCyanTheme ? '#00ffff' : '#ef4444'}`,
+                borderRadius: '2px',
+                backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                transition: 'left 0.08s ease-out, width 0.08s ease-out',
+              }}
+            />
+          );
+        })()}
 
         {/* VU Meters - Heart Tracker style, extend UP from edit bar */}
         <div
@@ -713,29 +951,48 @@ const PatternEditorComponent: React.FC = () => {
             {/* Render visible rows with wrapping support */}
             {visibleVirtualRows.map(({ virtualIndex, actualIndex, patternType }) => {
               // Use memoized row cells data based on which pattern this row belongs to
-              const rowCells = patternType === 'prev'
+              const allRowCells = patternType === 'prev'
                 ? (prevRowCellsData[actualIndex] || [])
                 : patternType === 'next'
                   ? (nextRowCellsData[actualIndex] || [])
                   : (rowCellsData[actualIndex] || []);
 
-              // Show cursor on current row - either playback position (when playing) or edit position (when stopped)
-              const isCursorRow = patternType === 'current' && actualIndex === (isPlaying ? currentRow : cursor.rowIndex);
+              // On mobile, only show the selected channel
+              const rowCells = isMobile
+                ? [allRowCells[mobileChannelIndex]].filter(Boolean)
+                : allRowCells;
+
+              // Mobile: only show the selected channel's color
+              const rowChannelColors = isMobile
+                ? [channelColors[mobileChannelIndex]]
+                : channelColors;
+
+              // Never show cursor on rows - caret is rendered as a fixed overlay on the edit bar
+              const isCursorRow = false;
 
               // Base opacity from viewport position
               let opacity = getRowOpacity(virtualIndex);
-              // Apply 50% dimming to adjacent pattern rows only when looping (pattern mode)
+              // Apply dimming to adjacent pattern rows only when looping (pattern mode)
               // When playing full song, show all patterns at full opacity
               if (patternType !== 'current' && isLooping) {
-                opacity *= 0.5;
+                // Cyan theme: use full opacity, rely on CSS for visual distinction
+                // Other themes: dim to 50%
+                opacity = isCyanTheme ? 1 : opacity * 0.5;
               }
+
+              // Ghost row detection
+              const isGhostRow = patternType !== 'current';
+
+              // Row position - virtualIndex determines vertical position
+              const rowTop = virtualIndex * ROW_HEIGHT;
 
               return (
                 <div
                   key={`row-${patternType}-${virtualIndex}`}
-                  className="absolute left-0 flex"
+                  className={`absolute left-0 flex ${isGhostRow ? 'ghost-row' : ''}`}
+                  data-pattern-type={patternType}
                   style={{
-                    top: virtualIndex * ROW_HEIGHT,
+                    top: rowTop,
                     height: ROW_HEIGHT,
                     minWidth: totalContentWidth,
                     opacity,
@@ -746,18 +1003,22 @@ const PatternEditorComponent: React.FC = () => {
                     // Determine which channel was clicked based on x position
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left - 40; // 40px for row number
-                    const channelWidth = 180; // approximate channel width
-                    const channelIndex = Math.max(0, Math.min(pattern.channels.length - 1, Math.floor(x / channelWidth)));
-                    cellContextMenu.openMenu(e, actualIndex, channelIndex);
+                    const channelWidth = isMobile ? mobileChannelWidth : 180; // approximate channel width
+                    const clickedChannel = isMobile
+                      ? mobileChannelIndex
+                      : Math.max(0, Math.min(pattern.channels.length - 1, Math.floor(x / channelWidth)));
+                    cellContextMenu.openMenu(e, actualIndex, clickedChannel);
                   }}
                 >
                   <TrackerRow
                     rowIndex={actualIndex}
                     cells={rowCells}
-                    channelColors={channelColors}
+                    channelColors={rowChannelColors}
                     cursor={cursor}
                     isCursorRow={isCursorRow}
                     isCurrentPlaybackRow={false}
+                    channelWidth={isMobile ? mobileChannelWidth : undefined}
+                    baseChannelIndex={isMobile ? mobileChannelIndex : 0}
                   />
                 </div>
               );

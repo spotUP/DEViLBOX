@@ -641,7 +641,19 @@ export class TB303Synth {
    * Trigger note release
    */
   public triggerRelease(time?: Tone.Unit.Time): void {
-    const now = time !== undefined ? time : Tone.now();
+    // Ensure we have a valid time value
+    let now: number;
+    if (time !== undefined && time !== null && typeof time === 'number' && !isNaN(time)) {
+      now = time;
+    } else {
+      now = Tone.now();
+    }
+
+    // Safety check - make sure we have a valid time
+    if (now === null || now === undefined || isNaN(now)) {
+      return; // Skip release if audio context isn't ready
+    }
+
     this.vcaEnvelope.triggerRelease(now);
     this.filterEnvelope.triggerRelease(now);
     this.isSliding = false;

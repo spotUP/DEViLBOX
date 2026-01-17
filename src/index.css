@@ -1059,6 +1059,175 @@
     box-shadow: 0 0 10px var(--color-accent-glow);
   }
 
+  /* Safe area utilities for mobile devices (notch, home indicator) */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left, 0);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Mobile bottom padding to account for tab bar (56px) + safe area */
+  .mobile-bottom-padding {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
+  }
+
+  /* Touch-friendly minimum tap targets */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .touch-target-lg {
+    min-width: 48px;
+    min-height: 48px;
+  }
+}
+
+/* ========================================
+   RESPONSIVE LAYOUT UTILITIES
+   ======================================== */
+
+/* Mobile-specific styles (< 640px) */
+@media (max-width: 639px) {
+  /* Touch-friendly button sizing - only for specific classes */
+  .touch-btn,
+  .ft2-button,
+  .mobile-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text selection on touch interactions */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* FT2 Toolbar: Stack sections vertically */
+  .ft2-toolbar-row {
+    display: flex;
+    flex-direction: column;
+    height: auto !important;
+    min-height: auto !important;
+    gap: 2px;
+  }
+
+  .ft2-toolbar-row > .ft2-section {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--ft2-border);
+  }
+
+  .ft2-toolbar-row > .ft2-section:last-child {
+    border-bottom: none;
+  }
+
+  /* Hide less essential toolbar sections on mobile */
+  .ft2-toolbar .hide-mobile {
+    display: none !important;
+  }
+
+  /* TB303 Knob Panel: 2-column grid */
+  .tb303-knob-panel {
+    flex-direction: column !important;
+    padding: 12px !important;
+  }
+
+  .tb303-knobs-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    width: 100% !important;
+  }
+
+  .tb303-knob-wrapper {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .devilfish-row {
+    border-left: none !important;
+    border-top: 1px solid var(--ft2-border);
+    padding-top: 12px !important;
+    padding-left: 0 !important;
+  }
+
+  /* Instrument List Panel: Touch-friendly */
+  .instrument-list-item {
+    min-height: 48px !important;
+    padding: 12px !important;
+  }
+
+  .instrument-action-buttons {
+    opacity: 1 !important; /* Always visible on mobile, not hover-only */
+  }
+
+  /* Compact number inputs on mobile */
+  .ft2-number-input {
+    min-width: 50px !important;
+  }
+
+  /* Full-width buttons on mobile */
+  .ft2-button-group {
+    flex-wrap: wrap;
+  }
+}
+
+/* Tablet styles (640px - 1024px) */
+@media (min-width: 640px) and (max-width: 1024px) {
+  /* FT2 Toolbar: 2-column grid for some sections */
+  .ft2-toolbar-row {
+    flex-wrap: wrap;
+  }
+
+  .ft2-toolbar-row > .ft2-section {
+    flex: 1 1 calc(50% - 1px);
+    min-width: 200px;
+  }
+}
+
+/* Desktop (> 1024px) - default styles apply */
+
+/* ========================================
+   RESPONSIVE MODAL DIALOGS
+   ======================================== */
+
+/* Mobile modals: Full screen - use .mobile-fullscreen class */
+@media (max-width: 639px) {
+  /* Modal content with explicit mobile class */
+  .mobile-fullscreen-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Help modal full screen */
+  .help-modal-content {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+}
+
+@layer utilities {
   /* Animation utilities */
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out;
@@ -1471,11 +1640,6 @@
 .vu-meter-vertical {
   position: absolute;
   bottom: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
   will-change: transform;
 }
 
@@ -1484,4 +1648,348 @@
   border-radius: 3px 3px 0 0;
   opacity: 0.6;
   transition: height 50ms ease-out;
+}
+
+/* ============================================================================
+   CYAN LINEART THEME - Monochrome wireframe style
+   Overrides for a minimal, outline-based aesthetic
+   ============================================================================ */
+
+[data-theme="cyan-lineart"] {
+  /* Background colors - very dark cyan instead of pure black */
+  --color-bg: #030808 !important;
+  --color-bg-secondary: #051010 !important;
+  --color-bg-tertiary: #071414 !important;
+  --color-bg-hover: #0a1a1a !important;
+  --color-bg-active: #0c2020 !important;
+
+  /* Base background on body and root */
+  background-color: #030808 !important;
+
+  & body,
+  & #root,
+  & #root > div {
+    background-color: #030808 !important;
+  }
+
+  /* Any element with explicit h-screen (main app container) */
+  & .h-screen {
+    background-color: #030808 !important;
+  }
+
+  /* Tracker row backgrounds - dark cyan */
+  --color-tracker-row-even: #030808 !important;
+  --color-tracker-row-odd: #041010 !important;
+  --color-tracker-row-highlight: #061414 !important;
+
+  /* Override synth/automation colors to cyan */
+  --color-synth-filter: #00ffff !important;
+  --color-synth-envelope: #00ffff !important;
+  --color-synth-accent: #00ffff !important;
+  --color-synth-drive: #00ffff !important;
+  --color-synth-modulation: #00ffff !important;
+  --color-synth-volume: #00ffff !important;
+  --color-synth-pan: #00ffff !important;
+  --color-synth-effects: #00ffff !important;
+
+  /* Force dark cyan on ALL background elements */
+  & .bg-dark-bg,
+  & [class*="bg-dark-bg"] {
+    background-color: #030808 !important;
+  }
+
+  & .bg-dark-bgSecondary,
+  & [class*="bg-dark-bgSecondary"] {
+    background-color: #051010 !important;
+  }
+
+  & .bg-dark-bgTertiary,
+  & [class*="bg-dark-bgTertiary"] {
+    background-color: #071414 !important;
+  }
+
+  & .bg-dark-bgHover,
+  & [class*="bg-dark-bgHover"] {
+    background-color: #0a1a1a !important;
+  }
+
+  & .bg-dark-bgActive,
+  & [class*="bg-dark-bgActive"] {
+    background-color: #0c2020 !important;
+  }
+
+  /* Pattern editor and tracker backgrounds - using CSS variables instead */
+
+  /* Main content areas */
+  & main,
+  & .main-content,
+  & [role="main"] {
+    background-color: #030808 !important;
+  }
+
+  /* Panels and sections */
+  & aside,
+  & .panel,
+  & [class*="panel"] {
+    background-color: #051010 !important;
+  }
+
+  /* Force ALL colors to cyan variants */
+  --color-accent: #00ffff !important;
+  --color-accent-secondary: #00e0e0 !important;
+  --color-accent-glow: rgba(0, 255, 255, 0.12) !important;
+
+  /* Cell colors - all cyan */
+  --color-cell-note: #00ffff !important;
+  --color-cell-instrument: #00e0e0 !important;
+  --color-cell-volume: #00c8c8 !important;
+  --color-cell-effect: #00b0b0 !important;
+
+  /* Tracker row colors */
+  --color-tracker-row-current: rgba(0, 255, 255, 0.08) !important;
+  --color-tracker-row-cursor: rgba(0, 255, 255, 0.12) !important;
+
+  /* Text colors - force cyan */
+  & .text-text-primary,
+  & .text-text-secondary {
+    color: #00ffff !important;
+  }
+
+  & .text-text-muted {
+    color: #008888 !important;
+  }
+
+  /* Tracker cells */
+  & span.tracker-cell {
+    color: #00ffff !important;
+  }
+
+  /* Ghost rows - dimmed more than current pattern */
+  & .ghost-row {
+    opacity: 0.25 !important;
+  }
+
+  /* Buttons - cyan borders */
+  & button {
+    border-color: rgba(0, 255, 255, 0.4) !important;
+    color: #00ffff !important;
+  }
+
+  /* Borders */
+  & .border-dark-border {
+    border-color: rgba(0, 255, 255, 0.2) !important;
+  }
+
+  /* Knobs - outlined cyan style */
+  & .knob-inner {
+    background: transparent !important;
+    border: 1px solid rgba(0, 255, 255, 0.5) !important;
+  }
+
+  & .knob-ring circle {
+    stroke: #00ffff !important;
+  }
+
+  /* Devil Fish label */
+  & .devilfish-label {
+    color: #00ffff !important;
+  }
+
+  /* Icons */
+  & .lucide {
+    color: #00ffff !important;
+  }
+
+  /* FT2 buttons - all cyan */
+  & .ft2-btn {
+    background: #030808 !important;
+    border: 1px solid rgba(0, 255, 255, 0.5) !important;
+    color: #00ffff !important;
+  }
+
+  & .ft2-btn:hover {
+    background: #051515 !important;
+    border-color: #00ffff !important;
+  }
+
+  & .ft2-btn-active,
+  & .ft2-btn-green,
+  & .ft2-btn-red,
+  & .ft2-btn-yellow,
+  & .ft2-btn-blue,
+  & .ft2-btn-purple {
+    background: #0a1818 !important;
+    border: 1px solid #00ffff !important;
+    color: #00ffff !important;
+  }
+
+  /* Instrument number (amber) -> cyan */
+  & .text-amber-400,
+  & .text-amber-500,
+  & [class*="text-amber"] {
+    color: #00e0e0 !important;
+  }
+
+  /* Error/red colors -> cyan */
+  & .text-accent-error,
+  & .bg-accent-error,
+  & [class*="text-red"],
+  & [class*="bg-red"] {
+    color: #00ffff !important;
+  }
+
+  & .bg-accent-error\/20,
+  & [class*="bg-red"] {
+    background-color: rgba(0, 255, 255, 0.2) !important;
+  }
+
+  /* Edit bar - cyan instead of red */
+  & [style*="background-color: rgba(239, 68, 68"] {
+    background-color: rgba(0, 255, 255, 0.2) !important;
+  }
+
+  /* FT2 toolbar */
+  & .ft2-toolbar {
+    background: #030808 !important;
+    border-color: rgba(0, 255, 255, 0.3) !important;
+  }
+
+  & .ft2-toolbar-row {
+    border-color: rgba(0, 255, 255, 0.2) !important;
+  }
+
+  & .ft2-section {
+    border-color: rgba(0, 255, 255, 0.25) !important;
+  }
+
+  /* FT2 inputs */
+  & .ft2-input,
+  & .ft2-numeric input {
+    background-color: #030808 !important;
+    border-color: rgba(0, 255, 255, 0.4) !important;
+    color: #00ffff !important;
+  }
+
+  /* FT2 labels */
+  & .ft2-numeric-label,
+  & .ft2-label {
+    color: #00a0a0 !important;
+  }
+
+  /* FT2 arrow buttons (numeric spinners) */
+  & .ft2-arrow-icon {
+    color: #00ffff !important;
+  }
+  & .ft2-arrow {
+    background: linear-gradient(180deg, #041515 0%, #030808 100%) !important;
+    border-color: rgba(0, 255, 255, 0.3) !important;
+  }
+  & .ft2-arrow:hover {
+    background: linear-gradient(180deg, #062020 0%, #041010 100%) !important;
+  }
+  & .ft2-arrow:hover .ft2-arrow-icon {
+    color: #00ffff !important;
+    text-shadow: 0 0 4px #00ffff;
+  }
+
+  /* Selects */
+  & select {
+    background-color: #030808 !important;
+    border-color: rgba(0, 255, 255, 0.4) !important;
+    color: #00ffff !important;
+  }
+
+  /* Instrument panel */
+  & .bg-ft2-bg {
+    background-color: #030808 !important;
+  }
+  & .bg-ft2-header {
+    background-color: #051010 !important;
+  }
+  & .bg-ft2-panel {
+    background-color: #041010 !important;
+  }
+
+  /* Tracker backgrounds */
+  & .bg-tracker-row-even {
+    background-color: #030808 !important;
+  }
+  & .bg-tracker-row-odd {
+    background-color: #041010 !important;
+  }
+  & .bg-tracker-row-highlight {
+    background-color: #051515 !important;
+  }
+
+  /* Scrollbars */
+  &::-webkit-scrollbar-thumb,
+  & ::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 255, 255, 0.3);
+  }
+
+  /* Knob indicator lines/dots */
+  & .knob-indicator,
+  & .knob-indicator line,
+  & .knob-indicator circle {
+    stroke: #00ffff !important;
+    fill: #00ffff !important;
+  }
+
+  /* Knob value text */
+  & .tb303-param-value,
+  & .knob-value {
+    color: #00ffff !important;
+  }
+
+  /* Toggle switches */
+  & .toggle-switch,
+  & [class*="toggle"] {
+    background-color: #030808 !important;
+    border-color: rgba(0, 255, 255, 0.4) !important;
+  }
+
+  & .toggle-switch input:checked + span,
+  & [class*="toggle"] input:checked + span {
+    background-color: rgba(0, 255, 255, 0.3) !important;
+  }
+
+  /* Toggle thumb/knob */
+  & .toggle-switch span::after,
+  & [role="switch"] span {
+    background-color: #00ffff !important;
+  }
+
+  /* Switch background when on */
+  & [role="switch"][data-state="checked"],
+  & [role="switch"]:checked {
+    background-color: rgba(0, 255, 255, 0.3) !important;
+  }
+
+  /* Switch background when off */
+  & [role="switch"][data-state="unchecked"],
+  & [role="switch"]:not(:checked) {
+    background-color: #030808 !important;
+    border-color: rgba(0, 255, 255, 0.4) !important;
+  }
+
+  /* Any remaining colored text elements */
+  & [class*="text-green"],
+  & [class*="text-blue"],
+  & [class*="text-purple"],
+  & [class*="text-pink"],
+  & [class*="text-orange"] {
+    color: #00ffff !important;
+  }
+}
+/* Global body background for cyan theme - outside nested selector for higher specificity */
+html[data-theme="cyan-lineart"] body {
+  background-color: #030808 !important;
+}
+
+html[data-theme="cyan-lineart"] #root {
+  background-color: #030808 !important;
+}
+
+html[data-theme="cyan-lineart"] #root > * {
+  background-color: #030808;
 }

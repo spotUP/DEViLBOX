@@ -11,7 +11,6 @@ interface ADSREnvelopeProps {
   sustain: number; // 0-100
   release: number; // ms
   onChange: (param: 'attack' | 'decay' | 'sustain' | 'release', value: number) => void;
-  width?: number;
   height?: number;
   color?: string;
 }
@@ -22,38 +21,63 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   sustain,
   release,
   onChange,
-  width = 280,
   height = 120,
   color = '#00ff88',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<'attack' | 'decay' | 'sustain' | 'release' | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [width, setWidth] = useState(280);
+
+  // ResizeObserver for dynamic width
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newWidth = entry.contentRect.width - 24; // Account for padding
+        if (newWidth > 0) {
+          setWidth(newWidth);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Padding and dimensions
   const padding = { top: 10, right: 10, bottom: 25, left: 10 };
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
-  // Time scaling (total time for visualization)
-  const maxTime = 3000; // 3 seconds max display
-  const sustainWidth = graphWidth * 0.2; // Fixed sustain hold width
+  // Calculate proportional widths to always fill the graph
+  // Each stage gets a proportion of the total width based on its time value
+  const totalTime = attack + decay + release;
+  const sustainProportion = 0.15; // Sustain gets 15% of width
+  const timeProportion = 1 - sustainProportion; // Remaining 85% for A, D, R
 
-  // Calculate point positions
-  const timeToX = (time: number) => (time / maxTime) * (graphWidth - sustainWidth);
+  // Calculate widths for each stage
+  const attackWidth = totalTime > 0 ? (attack / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
+  const decayWidth = totalTime > 0 ? (decay / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
+  const sustainWidth = graphWidth * sustainProportion;
+  const releaseWidth = totalTime > 0 ? (release / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
+
   const levelToY = (level: number) => graphHeight - (level / 100) * graphHeight;
 
-  // Control points
-  const attackX = padding.left + timeToX(attack);
+  // Control points - always fill the full width
+  const attackX = padding.left + attackWidth;
   const attackY = padding.top; // Attack goes to top (100%)
 
-  const decayX = attackX + timeToX(decay);
+  const decayX = attackX + decayWidth;
   const decayY = padding.top + levelToY(sustain);
 
   const sustainEndX = decayX + sustainWidth;
   const sustainY = decayY;
 
-  const releaseX = sustainEndX + timeToX(release);
+  const releaseX = padding.left + graphWidth; // Always at the right edge
   const releaseY = padding.top + graphHeight; // Release goes to bottom (0%)
 
   // Build the envelope path
@@ -79,6 +103,11 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
     setDragging(point);
   }, []);
 
+  // Max time values for each parameter
+  const maxAttack = 2000;
+  const maxDecay = 3000;
+  const maxRelease = 5000;
+
   // Handle drag
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragging || !svgRef.current) return;
@@ -87,18 +116,23 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
     const x = e.clientX - rect.left - padding.left;
     const y = e.clientY - rect.top - padding.top;
 
+    // Calculate position as proportion of available width (excluding sustain)
+    const availableWidth = graphWidth * timeProportion;
+
     switch (dragging) {
       case 'attack': {
-        // Attack: horizontal movement controls time
-        const time = Math.max(1, Math.min(maxTime * 0.4, (x / (graphWidth - sustainWidth)) * maxTime));
-        onChange('attack', Math.round(time));
+        // Attack: position determines proportion of time budget
+        const proportion = Math.max(0.01, Math.min(0.9, x / availableWidth));
+        const time = Math.round(proportion * maxAttack);
+        onChange('attack', Math.max(1, time));
         break;
       }
       case 'decay': {
-        // Decay: horizontal movement controls time (relative to attack end)
-        const relativeX = x - timeToX(attack);
-        const time = Math.max(1, Math.min(maxTime * 0.4, (relativeX / (graphWidth - sustainWidth)) * maxTime));
-        onChange('decay', Math.round(time));
+        // Decay: relative to attack end position
+        const relativeX = x - attackWidth;
+        const proportion = Math.max(0.01, Math.min(0.9, relativeX / availableWidth));
+        const time = Math.round(proportion * maxDecay);
+        onChange('decay', Math.max(1, time));
         break;
       }
       case 'sustain': {
@@ -108,14 +142,16 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         break;
       }
       case 'release': {
-        // Release: horizontal movement controls time (relative to sustain end)
-        const relativeX = x - timeToX(attack) - timeToX(decay) - sustainWidth;
-        const time = Math.max(1, Math.min(maxTime * 0.5, (relativeX / (graphWidth - sustainWidth)) * maxTime));
-        onChange('release', Math.round(time));
+        // Release: relative position from sustain end to right edge
+        const relativeX = x - attackWidth - decayWidth - sustainWidth;
+        const remainingWidth = graphWidth - attackWidth - decayWidth - sustainWidth;
+        const proportion = Math.max(0.01, Math.min(1, relativeX / remainingWidth));
+        const time = Math.round(proportion * maxRelease);
+        onChange('release', Math.max(1, time));
         break;
       }
     }
-  }, [dragging, attack, decay, onChange, graphWidth, sustainWidth, graphHeight]);
+  }, [dragging, attack, decay, onChange, graphWidth, graphHeight, attackWidth, decayWidth, sustainWidth, timeProportion]);
 
   // Handle drag end
   const handleMouseUp = useCallback(() => {
@@ -189,12 +225,12 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   );
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700">
+    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700 w-full">
       <svg
         ref={svgRef}
         width={width}
         height={height}
-        className="select-none"
+        className="select-none w-full"
       >
         {/* Grid lines */}
         <g stroke="#333" strokeWidth="1">
@@ -232,10 +268,10 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
 
         {/* Stage labels */}
         <g fontSize="9" fill="#666" fontFamily="monospace">
-          <text x={padding.left + timeToX(attack) / 2} y={height - 5} textAnchor="middle">A</text>
-          <text x={attackX + timeToX(decay) / 2} y={height - 5} textAnchor="middle">D</text>
+          <text x={padding.left + attackWidth / 2} y={height - 5} textAnchor="middle">A</text>
+          <text x={attackX + decayWidth / 2} y={height - 5} textAnchor="middle">D</text>
           <text x={decayX + sustainWidth / 2} y={height - 5} textAnchor="middle">S</text>
-          <text x={sustainEndX + timeToX(release) / 2} y={height - 5} textAnchor="middle">R</text>
+          <text x={sustainEndX + releaseWidth / 2} y={height - 5} textAnchor="middle">R</text>
         </g>
 
         {/* Control points */}

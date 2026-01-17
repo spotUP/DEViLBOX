@@ -6,6 +6,10 @@ import React, { useState } from 'react';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { X, Save, Tag } from 'lucide-react';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
+import { ModalFooter } from '@components/ui/ModalFooter';
+import { Button } from '@components/ui/Button';
 
 interface SavePresetDialogProps {
   instrument: InstrumentConfig;
@@ -53,33 +57,28 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       e.preventDefault();
       handleSave();
     }
-    if (e.key === 'Escape') {
-      onClose();
-    }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      size="sm"
+      theme="modern"
+      backdropOpacity="dark"
+      backdropBlur={true}
+      closeOnBackdropClick={true}
+      closeOnEscape={true}
     >
-      <div className="bg-dark-bgTertiary border border-dark-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
-            <Save size={18} className="text-accent-primary" />
-            Save Preset
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
+      <ModalHeader
+        title="Save Preset"
+        icon={<Save size={18} />}
+        onClose={onClose}
+        theme="modern"
+      />
 
-        {/* Content */}
-        <div className="p-4 space-y-4">
+      {/* Content */}
+      <div className="p-4 space-y-4">
           {/* Name */}
           <div>
             <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
@@ -199,23 +198,18 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-dark-border bg-dark-bgSecondary">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim()}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-accent-primary text-text-inverse hover:bg-accent-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Save Preset
-          </button>
-        </div>
-      </div>
-    </div>
+      <ModalFooter theme="modern" align="right">
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          disabled={!name.trim()}
+        >
+          Save Preset
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 };

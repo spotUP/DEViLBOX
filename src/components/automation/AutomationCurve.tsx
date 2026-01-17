@@ -1,9 +1,11 @@
 /**
  * AutomationCurveCanvas - Canvas-based automation curve editor
+ * Full-width with vertical grid lines for each pattern position
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { AutomationCurve as AutomationCurveType, AutomationPoint } from '@typedefs/automation';
+import { useThemeStore } from '@stores';
 
 interface AutomationCurveCanvasProps {
   curve: AutomationCurveType;
@@ -21,42 +23,78 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   patternLength,
   onChange,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawMode, _setDrawMode] = useState<DrawMode>('pencil');
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(800);
 
-  const width = 600;
-  const height = 180;
-  const padding = 20;
+  const height = 200;
+  const paddingLeft = 35;  // Space for Y-axis labels
+  const paddingRight = 10;
+  const paddingTop = 10;
+  const paddingBottom = 25;  // Space for X-axis labels
+
+  // Theme-aware colors
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const curveColor1 = isCyanTheme ? '#00ffff' : '#00d4aa';
+  const curveColor2 = isCyanTheme ? '#00ffff' : '#7c3aed';
+  const pointGlow = isCyanTheme ? 'rgba(0, 255, 255, 0.3)' : 'rgba(0, 212, 170, 0.3)';
+  const gridColor = isCyanTheme ? '#0a2020' : '#1a1a1d';
+  const gridColorMajor = isCyanTheme ? '#0f3030' : '#252528';
+  const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
+  const labelColor = isCyanTheme ? '#00a0a0' : '#606068';
+
+  // Resize observer to track container width
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCanvasWidth(entry.contentRect.width);
+      }
+    });
+
+    resizeObserver.observe(container);
+    setCanvasWidth(container.clientWidth);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Drawing area dimensions
+  const drawWidth = canvasWidth - paddingLeft - paddingRight;
+  const drawHeight = height - paddingTop - paddingBottom;
 
   // Convert row index to canvas X coordinate
   const rowToX = useCallback(
     (row: number): number => {
-      return padding + (row / patternLength) * (width - padding * 2);
+      return paddingLeft + (row / patternLength) * drawWidth;
     },
-    [patternLength]
+    [patternLength, drawWidth]
   );
 
   // Convert value (0-1) to canvas Y coordinate
   const valueToY = useCallback((value: number): number => {
-    return height - padding - value * (height - padding * 2);
-  }, []);
+    return paddingTop + (1 - value) * drawHeight;
+  }, [drawHeight]);
 
   // Convert canvas X to row index
   const xToRow = useCallback(
     (x: number): number => {
-      const normalized = (x - padding) / (width - padding * 2);
+      const normalized = (x - paddingLeft) / drawWidth;
       return Math.round(normalized * patternLength);
     },
-    [patternLength]
+    [patternLength, drawWidth]
   );
 
   // Convert canvas Y to value (0-1)
   const yToValue = useCallback((y: number): number => {
-    const normalized = (height - padding - y) / (height - padding * 2);
+    const normalized = 1 - (y - paddingTop) / drawHeight;
     return Math.max(0, Math.min(1, normalized));
-  }, []);
+  }, [drawHeight]);
 
   // Draw the curve
   const drawCurve = useCallback(() => {
@@ -67,37 +105,65 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     if (!ctx) return;
 
     // Clear canvas with dark background
-    ctx.fillStyle = '#0a0a0b';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvasWidth, height);
 
-    // Draw grid
-    ctx.strokeStyle = '#1a1a1d';
-    ctx.lineWidth = 1;
-
-    // Horizontal grid lines
-    for (let i = 0; i <= 4; i++) {
-      const y = padding + (i / 4) * (height - padding * 2);
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(width - padding, y);
-      ctx.stroke();
-    }
-
-    // Vertical grid lines (every 16 rows)
-    for (let row = 0; row <= patternLength; row += 16) {
+    // Draw vertical grid lines for each pattern position
+    for (let row = 0; row <= patternLength; row++) {
       const x = rowToX(row);
+      const isMajor = row % 16 === 0;
+      const isMinor = row % 4 === 0;
+
+      ctx.strokeStyle = isMajor ? gridColorMajor : gridColor;
+      ctx.lineWidth = isMajor ? 1.5 : 0.5;
+
+      // Only draw every row if pattern is small, otherwise every 4th
+      if (patternLength <= 64 || isMinor) {
+        ctx.beginPath();
+        ctx.moveTo(x, paddingTop);
+        ctx.lineTo(x, height - paddingBottom);
+        ctx.stroke();
+      }
+
+      // Draw row numbers at major positions
+      if (isMajor && row < patternLength) {
+        ctx.fillStyle = labelColor;
+        ctx.font = '9px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(row.toString(), x, height - 8);
+      }
+    }
+
+    // Draw horizontal grid lines (0%, 25%, 50%, 75%, 100%)
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = paddingTop + (i / 4) * drawHeight;
+      const isMajor = i === 2; // 50% line
+
+      ctx.strokeStyle = isMajor ? gridColorMajor : gridColor;
+      ctx.lineWidth = isMajor ? 1 : 0.5;
+
       ctx.beginPath();
-      ctx.moveTo(x, padding);
-      ctx.lineTo(x, height - padding);
+      ctx.moveTo(paddingLeft, y);
+      ctx.lineTo(canvasWidth - paddingRight, y);
       ctx.stroke();
     }
+
+    // Draw Y-axis labels
+    ctx.fillStyle = labelColor;
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('1.0', paddingLeft - 5, paddingTop + 4);
+    ctx.fillText('0.5', paddingLeft - 5, paddingTop + drawHeight / 2 + 3);
+    ctx.fillText('0.0', paddingLeft - 5, height - paddingBottom + 3);
 
     // Draw curve line
     if (curve.points.length > 0) {
-      // Gradient stroke
-      const gradient = ctx.createLinearGradient(padding, 0, width - padding, 0);
-      gradient.addColorStop(0, '#00d4aa');
-      gradient.addColorStop(1, '#7c3aed');
+      // Gradient stroke (or solid cyan for cyan theme)
+      const gradient = ctx.createLinearGradient(paddingLeft, 0, canvasWidth - paddingRight, 0);
+      gradient.addColorStop(0, curveColor1);
+      gradient.addColorStop(1, curveColor2);
 
       ctx.strokeStyle = gradient;
       ctx.lineWidth = 2;
@@ -135,13 +201,13 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
 
         // Point glow
         if (i === selectedPoint) {
-          ctx.fillStyle = 'rgba(0, 212, 170, 0.3)';
+          ctx.fillStyle = pointGlow;
           ctx.beginPath();
           ctx.arc(x, y, 10, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        ctx.fillStyle = i === selectedPoint ? '#00d4aa' : '#7c3aed';
+        ctx.fillStyle = i === selectedPoint ? curveColor1 : curveColor2;
         ctx.beginPath();
         ctx.arc(x, y, 5, 0, Math.PI * 2);
         ctx.fill();
@@ -153,16 +219,7 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         ctx.fill();
       });
     }
-
-    // Draw axis labels
-    ctx.fillStyle = '#606068';
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.fillText('1.0', 2, padding + 5);
-    ctx.fillText('0.5', 2, height / 2 + 5);
-    ctx.fillText('0.0', 2, height - padding + 5);
-    ctx.fillText('0', padding, height - 5);
-    ctx.fillText(patternLength.toString(), width - padding - 10, height - 5);
-  }, [curve, patternLength, selectedPoint, rowToX, valueToY]);
+  }, [curve, patternLength, selectedPoint, rowToX, valueToY, curveColor1, curveColor2, pointGlow, canvasWidth, bgColor, gridColor, gridColorMajor, labelColor, drawWidth, drawHeight]);
 
   useEffect(() => {
     drawCurve();
@@ -177,8 +234,10 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     const row = xToRow(x);
     const value = yToValue(y);
@@ -212,8 +271,10 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     const row = xToRow(x);
     const value = yToValue(y);
@@ -256,8 +317,10 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     // Find nearest point
     const nearestIndex = curve.points.findIndex((p) => {
@@ -411,21 +474,24 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         </button>
       </div>
 
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onContextMenu={handleContextMenu}
-        className={`rounded-lg border border-dark-border ${
-          isDragging ? 'cursor-grabbing' : 'cursor-crosshair'
-        }`}
-        tabIndex={0}
-      />
+      {/* Canvas Container - Full Width */}
+      <div ref={containerRef} className="w-full">
+        <canvas
+          ref={canvasRef}
+          width={canvasWidth}
+          height={height}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onContextMenu={handleContextMenu}
+          className={`w-full rounded-lg border border-dark-border ${
+            isDragging ? 'cursor-grabbing' : 'cursor-crosshair'
+          }`}
+          style={{ height: height }}
+          tabIndex={0}
+        />
+      </div>
 
       {/* Interpolation Mode */}
       <div className="mt-3 flex gap-2 items-center">

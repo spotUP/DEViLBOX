@@ -5,16 +5,26 @@
 
 import React from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { Knob } from '@components/ui/Knob';
+import { DEFAULT_CHIP_SYNTH } from '@typedefs/instrument';
+import { Knob } from '@components/controls/Knob';
 import { ADSREnvelope } from '@components/ui/ADSREnvelope';
 import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { SampleEditor } from './SampleEditor';
+import { ArpeggioEditor } from './ArpeggioEditor';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 
 // Sample-based synth types
 const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
+
+// Drum types for DrumMachine
+const DRUM_TYPES = [
+  { id: 'kick', label: 'KICK', icon: '🥁', description: '808-style bass kick' },
+  { id: 'snare', label: 'SNARE', icon: '🪘', description: 'Punchy snare with noise' },
+  { id: 'hihat', label: 'HI-HAT', icon: '🎛️', description: 'Metallic hi-hat' },
+  { id: 'clap', label: 'CLAP', icon: '👏', description: 'Filtered noise clap' },
+] as const;
 
 interface VisualSynthEditorProps {
   instrument: InstrumentConfig;
@@ -82,7 +92,64 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
       {/* Sample Editor for sample-based instruments */}
       {isSampleBased && (
         <div className="p-4">
-          <SampleEditor instrument={instrument} />
+          <SampleEditor instrument={instrument} onChange={onChange} />
+        </div>
+      )}
+
+      {/* DrumMachine Type Selector */}
+      {instrument.synthType === 'DrumMachine' && (
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 bg-red-500 rounded-full" />
+            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Drum Type</h3>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {DRUM_TYPES.map((drum) => {
+              const isSelected = instrument.drumMachine?.drumType === drum.id;
+              return (
+                <button
+                  key={drum.id}
+                  onClick={() => onChange({
+                    drumMachine: {
+                      ...instrument.drumMachine,
+                      drumType: drum.id as any,
+                    },
+                  })}
+                  className={`
+                    flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all
+                    ${isSelected
+                      ? 'bg-red-500/20 border-red-500 text-white'
+                      : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
+                    }
+                  `}
+                >
+                  <span className="text-2xl mb-1">{drum.icon}</span>
+                  <span className="text-xs font-bold">{drum.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-gray-500 text-center">
+            {DRUM_TYPES.find(d => d.id === instrument.drumMachine?.drumType)?.description || 'Select a drum type'}
+          </p>
+        </div>
+      )}
+
+      {/* ChipSynth Arpeggio Editor */}
+      {instrument.synthType === 'ChipSynth' && instrument.chipSynth && (
+        <div className="px-4 pb-4">
+          <ArpeggioEditor
+            config={instrument.chipSynth.arpeggio || { enabled: false, speed: 15, pattern: [0, 4, 7] }}
+            onChange={(arpeggio) => {
+              const currentChip = instrument.chipSynth || DEFAULT_CHIP_SYNTH;
+              onChange({
+                chipSynth: {
+                  ...currentChip,
+                  arpeggio,
+                },
+              });
+            }}
+          />
         </div>
       )}
 

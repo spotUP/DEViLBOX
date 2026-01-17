@@ -394,10 +394,10 @@ export class InstrumentFactory {
         detune: config.oscillator?.detune || 0,
       },
       envelope: {
-        attack: (config.envelope?.attack || 10) / 1000,
-        decay: (config.envelope?.decay || 200) / 1000,
-        sustain: (config.envelope?.sustain || 50) / 100,
-        release: (config.envelope?.release || 1000) / 1000,
+        attack: (config.envelope?.attack ?? 10) / 1000,
+        decay: (config.envelope?.decay ?? 200) / 1000,
+        sustain: (config.envelope?.sustain ?? 50) / 100,
+        release: (config.envelope?.release ?? 1000) / 1000,
       },
       volume: config.volume || -12,
     });
@@ -410,10 +410,10 @@ export class InstrumentFactory {
         detune: config.oscillator?.detune || 0,
       },
       envelope: {
-        attack: (config.envelope?.attack || 10) / 1000,
-        decay: (config.envelope?.decay || 200) / 1000,
-        sustain: (config.envelope?.sustain || 50) / 100,
-        release: (config.envelope?.release || 1000) / 1000,
+        attack: (config.envelope?.attack ?? 10) / 1000,
+        decay: (config.envelope?.decay ?? 200) / 1000,
+        sustain: (config.envelope?.sustain ?? 50) / 100,
+        release: (config.envelope?.release ?? 1000) / 1000,
       },
       filter: config.filter
         ? {
@@ -444,10 +444,10 @@ export class InstrumentFactory {
           type: config.oscillator?.type || 'sawtooth',
         },
         envelope: {
-          attack: (config.envelope?.attack || 10) / 1000,
-          decay: (config.envelope?.decay || 200) / 1000,
-          sustain: (config.envelope?.sustain || 50) / 100,
-          release: (config.envelope?.release || 1000) / 1000,
+          attack: (config.envelope?.attack ?? 10) / 1000,
+          decay: (config.envelope?.decay ?? 200) / 1000,
+          sustain: (config.envelope?.sustain ?? 50) / 100,
+          release: (config.envelope?.release ?? 1000) / 1000,
         },
       },
       voice1: {
@@ -455,10 +455,10 @@ export class InstrumentFactory {
           type: config.oscillator?.type || 'sawtooth',
         },
         envelope: {
-          attack: (config.envelope?.attack || 10) / 1000,
-          decay: (config.envelope?.decay || 200) / 1000,
-          sustain: (config.envelope?.sustain || 50) / 100,
-          release: (config.envelope?.release || 1000) / 1000,
+          attack: (config.envelope?.attack ?? 10) / 1000,
+          decay: (config.envelope?.decay ?? 200) / 1000,
+          sustain: (config.envelope?.sustain ?? 50) / 100,
+          release: (config.envelope?.release ?? 1000) / 1000,
         },
       },
       vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
@@ -473,13 +473,13 @@ export class InstrumentFactory {
         type: config.oscillator?.type || 'sine',
       },
       envelope: {
-        attack: (config.envelope?.attack || 10) / 1000,
-        decay: (config.envelope?.decay || 200) / 1000,
-        sustain: (config.envelope?.sustain || 50) / 100,
-        release: (config.envelope?.release || 1000) / 1000,
+        attack: (config.envelope?.attack ?? 10) / 1000,
+        decay: (config.envelope?.decay ?? 200) / 1000,
+        sustain: (config.envelope?.sustain ?? 50) / 100,
+        release: (config.envelope?.release ?? 1000) / 1000,
       },
       modulationIndex: 10,
-      volume: config.volume || -12,
+      volume: config.volume ?? -6, // Boost FM synth volume
     });
   }
 
@@ -489,12 +489,12 @@ export class InstrumentFactory {
         type: config.oscillator?.type || 'sine',
       },
       envelope: {
-        attack: (config.envelope?.attack || 10) / 1000,
-        decay: (config.envelope?.decay || 200) / 1000,
-        sustain: (config.envelope?.sustain || 50) / 100,
-        release: (config.envelope?.release || 1000) / 1000,
+        attack: (config.envelope?.attack ?? 10) / 1000,
+        decay: (config.envelope?.decay ?? 200) / 1000,
+        sustain: (config.envelope?.sustain ?? 50) / 100,
+        release: (config.envelope?.release ?? 1000) / 1000,
       },
-      volume: config.volume || -12,
+      volume: config.volume ?? -6, // Boost AM synth volume
     });
   }
 
@@ -503,16 +503,16 @@ export class InstrumentFactory {
       attackNoise: 1,
       dampening: 4000,
       resonance: 0.7,
-      volume: config.volume || -12,
+      volume: config.volume ?? 0, // Boost Pluck synth volume (very quiet)
     });
   }
 
   private static createMetalSynth(config: InstrumentConfig): Tone.MetalSynth {
     return new Tone.MetalSynth({
       envelope: {
-        attack: (config.envelope?.attack || 1) / 1000,
-        decay: (config.envelope?.decay || 100) / 1000,
-        release: (config.envelope?.release || 100) / 1000,
+        attack: (config.envelope?.attack ?? 1) / 1000,
+        decay: (config.envelope?.decay ?? 100) / 1000,
+        release: (config.envelope?.release ?? 100) / 1000,
       },
       volume: config.volume || -12,
     });
@@ -526,10 +526,10 @@ export class InstrumentFactory {
         type: config.oscillator?.type || 'sine',
       },
       envelope: {
-        attack: (config.envelope?.attack || 1) / 1000,
-        decay: (config.envelope?.decay || 400) / 1000,
+        attack: (config.envelope?.attack ?? 1) / 1000,
+        decay: (config.envelope?.decay ?? 400) / 1000,
         sustain: 0.01,
-        release: (config.envelope?.release || 100) / 1000,
+        release: (config.envelope?.release ?? 100) / 1000,
       },
       volume: config.volume || -12,
     });
@@ -541,12 +541,12 @@ export class InstrumentFactory {
         type: 'white',
       },
       envelope: {
-        attack: (config.envelope?.attack || 10) / 1000,
-        decay: (config.envelope?.decay || 200) / 1000,
-        sustain: (config.envelope?.sustain || 50) / 100,
-        release: (config.envelope?.release || 1000) / 1000,
+        attack: (config.envelope?.attack ?? 10) / 1000,
+        decay: (config.envelope?.decay ?? 200) / 1000,
+        sustain: (config.envelope?.sustain ?? 50) / 100,
+        release: (config.envelope?.release ?? 1000) / 1000,
       },
-      volume: config.volume || -12,
+      volume: config.volume ?? -12,
     });
   }
 
@@ -795,6 +795,7 @@ export class InstrumentFactory {
 
   /**
    * DrumMachine - 808/909 style drum synthesis
+   * Note: These drums use FIXED frequencies for authentic sound regardless of input note
    */
   private static createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {
     const dmConfig = config.drumMachine || DEFAULT_DRUM_MACHINE;
@@ -803,7 +804,8 @@ export class InstrumentFactory {
       case 'kick': {
         const kickConfig = dmConfig.kick || DEFAULT_DRUM_MACHINE.kick!;
         // 808 kick: pitched sine with pitch envelope
-        return new Tone.MembraneSynth({
+        // Transpose down 2 octaves so C3 plays like C1 (proper kick range)
+        const synth = new Tone.MembraneSynth({
           pitchDecay: (kickConfig.pitchDecay || 100) / 1000,
           octaves: 6,
           oscillator: { type: 'sine' },
@@ -813,13 +815,37 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.1,
           },
-          volume: config.volume || -12,
+          volume: config.volume ?? -6,
         });
+
+        // Transpose note down 2 octaves for kick range
+        const transposeNote = (note: string, semitones: number): string => {
+          const freq = Tone.Frequency(note).toFrequency();
+          return Tone.Frequency(freq * Math.pow(2, semitones / 12)).toNote();
+        };
+
+        return {
+          triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+            synth.triggerAttackRelease(transposeNote(note, -24), duration, time, velocity);
+          },
+          triggerAttack: (note: string, time?: number, velocity?: number) => {
+            synth.triggerAttack(transposeNote(note, -24), time, velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            synth.triggerRelease(time);
+          },
+          releaseAll: () => { try { synth.triggerRelease(); } catch { /* ignore */ } },
+          connect: (dest: Tone.InputNode) => synth.connect(dest),
+          disconnect: () => synth.disconnect(),
+          dispose: () => synth.dispose(),
+          volume: synth.volume,
+        } as any;
       }
 
       case 'snare': {
         const snareConfig = dmConfig.snare || { pitch: 200, tone: 50, snappy: 70, decay: 200 };
         // Snare: pitched oscillator + noise
+        // Transpose down 1 octave so C3 plays like C2 (proper snare range)
         const body = new Tone.MembraneSynth({
           pitchDecay: 0.05,
           octaves: 4,
@@ -830,7 +856,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.1,
           },
-          volume: config.volume || -12,
+          volume: config.volume ?? -6,
         });
         const noise = new Tone.NoiseSynth({
           noise: { type: 'white' },
@@ -840,23 +866,29 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.05,
           },
-          volume: (config.volume || -12) + (snareConfig.snappy / 10 - 5),
+          volume: (config.volume ?? -6) + (snareConfig.snappy / 10 - 5),
         });
 
         const output = new Tone.Gain(1);
         body.connect(output);
         noise.connect(output);
 
+        // Transpose note down 1 octave for snare range
+        const transposeNote = (note: string, semitones: number): string => {
+          const freq = Tone.Frequency(note).toFrequency();
+          return Tone.Frequency(freq * Math.pow(2, semitones / 12)).toNote();
+        };
+
         return {
           triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-            body.triggerAttackRelease(note, duration, time, velocity);
+            body.triggerAttackRelease(transposeNote(note, -12), duration, time, velocity);
             noise.triggerAttackRelease(duration, time, velocity);
           },
           triggerAttack: (note: string, time?: number, velocity?: number) => {
-            body.triggerAttack(note, time, velocity);
+            body.triggerAttack(transposeNote(note, -12), time, velocity);
             noise.triggerAttack(time, velocity);
           },
-          triggerRelease: (note: string, time?: number) => {
+          triggerRelease: (_note: string, time?: number) => {
             body.triggerRelease(time);
             noise.triggerRelease(time);
           },
@@ -1201,28 +1233,28 @@ export class InstrumentFactory {
         sustain: fmtConfig.envelope.sustain / 100,
         release: fmtConfig.envelope.release / 1000,
       },
-      volume: config.volume || -6, // Boost because we're splitting
+      volume: config.volume ?? 0, // Boost - formants cut a lot of signal
     });
 
-    // Create 3 parallel bandpass filters for formants
+    // Create 3 parallel bandpass filters for formants with lower Q for more output
     const f1 = new Tone.Filter({
       type: 'bandpass',
       frequency: formants.f1,
-      Q: 5,
+      Q: 3,
     });
     const f2 = new Tone.Filter({
       type: 'bandpass',
       frequency: formants.f2,
-      Q: 5,
+      Q: 3,
     });
     const f3 = new Tone.Filter({
       type: 'bandpass',
       frequency: formants.f3,
-      Q: 5,
+      Q: 3,
     });
 
-    // Mix formants together
-    const output = new Tone.Gain(0.5);
+    // Mix formants together with boost
+    const output = new Tone.Gain(2);
 
     synth.connect(f1);
     synth.connect(f2);

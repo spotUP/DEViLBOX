@@ -3,7 +3,7 @@
  * Single view with synth selection, parameters preview, and name input
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { VisualTB303Editor } from './VisualTB303Editor';
@@ -17,14 +17,16 @@ import {
   DEFAULT_ENVELOPE,
   DEFAULT_FILTER,
   DEFAULT_TB303,
+  DEFAULT_DRUM_MACHINE,
 } from '@typedefs/instrument';
+import { ToneEngine } from '@engine/ToneEngine';
 
 interface CreateInstrumentModalProps {
   onClose: () => void;
 }
 
 export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ onClose }) => {
-  const { createInstrument, updateInstrument } = useInstrumentStore();
+  const { createInstrument, updateInstrument, setPreviewInstrument } = useInstrumentStore();
 
   const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('TB303');
   const [synthSearch, setSynthSearch] = useState('');
@@ -32,6 +34,12 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
 
   // Create a temporary instrument config for editing
   const [tempInstrument, setTempInstrument] = useState<InstrumentConfig>(() => createTempInstrument('TB303'));
+
+  // Set preview instrument for MIDI keyboard to use
+  useEffect(() => {
+    setPreviewInstrument(tempInstrument);
+    return () => setPreviewInstrument(null);
+  }, [tempInstrument, setPreviewInstrument]);
 
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
@@ -54,6 +62,9 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
 
   // Handle synth type selection
   const handleSelectSynth = (synthType: SynthType) => {
+    // Invalidate the cached temp instrument so a new one is created with the new synth type
+    ToneEngine.getInstance().invalidateInstrument(-1);
+
     setSelectedSynthType(synthType);
     setTempInstrument(createTempInstrument(synthType));
     setInstrumentName(getSynthInfo(synthType).name);
@@ -61,6 +72,9 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
 
   // Handle saving the instrument
   const handleSave = () => {
+    // Clear preview instrument before closing
+    setPreviewInstrument(null);
+
     // Create the actual instrument
     const newId = createInstrument();
 
@@ -70,6 +84,12 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
       name: instrumentName,
     });
 
+    onClose();
+  };
+
+  // Handle close without saving
+  const handleClose = () => {
+    setPreviewInstrument(null);
     onClose();
   };
 
@@ -91,8 +111,8 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
   const IconComponent = getIcon(synthInfo.icon);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-6xl h-[90vh] max-h-[700px] bg-dark-bg border border-dark-border rounded-xl flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+      <div className="w-full h-full bg-dark-bg flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
           <div className="flex items-center gap-3">
@@ -120,7 +140,7 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
               Create
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded transition-colors"
             >
               <X size={18} />
@@ -228,6 +248,10 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
 
   if (synthType === 'TB303') {
     base.tb303 = DEFAULT_TB303;
+  }
+
+  if (synthType === 'DrumMachine') {
+    base.drumMachine = { ...DEFAULT_DRUM_MACHINE };
   }
 
   return base;

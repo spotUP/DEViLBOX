@@ -12,6 +12,7 @@ import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
 import { MasterEffectsModal, EffectParameterEditor } from '@components/effects';
 import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
+import { WhatsNewModal, useWhatsNew } from '@components/dialogs/WhatsNewModal';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
 import { useHistoryStore } from './stores/useHistoryStore';
@@ -38,6 +39,7 @@ function App() {
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
   const { applyAutoCompact } = useUIStore();
+  const { showModal: showWhatsNew, closeModal: closeWhatsNew } = useWhatsNew();
 
   // Register MIDI button mappings for transport/navigation control
   useButtonMappings();
@@ -177,6 +179,27 @@ function App() {
         return;
       }
 
+      // Ctrl+I: Instrument editor
+      if ((e.ctrlKey || e.metaKey) && e.key === 'i' && !e.shiftKey) {
+        e.preventDefault();
+        setShowInstrumentModal(!showInstrumentModal);
+        return;
+      }
+
+      // Ctrl+M: Master effects
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm' && !e.shiftKey) {
+        e.preventDefault();
+        setShowMasterFX(!showMasterFX);
+        return;
+      }
+
+      // Ctrl+Shift+M: Toggle master mute
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
+        e.preventDefault();
+        useAudioStore.getState().toggleMasterMute();
+        return;
+      }
+
       // L: Toggle Live Mode
       if (e.key === 'l' || e.key === 'L') {
         if (!e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -204,7 +227,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPatterns, showHelp, showExport, handleUndo, handleRedo, saveProject]);
+  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, handleUndo, handleRedo, saveProject]);
 
   const handleUpdateEffectParameter = (key: string, value: number) => {
     if (!editingEffect) return;
@@ -422,6 +445,7 @@ function App() {
       <InstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
+      {showWhatsNew && <WhatsNewModal onClose={closeWhatsNew} />}
 
       {/* Effect Parameter Editor Modal */}
       {editingEffect && (

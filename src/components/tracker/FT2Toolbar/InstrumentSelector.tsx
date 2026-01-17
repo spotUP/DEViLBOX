@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 
@@ -21,6 +22,8 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
     currentInstrumentId,
     setCurrentInstrument,
   } = useInstrumentStore();
+
+  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -108,7 +111,9 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
   };
 
   const formatValue = (val: number): string => {
-    return val.toString(16).toUpperCase().padStart(2, '0');
+    return useHexNumbers
+      ? val.toString(16).toUpperCase().padStart(2, '0')
+      : val.toString(10).padStart(2, '0');
   };
 
   return (
