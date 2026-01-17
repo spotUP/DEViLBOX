@@ -823,6 +823,7 @@ const PatternEditorComponent: React.FC = () => {
           let caretX = ROW_NUM_WIDTH + (channelIndex * CHANNEL_WIDTH) + 8; // +8 for channel padding
 
           // Add offset based on column type
+          // Column order: note, instrument, volume, effect, effect2, accent, slide
           switch (cursor.columnType) {
             case 'note':
               // caretX stays at start
@@ -836,11 +837,14 @@ const PatternEditorComponent: React.FC = () => {
             case 'effect':
               caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
               break;
-            case 'accent':
+            case 'effect2':
               caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
               break;
+            case 'accent':
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
+              break;
             case 'slide':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
+              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
               break;
           }
 
@@ -854,6 +858,7 @@ const PatternEditorComponent: React.FC = () => {
               caretWidth = VOLUME_WIDTH;
               break;
             case 'effect':
+            case 'effect2':
               caretWidth = EFFECT_WIDTH;
               break;
             case 'accent':
