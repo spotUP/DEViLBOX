@@ -10,7 +10,7 @@
     "modifiedAt": "2026-01-14T00:00:00.000Z",
     "version": "1.0.0"
   },
-  "bpm": 134,
+  "bpm": 140,
   "instruments": [
     {
       "id": 1,
@@ -264,7 +264,7 @@
               "note": "C-1",
               "instrument": 2,
               "volume": 50,
-              "effect": null
+              "effect": "F8C"
             },
             {
               "note": null,

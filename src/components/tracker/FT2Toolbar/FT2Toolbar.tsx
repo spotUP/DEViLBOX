@@ -145,7 +145,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     isPlaying,
     isLooping,
     bpm,
-    setBPM,
+    setBPM, // Used for loading songs, not for user input
     setIsLooping,
     play,
     stop,
@@ -462,16 +462,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
         </div>
 
-        {/* Tempo Section */}
+        {/* BPM Display - Read-only (controlled by F20+ effect commands) */}
         <div className="ft2-section ft2-section-tempo">
-          <FT2NumericInput
-            label="BPM"
-            value={bpm}
-            onChange={setBPM}
-            min={32}
-            max={255}
-            throttleMs={50}
-          />
+          <div className="ft2-numeric-group">
+            <span className="ft2-numeric-label">BPM:</span>
+            <span className="ft2-numeric-value" title="BPM is controlled via F20-FF effect commands in patterns">
+              {bpm.toString().padStart(3, '0')}
+            </span>
+          </div>
         </div>
 
         {/* Pattern Section */}
