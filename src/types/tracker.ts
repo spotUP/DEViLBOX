@@ -11,7 +11,8 @@ export interface TrackerCell {
   note: NoteValue;
   instrument: InstrumentValue;
   volume: VolumeValue;
-  effect: EffectValue;
+  effect: EffectValue; // Effect 1 (backward compatibility)
+  effect2?: EffectValue; // Effect 2 (optional for now)
   // TB-303 specific columns
   accent?: boolean;
   slide?: boolean;
@@ -69,7 +70,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effect' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
+  columnType: 'note' | 'instrument' | 'volume' | 'effect' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 
@@ -92,6 +93,7 @@ export type ColumnVisibility = {
   instrument: boolean;
   volume: boolean;
   effect: boolean;
+  effect2: boolean;
   accent: boolean;
   slide: boolean;
   cutoff: boolean;
@@ -117,6 +119,7 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   instrument: true,
   volume: true,
   effect: true,
+  effect2: true,
   accent: false,
   slide: false,
   cutoff: false,
@@ -130,6 +133,7 @@ export const EMPTY_CELL: TrackerCell = {
   instrument: null,
   volume: null,
   effect: null,
+  effect2: null,
 };
 
 export const NOTE_OFF: TrackerCell = {
@@ -137,4 +141,5 @@ export const NOTE_OFF: TrackerCell = {
   instrument: null,
   volume: null,
   effect: null,
+  effect2: null,
 };

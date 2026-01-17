@@ -407,6 +407,8 @@ export const useTrackerInput = () => {
             setCell(cursor.channelIndex, cursor.rowIndex, { volume: null });
           } else if (cursor.columnType === 'effect') {
             setCell(cursor.channelIndex, cursor.rowIndex, { effect: null });
+          } else if (cursor.columnType === 'effect2') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { effect2: null });
           } else {
             clearCell(cursor.channelIndex, cursor.rowIndex);
           }
@@ -641,12 +643,13 @@ export const useTrackerInput = () => {
         !e.altKey && !e.ctrlKey && !e.metaKey &&
         (cursor.columnType === 'instrument' ||
           cursor.columnType === 'volume' ||
-          cursor.columnType === 'effect')
+          cursor.columnType === 'effect' ||
+          cursor.columnType === 'effect2')
       ) {
         // Skip if it's a note key (numbers 2,3,5,6,7,9,0 are used for notes)
         const isNoteKey = ['2', '3', '5', '6', '7', '9', '0'].includes(key);
         if (isNoteKey && cursor.columnType !== 'instrument' &&
-            cursor.columnType !== 'volume' && cursor.columnType !== 'effect') {
+            cursor.columnType !== 'volume' && cursor.columnType !== 'effect' && cursor.columnType !== 'effect2') {
           return;
         }
 
@@ -671,6 +674,11 @@ export const useTrackerInput = () => {
           const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
           const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
           setCell(cursor.channelIndex, cursor.rowIndex, { effect: newStr });
+        } else if (cursor.columnType === 'effect2') {
+          const currentValue = currentCell.effect2 || '...';
+          const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
+          const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
+          setCell(cursor.channelIndex, cursor.rowIndex, { effect2: newStr });
         }
         return;
       }

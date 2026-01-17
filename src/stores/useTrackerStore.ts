@@ -187,12 +187,13 @@ export const useTrackerStore = create<TrackerStore>()(
 
           case 'left':
             // Move to previous column/channel
-            // Column order includes TB-303 accent and slide
+            // Column order includes TB-303 accent and slide, and dual effect columns
             const columnOrder: CursorPosition['columnType'][] = [
               'note',
               'instrument',
               'volume',
               'effect',
+              'effect2',
               'accent',
               'slide',
             ];
@@ -209,12 +210,13 @@ export const useTrackerStore = create<TrackerStore>()(
 
           case 'right':
             // Move to next column/channel
-            // Column order includes TB-303 accent and slide
+            // Column order includes TB-303 accent and slide, and dual effect columns
             const columnOrder2: CursorPosition['columnType'][] = [
               'note',
               'instrument',
               'volume',
               'effect',
+              'effect2',
               'accent',
               'slide',
             ];

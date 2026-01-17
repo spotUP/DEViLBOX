@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-17T21:06:14.412Z
+ * Generated: 2026-01-17T21:12:50.822Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '28';
-export const BUILD_HASH = '51b647d';
+export const BUILD_NUMBER = '29';
+export const BUILD_HASH = '02cf96a';
 export const BUILD_DATE = '2026-01-17';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.0',
     date: '2026-01-17',
     changes: [
+      {
+        type: 'feature',
+        description: 'Implement ProTracker-style BPM control via pattern commands'
+      },
       {
         type: 'fix',
         description: 'Fix TypeScript build errors for deployment'

@@ -103,11 +103,18 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                 isEmpty={cell.volume === null}
               />
 
-              {/* Effect */}
+              {/* Effect 1 */}
               <EffectCell
                 value={cell.effect}
                 isActive={isChannelActive && cursor.columnType === 'effect'}
                 isEmpty={cell.effect === null}
+              />
+
+              {/* Effect 2 */}
+              <EffectCell
+                value={cell.effect2 || null}
+                isActive={isChannelActive && cursor.columnType === 'effect2'}
+                isEmpty={cell.effect2 === null || cell.effect2 === undefined}
               />
 
               {/* Accent */}

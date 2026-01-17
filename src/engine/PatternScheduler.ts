@@ -356,55 +356,66 @@ export class PatternScheduler {
             // For TB-303, we should slide to the note instead of skipping it
             let useSlide = cell.slide || false;
             const effectCmd = cell.effect && cell.effect !== '...' ? parseInt(cell.effect[0], 16) : -1;
-            if (effectCmd === 0x3) {
+            const effectCmd2 = cell.effect2 && cell.effect2 !== '...' ? parseInt(cell.effect2[0], 16) : -1;
+            if (effectCmd === 0x3 || effectCmd2 === 0x3) {
               // Tone portamento - use slide instead of preventing trigger
               useSlide = true;
             }
 
-            // Process effect command if present
-            if (cell.effect && cell.effect !== '...') {
-              const effectResult = this.effectProcessor.processRowStart(
-                channelIndex,
-                cell.note,
-                cell.effect,
-                cell.volume
-              );
+            // Process effect commands if present (supports dual effects)
+            const effects = [cell.effect, cell.effect2].filter(e => e && e !== '...');
+            let preventNoteTrigger = false;
+            for (const effect of effects) {
+              if (effect && effect !== '...') {
+                const effectResult = this.effectProcessor.processRowStart(
+                  channelIndex,
+                  cell.note,
+                  effect,
+                  cell.volume
+                );
 
-              // Handle effect results
-              if (effectResult.setVolume !== undefined) {
-                // Apply volume to note (convert 0-64 to 0-1 velocity)
-                velocity = effectResult.setVolume / 64;
-              }
+                // Handle effect results
+                if (effectResult.setVolume !== undefined) {
+                  // Apply volume to note (convert 0-64 to 0-1 velocity)
+                  velocity = effectResult.setVolume / 64;
+                }
 
-              if (effectResult.setBPM !== undefined) {
-                console.log(`[PatternScheduler] Effect Fxx: Setting BPM to ${effectResult.setBPM}`);
-                engine.setBPM(effectResult.setBPM);
-              }
+                if (effectResult.setBPM !== undefined) {
+                  console.log(`[PatternScheduler] Effect Fxx: Setting BPM to ${effectResult.setBPM}`);
+                  engine.setBPM(effectResult.setBPM);
+                }
 
-              if (effectResult.patternBreak && !this.patternBreakScheduled) {
-                // Dxx - Pattern break: jump to next pattern at specified row
-                console.log(`[PatternScheduler] Effect Dxx: Pattern break to row ${effectResult.patternBreak.position}`);
-                this.patternBreakScheduled = true;
-                if (this.onPatternBreak) {
-                  this.onPatternBreak(effectResult.patternBreak.position);
-                } else if (this.onPatternEnd) {
-                  // Fallback: just advance to next pattern (row 0)
-                  this.onPatternEnd();
+                if (effectResult.patternBreak && !this.patternBreakScheduled) {
+                  // Dxx - Pattern break: jump to next pattern at specified row
+                  console.log(`[PatternScheduler] Effect Dxx: Pattern break to row ${effectResult.patternBreak.position}`);
+                  this.patternBreakScheduled = true;
+                  if (this.onPatternBreak) {
+                    this.onPatternBreak(effectResult.patternBreak.position);
+                  } else if (this.onPatternEnd) {
+                    // Fallback: just advance to next pattern (row 0)
+                    this.onPatternEnd();
+                  }
+                }
+
+                if (effectResult.jumpToPosition !== undefined) {
+                  // Bxx - Jump to song position
+                  console.log(`[PatternScheduler] Effect Bxx: Jump to position ${effectResult.jumpToPosition}`);
+                  if (this.onPositionJump) {
+                    this.onPositionJump(effectResult.jumpToPosition);
+                  }
+                }
+
+                const effectCmdNum = parseInt(effect[0], 16);
+                if (effectResult.preventNoteTrigger && effectCmdNum !== 0x3) {
+                  // Effect prevents note trigger (but not 3xx - handled via slide)
+                  preventNoteTrigger = true;
                 }
               }
+            }
 
-              if (effectResult.jumpToPosition !== undefined) {
-                // Bxx - Jump to song position
-                console.log(`[PatternScheduler] Effect Bxx: Jump to position ${effectResult.jumpToPosition}`);
-                if (this.onPositionJump) {
-                  this.onPositionJump(effectResult.jumpToPosition);
-                }
-              }
-
-              if (effectResult.preventNoteTrigger && effectCmd !== 0x3) {
-                // Effect prevents note trigger (but not 3xx - handled via slide)
-                return;
-              }
+            // If any effect prevents note trigger, return early
+            if (preventNoteTrigger) {
+              return;
             }
 
             // Check if channel is muted/solo'd
