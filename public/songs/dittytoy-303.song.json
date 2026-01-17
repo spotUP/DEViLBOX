@@ -127,7 +127,7 @@
               "note": "F-2",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": true,
               "slide": true
             },
@@ -706,7 +706,7 @@
               "note": "C#2",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": false,
               "slide": true
             },
@@ -1285,7 +1285,7 @@
               "note": "G#0",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": false,
               "slide": true
             },
@@ -1864,7 +1864,7 @@
               "note": "G#1",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": true,
               "slide": true
             },

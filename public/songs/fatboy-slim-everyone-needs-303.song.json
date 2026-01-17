@@ -127,7 +127,7 @@
               "note": "D#1",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": true,
               "slide": false
             },

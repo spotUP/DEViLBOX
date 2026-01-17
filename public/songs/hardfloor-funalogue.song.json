@@ -124,7 +124,7 @@
               "note": "A-1",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": true,
               "slide": true
             },
@@ -575,7 +575,7 @@
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": false,
               "slide": false
             },
@@ -1026,7 +1026,7 @@
               "note": "A-1",
               "instrument": 1,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": false,
               "slide": false
             },
@@ -1477,7 +1477,7 @@
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
+              "effect": "F06",
               "accent": false,
               "slide": false
             },

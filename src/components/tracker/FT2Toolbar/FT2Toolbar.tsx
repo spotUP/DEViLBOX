@@ -133,6 +133,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     deletePattern,
     expandPattern,
     shrinkPattern,
+    resizePattern,
     loadPatterns,
     recordMode,
     editStep,
@@ -423,6 +424,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     shrinkPattern?.(currentPatternIndex);
   };
 
+  // Pattern length change handler
+  const handleLengthChange = (newLength: number) => {
+    if (newLength >= 1 && newLength <= 256) {
+      resizePattern(currentPatternIndex, newLength);
+    }
+  };
+
   return (
     <div className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}>
       {/* Toolbar Compact Toggle - consistent right-side position */}
@@ -541,12 +549,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             />
           </div>
 
-          {/* Speed Section */}
+          {/* Speed Section - Read-only display (controlled by Fxx effect commands) */}
           <div className="ft2-section ft2-section-tempo">
             <FT2NumericInput
               label="Speed"
               value={6}
-              onChange={() => {}}
+              onChange={() => {}} // Read-only: Speed is controlled via F01-F1F effect commands in patterns
               min={1}
               max={31}
               format="hex"
@@ -558,7 +566,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <FT2NumericInput
               label="Length"
               value={patternLength}
-              onChange={() => {}}
+              onChange={handleLengthChange}
               min={1}
               max={256}
               format="hex"
@@ -570,12 +578,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       {/* Row 3: Song Length/Add/Expand-Shrink (hidden in compact mode) */}
       {!compactToolbar && (
         <div className="ft2-toolbar-row">
-          {/* Song Length */}
+          {/* Song Length - Read-only display (add/delete patterns to change) */}
           <div className="ft2-section ft2-section-pos">
             <FT2NumericInput
               label="Song Len"
               value={songLength}
-              onChange={() => {}}
+              onChange={() => {}} // Read-only: Use Ins/Del buttons to add/remove patterns
               min={1}
               max={256}
               format="hex"
