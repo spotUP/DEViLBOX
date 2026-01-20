@@ -91,6 +91,15 @@ export interface DevilFishConfig {
 }
 
 export interface TB303Config {
+  // Engine selection
+  engineType?: 'tonejs' | 'accurate'; // Default: 'tonejs'
+
+  // Tuning
+  tuning?: number; // Master tuning in Hz (default: 440)
+
+  // Tempo-relative envelopes (for slower tempos = longer sweeps)
+  tempoRelative?: boolean; // Default: false (absolute ms), true = scale with BPM
+
   oscillator: {
     type: 'sawtooth' | 'square';
   };
@@ -109,10 +118,9 @@ export interface TB303Config {
     time: number; // 60ms-360ms (Devil Fish extends original TB-303 range)
     mode: 'linear' | 'exponential';
   };
-  overdrive?: {
-    amount: number; // 0-100%
-  };
-  // Devil Fish modifications (optional - for backward compatibility)
+  // Neural Pedalboard (replaces simple overdrive)
+  pedalboard?: import('@typedefs/pedalboard').NeuralPedalboard;
+  // Devil Fish modifications
   devilFish?: DevilFishConfig;
 }
 
@@ -621,14 +629,22 @@ export type EffectType =
   | 'JCReverb'
   | 'StereoWidener'
   | 'TapeSaturation'
-  | 'SidechainCompressor';
+  | 'SidechainCompressor'
+  | 'Neural'; // Neural effects category
+
+export type EffectCategory = 'tonejs' | 'neural';
 
 export interface EffectConfig {
   id: string;
-  type: EffectType;
+  category: EffectCategory;  // Discriminator for effect type
+  type: EffectType;          // For tonejs: existing types; for neural: "Neural"
   enabled: boolean;
   wet: number; // 0-100%
-  parameters: Record<string, any>;
+  parameters: Record<string, number | string>;  // Parameters (numbers are 0-100 normalized, strings for types/modes)
+
+  // Neural-specific (only when category === 'neural')
+  neuralModelIndex?: number;   // Index into GUITARML_MODEL_REGISTRY
+  neuralModelName?: string;    // Display name cache
 }
 
 export interface InstrumentConfig {
@@ -711,9 +727,6 @@ export const DEFAULT_TB303: TB303Config = {
     time: 60,
     mode: 'exponential',
   },
-  overdrive: {
-    amount: 0,
-  },
 };
 
 /**
@@ -721,26 +734,26 @@ export const DEFAULT_TB303: TB303Config = {
  * Based on manual's "Limiting the Devil Fish to TB-303 sounds" section
  */
 export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
-  enabled: false,
+  enabled: true,         // Always enabled - neutral until knobs are turned
 
-  // Envelope defaults (TB-303 compatible)
+  // NEUTRAL envelope defaults (transparent until adjusted)
   normalDecay: 200,      // Standard MEG decay
-  accentDecay: 200,      // Accented notes fixed at ~200ms in TB-303
-  vegDecay: 3000,        // TB-303 had fixed ~3-4 second VEG decay
-  vegSustain: 0,         // No sustain in TB-303
-  softAttack: 4,         // TB-303 had ~4ms delay + 3ms attack
+  accentDecay: 200,      // Match normal notes initially
+  vegDecay: 3000,        // Authentic TB-303 VCA decay (~3 seconds)
+  vegSustain: 0,         // No sustain (neutral)
+  softAttack: 0.3,       // MINIMUM (0.3ms) - instant attack like original TB-303
 
-  // Filter defaults (TB-303 compatible)
-  filterTracking: 0,     // TB-303 filter didn't track pitch
-  filterFM: 0,           // No filter FM in TB-303
+  // NEUTRAL filter defaults (no effect until turned up)
+  filterTracking: 0,     // No key tracking
+  filterFM: 0,           // No FM
 
-  // Accent defaults (TB-303 compatible)
-  sweepSpeed: 'normal',  // Standard TB-303 accent behavior
-  accentSweepEnabled: true,
+  // NEUTRAL accent defaults
+  sweepSpeed: 'normal',  // Standard behavior
+  accentSweepEnabled: false,  // Disabled for neutral behavior
 
-  // Resonance mode (TB-303 compatible)
+  // NEUTRAL resonance mode
   highResonance: false,  // Normal resonance range
 
-  // Output (TB-303 compatible)
-  muffler: 'off',        // No muffler in TB-303
+  // NEUTRAL output
+  muffler: 'off',        // No distortion
 };
