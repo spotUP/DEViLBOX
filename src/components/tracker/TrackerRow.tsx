@@ -6,7 +6,6 @@
 import React from 'react';
 import { NoteCell } from './NoteCell';
 import { InstrumentCell } from './InstrumentCell';
-import { VolumeCell } from './VolumeCell';
 import { EffectCell } from './EffectCell';
 import { AccentCell } from './AccentCell';
 import { SlideCell } from './SlideCell';
@@ -18,6 +17,7 @@ interface TrackerRowProps {
   rowIndex: number;
   cells: TrackerCell[];
   channelColors: (string | null)[];
+  channelCollapsed?: boolean[]; // Array of collapsed states for each channel
   cursor: CursorPosition;
   isCursorRow: boolean;
   isCurrentPlaybackRow: boolean;
@@ -26,7 +26,7 @@ interface TrackerRowProps {
 }
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
-  ({ rowIndex, cells, channelColors, cursor, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
+  ({ rowIndex, cells, channelColors, channelCollapsed, cursor, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const rowNumber = useHexNumbers
@@ -65,6 +65,23 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
           const isChannelActive = false;
           const isNoteOff = cell.note === '===';
           const channelColor = channelColors[localIndex];
+          const isCollapsed = channelCollapsed?.[localIndex] ?? false;
+
+          // Collapsed channel: render minimal view
+          if (isCollapsed) {
+            return (
+              <div
+                key={localIndex}
+                className="flex-shrink-0 h-full border-r border-dark-border"
+                style={{
+                  minWidth: 48,
+                  maxWidth: 48,
+                  backgroundColor: channelColor ? `${channelColor}20` : 'var(--color-dark-bgTertiary)',
+                  boxShadow: channelColor ? `inset 3px 0 0 ${channelColor}` : undefined,
+                }}
+              />
+            );
+          }
 
           return (
             <div
@@ -96,12 +113,7 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                 isEmpty={cell.instrument === null}
               />
 
-              {/* Volume */}
-              <VolumeCell
-                value={cell.volume}
-                isActive={isChannelActive && cursor.columnType === 'volume'}
-                isEmpty={cell.volume === null}
-              />
+              {/* Volume column removed - use Cxx effect command instead */}
 
               {/* Effect 1 */}
               <EffectCell
@@ -144,11 +156,17 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
     const colorsChanged = prevProps.channelColors.length !== nextProps.channelColors.length ||
       prevProps.channelColors.some((c, i) => c !== nextProps.channelColors[i]);
 
+    // Check if channel collapsed states changed
+    const collapsedChanged =
+      (prevProps.channelCollapsed?.length !== nextProps.channelCollapsed?.length) ||
+      (prevProps.channelCollapsed?.some((c, i) => c !== nextProps.channelCollapsed?.[i]));
+
     return (
       prevProps.rowIndex === nextProps.rowIndex &&
       prevProps.channelWidth === nextProps.channelWidth &&
       prevProps.baseChannelIndex === nextProps.baseChannelIndex &&
       !colorsChanged &&
+      !collapsedChanged &&
       prevProps.cells === nextProps.cells
     );
   }

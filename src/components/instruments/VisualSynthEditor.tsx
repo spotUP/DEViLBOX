@@ -13,7 +13,7 @@ import { FilterCurve } from '@components/ui/FilterCurve';
 import { SampleEditor } from './SampleEditor';
 import { ArpeggioEditor } from './ArpeggioEditor';
 import { getSynthInfo } from '@constants/synthCategories';
-import * as LucideIcons from 'lucide-react';
+import { SynthIcon } from './SynthIcon';
 
 // Sample-based synth types
 const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
@@ -38,32 +38,25 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
   const isSampleBased = SAMPLE_SYNTH_TYPES.includes(instrument.synthType);
   const synthInfo = getSynthInfo(instrument.synthType);
 
-  // Get icon component
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
-  const SynthIcon = getIcon(synthInfo.icon);
-
   // Update helpers - ensure we have defaults when spreading optional types
-  const updateOscillator = (key: string, value: any) => {
+  const updateOscillator = (key: string, value: unknown) => {
     const currentOsc = instrument.oscillator || { type: 'sawtooth', detune: 0, octave: 0 };
     onChange({
-      oscillator: { ...currentOsc, [key]: value },
+      oscillator: { ...currentOsc, [key]: value } as InstrumentConfig['oscillator'],
     });
   };
 
   const updateEnvelope = (key: string, value: number) => {
     const currentEnv = instrument.envelope || { attack: 10, decay: 200, sustain: 50, release: 1000 };
     onChange({
-      envelope: { ...currentEnv, [key]: value },
+      envelope: { ...currentEnv, [key]: value } as InstrumentConfig['envelope'],
     });
   };
 
-  const updateFilter = (key: string, value: any) => {
+  const updateFilter = (key: string, value: unknown) => {
     const currentFilter = instrument.filter || { type: 'lowpass' as const, frequency: 2000, Q: 1, rolloff: -24 as const };
     onChange({
-      filter: { ...currentFilter, [key]: value },
+      filter: { ...currentFilter, [key]: value } as InstrumentConfig['filter'],
     });
   };
 
@@ -73,7 +66,7 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
       <div className="px-6 py-4 border-b border-gray-800 bg-[#1a1a1a]">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 ${synthInfo.color}`}>
-            <SynthIcon size={28} />
+            <SynthIcon iconName={synthInfo.icon} size={28} />
           </div>
           <div className="flex-1">
             <h2 className="text-xl font-bold text-white">{synthInfo.name}</h2>
@@ -107,16 +100,15 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
             {DRUM_TYPES.map((drum) => {
               const isSelected = instrument.drumMachine?.drumType === drum.id;
               return (
-                <button
-                  key={drum.id}
-                  onClick={() => onChange({
-                    drumMachine: {
-                      ...instrument.drumMachine,
-                      drumType: drum.id as any,
-                    },
-                  })}
-                  className={`
-                    flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all
+                                  <button
+                                    key={drum.id}
+                                    onClick={() => onChange({
+                                      drumMachine: {
+                                        ...instrument.drumMachine,
+                                        drumType: drum.id as 'kick' | 'snare' | 'hihat' | 'clap',
+                                      },
+                                    })}
+                                    className={`                    flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all
                     ${isSelected
                       ? 'bg-red-500/20 border-red-500 text-white'
                       : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
@@ -168,7 +160,7 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
               {/* Waveform Selector */}
               <div className="mb-4">
                 <WaveformSelector
-                  value={instrument.oscillator.type as any}
+                  value={instrument.oscillator.type as 'sine' | 'square' | 'sawtooth' | 'triangle'}
                   onChange={(type) => updateOscillator('type', type)}
                   size="lg"
                   color="#4a9eff"
@@ -252,7 +244,7 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
               <FilterCurve
                 cutoff={instrument.filter.frequency}
                 resonance={instrument.filter.Q}
-                type={instrument.filter.type as any}
+                type={instrument.filter.type as 'lowpass' | 'highpass' | 'bandpass' | 'notch'}
                 onCutoffChange={(v) => updateFilter('frequency', v)}
                 onResonanceChange={(v) => updateFilter('Q', v)}
                 color="#ff6b6b"
@@ -330,7 +322,7 @@ function renderSpecialParameters(
 ): React.ReactNode {
   const params = instrument.parameters || {};
 
-  const updateParam = (key: string, value: any) => {
+  const updateParam = (key: string, value: unknown) => {
     onChange({
       parameters: { ...params, [key]: value },
     });

@@ -69,7 +69,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }
     if (y < 10) y = 10;
 
-    setAdjustedPosition({ x, y });
+    requestAnimationFrame(() => {
+      setAdjustedPosition({ x, y });
+    });
   }, [position]);
 
   // Close on outside click
@@ -212,28 +214,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 // Separate portal component for submenus
 const ContextMenuPortal: React.FC<ContextMenuProps> = (props) => {
   return <ContextMenu {...props} />;
-};
-
-// Hook for context menu state
-export const useContextMenu = () => {
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
-
-  const openContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
-  }, []);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenuPosition(null);
-  }, []);
-
-  return {
-    position: contextMenuPosition,
-    open: openContextMenu,
-    close: closeContextMenu,
-    isOpen: contextMenuPosition !== null,
-  };
 };
 
 // Dropdown button that opens a context menu

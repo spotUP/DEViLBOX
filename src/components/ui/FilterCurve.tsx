@@ -56,26 +56,27 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   // Logarithmic frequency scale (20Hz to 20kHz)
   const minFreq = 20;
   const maxFreq = 20000;
-  const freqToX = (freq: number) => {
+  const freqToX = useCallback((freq: number) => {
     const logMin = Math.log10(minFreq);
     const logMax = Math.log10(maxFreq);
     const logFreq = Math.log10(Math.max(minFreq, Math.min(maxFreq, freq)));
     return padding.left + ((logFreq - logMin) / (logMax - logMin)) * graphWidth;
-  };
-  const xToFreq = (x: number) => {
+  }, [graphWidth, padding.left]);
+
+  const xToFreq = useCallback((x: number) => {
     const logMin = Math.log10(minFreq);
     const logMax = Math.log10(maxFreq);
     const normalized = (x - padding.left) / graphWidth;
     return Math.pow(10, logMin + normalized * (logMax - logMin));
-  };
+  }, [graphWidth, padding.left]);
 
   // dB scale (-24 to +24 dB)
   const minDb = -24;
   const maxDb = 24;
-  const dbToY = (db: number) => {
+  const dbToY = useCallback((db: number) => {
     const normalized = (db - minDb) / (maxDb - minDb);
     return padding.top + (1 - normalized) * graphHeight;
-  };
+  }, [graphHeight, padding.top]);
 
   // Generate filter response curve
   const generateFilterPath = useCallback(() => {
@@ -129,7 +130,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
     }
 
     return points.join(' ');
-  }, [cutoff, resonance, type, graphWidth]);
+  }, [cutoff, resonance, type, graphWidth, dbToY, padding.left, xToFreq]);
 
   // Handle drag
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -152,7 +153,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
     const normalizedY = 1 - (y - padding.top) / graphHeight;
     const newResonance = Math.round(normalizedY * 30);
     onResonanceChange(Math.max(0, Math.min(30, newResonance)));
-  }, [isDragging, onCutoffChange, onResonanceChange, graphHeight]);
+  }, [isDragging, onCutoffChange, onResonanceChange, graphHeight, padding.top, xToFreq]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);

@@ -11,6 +11,7 @@ const SONGS_DIR = path.join(__dirname, '../public/songs');
 
 // Demo songs with their desired BPM
 const DEMO_SONGS = [
+  { file: 'daft-punk-da-funk.song.json', bpm: 111 },
   { file: 'phuture-acid-tracks.song.json', bpm: 125 }, // Classic acid house
   { file: 'hardfloor-funalogue.song.json', bpm: 130 }, // Harder techno
   { file: 'josh-wink-higher-state.song.json', bpm: 130 }, // Acid techno

@@ -7,6 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
+        // FastTracker II palette
+        ft2: {
+          bg: 'var(--ft2-bg)',
+          panel: 'var(--ft2-panel)',
+          text: 'var(--ft2-text)',
+          textDim: 'var(--ft2-text-dim)',
+          highlight: 'var(--ft2-highlight)',
+          cursor: 'var(--ft2-cursor)',
+          mark: 'var(--ft2-mark)',
+          border: 'var(--ft2-border)',
+        },
         // Theme-aware colors using CSS variables
         dark: {
           bg: 'var(--color-bg)',

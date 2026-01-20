@@ -25,7 +25,7 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawMode, _setDrawMode] = useState<DrawMode>('pencil');
+  const [drawMode, setDrawMode] = useState<DrawMode>('pencil');
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(800);
@@ -64,16 +64,15 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Drawing area dimensions
-  const drawWidth = canvasWidth - paddingLeft - paddingRight;
   const drawHeight = height - paddingTop - paddingBottom;
 
   // Convert row index to canvas X coordinate
   const rowToX = useCallback(
     (row: number): number => {
+      const drawWidth = canvasWidth - paddingLeft - paddingRight;
       return paddingLeft + (row / patternLength) * drawWidth;
     },
-    [patternLength, drawWidth]
+    [patternLength, canvasWidth]
   );
 
   // Convert value (0-1) to canvas Y coordinate
@@ -84,10 +83,11 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
   // Convert canvas X to row index
   const xToRow = useCallback(
     (x: number): number => {
+      const drawWidth = canvasWidth - paddingLeft - paddingRight;
       const normalized = (x - paddingLeft) / drawWidth;
       return Math.round(normalized * patternLength);
     },
-    [patternLength, drawWidth]
+    [patternLength, canvasWidth]
   );
 
   // Convert canvas Y to value (0-1)
@@ -219,7 +219,7 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         ctx.fill();
       });
     }
-  }, [curve, patternLength, selectedPoint, rowToX, valueToY, curveColor1, curveColor2, pointGlow, canvasWidth, bgColor, gridColor, gridColorMajor, labelColor, drawWidth, drawHeight]);
+  }, [curve, patternLength, selectedPoint, rowToX, valueToY, curveColor1, curveColor2, pointGlow, canvasWidth, bgColor, gridColor, gridColorMajor, labelColor, height, paddingLeft, paddingRight, paddingTop, paddingBottom, drawHeight]);
 
   useEffect(() => {
     drawCurve();
@@ -431,6 +431,27 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
 
       {/* Toolbar */}
       <div className="flex gap-2 mb-3 flex-wrap">
+        <div className="flex bg-dark-bgTertiary rounded-md p-0.5 border border-dark-border">
+          <button
+            onClick={() => setDrawMode('pencil')}
+            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              drawMode === 'pencil' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            Pencil
+          </button>
+          <button
+            onClick={() => setDrawMode('select')}
+            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              drawMode === 'select' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            Select
+          </button>
+        </div>
+
+        <div className="w-px bg-dark-border mx-1"></div>
+
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => applyPreset('rampUp')}

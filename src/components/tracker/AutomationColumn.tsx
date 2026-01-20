@@ -86,8 +86,8 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
   patternId,
   patternLength,
   rowHeight,
-  scrollOffset: _scrollOffset,
-  containerHeight: _containerHeight,
+  scrollOffset: _scrollOffset, // eslint-disable-line @typescript-eslint/no-unused-vars
+  containerHeight: _containerHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
   parameter = 'cutoff',
 }) => {
   const { getAutomation } = useAutomationStore();

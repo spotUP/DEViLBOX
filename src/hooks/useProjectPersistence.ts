@@ -4,6 +4,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
+import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 
@@ -34,7 +35,7 @@ export function saveProjectToStorage(): boolean {
     const audioState = useAudioStore.getState();
 
     const savedProject: SavedProject = {
-      version: '1.0.0',
+      version: APP_VERSION,
       savedAt: new Date().toISOString(),
       metadata: projectState.metadata,
       bpm: transportState.bpm,

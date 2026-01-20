@@ -36,28 +36,32 @@ const generateWaveformPath = (type: WaveformType, width: number, height: number)
       case 'square':
         y = midY - (Math.sin(phase) >= 0 ? 1 : -1) * amplitude;
         break;
-      case 'sawtooth':
+      case 'sawtooth': {
         // Sawtooth: linear ramp from -1 to 1
         const sawPhase = ((phase / Math.PI) % 2) - 1;
         y = midY - sawPhase * amplitude;
         break;
-      case 'triangle':
+      }
+      case 'triangle': {
         // Triangle: absolute value of sawtooth
         const triPhase = ((phase / Math.PI) % 2);
         const triVal = triPhase < 1 ? triPhase * 2 - 1 : 3 - triPhase * 2;
         y = midY - triVal * amplitude;
         break;
-      case 'pulse':
+      }
+      case 'pulse': {
         // Narrow pulse wave (25% duty cycle)
         const pulsePhase = (phase / Math.PI) % 2;
         y = midY - (pulsePhase < 0.5 ? 1 : -1) * amplitude;
         break;
-      case 'pwm':
+      }
+      case 'pwm': {
         // PWM - varying pulse width
         const pwmDuty = 0.25 + ((i / numPoints) * 0.5);
         const pwmPhase = (phase / Math.PI) % 2;
         y = midY - (pwmPhase < pwmDuty ? 1 : -1) * amplitude;
         break;
+      }
       default:
         y = midY;
     }

@@ -40,9 +40,9 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
   const [showLoadModal, setShowLoadModal] = useState(false);
 
   // Get icon for synth type
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  const getIcon = (iconName: string): LucideIcons.LucideIcon => {
+    const icons = LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>;
+    return icons[iconName] || LucideIcons.Music2;
   };
 
   return (
@@ -91,7 +91,7 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
       </div>
 
       {/* Instrument List */}
-      <div className="flex-1 overflow-y-auto scrollbar-ft2">
+      <div className="flex-1 overflow-y-auto scrollbar-modern max-h-full min-h-0">
         {instruments
           .slice()
           .sort((a, b) => a.id - b.id)

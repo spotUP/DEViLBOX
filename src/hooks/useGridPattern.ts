@@ -137,7 +137,7 @@ export function useGridPattern(channelIndex: number) {
 
   const currentPattern = patterns[currentPatternIndex];
   const channel = currentPattern?.channels[channelIndex];
-  const cells = channel?.rows || [];
+  const cells = useMemo(() => channel?.rows || [], [channel?.rows]);
 
   // Get maxSteps from actual pattern length
   const maxSteps = currentPattern?.length || 16;

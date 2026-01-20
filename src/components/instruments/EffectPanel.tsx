@@ -248,7 +248,7 @@ export const EffectPanel: React.FC<EffectPanelProps> = ({ instrumentId, effect, 
     }
 
     // Format number
-    let formatted = value.toFixed(param.step < 0.1 ? 2 : param.step < 1 ? 1 : 0);
+    const formatted = value.toFixed(param.step < 0.1 ? 2 : param.step < 1 ? 1 : 0);
 
     // Add unit
     return `${formatted}${param.unit}`;

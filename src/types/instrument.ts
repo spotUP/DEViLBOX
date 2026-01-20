@@ -44,6 +44,40 @@ export interface EnvelopeConfig {
   release: number; // 0-5000ms
 }
 
+/**
+ * Auto-Vibrato Configuration
+ */
+export interface VibratoConfig {
+  enabled: boolean;
+  waveform: 'sine' | 'triangle' | 'square' | 'sawtooth';
+  rate: number;   // 0-10Hz
+  depth: number;  // 0-100%
+  sweep: number;  // 0-2000ms delay/fade-in
+}
+
+/**
+ * Professional Tracker Envelope
+ * Supports multiple points, sustain, and looping
+ */
+export interface TrackerEnvelopePoint {
+  x: number; // 0-325 (FT2 range) or normalized 0-1
+  y: number; // 0-64 (FT2 range) or normalized 0-1
+}
+
+export interface TrackerEnvelope {
+  enabled: boolean;
+  points: TrackerEnvelopePoint[];
+  sustainEnabled: boolean;
+  sustainPoint: number;
+  loopEnabled: boolean;
+  loopStart: number;
+  loopEnd: number;
+}
+
+export interface MultiSampleMap {
+  [note: number]: number; // MIDI Note (0-127) -> Sample Index
+}
+
 export interface FilterConfig {
   type: FilterType;
   frequency: number; // 20Hz-20kHz
@@ -91,6 +125,7 @@ export interface DevilFishConfig {
 }
 
 export interface TB303Config {
+  tuning?: number; // -1200 to 1200 cents
   oscillator: {
     type: 'sawtooth' | 'square';
   };
@@ -112,6 +147,7 @@ export interface TB303Config {
   overdrive?: {
     amount: number; // 0-100%
   };
+  neuralModel?: string; // Name of the JC303 model to load (e.g. 'ProcoRatPedal_HighGain')
   // Devil Fish modifications (optional - for backward compatibility)
   devilFish?: DevilFishConfig;
 }
@@ -651,6 +687,26 @@ export interface InstrumentConfig {
   pwmSynth?: PWMSynthConfig;
   stringMachine?: StringMachineConfig;
   formantSynth?: FormantSynthConfig;
+  
+  // Professional Tracker Features
+  volumeEnvelope?: TrackerEnvelope;
+  panningEnvelope?: TrackerEnvelope;
+  vibrato?: VibratoConfig;
+  volumeFadeout?: number; // 0-4095
+  samples?: {
+    url: string;
+    name: string;
+    loopEnabled: boolean;
+    loopStart: number;
+    loopEnd: number;
+    loopMode: 'forward' | 'ping-pong';
+    baseNote: string;
+    fineTune: number;
+    volume: number; // 0-64
+    pan: number; // 0-255
+  }[];
+  sampleMap?: MultiSampleMap;
+
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100
@@ -693,6 +749,7 @@ export const DEFAULT_FILTER: FilterConfig = {
 };
 
 export const DEFAULT_TB303: TB303Config = {
+  tuning: 0,
   oscillator: {
     type: 'sawtooth',
   },

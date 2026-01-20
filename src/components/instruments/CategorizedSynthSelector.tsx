@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
 import type { SynthType } from '@typedefs/instrument';
+import { DEFAULT_TB303, DEFAULT_WAVETABLE } from '@typedefs/instrument';
 import * as LucideIcons from 'lucide-react';
 import { Check, ChevronRight } from 'lucide-react';
 
@@ -25,22 +26,29 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [hoveredSynth, setHoveredSynth] = useState<SynthType | null>(null);
 
+  // Helper to find category name for a synth type
+  const categoryForSynth = (type: SynthType) => {
+    return SYNTH_CATEGORIES.find(cat => cat.synths.some(s => s.type === type))?.name || 'Synthesizer';
+  };
+
   // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  const getIcon = (iconName: string): LucideIcons.LucideIcon => {
+    const icons = LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>;
+    return icons[iconName] || LucideIcons.Music2;
   };
 
   // Handle synth selection
   const handleSelectSynth = (synthType: SynthType) => {
     if (!currentInstrument) return;
 
+    console.log('[CategorizedSynthSelector] Selecting synth:', synthType, 'for instrument:', currentInstrument.id);
+
     // Update current instrument's synth type
     updateInstrument(currentInstrument.id, {
       synthType,
-      // Reset synth-specific configs
-      tb303: synthType === 'TB303' ? currentInstrument.tb303 : undefined,
-      wavetable: synthType === 'Wavetable' ? currentInstrument.wavetable : undefined,
+      // Reset synth-specific configs to defaults if switching
+      tb303: synthType === 'TB303' ? { ...DEFAULT_TB303 } : undefined,
+      wavetable: synthType === 'Wavetable' ? { ...DEFAULT_WAVETABLE } : undefined,
     });
 
     onSelect?.(synthType);
@@ -105,13 +113,13 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
     );
   };
 
-  // Compact grid view
+  // Compact list view
   if (compact) {
     const allSynths = SYNTH_CATEGORIES.flatMap(cat => cat.synths);
     const uniqueSynths = Array.from(new Map(allSynths.map(s => [s.type, s])).values());
 
     return (
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-col gap-1 p-2">
         {uniqueSynths.map((synth) => {
           const isSelected = currentInstrument?.synthType === synth.type;
           const IconComponent = getIcon(synth.icon);
@@ -119,19 +127,35 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
           return (
             <button
               key={synth.type}
-              onClick={() => handleSelectSynth(synth.type)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSelectSynth(synth.type);
+              }}
               className={`
-                flex items-center gap-2 p-2 rounded-lg border text-left transition-all
+                flex items-center gap-3 p-2 rounded border text-left transition-all
                 ${isSelected
-                  ? 'bg-accent-primary/15 border-accent-primary'
-                  : 'bg-dark-bgSecondary border-dark-border hover:border-text-muted'
+                  ? 'bg-accent-primary/20 border-accent-primary shadow-[0_0_10px_rgba(0,242,255,0.1)]'
+                  : 'bg-dark-bgSecondary/60 border-dark-border hover:border-text-muted hover:bg-dark-bgHover'
                 }
               `}
             >
-              <IconComponent size={14} className={synth.color} />
-              <span className={`text-sm ${isSelected ? 'text-accent-primary' : 'text-text-secondary'}`}>
-                {synth.shortName}
-              </span>
+              <div className={`p-1.5 rounded bg-dark-bgTertiary ${isSelected ? 'text-accent-primary' : synth.color}`}>
+                <IconComponent size={16} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className={`text-xs font-bold truncate ${isSelected ? 'text-accent-primary' : 'text-text-primary'}`}>
+                  {synth.name}
+                </span>
+                <span className="text-[9px] text-text-muted uppercase tracking-tighter truncate">
+                  {categoryForSynth(synth.type)}
+                </span>
+              </div>
+              {isSelected && (
+                <div className="ml-auto">
+                  <Check size={12} className="text-accent-primary" />
+                </div>
+              )}
             </button>
           );
         })}

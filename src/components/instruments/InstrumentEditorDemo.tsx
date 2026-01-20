@@ -1,4 +1,3 @@
-// @ts-nocheck - Demo file with outdated component props
 /**
  * InstrumentEditorDemo - Comprehensive demo showing all instrument & effect features
  * Demonstrates: InstrumentFactory, EffectChain, EffectPanel, PresetBrowser

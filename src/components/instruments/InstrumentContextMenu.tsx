@@ -15,7 +15,8 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react';
-import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { useContextMenu } from '@hooks/useContextMenu';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface InstrumentContextMenuProps {
@@ -31,21 +32,20 @@ const RenameDialog: React.FC<{
   currentName: string;
   onConfirm: (newName: string) => void;
   onClose: () => void;
-}> = ({ isOpen, currentName, onConfirm, onClose }) => {
-  const [name, setName] = useState(currentName);
+}> = ({ isOpen, currentName: _currentName, onConfirm, onClose }) => {
+  const [name, setName] = useState(_currentName);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setName(currentName);
       // Focus input after dialog opens
       setTimeout(() => inputRef.current?.select(), 0);
     }
-  }, [isOpen, currentName]);
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && name !== currentName) {
+    if (name.trim() && name !== _currentName) {
       onConfirm(name.trim());
     }
     onClose();
@@ -100,7 +100,7 @@ const RenameDialog: React.FC<{
             </button>
             <button
               type="submit"
-              disabled={!name.trim() || name === currentName}
+              disabled={!name.trim() || name === _currentName}
               className="px-3 py-1.5 text-sm bg-accent-primary text-text-inverse rounded
                        hover:bg-accent-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -289,7 +289,8 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
             try {
               const sourceInstrument = JSON.parse(clipboardData);
               // Copy everything except id and name
-              const { id, name, ...settings } = sourceInstrument;
+              const { id: _, name: __, ...settings } = sourceInstrument;
+              void _; void __;
               updateInstrument(instrumentId, settings);
             } catch (e) {
               console.error('Failed to paste instrument settings:', e);
@@ -340,12 +341,14 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
       )}
 
       {/* Rename Dialog */}
-      <RenameDialog
-        isOpen={showRenameDialog}
-        currentName={instrument?.name || ''}
-        onConfirm={handleRename}
-        onClose={() => setShowRenameDialog(false)}
-      />
+      {showRenameDialog && (
+        <RenameDialog
+          isOpen={showRenameDialog}
+          currentName={instrument?.name || ''}
+          onConfirm={handleRename}
+          onClose={() => setShowRenameDialog(false)}
+        />
+      )}
 
       {/* Reset Confirmation Dialog */}
       <ConfirmDialog

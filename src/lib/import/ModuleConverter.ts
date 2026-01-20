@@ -55,7 +55,7 @@ function convertEffect(effectType: number, parameter: number): string | null {
  * Convert a raw pattern cell to our TrackerCell format
  */
 function convertCell(rawCell: RawPatternCell): TrackerCell {
-  const [noteNum, instrument, _volumeEffect, effectType, volume, parameter] = rawCell;
+  const [noteNum, instrument, , effectType, volume, parameter] = rawCell;
 
   const cell: TrackerCell = {
     note: convertNote(noteNum),
@@ -94,18 +94,10 @@ export function convertSongToPatterns(song: RawSongData): Pattern[] {
       // Extract rows for this channel
       const rows: TrackerCell[] = [];
 
-      // Track the most recently used instrument in this channel
-      let lastInstrument: number | null = null;
-
       for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
         const rawRow = rawPattern.rows[rowIdx];
         if (rawRow && rawRow[chIdx]) {
           const cell = convertCell(rawRow[chIdx] as RawPatternCell);
-
-          // Track last used instrument for this channel
-          if (cell.instrument !== null) {
-            lastInstrument = cell.instrument;
-          }
 
           rows.push(cell);
         } else {
@@ -119,7 +111,7 @@ export function convertSongToPatterns(song: RawSongData): Pattern[] {
       }
 
       // Find the first instrument used in this channel, or default to 1
-      const defaultInstrument = lastInstrument !== null ? lastInstrument : 1;
+      // const defaultInstrument = lastInstrument !== null ? lastInstrument : 1;
 
       channels.push({
         id: `import-ch-${patIdx}-${chIdx}-${Date.now()}`,
@@ -129,8 +121,9 @@ export function convertSongToPatterns(song: RawSongData): Pattern[] {
         solo: false,
         volume: 80,
         pan: 0,
-        instrumentId: defaultInstrument,
+        instrumentId: null,
         color: null,
+        collapsed: false,
       });
     }
 

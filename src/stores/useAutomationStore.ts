@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { idGenerator } from '../utils/idGenerator';
 import type {
   AutomationCurve,
   AutomationPreset,
@@ -94,7 +95,7 @@ export const useAutomationStore = create<AutomationStore>()(
     addCurve: (patternId, channelIndex, parameter) =>
       set((state) => {
         const newCurve: AutomationCurve = {
-          id: `curve-${Date.now()}`,
+          id: idGenerator.generate('curve'),
           patternId,
           channelIndex,
           parameter,
