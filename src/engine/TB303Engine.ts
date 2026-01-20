@@ -22,6 +22,7 @@
 import * as Tone from 'tone';
 import type { TB303Config, DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
+import { GuitarMLEngine } from './GuitarMLEngine';
 
 export class TB303Synth {
   // Oscillator
@@ -32,6 +33,12 @@ export class TB303Synth {
   private filter1: Tone.Filter;
   private filter2: Tone.Filter;
   private filterEnvelope: Tone.FrequencyEnvelope;
+
+  // Additional filters from Open303 for authentic tone shaping
+  private preFilterHP: Tone.Filter;    // 44.486 Hz highpass (pre-filter DC blocker)
+  private postFilterHP: Tone.Filter;   // 24.167 Hz highpass (post-filter cleanup)
+  private allpassFilter: Tone.Filter;  // 14.008 Hz allpass (phase correction)
+  private notchFilter: Tone.Filter;    // 7.5164 Hz notch (rumble removal)
 
   // VCA
   private vca: Tone.Gain;
@@ -44,10 +51,16 @@ export class TB303Synth {
   // Simulates the soft saturation of the real 303's transistor/diode filter
   private filterSaturation: Tone.WaveShaper;
 
-  // Overdrive/Saturation
+  // Overdrive/Saturation (Simple waveshaper)
   private overdrive: Tone.WaveShaper;
   private overdriveGain: Tone.Gain;
   private overdriveAmount: number = 0;
+
+  // GuitarML Neural Network Overdrive (optional, replaces waveshaper when enabled)
+  private guitarML: GuitarMLEngine | null = null;
+  private guitarMLEnabled: boolean = false;
+  private guitarMLInitialized: boolean = false; // Lazy loading flag
+  private guitarMLBypass: Tone.Gain; // For routing: either through GuitarML or bypass
 
   // Output
   private output: Tone.Gain;
@@ -72,6 +85,13 @@ export class TB303Synth {
   private baseEnvMod: number = 4000;
   private tuningCents: number = 0;
   private currentAccentBoost: number = 0;
+  private currentBPM: number = 125; // Track current BPM for tempo-relative mode
+  private tempoRelative: boolean = false; // Tempo-relative envelope mode
+
+  // Envelope modulation calibration (from Open303 hardware measurements)
+  // These values provide exponential modulation similar to the real TB-303
+  private envScaler: number = 1.0;
+  private envOffset: number = 0.0;
 
   // Devil Fish state
   private accentCharge: number = 0; // Capacitor charge for sweep speed
@@ -87,7 +107,11 @@ export class TB303Synth {
   constructor(config: TB303Config) {
     this.config = this.normalizeConfig(config);
     this.devilFish = config.devilFish ? { ...DEFAULT_DEVIL_FISH, ...config.devilFish } : { ...DEFAULT_DEVIL_FISH };
+    this.tempoRelative = config.tempoRelative ?? false;
     this.baseCutoff = this.config.filter.cutoff;
+
+    // Calculate initial envelope modulation calibration (Open303-style)
+    this.calculateEnvModScalerAndOffset();
     this.baseEnvMod = this.baseCutoff * (this.config.filterEnvelope.envMod / 100) * 10;
 
     // === OSCILLATOR ===
@@ -110,6 +134,15 @@ export class TB303Synth {
       return asymmetry + dcOffset;
     }, 4096);
 
+    // === ADDITIONAL FILTERS (from Open303) ===
+    // Pre-filter highpass: Removes DC offset and subsonic rumble before main filter
+    this.preFilterHP = new Tone.Filter({
+      type: 'highpass',
+      frequency: 44.486,
+      rolloff: -12,
+      Q: 0.707, // Butterworth response
+    });
+
     // === CASCADED FILTERS ===
     // Two 2-pole filters in series = 4-pole (24dB/oct) response
     // This gives a more authentic 303 filter sound
@@ -127,6 +160,28 @@ export class TB303Synth {
       frequency: this.baseCutoff,
       rolloff: -12, // 2-pole
       Q: filterQ * 0.7, // Slightly lower Q on second stage
+    });
+
+    // Post-filter highpass: Final cleanup of subsonic content
+    this.postFilterHP = new Tone.Filter({
+      type: 'highpass',
+      frequency: 24.167,
+      rolloff: -12,
+      Q: 0.707,
+    });
+
+    // Allpass filter: Phase correction at low frequencies
+    this.allpassFilter = new Tone.Filter({
+      type: 'allpass',
+      frequency: 14.008,
+      Q: 0.707,
+    });
+
+    // Notch filter: Removes specific resonance/rumble frequency
+    this.notchFilter = new Tone.Filter({
+      type: 'notch',
+      frequency: 7.5164,
+      Q: 0.5, // Wide notch (4.7 octaves bandwidth approximation)
     });
 
     // TB-303 MEG (Main Envelope Generator) - Filter Envelope
@@ -192,6 +247,12 @@ export class TB303Synth {
       return Math.tanh(x * drive) / Math.tanh(drive);
     }, 4096);
 
+    // === GUITARML NEURAL NETWORK OVERDRIVE ===
+    // Optional neural amp/pedal modeling (replaces waveshaper when enabled)
+    this.guitarMLBypass = new Tone.Gain(1);
+    this.guitarML = new GuitarMLEngine(Tone.getContext().rawContext as AudioContext);
+    this.guitarMLEnabled = false;
+
     // === DEVIL FISH: MUFFLER ===
     // Soft clipping on VCA output - different character from overdrive
     // Muffler softens loudest extremes while adding square-wave buzz
@@ -208,17 +269,27 @@ export class TB303Synth {
     // === OUTPUT ===
     this.output = new Tone.Gain(1);
 
-    // === CONNECT SIGNAL CHAIN ===
-    // Oscillator → Asymmetry → Filter1 → Filter2 → FilterSaturation → Overdrive → VCA → Accent → Click → Envelope → Muffler → Output
+    // === CONNECT SIGNAL CHAIN (with Open303 filter improvements) ===
+    // Oscillator → Asymmetry → PreHP → Filter1 → Filter2 → FilterSaturation → Allpass → PostHP → Notch → OverdriveGain →
+    //    → [Overdrive (waveshaper) OR GuitarML] → VCA → Accent → Click → Envelope → Muffler → Output
     //                                                                                      ↓
     //                                                                                    Bleed → Output (parallel path)
     this.oscillator.connect(this.oscillatorAsymmetry);
-    this.oscillatorAsymmetry.connect(this.filter1);
+    this.oscillatorAsymmetry.connect(this.preFilterHP);
+    this.preFilterHP.connect(this.filter1);
     this.filter1.connect(this.filter2);
     this.filter2.connect(this.filterSaturation);
-    this.filterSaturation.connect(this.overdriveGain);
+    this.filterSaturation.connect(this.allpassFilter);
+    this.allpassFilter.connect(this.postFilterHP);
+    this.postFilterHP.connect(this.notchFilter);
+    this.notchFilter.connect(this.overdriveGain);
+
+    // Overdrive routing: can switch between waveshaper and GuitarML
+    // Default: waveshaper path (GuitarML disabled)
     this.overdriveGain.connect(this.overdrive);
-    this.overdrive.connect(this.vca);
+    this.overdrive.connect(this.guitarMLBypass);
+    this.guitarMLBypass.connect(this.vca);
+
     this.vca.connect(this.accentGain);
     this.accentGain.connect(this.accentClick);
     this.accentClick.connect(this.vcaEnvelope);
@@ -247,13 +318,87 @@ export class TB303Synth {
     this.setVolume(this.baseVolume);
     this.setOverdrive(this.config.overdrive?.amount ?? 0);
 
-    console.log('[TB303Synth] Created with cascaded filters', {
+    console.log('[TB303Synth] Created with Open303-improved filters + GuitarML', {
       oscillator: this.config.oscillator.type,
       cutoff: this.config.filter.cutoff,
       resonance: this.config.filter.resonance,
       envMod: this.config.filterEnvelope.envMod,
       decay: this.config.filterEnvelope.decay,
+      improvements: 'exponential modulation + additional filters (pre-HP, post-HP, allpass, notch) + neural overdrive',
     });
+
+    // GuitarML will be lazy-loaded when first enabled
+  }
+
+  /**
+   * Initialize GuitarML engine (lazy loading)
+   */
+  private async initializeGuitarML(): Promise<void> {
+    if (!this.guitarML || this.guitarMLInitialized) return;
+
+    try {
+      console.log('[TB303Synth] Lazy loading GuitarML...');
+      await this.guitarML.initialize();
+
+      // Load model if specified in config
+      if (this.config.overdrive?.modelIndex !== undefined) {
+        await this.guitarML.loadModel(this.config.overdrive.modelIndex);
+      }
+
+      // Set initial parameters
+      if (this.config.overdrive?.drive !== undefined) {
+        this.guitarML.setGain((this.config.overdrive.drive - 50) * 0.36);
+        this.guitarML.setCondition(this.config.overdrive.drive / 100);
+      }
+
+      // Set dry/wet to 100% (full wet) by default if not specified
+      if (this.config.overdrive?.dryWet !== undefined) {
+        this.guitarML.setDryWet(this.config.overdrive.dryWet / 100);
+      } else {
+        this.guitarML.setDryWet(1.0); // 100% wet by default
+      }
+
+      this.guitarMLInitialized = true;
+      console.log('[TB303Synth] GuitarML lazy loaded successfully with dry/wet:', this.config.overdrive?.dryWet ?? 100);
+    } catch (error) {
+      console.error('[TB303Synth] Failed to initialize GuitarML:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate calibrated envelope scaler and offset
+   * Based on Open303 hardware measurements for exponential modulation
+   *
+   * This provides the characteristic TB-303 envelope response where:
+   * - Low cutoff frequencies have steeper envelope curves
+   * - High cutoff frequencies have gentler envelope curves
+   * - Envelope modulation is multiplicative (exponential), not additive
+   */
+  private calculateEnvModScalerAndOffset(): void {
+    // Constants from Open303.cpp measurements (lines 297-304)
+    const c0 = 313.8152786059267;   // Lowest nominal cutoff
+    const c1 = 2394.411986817546;   // Highest nominal cutoff
+    const oF = 0.048292930943553;
+    const oC = 0.294391201442418;
+    const sLoF = 3.773996325111173;
+    const sLoC = 0.736965594166206;
+    const sHiF = 4.194548788411135;
+    const sHiC = 0.864344900642434;
+
+    // Normalize envelope modulation (0-1)
+    const e = (this.config.filterEnvelope.envMod / 100) / 4.0;
+
+    // Normalize cutoff position (0-1)
+    const c = Math.log(this.baseCutoff / c0) / Math.log(c1 / c0);
+
+    // Calculate scaler (interpolate between low and high)
+    const sLo = sLoF * e + sLoC;
+    const sHi = sHiF * e + sHiC;
+    this.envScaler = (1.0 - c) * sLo + c * sHi;
+
+    // Calculate offset
+    this.envOffset = oF * c + oC;
   }
 
   /**
@@ -404,13 +549,13 @@ export class TB303Synth {
 
     if (this.devilFish.enabled) {
       // === DEVIL FISH MODE ===
-      // Use separate Normal/Accent decay times
-      filterDecayTime = accent
-        ? this.devilFish.accentDecay / 1000
-        : this.devilFish.normalDecay / 1000;
+      // Use separate Normal/Accent decay times (with tempo scaling)
+      const accentDecay = this.scaleDecayForTempo(this.devilFish.accentDecay);
+      const normalDecay = this.scaleDecayForTempo(this.devilFish.normalDecay);
+      filterDecayTime = accent ? accentDecay / 1000 : normalDecay / 1000;
 
-      // VEG decay time
-      vegDecayTime = this.devilFish.vegDecay / 1000;
+      // VEG decay time (with tempo scaling)
+      vegDecayTime = this.scaleDecayForTempo(this.devilFish.vegDecay) / 1000;
 
       // Soft attack for non-accented notes, authentic 3ms attack for accented notes
       attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
@@ -563,10 +708,10 @@ export class TB303Synth {
     let accentMultiplier = 1;
 
     if (this.devilFish.enabled) {
-      filterDecayTime = accent
-        ? this.devilFish.accentDecay / 1000
-        : this.devilFish.normalDecay / 1000;
-      vegDecayTime = this.devilFish.vegDecay / 1000;
+      const accentDecay = this.scaleDecayForTempo(this.devilFish.accentDecay);
+      const normalDecay = this.scaleDecayForTempo(this.devilFish.normalDecay);
+      filterDecayTime = accent ? accentDecay / 1000 : normalDecay / 1000;
+      vegDecayTime = this.scaleDecayForTempo(this.devilFish.vegDecay) / 1000;
       attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
       this.vcaEnvelope.sustain = this.devilFish.vegSustain / 100;
 
@@ -668,14 +813,17 @@ export class TB303Synth {
 
   /**
    * Set filter cutoff frequency
-   * Based on dittytoy: kf = 2^(cutoff * 7 - 7 + envmod)
+   * With Open303-style exponential modulation
    */
   public setCutoff(frequency: number): void {
     this.baseCutoff = Math.min(Math.max(frequency, 50), 18000);
     this.config.filter.cutoff = this.baseCutoff;
-    this.filter1.frequency.value = this.baseCutoff;
-    this.filter2.frequency.value = this.baseCutoff;
+
+    // Update the envelope's base frequency - envelope handles smoothing
     this.filterEnvelope.baseFrequency = this.baseCutoff;
+
+    // Recalculate envelope modulation calibration
+    this.calculateEnvModScalerAndOffset();
     this.updateEnvMod();
   }
 
@@ -690,6 +838,8 @@ export class TB303Synth {
     const q = this.devilFish.enabled && this.devilFish.highResonance
       ? this.resonanceToQHighRes(resonance)
       : this.resonanceToQ(resonance);
+
+    // Direct set - resonance changes should be immediate for acid character
     this.filter1.Q.value = q;
     this.filter2.Q.value = q * 0.7;
   }
@@ -699,27 +849,44 @@ export class TB303Synth {
    */
   public setEnvMod(envModPercent: number): void {
     this.config.filterEnvelope.envMod = Math.min(Math.max(envModPercent, 0), 100);
+
+    // Recalculate envelope modulation calibration
+    this.calculateEnvModScalerAndOffset();
     this.updateEnvMod();
   }
 
   /**
    * Update envelope modulation range
+   * Uses Open303-style exponential modulation: cutoff * pow(2, envelope * octaves)
    */
   private updateEnvMod(): void {
-    // Based on dittytoy: envmod * 5 octaves of sweep
-    this.baseEnvMod = this.baseCutoff * (this.config.filterEnvelope.envMod / 100) * 10;
-    const octaves = Math.log2((this.baseCutoff + this.baseEnvMod) / this.baseCutoff);
+    // Calculate envelope sweep in octaves using calibrated scaler
+    // The envelope will sweep from baseCutoff to baseCutoff * pow(2, octaves)
+    // envScaler determines how many octaves the envelope sweeps
+    const maxOctaves = 5.0; // Maximum sweep range (like Open303)
+    const envAmount = this.config.filterEnvelope.envMod / 100;
+
+    // Use calibrated scaler to determine actual octave range
+    // This provides the characteristic TB-303 response
+    const octaves = this.envScaler * envAmount * maxOctaves;
+
     this.filterEnvelope.octaves = Math.max(0.1, octaves);
   }
 
   /**
    * Set envelope decay time
    * Based on dittytoy: fenv *= exp(-(1-decay) * 0.004)
+   * Applies tempo scaling if tempo-relative mode is enabled
+   *
+   * NOTE: In Devil Fish mode, filter decay and VCA decay are independent.
+   * This method only updates the filter envelope decay.
+   * VCA envelope decay is controlled by vegDecay and set during note triggering.
    */
   public setDecay(decayMs: number): void {
     this.config.filterEnvelope.decay = Math.min(Math.max(decayMs, 30), 3000);
-    const decaySeconds = this.config.filterEnvelope.decay / 1000;
-    this.vcaEnvelope.decay = decaySeconds;
+    const scaledDecay = this.scaleDecayForTempo(this.config.filterEnvelope.decay);
+    const decaySeconds = scaledDecay / 1000;
+    // Only update filter envelope decay - VCA uses vegDecay independently
     this.filterEnvelope.decay = decaySeconds;
   }
 
@@ -739,21 +906,153 @@ export class TB303Synth {
 
   /**
    * Set overdrive amount (0-100)
-   * Based on dittytoy's soft clipping with upsampling
+   * Works for both waveshaper and GuitarML modes
    */
   public setOverdrive(amount: number): void {
     this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
-    this.config.overdrive = { amount: this.overdriveAmount * 100 };
+    this.config.overdrive = { ...this.config.overdrive, amount: this.overdriveAmount * 100 };
 
-    // Update waveshaper curve
-    this.overdrive.curve = new Float32Array(4096).map((_, i) => {
-      const x = (i / 4096) * 2 - 1;
-      const drive = 1 + this.overdriveAmount * 8;
-      return Math.tanh(x * drive) / Math.tanh(drive);
-    });
+    if (this.guitarMLEnabled && this.guitarML) {
+      // GuitarML mode: control drive and condition
+      const drive = amount;
+      this.guitarML.setGain((drive - 50) * 0.36); // -18 to +18 dB
+      this.guitarML.setCondition(drive / 100); // 0-1
+    } else {
+      // Waveshaper mode
+      // Update waveshaper curve
+      this.overdrive.curve = new Float32Array(4096).map((_, i) => {
+        const x = (i / 4096) * 2 - 1;
+        const drive = 1 + this.overdriveAmount * 8;
+        return Math.tanh(x * drive) / Math.tanh(drive);
+      });
 
-    // Boost input gain to drive the overdrive harder
-    this.overdriveGain.gain.value = 1 + this.overdriveAmount * 2;
+      // Boost input gain to drive the overdrive harder
+      this.overdriveGain.gain.value = 1 + this.overdriveAmount * 2;
+    }
+  }
+
+  /**
+   * Enable/disable GuitarML neural overdrive
+   * When enabled, replaces waveshaper with neural model
+   */
+  public async setGuitarMLEnabled(enabled: boolean): Promise<void> {
+    if (!this.guitarML) {
+      console.warn('[TB303Synth] GuitarML not available');
+      return;
+    }
+
+    this.guitarMLEnabled = enabled;
+
+    // If enabling GuitarML, initialize it lazily if not already done
+    if (enabled && !this.guitarMLInitialized) {
+      try {
+        await this.initializeGuitarML();
+      } catch (error) {
+        console.error('[TB303Synth] Failed to lazy load GuitarML:', error);
+        this.guitarMLEnabled = false;
+        return;
+      }
+    }
+
+    // If enabling GuitarML, wait for it to be ready
+    if (enabled && !this.guitarML.isReady()) {
+      console.log('[TB303Synth] Waiting for GuitarML to initialize...');
+      // Wait up to 5 seconds for initialization
+      const startTime = Date.now();
+      while (!this.guitarML.isReady() && (Date.now() - startTime) < 5000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (!this.guitarML.isReady()) {
+        console.error('[TB303Synth] GuitarML initialization timeout');
+        this.guitarMLEnabled = false;
+        return;
+      }
+      console.log('[TB303Synth] GuitarML ready');
+    }
+
+    // Disconnect current routing
+    this.overdriveGain.disconnect();
+    this.overdrive.disconnect();
+    this.guitarMLBypass.disconnect();
+
+    if (this.guitarMLEnabled && this.guitarML.isReady()) {
+      // Route: overdriveGain → GuitarML → bypass → vca
+      console.log('[TB303Synth] Routing through GuitarML');
+      this.overdriveGain.connect(this.guitarML.getInput());
+      this.guitarML.connect(this.guitarMLBypass);
+      this.guitarMLBypass.connect(this.vca);
+
+      this.guitarML.setEnabled(true);
+
+      // Ensure dry/wet is set to 100% (full wet) if not specified
+      if (this.config.overdrive?.dryWet === undefined) {
+        this.guitarML.setDryWet(1.0); // 100% wet
+        console.log('[TB303Synth] GuitarML dry/wet set to 100%');
+      }
+
+      // Set gain/condition from overdrive amount
+      const drive = this.config.overdrive?.amount ?? 50;
+      this.guitarML.setGain((drive - 50) * 0.36);
+      this.guitarML.setCondition(drive / 100);
+      console.log('[TB303Synth] GuitarML gain/condition set:', { drive });
+    } else {
+      // Route: overdriveGain → waveshaper → bypass → vca
+      console.log('[TB303Synth] Routing through waveshaper');
+      this.overdriveGain.connect(this.overdrive);
+      this.overdrive.connect(this.guitarMLBypass);
+      this.guitarMLBypass.connect(this.vca);
+
+      if (this.guitarML) {
+        this.guitarML.setEnabled(false);
+      }
+    }
+
+    console.log('[TB303Synth] GuitarML', enabled ? 'enabled' : 'disabled', '- ready:', this.guitarML.isReady());
+  }
+
+  /**
+   * Load GuitarML model by index (lazy loads GuitarML if needed)
+   */
+  public async loadGuitarMLModel(modelIndex: number): Promise<void> {
+    if (!this.guitarML) return;
+
+    try {
+      // Initialize GuitarML if not already done
+      if (!this.guitarMLInitialized) {
+        await this.initializeGuitarML();
+      }
+
+      await this.guitarML.loadModel(modelIndex);
+      this.config.overdrive = { ...this.config.overdrive, modelIndex };
+      console.log('[TB303Synth] Loaded GuitarML model:', modelIndex);
+    } catch (error) {
+      console.error('[TB303Synth] Failed to load GuitarML model:', error);
+    }
+  }
+
+  /**
+   * Set GuitarML dry/wet mix (0-100)
+   */
+  public setGuitarMLMix(mix: number): void {
+    if (!this.guitarML) return;
+
+    this.guitarML.setDryWet(mix / 100);
+    this.config.overdrive = { ...this.config.overdrive, dryWet: mix };
+  }
+
+  /**
+   * Get GuitarML engine for direct access
+   */
+  public getGuitarML(): GuitarMLEngine | null {
+    return this.guitarML;
+  }
+
+  /**
+   * Check if GuitarML is enabled
+   */
+  public isGuitarMLEnabled(): boolean {
+    return this.guitarMLEnabled;
   }
 
   // ============================================
@@ -772,6 +1071,32 @@ export class TB303Synth {
     this.setFilterFM(this.devilFish.filterFM);
     this.updateResonanceMode();
     console.log('[TB303Synth] Devil Fish', enabled ? 'enabled' : 'disabled', this.devilFish);
+  }
+
+  /**
+   * Scale decay time based on tempo if tempo-relative mode is enabled
+   * Reference: 125 BPM (default)
+   * Slower tempos = longer decay, faster tempos = shorter decay
+   */
+  private scaleDecayForTempo(decayMs: number): number {
+    if (!this.tempoRelative) return decayMs;
+    const referenceBPM = 125;
+    return decayMs * (referenceBPM / this.currentBPM);
+  }
+
+  /**
+   * Set current BPM for tempo-relative envelope scaling
+   */
+  public setBPM(bpm: number): void {
+    this.currentBPM = Math.min(Math.max(bpm, 20), 999);
+  }
+
+  /**
+   * Enable/disable tempo-relative envelope mode
+   * When enabled, envelope times scale with BPM (slower = longer sweeps)
+   */
+  public setTempoRelative(enabled: boolean): void {
+    this.tempoRelative = enabled;
   }
 
   /**
@@ -1227,9 +1552,22 @@ export class TB303Synth {
     // Stop filter FM processing if running
     this.stopFilterFMProcessing();
 
+    // Dispose GuitarML
+    if (this.guitarML) {
+      this.guitarML.dispose();
+      this.guitarML = null;
+    }
+
     // Dispose all audio nodes
     this.oscillator.dispose();
     this.oscillatorAsymmetry.dispose();
+
+    // Dispose Open303-style additional filters
+    this.preFilterHP.dispose();
+    this.postFilterHP.dispose();
+    this.allpassFilter.dispose();
+    this.notchFilter.dispose();
+
     this.filter1.dispose();
     this.filter2.dispose();
     this.filterSaturation.dispose();
@@ -1241,6 +1579,7 @@ export class TB303Synth {
     this.vcaBleed.dispose();
     this.overdrive.dispose();
     this.overdriveGain.dispose();
+    this.guitarMLBypass.dispose();
 
     // Dispose Devil Fish nodes
     this.muffler.dispose();
@@ -1334,6 +1673,90 @@ export class TB303Synth {
    */
   public getBaseCutoff(): number {
     return this.baseCutoff;
+  }
+
+  /**
+   * Get current envelope position (0-1) for visualization
+   * Returns normalized envelope position within ADSR curve
+   */
+  public getEnvelopePosition(): number {
+    const now = Tone.now();
+    const elapsed = now - this.lastTriggerTime;
+
+    // If no recent trigger or very old, return 0
+    if (this.lastTriggerTime === 0 || elapsed > 5) {
+      return 0;
+    }
+
+    const attack = this.filterEnvelope.attack;
+    const decay = this.lastFilterDecay;
+    const sustain = this.filterEnvelope.sustain;
+    const release = this.filterEnvelope.release;
+    const duration = this.lastTriggerDuration;
+    const totalTime = attack + decay + Math.max(duration - (attack + decay), 0) + release;
+
+    // Normalize position to 0-1 over total envelope time
+    return Math.min(elapsed / totalTime, 1);
+  }
+
+  /**
+   * Get current envelope value (0-1) for visualization
+   * Returns the actual envelope amplitude at current time
+   */
+  public getEnvelopeValue(): number {
+    const now = Tone.now();
+    const elapsed = now - this.lastTriggerTime;
+
+    // If no recent trigger or very old, return 0
+    if (this.lastTriggerTime === 0 || elapsed > 5) {
+      return 0;
+    }
+
+    const attack = this.filterEnvelope.attack;
+    const decay = this.lastFilterDecay;
+    const sustain = this.filterEnvelope.sustain;
+    const release = this.filterEnvelope.release;
+    const duration = this.lastTriggerDuration;
+
+    // Calculate envelope value (0-1)
+    let envValue = 0;
+
+    if (elapsed < attack) {
+      // Attack phase: ramp up to 1
+      envValue = elapsed / attack;
+    } else if (elapsed < attack + decay) {
+      // Decay phase: exponential decay from 1 to sustain
+      const decayElapsed = elapsed - attack;
+      const decayProgress = decayElapsed / decay;
+      envValue = 1 - (1 - sustain) * (1 - Math.exp(-3 * decayProgress));
+    } else if (elapsed < duration) {
+      // Sustain phase
+      envValue = sustain;
+    } else if (elapsed < duration + release) {
+      // Release phase
+      const releaseElapsed = elapsed - duration;
+      const releaseProgress = releaseElapsed / release;
+      envValue = sustain * Math.exp(-3 * releaseProgress);
+    }
+
+    return envValue;
+  }
+
+  /**
+   * Get accent charge level (0-1) for visualization
+   * Returns the current Devil Fish accent sweep capacitor charge
+   */
+  public getAccentCharge(): number {
+    return this.accentCharge;
+  }
+
+  /**
+   * Check if envelope is currently active
+   */
+  public isEnvelopeActive(): boolean {
+    const now = Tone.now();
+    const elapsed = now - this.lastTriggerTime;
+    return this.lastTriggerTime > 0 && elapsed < 5;
   }
 
   /**
