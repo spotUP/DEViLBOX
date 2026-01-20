@@ -1,0 +1,189 @@
+{
+  "format": "devilbox-song",
+  "version": "1.1.0",
+  "metadata": {
+    "id": "daft-punk-da-funk",
+    "name": "Da Funk - Daft Punk",
+    "author": "Daft Punk",
+    "description": "The iconic acid bassline from 'Da Funk'. Corrected octave shifts (Up/Down), slides, and accents.",
+    "createdAt": "2026-01-18T00:00:00.000Z",
+    "modifiedAt": "2026-01-18T00:00:00.000Z",
+    "version": "1.1.0"
+  },
+  "bpm": 111,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "303 Sawtooth",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": {
+          "type": "sawtooth"
+        },
+        "filter": {
+          "cutoff": 450,
+          "resonance": 65
+        },
+        "filterEnvelope": {
+          "envMod": 80,
+          "decay": 450
+        },
+        "accent": {
+          "amount": 75
+        },
+        "slide": {
+          "time": 60,
+          "mode": "exponential"
+        }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 2,
+      "name": "909 Kick",
+      "synthType": "MembraneSynth",
+      "envelope": {
+        "attack": 2,
+        "decay": 350,
+        "sustain": 0,
+        "release": 100
+      },
+      "effects": [],
+      "volume": -4,
+      "pan": 0,
+      "parameters": {
+        "pitchDecay": 0.05,
+        "octaves": 5
+      }
+    },
+    {
+      "id": 3,
+      "name": "909 Snare",
+      "synthType": "NoiseSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 150,
+        "sustain": 0,
+        "release": 80
+      },
+      "effects": [],
+      "volume": -8,
+      "pan": 0,
+      "parameters": {
+        "type": "white"
+      }
+    },
+    {
+      "id": 4,
+      "name": "909 Hi-Hat",
+      "synthType": "MetalSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 50,
+        "sustain": 0,
+        "release": 30
+      },
+      "effects": [],
+      "volume": -15,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-da-funk",
+      "name": "Da Funk Riff",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-303",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 90,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            { "note": "G-1", "instrument": 1, "volume": null, "effect": "F6F", "accent": false, "slide": false },
+            { "note": "A#3", "instrument": 1, "volume": null, "effect": "F06", "accent": false, "slide": false },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "F-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "D#2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "C#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "C#1", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "C#2", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": false },
+            { "note": "D#3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "D#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "F-3", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G-3", "instrument": 1, "volume": null, "effect": null, "accent": true, "slide": true },
+            { "note": "G#1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": false },
+            { "note": "G-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "C-1", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true },
+            { "note": "G-2", "instrument": 1, "volume": null, "effect": null, "accent": false, "slide": true }
+          ]
+        },
+        {
+          "id": "ch-drums",
+          "name": "Drums",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#f97316",
+          "rows": [
+            { "note": "C-1", "instrument": 2, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": "C-1", "instrument": 2, "volume": null, "effect": null },
+            { "note": "C-2", "instrument": 3, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": "C-1", "instrument": 2, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": "C-1", "instrument": 2, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": "C-2", "instrument": 3, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null },
+            { "note": null, "instrument": null, "volume": null, "effect": null }
+          ]
+        },
+        {
+          "id": "ch-hats",
+          "name": "Hats",
+          "muted": false,
+          "solo": false,
+          "volume": 70,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#eab308",
+          "rows": [
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 30, "effect": null },
+            { "note": "C-4", "instrument": 4, "volume": 20, "effect": null }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": [
+    "pattern-da-funk"
+  ]
+}

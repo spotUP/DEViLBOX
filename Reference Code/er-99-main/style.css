@@ -1,0 +1,964 @@
+body {
+    color: #eee;
+    /* font-family: Arial, Helvetica, sans-serif; */
+    font-family: 'Space Mono', monospace;
+    background: #333;
+    height: 100%;
+    margin: 0;
+    padding: 10px;
+    box-sizing: border-box;
+    background-image: linear-gradient(90deg, rgb(48, 139, 146),rgb(46, 142, 110));
+    background-size: cover;
+}
+
+.clear{ clear: both;  }
+.right{ float: right; }
+.left { float: left;  }
+
+a {
+    color: #a8edff;
+    font-weight: bold;
+}
+
+a:hover{
+    color: #85e3fc;
+}
+
+a:active{
+    color: #427d8d;
+}
+
+html{
+    height: 100%;
+}
+
+#wrapper{
+    color: #545c79;
+
+    background-color: #e8e4da;
+    /* border: 2px solid #d8d4ca; */
+    padding: 1px 20px;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+    position: relative;
+    /* border-top: 5px solid rgba(255,255,255, 0.5); */
+    /* border-top: 1px solid transparent; */
+    border-left: 15px solid rgb(93, 92, 86);
+    border-right: 15px solid rgb(93, 92, 86);
+    box-sizing: border-box;
+    /* border-bottom: 5px solid rgba(0,0,0, 0.5); */
+    min-height: 710px;
+    background-size: cover;
+}
+
+#bg{
+    z-index: 0;;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.5;
+    background-image: url('img/plastic_texture_1920.jpg');
+    background-size: cover;
+    box-shadow:  inset 0 7px 9px rgb(255 255 255 / 90%), inset -1px -13px 15px rgb(0 0 0 / 50%)
+}
+
+.header{
+    position: relative;
+    z-index: 2;
+}
+
+h1, h2{
+    margin: 0;
+}
+
+#logotype{
+    float: left;
+}
+
+#midi{
+    margin: 20px 0;
+}
+
+#midi .led{
+    margin: 8px;
+}
+
+#midi_controls{
+    text-align: right;
+    width: 350px;
+    margin-top: 18px;
+    float: right;
+    font-size: 10px;
+}
+
+#midi_button{
+    top: -5px;
+}
+
+select{
+    background: transparent;
+    color: #666;
+    font-family: 'Space Mono';
+    font-size: 10px;
+}
+
+input[type="text"]{
+    color : #fff;
+    border: 0px none;
+    background: rgba(255,255,255,0.3);
+    font-family: 'Space Mono';
+    font-size: 14px;
+}
+
+.archive{
+    font-family: 'Exo', "Archive";
+    font-weight: 900;
+}
+
+button {
+    padding: 10px;
+}
+
+.highlight, #logotype { 
+    color: #fd8505;
+}
+
+.highlight{
+    background-color: #272c3f; 
+}
+
+.highlight:hover{
+    background-color:  #3f4761;;
+}
+
+.highlight:active, .highlight.active { 
+    background-color: #10131b; 
+}
+
+
+
+.shift {
+    background-color: #f29d2b;
+    font-style: italic;
+    font-weight: 700;
+}
+
+/* .shift:hover{
+    background-color: #e77c09;
+}
+
+.shift:active{
+    background-color: #c36d11;
+} */
+
+.controls{
+    margin: 0 -20px 0 -10px;
+}
+
+.control_group{
+    /* max-width: 155px; */
+    float: left;
+    display: block;
+    padding: 20px;
+    margin-left: 0;
+    font-size: 12px;
+    width: 12.2%;
+    box-sizing: border-box;
+    /* border-left: 1px solid #545c79; */
+}
+
+/* .control_group:nth-of-type(1){
+    padding-left: 0;
+} */
+
+
+
+.control_divider{
+    height: 280px;
+    float: left;
+    border-left: 2px solid #545c79;
+    margin: 50px 0 0 0;
+}
+
+.control_group_header{
+    display: block;
+    text-align: center;
+    padding: 0;
+    /* text-transform: uppercase; */
+    /* font-weight: bold; */
+    font-style: italic;
+    font-weight: 700;
+    /* letter-spacing: -1px; */
+    font-size: 14px;
+    margin: 0 -15px;
+    position: relative;
+    z-index: 10;
+    height: 32px;
+}
+
+.control_group_header .instrument_name{
+    /* border: 1px solid red; */
+    display: block;
+    text-align: center;
+    padding: 5px 0;
+}
+
+.control_group_header .instrument_name.half_width{
+    width: 50%;
+    float: left;
+}
+
+.control_group_header .instrument_name.half_width:nth-of-type(2){
+    text-align: right;
+}
+.control_group_header .instrument_name.half_width:nth-of-type(3){
+    text-align: left;
+}
+
+
+.control{
+    width: 50%;
+    float: left;
+    margin: 15px 0 2px 0;
+    text-align: center;
+    letter-spacing: 0px;
+    /* text-transform: uppercase; */
+    position: relative;
+}
+
+
+.knob{
+    border: 2px solid #333;
+    width: 40px;
+    height: 40px;
+    border-radius: 25px;
+    transform: rotate(0);
+    position: relative;
+    background-color: #1b2132;
+    background-image: url('img/plastic_texture_dark.jpg');
+    background-size: 300px;
+    margin-bottom: 5px;
+}
+
+/* .control:nth-of-type(1n) .knob,
+.master_control:nth-of-type(1n) .knob{ 
+    background-position: -100px -100px;
+}
+
+.control:nth-of-type(2n) .knob,
+.master_control:nth-of-type(2n) .knob{ 
+    background-position: -200px -200px;
+}
+
+.control:nth-of-type(3n) .knob,
+.master_control:nth-of-type(3n) .knob{ 
+    background-position: -200px 0px;
+}
+
+.control:nth-of-type(4n) .knob,
+.master_control:nth-of-type(4n) .knob{ 
+    background-position: 0px -200px;
+} */
+
+
+.big_knob{
+    width: 70px;
+    height: 70px;
+    border-radius: 50px;
+    margin-bottom: 0;
+    display: block;
+}
+
+.control:before, .master_control.has_knob:before{
+    content: ' ';
+    box-shadow: 2px 5px 5px rgb(0 0 0 / 50%);
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    top: 1px;
+    left: 50%;
+    margin-left: -20px;
+    border-radius: 50%;
+    display: block;
+}
+
+
+
+.knob .indicator{
+    height: 10px;
+    width: 1px;
+    background: #fd8505;
+    position: absolute;
+    top: 0px;
+    left: 50%;
+    border-left: 3px solid #ed7505;
+    /* border-right: 1px solid #666; */
+}
+
+#sequencer{
+    clear: both;
+    margin-top: 20px;
+}
+
+#sequencer{
+    clear: both;
+    margin-top: 20px;
+    height: auto;
+    /* background: rgba(0,0,0,0.9); */
+    padding: 2px 0 3px 0;
+}
+
+#sequencer::after{
+    content: ' ';
+    clear: both;
+    width: 0;
+    height: 0;
+    position: relative;
+    display:block;
+}
+
+.sequencer_button, .big_button{
+    box-sizing: border-box;
+
+    width: 5.75%; 
+    aspect-ratio: 1 / 1;
+    margin: 0 0.5% 0 0;
+    float: left;
+    display: block;
+    border-style: solid;
+    border-color: transparent;
+    border-color: rgba(0, 0, 0, 0.31) rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.31);
+    /* background-color: rgba(0, 0, 0, 0.61);; */
+    border-width: 1px 3px 4px 3px;
+    border-radius: 2px;
+    position: relative;
+    z-index: 10;
+    box-sizing: border-box;
+    box-shadow:  inset 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.sequencer_button::after, .big_button::after, .control_group_header:after{
+    content: ' ';
+    background-image: url(img/plastic_texture_small.jpg);
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    position: absolute;
+    z-index: -1;
+    opacity: 0.4;
+    background-size: 100%;
+    border-radius: 3px;
+}
+
+.sequencer_button::before, .big_button::before{
+    background-color: #d1c8af;
+    content: ' ';
+    position: absolute;
+    display: block;
+    top: 0;
+    left: 0;
+    background: transparent;
+    border-top: 3px solid #d7d5cf;
+    border-left: 8px solid #bbab8d;
+    border-bottom: 12px solid #b7b4ad;
+    border-right: 6px solid #5e5c5c;
+    border-radius: 3px;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    box-shadow: 3px 3px 5px rgba(0,0,0,0.7);
+    overflow: hidden;
+}
+
+.sequencer_button:active, .big_button:active{
+    border-width: 3px 3px 2px 3px;
+}
+
+.sequencer_button:active::before, .big_button:active::before{
+    box-shadow: none;
+    /*box-shadow: 2px -2px 2px rgb(0 0 0 / 50%); */
+    background-color: #aca080;
+    border-color: #8d8a81 #3e3c3c #87837a #74674f;
+    box-shadow: 2px 2px 3px rgba(0,0,0,0.5)
+    /* top: 4px; */
+}
+
+/* .sequencer_button .number{
+    border-bottom: 1px solid #5e5c5c;
+}
+
+.sequencer_button:nth-of-type(4n+1) .number{
+    text-decoration-line: underline;
+    border-bottom: 2px solid rgba(100,100,100,0.5);
+} */
+
+.sequencer_button:nth-of-type(4n+1):before{
+    background-color: #fafafa;
+}
+
+.big_button{
+    width: 60px;
+    height: 60px;
+}
+
+.rect_button{
+    width: 30px;
+    height: 16px;
+    display: inline-block;
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid rgb(0 0 0 / 29%);
+    box-shadow: 1px 1px 2px rgb(0 0 0 / 70%);
+    position: relative;
+    top: 1px;
+}
+
+.rect_button:before{
+    content: '';
+    background-image: url(img/plastic_texture_small.jpg);
+    background-size: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 30px;
+    height: 16px;
+    opacity: 0.5;
+}
+
+
+.rect_button:active{
+    top: 2px;
+    box-shadow: 0px 0px 1px rgb(0 0 0 / 37%);
+
+}
+
+    /* .sequencer_button:before{
+        content: ' ';
+        position: absolute;
+        width: 102%;
+        height: 102%;
+        background:rgba(255, 255, 255, 0.3);
+        margin: -5px;
+        top: -2px;
+        left: -2px;
+    } */
+
+.squareled{
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    margin-left: -15%;
+    width: 30%;
+    height: 7px;
+    background: rgba(0, 0, 0, 0.7)
+}
+
+.active .squareled{
+    /* box-shadow: inset 0 0 5px rgba(255, 66, 66, 0.99); */
+    /* background-image: radial-gradient(rgb(222, 112, 112), rgb(134, 23, 23)); */
+    background-image: radial-gradient(rgb(222, 58, 58), rgb(139, 29, 29));
+
+    background-color: rgba(240, 0, 0, 0.7);
+    box-shadow: 0 0 5px rgba(235, 52, 52, 0.9);
+}
+
+.accent .squareled{
+    background-image: radial-gradient(rgb(219, 155, 155), rgb(225, 73, 73), rgb(192, 35, 35));
+    background-color: rgba(240, 0, 0, 0.7);
+    box-shadow: 0 0 8px rgba(235, 52, 52, 0.9);
+    /* box-shadow: 0 0 5px rgba(209, 5, 5, 0.9); */
+}
+
+.sequencer_button .number{
+    display: block;
+    position: absolute;
+    top: -30px;
+    text-align: center;
+    width: 100%;
+    left: 0;
+    margin: 0;
+}
+
+.sequencer_button:active .number{
+    top: -32px;
+}
+
+.led{
+    background-color:rgba(88, 4, 4, 0.7);
+    width: 10px;
+    height: 10px;
+    float: left;
+    margin: 10px -15px 0 5px;
+    /* transition: box-shadow 0.5s linear; */
+    box-shadow: inset 0 0 5px rgba(255, 66, 66, 0.01);
+    transition: box-shadow 0.2s linear, background-color 0.2s linear;
+    border-radius: 10px;
+
+}
+
+.led:last-of-type{
+    /* background-color: blue; */
+    float: right;
+    margin: 10px 5px 0 -15px;
+}
+
+.led.active{
+    box-shadow: inset 0 0 5px rgba(255, 66, 66, 0.99);
+    background-color: rgba(240, 0, 0, 0.7);
+    transition: box-shadow 0.01s linear, background-color 0.01s linear;
+}
+
+.short_name{
+    display: none;
+}
+
+#master_controls{
+    padding: 10px 0 0;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-width: 1px 0;
+    margin-top: 0px;
+    min-height: 90px;
+    margin-bottom: 10px;
+}
+
+#master_controls_1, #master_controls_2, #master_controls_3{
+    float: left;
+}
+
+#master_controls_4{
+    float: right;
+}
+
+.master_control{
+    position: relative;
+    display: block;
+    float: left;
+    padding-right: 20px;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.master_control.has_knob:before{
+    top: 0px;
+    left: 0px;
+    margin-left: 0;
+    width: 68px;
+    height: 68px;
+}
+
+#screen{
+    background:rgb(62, 3, 3);
+    color:rgba(240, 0, 0, 0.7);
+    text-shadow: 0px 1px 8px rgba(255, 66, 66, 0.66);
+    font-size: 60px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 10px;
+    padding: 10px;
+    height: 50px;
+    line-height: 44px;
+    padding-right: 5px;
+    width: 148px;
+    text-align: right;
+    text-transform: uppercase;
+}
+
+.led_button{
+    background-image: radial-gradient(rgb(87, 57, 57), rgb(130, 117, 117), rgb(90, 81, 81));
+    width: 20px;
+    height: 20px;
+    margin: 0 5px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: rgba(68, 68, 68, 0.35);
+    box-sizing: border-box;
+    overflow: visible;
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.led_button.dim, .led_button.dim:hover{
+    background-image: radial-gradient(rgb(212, 212, 212), rgb(165, 165, 165), rgb(132, 132, 132));
+}
+
+.led_button.active{
+    background-image: radial-gradient(rgb(255, 186, 186), rgb(188, 13, 13), rgb(162, 72, 72));
+    border-color: rgba(177, 57, 57, 0.5);
+    /* box-shadow: rgba(255, 66, 66, 0.66); */
+    box-shadow: 0 0 5px rgba(255, 61, 61, 0.7);
+
+}
+
+.led_button:hover{
+    background-image: radial-gradient(rgb(67, 43, 43), rgb(106, 93, 93), rgb(71, 62, 62));
+}
+
+.led_button.active:hover{
+    background-image: radial-gradient(rgb(236, 176, 176), rgb(173, 14, 14), rgb(155, 74, 74));
+}
+
+.led_button:active, .led_button.active:active{
+    background-image: radial-gradient(rgb(130, 79, 79), rgb(86, 42, 42), rgb(44, 36, 36));
+}
+
+
+.led_button .number{
+    position: relative;
+    top: 20px;
+    left: -4px;
+}
+
+
+
+
+
+
+/* /////////////////////////
+/////////////////////////////
+////// BELOW THE DRUM MACHINE
+/////////////////////////////
+/////////////////////////////
+ */
+
+
+
+.postscript{
+    /* max-width: 1000px; */
+    margin: 0 auto;
+}
+
+
+.column{
+    width: 30%; 
+    float: right;
+    margin: 0 2% 0 1%;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+}
+
+.doublecolumn{
+    float: left;
+    width: 45%;
+    margin: 0 2%;
+}
+
+hr{
+    border: 0px none;
+    border-top: 1px solid rgba(255,255,255,0.5);
+    background: transparent;
+    height: 0;
+    margin: 19px 30px;
+    clear: both;
+    border-bottom: 0px none;
+    box-shadow: none;
+}
+/* .column:nth-of-type(n-1){
+    padding-right: 10px;
+} */
+
+.simple_button{
+    font-family: 'Space Mono', monospace;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border: 0px none;
+    border-radius: 10px;
+    background: #e8e4da;
+    position: relative;
+}
+
+.simple_button:hover{
+    background: #dcd7cb;
+    box-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+.simple_button:active{
+    background: #c6c2b8;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+    top: 1px;
+}
+
+.preset_list{
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.preset_list li{
+    list-style-type: decimal;
+    padding: 5px;
+    position: relative;
+}
+
+.preset_list li .preset_delete{
+    display: none;
+}
+
+.preset_list::-webkit-scrollbar {
+    width: 12px;               /* width of the entire scrollbar */
+  }
+  
+.preset_list::-webkit-scrollbar-track {
+    background: transparent;        /* color of the tracking area */
+}
+  
+.preset_list::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.5);    /* color of the scroll thumb */
+    border-radius: 20px;       /* roundness of the scroll thumb */
+    border: 3px solid transparent;  /* creates padding around scroll thumb */
+  }
+
+
+#save_preset, #save_sequence{
+    float: left;
+    margin-top: 10px;
+    margin-left: 15px;
+}
+
+
+.preset_list li:hover{
+    background: rgba(255,255,255,0.3); 
+    cursor: pointer;
+}
+
+.preset_list li:active{
+    background: rgba(100,100,100,0.5); 
+    cursor: pointer;
+}
+
+.preset_list li:hover .preset_delete{
+    display: inline-block;
+    position: absolute;
+    right: 5px;
+}
+
+.preset_list li:hover .preset_delete:hover{
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+
+
+@media only screen and (max-width : 1250px){
+    #master_controls{
+        min-height: 170px;
+    }
+
+    #master_controls_2{
+        float: left;
+    }
+
+    #master_controls_3{
+        float: left;
+        clear: left;
+    }
+
+    .big_knob{
+        width: 60px;
+        height: 60px;
+        display: block;
+    }
+
+    .master_control.has_knob:before{
+        width: 58px;
+        height: 58px;
+    }
+    
+}
+
+
+/* iPads (portrait and landscape) ----------- */
+@media only screen and (max-width : 999px) and (min-width: 713px){
+  /* Styles */
+    .control_group{
+        width: 24.6%;
+    }
+
+    .extra_parameters{
+        display: none;
+    }
+
+    .control_group:nth-of-type(6){
+        padding-right: 0;
+    }
+
+    .control_group:nth-of-type(9){
+        clear: left;
+    }
+
+    .control_divider{
+        height: 168px;
+    }
+
+    .control_divider:nth-of-type(8){
+        display: none;
+    }
+
+    .sequencer_button{
+        margin-right: 2px;
+        width: 5.9%;
+    }
+
+    .sequencer_button::before{
+        border-width: 0px 2px 5px 4px;
+    }
+
+    .hidden-md{ display: none; }
+
+    #master_controls_2{
+        float: left;
+    }
+
+    #master_controls_3{
+        clear: left;
+        float: left;
+    }
+
+    .column{
+        width: 45%; 
+        margin: 0 2% 0 1%;
+    }
+
+
+    .flexcolumn, .doublecolumn{
+        clear: both;
+        width: auto;
+        border-top: 1px solid rgba(255,255,255,0.5);
+        margin-top: 20px;
+        padding-top: 20px;
+    }
+
+
+}
+
+
+/* Smartphones (landscape) ----------- */
+@media only screen and (max-width : 712px) {
+    body{
+        padding: 5px;
+    }
+
+    #bg{
+        /* background-image: none; */
+        background-size: auto 100%;
+        padding: 0;
+    }
+
+    #wrapper{
+        border-width: 2px;
+        margin: 10px 0;
+    }
+
+    .control br{
+        display: none;
+    }
+
+    .control:before{
+        display: none;
+    }
+
+    .control_group{
+        width: 50%;
+        padding-top: 5px;
+    }
+
+    .control_divider{
+        display: none;
+        height: 167px;
+    }
+
+    .control_divider::nth-of-type(4) {
+        display: none;
+    }
+
+    .sequencer_button{
+        border-width: 0px 2px 3px 2px;
+        margin-right: 1px;
+        width: 12.2%;
+        margin-bottom: 30px;
+    }
+
+    .hidden-md, .hidden-sm{ display: none; }
+
+    .big_knob, .big_button{ 
+        width: 55px;
+        height: 55px;
+        display: block;
+    }
+
+    .master_control.has_knob:before{
+        width: 53px;
+        height: 53px;
+    }
+
+    /* .sequencer_button .number{
+        top: 9px !important;
+    } */
+
+    #screen{
+        font-size: 56px;
+        height: 50px;
+        width: 130px;
+        margin-bottom: 20px;
+    }
+
+    .led_button{
+        margin: 0 2px 25px;
+    }
+
+    #master_controls_2{
+        float: right;
+    }
+
+    #master_controls_3{
+        clear: left;
+        float: left;
+    }
+
+    #master_controls_4{
+        clear: right;
+    }
+
+    .column, .doublecolumn{
+        width: 45%; 
+        margin: 0 2% 0 1%;
+    }
+    
+
+}
+
+
+
+/*  */
+
+@media only screen and (max-width : 480px) {  
+    .control_group {
+        width: 100%;
+        float: none;
+        /* border-bottom: 2px solid #ccc; */
+        clear: both;
+    }
+
+    .control_divider{
+        display: none;
+    }
+
+    .sequencer_button{
+        border-width: 0px 1px 2px 2px;
+        margin: 0px;
+        width: 25%;
+    }
+
+    .hidden-md, .hidden-sm, .hidden-xs{ display: none;}
+
+    .column{
+        width: 100%; 
+        margin: 0;
+    }
+
+}
+
+  

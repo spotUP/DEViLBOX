@@ -1,0 +1,134 @@
+{
+  "format": "devilbox-song",
+  "version": "1.1.0",
+  "metadata": {
+    "id": "default-song",
+    "name": "Default Project",
+    "author": "User",
+    "description": "Default empty project with TB-303 and Drum Machine",
+    "createdAt": "2026-01-19T00:00:00.000Z",
+    "modifiedAt": "2026-01-19T00:00:00.000Z",
+    "version": "1.1.0"
+  },
+  "bpm": 140,
+  "instruments": [
+    {
+      "id": 0,
+      "name": "TB-303 Acid",
+      "synthType": "TB303",
+      "tb303": {
+        "tuning": 0,
+        "oscillator": {
+          "type": "sawtooth"
+        },
+        "filter": {
+          "cutoff": 800,
+          "resonance": 65
+        },
+        "filterEnvelope": {
+          "envMod": 60,
+          "decay": 200
+        },
+        "accent": {
+          "amount": 70
+        },
+        "slide": {
+          "time": 60,
+          "mode": "exponential"
+        },
+        "overdrive": {
+          "amount": 0
+        },
+        "neuralModel": "none"
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 1,
+      "name": "808 Kick",
+      "synthType": "MembraneSynth",
+      "oscillator": { "type": "sine", "detune": 0, "octave": -2 },
+      "envelope": { "attack": 0.001, "decay": 0.5, "sustain": 0, "release": 0.1 },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 2,
+      "name": "DnB Snare",
+      "synthType": "NoiseSynth",
+      "envelope": { "attack": 0.001, "decay": 0.2, "sustain": 0, "release": 0.1 },
+      "effects": [],
+      "volume": -8,
+      "pan": 0
+    },
+    {
+      "id": 3,
+      "name": "Closed Hat",
+      "synthType": "MetalSynth",
+      "envelope": { "attack": 0.001, "decay": 0.05, "sustain": 0, "release": 0.02 },
+      "effects": [],
+      "volume": -12,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-0",
+      "name": "Pattern 00",
+      "length": 64,
+      "channels": [
+        {
+          "id": "channel-0",
+          "name": "Channel 1",
+          "rows": [],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": null,
+          "color": "#22c55e",
+          "collapsed": false
+        },
+        {
+          "id": "channel-1",
+          "name": "Channel 2",
+          "rows": [],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": null,
+          "color": "#f97316",
+          "collapsed": false
+        },
+        {
+          "id": "channel-2",
+          "name": "Channel 3",
+          "rows": [],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": null,
+          "color": "#a855f7",
+          "collapsed": false
+        },
+        {
+          "id": "channel-3",
+          "name": "Channel 4",
+          "rows": [],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": null,
+          "color": "#eab308",
+          "collapsed": false
+        }
+      ]
+    }
+  ]
+}
