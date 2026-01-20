@@ -6,13 +6,13 @@ import { saveAs } from 'file-saver';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { ProjectMetadata } from '@typedefs/project';
-
+import { APP_VERSION } from '@constants/version';
 import type { AutomationCurve } from '@typedefs/automation';
 
 // Export Format Types
 export interface SongExport {
   format: 'devilbox-song';
-  version: '1.0.0';
+  version: string;
   metadata: ProjectMetadata;
   bpm: number;
   instruments: InstrumentConfig[];
@@ -25,7 +25,7 @@ export interface SongExport {
 
 export interface SFXExport {
   format: 'devilbox-sfx';
-  version: '1.0.0';
+  version: string;
   name: string;
   instrument: InstrumentConfig;
   pattern: Pattern;
@@ -34,7 +34,7 @@ export interface SFXExport {
 
 export interface InstrumentExport {
   format: 'devilbox-instrument';
-  version: '1.0.0';
+  version: string;
   instrument: InstrumentConfig;
 }
 
@@ -60,7 +60,7 @@ export function exportSong(
 ): void {
   const songData: SongExport = {
     format: 'devilbox-song',
-    version: '1.0.0',
+    version: APP_VERSION,
     metadata,
     bpm,
     instruments,
@@ -94,7 +94,7 @@ export function exportSFX(
 ): void {
   const sfxData: SFXExport = {
     format: 'devilbox-sfx',
-    version: '1.0.0',
+    version: APP_VERSION,
     name,
     instrument,
     pattern,
@@ -120,7 +120,7 @@ export function exportInstrument(
 ): void {
   const instrumentData: InstrumentExport = {
     format: 'devilbox-instrument',
-    version: '1.0.0',
+    version: APP_VERSION,
     instrument,
   };
 
@@ -214,7 +214,7 @@ export async function detectFileFormat(file: File): Promise<'song' | 'sfx' | 'in
  */
 function sanitizeFilename(name: string): string {
   return name
-    .replace(/[^a-z0-9_\-]/gi, '_')
+    .replace(/[^a-z0-9_-]/gi, '_')
     .replace(/_{2,}/g, '_')
     .toLowerCase();
 }
@@ -222,32 +222,32 @@ function sanitizeFilename(name: string): string {
 /**
  * Validate exported data structure
  */
-export function validateSongExport(data: any): data is SongExport {
+export function validateSongExport(data: any): data is SongExport { // eslint-disable-line @typescript-eslint/no-explicit-any
   return (
     data &&
     data.format === 'devilbox-song' &&
-    data.version === '1.0.0' &&
+    data.version === APP_VERSION &&
     Array.isArray(data.instruments) &&
     Array.isArray(data.patterns) &&
     Array.isArray(data.sequence)
   );
 }
 
-export function validateSFXExport(data: any): data is SFXExport {
+export function validateSFXExport(data: any): data is SFXExport { // eslint-disable-line @typescript-eslint/no-explicit-any
   return (
     data &&
     data.format === 'devilbox-sfx' &&
-    data.version === '1.0.0' &&
+    data.version === APP_VERSION &&
     data.instrument &&
     data.pattern
   );
 }
 
-export function validateInstrumentExport(data: any): data is InstrumentExport {
+export function validateInstrumentExport(data: any): data is InstrumentExport { // eslint-disable-line @typescript-eslint/no-explicit-any
   return (
     data &&
     data.format === 'devilbox-instrument' &&
-    data.version === '1.0.0' &&
+    data.version === APP_VERSION &&
     data.instrument
   );
 }
