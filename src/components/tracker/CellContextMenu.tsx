@@ -14,6 +14,8 @@ import {
   Wand2,
   Columns,
   LayoutGrid,
+  ArrowUpCircle,
+  ArrowDownCircle,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -40,96 +42,112 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     currentPatternIndex,
     setCell,
     cursor,
+    selection,
+    copySelection,
+    cutSelection,
+    paste,
+    transposeSelection,
+    selectColumn,
+    selectChannel,
+    insertRow: insertRowAction,
+    deleteRow: deleteRowAction,
   } = useTrackerStore();
 
   const pattern = patterns[currentPatternIndex];
 
-  // Copy cell to clipboard
+  const isInsideSelection = useMemo(() => {
+    if (!selection) return false;
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const maxRow = Math.max(selection.startRow, selection.endRow);
+    const minCh = Math.min(selection.startChannel, selection.endChannel);
+    const maxCh = Math.max(selection.startChannel, selection.endChannel);
+    return rowIndex >= minRow && rowIndex <= maxRow && channelIndex >= minCh && channelIndex <= maxCh;
+  }, [selection, rowIndex, channelIndex]);
+
+  // Copy cell or selection
   const handleCopy = useCallback(() => {
-    if (!pattern) return;
-    const cell = pattern.channels[channelIndex].rows[rowIndex];
-    localStorage.setItem('devilbox-cell-clipboard', JSON.stringify(cell));
-  }, [pattern, channelIndex, rowIndex]);
+    if (isInsideSelection) {
+      copySelection();
+    } else {
+      if (!pattern) return;
+      const cell = pattern.channels[channelIndex].rows[rowIndex];
+      localStorage.setItem('devilbox-cell-clipboard', JSON.stringify(cell));
+    }
+    onClose();
+  }, [isInsideSelection, copySelection, pattern, channelIndex, rowIndex, onClose]);
 
-  // Cut cell
+  // Cut cell or selection
   const handleCut = useCallback(() => {
-    handleCopy();
-    setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
-    });
-  }, [handleCopy, setCell, channelIndex, rowIndex]);
+    if (isInsideSelection) {
+      cutSelection();
+    } else {
+      handleCopy();
+      setCell(channelIndex, rowIndex, {
+        note: null,
+        instrument: null,
+        volume: null,
+        effect: null,
+      });
+    }
+    onClose();
+  }, [isInsideSelection, cutSelection, handleCopy, setCell, channelIndex, rowIndex, onClose]);
 
-  // Paste cell
+  // Paste cell or selection
   const handlePaste = useCallback(() => {
-    const clipboardData = localStorage.getItem('devilbox-cell-clipboard');
-    if (clipboardData) {
-      try {
-        const cell = JSON.parse(clipboardData);
-        setCell(channelIndex, rowIndex, cell);
-      } catch (e) {
-        console.error('Failed to paste cell:', e);
+    if (isInsideSelection || selection) {
+      paste();
+    } else {
+      const clipboardData = localStorage.getItem('devilbox-cell-clipboard');
+      if (clipboardData) {
+        try {
+          const cell = JSON.parse(clipboardData);
+          setCell(channelIndex, rowIndex, cell);
+        } catch (e) {
+          console.error('Failed to paste cell:', e);
+        }
       }
     }
-  }, [setCell, channelIndex, rowIndex]);
+    onClose();
+  }, [isInsideSelection, selection, paste, setCell, channelIndex, rowIndex, onClose]);
 
-  // Clear cell
+  // Clear cell or selection
   const handleClear = useCallback(() => {
-    setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
-    });
-  }, [setCell, channelIndex, rowIndex]);
+    if (isInsideSelection) {
+      cutSelection(); // cut is equivalent to clear + copy to buffer
+    } else {
+      setCell(channelIndex, rowIndex, {
+        note: null,
+        instrument: null,
+        volume: null,
+        effect: null,
+      });
+    }
+    onClose();
+  }, [isInsideSelection, cutSelection, setCell, channelIndex, rowIndex, onClose]);
 
   // Insert row (shift down)
   const handleInsertRow = useCallback(() => {
-    if (!pattern) return;
-    // Shift all rows down from current position
-    for (let row = pattern.length - 1; row > rowIndex; row--) {
-      const prevCell = pattern.channels[channelIndex].rows[row - 1];
-      setCell(channelIndex, row, prevCell);
-    }
-    // Clear current row
-    setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
-    });
-  }, [pattern, channelIndex, rowIndex, setCell]);
+    insertRowAction(channelIndex, rowIndex);
+    onClose();
+  }, [rowIndex, channelIndex, insertRowAction, onClose]);
 
   // Delete row (shift up)
   const handleDeleteRow = useCallback(() => {
-    if (!pattern) return;
-    // Shift all rows up from current position
-    for (let row = rowIndex; row < pattern.length - 1; row++) {
-      const nextCell = pattern.channels[channelIndex].rows[row + 1];
-      setCell(channelIndex, row, nextCell);
-    }
-    // Clear last row
-    setCell(channelIndex, pattern.length - 1, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
-    });
-  }, [pattern, channelIndex, rowIndex, setCell]);
+    deleteRowAction(channelIndex, rowIndex);
+    onClose();
+  }, [rowIndex, channelIndex, deleteRowAction, onClose]);
 
   // Select entire column
   const handleSelectColumn = useCallback(() => {
-    // TODO: Implement block selection for column
-    console.log('Select column', channelIndex, cursor.columnType);
-  }, [channelIndex, cursor.columnType]);
+    selectColumn(channelIndex, cursor.columnType);
+    onClose();
+  }, [channelIndex, cursor.columnType, selectColumn, onClose]);
 
   // Select entire channel
   const handleSelectChannel = useCallback(() => {
-    // TODO: Implement block selection for channel
-    console.log('Select channel', channelIndex);
-  }, [channelIndex]);
+    selectChannel(channelIndex);
+    onClose();
+  }, [channelIndex, selectChannel, onClose]);
 
   const menuItems = useMemo((): MenuItemType[] => [
     // Cut/Copy/Paste
@@ -176,6 +194,28 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       icon: <ArrowUp size={14} />,
       shortcut: 'Backspace',
       onClick: handleDeleteRow,
+    },
+    { type: 'divider' },
+    // Transpose
+    {
+      id: 'transpose-up',
+      label: 'Transpose Octave Up',
+      icon: <ArrowUpCircle size={14} />,
+      shortcut: 'Ctrl+Shift+Up',
+      onClick: () => {
+        transposeSelection(12);
+        onClose();
+      },
+    },
+    {
+      id: 'transpose-down',
+      label: 'Transpose Octave Down',
+      icon: <ArrowDownCircle size={14} />,
+      shortcut: 'Ctrl+Shift+Down',
+      onClick: () => {
+        transposeSelection(-12);
+        onClose();
+      },
     },
     { type: 'divider' },
     // Interpolate/Humanize
@@ -229,42 +269,4 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       onClose={onClose}
     />
   );
-};
-
-// Hook for using cell context menu
-export const useCellContextMenu = () => {
-  const [menuState, setMenuState] = React.useState<{
-    position: { x: number; y: number } | null;
-    rowIndex: number;
-    channelIndex: number;
-  }>({
-    position: null,
-    rowIndex: 0,
-    channelIndex: 0,
-  });
-
-  const openMenu = useCallback((
-    e: React.MouseEvent,
-    rowIndex: number,
-    channelIndex: number
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenuState({
-      position: { x: e.clientX, y: e.clientY },
-      rowIndex,
-      channelIndex,
-    });
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenuState((prev) => ({ ...prev, position: null }));
-  }, []);
-
-  return {
-    ...menuState,
-    openMenu,
-    closeMenu,
-    isOpen: menuState.position !== null,
-  };
 };

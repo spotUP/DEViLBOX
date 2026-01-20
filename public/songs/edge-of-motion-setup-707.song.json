@@ -1,6 +1,6 @@
 {
   "format": "devilbox-song",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "metadata": {
     "id": "edge-of-motion-setup-707",
     "name": "Set Up 707 - Edge Of Motion",
@@ -8,7 +8,7 @@
     "description": "Two-part 303 bassline using just C notes at different octaves.",
     "createdAt": "2026-01-14T00:00:00.000Z",
     "modifiedAt": "2026-01-14T00:00:00.000Z",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "bpm": 125,
   "instruments": [

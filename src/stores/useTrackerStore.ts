@@ -11,9 +11,12 @@ import type {
   BlockSelection,
   ClipboardData,
   ColumnVisibility,
+  TimeSignature,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getToneEngine } from '@engine/ToneEngine';
+import { idGenerator } from '../utils/idGenerator';
+import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 
 // Note names for transpose operations
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -53,6 +56,12 @@ interface TrackerStore {
   followPlayback: boolean;
   showGhostPatterns: boolean; // Show previous/next patterns as ghosts
   columnVisibility: ColumnVisibility;
+  copyMask: {
+    note: boolean;
+    instrument: boolean;
+    volume: boolean;
+    effect: boolean;
+  };
   currentOctave: number; // FT2: F1-F7 selects octave 1-7
   recordMode: boolean; // When true, entering notes advances cursor by editStep
   editStep: number; // Rows to advance after entering a note (1-16)
@@ -65,23 +74,33 @@ interface TrackerStore {
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
   setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>) => void;
   clearCell: (channelIndex: number, rowIndex: number) => void;
+  clearChannel: (channelIndex: number) => void;
+  clearPattern: () => void;
+  insertRow: (channelIndex: number, rowIndex: number) => void;
+  deleteRow: (channelIndex: number, rowIndex: number) => void;
   setFollowPlayback: (enabled: boolean) => void;
   setShowGhostPatterns: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
+  setCopyMask: (mask: Partial<TrackerStore['copyMask']>) => void;
   setCurrentOctave: (octave: number) => void;
   toggleRecordMode: () => void;
   setEditStep: (step: number) => void;
 
   // Block operations
   startSelection: () => void;
+  updateSelection: (channelIndex: number, rowIndex: number) => void;
   endSelection: () => void;
   clearSelection: () => void;
+  selectColumn: (channelIndex: number, columnType: CursorPosition['columnType']) => void;
+  selectChannel: (channelIndex: number) => void;
+  selectPattern: () => void;
   copySelection: () => void;
   cutSelection: () => void;
   paste: () => void;
 
   // Advanced editing
-  transposeSelection: (semitones: number) => void;
+  transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
+  remapInstrument: (oldId: number, newId: number, scope: 'track' | 'pattern' | 'song') => void;
   interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan', startValue: number, endValue: number) => void;
   humanizeSelection: (volumeVariation: number) => void;
 
@@ -96,12 +115,15 @@ interface TrackerStore {
   shrinkPattern: (index: number) => void;
   reorderPatterns: (oldIndex: number, newIndex: number) => void;
   updatePatternName: (index: number, name: string) => void;
+  updateTimeSignature: (index: number, signature: Partial<TimeSignature>) => void;
+  updateAllTimeSignatures: (signature: Partial<TimeSignature>) => void;
 
   // Channel management
   addChannel: () => void;
   removeChannel: (channelIndex: number) => void;
   toggleChannelMute: (channelIndex: number) => void;
   toggleChannelSolo: (channelIndex: number) => void;
+  toggleChannelCollapse: (channelIndex: number) => void;
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
@@ -117,10 +139,11 @@ interface TrackerStore {
   reset: () => void;
 }
 
-const createEmptyPattern = (length: number = 64, numChannels: number = 4): Pattern => ({
-  id: `pattern-${Date.now()}`,
+const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels: number = DEFAULT_NUM_CHANNELS): Pattern => ({
+  id: idGenerator.generate('pattern'),
   name: 'Untitled Pattern',
   length,
+  timeSignature: { beatsPerMeasure: 4, stepsPerBeat: 4 },
   channels: Array.from({ length: numChannels }, (_, i) => ({
     id: `channel-${i}`,
     name: `Channel ${i + 1}`,
@@ -131,6 +154,7 @@ const createEmptyPattern = (length: number = 64, numChannels: number = 4): Patte
     pan: 0,
     instrumentId: null,
     color: null,
+    collapsed: false,
   })),
 });
 
@@ -150,6 +174,12 @@ export const useTrackerStore = create<TrackerStore>()(
     followPlayback: false,
     showGhostPatterns: true, // Show ghost patterns by default
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+    copyMask: {
+      note: true,
+      instrument: true,
+      volume: true,
+      effect: true,
+    },
     currentOctave: 4, // Default octave (F4)
     recordMode: false, // Start with record mode off
     editStep: 1, // Default edit step (advance 1 row after note entry)
@@ -168,6 +198,20 @@ export const useTrackerStore = create<TrackerStore>()(
         const numChannels = pattern.channels.length;
         const numRows = pattern.length;
 
+        // Map column types to their digit count (0 means not editable on digit level or handles separately)
+        const DIGIT_COUNTS: Record<string, number> = {
+          instrument: 2,
+          volume: 2,
+          effect: 3,
+          effect2: 3,
+          cutoff: 2,
+          resonance: 2,
+          envMod: 2,
+          pan: 2,
+        };
+
+        const currentDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
+
         switch (direction) {
           case 'up':
             if (state.cursor.rowIndex > 0) {
@@ -185,9 +229,12 @@ export const useTrackerStore = create<TrackerStore>()(
             }
             break;
 
-          case 'left':
-            // Move to previous column/channel
-            // Column order includes TB-303 accent and slide, and dual effect columns
+          case 'left': {
+            if (currentDigits > 0 && state.cursor.digitIndex > 0) {
+              state.cursor.digitIndex--;
+              return;
+            }
+
             const columnOrder: CursorPosition['columnType'][] = [
               'note',
               'instrument',
@@ -200,17 +247,23 @@ export const useTrackerStore = create<TrackerStore>()(
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
             if (currentColumnIndex > 0) {
               state.cursor.columnType = columnOrder[currentColumnIndex - 1];
-              state.cursor.digitIndex = 0;
+              const nextDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
+              state.cursor.digitIndex = nextDigits > 0 ? nextDigits - 1 : 0;
             } else if (state.cursor.channelIndex > 0) {
               state.cursor.channelIndex--;
-              state.cursor.columnType = 'slide'; // Jump to last column of previous channel
-              state.cursor.digitIndex = 0;
+              state.cursor.columnType = columnOrder[columnOrder.length - 1];
+              const nextDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
+              state.cursor.digitIndex = nextDigits > 0 ? nextDigits - 1 : 0;
             }
             break;
+          }
 
-          case 'right':
-            // Move to next column/channel
-            // Column order includes TB-303 accent and slide, and dual effect columns
+          case 'right': {
+            if (currentDigits > 0 && state.cursor.digitIndex < currentDigits - 1) {
+              state.cursor.digitIndex++;
+              return;
+            }
+
             const columnOrder2: CursorPosition['columnType'][] = [
               'note',
               'instrument',
@@ -226,10 +279,11 @@ export const useTrackerStore = create<TrackerStore>()(
               state.cursor.digitIndex = 0;
             } else if (state.cursor.channelIndex < numChannels - 1) {
               state.cursor.channelIndex++;
-              state.cursor.columnType = 'note'; // Jump to first column of next channel
+              state.cursor.columnType = 'note';
               state.cursor.digitIndex = 0;
             }
             break;
+          }
         }
       }),
 
@@ -281,6 +335,60 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
+    clearChannel: (channelIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+          pattern.channels[channelIndex].rows = pattern.channels[channelIndex].rows.map(() => ({ ...EMPTY_CELL }));
+        }
+      }),
+
+    clearPattern: () =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        pattern.channels.forEach((channel) => {
+          channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
+        });
+      }),
+
+    insertRow: (channelIndex, rowIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (
+          channelIndex >= 0 &&
+          channelIndex < pattern.channels.length &&
+          rowIndex >= 0 &&
+          rowIndex < pattern.length
+        ) {
+          const rows = pattern.channels[channelIndex].rows;
+          // Shift rows down starting from rowIndex
+          for (let i = pattern.length - 1; i > rowIndex; i--) {
+            rows[i] = { ...rows[i - 1] };
+          }
+          // Clear inserted row
+          rows[rowIndex] = { ...EMPTY_CELL };
+        }
+      }),
+
+    deleteRow: (channelIndex, rowIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (
+          channelIndex >= 0 &&
+          channelIndex < pattern.channels.length &&
+          rowIndex >= 0 &&
+          rowIndex < pattern.length
+        ) {
+          const rows = pattern.channels[channelIndex].rows;
+          // Shift rows up starting from rowIndex
+          for (let i = rowIndex; i < pattern.length - 1; i++) {
+            rows[i] = { ...rows[i + 1] };
+          }
+          // Clear last row
+          rows[pattern.length - 1] = { ...EMPTY_CELL };
+        }
+      }),
+
     setFollowPlayback: (enabled) =>
       set((state) => {
         state.followPlayback = enabled;
@@ -294,6 +402,11 @@ export const useTrackerStore = create<TrackerStore>()(
     setColumnVisibility: (visibility) =>
       set((state) => {
         Object.assign(state.columnVisibility, visibility);
+      }),
+
+    setCopyMask: (mask) =>
+      set((state) => {
+        Object.assign(state.copyMask, mask);
       }),
 
     setCurrentOctave: (octave) =>
@@ -324,6 +437,14 @@ export const useTrackerStore = create<TrackerStore>()(
         };
       }),
 
+    updateSelection: (channelIndex, rowIndex) =>
+      set((state) => {
+        if (state.selection) {
+          state.selection.endChannel = channelIndex;
+          state.selection.endRow = rowIndex;
+        }
+      }),
+
     endSelection: () =>
       set((state) => {
         if (state.selection) {
@@ -335,6 +456,42 @@ export const useTrackerStore = create<TrackerStore>()(
     clearSelection: () =>
       set((state) => {
         state.selection = null;
+      }),
+
+    selectColumn: (channelIndex, columnType) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        state.selection = {
+          startChannel: channelIndex,
+          endChannel: channelIndex,
+          startRow: 0,
+          endRow: pattern.length - 1,
+          columnTypes: [columnType],
+        };
+      }),
+
+    selectChannel: (channelIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        state.selection = {
+          startChannel: channelIndex,
+          endChannel: channelIndex,
+          startRow: 0,
+          endRow: pattern.length - 1,
+          columnTypes: ['note', 'instrument', 'volume', 'effect', 'effect2', 'accent', 'slide'],
+        };
+      }),
+
+    selectPattern: () =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        state.selection = {
+          startChannel: 0,
+          endChannel: pattern.channels.length - 1,
+          startRow: 0,
+          endRow: pattern.length - 1,
+          columnTypes: ['note', 'instrument', 'volume', 'effect', 'effect2', 'accent', 'slide'],
+        };
       }),
 
     copySelection: () =>
@@ -405,6 +562,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const pattern = state.patterns[state.currentPatternIndex];
         const { channelIndex, rowIndex } = state.cursor;
         const { data } = state.clipboard;
+        const { copyMask } = state;
 
         for (let ch = 0; ch < data.length; ch++) {
           const targetChannel = channelIndex + ch;
@@ -414,15 +572,32 @@ export const useTrackerStore = create<TrackerStore>()(
             const targetRow = rowIndex + row;
             if (targetRow >= pattern.length) break;
 
-            pattern.channels[targetChannel].rows[targetRow] = { ...data[ch][row] };
+            const sourceCell = data[ch][row];
+            const targetCell = pattern.channels[targetChannel].rows[targetRow];
+
+            // Merge properties based on mask
+            if (copyMask.note) {
+              targetCell.note = sourceCell.note;
+            }
+            if (copyMask.instrument) {
+              targetCell.instrument = sourceCell.instrument;
+            }
+            if (copyMask.volume) {
+              targetCell.volume = sourceCell.volume;
+            }
+            if (copyMask.effect) {
+              targetCell.effect = sourceCell.effect;
+              targetCell.effect2 = sourceCell.effect2;
+            }
           }
         }
       }),
 
     // Advanced editing - Transpose selection by semitones
-    transposeSelection: (semitones) =>
+    transposeSelection: (semitones, currentInstrumentOnly = false) =>
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
+        const targetInstrumentId = currentInstrumentOnly ? state.patterns[state.currentPatternIndex].channels[state.cursor.channelIndex].rows[state.cursor.rowIndex].instrument : null;
 
         // Determine range to transpose (selection or just cursor position)
         let minChannel: number, maxChannel: number, minRow: number, maxRow: number;
@@ -448,10 +623,15 @@ export const useTrackerStore = create<TrackerStore>()(
             if (row >= pattern.length) continue;
 
             const cell = pattern.channels[ch].rows[row];
-            if (!cell.note) continue;
+            if (!cell.note || cell.note === '...' || cell.note === '===') continue;
+
+            // If filtering by current instrument, skip others
+            if (currentInstrumentOnly && targetInstrumentId !== null && cell.instrument !== targetInstrumentId) {
+              continue;
+            }
 
             const semitone = parseNote(cell.note);
-            if (semitone === null) continue; // Skip note-off and empty
+            if (semitone === null) continue;
 
             const newSemitone = semitone + semitones;
             const newNote = semitoneToNote(newSemitone);
@@ -459,8 +639,32 @@ export const useTrackerStore = create<TrackerStore>()(
             if (newNote) {
               cell.note = newNote;
             }
-            // If out of range, keep original note
           }
+        }
+      }),
+
+    // Swap all occurrences of Instrument A with Instrument B
+    remapInstrument: (oldId, newId, scope) =>
+      set((state) => {
+        const processPattern = (patt: Pattern, channelIdx?: number) => {
+          const chStart = channelIdx !== undefined ? channelIdx : 0;
+          const chEnd = channelIdx !== undefined ? channelIdx : patt.channels.length - 1;
+
+          for (let ch = chStart; ch <= chEnd; ch++) {
+            patt.channels[ch].rows.forEach(row => {
+              if (row.instrument === oldId) {
+                row.instrument = newId;
+              }
+            });
+          }
+        };
+
+        if (scope === 'track') {
+          processPattern(state.patterns[state.currentPatternIndex], state.cursor.channelIndex);
+        } else if (scope === 'pattern') {
+          processPattern(state.patterns[state.currentPatternIndex]);
+        } else if (scope === 'song') {
+          state.patterns.forEach(p => processPattern(p));
         }
       }),
 
@@ -541,9 +745,9 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    addPattern: (length = 64) =>
+    addPattern: (length = DEFAULT_PATTERN_LENGTH) =>
       set((state) => {
-        const numChannels = state.patterns[0]?.channels.length || 4;
+        const numChannels = state.patterns[0]?.channels.length || DEFAULT_NUM_CHANNELS;
         state.patterns.push(createEmptyPattern(length, numChannels));
       }),
 
@@ -562,7 +766,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (index >= 0 && index < state.patterns.length) {
           const original = state.patterns[index];
           const cloned: Pattern = JSON.parse(JSON.stringify(original));
-          cloned.id = `pattern-${Date.now()}`;
+          cloned.id = idGenerator.generate('pattern');
           cloned.name = `${original.name} (Copy)`;
           state.patterns.splice(index + 1, 0, cloned);
         }
@@ -616,7 +820,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (index >= 0 && index < state.patterns.length) {
           const original = state.patterns[index];
           const cloned: Pattern = JSON.parse(JSON.stringify(original));
-          cloned.id = `pattern-${Date.now()}`;
+          cloned.id = idGenerator.generate('pattern');
           cloned.name = `${original.name} (Copy)`;
           state.patterns.splice(index + 1, 0, cloned);
           state.currentPatternIndex = index + 1;
@@ -628,7 +832,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (index >= 0 && index < state.patterns.length) {
           const pattern = state.patterns[index];
           const oldLength = pattern.length;
-          const newLength = Math.min(oldLength * 2, 256); // Max 256 rows
+          const newLength = Math.min(oldLength * 2, MAX_PATTERN_LENGTH); // Max 256 rows
 
           if (newLength === oldLength) return;
 
@@ -650,7 +854,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (index >= 0 && index < state.patterns.length) {
           const pattern = state.patterns[index];
           const oldLength = pattern.length;
-          const newLength = Math.max(Math.floor(oldLength / 2), 1); // Min 1 row
+          const newLength = Math.max(Math.floor(oldLength / 2), MIN_PATTERN_LENGTH); // Min 1 row
 
           if (newLength === oldLength) return;
 
@@ -704,10 +908,27 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
+    updateTimeSignature: (index, signature) =>
+      set((state) => {
+        if (index >= 0 && index < state.patterns.length) {
+          const pattern = state.patterns[index];
+          if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
+          Object.assign(pattern.timeSignature, signature);
+        }
+      }),
+
+    updateAllTimeSignatures: (signature) =>
+      set((state) => {
+        state.patterns.forEach(pattern => {
+          if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
+          Object.assign(pattern.timeSignature, signature);
+        });
+      }),
+
     // Channel management
     addChannel: () =>
       set((state) => {
-        const maxChannels = 16;
+        const maxChannels = MAX_CHANNELS;
         // Get available colors (excluding null)
         const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
         // Pick a random color for the new channel
@@ -717,7 +938,7 @@ export const useTrackerStore = create<TrackerStore>()(
           if (pattern.channels.length < maxChannels) {
             const newChannelIndex = pattern.channels.length;
             pattern.channels.push({
-              id: `channel-${Date.now()}-${newChannelIndex}`,
+              id: idGenerator.generate('channel'),
               name: `Channel ${newChannelIndex + 1}`,
               rows: Array.from({ length: pattern.length }, () => ({ ...EMPTY_CELL })),
               muted: false,
@@ -726,6 +947,7 @@ export const useTrackerStore = create<TrackerStore>()(
               pan: 0,
               instrumentId: null,
               color: randomColor,
+              collapsed: false,
             });
           }
         });
@@ -733,7 +955,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
     removeChannel: (channelIndex) =>
       set((state) => {
-        const minChannels = 1;
+        const minChannels = MIN_CHANNELS;
         state.patterns.forEach((pattern) => {
           if (
             pattern.channels.length > minChannels &&
@@ -783,6 +1005,15 @@ export const useTrackerStore = create<TrackerStore>()(
       }
     },
 
+    toggleChannelCollapse: (channelIndex) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+            pattern.channels[channelIndex].collapsed = !pattern.channels[channelIndex].collapsed;
+          }
+        });
+      }),
+
     setChannelVolume: (channelIndex, volume) =>
       set((state) => {
         state.patterns.forEach((pattern) => {
@@ -822,9 +1053,10 @@ export const useTrackerStore = create<TrackerStore>()(
             channels: patterns[0].channels.length,
             firstChannelRows: patterns[0].channels[0]?.rows?.length,
           });
-          // Ensure all channels have required properties (color)
+          // Ensure all channels have required properties (color) and length is valid
           const normalizedPatterns = patterns.map((pattern) => ({
             ...pattern,
+            length: Math.max(1, pattern.length),
             channels: pattern.channels.map((channel) => ({
               ...channel,
               color: channel.color ?? null,
@@ -850,6 +1082,7 @@ export const useTrackerStore = create<TrackerStore>()(
         // Normalize the pattern to ensure all channels have required properties
         const normalizedPattern = {
           ...pattern,
+          length: Math.max(1, pattern.length),
           channels: pattern.channels.map((channel) => ({
             ...channel,
             color: channel.color ?? null,

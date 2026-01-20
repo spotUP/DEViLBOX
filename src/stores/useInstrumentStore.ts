@@ -17,6 +17,8 @@ import {
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getToneEngine } from '@engine/ToneEngine';
+import { idGenerator } from '../utils/idGenerator';
+import { MAX_INSTRUMENTS } from '../constants/audioConstants';
 
 interface InstrumentStore {
   // State
@@ -69,12 +71,12 @@ const createDefaultInstrument = (id: number): InstrumentConfig => ({
 
 // Find next available instrument ID (0-255)
 const findNextId = (existingIds: number[]): number => {
-  for (let id = 0; id < 256; id++) {
+  for (let id = 0; id < MAX_INSTRUMENTS; id++) {
     if (!existingIds.includes(id)) {
       return id;
     }
   }
-  console.warn('Maximum number of instruments reached (256)');
+  console.warn(`Maximum number of instruments reached (${MAX_INSTRUMENTS})`);
   return 0;
 };
 
@@ -137,17 +139,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const instrument = state.instruments.find((inst) => inst.id === id);
         if (instrument) {
           // Explicitly exclude 'id' from updates to prevent ID from being changed
-          const { id: _ignoredId, ...safeUpdates } = updates as any;
+          const { id: _ignoredId, ...safeUpdates } = updates as any; // eslint-disable-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
 
           // Deep merge nested objects to preserve existing fields
           Object.keys(safeUpdates).forEach(key => {
             const value = safeUpdates[key];
             if (value && typeof value === 'object' && !Array.isArray(value) && instrument[key as keyof InstrumentConfig]) {
               // Merge nested objects (oscillator, envelope, filter, etc.)
-              Object.assign(instrument[key as keyof InstrumentConfig] as any, value);
+              Object.assign(instrument[key as keyof InstrumentConfig] as any, value); // eslint-disable-line @typescript-eslint/no-explicit-any
             } else {
               // Direct assignment for primitives and new objects
-              (instrument as any)[key] = value;
+              (instrument as any)[key] = value; // eslint-disable-line @typescript-eslint/no-explicit-any
             }
           });
         }
@@ -271,7 +273,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
           const newEffect: EffectConfig = {
-            id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: idGenerator.generate('effect'),
             type: effectType,
             enabled: true,
             wet: 50,
@@ -387,7 +389,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
           const newPreset: InstrumentPreset = {
-            id: `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: idGenerator.generate('preset'),
             name,
             category,
             tags: [],
@@ -416,7 +418,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       get().instruments.forEach((inst) => {
         try {
           engine.invalidateInstrument(inst.id);
-        } catch (e) {
+        } catch (_e) { // eslint-disable-line @typescript-eslint/no-unused-vars
           // Ignore errors during invalidation
         }
       });
@@ -436,7 +438,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       get().instruments.forEach((inst) => {
         try {
           engine.invalidateInstrument(inst.id);
-        } catch (e) {
+        } catch (_e) { // eslint-disable-line @typescript-eslint/no-unused-vars
           // Ignore errors during invalidation
         }
       });

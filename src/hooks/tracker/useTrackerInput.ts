@@ -1,9 +1,4 @@
-// @ts-nocheck - Undefined argument issue
-/**
- * useTrackerInput - FastTracker II Keyboard Input System
- * Implements authentic FT2 keyboard shortcuts
- */
-
+import * as Tone from 'tone';
 import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -69,9 +64,10 @@ export const useTrackerInput = () => {
     moveCursor,
     moveCursorToRow,
     moveCursorToChannel,
-    moveCursorToColumn: _moveCursorToColumn,
     setCell,
     clearCell,
+    insertRow: insertRowAction,
+    deleteRow: deleteRowAction,
     patterns,
     currentPatternIndex,
     setCurrentPattern,
@@ -85,9 +81,8 @@ export const useTrackerInput = () => {
     currentOctave,
     setCurrentOctave,
     transposeSelection,
-    interpolateSelection,
-    humanizeSelection,
     recordMode,
+    toggleRecordMode,
     editStep,
   } = useTrackerStore();
 
@@ -96,7 +91,7 @@ export const useTrackerInput = () => {
     currentRow: playbackRow,
     stop,
     play,
-    togglePlayPause: _togglePlayPause,
+    setIsLooping,
   } = useTransportStore();
 
   const {
@@ -130,7 +125,7 @@ export const useTrackerInput = () => {
       heldNotesRef.current.set(key, { note: fullNote, instrumentId: currentInstrumentId });
 
       // Trigger attack (note will sustain until keyup)
-      engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
+      engine.triggerNoteAttack(currentInstrumentId, fullNote, Tone.now(), 1, instrument);
     },
     [currentInstrumentId, instruments]
   );
@@ -142,7 +137,6 @@ export const useTrackerInput = () => {
       if (!heldNote) return;
 
       const engine = getToneEngine();
-      const instrument = instruments.find((i) => i.id === heldNote.instrumentId);
 
       // Release the note
       engine.releaseNote(heldNote.instrumentId, heldNote.note);
@@ -150,7 +144,7 @@ export const useTrackerInput = () => {
       // Remove from held notes
       heldNotesRef.current.delete(key);
     },
-    [instruments]
+    []
   );
 
   // Enter note into cell
@@ -179,15 +173,26 @@ export const useTrackerInput = () => {
 
   // Insert empty row at cursor, shift rows down
   const insertRow = useCallback(() => {
-    // This would need to be implemented in the store
-    // For now, we'll just clear the current cell
-    clearCell(cursor.channelIndex, cursor.rowIndex);
-  }, [cursor, clearCell]);
+    insertRowAction(cursor.channelIndex, cursor.rowIndex);
+  }, [cursor, insertRowAction]);
 
   // Delete row at cursor, shift rows up
   const deleteRow = useCallback(() => {
-    clearCell(cursor.channelIndex, cursor.rowIndex);
-  }, [cursor, clearCell]);
+    deleteRowAction(cursor.channelIndex, cursor.rowIndex);
+  }, [cursor, deleteRowAction]);
+
+  // Sync instrument when cursor moves to a cell with an instrument
+  useEffect(() => {
+    if (!pattern) return;
+    const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+    if (cell && cell.instrument !== null && cell.instrument !== undefined && cell.instrument !== currentInstrumentId) {
+      // Small delay to avoid flickering while navigating fast
+      const timer = setTimeout(() => {
+        setCurrentInstrument(cell.instrument!);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [cursor.rowIndex, cursor.channelIndex, pattern, setCurrentInstrument, currentInstrumentId]);
 
   // Handle keyboard input
   const handleKeyDown = useCallback(
@@ -209,8 +214,46 @@ export const useTrackerInput = () => {
       const keyLower = key.toLowerCase();
 
       // ============================================
-      // 5.1 Cursor Moves
+      // 5.1 Cursor Moves & Playback
       // ============================================
+
+      // F5: Play Song
+      if (key === 'F5') {
+        e.preventDefault();
+        if (isPlaying) stop();
+        setIsLooping(false);
+        play();
+        return;
+      }
+
+      // F6: Play Pattern
+      if (key === 'F6') {
+        e.preventDefault();
+        if (isPlaying) stop();
+        setIsLooping(true);
+        play();
+        return;
+      }
+
+      // F7: Play Pattern from current row
+      if (key === 'F7') {
+        e.preventDefault();
+        if (isPlaying) stop();
+        setIsLooping(true);
+        // We'd need to set transport position here, but play() handles it if current row is set
+        play();
+        return;
+      }
+
+      // F8 / ESC: Stop
+      if (key === 'F8' || key === 'Escape') {
+        e.preventDefault();
+        stop();
+        if (key === 'Escape') {
+          clearSelection();
+        }
+        return;
+      }
 
       // F9-F12: Jump in pattern (0%, 25%, 50%, 75%)
       if (key === 'F9') {
@@ -514,9 +557,11 @@ export const useTrackerInput = () => {
           return;
         }
 
-        // Space = Stop playback
+        // Space = Stop playback + Toggle Record Mode
         if (isPlaying) {
           stop();
+        } else {
+          toggleRecordMode();
         }
         return;
       }
@@ -634,51 +679,57 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
-      // Hex Entry for Instrument/Volume/Effect
+      // 5.6 Character Entry for Columns
       // ============================================
 
-      // Hex digit entry for instrument, volume, effect columns
+      const isHexDigit = HEX_DIGITS_ALL.includes(key);
+      const isEffectCommandChar = /^[0-9a-zA-Z]$/.test(key);
+
       if (
-        HEX_DIGITS_ALL.includes(key) &&
         !e.altKey && !e.ctrlKey && !e.metaKey &&
         (cursor.columnType === 'instrument' ||
           cursor.columnType === 'volume' ||
           cursor.columnType === 'effect' ||
           cursor.columnType === 'effect2')
       ) {
-        // Skip if it's a note key (numbers 2,3,5,6,7,9,0 are used for notes)
-        const isNoteKey = ['2', '3', '5', '6', '7', '9', '0'].includes(key);
-        if (isNoteKey && cursor.columnType !== 'instrument' &&
-            cursor.columnType !== 'volume' && cursor.columnType !== 'effect' && cursor.columnType !== 'effect2') {
-          return;
+        // Validation for different column types
+        if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
+          if (!isHexDigit) return;
+        } else {
+          // Effect column allows commands (letters) and hex digits (values)
+          if (!isEffectCommandChar) return;
         }
 
         e.preventDefault();
-        const hexDigit = key.toUpperCase();
+        const char = key.toUpperCase();
         const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
 
         if (cursor.columnType === 'instrument') {
           const currentValue = currentCell.instrument || 0;
           const currentHex = currentValue.toString(16).toUpperCase().padStart(2, '0');
-          const newHex = (currentHex[1] + hexDigit).padStart(2, '0');
-          const newValue = parseInt(newHex, 16);
-          setCell(cursor.channelIndex, cursor.rowIndex, { instrument: newValue });
+          const hexArray = currentHex.split('');
+          hexArray[cursor.digitIndex] = char;
+          const newValue = parseInt(hexArray.join(''), 16);
+          setCell(cursor.channelIndex, cursor.rowIndex, { instrument: isNaN(newValue) ? 0 : newValue });
+          moveCursor('right');
         } else if (cursor.columnType === 'volume') {
           const currentValue = currentCell.volume || 0;
           const currentHex = currentValue.toString(16).toUpperCase().padStart(2, '0');
-          const newHex = (currentHex[1] + hexDigit).padStart(2, '0');
-          const newValue = Math.min(0x40, parseInt(newHex, 16));
-          setCell(cursor.channelIndex, cursor.rowIndex, { volume: newValue });
-        } else if (cursor.columnType === 'effect') {
-          const currentValue = currentCell.effect || '...';
-          const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
-          const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
-          setCell(cursor.channelIndex, cursor.rowIndex, { effect: newStr });
-        } else if (cursor.columnType === 'effect2') {
-          const currentValue = currentCell.effect2 || '...';
-          const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
-          const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
-          setCell(cursor.channelIndex, cursor.rowIndex, { effect2: newStr });
+          const hexArray = currentHex.split('');
+          hexArray[cursor.digitIndex] = char;
+          const newValue = Math.min(0x40, parseInt(hexArray.join(''), 16));
+          setCell(cursor.channelIndex, cursor.rowIndex, { volume: isNaN(newValue) ? 0 : newValue });
+          moveCursor('right');
+        } else if (cursor.columnType === 'effect' || cursor.columnType === 'effect2') {
+          const field = cursor.columnType === 'effect' ? 'effect' : 'effect2';
+          const currentValue = currentCell[field] || '000';
+          const currentStr = currentValue === '...' ? '000' : currentValue.padStart(3, '0');
+          const strArray = currentStr.split('');
+          
+          // First char is command, next two are parameters
+          strArray[cursor.digitIndex] = char;
+          setCell(cursor.channelIndex, cursor.rowIndex, { [field]: strArray.join('') });
+          moveCursor('right');
         }
         return;
       }
@@ -716,8 +767,7 @@ export const useTrackerInput = () => {
       insertRow,
       deleteRow,
       transposeSelection,
-      interpolateSelection,
-      humanizeSelection,
+      setCurrentOctave,
     ]
   );
 

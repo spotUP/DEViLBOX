@@ -3,7 +3,7 @@
  * Displays a miniature automation curve below channel rows
  */
 
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import type { AutomationParameter } from '@typedefs/automation';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
@@ -63,11 +63,20 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   const activeCurve = curves.find((c) => c.parameter === activeParameter);
 
   // Get parameter info
-  const paramInfo = AUTOMATION_PARAMETERS.find((p) => p.id === activeParameter);
+  const paramInfo = useMemo(() => 
+    AUTOMATION_PARAMETERS.find((p) => p.id === activeParameter)
+  , [activeParameter]);
 
   // Canvas dimensions
   const width = 200;
   const height = compact ? 32 : 60;
+
+  const activeCurveId = activeCurve?.id;
+  const { paramMin, paramMax, paramColor } = useMemo(() => ({
+    paramMin: paramInfo?.min || 0,
+    paramMax: paramInfo?.max || 100,
+    paramColor: paramInfo?.color || '#4f9d69'
+  }), [paramInfo]);
 
   // Draw the automation curve
   useEffect(() => {
@@ -102,16 +111,14 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
 
     // Draw curve if exists
     if (activeCurve && activeCurve.points.length > 0) {
-      ctx.strokeStyle = paramInfo?.color || '#4f9d69';
+      ctx.strokeStyle = paramColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
 
       // Draw line through all points
       activeCurve.points.forEach((point, i) => {
         const x = (point.row / patternLength) * width;
-        const normalizedValue = paramInfo
-          ? (point.value - paramInfo.min) / (paramInfo.max - paramInfo.min)
-          : point.value / 100;
+        const normalizedValue = (point.value - paramMin) / (paramMax - paramMin);
         const y = height - normalizedValue * height;
 
         if (i === 0) {
@@ -124,12 +131,10 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       ctx.stroke();
 
       // Draw points
-      ctx.fillStyle = paramInfo?.color || '#4f9d69';
+      ctx.fillStyle = paramColor;
       activeCurve.points.forEach((point) => {
         const x = (point.row / patternLength) * width;
-        const normalizedValue = paramInfo
-          ? (point.value - paramInfo.min) / (paramInfo.max - paramInfo.min)
-          : point.value / 100;
+        const normalizedValue = (point.value - paramMin) / (paramMax - paramMin);
         const y = height - normalizedValue * height;
 
         ctx.beginPath();
@@ -139,13 +144,13 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     }
 
     // Draw "no automation" hint if empty
-    if (!activeCurve || activeCurve.points.length === 0) {
+    if (!activeCurveId) {
       ctx.fillStyle = '#4a4a5e';
       ctx.font = '10px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText('Click to add points', width / 2, height / 2 + 4);
     }
-  }, [activeCurve, patternLength, width, height, paramInfo]);
+  }, [activeCurve, patternLength, width, height, paramMin, paramMax, paramColor, activeCurveId]);
 
   // Handle canvas click to add/edit points
   const handleCanvasClick = useCallback(
@@ -160,12 +165,10 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       // Calculate row and value from click position
       const row = Math.round((x / width) * patternLength);
       const normalizedValue = 1 - y / height;
-      const value = paramInfo
-        ? paramInfo.min + normalizedValue * (paramInfo.max - paramInfo.min)
-        : normalizedValue * 100;
+      const value = paramMin + normalizedValue * (paramMax - paramMin);
 
       // Create curve if doesn't exist
-      let curveId = activeCurve?.id;
+      let curveId = activeCurveId;
       if (!curveId) {
         curveId = addCurve(patternId, channelIndex, activeParameter);
       }
@@ -175,14 +178,15 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       onAutomationChange?.();
     },
     [
-      activeCurve,
+      activeCurveId,
       patternId,
       channelIndex,
       activeParameter,
       patternLength,
       width,
       height,
-      paramInfo,
+      paramMin,
+      paramMax,
       addCurve,
       addPoint,
       onAutomationChange,
@@ -192,7 +196,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   // Handle mouse drag for continuous drawing
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDragging || !activeCurve) return;
+      if (!isDragging || !activeCurveId) return;
 
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -203,22 +207,20 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
 
       const row = Math.round((x / width) * patternLength);
       const normalizedValue = 1 - y / height;
-      const value = paramInfo
-        ? paramInfo.min + normalizedValue * (paramInfo.max - paramInfo.min)
-        : normalizedValue * 100;
+      const value = paramMin + normalizedValue * (paramMax - paramMin);
 
-      addPoint(activeCurve.id, row, Math.round(value));
+      addPoint(activeCurveId, row, Math.round(value));
     },
-    [isDragging, activeCurve, patternLength, width, height, paramInfo, addPoint]
+    [isDragging, activeCurveId, patternLength, width, height, paramMin, paramMax, addPoint]
   );
 
   // Handle clear automation
   const handleClear = useCallback(() => {
-    if (activeCurve) {
-      removeCurve(activeCurve.id);
+    if (activeCurveId) {
+      removeCurve(activeCurveId);
       onAutomationChange?.();
     }
-  }, [activeCurve, removeCurve, onAutomationChange]);
+  }, [activeCurveId, removeCurve, onAutomationChange]);
 
   if (compact && !isExpanded) {
     // Mini collapsed view - just a bar with parameter indicator

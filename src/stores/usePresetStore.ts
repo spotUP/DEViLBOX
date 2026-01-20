@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
+import { idGenerator } from '../utils/idGenerator';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
 export type PresetCategory = 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX' | 'User';
@@ -55,7 +56,7 @@ export const usePresetStore = create<PresetStore>()(
 
       // Save current instrument as preset
       savePreset: (instrument, name, category, tags = []) => {
-        const presetId = `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const presetId = idGenerator.generate('preset');
 
         set((state) => {
           const newPreset: UserPreset = {

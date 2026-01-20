@@ -4,16 +4,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
-import { Plus, X, Palette, ChevronUp, ChevronDown } from 'lucide-react';
+import { APP_VERSION } from '@constants/version';
+import { Plus, X, Palette, ChevronUp, ChevronDown, Download } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
+import { isElectron } from '@utils/electron';
 
 export const NavBar: React.FC = () => {
   const { metadata, isDirty } = useProjectStore();
   const { masterVolume, setMasterVolume } = useAudioStore();
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, updateTabName, markTabDirty } = useTabsStore();
   const { currentThemeId, setTheme, getCurrentTheme } = useThemeStore();
-  const { oscilloscopeVisible, toggleOscilloscopeVisible } = useUIStore();
+  const { oscilloscopeVisible, toggleOscilloscopeVisible, setShowDownloadModal } = useUIStore();
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
@@ -61,21 +63,33 @@ export const NavBar: React.FC = () => {
   };
 
   return (
-    <div className="bg-dark-bgSecondary border-b border-dark-border">
+    <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
       {/* Top Bar: Title and Volume */}
       <nav className="flex items-center justify-between px-4 py-2 border-b border-dark-border">
         {/* Left: App Title */}
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg tracking-tight">
-            <span className="text-accent-primary">DEViL</span><span className="text-text-primary">BOX</span>
+            <span className="text-accent-primary">DEViLBOX</span>
           </h1>
           <span className="text-xs font-medium text-text-inverse bg-accent-primary px-2 py-0.5 rounded">
-            v1.0.0
+            v{APP_VERSION}
           </span>
         </div>
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
         <div className="flex items-center gap-4">
+          {/* Download Button (Web only) */}
+          {!isElectron() && (
+            <button
+              onClick={() => setShowDownloadModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bgTertiary hover:bg-dark-bgHover text-accent-primary text-xs font-bold transition-colors rounded border border-accent-primary/30"
+              title="Download Desktop App"
+            >
+              <Download size={14} />
+              <span className="hidden sm:inline uppercase">Desktop App</span>
+            </button>
+          )}
+
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
 

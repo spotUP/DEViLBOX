@@ -37,6 +37,7 @@ export interface ChannelData {
   pan: number; // -100 to 100
   instrumentId: number | null;
   color: string | null; // Channel background color (CSS color value)
+  collapsed: boolean; // When true, channel is shown in minimal collapsed view
 }
 
 // Channel color palette - muted colors that work on dark backgrounds
@@ -54,12 +55,18 @@ export const CHANNEL_COLORS = [
   '#6b7280', // Gray
 ] as const;
 
+export interface TimeSignature {
+  beatsPerMeasure: number; // e.g. 3 for 3/x
+  stepsPerBeat: number;    // e.g. 4 for x/4 (rows per beat)
+}
+
 export interface Pattern {
   id: string;
   name: string;
   length: number; // 16, 32, 64, 128
   channels: ChannelData[];
   bpm?: number; // Optional override
+  timeSignature?: TimeSignature;
 }
 
 export interface PatternSequence {
@@ -117,7 +124,7 @@ export interface TrackerState {
 export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   note: true,
   instrument: true,
-  volume: true,
+  volume: false, // Volume controlled via Cxx effect command
   effect: true,
   effect2: true,
   accent: false,

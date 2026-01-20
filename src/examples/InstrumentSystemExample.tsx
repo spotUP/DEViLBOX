@@ -1,10 +1,4 @@
-// @ts-nocheck - Example file with outdated component props
-/**
- * InstrumentSystemExample - Example integration of the instrument & effects system
- * Shows how to integrate components into your tracker application
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
 import { ToneEngine } from '@engine/ToneEngine';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -40,8 +34,7 @@ export const SimpleExample: React.FC = () => {
         effects={currentInstrument.effects}
       />
 
-      {/* Test keyboard */}
-      <TestKeyboard instrumentId={currentInstrumentId} />
+      <TestKeyboard instrument={currentInstrument} />
     </div>
   );
 };
@@ -51,9 +44,12 @@ export const SimpleExample: React.FC = () => {
  * Shows how to use InstrumentFactory directly with ToneEngine
  */
 export const AdvancedExample: React.FC = () => {
-  const [toneInstrument, setToneInstrument] = useState<Tone.ToneAudioNode | null>(null);
-  const [toneEffects, setToneEffects] = useState<Tone.ToneAudioNode[]>([]);
+  const [instrumentCreated, setInstrumentCreated] = useState(false);
+  const [effectCount, setEffectCount] = useState(0);
   const { currentInstrument, currentInstrumentId } = useInstrumentStore();
+  
+  const toneInstrumentRef = useRef<Tone.ToneAudioNode | null>(null);
+  const toneEffectsRef = useRef<Tone.ToneAudioNode[]>([]);
 
   // Create Tone.js instrument when config changes
   useEffect(() => {
@@ -63,30 +59,39 @@ export const AdvancedExample: React.FC = () => {
     const engine = ToneEngine.getInstance();
 
     // Dispose old instrument
-    if (toneInstrument) {
-      InstrumentFactory.disposeInstrument(toneInstrument, toneEffects);
+    if (toneInstrumentRef.current) {
+      InstrumentFactory.disposeInstrument(toneInstrumentRef.current, toneEffectsRef.current);
     }
 
     // Create new instrument
     const instrument = InstrumentFactory.createInstrument(currentInstrument);
     const effects = InstrumentFactory.createEffectChain(currentInstrument.effects);
+    if (engine.masterChannel) {
+      InstrumentFactory.connectWithEffects(instrument, effects, engine.masterChannel);
+    }
 
-    // Connect to master
-    InstrumentFactory.connectWithEffects(instrument, effects, engine.masterChannel);
 
-    // Store references
-    setToneInstrument(instrument);
-    setToneEffects(effects);
+    // Store references in refs (non-reactive)
+    toneInstrumentRef.current = instrument;
+    toneEffectsRef.current = effects;
+    
+    // Update UI state - defer to next tick to avoid cascading render warning
+    setTimeout(() => {
+      setInstrumentCreated(true);
+      setEffectCount(effects.length);
+    }, 0);
 
     // Cleanup
     return () => {
-      InstrumentFactory.disposeInstrument(instrument, effects);
+      if (instrument) {
+        InstrumentFactory.disposeInstrument(instrument, effects);
+      }
     };
   }, [currentInstrument]);
 
   const handlePlayNote = (note: string) => {
-    if (toneInstrument && 'triggerAttackRelease' in toneInstrument) {
-      toneInstrument.triggerAttackRelease(note, '8n');
+    if (toneInstrumentRef.current && 'triggerAttackRelease' in toneInstrumentRef.current) {
+      (toneInstrumentRef.current as any).triggerAttackRelease(note, '8n');
     }
   };
 
@@ -102,11 +107,11 @@ export const AdvancedExample: React.FC = () => {
       <div className="mb-4 p-2 bg-ft2-header border border-ft2-border">
         <div className="text-xs font-mono text-ft2-textDim">
           Tone.js Instrument:{' '}
-          <span className="text-ft2-highlight">{toneInstrument ? 'Created' : 'None'}</span>
+          <span className="text-ft2-highlight">{instrumentCreated ? 'Created' : 'None'}</span>
         </div>
         <div className="text-xs font-mono text-ft2-textDim">
           Effects Chain:{' '}
-          <span className="text-ft2-highlight">{toneEffects.length} effects</span>
+          <span className="text-ft2-highlight">{effectCount} effects</span>
         </div>
       </div>
 
@@ -334,7 +339,7 @@ export const CompleteExample: React.FC = () => {
 
       {/* Keyboard */}
       <div className="border-t border-ft2-border">
-        <TestKeyboard instrumentId={currentInstrumentId} />
+        <TestKeyboard instrument={currentInstrument} />
       </div>
     </div>
   );
@@ -345,7 +350,7 @@ export const CompleteExample: React.FC = () => {
  * Demonstrates programmatically creating a complex effect chain
  */
 export const CustomEffectChainExample: React.FC = () => {
-  const { currentInstrumentId, addEffect, updateEffect } = useInstrumentStore();
+  const { currentInstrumentId, addEffect } = useInstrumentStore();
 
   const createDelayReverbChain = () => {
     if (currentInstrumentId === null) return;

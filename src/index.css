@@ -94,6 +94,21 @@
   }
 }
 
+@layer base {
+  :root {
+    --color-bg: #0a0a0c;
+    --color-bg-secondary: #141418;
+    --color-bg-tertiary: #1c1c22;
+    --color-border: #2a2a32;
+    --color-text-primary: #e0e0e0;
+    --color-text-muted: #808088;
+    --color-accent: #00f2ff;
+    --color-accent-glow: rgba(0, 242, 255, 0.3);
+    --color-error: #ff4d4d;
+  }
+}
+
+
 @layer components {
   /* Tracker cell styles */
   .tracker-cell {
@@ -549,13 +564,16 @@
   /* TB303 Knob Panel */
   .tb303-knob-panel {
     position: relative;
+    z-index: 20;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 24px;
     padding: 12px 16px;
     background-color: var(--color-bg-secondary);
     border-bottom: 1px solid var(--color-border);
+    max-width: 100%;
+    min-height: 100px;
   }
 
   .tb303-knob-panel-header {
@@ -1290,6 +1308,9 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   position: relative;
+  max-width: 100%;
+  overflow: visible;
+  z-index: 30;
 }
 
 .ft2-toolbar-compact {

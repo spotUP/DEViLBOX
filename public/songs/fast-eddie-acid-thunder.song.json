@@ -1,6 +1,6 @@
 {
   "format": "devilbox-song",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "metadata": {
     "id": "fast-eddie-acid-thunder",
     "name": "Acid Thunder - Fast Eddie",
@@ -8,7 +8,7 @@
     "description": "1988 Chicago acid house classic. Real TB-303 recording.",
     "createdAt": "2026-01-14T00:00:00.000Z",
     "modifiedAt": "2026-01-14T00:00:00.000Z",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "bpm": 128,
   "instruments": [

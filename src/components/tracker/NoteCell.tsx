@@ -43,17 +43,19 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
 
     return (
       <span
-        className={`tracker-cell ${colorClass} ${
-          isActive ? 'bg-accent-primary text-text-inverse font-bold rounded-sm' : ''
+        className={`tracker-cell font-mono ${colorClass} ${
+          isActive ? 'bg-accent-primary text-text-inverse font-bold' : ''
         }`}
         style={{
-          width: '3ch',
-          minWidth: '3ch',
-          maxWidth: '3ch',
+          width: '3.5ch',
+          minWidth: '3.5ch',
+          maxWidth: '3.5ch',
           display: 'inline-block',
           textAlign: 'left',
           overflow: 'hidden',
-          whiteSpace: 'nowrap'
+          whiteSpace: 'nowrap',
+          fontSize: '11px',
+          padding: '0 1px'
         }}
       >
         {displayValue}
