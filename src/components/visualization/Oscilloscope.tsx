@@ -1,9 +1,4 @@
-// @ts-nocheck - Argument count mismatch
-/**
- * Oscilloscope - Canvas-based waveform and spectrum visualizer
- */
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useAudioStore } from '@stores';
 import { useThemeStore } from '@stores/useThemeStore';
 
@@ -20,14 +15,16 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
   const { analyserNode, fftNode } = useAudioStore();
   const [actualWidth, setActualWidth] = useState(typeof width === 'number' ? width : 800);
 
   // Handle responsive width
   useEffect(() => {
     if (width !== 'auto') {
-      setActualWidth(width);
+      requestAnimationFrame(() => {
+        setActualWidth(width);
+      });
       return;
     }
 

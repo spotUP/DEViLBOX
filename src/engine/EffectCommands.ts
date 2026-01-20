@@ -12,6 +12,7 @@
  */
 
 import * as Tone from 'tone';
+import { AUDIO_CONSTANTS } from '../constants/audioConstants';
 
 export type EffectCommand = string | null; // "A0F", "301", "C40", etc.
 
@@ -178,7 +179,7 @@ export class EffectProcessor {
   private currentTick: number = 0;
 
   // Global state
-  private globalVolume: number = 64; // 0-64
+  private globalVolume: number = AUDIO_CONSTANTS.VOLUME.MAX_VALUE; // 0-64
 
   /**
    * Parse effect command string (e.g., "A0F", "301", "E91")
@@ -247,7 +248,7 @@ export class EffectProcessor {
   private ensureMemory(channelIndex: number): void {
     if (!this.memory[channelIndex]) {
       this.memory[channelIndex] = {
-        volume: 64,
+        volume: AUDIO_CONSTANTS.VOLUME.MAX_VALUE,
         pan: 128,
         vibratoWaveform: 'sine',
         tremoloWaveform: 'sine',
@@ -280,7 +281,7 @@ export class EffectProcessor {
     }
 
     // Set volume if specified (volume column)
-    if (volume !== null && volume >= 0 && volume <= 64) {
+    if (volume !== null && volume >= 0 && volume <= AUDIO_CONSTANTS.VOLUME.MAX_VALUE) {
       this.memory[channelIndex].volume = volume;
       result.setVolume = volume;
     }
@@ -423,18 +424,20 @@ export class EffectProcessor {
         break;
 
       // ========== Cxx - Set Volume ==========
-      case 0xC:
-        const vol = Math.min(param, 64);
+      case 0xC: {
+        const vol = Math.min(param, AUDIO_CONSTANTS.VOLUME.MAX_VALUE);
         mem.volume = vol;
         result.setVolume = vol;
         break;
+      }
 
       // ========== Dxx - Pattern Break ==========
-      case 0xD:
+      case 0xD: {
         // param is decimal-coded: D32 = row 32, not row 50
         const breakRow = x * 10 + y;
         result.patternBreak = { position: breakRow };
         break;
+      }
 
       // ========== Exx - Extended Commands ==========
       case 0xE:
@@ -465,7 +468,7 @@ export class EffectProcessor {
 
     if (effectLetter === 'G') {
       // Gxx - Set Global Volume (0-40)
-      const gvol = Math.min(param, 64);
+      const gvol = Math.min(param, AUDIO_CONSTANTS.VOLUME.MAX_VALUE);
       this.globalVolume = gvol;
       result.setGlobalVolume = gvol;
     }
@@ -569,11 +572,12 @@ export class EffectProcessor {
         break;
 
       // E4x - Vibrato Control (waveform)
-      case 0x4:
+      case 0x4: {
         const vibratoWaves: WaveformType[] = ['sine', 'rampDown', 'square', 'random'];
         mem.vibratoWaveform = vibratoWaves[y & 3];
         mem.vibratoNoRetrig = (y & 4) !== 0;
         break;
+      }
 
       // E5x - Set Finetune
       case 0x5:
@@ -599,11 +603,12 @@ export class EffectProcessor {
         break;
 
       // E7x - Tremolo Control (waveform)
-      case 0x7:
+      case 0x7: {
         const tremoloWaves: WaveformType[] = ['sine', 'rampDown', 'square', 'random'];
         mem.tremoloWaveform = tremoloWaves[y & 3];
         mem.tremoloNoRetrig = (y & 4) !== 0;
         break;
+      }
 
       // E8x - Set Panning (coarse, 16 positions)
       case 0x8:
@@ -624,13 +629,13 @@ export class EffectProcessor {
 
       // EAx - Fine Volume Slide Up
       case 0xA:
-        mem.volume = Math.min(64, (mem.volume || 64) + y);
+        mem.volume = Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, (mem.volume || AUDIO_CONSTANTS.VOLUME.MAX_VALUE) + y);
         result.setVolume = mem.volume;
         break;
 
       // EBx - Fine Volume Slide Down
       case 0xB:
-        mem.volume = Math.max(0, (mem.volume || 64) - y);
+        mem.volume = Math.max(0, (mem.volume || AUDIO_CONSTANTS.VOLUME.MAX_VALUE) - y);
         result.setVolume = mem.volume;
         break;
 
@@ -687,7 +692,7 @@ export class EffectProcessor {
 
     // Arpeggio - cycle through base, +x, +y semitones
     if (state.arpeggio) {
-      const { baseFreq, x, y, step: _step } = state.arpeggio;
+      const { baseFreq, x, y } = state.arpeggio;
       const offsets = [0, x, y];
       const offset = offsets[tick % 3];
       result.frequencySet = baseFreq * Math.pow(2, offset / 12);
@@ -742,14 +747,14 @@ export class EffectProcessor {
     // Volume Slide
     if (state.volumeSlide) {
       const { up, down } = state.volumeSlide;
-      mem.volume = Math.max(0, Math.min(64, (mem.volume || 64) + up - down));
+      mem.volume = Math.max(0, Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, (mem.volume || AUDIO_CONSTANTS.VOLUME.MAX_VALUE) + up - down));
       result.volumeSet = mem.volume;
     }
 
     // Panning Slide
     if (state.panSlide) {
       const { right, left } = state.panSlide;
-      mem.pan = Math.max(0, Math.min(255, (mem.pan || 128) + right - left));
+      mem.pan = Math.max(0, Math.min(AUDIO_CONSTANTS.PAN.SCALE, (mem.pan || 128) + right - left));
       result.panSet = mem.pan;
     }
 
@@ -767,9 +772,9 @@ export class EffectProcessor {
           const volMults: number[] = [1, 1, 1, 1, 1, 1, 2/3, 0.5, 1, 1, 1, 1, 1, 1, 1.5, 2];
 
           if (vc <= 5 || (vc >= 9 && vc <= 13)) {
-            mem.volume = Math.max(0, Math.min(64, (mem.volume || 64) + volChanges[vc]));
+            mem.volume = Math.max(0, Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, (mem.volume || AUDIO_CONSTANTS.VOLUME.MAX_VALUE) + volChanges[vc]));
           } else if (vc === 6 || vc === 7 || vc === 14 || vc === 15) {
-            mem.volume = Math.max(0, Math.min(64, Math.floor((mem.volume || 64) * volMults[vc])));
+            mem.volume = Math.max(0, Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, Math.floor((mem.volume || AUDIO_CONSTANTS.VOLUME.MAX_VALUE) * volMults[vc])));
           }
           result.volumeSet = mem.volume;
         }
@@ -810,7 +815,7 @@ export class EffectProcessor {
     if (mem.globalSlideUp || mem.globalSlideDown) {
       const gup = mem.globalSlideUp || 0;
       const gdown = mem.globalSlideDown || 0;
-      this.globalVolume = Math.max(0, Math.min(64, this.globalVolume + gup - gdown));
+      this.globalVolume = Math.max(0, Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, this.globalVolume + gup - gdown));
       result.globalVolumeAdd = gup - gdown;
     }
 
@@ -828,7 +833,7 @@ export class EffectProcessor {
    * Get current volume for channel (0-64)
    */
   public getCurrentVolume(channelIndex: number): number {
-    return this.memory[channelIndex]?.volume ?? 64;
+    return this.memory[channelIndex]?.volume ?? AUDIO_CONSTANTS.VOLUME.MAX_VALUE;
   }
 
   /**
@@ -842,7 +847,7 @@ export class EffectProcessor {
    * Set global volume
    */
   public setGlobalVolume(vol: number): void {
-    this.globalVolume = Math.max(0, Math.min(64, vol));
+    this.globalVolume = Math.max(0, Math.min(AUDIO_CONSTANTS.VOLUME.MAX_VALUE, vol));
   }
 
   /**
@@ -873,7 +878,7 @@ export class EffectProcessor {
   public clearAll(): void {
     this.channelStates.clear();
     this.memory = {};
-    this.globalVolume = 64;
+    this.globalVolume = AUDIO_CONSTANTS.VOLUME.MAX_VALUE;
     this.ticksPerRow = 6;
   }
 

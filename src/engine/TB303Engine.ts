@@ -1,1431 +1,242 @@
-// @ts-nocheck - Unused variable warnings
 /**
- * TB303Engine - Roland TB-303 Acid Bass Synthesizer Emulation
- *
- * Improved emulation based on dittytoy's implementation:
- * - Cascaded dual filters for authentic 4-pole response
- * - Better accent behavior (boosts volume + cutoff + envelope)
- * - Improved resonance curve
- * - Overdrive with configurable drive amount
- * - Smoother slide/portamento
- *
- * Devil Fish Mod (Robin Whittle):
- * - Separate Normal/Accent decay controls
- * - VEG (Volume Envelope Generator) with sustain
- * - Filter FM (audio-rate filter modulation)
- * - Filter Tracking (filter follows note pitch)
- * - Sweep Speed control (accent buildup behavior)
- * - High Resonance mode (self-oscillation)
- * - Muffler (soft clipping on VCA output)
+ * TB303 - High-Performance Roland TB-303 Emulation for DEViLBOX
+ * 
+ * Idiomatic Tone.js Node implementation.
+ * Strictly uses the injected Native Context from ToneContext.
  */
 
 import * as Tone from 'tone';
-import type { TB303Config, DevilFishConfig } from '@typedefs/instrument';
-import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
+import { ToneContext } from './core/ToneContext';
+import type { DevilFishConfig } from '@typedefs/instrument';
 
-export class TB303Synth {
-  // Oscillator
-  private oscillator: Tone.Oscillator;
-  private oscillatorAsymmetry: Tone.WaveShaper; // Adds authentic 303 waveform character
+export interface TB303Options extends Tone.ToneAudioNodeOptions {
+  cutoff: number;
+  resonance: number;
+  envMod: number;
+  decay: number;
+  accent: number;
+  waveform: 'sawtooth' | 'square';
+}
 
-  // Cascaded filters for authentic 4-pole response (2x 2-pole = 4-pole)
-  private filter1: Tone.Filter;
-  private filter2: Tone.Filter;
-  private filterEnvelope: Tone.FrequencyEnvelope;
+export class TB303 extends Tone.ToneAudioNode<TB303Options> {
+  readonly name: string = 'TB303';
+  public readonly isTB303 = true;
 
-  // VCA
-  private vca: Tone.Gain;
-  private accentGain: Tone.Gain; // Separate gain for accent boost
-  private vcaEnvelope: Tone.AmplitudeEnvelope;
-  private vcaBleed: Tone.Gain; // Subtle signal bleed like real 303
-  private accentClick: Tone.Gain; // Transient click for accented notes
+  public input: undefined; 
+  public output: Tone.Volume;
+  
+  private _panner: Tone.Panner;
+  private _worklet: AudioWorkletNode | null = null;
+  private _bridge: GainNode | null = null;
+  private _messageQueue: any[] = [];
+  private _isReady = false;
+  private _currentNote: string | null = null;
+  private _vizCutoff: number = 1000;
+  private _vizAccent: number = 1;
 
-  // Diode Ladder Filter Saturation
-  // Simulates the soft saturation of the real 303's transistor/diode filter
-  private filterSaturation: Tone.WaveShaper;
-
-  // Overdrive/Saturation
-  private overdrive: Tone.WaveShaper;
-  private overdriveGain: Tone.Gain;
-  private overdriveAmount: number = 0;
-
-  // Output
-  private output: Tone.Gain;
-
-  // === DEVIL FISH ADDITIONS ===
-  // Muffler - soft clipping on VCA output
-  private muffler: Tone.WaveShaper;
-  private mufflerBypass: Tone.Gain;
-
-  // Filter FM - VCA output feeds back to filter frequency
-  private filterFMGain: Tone.Gain;
-  private filterFMAnalyser: Tone.Analyser;
-
-  // State
-  private config: TB303Config;
-  private devilFish: DevilFishConfig;
-  private currentNote: string | null = null;
-  private currentNoteFreq: number = 440;
-  private isSliding: boolean = false;
-  private baseVolume: number = -6;
-  private baseCutoff: number = 800;
-  private baseEnvMod: number = 4000;
-  private tuningCents: number = 0;
-  private currentAccentBoost: number = 0;
-
-  // Devil Fish state
-  private accentCharge: number = 0; // Capacitor charge for sweep speed
-  private lastAccentTime: number = 0;
-  private filterFMInterval: number | null = null;
-
-  // Envelope tracking for visualization
-  private lastTriggerTime: number = 0;
-  private lastTriggerDuration: number = 0;
-  private lastEnvOctaves: number = 0;
-  private lastFilterDecay: number = 0.2;
-
-  constructor(config: TB303Config) {
-    this.config = this.normalizeConfig(config);
-    this.devilFish = config.devilFish ? { ...DEFAULT_DEVIL_FISH, ...config.devilFish } : { ...DEFAULT_DEVIL_FISH };
-    this.baseCutoff = this.config.filter.cutoff;
-    this.baseEnvMod = this.baseCutoff * (this.config.filterEnvelope.envMod / 100) * 10;
-
-    // === OSCILLATOR ===
-    // Using Tone.js oscillator - for true polyBLEP would need AudioWorklet
-    this.oscillator = new Tone.Oscillator({
-      type: this.config.oscillator.type,
-      frequency: 440,
+  constructor(options?: Partial<TB303Options>) {
+    super(options);
+    const opts = Tone.defaultArg(options, {
+      cutoff: 800,
+      resonance: 50,
+      envMod: 50,
+      decay: 200,
+      accent: 50,
+      waveform: 'sawtooth'
     });
 
-    // === OSCILLATOR ASYMMETRY ===
-    // Real 303 sawtooth has slight DC offset and asymmetry from analog circuitry
-    // This adds warmth and character - subtle but audible
-    this.oscillatorAsymmetry = new Tone.WaveShaper((x) => {
-      // Add slight DC offset (real 303 has DC coupling issues)
-      const dcOffset = 0.02;
-      // Subtle asymmetric soft clipping - positive peaks slightly softer
-      const asymmetry = x >= 0
-        ? x * 0.98 + Math.tanh(x * 0.5) * 0.02
-        : x * 1.0;
-      return asymmetry + dcOffset;
-    }, 4096);
+    this.output = new Tone.Volume({ context: this.context });
+    this._panner = new Tone.Panner({ context: this.context }).connect(this.output);
+    
+    this._initWorklet(opts).catch(e => console.error('[TB303] Init Failed:', e));
+  }
 
-    // === CASCADED FILTERS ===
-    // Two 2-pole filters in series = 4-pole (24dB/oct) response
-    // This gives a more authentic 303 filter sound
-    const filterQ = this.resonanceToQ(this.config.filter.resonance);
+  /**
+   * Directly access the manually injected native context.
+   * No hunting, no unwrapping. Just the source of truth.
+   */
+  private _getNativeContext(): BaseAudioContext | null {
+    return ToneContext.nativeContext;
+  }
 
-    this.filter1 = new Tone.Filter({
-      type: 'lowpass',
-      frequency: this.baseCutoff,
-      rolloff: -12, // 2-pole
-      Q: filterQ,
-    });
+  private async _initWorklet(opts: any) {
+    let nativeCtx = this._getNativeContext();
+    let attempts = 0;
 
-    this.filter2 = new Tone.Filter({
-      type: 'lowpass',
-      frequency: this.baseCutoff,
-      rolloff: -12, // 2-pole
-      Q: filterQ * 0.7, // Slightly lower Q on second stage
-    });
+    // Wait for the manual injection to complete in ToneContext.init()
+    while (!nativeCtx && attempts < 40) {
+      await new Promise(r => setTimeout(r, 100));
+      nativeCtx = this._getNativeContext();
+      attempts++;
+    }
+    
+    if (!nativeCtx || !nativeCtx.audioWorklet) {
+      throw new Error('TB303 requires a native BaseAudioContext with Worklet support.');
+    }
 
-    // TB-303 MEG (Main Envelope Generator) - Filter Envelope
-    // Real 303: ~3ms attack, 200ms-2000ms decay depending on DECAY knob
-    this.filterEnvelope = new Tone.FrequencyEnvelope({
-      attack: 0.003, // 3ms attack (authentic 303)
-      decay: this.config.filterEnvelope.decay / 1000,
-      sustain: 0,
-      release: 0.01,
-      baseFrequency: this.baseCutoff,
-      octaves: Math.log2((this.baseCutoff + this.baseEnvMod) / this.baseCutoff),
-      exponent: 2,
-    });
+    try {
+      // 1. Create native bridge
+      this._bridge = nativeCtx.createGain();
+      this._bridge.channelCount = 1;
+      this._bridge.channelCountMode = 'explicit';
+      
+      // 2. Safe Bridge: Tone.connect handles the Tone-to-Native complexity
+      Tone.connect(this._bridge, this._panner);
 
-    // === VCA ===
-    this.vca = new Tone.Gain(1);
-    this.accentGain = new Tone.Gain(1); // For accent volume boost
-
-    // TB-303 VEG (Volume Envelope Generator)
-    // Real 303: ~3ms attack, ~3000ms decay, decays to zero (no sustain)
-    // VEG decay is FIXED - independent of filter decay knob
-    this.vcaEnvelope = new Tone.AmplitudeEnvelope({
-      attack: 0.003, // 3ms attack (authentic 303)
-      decay: 3.0, // ~3000ms decay (fixed, like real 303)
-      sustain: 0, // Decays fully to zero
-      release: 0.05,
-    });
-
-    // === VCA BLEED ===
-    // Real 303 has very slight signal bleed even when VCA is "closed"
-    // This prevents complete silence and adds warmth between notes
-    // Typically -60dB to -50dB below full signal
-    this.vcaBleed = new Tone.Gain(0.002); // ~-54dB bleed
-
-    // === ACCENT CLICK ===
-    // Real 303 accents have a characteristic percussive "click" at attack
-    // Caused by the envelope driving the VCA hard with a fast transient
-    this.accentClick = new Tone.Gain(0);
-
-    // === DIODE LADDER FILTER SATURATION ===
-    // Real 303 filter uses transistors/diodes that have soft saturation
-    // This creates warmth and prevents harsh resonance peaks
-    // Subtle asymmetric soft clipping to simulate diode nonlinearity
-    this.filterSaturation = new Tone.WaveShaper((x) => {
-      // Asymmetric soft saturation like real diodes
-      // Positive side has slightly more headroom than negative
-      const threshold = 0.7;
-      if (Math.abs(x) < threshold) {
-        return x;
+      // 3. Load DSP
+      if (!(window as any)._open303WorkletLoaded) {
+        const basePath = import.meta.env.BASE_URL || '/';
+        await nativeCtx.audioWorklet.addModule(`${basePath}open303.worklet.js`);
+        (window as any)._open303WorkletLoaded = true;
       }
-      const sign = x >= 0 ? 1 : -1;
-      const asymmetry = x >= 0 ? 1.0 : 0.95; // Slight asymmetry
-      const excess = Math.abs(x) - threshold;
-      return sign * (threshold + Math.tanh(excess * 2.5) * (1 - threshold) * asymmetry);
-    }, 4096);
 
-    // === OVERDRIVE ===
-    // Soft clipping with adjustable drive (inspired by dittytoy's approach)
-    this.overdriveGain = new Tone.Gain(1);
-    this.overdrive = new Tone.WaveShaper((x) => {
-      // Soft clipping curve - gets more aggressive with higher input
-      const drive = 1 + this.overdriveAmount * 8;
-      return Math.tanh(x * drive) / Math.tanh(drive);
-    }, 4096);
+      // 4. Construct Worklet
+      this._worklet = new AudioWorkletNode(nativeCtx, 'open303-processor', {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [1]
+      });
 
-    // === DEVIL FISH: MUFFLER ===
-    // Soft clipping on VCA output - different character from overdrive
-    // Muffler softens loudest extremes while adding square-wave buzz
-    // Bass passes largely unaffected
-    this.mufflerBypass = new Tone.Gain(1);
-    this.muffler = new Tone.WaveShaper((x) => x, 4096); // Start with bypass curve
-    this.updateMufflerCurve();
+      this._worklet.port.onmessage = (e) => {
+        if (e.data.type === 'viz') {
+          this._vizCutoff = e.data.cutoff;
+          this._vizAccent = e.data.accent;
+        }
+      };
 
-    // === DEVIL FISH: FILTER FM ===
-    // VCA output feeds back to filter frequency for audio-rate modulation
-    this.filterFMGain = new Tone.Gain(0); // Start with no FM
-    this.filterFMAnalyser = new Tone.Analyser('waveform', 256);
+      // 5. Connect
+      this._worklet.connect(this._bridge);
+      this._isReady = true;
 
-    // === OUTPUT ===
-    this.output = new Tone.Gain(1);
+      // 6. Initial Parameters
+      setTimeout(() => {
+        this.setCutoff(opts.cutoff);
+        this.setResonance(opts.resonance);
+        this.setEnvMod(opts.envMod);
+        this.setDecay(opts.decay);
+        this.setAccentAmount(opts.accent);
+        this.setWaveform(opts.waveform);
 
-    // === CONNECT SIGNAL CHAIN ===
-    // Oscillator → Asymmetry → Filter1 → Filter2 → FilterSaturation → Overdrive → VCA → Accent → Click → Envelope → Muffler → Output
-    //                                                                                      ↓
-    //                                                                                    Bleed → Output (parallel path)
-    this.oscillator.connect(this.oscillatorAsymmetry);
-    this.oscillatorAsymmetry.connect(this.filter1);
-    this.filter1.connect(this.filter2);
-    this.filter2.connect(this.filterSaturation);
-    this.filterSaturation.connect(this.overdriveGain);
-    this.overdriveGain.connect(this.overdrive);
-    this.overdrive.connect(this.vca);
-    this.vca.connect(this.accentGain);
-    this.accentGain.connect(this.accentClick);
-    this.accentClick.connect(this.vcaEnvelope);
-    this.vcaEnvelope.connect(this.muffler);
-    this.muffler.connect(this.output);
+        while (this._messageQueue.length > 0) {
+          const msg = this._messageQueue.shift();
+          this._worklet?.port.postMessage(msg);
+        }
+      }, 50);
 
-    // VCA bleed path - bypasses envelope for subtle constant signal
-    this.vca.connect(this.vcaBleed);
-    this.vcaBleed.connect(this.output);
-
-    // Connect filter envelope to BOTH filters for cascaded sweep
-    this.filterEnvelope.connect(this.filter1.frequency);
-    this.filterEnvelope.connect(this.filter2.frequency);
-
-    // === DEVIL FISH: FILTER FM FEEDBACK ===
-    // Manual: "VCA (which includes the Muffler on its output)" - tap AFTER muffler
-    // Use analyser to sample VCA output for filter FM modulation
-    this.muffler.connect(this.filterFMAnalyser);
-    // Note: Filter FM is implemented via polling (startFilterFMProcessing) rather than
-    // direct audio connections because Tone.js Signals don't support direct audio-rate modulation
-
-    // Start oscillator
-    this.oscillator.start();
-
-    // Apply initial settings
-    this.setVolume(this.baseVolume);
-    this.setOverdrive(this.config.overdrive?.amount ?? 0);
-
-    console.log('[TB303Synth] Created with cascaded filters', {
-      oscillator: this.config.oscillator.type,
-      cutoff: this.config.filter.cutoff,
-      resonance: this.config.filter.resonance,
-      envMod: this.config.filterEnvelope.envMod,
-      decay: this.config.filterEnvelope.decay,
-    });
-  }
-
-  /**
-   * Convert resonance percentage (0-100) to filter Q value
-   * Based on dittytoy: kq = 1 - resonance * 0.9
-   * Inverted and mapped to Tone.js Q range
-   *
-   * TB-303 AUTHENTIC RESONANCE CURVE:
-   * Real 303 filter has a characteristic resonance response where:
-   * - Low resonance: Gentle peak, warm sound
-   * - Mid resonance: Strong "acid" character, not yet self-oscillating
-   * - High resonance (>80%): Approaches self-oscillation, filter "sings"
-   * - Max resonance: Clean sine wave at cutoff frequency
-   */
-  private resonanceToQ(resonance: number): number {
-    const normalized = resonance / 100;
-
-    // Use a curve that stays musical through the range but allows
-    // self-oscillation at very high values (>90%)
-    // Real 303 has a "sweet spot" around 60-80% that sounds very acid
-    if (normalized < 0.8) {
-      // 0-80%: Musical range, exponential curve
-      // Range: 0.7 to ~15 (strong resonance but not oscillating)
-      return 0.7 + Math.pow(normalized / 0.8, 1.8) * 14.3;
-    } else {
-      // 80-100%: Transition to self-oscillation range
-      // Steeper curve to reach oscillation threshold
-      const highNorm = (normalized - 0.8) / 0.2; // 0-1 for 80-100%
-      return 15 + Math.pow(highNorm, 1.5) * 20; // 15 to 35
+    } catch (e) {
+      console.error('[TB303] Path construction failed:', e);
     }
   }
 
-  /**
-   * Normalize config with defaults
-   */
-  private normalizeConfig(config: TB303Config): TB303Config {
-    return {
-      oscillator: {
-        type: config.oscillator?.type || 'sawtooth',
-      },
-      filter: {
-        cutoff: config.filter?.cutoff ?? 800,
-        resonance: config.filter?.resonance ?? 50,
-      },
-      filterEnvelope: {
-        envMod: config.filterEnvelope?.envMod ?? 50,
-        decay: config.filterEnvelope?.decay ?? 200,
-      },
-      accent: {
-        amount: config.accent?.amount ?? 50,
-      },
-      slide: {
-        time: config.slide?.time ?? 60,
-        mode: config.slide?.mode || 'exponential',
-      },
-      overdrive: {
-        amount: config.overdrive?.amount ?? 0,
-      },
-    };
+  // === Standard API ===
+
+  public triggerAttack(note: any, _time?: any, velocity: number = 1, accent: boolean = false, slide: boolean = false): this {
+    const pitch = Tone.Frequency(note).toMidi();
+    const msg = { type: 'noteOn', pitch, velocity: Math.floor(velocity * 127), accent, slide: slide && this._currentNote !== null };
+    if (this._isReady && this._worklet) this._worklet.port.postMessage(msg);
+    else this._messageQueue.push(msg);
+    this._currentNote = note.toString();
+    return this;
   }
 
-  /**
-   * Trigger note with TB-303 accent and slide behavior
-   * Accent behavior based on dittytoy:
-   * - Boosts volume by (accent + 1) factor
-   * - Boosts filter cutoff
-   * - Faster filter envelope decay
-   *
-   * Devil Fish additions:
-   * - Separate Normal/Accent decay times
-   * - VEG decay and sustain for infinite notes
-   * - Soft attack for non-accented notes
-   * - Filter tracking (linear Hz response)
-   * - Sweep speed capacitor simulation
-   */
-  public triggerAttackRelease(
-    note: string,
-    duration: number | string,
-    time?: Tone.Unit.Time,
-    velocity: number = 1,
-    accent: boolean = false,
-    slide: boolean = false
-  ): void {
-    const now = time !== undefined ? time : Tone.now();
-    const currentTime = Tone.now();
-    const targetFreq = Tone.Frequency(note).toFrequency();
-    this.currentNoteFreq = targetFreq;
-
-    // Handle slide (portamento to new note without retriggering envelopes)
-    // In tracker notation: slide flag on current note means "slide FROM previous note TO this note"
-    // The previous note does NOT need a slide flag - only the target note does
-    //
-    // TB-303 AUTHENTIC SLIDE: Real 303 uses RC circuit with ~60ms time constant
-    // The slide time is FIXED regardless of interval (C2→C3 same time as C2→C4)
-    // This is different from typical portamento which uses V/oct exponential ramps
-    if (slide && this.currentNote && this.currentNote !== note) {
-      console.log('[TB303] SLIDE to', note, 'from', this.currentNote);
-      // Fixed ~60ms RC time constant like real 303 (can be adjusted with slide.time knob)
-      const slideTimeMs = this.config.slide.time; // Default 60ms
-      const slideTimeSec = slideTimeMs / 1000;
-
-      // Use linear ramp for authentic RC circuit behavior
-      // RC circuits slew voltage linearly in Hz (not exponentially in V/oct)
-      // This makes the slide sound consistent regardless of interval size
-      const currentFreq = this.oscillator.frequency.value;
-      this.oscillator.frequency.cancelScheduledValues(now);
-      this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
-
-      this.currentNote = note;
-      this.isSliding = true; // Mark that we're in a slide
-      // Update filter tracking for new note during slide
-      if (this.devilFish.enabled && this.devilFish.filterTracking > 0) {
-        this.applyFilterTracking(targetFreq);
-      }
-      return;
-    }
-
-    // Cancel any in-progress envelopes to ensure clean retrigger
-    // This is critical for same-note sequences at high BPM
-    this.vcaEnvelope.cancel(now);
-    this.filterEnvelope.cancel(now);
-
-    // Normal note trigger
-    this.currentNote = note;
-    this.isSliding = slide;
-
-    // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
-    // This creates the characteristic "staccato" attack feel
-    // Only applies to non-slide notes (slide notes don't retrigger)
-    const triggerDelay = 0.004; // 4ms like real 303
-
-    // Set oscillator frequency (immediate, before envelopes start)
-    this.oscillator.frequency.setValueAtTime(targetFreq, now);
-
-    // === DEVIL FISH: Apply filter tracking (LINEAR Hz response per manual) ===
-    if (this.devilFish.enabled && this.devilFish.filterTracking > 0) {
-      this.applyFilterTracking(targetFreq);
-    }
-
-    // Calculate envelope and accent parameters
-    let filterDecayTime: number;
-    let vegDecayTime: number;
-    let attackTime: number;
-    let envMod = this.baseEnvMod;
-    let cutoffBoost = 0;
-    let accentMultiplier = 1;
-
-    if (this.devilFish.enabled) {
-      // === DEVIL FISH MODE ===
-      // Use separate Normal/Accent decay times
-      filterDecayTime = accent
-        ? this.devilFish.accentDecay / 1000
-        : this.devilFish.normalDecay / 1000;
-
-      // VEG decay time
-      vegDecayTime = this.devilFish.vegDecay / 1000;
-
-      // Soft attack for non-accented notes, authentic 3ms attack for accented notes
-      attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
-
-      // Apply VEG sustain (0% = normal decay, 100% = infinite notes)
-      this.vcaEnvelope.sustain = this.devilFish.vegSustain / 100;
-
-      // Calculate accent boost using sweep speed capacitor simulation
-      // Pass the scheduled time for accurate timing with pre-scheduled notes
-      if (accent && this.devilFish.accentSweepEnabled) {
-        accentMultiplier = 1 + this.calculateAccentBoost(true, now);
-      } else if (accent) {
-        accentMultiplier = 1 + (this.config.accent.amount / 100);
-      }
-    } else {
-      // === STANDARD TB-303 MODE ===
-      // MEG decay: controlled by Decay knob (200ms-2000ms)
-      filterDecayTime = this.config.filterEnvelope.decay / 1000;
-      // VEG decay: FIXED at ~3000ms (independent of Decay knob, like real 303)
-      vegDecayTime = 3.0;
-      // Attack: ~3ms (authentic 303)
-      attackTime = 0.003;
-      // Sustain: 0 (decays fully to zero)
-      this.vcaEnvelope.sustain = 0;
-
-      if (accent) {
-        const accentAmount = this.config.accent.amount / 100;
-        accentMultiplier = 1 + accentAmount;
-        cutoffBoost = accentAmount * 0.4;
-        envMod *= (1 + accentAmount * 0.5);
-        // Accent forces MEG decay to ~200ms (authentic behavior)
-        filterDecayTime = Math.min(filterDecayTime, 0.2);
-      }
-    }
-
-    // Update envelope parameters
-    this.vcaEnvelope.attack = attackTime;
-    this.vcaEnvelope.decay = vegDecayTime;
-    this.filterEnvelope.attack = attackTime;
-    this.filterEnvelope.decay = filterDecayTime;
-
-    // Update filter envelope octaves
-    const octaves = Math.log2((this.baseCutoff + envMod) / this.baseCutoff) + cutoffBoost;
-    this.filterEnvelope.octaves = Math.max(0.1, octaves);
-
-    // Apply accent volume boost
-    this.accentGain.gain.setValueAtTime(accentMultiplier, now);
-    // Decay accent over time (like dittytoy's aenv *= 0.9995)
-    // Start ramp slightly after setValueAtTime to avoid timing conflicts
-    if (accent) {
-      this.accentGain.gain.exponentialRampTo(1, 0.5, now + 0.001);
-
-      // TB-303 ACCENT CLICK: Characteristic percussive transient
-      // Real 303 accents have a brief "click" caused by the VCA being driven hard
-      // This adds punch and attack to accented notes
-      const clickIntensity = 1.0 + (this.config.accent.amount / 100) * 0.8; // 1.0 to 1.8x
-      this.accentClick.gain.cancelScheduledValues(now);
-      this.accentClick.gain.setValueAtTime(clickIntensity, now);
-      // Very fast decay (~8ms) for the click transient
-      this.accentClick.gain.exponentialRampToValueAtTime(1.0, now + 0.008);
-    } else {
-      // Non-accented: ensure click gain is at unity
-      this.accentClick.gain.setValueAtTime(1.0, now);
-    }
-
-    // TB-303 ACCENT RESONANCE MODULATION
-    // Real 303 boosts filter Q during accent for that characteristic "squelch"
-    // The accent circuit feeds into the resonance control, increasing Q
-    if (accent) {
-      const accentAmount = this.config.accent.amount / 100;
-      const baseQ = this.resonanceToQ(this.config.filter.resonance);
-      // Boost Q by up to 50% during accent (creates the squelch)
-      const accentQBoost = baseQ * accentAmount * 0.5;
-      const accentQ = Math.min(baseQ + accentQBoost, 35); // Cap at 35 to prevent instability
-
-      // Set boosted Q immediately
-      this.filter1.Q.setValueAtTime(accentQ, now);
-      this.filter2.Q.setValueAtTime(accentQ * 0.7, now);
-
-      // Decay Q back to base over ~200ms (matches MEG accent decay)
-      this.filter1.Q.exponentialRampToValueAtTime(baseQ, now + 0.2);
-      this.filter2.Q.exponentialRampToValueAtTime(baseQ * 0.7, now + 0.2);
-    }
-
-    // Track envelope state for visualization
-    this.lastTriggerTime = Tone.now();
-    this.lastTriggerDuration = typeof duration === 'number' ? duration : Tone.Time(duration).toSeconds();
-    this.lastEnvOctaves = octaves;
-    this.lastFilterDecay = this.filterEnvelope.decay;
-
-    // Trigger envelopes with 4ms delay (characteristic 303 feel)
-    const envelopeTime = now + triggerDelay;
-    this.vcaEnvelope.triggerAttackRelease(duration, envelopeTime, velocity);
-    this.filterEnvelope.triggerAttackRelease(duration, envelopeTime);
+  public triggerRelease(_time?: any): this {
+    const msg = { type: 'noteOff' };
+    if (this._isReady && this._worklet) this._worklet.port.postMessage(msg);
+    else this._messageQueue.push(msg);
+    this._currentNote = null;
+    return this;
   }
 
-  /**
-   * Trigger note attack only
-   * Devil Fish: Uses separate decay times, VEG sustain, soft attack, filter tracking
-   */
-  public triggerAttack(
-    note: string,
-    time?: Tone.Unit.Time,
-    velocity: number = 1,
-    accent: boolean = false,
-    slide: boolean = false
-  ): void {
-    const now = time !== undefined ? time : Tone.now();
-    const targetFreq = Tone.Frequency(note).toFrequency();
-    this.currentNoteFreq = targetFreq;
-
-    // Slide: portamento from previous note without retriggering envelopes
-    // TB-303 AUTHENTIC SLIDE: Fixed RC time constant (~60ms)
-    if (slide && this.currentNote && this.currentNote !== note) {
-      const slideTimeMs = this.config.slide.time;
-      const slideTimeSec = slideTimeMs / 1000;
-
-      // Linear ramp for authentic RC circuit behavior
-      const currentFreq = this.oscillator.frequency.value;
-      this.oscillator.frequency.cancelScheduledValues(now);
-      this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
-
-      this.currentNote = note;
-      this.isSliding = true;
-      if (this.devilFish.enabled && this.devilFish.filterTracking > 0) {
-        this.applyFilterTracking(targetFreq);
-      }
-      return;
-    }
-
-    this.currentNote = note;
-    this.isSliding = slide;
-
-    // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
-    const triggerDelay = 0.004; // 4ms like real 303
-
-    this.oscillator.frequency.setValueAtTime(targetFreq, now);
-
-    // Apply filter tracking
-    if (this.devilFish.enabled && this.devilFish.filterTracking > 0) {
-      this.applyFilterTracking(targetFreq);
-    }
-
-    let filterDecayTime: number;
-    let vegDecayTime: number;
-    let attackTime: number;
-    let envMod = this.baseEnvMod;
-    let cutoffBoost = 0;
-    let accentMultiplier = 1;
-
-    if (this.devilFish.enabled) {
-      filterDecayTime = accent
-        ? this.devilFish.accentDecay / 1000
-        : this.devilFish.normalDecay / 1000;
-      vegDecayTime = this.devilFish.vegDecay / 1000;
-      attackTime = accent ? 0.003 : this.devilFish.softAttack / 1000;
-      this.vcaEnvelope.sustain = this.devilFish.vegSustain / 100;
-
-      if (accent && this.devilFish.accentSweepEnabled) {
-        accentMultiplier = 1 + this.calculateAccentBoost(true, now);
-      } else if (accent) {
-        accentMultiplier = 1 + (this.config.accent.amount / 100);
-      }
-    } else {
-      // === STANDARD TB-303 MODE ===
-      filterDecayTime = this.config.filterEnvelope.decay / 1000;
-      vegDecayTime = 3.0; // Fixed ~3000ms VEG decay
-      attackTime = 0.003; // 3ms attack
-      this.vcaEnvelope.sustain = 0;
-
-      if (accent) {
-        const accentAmount = this.config.accent.amount / 100;
-        accentMultiplier = 1 + accentAmount;
-        cutoffBoost = accentAmount * 0.4;
-        envMod *= (1 + accentAmount * 0.5);
-        filterDecayTime = Math.min(filterDecayTime, 0.2);
-      }
-    }
-
-    this.vcaEnvelope.attack = attackTime;
-    this.vcaEnvelope.decay = vegDecayTime;
-    this.filterEnvelope.attack = attackTime;
-    this.filterEnvelope.decay = filterDecayTime;
-    this.filterEnvelope.octaves = Math.max(0.1, Math.log2((this.baseCutoff + envMod) / this.baseCutoff) + cutoffBoost);
-
-    this.accentGain.gain.setValueAtTime(accentMultiplier, now);
-    // Start ramp slightly after setValueAtTime to avoid timing conflicts
-    if (accent) {
-      this.accentGain.gain.exponentialRampTo(1, 0.5, now + 0.001);
-
-      // TB-303 ACCENT CLICK: Characteristic percussive transient
-      const clickIntensity = 1.0 + (this.config.accent.amount / 100) * 0.8;
-      this.accentClick.gain.cancelScheduledValues(now);
-      this.accentClick.gain.setValueAtTime(clickIntensity, now);
-      this.accentClick.gain.exponentialRampToValueAtTime(1.0, now + 0.008);
-    } else {
-      this.accentClick.gain.setValueAtTime(1.0, now);
-    }
-
-    // TB-303 ACCENT RESONANCE MODULATION
-    // Real 303 boosts filter Q during accent for that characteristic "squelch"
-    if (accent) {
-      const accentAmount = this.config.accent.amount / 100;
-      const baseQ = this.resonanceToQ(this.config.filter.resonance);
-      const accentQBoost = baseQ * accentAmount * 0.5;
-      const accentQ = Math.min(baseQ + accentQBoost, 35);
-
-      this.filter1.Q.setValueAtTime(accentQ, now);
-      this.filter2.Q.setValueAtTime(accentQ * 0.7, now);
-      this.filter1.Q.exponentialRampToValueAtTime(baseQ, now + 0.2);
-      this.filter2.Q.exponentialRampToValueAtTime(baseQ * 0.7, now + 0.2);
-    }
-
-    // Track envelope state for visualization
-    this.lastTriggerTime = Tone.now();
-    this.lastTriggerDuration = 10; // Long duration for attack-only triggers
-    this.lastEnvOctaves = this.filterEnvelope.octaves;
-    this.lastFilterDecay = filterDecayTime;
-
-    // Trigger envelopes with 4ms delay (characteristic 303 feel)
-    const envelopeTime = now + triggerDelay;
-    this.vcaEnvelope.triggerAttack(envelopeTime, velocity);
-    this.filterEnvelope.triggerAttack(envelopeTime);
+  public triggerAttackRelease(note: any, duration: any, time?: any, velocity: number = 1, accent: boolean = false, slide: boolean = false): this {
+    const now = this.toSeconds(time);
+    const durSec = this.toSeconds(duration);
+    this.triggerAttack(note, now, velocity, accent, slide);
+    this.context.transport.schedule(() => {
+      this.triggerRelease();
+    }, now + durSec);
+    return this;
   }
 
-  /**
-   * Trigger note release
-   */
-  public triggerRelease(time?: Tone.Unit.Time): void {
-    // Ensure we have a valid time value
-    let now: number;
-    if (time !== undefined && time !== null && typeof time === 'number' && !isNaN(time)) {
-      now = time;
-    } else {
-      now = Tone.now();
-    }
+  // === Parameter Controls ===
 
-    // Safety check - make sure we have a valid time
-    if (now === null || now === undefined || isNaN(now)) {
-      return; // Skip release if audio context isn't ready
-    }
+  public setCutoff(v: number) { this._sendRawParam('cutoff', v); }
+  public setResonance(v: number) { this._sendRawParam('resonance', v); }
+  public setEnvMod(v: number) { this._sendRawParam('envMod', v); }
+  public setDecay(v: number) { this._sendRawParam('decay', v); }
+  public setAccentAmount(v: number) { this._sendRawParam('accent', v); }
+  public setWaveform(v: 'sawtooth' | 'square') { this._sendRawParam('waveform', v === 'square' ? 1 : 0); }
+  public setTuning(cents: number) { this._sendRawParam('tuning', 440 * Math.pow(2, cents / 1200)); }
+  public setSlideTime(v: number) { this._sendRawParam('slideTime', v); }
+  public setOverdrive(v: number) { this._sendRawParam('overdrive', v); }
 
-    this.vcaEnvelope.triggerRelease(now);
-    this.filterEnvelope.triggerRelease(now);
-    this.isSliding = false;
-  }
+  // Devil Fish Parameters
+  public setSweepSpeed(v: string) { this._sendRawParam('sweep', v); }
+  public setMuffler(v: string) { this._sendRawParam('muffler', v); }
+  public setHighResonance(v: boolean) { this._sendRawParam('highResonance', v ? 1 : 0); }
+  public setAccentSweepEnabled(v: boolean) { this._sendRawParam('accentSweepEnabled', v ? 1 : 0); }
+  public setNormalDecay(v: number) { this._sendRawParam('decay', v); }
+  public setAccentDecay(v: number) { this._sendRawParam('accentDecay', v); }
+  public setVegDecay(v: number) { this._sendRawParam('ampDecay', v); }
+  public setVegSustain(percent: number) { this._sendRawParam('ampSustain', percent / 100); }
+  public setSoftAttack(v: number) { this._sendRawParam('softAttack', v); }
+  public setFilterTracking(v: number) { this._sendRawParam('tracking', v); }
+  public setFilterFM(v: number) { this._sendRawParam('filterFM', v); }
 
-  /**
-   * Release all notes
-   */
-  public releaseAll(): void {
-    this.triggerRelease();
-  }
-
-  /**
-   * Set filter cutoff frequency
-   * Based on dittytoy: kf = 2^(cutoff * 7 - 7 + envmod)
-   */
-  public setCutoff(frequency: number): void {
-    this.baseCutoff = Math.min(Math.max(frequency, 50), 18000);
-    this.config.filter.cutoff = this.baseCutoff;
-    this.filter1.frequency.value = this.baseCutoff;
-    this.filter2.frequency.value = this.baseCutoff;
-    this.filterEnvelope.baseFrequency = this.baseCutoff;
-    this.updateEnvMod();
-  }
-
-  /**
-   * Set filter resonance
-   * Based on dittytoy: kq = 1 - resonance * 0.9 - accent * 0.1
-   */
-  public setResonance(resonancePercent: number): void {
-    const resonance = Math.min(Math.max(resonancePercent, 0), 100);
-    this.config.filter.resonance = resonance;
-    // Use high resonance Q curve if Devil Fish high resonance mode is enabled
-    const q = this.devilFish.enabled && this.devilFish.highResonance
-      ? this.resonanceToQHighRes(resonance)
-      : this.resonanceToQ(resonance);
-    this.filter1.Q.value = q;
-    this.filter2.Q.value = q * 0.7;
-  }
-
-  /**
-   * Set envelope modulation amount
-   */
-  public setEnvMod(envModPercent: number): void {
-    this.config.filterEnvelope.envMod = Math.min(Math.max(envModPercent, 0), 100);
-    this.updateEnvMod();
-  }
-
-  /**
-   * Update envelope modulation range
-   */
-  private updateEnvMod(): void {
-    // Based on dittytoy: envmod * 5 octaves of sweep
-    this.baseEnvMod = this.baseCutoff * (this.config.filterEnvelope.envMod / 100) * 10;
-    const octaves = Math.log2((this.baseCutoff + this.baseEnvMod) / this.baseCutoff);
-    this.filterEnvelope.octaves = Math.max(0.1, octaves);
-  }
-
-  /**
-   * Set envelope decay time
-   * Based on dittytoy: fenv *= exp(-(1-decay) * 0.004)
-   */
-  public setDecay(decayMs: number): void {
-    this.config.filterEnvelope.decay = Math.min(Math.max(decayMs, 30), 3000);
-    const decaySeconds = this.config.filterEnvelope.decay / 1000;
-    this.vcaEnvelope.decay = decaySeconds;
-    this.filterEnvelope.decay = decaySeconds;
-  }
-
-  /**
-   * Set accent amount
-   */
-  public setAccentAmount(amount: number): void {
-    this.config.accent.amount = Math.min(Math.max(amount, 0), 100);
-  }
-
-  /**
-   * Set slide time
-   */
-  public setSlideTime(timeMs: number): void {
-    this.config.slide.time = Math.min(Math.max(timeMs, 10), 500);
-  }
-
-  /**
-   * Set overdrive amount (0-100)
-   * Based on dittytoy's soft clipping with upsampling
-   */
-  public setOverdrive(amount: number): void {
-    this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
-    this.config.overdrive = { amount: this.overdriveAmount * 100 };
-
-    // Update waveshaper curve
-    this.overdrive.curve = new Float32Array(4096).map((_, i) => {
-      const x = (i / 4096) * 2 - 1;
-      const drive = 1 + this.overdriveAmount * 8;
-      return Math.tanh(x * drive) / Math.tanh(drive);
-    });
-
-    // Boost input gain to drive the overdrive harder
-    this.overdriveGain.gain.value = 1 + this.overdriveAmount * 2;
-  }
-
-  // ============================================
-  // DEVIL FISH MOD METHODS
-  // ============================================
-
-  /**
-   * Enable/disable Devil Fish mode with configuration
-   */
-  public enableDevilFish(enabled: boolean, config?: Partial<DevilFishConfig>): void {
-    this.devilFish.enabled = enabled;
+  public enableDevilFish(enabled: boolean, config?: Partial<DevilFishConfig>) {
+    this._sendRawParam('dfEnabled', enabled ? 1 : 0);
     if (config) {
-      Object.assign(this.devilFish, config);
-    }
-    this.updateMufflerCurve();
-    this.setFilterFM(this.devilFish.filterFM);
-    this.updateResonanceMode();
-    console.log('[TB303Synth] Devil Fish', enabled ? 'enabled' : 'disabled', this.devilFish);
-  }
-
-  /**
-   * Set MEG (Main Envelope Generator) decay for normal (non-accented) notes
-   * Devil Fish range: 30-3000ms
-   */
-  public setNormalDecay(decayMs: number): void {
-    this.devilFish.normalDecay = Math.min(Math.max(decayMs, 30), 3000);
-  }
-
-  /**
-   * Set MEG decay for accented notes
-   * Devil Fish range: 30-3000ms
-   * Original TB-303 had this fixed at ~200ms
-   */
-  public setAccentDecay(decayMs: number): void {
-    this.devilFish.accentDecay = Math.min(Math.max(decayMs, 30), 3000);
-  }
-
-  /**
-   * Set VEG (Volume Envelope Generator) decay
-   * Devil Fish range: 16-3000ms
-   * Original TB-303 had fixed ~3-4 second decay
-   */
-  public setVegDecay(decayMs: number): void {
-    this.devilFish.vegDecay = Math.min(Math.max(decayMs, 16), 3000);
-  }
-
-  /**
-   * Set VEG sustain level
-   * 0% = normal TB-303 behavior (note fades)
-   * 100% = infinite notes (drone mode)
-   */
-  public setVegSustain(percent: number): void {
-    this.devilFish.vegSustain = Math.min(Math.max(percent, 0), 100);
-  }
-
-  /**
-   * Set attack time for non-accented notes
-   * Devil Fish range: 0.3-30ms
-   * Original TB-303 had ~4ms delay + 3ms attack
-   */
-  public setSoftAttack(timeMs: number): void {
-    this.devilFish.softAttack = Math.min(Math.max(timeMs, 0.3), 30);
-  }
-
-  /**
-   * Set filter tracking amount
-   * 0% = filter doesn't follow pitch (TB-303 default)
-   * 100% = filter follows pitch 1:1
-   * 200% = filter over-tracks (goes higher than pitch)
-   */
-  public setFilterTracking(percent: number): void {
-    this.devilFish.filterTracking = Math.min(Math.max(percent, 0), 200);
-  }
-
-  /**
-   * Set Filter FM amount
-   * VCA output feeds back to filter frequency for audio-rate modulation
-   * Creates edginess, complexity, even chaos
-   * Uses polling approach since Tone.js Signals don't support direct audio-rate modulation
-   */
-  public setFilterFM(percent: number): void {
-    this.devilFish.filterFM = Math.min(Math.max(percent, 0), 100);
-
-    if (this.devilFish.filterFM > 0 && !this.filterFMInterval) {
-      this.startFilterFMProcessing();
-    } else if (this.devilFish.filterFM === 0 && this.filterFMInterval) {
-      this.stopFilterFMProcessing();
+      this.setNormalDecay(config.normalDecay || 200);
+      this.setAccentDecay(config.accentDecay || 200);
+      this.setVegDecay(config.vegDecay || 3000);
+      this.setVegSustain(config.vegSustain || 0);
+      this.setSoftAttack(config.softAttack || 4);
+      this.setFilterTracking(config.filterTracking || 0);
+      this.setFilterFM(config.filterFM || 0);
+      this.setSweepSpeed(config.sweepSpeed || 'normal');
+      this.setAccentSweepEnabled(config.accentSweepEnabled ?? true);
+      this.setHighResonance(config.highResonance || false);
+      this.setMuffler(config.muffler || 'off');
     }
   }
 
-  /**
-   * Start Filter FM processing loop
-   * Polls VCA output via analyser and modulates filter envelope base frequency
-   * This allows FM and envelope to work together (FM modulates base, envelope adds on top)
-   */
-  private startFilterFMProcessing(): void {
-    if (this.filterFMInterval) return;
-
-    const processFilterFM = () => {
-      if (this.devilFish.filterFM === 0) {
-        this.filterFMInterval = null;
-        return;
-      }
-
-      // Get VCA output level from analyser
-      const waveform = this.filterFMAnalyser.getValue() as Float32Array;
-      // Use average of waveform as modulation signal
-      let sum = 0;
-      for (let i = 0; i < waveform.length; i++) {
-        sum += waveform[i];
-      }
-      const avgLevel = sum / waveform.length;
-
-      // Scale FM amount: 0% = no FM, 100% = ±2000Hz modulation
-      const fmAmount = (this.devilFish.filterFM / 100) * 2000;
-      const fmOffset = avgLevel * fmAmount;
-
-      // Modulate filter envelope's base frequency
-      // This allows FM and envelope to work together
-      const modulatedBase = Math.min(Math.max(this.baseCutoff + fmOffset, 50), 18000);
-      this.filterEnvelope.baseFrequency = modulatedBase;
-
-      this.filterFMInterval = requestAnimationFrame(processFilterFM);
-    };
-
-    this.filterFMInterval = requestAnimationFrame(processFilterFM);
-  }
-
-  /**
-   * Stop filter FM processing
-   */
-  private stopFilterFMProcessing(): void {
-    if (this.filterFMInterval) {
-      cancelAnimationFrame(this.filterFMInterval);
-      this.filterFMInterval = null;
-    }
-    // Reset filter envelope base frequency
-    this.filterEnvelope.baseFrequency = this.baseCutoff;
-  }
-
-  /**
-   * Set sweep speed mode
-   * Controls how accent "charge" accumulates over consecutive accents
-   * - fast: Quick discharge, smaller subsequent accents
-   * - normal: Classic TB-303 behavior (accents build up)
-   * - slow: Double buildup potential, longer cooldown
-   */
-  public setSweepSpeed(mode: 'fast' | 'normal' | 'slow'): void {
-    this.devilFish.sweepSpeed = mode;
-  }
-
-  /**
-   * Enable/disable accent sweep circuit
-   */
-  public setAccentSweepEnabled(enabled: boolean): void {
-    this.devilFish.accentSweepEnabled = enabled;
-  }
-
-  /**
-   * Enable/disable high resonance mode
-   * When enabled, filter can self-oscillate at mid/high frequencies
-   */
-  public setHighResonance(enabled: boolean): void {
-    this.devilFish.highResonance = enabled;
-    this.updateResonanceMode();
-  }
-
-  /**
-   * Update resonance curve based on mode
-   */
-  private updateResonanceMode(): void {
-    if (this.devilFish.enabled && this.devilFish.highResonance) {
-      // High resonance mode: allow self-oscillation
-      const q = this.resonanceToQHighRes(this.config.filter.resonance);
-      this.filter1.Q.value = q;
-      this.filter2.Q.value = q * 0.7;
+  private _sendRawParam(name: string, value: any) {
+    const msg = { type: 'param', name, value };
+    if (this._isReady && this._worklet) {
+      this._worklet.port.postMessage(msg);
     } else {
-      // Normal mode
-      const q = this.resonanceToQ(this.config.filter.resonance);
-      this.filter1.Q.value = q;
-      this.filter2.Q.value = q * 0.7;
+      this._messageQueue.push(msg);
     }
   }
 
-  /**
-   * Convert resonance to Q in high resonance mode (self-oscillation enabled)
-   */
-  private resonanceToQHighRes(resonance: number): number {
-    const normalized = resonance / 100;
-    // Much higher Q range: 0.5 to 50 (self-oscillation threshold)
-    return 0.5 + Math.pow(normalized, 1.2) * 49.5;
-  }
-
-  /**
-   * Set muffler mode
-   * - off: No muffler (TB-303 default)
-   * - soft: Gentle soft clipping, adds warmth
-   * - hard: Aggressive clipping, adds buzz/fuzz
-   */
-  public setMuffler(mode: 'off' | 'soft' | 'hard'): void {
-    this.devilFish.muffler = mode;
-    this.updateMufflerCurve();
-  }
-
-  /**
-   * Update muffler waveshaper curve based on mode
-   * Muffler is unique to Devil Fish - soft clips the VCA output
-   * Different from overdrive which is pre-filter
-   */
-  private updateMufflerCurve(): void {
-    if (!this.devilFish.enabled || this.devilFish.muffler === 'off') {
-      // Bypass - linear curve
-      this.muffler.curve = new Float32Array(4096).map((_, i) => {
-        return (i / 4096) * 2 - 1;
-      });
-    } else if (this.devilFish.muffler === 'soft') {
-      // Soft muffler - gentle limiting that preserves bass
-      this.muffler.curve = new Float32Array(4096).map((_, i) => {
-        const x = (i / 4096) * 2 - 1;
-        // Soft knee compression - louder signals get compressed more
-        const threshold = 0.5;
-        if (Math.abs(x) < threshold) {
-          return x;
-        }
-        const sign = x >= 0 ? 1 : -1;
-        const excess = Math.abs(x) - threshold;
-        return sign * (threshold + Math.tanh(excess * 2) * (1 - threshold));
-      });
-    } else {
-      // Hard muffler - more aggressive clipping with buzz
-      this.muffler.curve = new Float32Array(4096).map((_, i) => {
-        const x = (i / 4096) * 2 - 1;
-        // Hard limiting with subtle square-wave-like buzz
-        const threshold = 0.3;
-        if (Math.abs(x) < threshold) {
-          return x;
-        }
-        const sign = x >= 0 ? 1 : -1;
-        const excess = Math.abs(x) - threshold;
-        // More aggressive compression
-        return sign * (threshold + Math.tanh(excess * 4) * (1 - threshold) * 0.7);
-      });
-    }
-  }
-
-  /**
-   * Apply filter tracking for a given note frequency
-   * IMPORTANT: Devil Fish uses LINEAR tracking (Hz per volt), NOT exponential (1V/oct)
-   *
-   * From manual: "The voltage to frequency function of internal Filter Tracking pot is linear...
-   * the relationship between the internal CV and the filter frequency is linear in a volts to Hertz sense"
-   * "At maximum, the maximum Filter Tracking is about 2.7 kHz per volt"
-   *
-   * Reference: C2 (65.41 Hz) = 2V is the center point (no change)
-   * Notes below this cause filter to DROP, notes above cause it to RISE
-   */
-  private applyFilterTracking(noteFreq: number): void {
-    if (!this.devilFish.enabled || this.devilFish.filterTracking === 0) {
+  public async loadNeuralModel(name: string) {
+    if (!name || name === 'none') {
+      this._sendRawParam('loadModel', null);
       return;
     }
-
-    const trackingOffset = this.getFilterTrackingOffset(noteFreq);
-    const targetCutoff = Math.min(Math.max(this.baseCutoff + trackingOffset, 50), 18000);
-
-    this.filter1.frequency.value = targetCutoff;
-    this.filter2.frequency.value = targetCutoff;
-  }
-
-  /**
-   * Calculate filter tracking offset for a given note (LINEAR Hz response)
-   *
-   * From manual: "for instance, with a particular setting... the filter might have a cutoff
-   * of say 1 kHz. With a CV of 3 volts this would become 1.5 kHz, with 4 volts it would
-   * become 2 kHz and with 5 volts, it would become 2.5 kHz"
-   *
-   * This is LINEAR: each volt adds the same Hz amount (not exponential octaves)
-   * TB-303 CV range: 1-5V over 3 octaves, center at 2V (C2 = 65.41 Hz)
-   */
-  private getFilterTrackingOffset(noteFreq: number): number {
-    if (!this.devilFish.enabled || this.devilFish.filterTracking === 0) {
-      return 0;
-    }
-
-    // Reference: C2 (65.41 Hz) at 2V is the "zero point" for filter tracking
-    const referenceFreq = 65.41; // C2
-    const referenceVoltage = 2.0;
-
-    // Convert note frequency to CV voltage (1V/octave, C2 = 2V)
-    const noteVoltage = referenceVoltage + Math.log2(noteFreq / referenceFreq);
-
-    // Voltage difference from reference
-    const voltageDiff = noteVoltage - referenceVoltage;
-
-    // LINEAR tracking: ~2.7 kHz per volt at max setting
-    // Scale by tracking amount (0-200%, where 100% = 1:1, 200% = over-tracking)
-    const maxHzPerVolt = 2700; // 2.7 kHz per volt at max
-    const trackingAmount = this.devilFish.filterTracking / 100;
-
-    // Return LINEAR Hz offset (not exponential!)
-    return voltageDiff * maxHzPerVolt * trackingAmount;
-  }
-
-  /**
-   * Calculate accent boost based on sweep speed mode
-   * Simulates the capacitor charge/discharge in Devil Fish
-   * @param accent Whether this note is accented
-   * @param time The scheduled time for this note (for accurate timing with scheduled notes)
-   */
-  private calculateAccentBoost(accent: boolean, time?: number): number {
-    if (!this.devilFish.enabled || !this.devilFish.accentSweepEnabled) {
-      return accent ? this.config.accent.amount / 100 : 0;
-    }
-
-    // Use provided time or fall back to Tone.now() for real-time triggering
-    const noteTime = time !== undefined ? time : Tone.now();
-    const timeSinceLastAccent = noteTime - this.lastAccentTime;
-
-    // Discharge rate depends on sweep speed
-    let dischargeRate: number;
-    let chargeRate: number;
-    let maxCharge: number;
-
-    switch (this.devilFish.sweepSpeed) {
-      case 'fast':
-        dischargeRate = 0.8; // Fast discharge
-        chargeRate = 0.3;
-        maxCharge = 1.2;
-        break;
-      case 'slow':
-        dischargeRate = 0.2; // Slow discharge
-        chargeRate = 0.6;
-        maxCharge = 2.0; // Can build up more
-        break;
-      case 'normal':
-      default:
-        dischargeRate = 0.5;
-        chargeRate = 0.5;
-        maxCharge = 1.5;
-        break;
-    }
-
-    // Discharge over time
-    this.accentCharge *= Math.exp(-dischargeRate * timeSinceLastAccent);
-
-    if (accent) {
-      // Charge up
-      this.accentCharge = Math.min(this.accentCharge + chargeRate, maxCharge);
-      this.lastAccentTime = noteTime;
-    }
-
-    // Base accent + charged boost
-    const baseAccent = accent ? this.config.accent.amount / 100 : 0;
-    return baseAccent * (1 + this.accentCharge * 0.5);
-  }
-
-  /**
-   * Get Devil Fish configuration
-   */
-  public getDevilFishConfig(): DevilFishConfig {
-    return { ...this.devilFish };
-  }
-
-  /**
-   * Update Devil Fish configuration
-   */
-  public updateDevilFishConfig(config: Partial<DevilFishConfig>): void {
-    if (config.enabled !== undefined) {
-      this.enableDevilFish(config.enabled, config);
-    } else {
-      Object.assign(this.devilFish, config);
-      if (config.muffler !== undefined) this.updateMufflerCurve();
-      if (config.filterFM !== undefined) this.setFilterFM(config.filterFM);
-      if (config.highResonance !== undefined) this.updateResonanceMode();
-    }
-  }
-
-  // ============================================
-  // END DEVIL FISH MOD METHODS
-  // ============================================
-
-  /**
-   * Set tuning offset in cents
-   */
-  public setTuning(cents: number): void {
-    this.tuningCents = Math.min(Math.max(cents, -1200), 1200);
-    this.oscillator.detune.value = this.tuningCents;
-  }
-
-  /**
-   * Get current tuning in cents
-   */
-  public getTuning(): number {
-    return this.tuningCents;
-  }
-
-  /**
-   * Set oscillator waveform
-   */
-  public setWaveform(type: 'sawtooth' | 'square'): void {
-    this.config.oscillator.type = type;
-    this.oscillator.type = type;
-  }
-
-  /**
-   * Set output volume
-   */
-  public setVolume(volumeDb: number): void {
-    this.baseVolume = volumeDb;
-    this.vca.gain.value = Tone.dbToGain(volumeDb);
-  }
-
-  /**
-   * Update configuration
-   */
-  public updateConfig(config: Partial<TB303Config>): void {
-    if (config.oscillator?.type) {
-      this.setWaveform(config.oscillator.type);
-    }
-    if (config.filter) {
-      if (config.filter.cutoff !== undefined) {
-        this.setCutoff(config.filter.cutoff);
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}models/jc303/${name}.json`);
+      const model = await res.json();
+      if (this._worklet && model.state_dict) {
+        const weights = {
+          rec: {
+            weight_ih_l0: model.state_dict['rec.weight_ih_l0'],
+            weight_hh_l0: model.state_dict['rec.weight_hh_l0'],
+            bias_ih_l0: model.state_dict['rec.bias_ih_l0'],
+            bias_hh_l0: model.state_dict['rec.bias_hh_l0'],
+          },
+          lin: { weight: model.state_dict['lin.weight'], bias: model.state_dict['lin.bias'] }
+        };
+        this._worklet.port.postMessage({ type: 'loadModel', weights });
       }
-      if (config.filter.resonance !== undefined) {
-        this.setResonance(config.filter.resonance);
-      }
-    }
-    if (config.filterEnvelope) {
-      if (config.filterEnvelope.envMod !== undefined) {
-        this.setEnvMod(config.filterEnvelope.envMod);
-      }
-      if (config.filterEnvelope.decay !== undefined) {
-        this.setDecay(config.filterEnvelope.decay);
-      }
-    }
-    if (config.accent?.amount !== undefined) {
-      this.setAccentAmount(config.accent.amount);
-    }
-    if (config.slide) {
-      if (config.slide.time !== undefined) {
-        this.setSlideTime(config.slide.time);
-      }
-      if (config.slide.mode !== undefined) {
-        this.config.slide.mode = config.slide.mode;
-      }
-    }
-    if (config.overdrive?.amount !== undefined) {
-      this.setOverdrive(config.overdrive.amount);
-    }
+    } catch (e) { console.error('[TB303] Model failed:', e); }
   }
 
-  /**
-   * Connect to destination
-   */
-  public connect(destination: Tone.InputNode): this {
-    this.output.connect(destination);
-    return this;
-  }
-
-  /**
-   * Disconnect from all destinations
-   */
-  public disconnect(): this {
-    this.output.disconnect();
-    return this;
-  }
-
-  /**
-   * Dispose of all resources
-   */
-  public dispose(): void {
-    // Stop filter FM processing if running
-    this.stopFilterFMProcessing();
-
-    // Dispose all audio nodes
-    this.oscillator.dispose();
-    this.oscillatorAsymmetry.dispose();
-    this.filter1.dispose();
-    this.filter2.dispose();
-    this.filterSaturation.dispose();
-    this.filterEnvelope.dispose();
-    this.vca.dispose();
-    this.accentGain.dispose();
-    this.accentClick.dispose();
-    this.vcaEnvelope.dispose();
-    this.vcaBleed.dispose();
-    this.overdrive.dispose();
-    this.overdriveGain.dispose();
-
-    // Dispose Devil Fish nodes
-    this.muffler.dispose();
-    this.mufflerBypass.dispose();
-    this.filterFMGain.dispose();
-    this.filterFMAnalyser.dispose();
-
-    this.output.dispose();
-  }
-
-  /**
-   * Get the output node
-   */
-  public get audioNode(): Tone.Gain {
-    return this.output;
-  }
-
-  /**
-   * Get current configuration
-   */
-  public getConfig(): TB303Config {
-    return { ...this.config };
-  }
-
-  /**
-   * Get instantaneous filter cutoff frequency
-   * Calculates the current envelope position for visualization
-   * Returns estimated frequency including envelope modulation
-   */
-  public getInstantCutoff(): number {
-    const now = Tone.now();
-    const elapsed = now - this.lastTriggerTime;
-
-    // If no recent trigger or very old, return base cutoff
-    if (this.lastTriggerTime === 0 || elapsed > 5) {
-      return this.baseCutoff;
-    }
-
-    const attack = this.filterEnvelope.attack;
-    const decay = this.lastFilterDecay;
-    const sustain = this.filterEnvelope.sustain;
-    const release = this.filterEnvelope.release;
-    const duration = this.lastTriggerDuration;
-
-    // Calculate envelope value (0-1)
-    let envValue = 0;
-
-    if (elapsed < attack) {
-      // Attack phase: ramp up to 1
-      envValue = elapsed / attack;
-    } else if (elapsed < attack + decay) {
-      // Decay phase: exponential decay from 1 to sustain
-      const decayElapsed = elapsed - attack;
-      const decayProgress = decayElapsed / decay;
-      envValue = 1 - (1 - sustain) * (1 - Math.exp(-3 * decayProgress));
-    } else if (elapsed < duration) {
-      // Sustain phase
-      envValue = sustain;
-    } else if (elapsed < duration + release) {
-      // Release phase
-      const releaseElapsed = elapsed - duration;
-      const releaseProgress = releaseElapsed / release;
-      envValue = sustain * Math.exp(-3 * releaseProgress);
-    } else {
-      // Envelope finished
-      envValue = 0;
-    }
-
-    // Convert envelope value to frequency
-    // FrequencyEnvelope uses octaves from baseFrequency
-    const baseFreq = this.filterEnvelope.baseFrequency;
-    const octaves = this.lastEnvOctaves;
-    const maxFreq = baseFreq * Math.pow(2, octaves);
-
-    // Envelope output is exponential interpolation
-    const currentFreq = baseFreq * Math.pow(maxFreq / baseFreq, envValue);
-
-    return Math.min(Math.max(currentFreq, 50), 18000);
-  }
-
-  /**
-   * Get instantaneous accent gain
-   * Returns current accent multiplier for visualization
-   */
-  public getInstantAccent(): number {
-    return this.accentGain.gain.value;
-  }
-
-  /**
-   * Get base cutoff (before modulation)
-   */
-  public getBaseCutoff(): number {
-    return this.baseCutoff;
-  }
-
-  /**
-   * Get current resonance (0-100)
-   */
-  public getResonance(): number {
-    return this.config.filter.resonance;
-  }
-
-  /**
-   * Get current envelope modulation amount (0-100)
-   */
-  public getEnvMod(): number {
-    return this.config.filterEnvelope.envMod;
-  }
-
-  /**
-   * Get current decay time in ms
-   */
-  public getDecay(): number {
-    return this.config.filterEnvelope.decay;
-  }
-
-  /**
-   * Get current accent amount (0-100)
-   */
-  public getAccentAmount(): number {
-    return this.config.accent.amount;
-  }
-
-  /**
-   * Get current overdrive amount (0-100)
-   */
-  public getOverdrive(): number {
-    return this.overdriveAmount * 100;
-  }
-
-  // === Devil Fish Getters ===
-
-  /**
-   * Get normal decay time in ms (Devil Fish)
-   */
-  public getNormalDecay(): number {
-    return this.devilFish.normalDecay;
-  }
-
-  /**
-   * Get accent decay time in ms (Devil Fish)
-   */
-  public getAccentDecay(): number {
-    return this.devilFish.accentDecay;
-  }
-
-  /**
-   * Get VEG decay time in ms (Devil Fish)
-   */
-  public getVegDecay(): number {
-    return this.devilFish.vegDecay;
-  }
-
-  /**
-   * Get VEG sustain level (0-100) (Devil Fish)
-   */
-  public getVegSustain(): number {
-    return this.devilFish.vegSustain;
-  }
-
-  /**
-   * Get soft attack time in ms (Devil Fish)
-   */
-  public getSoftAttack(): number {
-    return this.devilFish.softAttack;
-  }
-
-  /**
-   * Get filter tracking amount (0-200) (Devil Fish)
-   */
-  public getFilterTracking(): number {
-    return this.devilFish.filterTracking;
-  }
-
-  /**
-   * Get filter FM amount (0-100) (Devil Fish)
-   */
-  public getFilterFM(): number {
-    return this.devilFish.filterFM;
-  }
-
-  /**
-   * Check if Devil Fish mode is enabled
-   */
-  public isDevilFishEnabled(): boolean {
-    return this.devilFish.enabled;
-  }
+  public connect(dest: any) { this.output.connect(dest); return this; }
+  public disconnect() { this.output.disconnect(); return this; }
+  public dispose() { this.output.dispose(); this._panner.dispose(); this._worklet?.disconnect(); return this; }
+  
+  public get volume(): Tone.Volume { return this.output; }
+  public get pan(): Tone.Param<"audioRange"> { return this._panner.pan; }
+  public getInstantCutoff() { return this._vizCutoff; }
+  public getInstantAccent() { return this._vizAccent; }
 }

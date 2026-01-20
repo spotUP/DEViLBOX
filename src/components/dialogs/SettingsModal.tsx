@@ -7,6 +7,7 @@ import { X } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { Toggle } from '@components/controls/Toggle';
+import { APP_VERSION } from '@constants/version';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -120,7 +121,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           {/* Info Section */}
           <section className="pt-4 border-t border-ft2-border">
             <div className="text-ft2-textDim text-[10px] font-mono space-y-1">
-              <div>DEViLBOX v1.0.0</div>
+              <div>DEViLBOX v{APP_VERSION}</div>
               <div>TB-303 Acid Tracker</div>
               <div className="text-ft2-highlight">Settings are saved automatically</div>
             </div>

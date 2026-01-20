@@ -361,14 +361,14 @@ class WavetableVoice {
     // Apply to all oscillators using partials
     this.oscillators.forEach((osc) => {
       // Set as custom oscillator with partials
-      (osc as any).partials = partials;
+      (osc as any).partials = partials; // eslint-disable-line @typescript-eslint/no-explicit-any
     });
   }
 
   /**
    * Trigger attack
    */
-  triggerAttack(frequency: number, time: number, _velocity: number): void {
+  triggerAttack(frequency: number, time: number, _velocity: number): void { // eslint-disable-line @typescript-eslint/no-unused-vars
     this.oscillators.forEach((osc) => {
       osc.frequency.setValueAtTime(frequency, time);
       osc.start(time);

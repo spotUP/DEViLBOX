@@ -1,3 +1,5 @@
+import { APP_VERSION } from '@constants/version';
+
 /**
  * Project Types - Project Metadata & UI State
  */
@@ -17,6 +19,16 @@ export interface ProjectState {
   isDirty: boolean; // Unsaved changes
   lastSavedAt: string | null;
 }
+
+export const DEFAULT_PROJECT_METADATA: ProjectMetadata = {
+  id: '',
+  name: 'Untitled',
+  author: 'Unknown',
+  description: '',
+  createdAt: new Date().toISOString(),
+  modifiedAt: new Date().toISOString(),
+  version: APP_VERSION,
+};
 
 export type ThemeType = 'ft2-blue' | 'dark' | 'custom';
 
@@ -46,16 +58,6 @@ export interface KeyboardShortcut {
   description: string;
   action: string;
 }
-
-export const DEFAULT_PROJECT_METADATA: ProjectMetadata = {
-  id: '',
-  name: 'Untitled',
-  author: 'Unknown',
-  description: '',
-  createdAt: new Date().toISOString(),
-  modifiedAt: new Date().toISOString(),
-  version: '1.0.0',
-};
 
 export const FT2_KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { key: 'Space', description: 'Play/Stop', action: 'playback.toggle' },

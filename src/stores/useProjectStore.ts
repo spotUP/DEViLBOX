@@ -5,6 +5,8 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { ProjectMetadata } from '@typedefs/project';
+import { idGenerator } from '../utils/idGenerator';
+import { APP_VERSION } from '@constants/version';
 
 interface ProjectStore {
   // State
@@ -21,16 +23,16 @@ interface ProjectStore {
 }
 
 export const useProjectStore = create<ProjectStore>()(
-  immer((set, _get) => ({
+  immer((set) => ({
     // Initial state
     metadata: {
-      id: `project-${Date.now()}`,
+      id: idGenerator.generate('project'),
       name: 'Untitled',
       author: 'Unknown',
       description: '',
       createdAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),
-      version: '1.0.0',
+      version: APP_VERSION,
     },
     isDirty: false,
     lastSavedAt: null,
@@ -63,13 +65,13 @@ export const useProjectStore = create<ProjectStore>()(
     resetProject: () =>
       set((state) => {
         state.metadata = {
-          id: `project-${Date.now()}`,
+          id: idGenerator.generate('project'),
           name: 'Untitled',
           author: 'Unknown',
           description: '',
           createdAt: new Date().toISOString(),
           modifiedAt: new Date().toISOString(),
-          version: '1.0.0',
+          version: APP_VERSION,
         };
         state.isDirty = false;
         state.lastSavedAt = null;

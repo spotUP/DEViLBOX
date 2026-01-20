@@ -8,6 +8,7 @@ const path = require('path');
 
 const SONGS_DIR = path.join(__dirname, '../public/songs');
 const DEMO_SONGS = [
+  'daft-punk-da-funk.song.json',
   'phuture-acid-tracks.song.json',
   'hardfloor-funalogue.song.json',
   'josh-wink-higher-state.song.json',

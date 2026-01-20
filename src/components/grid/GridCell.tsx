@@ -143,6 +143,7 @@ interface NoteCellProps {
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
   onSetOctave?: (stepIndex: number, shift: number) => void;
+  className?: string;
 }
 
 export const NoteGridCell: React.FC<NoteCellProps> = memo(({
@@ -157,6 +158,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   onToggleAccent,
   onToggleSlide,
   onSetOctave,
+  className = '',
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -235,10 +237,11 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         className={`
-          w-7 h-7 rounded transition-all duration-75 border relative
+          rounded transition-all duration-75 border relative
           ${getBaseClasses()}
           ${isCurrentStep ? 'ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg' : getOctaveBorderClasses()}
           ${isActive ? 'shadow-sm' : ''}
+          ${className || 'w-7 h-7'}
         `}
         title={isActive ? 'Shift+click: accent, Ctrl+click: slide, Alt+click: octave' : ''}
       >

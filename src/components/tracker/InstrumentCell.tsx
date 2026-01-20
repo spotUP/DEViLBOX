@@ -10,10 +10,11 @@ interface InstrumentCellProps {
   value: InstrumentValue;
   isActive: boolean;
   isEmpty: boolean;
+  digitIndex?: number;
 }
 
 export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
-  ({ value, isActive, isEmpty }) => {
+  ({ value, isActive, isEmpty, digitIndex = 0 }) => {
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const displayValue = value !== null
       ? useHexNumbers
@@ -25,11 +26,23 @@ export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
 
     return (
       <span
-        className={`tracker-cell ${colorClass} ${
-          isActive ? 'bg-accent-primary text-text-inverse font-bold rounded-sm' : ''
+        className={`tracker-cell font-mono ${colorClass} ${
+          isActive ? 'bg-accent-primary/20' : ''
         }`}
+        style={{
+          fontSize: '11px',
+          padding: '0 1px',
+          letterSpacing: '-0.5px'
+        }}
       >
-        {displayValue}
+        {displayValue.split('').map((char, i) => (
+          <span
+            key={i}
+            className={isActive && digitIndex === i ? 'bg-accent-primary text-text-inverse font-bold' : ''}
+          >
+            {char}
+          </span>
+        ))}
       </span>
     );
   }

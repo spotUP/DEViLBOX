@@ -10,10 +10,14 @@ import { useAutomationStore } from './useAutomationStore';
 import { useProjectStore } from './useProjectStore';
 import { useTransportStore } from './useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { idGenerator } from '../utils/idGenerator';
+import { DEFAULT_BPM } from '@typedefs/audio';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { ProjectMetadata } from '@typedefs/project';
+
+import { APP_VERSION } from '@constants/version';
 
 // State snapshot for a tab
 interface TabState {
@@ -75,7 +79,7 @@ const restoreState = (state: TabState) => {
   const engine = getToneEngine();
   try {
     engine.stop();
-  } catch (e) {
+  } catch {
     // Ignore errors if engine not initialized
   }
 
@@ -109,7 +113,7 @@ const restoreState = (state: TabState) => {
 const getInitialState = (): TabState => {
   return {
     patterns: [{
-      id: `pattern-${Date.now()}`,
+      id: idGenerator.generate('pattern'),
       name: 'Untitled Pattern',
       length: 64,
       channels: Array.from({ length: 4 }, (_, i) => ({
@@ -127,6 +131,7 @@ const getInitialState = (): TabState => {
         pan: 0,
         instrumentId: null,
         color: null,
+        collapsed: false,
       })),
     }],
     currentPatternIndex: 0,
@@ -151,20 +156,20 @@ const getInitialState = (): TabState => {
     currentInstrumentId: 0,
     automationCurves: [],
     metadata: {
-      id: `project-${Date.now()}`,
+      id: idGenerator.generate('project'),
       name: 'Untitled',
       author: 'Unknown',
       description: '',
       createdAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),
-      version: '1.0.0',
+      version: APP_VERSION,
     },
-    bpm: 125,
+    bpm: DEFAULT_BPM,
   };
 };
 
 const createNewTab = (): ProjectTab => ({
-  id: `tab-${Date.now()}`,
+  id: idGenerator.generate('tab'),
   name: 'Untitled',
   isDirty: false,
   state: null,

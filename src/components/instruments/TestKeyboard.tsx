@@ -52,11 +52,11 @@ function generateKeys(startOctave: number, numOctaves: number): Key[] {
       const mappedOctave = oct - keyboardOctaveOffset;
       if (mappedOctave === 0) {
         // Lower octave keys
-        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName);
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([, v]) => v === noteName);
         if (entry) keyboardKey = entry[0];
       } else if (mappedOctave === 1) {
         // Upper octave keys
-        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName + '+');
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([, v]) => v === noteName + '+');
         if (entry) keyboardKey = entry[0];
       } else if (mappedOctave === 2 && noteName === 'C') {
         // Top C
@@ -183,16 +183,18 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     if (activeNotesRef.current.has(note)) return;
 
     const engine = engineRef.current;
-    const inst = instrument;
+    const inst = instrumentRef.current;
+    if (!inst) return;
 
     engine.triggerNoteAttack(inst.id, note, 0, 0.8, inst);
     setActiveNotes((prev) => new Set(prev).add(note));
-  }, [instrument]);
+  }, []);
 
   // Release note - stops the sustained note
   const releaseNote = useCallback((note: string) => {
     const engine = engineRef.current;
-    const inst = instrument;
+    const inst = instrumentRef.current;
+    if (!inst) return;
 
     engine.triggerNoteRelease(inst.id, note, 0, inst);
     setActiveNotes((prev) => {
@@ -200,7 +202,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       next.delete(note);
       return next;
     });
-  }, [instrument]);
+  }, []);
 
   // Keyboard event handlers
   useEffect(() => {
@@ -245,6 +247,9 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
       window.removeEventListener('keyup', handleKeyUp, true);
     };
   }, [attackNote, releaseNote, keys]);
+
+  // Handle case where no instrument is selected
+  if (!instrument) return null;
 
   // Separate white and black keys
   const whiteKeys = keys.filter((k) => !k.isBlack);

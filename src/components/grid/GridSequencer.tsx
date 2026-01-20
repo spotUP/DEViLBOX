@@ -13,7 +13,7 @@
  * - Right-click: context menu with all options
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useGridPattern } from '../../hooks/useGridPattern';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { GridControls } from './GridControls';
@@ -48,7 +48,10 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // Use a ref to access current steps without causing callback recreation
   const stepsRef = useRef(gridPattern.steps);
-  stepsRef.current = gridPattern.steps;
+  
+  useEffect(() => {
+    stepsRef.current = gridPattern.steps;
+  }, [gridPattern.steps]);
 
   // Handle note cell click - stable callback
   const handleNoteClick = useCallback(
@@ -118,9 +121,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
       {/* Grid */}
       <div className="flex-1 overflow-auto p-2">
-        <div className="inline-block min-w-full">
+        <div className="flex flex-col min-h-full min-w-full">
           {/* Step numbers header */}
-          <div className="flex items-center mb-1 pl-12">
+          <div className="flex items-center mb-1 pl-12 shrink-0">
             {stepIndices.map((stepIdx) => (
               <div
                 key={stepIdx}
@@ -135,42 +138,47 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           </div>
 
           {/* Note rows (B to C, high to low) */}
-          {NOTE_INDICES.map((noteIndex, rowIndex) => (
-            <div key={noteIndex} className="flex items-center mb-0.5">
-              {/* Row label */}
-              <div
-                className={`w-10 mr-2 text-right text-xs font-mono
-                  ${NOTE_NAMES[rowIndex].includes('#') ? 'text-text-muted' : 'text-text-secondary'}
-                `}
-              >
-                {NOTE_NAMES[rowIndex]}
+          <div className="flex-1 flex flex-col min-h-0">
+            {NOTE_INDICES.map((noteIndex, rowIndex) => (
+              <div key={noteIndex} className="flex flex-1 items-stretch mb-0.5 min-h-[30px]">
+                {/* Row label */}
+                <div
+                  className={`w-10 mr-2 flex items-center justify-end text-xs font-mono
+                    ${NOTE_NAMES[rowIndex].includes('#') ? 'text-text-muted' : 'text-text-secondary'}
+                  `}
+                >
+                  {NOTE_NAMES[rowIndex]}
+                </div>
+
+                {/* Cells container */}
+                <div className="flex flex-1 items-stretch">
+                  {stepIndices.map((stepIdx) => {
+                    const step = gridPattern.steps[stepIdx];
+                    const isActive = step?.noteIndex === noteIndex;
+
+                    return (
+                      <div key={stepIdx} className="mx-0.5 flex-1 min-w-[28px]">
+                        <NoteGridCell
+                          noteIndex={noteIndex}
+                          stepIndex={stepIdx}
+                          isActive={isActive}
+                          isCurrentStep={currentStep === stepIdx}
+                          accent={isActive ? step?.accent : false}
+                          slide={isActive ? step?.slide : false}
+                          octaveShift={isActive ? step?.octaveShift : 0}
+                          onClick={handleNoteClick}
+                          onToggleAccent={toggleAccent}
+                          onToggleSlide={toggleSlide}
+                          onSetOctave={handleSetOctave}
+                          className="w-full h-full"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-
-              {/* Cells */}
-              {stepIndices.map((stepIdx) => {
-                const step = gridPattern.steps[stepIdx];
-                const isActive = step?.noteIndex === noteIndex;
-
-                return (
-                  <div key={stepIdx} className="mx-0.5">
-                    <NoteGridCell
-                      noteIndex={noteIndex}
-                      stepIndex={stepIdx}
-                      isActive={isActive}
-                      isCurrentStep={currentStep === stepIdx}
-                      accent={isActive ? step?.accent : false}
-                      slide={isActive ? step?.slide : false}
-                      octaveShift={isActive ? step?.octaveShift : 0}
-                      onClick={handleNoteClick}
-                      onToggleAccent={toggleAccent}
-                      onToggleSlide={toggleSlide}
-                      onSetOctave={handleSetOctave}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Legend */}

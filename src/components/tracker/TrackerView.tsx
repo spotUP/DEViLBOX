@@ -14,9 +14,11 @@ import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
+import { AdvancedEditPanel } from './AdvancedEditPanel';
 import { MobileTrackerView } from './MobileTrackerView';
-import { useResponsive } from '@contexts/ResponsiveContext';
-import { List, Grid3X3, Piano, Music2, Eye, EyeOff } from 'lucide-react';
+import { LiveModeToggle } from './LiveModeIndicator';
+import { useResponsive } from '@hooks/useResponsive';
+import { List, Grid3X3, Piano, Music2, Eye, EyeOff, Zap } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
@@ -114,26 +116,30 @@ function createInstrumentsForModule(
 }
 
 interface TrackerViewProps {
-  onShowPatterns?: () => void;
   onShowExport?: () => void;
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
   onShowInstruments?: () => void;
-  showPatterns?: boolean;
+  onShowImportModule?: () => void;
   showMasterFX?: boolean;
+  showImportModule?: boolean;
 }
 
 export const TrackerView: React.FC<TrackerViewProps> = ({
-  onShowPatterns,
   onShowExport,
   onShowHelp,
   onShowMasterFX,
   onShowInstruments,
-  showPatterns,
+  onShowImportModule,
   showMasterFX,
+  showImportModule: externalShowImportModule,
 }) => {
   const { isMobile } = useResponsive();
-  const { patterns, currentPatternIndex, currentOctave, loadPatterns, cursor, showGhostPatterns, setShowGhostPatterns } = useTrackerStore();
+  const { 
+    patterns, currentPatternIndex, currentOctave, loadPatterns, 
+    cursor, showGhostPatterns, setShowGhostPatterns,
+    resizePattern, updateTimeSignature
+  } = useTrackerStore();
   const { loadInstruments } = useInstrumentStore();
   const { setMetadata } = useProjectStore();
   const { setBPM } = useTransportStore();
@@ -147,15 +153,22 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showInterpolate, setShowInterpolate] = useState(false);
   const [showHumanize, setShowHumanize] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
-  const [showImportModule, setShowImportModule] = useState(false);
+  const [internalShowImportModule, setInternalShowImportModule] = useState(false);
+
+  // Use external or internal import state
+  const showImportModule = externalShowImportModule ?? internalShowImportModule;
+  const setShowImportModule = onShowImportModule ?? setInternalShowImportModule;
 
   // Instrument panel state
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
+  const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
 
   // Sync grid channel with tracker cursor when switching views
   useEffect(() => {
     if (viewMode === 'grid') {
-      setGridChannelIndex(cursor.channelIndex);
+      requestAnimationFrame(() => {
+        setGridChannelIndex(cursor.channelIndex);
+      });
     }
   }, [viewMode, cursor.channelIndex]);
 
@@ -191,7 +204,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       setShowImportModule(true);
       return;
     }
-  }, []);
+  }, [
+    setShowImportModule,
+    setShowInterpolate,
+    setShowHumanize,
+    setShowFindReplace
+  ]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleDialogShortcuts);
@@ -291,12 +309,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     return (
       <>
         <MobileTrackerView
-          onShowPatterns={onShowPatterns}
           onShowExport={onShowExport}
           onShowHelp={onShowHelp}
           onShowMasterFX={onShowMasterFX}
           onShowInstruments={onShowInstruments}
-          showPatterns={showPatterns}
           showMasterFX={showMasterFX}
         />
         {/* Dialogs still need to render */}
@@ -315,11 +331,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Desktop view
   return (
     <div className="flex-1 flex flex-col bg-dark-bg overflow-hidden">
-      {/* Top Control Bar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center gap-6">
+      {/* Top Control Bar - Fixed position to prevent being pushed off-screen */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10">
+        <div className="flex items-center gap-6 flex-shrink min-w-0">
           {/* Pattern Info */}
           <div className="flex items-center gap-3">
+            <LiveModeToggle />
+            <div className="w-px h-4 bg-dark-border mx-1" />
             <span className="text-text-muted text-xs font-mono">PATTERN</span>
             <span className="text-accent-primary font-bold font-mono text-sm">
               {pattern?.name || 'Untitled'}
@@ -330,18 +348,42 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <div className="w-px h-4 bg-dark-border" />
 
           {/* Quick Stats */}
-          <div className="hidden sm:flex items-center gap-4 text-xs font-mono">
-            <span className="text-text-muted">
-              LEN: <span className="text-text-primary">{pattern?.length || 64}</span>
-            </span>
-            <span className="text-text-muted">
-              OCT: <span className="text-accent-secondary">F{currentOctave}</span>
+          <div className="hidden lg:flex items-center gap-4 text-[10px] font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-text-muted uppercase font-bold">Len:</span>
+              <input 
+                type="number" min="1" max="256"
+                value={pattern?.length || 64}
+                onChange={(e) => resizePattern(currentPatternIndex, parseInt(e.target.value) || 1)}
+                className="w-8 bg-dark-bgTertiary text-text-primary border border-dark-border px-1 focus:outline-none focus:border-accent-primary rounded"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-text-muted uppercase font-bold">Sig:</span>
+              <div className="flex items-center bg-dark-bgTertiary border border-dark-border rounded px-1">
+                <input 
+                  type="number" min="1" max="32"
+                  value={pattern?.timeSignature?.beatsPerMeasure || 4}
+                  onChange={(e) => updateTimeSignature(currentPatternIndex, { beatsPerMeasure: parseInt(e.target.value) || 1 })}
+                  className="w-5 bg-transparent text-accent-primary focus:outline-none text-center"
+                />
+                <span className="text-text-muted">/</span>
+                <input 
+                  type="number" min="1" max="32"
+                  value={pattern?.timeSignature?.stepsPerBeat || 4}
+                  onChange={(e) => updateTimeSignature(currentPatternIndex, { stepsPerBeat: parseInt(e.target.value) || 1 })}
+                  className="w-5 bg-transparent text-accent-primary focus:outline-none text-center"
+                />
+              </div>
+            </div>
+            <span className="text-text-muted uppercase font-bold">
+              Oct: <span className="text-accent-secondary">F{currentOctave}</span>
             </span>
           </div>
         </div>
 
-        {/* View Mode Toggle + Channel Selector */}
-        <div className="flex items-center gap-3">
+        {/* View Mode Toggle + Channel Selector - Never shrink, always visible */}
+        <div className="flex items-center gap-3 flex-shrink-0">
           {/* Channel Selector (grid view only) */}
           {viewMode === 'grid' && pattern && (
             <div className="flex items-center gap-2">
@@ -427,6 +469,21 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 {showGhostPatterns ? <Eye size={14} /> : <EyeOff size={14} />}
                 <span className="hidden sm:inline">Ghosts</span>
               </button>
+              <div className="w-px h-4 bg-dark-border" />
+              <button
+                onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                className={`
+                  flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                  ${showAdvancedEdit
+                    ? 'bg-accent-primary/20 text-accent-primary'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
+                  }
+                `}
+                title="Toggle Advanced Edit Panel"
+              >
+                <Zap size={14} />
+                <span className="hidden sm:inline">Adv Edit</span>
+              </button>
             </>
           )}
         </div>
@@ -434,13 +491,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       {/* FT2 Style Toolbar */}
       <FT2Toolbar
-        onShowPatterns={onShowPatterns}
         onShowExport={onShowExport}
         onShowHelp={onShowHelp}
         onShowMasterFX={onShowMasterFX}
         onShowInstruments={onShowInstruments}
         onImport={() => setShowImportModule(true)}
-        showPatterns={showPatterns}
         showMasterFX={showMasterFX}
       />
 
@@ -448,9 +503,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <TB303KnobPanel />
 
       {/* Main Content Area with Pattern Editor and Instrument Panel */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden relative z-10">
         {/* Pattern Editor / Grid Sequencer / Piano Roll - Takes remaining space */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           {viewMode === 'tracker' ? (
             <PatternEditor />
           ) : viewMode === 'grid' ? (
@@ -459,6 +514,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <PianoRoll channelIndex={gridChannelIndex} />
           )}
         </div>
+
+        {/* Advanced Edit Panel */}
+        {showAdvancedEdit && (
+          <AdvancedEditPanel />
+        )}
 
         {/* Instrument Panel Toggle Button */}
         <button
@@ -476,7 +536,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         {/* Instrument List Panel */}
         {showInstrumentPanel && (
-          <div className="flex-shrink-0 w-64 border-l border-ft2-border animate-fade-in">
+          <div className="flex-shrink-0 w-64 border-l border-ft2-border animate-fade-in h-full flex flex-col overflow-hidden">
             <InstrumentListPanel onEditInstrument={onShowInstruments} />
           </div>
         )}

@@ -1,6 +1,6 @@
 {
   "format": "devilbox-song",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "metadata": {
     "id": "dittytoy-303",
     "name": "DT303 (Dittytoy Clone)",
@@ -8,7 +8,7 @@
     "description": "Port of the classic dittytoy DT303 acid synth demo. Original: https://dittytoy.net/ditty/0029103012",
     "createdAt": "2026-01-14T00:00:00.000Z",
     "modifiedAt": "2026-01-14T00:00:00.000Z",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "bpm": 125,
   "instruments": [

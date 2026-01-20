@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import * as LucideIcons from 'lucide-react';
 import { Search, X } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '../../types/instrument';
 import { useInstrumentStore } from '../../stores';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { SynthIcon } from './SynthIcon';
 
 interface SynthTypeSelectorProps {
   instrument: InstrumentConfig;
@@ -17,12 +17,6 @@ interface SynthTypeSelectorProps {
 export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument }) => {
   const { updateInstrument } = useInstrumentStore();
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
 
   // Filter synths based on search query
   const filteredSynths = useMemo(() => {
@@ -76,11 +70,10 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
         <div className="flex items-center gap-3">
           {(() => {
             const info = getSynthInfo(instrument.synthType);
-            const IconComponent = getIcon(info.icon);
             return (
               <>
                 <div className={`p-2 rounded-md bg-dark-bgTertiary ${info.color}`}>
-                  <IconComponent size={20} />
+                  <SynthIcon iconName={info.icon} size={20} />
                 </div>
                 <div>
                   <span className="text-text-muted text-sm">Current: </span>
@@ -105,7 +98,6 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
         {filteredSynths.map((synthType) => {
           const synth = SYNTH_INFO[synthType];
           const isActive = instrument.synthType === synthType;
-          const IconComponent = getIcon(synth.icon);
 
           return (
             <button
@@ -121,13 +113,10 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
               `}
             >
               <div className="flex items-center gap-2 mb-1">
-                <IconComponent size={16} className={isActive ? 'text-accent-primary' : synth.color} />
-                <span className={`font-mono text-xs font-bold ${isActive ? 'text-accent-primary' : 'text-text-primary'}`}>
+                <SynthIcon iconName={synth.icon} size={16} className={synth.color} />
+                <span className={`font-bold text-xs ${isActive ? 'text-accent-primary' : 'text-text-primary'}`}>
                   {synth.shortName}
                 </span>
-              </div>
-              <div className={`text-[10px] leading-tight ${isActive ? 'text-accent-primary/80' : 'text-text-muted'}`}>
-                {synth.bestFor.slice(0, 2).join(', ')}
               </div>
             </button>
           );

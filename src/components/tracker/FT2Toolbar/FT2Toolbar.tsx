@@ -13,7 +13,7 @@ import React, { useRef, useState } from 'react';
 import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useMIDIStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
@@ -28,6 +28,7 @@ import { encodeWav } from '@lib/import/WavEncoder';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
+import type { AutomationCurve } from '@typedefs/automation';
 
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.song.json', ...getSupportedExtensions()].join(',');
@@ -105,24 +106,20 @@ function createInstrumentsForModule(
 }
 
 interface FT2ToolbarProps {
-  onShowPatterns?: () => void;
   onShowExport?: () => void;
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
   onShowInstruments?: () => void;
   onImport?: () => void;
-  showPatterns?: boolean;
   showMasterFX?: boolean;
 }
 
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
-  onShowPatterns,
   onShowExport,
   onShowHelp,
   onShowMasterFX,
   onShowInstruments,
   onImport,
-  showPatterns,
   showMasterFX,
 }) => {
   const {
@@ -157,10 +154,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { isDirty, setMetadata, metadata } = useProjectStore();
   const { save: saveProject } = useProjectPersistence();
   const { instruments, loadInstruments } = useInstrumentStore();
-  const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
+  const { masterMuted, toggleMasterMute, masterEffects, contextState } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, useHexNumbers } = useUIStore();
   const { isLiveMode, toggleLiveMode, pendingPatternIndex } = useLiveModeStore();
   const { curves } = useAutomationStore();
+  const { lastActivityTimestamp, isInitialized: midiInitialized } = useMIDIStore();
+  const [midiActive, setMidiActive] = useState(false);
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,8 +168,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const demoMenuRef = useRef<HTMLDivElement>(null);
 
+  // Flash MIDI indicator on activity
+  React.useEffect(() => {
+    if (lastActivityTimestamp > 0) {
+      setMidiActive(true);
+      const timer = setTimeout(() => setMidiActive(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [lastActivityTimestamp]);
+
   // Demo songs available on the server
   const DEMO_SONGS = [
+    { file: 'daft-punk-da-funk.song.json', name: 'Daft Punk - Da Funk' },
     { file: 'phuture-acid-tracks.song.json', name: 'Phuture - Acid Tracks' },
     { file: 'hardfloor-funalogue.song.json', name: 'Hardfloor - Funalogue' },
     { file: 'josh-wink-higher-state.song.json', name: 'Josh Wink - Higher State' },
@@ -242,7 +251,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     try {
       const sequence = patterns.map((p) => p.id);
       // Convert automation curves to export format
-      const automationData: Record<string, any> = {};
+      const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_channel, channelIndex) => {
           const channelCurves = curves.filter(
@@ -257,7 +266,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 acc[curve.parameter] = curve;
                 return acc;
               },
-              {} as Record<string, any>
+              {} as Record<string, AutomationCurve>
             );
           }
         });
@@ -529,6 +538,29 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               ⏳ {pendingPatternIndex.toString(16).toUpperCase().padStart(2, '0')}
             </span>
           )}
+
+          {/* Status Indicators */}
+          <div className="flex items-center gap-3 ml-4 pl-4 border-l border-[#3a3a42]">
+            {/* MIDI Status */}
+            <div className="flex flex-col items-center" title={midiInitialized ? 'MIDI System Ready' : 'MIDI Not Initialized'}>
+              <span className="text-[8px] text-text-muted mb-0.5">MIDI</span>
+              <div 
+                className={`w-3 h-3 rounded-sm transition-colors duration-75 border border-black/20 ${
+                  midiActive ? 'bg-accent-primary shadow-glow-sm' : midiInitialized ? 'bg-dark-bgActive' : 'bg-dark-bg'
+                }`} 
+              />
+            </div>
+
+            {/* Audio Status */}
+            <div className="flex flex-col items-center" title={`Audio Engine: ${contextState}`}>
+              <span className="text-[8px] text-text-muted mb-0.5">AUDIO</span>
+              <div 
+                className={`w-3 h-3 rounded-sm transition-colors border border-black/20 ${
+                  contextState === 'running' ? 'bg-accent-success shadow-[0_0_5px_rgba(16,185,129,0.5)]' : 'bg-accent-error'
+                }`} 
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -678,9 +710,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
           <FT2Button onClick={onImport} small title="Import module dialog">
             Import
-          </FT2Button>
-          <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list (Ctrl+Shift+P)">
-            Patterns
           </FT2Button>
           <FT2Button onClick={onShowInstruments} small title="Instrument editor (Ctrl+I)">
             Instr

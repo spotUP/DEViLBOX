@@ -83,27 +83,25 @@ export const usePatternPlayback = () => {
       const nextIndex = actualCurrentIndex + 1;
 
       if (nextIndex < patterns.length) {
-        // Advance to next pattern - schedule at the exact end time for seamless transition
+        // Advance to next pattern
         console.log(`[Playback] Advancing to pattern ${nextIndex}/${patterns.length} at time ${patternEndTime}s`);
 
-        // Schedule next pattern at the exact end time (before React state updates)
         const nextPattern = patterns[nextIndex];
         scheduler.schedulePattern(nextPattern, instruments, (row) => {
           setCurrentRow(row, nextPattern.length);
-          // Update UI state when first row of new pattern plays
           if (row === 0) {
-            setCurrentPattern(nextIndex);
+            // Use store directly to avoid stale state in callback
+            useTrackerStore.getState().setCurrentPattern(nextIndex);
           }
         }, patternEndTime);
       } else {
-        // End of song - loop back to beginning
+        // End of song - ALWAYS loop back to beginning in DEViLBOX
         console.log('[Playback] End of song, looping to beginning');
         const firstPattern = patterns[0];
         scheduler.schedulePattern(firstPattern, instruments, (row) => {
           setCurrentRow(row, firstPattern.length);
-          // Update UI state when first row of new pattern plays
           if (row === 0) {
-            setCurrentPattern(0);
+            useTrackerStore.getState().setCurrentPattern(0);
           }
         }, patternEndTime);
       }
@@ -115,7 +113,7 @@ export const usePatternPlayback = () => {
       isAdvancingRef.current = false;
       advancingTimeoutRef.current = null;
     }, 100);
-  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
+  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow, scheduler]);
 
   // Handle pattern break (Dxx command) - advance to next pattern
   const handlePatternBreak = useCallback((targetRow: number) => {
@@ -132,17 +130,15 @@ export const usePatternPlayback = () => {
       const nextPattern = patterns[nextIndex];
       scheduler.schedulePattern(nextPattern, instruments, (row) => {
         setCurrentRow(row, nextPattern.length);
-        if (row === 0) setCurrentPattern(nextIndex);
+        if (row === 0) useTrackerStore.getState().setCurrentPattern(nextIndex);
       }, patternEndTime);
-    } else if (isLooping) {
+    } else {
+      // ALWAYS loop back to beginning in DEViLBOX
       const firstPattern = patterns[0];
       scheduler.schedulePattern(firstPattern, instruments, (row) => {
         setCurrentRow(row, firstPattern.length);
-        if (row === 0) setCurrentPattern(0);
+        if (row === 0) useTrackerStore.getState().setCurrentPattern(0);
       }, patternEndTime);
-    } else {
-      engine.stop();
-      scheduler.clearSchedule();
     }
 
     if (advancingTimeoutRef.current) clearTimeout(advancingTimeoutRef.current);
@@ -150,7 +146,7 @@ export const usePatternPlayback = () => {
       isAdvancingRef.current = false;
       advancingTimeoutRef.current = null;
     }, 100);
-  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
+  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow, scheduler, engine]);
 
   // Handle position jump (Bxx command) - jump to specific song position
   const handlePositionJump = useCallback((position: number) => {
@@ -164,17 +160,15 @@ export const usePatternPlayback = () => {
       const targetPattern = patterns[position];
       scheduler.schedulePattern(targetPattern, instruments, (row) => {
         setCurrentRow(row, targetPattern.length);
-        if (row === 0) setCurrentPattern(position);
+        if (row === 0) useTrackerStore.getState().setCurrentPattern(position);
       }, patternEndTime);
-    } else if (isLooping) {
+    } else {
+      // ALWAYS loop back to beginning in DEViLBOX
       const firstPattern = patterns[0];
       scheduler.schedulePattern(firstPattern, instruments, (row) => {
         setCurrentRow(row, firstPattern.length);
-        if (row === 0) setCurrentPattern(0);
+        if (row === 0) useTrackerStore.getState().setCurrentPattern(0);
       }, patternEndTime);
-    } else {
-      engine.stop();
-      scheduler.clearSchedule();
     }
 
     if (advancingTimeoutRef.current) clearTimeout(advancingTimeoutRef.current);
@@ -182,12 +176,12 @@ export const usePatternPlayback = () => {
       isAdvancingRef.current = false;
       advancingTimeoutRef.current = null;
     }, 100);
-  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow]);
+  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRow, scheduler, engine]);
 
   // Keep automation in sync during playback
   // This ensures automation changes are applied even after playback has started
   useEffect(() => {
-    if (isPlaying && hasStartedRef.current) {
+    if (isPlaying && playbackStartedRef.current) {
       console.log('[Playback] Syncing automation data during playback:', {
         hasAutomation: Object.keys(automation).length > 0,
         patternIds: Object.keys(automation),
@@ -199,17 +193,17 @@ export const usePatternPlayback = () => {
         automationPlayer.setAutomationData(automation);
       }
     }
-  }, [automation, isPlaying]);
+  }, [automation, isPlaying, scheduler]);
 
   // Sync BPM changes
   useEffect(() => {
     engine.setBPM(bpm);
-  }, [bpm]);
+  }, [bpm, engine]);
 
   // Sync master effects
   useEffect(() => {
     engine.rebuildMasterEffects(masterEffects);
-  }, [masterEffects]);
+  }, [masterEffects, engine]);
 
   // Sync channel settings when pattern changes
   useEffect(() => {
@@ -223,25 +217,24 @@ export const usePatternPlayback = () => {
       // Update mute/solo states (handles solo logic)
       engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
     }
-  }, [pattern]);
+  }, [pattern, engine]);
 
   // Track if we've started playback (to avoid re-scheduling on pattern changes)
-  const hasStartedRef = useRef(false);
+  const playbackStartedRef = useRef(false);
 
-  // Handle playback start/stop - only schedules initial pattern, callbacks handle transitions
+  // Start playback
   useEffect(() => {
-    if (isPlaying && pattern && !hasStartedRef.current) {
+    if (isPlaying && pattern && !playbackStartedRef.current) {
       // Start playback - schedule initial pattern
       console.log(`[Playback] Starting playback at pattern ${currentPatternIndex}: ${pattern.name}`);
-      hasStartedRef.current = true;
-
-      // Set automation data
-      scheduler.setAutomation(automation);
-
-      // Set pattern callbacks for song advancement
+      
+      // Set pattern callbacks for song advancement FIRST
       scheduler.setOnPatternEnd(handlePatternEnd);
       scheduler.setOnPatternBreak(handlePatternBreak);
       scheduler.setOnPositionJump(handlePositionJump);
+
+      // Set automation data
+      scheduler.setAutomation(automation);
 
       // Schedule initial pattern at time 0
       scheduler.schedulePattern(pattern, instruments, (row) => {
@@ -249,31 +242,39 @@ export const usePatternPlayback = () => {
       }, 0);
 
       // Start transport
-      engine.start().catch((err) => {
+      engine.start().then(() => {
+        playbackStartedRef.current = true;
+      }).catch((err) => {
         console.error('Failed to start transport:', err);
       });
-    } else if (!isPlaying && hasStartedRef.current) {
+    }
+  }, [isPlaying, pattern, instruments, automation, handlePatternEnd, handlePatternBreak, handlePositionJump, setCurrentRow, currentPatternIndex, scheduler, engine]);
+
+  // Stop playback
+  useEffect(() => {
+    if (!isPlaying && playbackStartedRef.current) {
       // Stop playback
       console.log('[Playback] Stopping playback');
-      hasStartedRef.current = false;
+      
       engine.stop();
       scheduler.clearSchedule();
       scheduler.setOnPatternEnd(null);
       scheduler.setOnPatternBreak(null);
       scheduler.setOnPositionJump(null);
       setCurrentRow(0);
+      playbackStartedRef.current = false;
     }
+  }, [isPlaying, scheduler, engine, setCurrentRow]);
 
+  useEffect(() => {
     return () => {
       // Cleanup on unmount
-      if (!isPlaying) {
-        scheduler.clearSchedule();
-        scheduler.setOnPatternEnd(null);
-        scheduler.setOnPatternBreak(null);
-        scheduler.setOnPositionJump(null);
-      }
+      scheduler.clearSchedule();
+      scheduler.setOnPatternEnd(null);
+      scheduler.setOnPatternBreak(null);
+      scheduler.setOnPositionJump(null);
     };
-  }, [isPlaying, pattern, instruments, automation, handlePatternEnd, handlePatternBreak, handlePositionJump, setCurrentRow, currentPatternIndex]);
+  }, [scheduler]);
 
   return {
     isPlaying,

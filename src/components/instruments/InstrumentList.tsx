@@ -74,9 +74,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
   const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
 
   // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  const getIcon = (iconName: string): LucideIcons.LucideIcon => {
+    const icons = LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>;
+    return icons[iconName] || LucideIcons.Music2;
   };
 
   return (

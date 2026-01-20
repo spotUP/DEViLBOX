@@ -130,7 +130,7 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
   };
 
   const formatValue = (value: number, param: EffectParameter): string => {
-    let formatted = value.toFixed(param.step < 0.1 ? 2 : param.step < 1 ? 1 : 0);
+    const formatted = value.toFixed(param.step < 0.1 ? 2 : param.step < 1 ? 1 : 0);
     return `${formatted}${param.unit}`;
   };
 
