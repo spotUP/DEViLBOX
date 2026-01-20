@@ -7,19 +7,53 @@
 
 import React, { useState, useCallback, useEffect, useRef, useReducer } from 'react';
 import * as Tone from 'tone';
-import { Save, ChevronDown, ChevronUp, Radio } from 'lucide-react';
+import { ChevronDown, ChevronUp, Radio } from 'lucide-react';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { Switch3Way } from '@components/controls/Switch3Way';
+import { EnvelopeVisualizer } from '@components/ui/EnvelopeVisualizer';
+import { AccentChargeVisualizer } from '@components/ui/AccentChargeVisualizer';
 import { useInstrumentStore, useTrackerStore, useTransportStore, useAutomationStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { TB303Synth } from '@engine/TB303Engine';
 import { getManualOverrideManager } from '@engine/ManualOverrideManager';
-import { TB303_PRESETS } from '@constants/tb303Presets';
 import type { DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
+import { DEFAULT_PEDALBOARD } from '@typedefs/pedalboard';
+import { TB303_PRESETS } from '@constants/tb303Presets';
+
+// Throttle function - limits how often a function can be called
+const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
+  let lastCall = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: any[] | null = null;
+
+  return ((...args: any[]) => {
+    const now = Date.now();
+    lastArgs = args;
+
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      func(...args);
+      lastArgs = null;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    } else {
+      // Schedule the last call after delay
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now();
+        if (lastArgs) func(...lastArgs);
+        lastArgs = null;
+        timeoutId = null;
+      }, delay - (now - lastCall));
+    }
+  }) as T;
+};
 
 interface TB303Params {
   cutoff: number;
@@ -28,6 +62,11 @@ interface TB303Params {
   decay: number;
   accent: number;
   overdrive: number;
+  tuning: number;
+  engineType: 'tonejs' | 'accurate';
+  overdriveModel: number; // GuitarML model index (0-36)
+  useNeuralOverdrive: boolean; // Toggle between waveshaper and GuitarML
+  tempoRelative: boolean; // Tempo-relative envelope mode (slower BPM = longer sweeps)
 }
 
 const DEFAULT_PARAMS: TB303Params = {
@@ -37,6 +76,11 @@ const DEFAULT_PARAMS: TB303Params = {
   decay: 200,
   accent: 70,
   overdrive: 0,
+  tuning: 440,
+  engineType: 'tonejs',
+  overdriveModel: 0, // Default to TS9
+  useNeuralOverdrive: false, // Default to waveshaper
+  tempoRelative: false, // Default to absolute time
 };
 
 // Live modulation state - consolidated for better performance
@@ -77,6 +121,7 @@ const liveModulationReducer = (
   }
 };
 
+
 const TB303KnobPanelComponent: React.FC = () => {
   // Use selectors to minimize re-renders - only subscribe to needed state
   const { instruments, updateInstrument } = useInstrumentStore(
@@ -86,6 +131,7 @@ const TB303KnobPanelComponent: React.FC = () => {
     useShallow((state) => ({ patterns: state.patterns, currentPatternIndex: state.currentPatternIndex }))
   );
   const isPlaying = useTransportStore((state) => state.isPlaying);
+  const currentBPM = useTransportStore((state) => state.bpm);
   const curves = useAutomationStore((state) => state.curves);
   const { tb303Collapsed, toggleTB303Collapsed } = useUIStore(
     useShallow((state) => ({ tb303Collapsed: state.tb303Collapsed, toggleTB303Collapsed: state.toggleTB303Collapsed }))
@@ -94,7 +140,7 @@ const TB303KnobPanelComponent: React.FC = () => {
   const { registerCCHandler, unregisterCCHandler, controlledInstrumentId, setControlledInstrument } = useMIDIStore();
 
   const [params, setParams] = useState<TB303Params>(DEFAULT_PARAMS);
-  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [_showPresetMenu, _setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
 
@@ -121,6 +167,11 @@ const TB303KnobPanelComponent: React.FC = () => {
 
   // Devil Fish state
   const [devilFishConfig, setDevilFishConfig] = useState<DevilFishConfig>({ ...DEFAULT_DEVIL_FISH });
+
+  // Visualization state
+  const [envelopePosition, setEnvelopePosition] = useState<number>(0);
+  const [envelopeActive, setEnvelopeActive] = useState<boolean>(false);
+  const [accentCharge, setAccentCharge] = useState<number>(0);
 
   // Find all TB303 instruments
   const tb303Instruments = instruments.filter(i => i.synthType === 'TB303');
@@ -173,37 +224,78 @@ const TB303KnobPanelComponent: React.FC = () => {
 
   useEffect(() => {
     if (firstTB303Config) {
+      // Extract pedalboard config
+      const pedalboard = firstTB303Config.pedalboard ?? DEFAULT_PEDALBOARD;
+      const firstEffect = pedalboard.chain[0];
+
+      const currentDecay = firstTB303Config.filterEnvelope?.decay ?? DEFAULT_PARAMS.decay;
+
       setParams({
         cutoff: firstTB303Config.filter?.cutoff ?? DEFAULT_PARAMS.cutoff,
         resonance: firstTB303Config.filter?.resonance ?? DEFAULT_PARAMS.resonance,
         envMod: firstTB303Config.filterEnvelope?.envMod ?? DEFAULT_PARAMS.envMod,
-        decay: firstTB303Config.filterEnvelope?.decay ?? DEFAULT_PARAMS.decay,
+        decay: currentDecay,
         accent: firstTB303Config.accent?.amount ?? DEFAULT_PARAMS.accent,
-        overdrive: firstTB303Config.overdrive?.amount ?? DEFAULT_PARAMS.overdrive,
+        overdrive: firstEffect?.parameters?.drive ?? DEFAULT_PARAMS.overdrive,
+        tuning: firstTB303Config.tuning ?? DEFAULT_PARAMS.tuning,
+        engineType: firstTB303Config.engineType ?? DEFAULT_PARAMS.engineType,
+        overdriveModel: firstEffect?.modelIndex ?? DEFAULT_PARAMS.overdriveModel,
+        useNeuralOverdrive: pedalboard.enabled && pedalboard.chain.length > 0,
+        tempoRelative: firstTB303Config.tempoRelative ?? DEFAULT_PARAMS.tempoRelative,
       });
-      // Sync Devil Fish config
+
+      // Sync Devil Fish config (always enabled, neutral until knobs are turned)
+      // Sync normalDecay/accentDecay to current Decay knob value for transparent behavior
       if (firstTB303Config.devilFish) {
-        setDevilFishConfig({ ...DEFAULT_DEVIL_FISH, ...firstTB303Config.devilFish });
+        // Fix any broken vegDecay values (old default was 16ms which caused clicks)
+        const savedVegDecay = firstTB303Config.devilFish.vegDecay ?? 3000;
+        const fixedVegDecay = savedVegDecay < 100 ? 3000 : savedVegDecay;
+
+        const finalConfig = {
+          ...DEFAULT_DEVIL_FISH,
+          ...firstTB303Config.devilFish,
+          enabled: true, // Always enabled
+          vegDecay: fixedVegDecay, // Force minimum vegDecay
+          // If normalDecay/accentDecay are at defaults, sync them to current decay
+          normalDecay: firstTB303Config.devilFish.normalDecay !== undefined
+            ? firstTB303Config.devilFish.normalDecay
+            : currentDecay,
+          accentDecay: firstTB303Config.devilFish.accentDecay !== undefined
+            ? firstTB303Config.devilFish.accentDecay
+            : currentDecay,
+        };
+
+        console.log('[TB303KnobPanel] Initializing Devil Fish config:', {
+          savedVegDecay,
+          fixedVegDecay,
+          finalConfig
+        });
+
+        setDevilFishConfig(finalConfig);
       } else {
-        setDevilFishConfig({ ...DEFAULT_DEVIL_FISH });
+        // No Devil Fish config - sync decay times to current Decay knob
+        setDevilFishConfig({
+          ...DEFAULT_DEVIL_FISH,
+          enabled: true, // Always enabled
+          normalDecay: currentDecay,
+          accentDecay: currentDecay,
+        });
       }
     }
   }, [tb303ConfigKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ensure synth instances have Devil Fish config when enabled
+  // Ensure synth instances have Devil Fish config (always enabled)
   useEffect(() => {
-    if (devilFishConfig.enabled) {
-      const engineInstruments = (engine as any).instruments as Map<string, any>;
-      if (engineInstruments) {
-        engineInstruments.forEach((instrument) => {
-          if (instrument instanceof TB303Synth) {
-            instrument.enableDevilFish(true, devilFishConfig);
-          }
-        });
-      }
+    const engineInstruments = (engine as any).instruments as Map<string, any>;
+    if (engineInstruments) {
+      engineInstruments.forEach((instrument) => {
+        if (instrument instanceof TB303Synth) {
+          instrument.enableDevilFish(true, devilFishConfig);
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devilFishConfig.enabled]);
+  }, [devilFishConfig]);
 
   // Interpolate automation curve value at fractional row position
   const interpolateAutomation = useCallback((curve: typeof curves[0] | undefined, row: number): number | null => {
@@ -399,6 +491,27 @@ const TB303KnobPanelComponent: React.FC = () => {
         dispatchLiveModulation({ type: 'SET_MULTIPLE', values: updates });
       }
 
+      // Update visualization data (envelope and accent charge)
+      try {
+        const engine = getToneEngine();
+        const inst = tb303Instruments[0];
+        if (inst) {
+          const synth = engine.getInstrument(inst.id, inst, -1);
+          if (synth && synth instanceof TB303Synth) {
+            // Get envelope position and accent charge
+            const envPos = synth.getEnvelopePosition();
+            const envActive = synth.isEnvelopeActive();
+            const charge = synth.getAccentCharge();
+
+            setEnvelopePosition(envPos);
+            setEnvelopeActive(envActive);
+            setAccentCharge(charge);
+          }
+        }
+      } catch (error) {
+        // Silently ignore errors in visualization polling
+      }
+
       animationRef.current = requestAnimationFrame(pollLiveValues);
     };
 
@@ -434,11 +547,36 @@ const TB303KnobPanelComponent: React.FC = () => {
     });
   }, [engine, controlledInstrumentId]);
 
+  // Update BPM on all TB303 synths when transport BPM changes
+  useEffect(() => {
+    updateAllTB303(synth => synth.setBPM?.(currentBPM));
+  }, [currentBPM, updateAllTB303]);
+
   // Persist TB303 params to instrument store (so they get saved with the tune)
   const persistToStore = useCallback((paramUpdates: Partial<TB303Params>) => {
     tb303Instruments.forEach(inst => {
       const currentTb303 = inst.tb303;
       if (!currentTb303) return; // Skip if no TB303 config
+
+      const pedalboard = currentTb303.pedalboard ?? DEFAULT_PEDALBOARD;
+      const firstEffect = pedalboard.chain[0];
+
+      // If overdrive parameter is updated, update first effect in pedalboard
+      let updatedPedalboard = pedalboard;
+      if (paramUpdates.overdrive !== undefined && firstEffect) {
+        updatedPedalboard = {
+          ...pedalboard,
+          chain: pedalboard.chain.map((effect, index) =>
+            index === 0 ? {
+              ...effect,
+              parameters: {
+                ...effect.parameters,
+                drive: paramUpdates.overdrive!,
+              },
+            } : effect
+          ),
+        };
+      }
 
       updateInstrument(inst.id, {
         tb303: {
@@ -457,110 +595,237 @@ const TB303KnobPanelComponent: React.FC = () => {
             ...currentTb303.accent,
             amount: paramUpdates.accent ?? currentTb303.accent?.amount ?? 70,
           },
-          overdrive: {
-            ...currentTb303.overdrive,
-            amount: paramUpdates.overdrive ?? currentTb303.overdrive?.amount ?? 0,
-          },
+          pedalboard: updatedPedalboard,
         },
       });
     });
   }, [tb303Instruments, updateInstrument]);
 
   // Parameter change handlers - each registers a manual override AND persists to store
-  const handleCutoffChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, cutoff: value }));
-    updateAllTB303(synth => synth.setCutoff(value));
-    persistToStore({ cutoff: value });
-    // Register override - automation won't apply for one pattern cycle
-    overrideManager.setOverride('cutoff', value / 18000); // Normalize to 0-1
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  // Throttled audio updates (16ms = ~60fps) to prevent audio glitches
+  const handleCutoffChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, cutoff: value }));
+      updateAllTB303(synth => synth.setCutoff(value));
+      persistToStore({ cutoff: value });
+      // Register override - automation won't apply for one pattern cycle
+      overrideManager.setOverride('cutoff', value / 18000); // Normalize to 0-1
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  const handleResonanceChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, resonance: value }));
-    updateAllTB303(synth => synth.setResonance(value));
-    persistToStore({ resonance: value });
-    overrideManager.setOverride('resonance', value / 100);
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  const handleResonanceChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, resonance: value }));
+      updateAllTB303(synth => synth.setResonance(value));
+      persistToStore({ resonance: value });
+      overrideManager.setOverride('resonance', value / 100);
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  const handleEnvModChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, envMod: value }));
-    updateAllTB303(synth => synth.setEnvMod(value));
-    persistToStore({ envMod: value });
-    overrideManager.setOverride('envMod', value / 100);
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  const handleEnvModChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, envMod: value }));
+      updateAllTB303(synth => synth.setEnvMod(value));
+      persistToStore({ envMod: value });
+      overrideManager.setOverride('envMod', value / 100);
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  const handleDecayChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, decay: value }));
-    updateAllTB303(synth => synth.setDecay(value));
-    persistToStore({ decay: value });
-    overrideManager.setOverride('decay', (value - 30) / 2970); // Normalize 30-3000 to 0-1
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  const handleDecayChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, decay: value }));
+      updateAllTB303(synth => synth.setDecay(value));
+      persistToStore({ decay: value });
+      overrideManager.setOverride('decay', (value - 30) / 2970); // Normalize 30-3000 to 0-1
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  const handleAccentChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, accent: value }));
-    updateAllTB303(synth => synth.setAccentAmount(value));
-    persistToStore({ accent: value });
-    overrideManager.setOverride('accent', value / 100);
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  const handleAccentChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, accent: value }));
+      updateAllTB303(synth => synth.setAccentAmount(value));
+      persistToStore({ accent: value });
+      overrideManager.setOverride('accent', value / 100);
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  const handleOverdriveChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, overdrive: value }));
-    updateAllTB303(synth => synth.setOverdrive(value));
-    persistToStore({ overdrive: value });
-    overrideManager.setOverride('overdrive', value / 100);
-  }, [updateAllTB303, overrideManager, persistToStore]);
+  const handleOverdriveChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, overdrive: value }));
+      updateAllTB303(synth => synth.setOverdrive(value));
+      persistToStore({ overdrive: value });
+      overrideManager.setOverride('overdrive', value / 100);
+    }, 16),
+    [updateAllTB303, overrideManager, persistToStore]
+  );
 
-  // Devil Fish handlers
-  const handleDevilFishEnableChange = useCallback((enabled: boolean) => {
-    const newConfig = { ...devilFishConfig, enabled };
-    setDevilFishConfig(newConfig);
 
-    // Ensure synth instances exist and update them
+  const handleTuningChange = useCallback((value: number) => {
+    setParams(p => ({ ...p, tuning: value }));
+    updateAllTB303(synth => synth.setTuning?.(value));
+
+    // Persist tuning to store
     tb303Instruments.forEach(inst => {
-      const synth = engine.getInstrument(inst.id, inst, -1);
-      if (synth instanceof TB303Synth) {
-        synth.enableDevilFish(enabled, newConfig);
-      }
+      const currentTb303 = inst.tb303;
+      if (!currentTb303) return;
+      updateInstrument(inst.id, {
+        tb303: {
+          ...currentTb303,
+          tuning: value,
+        },
+      });
+    });
+  }, [updateAllTB303, tb303Instruments, updateInstrument]);
+
+  const handleTempoRelativeChange = useCallback((enabled: boolean) => {
+    setParams(p => ({ ...p, tempoRelative: enabled }));
+    updateAllTB303(synth => synth.setTempoRelative?.(enabled));
+
+    // Persist to store
+    tb303Instruments.forEach(inst => {
+      const currentTb303 = inst.tb303;
+      if (!currentTb303) return;
+      updateInstrument(inst.id, {
+        tb303: {
+          ...currentTb303,
+          tempoRelative: enabled,
+        },
+      });
+    });
+  }, [updateAllTB303, tb303Instruments, updateInstrument]);
+
+  const handleEngineTypeChange = useCallback((engineType: 'tonejs' | 'accurate') => {
+    setParams(p => ({ ...p, engineType }));
+
+    // Update all TB303 instruments in store - this will trigger recreation of synths
+    tb303Instruments.forEach(inst => {
+      const currentTb303 = inst.tb303;
+      if (!currentTb303) return;
+      updateInstrument(inst.id, {
+        tb303: {
+          ...currentTb303,
+          engineType,
+        },
+      });
     });
 
-    // Also update any existing per-channel instances
-    updateAllTB303(synth => synth.enableDevilFish(enabled, newConfig));
-  }, [updateAllTB303, devilFishConfig, engine, tb303Instruments]);
+    // Force recreation of synth instances by clearing and reinitializing
+    // The engine will automatically pick up the new engineType from the config
+    const engineInstruments = (engine as any).instruments as Map<number, any>;
+    if (engineInstruments) {
+      tb303Instruments.forEach(inst => {
+        engineInstruments.delete(inst.id);
+      });
+    }
+  }, [tb303Instruments, updateInstrument, engine]);
 
-  const handleNormalDecayChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, normalDecay: value }));
-    updateAllTB303(synth => synth.setNormalDecay(value));
-  }, [updateAllTB303]);
+  // Load TB-303 preset
+  const handlePresetChange = useCallback((presetIndex: number) => {
+    if (presetIndex < 0 || presetIndex >= TB303_PRESETS.length) return;
 
-  const handleAccentDecayChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, accentDecay: value }));
-    updateAllTB303(synth => synth.setAccentDecay(value));
-  }, [updateAllTB303]);
+    const preset = TB303_PRESETS[presetIndex];
+    const presetTB303 = preset.tb303;
 
-  const handleVegDecayChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, vegDecay: value }));
-    updateAllTB303(synth => synth.setVegDecay(value));
-  }, [updateAllTB303]);
+    if (!presetTB303) return;
 
-  const handleVegSustainChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, vegSustain: value }));
-    updateAllTB303(synth => synth.setVegSustain(value));
-  }, [updateAllTB303]);
+    // Apply preset to all TB303 instruments
+    tb303Instruments.forEach(inst => {
+      updateInstrument(inst.id, {
+        tb303: {
+          ...inst.tb303,
+          ...presetTB303,
+          // Ensure Devil Fish is always enabled
+          devilFish: {
+            ...DEFAULT_DEVIL_FISH,
+            ...(presetTB303.devilFish || {}),
+            enabled: true,
+          },
+        },
+      });
+    });
 
-  const handleSoftAttackChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, softAttack: value }));
-    updateAllTB303(synth => synth.setSoftAttack(value));
-  }, [updateAllTB303]);
+    // Update local state to reflect preset
+    if (presetTB303.filter && presetTB303.filterEnvelope && presetTB303.accent) {
+      setParams({
+        ...params,
+        cutoff: presetTB303.filter.cutoff ?? 800,
+        resonance: presetTB303.filter.resonance ?? 65,
+        envMod: presetTB303.filterEnvelope.envMod ?? 60,
+        decay: presetTB303.filterEnvelope.decay ?? 200,
+        accent: presetTB303.accent.amount ?? 70,
+      });
+    }
 
-  const handleFilterTrackingChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, filterTracking: value }));
-    updateAllTB303(synth => synth.setFilterTracking(value));
-  }, [updateAllTB303]);
+    if (presetTB303.devilFish) {
+      setDevilFishConfig({
+        ...DEFAULT_DEVIL_FISH,
+        ...presetTB303.devilFish,
+        enabled: true, // Always enabled
+      });
+    }
+  }, [tb303Instruments, updateInstrument, params]);
 
-  const handleFilterFMChange = useCallback((value: number) => {
-    setDevilFishConfig(c => ({ ...c, filterFM: value }));
-    updateAllTB303(synth => synth.setFilterFM(value));
-  }, [updateAllTB303]);
+  // Devil Fish handlers (always enabled, throttled for smooth audio)
+  const handleNormalDecayChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, normalDecay: value }));
+      updateAllTB303(synth => synth.setNormalDecay(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleAccentDecayChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, accentDecay: value }));
+      updateAllTB303(synth => synth.setAccentDecay(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleVegDecayChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, vegDecay: value }));
+      updateAllTB303(synth => synth.setVegDecay(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleVegSustainChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, vegSustain: value }));
+      updateAllTB303(synth => synth.setVegSustain(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleSoftAttackChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, softAttack: value }));
+      updateAllTB303(synth => synth.setSoftAttack(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleFilterTrackingChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, filterTracking: value }));
+      updateAllTB303(synth => synth.setFilterTracking(value));
+    }, 16),
+    [updateAllTB303]
+  );
+
+  const handleFilterFMChange = useCallback(
+    throttle((value: number) => {
+      setDevilFishConfig(c => ({ ...c, filterFM: value }));
+      updateAllTB303(synth => synth.setFilterFM(value));
+    }, 16),
+    [updateAllTB303]
+  );
 
   const handleSweepSpeedChange = useCallback((value: 'fast' | 'normal' | 'slow') => {
     setDevilFishConfig(c => ({ ...c, sweepSpeed: value }));
@@ -584,13 +849,22 @@ const TB303KnobPanelComponent: React.FC = () => {
 
   // MIDI CC handler registration
   useEffect(() => {
-    // Register handlers for MIDI CC control
+    // Register handlers for MIDI CC control - Basic TB-303 parameters
     registerCCHandler('cutoff', handleCutoffChange);
     registerCCHandler('resonance', handleResonanceChange);
     registerCCHandler('envMod', handleEnvModChange);
     registerCCHandler('decay', handleDecayChange);
     registerCCHandler('accent', handleAccentChange);
     registerCCHandler('overdrive', handleOverdriveChange);
+
+    // Devil Fish parameters (always registered since always enabled)
+    registerCCHandler('normalDecay', handleNormalDecayChange);
+    registerCCHandler('accentDecay', handleAccentDecayChange);
+    registerCCHandler('vegDecay', handleVegDecayChange);
+    registerCCHandler('vegSustain', handleVegSustainChange);
+    registerCCHandler('softAttack', handleSoftAttackChange);
+    registerCCHandler('filterTracking', handleFilterTrackingChange);
+    registerCCHandler('filterFM', handleFilterFMChange);
 
     // Cleanup on unmount
     return () => {
@@ -600,6 +874,15 @@ const TB303KnobPanelComponent: React.FC = () => {
       unregisterCCHandler('decay');
       unregisterCCHandler('accent');
       unregisterCCHandler('overdrive');
+
+      // Devil Fish cleanup
+      unregisterCCHandler('normalDecay');
+      unregisterCCHandler('accentDecay');
+      unregisterCCHandler('vegDecay');
+      unregisterCCHandler('vegSustain');
+      unregisterCCHandler('softAttack');
+      unregisterCCHandler('filterTracking');
+      unregisterCCHandler('filterFM');
     };
   }, [
     registerCCHandler,
@@ -610,52 +893,18 @@ const TB303KnobPanelComponent: React.FC = () => {
     handleDecayChange,
     handleAccentChange,
     handleOverdriveChange,
+    handleNormalDecayChange,
+    handleAccentDecayChange,
+    handleVegDecayChange,
+    handleVegSustainChange,
+    handleSoftAttackChange,
+    handleFilterTrackingChange,
+    handleFilterFMChange,
   ]);
 
-  // Load a factory preset
-  const handleLoadPreset = useCallback((preset: typeof TB303_PRESETS[0]) => {
-    if (!preset.tb303) return;
-
-    const newParams: TB303Params = {
-      cutoff: preset.tb303.filter?.cutoff ?? DEFAULT_PARAMS.cutoff,
-      resonance: preset.tb303.filter?.resonance ?? DEFAULT_PARAMS.resonance,
-      envMod: preset.tb303.filterEnvelope?.envMod ?? DEFAULT_PARAMS.envMod,
-      decay: preset.tb303.filterEnvelope?.decay ?? DEFAULT_PARAMS.decay,
-      accent: preset.tb303.accent?.amount ?? DEFAULT_PARAMS.accent,
-      overdrive: preset.tb303.overdrive?.amount ?? DEFAULT_PARAMS.overdrive,
-    };
-
-    setParams(newParams);
-
-    // Determine if this preset enables Devil Fish mode
-    const devilFishEnabled = preset.tb303.devilFish?.enabled ?? false;
-    const devilFishConfig = preset.tb303.devilFish;
-
-    // Update all TB303 synths
-    updateAllTB303(synth => {
-      synth.setCutoff(newParams.cutoff);
-      synth.setResonance(newParams.resonance);
-      synth.setEnvMod(newParams.envMod);
-      synth.setDecay(newParams.decay);
-      synth.setAccentAmount(newParams.accent);
-      synth.setOverdrive(newParams.overdrive);
-      // Enable/disable Devil Fish mode based on preset
-      synth.enableDevilFish(devilFishEnabled, devilFishConfig);
-    });
-
-    // Persist to store
-    tb303Instruments.forEach(inst => {
-      updateInstrument(inst.id, {
-        name: preset.name,
-        tb303: preset.tb303,
-      });
-    });
-
-    setShowPresetMenu(false);
-  }, [updateAllTB303, tb303Instruments, updateInstrument]);
 
   // Get user presets from localStorage with validation
-  const getUserPresets = useCallback((): Array<{ name: string; params: TB303Params }> => {
+  const getUserPresets = useCallback((): Array<{ name: string; params: TB303Params; devilFishConfig?: DevilFishConfig }> => {
     try {
       const stored = localStorage.getItem('tb303-user-presets');
       if (!stored) return [];
@@ -665,7 +914,7 @@ const TB303KnobPanelComponent: React.FC = () => {
       if (!Array.isArray(parsed)) return [];
 
       return parsed.filter(
-        (p): p is { name: string; params: TB303Params } =>
+        (p): p is { name: string; params: TB303Params; devilFishConfig?: DevilFishConfig } =>
           p !== null &&
           typeof p === 'object' &&
           typeof p.name === 'string' &&
@@ -682,39 +931,18 @@ const TB303KnobPanelComponent: React.FC = () => {
     if (!presetName.trim()) return;
 
     const userPresets = getUserPresets();
-    userPresets.push({ name: presetName.trim(), params: { ...params } });
+    userPresets.push({
+      name: presetName.trim(),
+      params: { ...params },
+      devilFishConfig: { ...devilFishConfig },
+    });
     localStorage.setItem('tb303-user-presets', JSON.stringify(userPresets));
 
     setPresetName('');
     setShowSaveDialog(false);
-  }, [presetName, params, getUserPresets]);
+  }, [presetName, params, devilFishConfig, getUserPresets]);
 
-  // Load user preset
-  const handleLoadUserPreset = useCallback((preset: { name: string; params: TB303Params }) => {
-    setParams(preset.params);
 
-    updateAllTB303(synth => {
-      synth.setCutoff(preset.params.cutoff);
-      synth.setResonance(preset.params.resonance);
-      synth.setEnvMod(preset.params.envMod);
-      synth.setDecay(preset.params.decay);
-      synth.setAccentAmount(preset.params.accent);
-      synth.setOverdrive(preset.params.overdrive);
-    });
-
-    // Persist to store
-    persistToStore(preset.params);
-
-    setShowPresetMenu(false);
-  }, [updateAllTB303, persistToStore]);
-
-  // Delete user preset
-  const handleDeleteUserPreset = useCallback((presetName: string) => {
-    const userPresets = getUserPresets().filter(p => p.name !== presetName);
-    localStorage.setItem('tb303-user-presets', JSON.stringify(userPresets));
-  }, [getUserPresets]);
-
-  const userPresets = getUserPresets();
 
   // Format value for display
   const formatValue = (value: number, unit: string) => {
@@ -746,7 +974,6 @@ const TB303KnobPanelComponent: React.FC = () => {
       <div className="tb303-knob-panel-header">
         <div className="tb303-knob-panel-label">
           TB-303
-          {devilFishConfig.enabled && <span className="devilfish-badge">+DF</span>}
         </div>
 
         {/* Synth Target Selector - choose which instrument MIDI knobs control */}
@@ -768,51 +995,6 @@ const TB303KnobPanelComponent: React.FC = () => {
             </select>
           </div>
         )}
-
-        {/* Preset Dropdown */}
-        <div className="tb303-preset-controls">
-          <div className="tb303-preset-dropdown">
-            <button
-              className="tb303-preset-button"
-              onClick={() => setShowPresetMenu(!showPresetMenu)}
-              title="Load preset"
-            >
-              <span>Presets</span>
-              <ChevronDown size={12} />
-            </button>
-
-            {showPresetMenu && (
-              <div className="tb303-preset-menu">
-                {userPresets.length > 0 && (
-                  <>
-                    <div className="tb303-preset-category">User Presets</div>
-                    {userPresets.map((preset) => (
-                      <div key={preset.name} className="tb303-preset-item tb303-preset-item-user">
-                        <span onClick={() => handleLoadUserPreset(preset)}>{preset.name}</span>
-                        <button
-                          className="tb303-preset-delete"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteUserPreset(preset.name); }}
-                          title="Delete preset"
-                        >×</button>
-                      </div>
-                    ))}
-                    <div className="tb303-preset-divider" />
-                  </>
-                )}
-                <div className="tb303-preset-category">Factory Presets</div>
-                {TB303_PRESETS.slice(0, 20).map((preset) => (
-                  <div key={preset.name} className="tb303-preset-item" onClick={() => handleLoadPreset(preset)}>
-                    {preset.name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button className="tb303-save-button" onClick={() => setShowSaveDialog(true)} title="Save preset">
-            <Save size={12} />
-          </button>
-        </div>
       </div>
 
       {/* Collapsed view - inline values */}
@@ -849,8 +1031,65 @@ const TB303KnobPanelComponent: React.FC = () => {
       {/* Expanded view - all controls */}
       {!tb303Collapsed && (
         <div className="tb303-expanded-content">
+          {/* Engine Selection */}
+          <div className="devilfish-row" style={{ marginBottom: '12px' }}>
+            <div className="devilfish-row-header">
+              <span className="devilfish-label">Engine</span>
+              <select
+                value={params.engineType}
+                onChange={(e) => handleEngineTypeChange(e.target.value as 'tonejs' | 'accurate')}
+                className="tb303-synth-select"
+                style={{ marginLeft: '8px' }}
+              >
+                <option value="tonejs">Tone.js (Classic)</option>
+                <option value="accurate">Open303 (Accurate)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Preset Selection */}
+          <div className="devilfish-row" style={{ marginBottom: '12px' }}>
+            <div className="devilfish-row-header">
+              <span className="devilfish-label">Preset</span>
+              <select
+                onChange={(e) => handlePresetChange(Number(e.target.value))}
+                className="tb303-synth-select"
+                style={{ marginLeft: '8px' }}
+                defaultValue=""
+              >
+                <option value="" disabled>Select preset...</option>
+                {TB303_PRESETS.map((preset, index) => (
+                  <option key={index} value={index}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Tempo-Relative Mode */}
+          <div className="devilfish-row" style={{ marginBottom: '12px' }}>
+            <div className="devilfish-row-header">
+              <span className="devilfish-label" title="Scale envelope decay times with tempo (slower BPM = longer, creakier sweeps)">Tempo Relative</span>
+              <Toggle
+                label=""
+                title={`Envelope times ${params.tempoRelative ? 'scale with tempo' : 'are absolute'} (currently ${currentBPM} BPM)`}
+                value={params.tempoRelative}
+                onChange={handleTempoRelativeChange}
+                color="var(--color-synth-envelope)"
+                size="sm"
+              />
+            </div>
+            {params.tempoRelative && (
+              <div style={{ marginTop: '4px', fontSize: '10px', color: '#888', fontFamily: 'monospace' }}>
+                Envelopes scaled to {currentBPM} BPM (reference: 125 BPM)
+              </div>
+            )}
+          </div>
+
           {/* TB-303 Knobs */}
           <div className="tb303-knobs-container">
+            <Knob label="Tuning" value={params.tuning} min={430} max={450} unit="Hz" onChange={handleTuningChange} defaultValue={440} color="var(--color-synth-modulation)" />
             <Knob label="Cutoff" value={params.cutoff} min={50} max={18000} unit="Hz" onChange={handleCutoffChange} logarithmic defaultValue={800} color="var(--color-synth-filter)" displayValue={liveCutoff} isActive={isPlaying && liveCutoff !== undefined} />
             <Knob label="Reso" value={params.resonance} min={0} max={100} unit="%" onChange={handleResonanceChange} defaultValue={65} color="var(--color-synth-filter)" displayValue={liveResonance} isActive={isPlaying && liveResonance !== undefined} />
             <Knob label="EnvMod" value={params.envMod} min={0} max={100} unit="%" onChange={handleEnvModChange} defaultValue={60} color="var(--color-synth-envelope)" displayValue={liveEnvMod} isActive={isPlaying && liveEnvMod !== undefined} />
@@ -859,31 +1098,56 @@ const TB303KnobPanelComponent: React.FC = () => {
             <Knob label="Drive" value={params.overdrive} min={0} max={100} unit="%" onChange={handleOverdriveChange} defaultValue={0} color="var(--color-synth-drive)" displayValue={liveOverdrive} isActive={isPlaying && liveOverdrive !== undefined} />
           </div>
 
-          {/* Devil Fish Section */}
+          {/* Filter Envelope Visualization */}
+          <div style={{ marginTop: '12px', marginBottom: '12px' }}>
+            <EnvelopeVisualizer
+              attack={3}
+              decay={liveDecay ?? params.decay}
+              sustain={0}
+              release={50}
+              envMod={liveEnvMod ?? params.envMod}
+              currentPosition={envelopePosition}
+              isActive={envelopeActive}
+              height={50}
+              color="var(--color-synth-envelope)"
+              label="Filter Envelope"
+            />
+          </div>
+
+          {/* Devil Fish Section (Both Engines) - Always enabled, neutral until knobs are turned */}
           <div className="devilfish-row">
             <div className="devilfish-row-header">
-              <span className="devilfish-label">Devil Fish</span>
-              <Toggle label="" value={devilFishConfig.enabled} onChange={handleDevilFishEnableChange} color="var(--color-synth-drive)" size="sm" />
+              <span className="devilfish-label" title="Robin Whittle's Devil Fish mod - advanced TB-303 modifications (always enabled)">Devil Fish Mods</span>
             </div>
 
-            {devilFishConfig.enabled && (
-              <div className="devilfish-knobs">
-                <Knob label="Norm Dec" value={devilFishConfig.normalDecay} min={30} max={3000} unit="ms" onChange={handleNormalDecayChange} logarithmic defaultValue={200} color="var(--color-synth-envelope)" displayValue={liveNormalDecay} isActive={isPlaying && liveNormalDecay !== undefined} />
-                <Knob label="Acc Dec" value={devilFishConfig.accentDecay} min={30} max={3000} unit="ms" onChange={handleAccentDecayChange} logarithmic defaultValue={200} color="var(--color-synth-accent)" displayValue={liveAccentDecay} isActive={isPlaying && liveAccentDecay !== undefined} />
-                <Knob label="Soft Atk" value={devilFishConfig.softAttack} min={0.3} max={30} unit="ms" onChange={handleSoftAttackChange} logarithmic defaultValue={3} color="var(--color-synth-envelope)" displayValue={liveSoftAttack} isActive={isPlaying && liveSoftAttack !== undefined} />
-                <Knob label="VEG Dec" value={devilFishConfig.vegDecay} min={16} max={3000} unit="ms" onChange={handleVegDecayChange} logarithmic defaultValue={300} color="var(--color-synth-filter)" displayValue={liveVegDecay} isActive={isPlaying && liveVegDecay !== undefined} />
-                <Knob label="VEG Sus" value={devilFishConfig.vegSustain} min={0} max={100} unit="%" onChange={handleVegSustainChange} defaultValue={0} color="var(--color-synth-filter)" displayValue={liveVegSustain} isActive={isPlaying && liveVegSustain !== undefined} />
-                <Knob label="Tracking" value={devilFishConfig.filterTracking} min={0} max={200} unit="%" onChange={handleFilterTrackingChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterTracking} isActive={isPlaying && liveFilterTracking !== undefined} />
-                <Knob label="FM" value={devilFishConfig.filterFM} min={0} max={100} unit="%" onChange={handleFilterFMChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterFM} isActive={isPlaying && liveFilterFM !== undefined} />
-                <Switch3Way label="Sweep" value={devilFishConfig.sweepSpeed} options={['fast', 'normal', 'slow']} labels={['F', 'N', 'S']} onChange={handleSweepSpeedChange} color="var(--color-synth-accent)" />
-                <Switch3Way label="Muffler" value={devilFishConfig.muffler} options={['off', 'soft', 'hard']} labels={['Off', 'Sft', 'Hrd']} onChange={handleMufflerChange} color="var(--color-synth-drive)" />
-                <Toggle label="Hi Reso" value={devilFishConfig.highResonance} onChange={handleHighResonanceChange} color="var(--color-synth-filter)" size="sm" />
-                <Toggle label="Acc Swp" value={devilFishConfig.accentSweepEnabled} onChange={handleAccentSweepChange} color="var(--color-synth-accent)" size="sm" />
-              </div>
-            )}
+            <div className="devilfish-knobs">
+              <Knob label="Norm Dec" title="Filter envelope decay time for normal (non-accented) notes" value={devilFishConfig.normalDecay} min={30} max={3000} unit="ms" onChange={handleNormalDecayChange} logarithmic defaultValue={200} color="var(--color-synth-envelope)" displayValue={liveNormalDecay} isActive={isPlaying && liveNormalDecay !== undefined} />
+              <Knob label="Acc Dec" title="Filter envelope decay time for accented notes" value={devilFishConfig.accentDecay} min={30} max={3000} unit="ms" onChange={handleAccentDecayChange} logarithmic defaultValue={200} color="var(--color-synth-accent)" displayValue={liveAccentDecay} isActive={isPlaying && liveAccentDecay !== undefined} />
+              <Knob label="Soft Atk" title="Attack time for non-accented notes (makes notes less percussive)" value={devilFishConfig.softAttack} min={0.3} max={30} unit="ms" onChange={handleSoftAttackChange} logarithmic defaultValue={0.3} color="var(--color-synth-envelope)" displayValue={liveSoftAttack} isActive={isPlaying && liveSoftAttack !== undefined} />
+              <Knob label="VEG Dec" title="Volume envelope decay time (independent of filter envelope)" value={devilFishConfig.vegDecay} min={16} max={3000} unit="ms" onChange={handleVegDecayChange} logarithmic defaultValue={16} color="var(--color-synth-filter)" displayValue={liveVegDecay} isActive={isPlaying && liveVegDecay !== undefined} />
+              <Knob label="VEG Sus" title="Volume envelope sustain level (0%=decay to zero, 100%=infinite notes)" value={devilFishConfig.vegSustain} min={0} max={100} unit="%" onChange={handleVegSustainChange} defaultValue={0} color="var(--color-synth-filter)" displayValue={liveVegSustain} isActive={isPlaying && liveVegSustain !== undefined} />
+              <Knob label="Tracking" title="Filter cutoff follows note pitch (0%=off, 100%=1:1, 200%=over-tracking)" value={devilFishConfig.filterTracking} min={0} max={200} unit="%" onChange={handleFilterTrackingChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterTracking} isActive={isPlaying && liveFilterTracking !== undefined} />
+              <Knob label="FM" title="Audio-rate filter modulation (VCA output modulates filter frequency)" value={devilFishConfig.filterFM} min={0} max={100} unit="%" onChange={handleFilterFMChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterFM} isActive={isPlaying && liveFilterFM !== undefined} />
+              <Switch3Way label="Sweep" title="Accent sweep speed (capacitor charge rate for consecutive accents)" value={devilFishConfig.sweepSpeed} options={['fast', 'normal', 'slow']} labels={['F', 'N', 'S']} onChange={handleSweepSpeedChange} color="var(--color-synth-accent)" />
+              <Switch3Way label="Muffler" title="VCA soft clipping (adds buzz and square-wave character)" value={devilFishConfig.muffler} options={['off', 'soft', 'hard']} labels={['Off', 'Sft', 'Hrd']} onChange={handleMufflerChange} color="var(--color-synth-drive)" />
+              <Toggle label="Hi Reso" title="Enable high resonance mode for filter self-oscillation" value={devilFishConfig.highResonance} onChange={handleHighResonanceChange} color="var(--color-synth-filter)" size="sm" />
+              <Toggle label="Acc Swp" title="Enable accent sweep circuit (capacitor charge buildup)" value={devilFishConfig.accentSweepEnabled} onChange={handleAccentSweepChange} color="var(--color-synth-accent)" size="sm" />
+            </div>
+
+            {/* Accent Charge Visualization */}
+            <div style={{ marginTop: '12px' }}>
+              <AccentChargeVisualizer
+                charge={accentCharge}
+                sweepSpeed={devilFishConfig.sweepSpeed}
+                enabled={devilFishConfig.accentSweepEnabled}
+                height={60}
+                color="var(--color-synth-accent)"
+              />
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
