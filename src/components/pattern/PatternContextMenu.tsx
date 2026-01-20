@@ -15,7 +15,8 @@ import {
   Download,
   X,
 } from 'lucide-react';
-import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { useContextMenu } from '@hooks/useContextMenu';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 
@@ -36,10 +37,10 @@ const RenameDialog: React.FC<{
 
   useEffect(() => {
     if (isOpen) {
-      setName(currentName);
+      // Focus input after dialog opens
       setTimeout(() => inputRef.current?.select(), 0);
     }
-  }, [isOpen, currentName]);
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,12 +383,14 @@ export const PatternContextMenu: React.FC<PatternContextMenuProps> = ({
       )}
 
       {/* Rename Dialog */}
-      <RenameDialog
-        isOpen={showRenameDialog}
-        currentName={pattern?.name || ''}
-        onConfirm={handleRename}
-        onClose={() => setShowRenameDialog(false)}
-      />
+      {showRenameDialog && (
+        <RenameDialog
+          isOpen={showRenameDialog}
+          currentName={pattern?.name || ''}
+          onConfirm={handleRename}
+          onClose={() => setShowRenameDialog(false)}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

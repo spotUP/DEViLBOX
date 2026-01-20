@@ -24,11 +24,14 @@ import {
   Waves,
   Eye,
   EyeOff,
+  RefreshCw,
+  LayoutGrid,
 } from 'lucide-react';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { AutomationParameter } from '@typedefs/automation';
 import type { ChannelData } from '@typedefs/tracker';
@@ -52,7 +55,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   channelIndex,
   channel,
   patternId,
-  patternLength: _patternLength,
+  patternLength: _patternLength, // eslint-disable-line @typescript-eslint/no-unused-vars
   onFillPattern,
   onClearChannel,
   onCopyChannel,
@@ -62,25 +65,35 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onInterpolate,
 }) => {
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
-  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, patterns } = useTrackerStore();
+  const { 
+    toggleChannelMute, 
+    toggleChannelSolo, 
+    removeChannel, 
+    setChannelColor, 
+    patterns, 
+    remapInstrument,
+    copyMask,
+    setCopyMask
+  } = useTrackerStore();
+  const { currentInstrumentId } = useInstrumentStore();
   const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore();
 
   const showLane = getShowLane(channelIndex);
   const curves = getCurvesForPattern(patternId, channelIndex);
   const hasCurves = curves.length > 0;
 
-  // Automation parameters for submenu
-  const automationParams: { id: AutomationParameter; label: string; color: string }[] = [
-    { id: 'cutoff', label: 'Cutoff', color: '#4f9d69' },
-    { id: 'resonance', label: 'Resonance', color: '#3b82f6' },
-    { id: 'envMod', label: 'Env Mod', color: '#f59e0b' },
-    { id: 'volume', label: 'Volume', color: '#ef4444' },
-    { id: 'pan', label: 'Pan', color: '#8b5cf6' },
-    { id: 'decay', label: 'Decay', color: '#06b6d4' },
-  ];
-
   // Build menu items based on mode
   const menuItems = useMemo((): MenuItemType[] => {
+    // Automation parameters for submenu
+    const automationParams: { id: AutomationParameter; label: string; color: string }[] = [
+      { id: 'cutoff', label: 'Cutoff', color: '#4f9d69' },
+      { id: 'resonance', label: 'Resonance', color: '#3b82f6' },
+      { id: 'envMod', label: 'Env Mod', color: '#f59e0b' },
+      { id: 'volume', label: 'Volume', color: '#ef4444' },
+      { id: 'pan', label: 'Pan', color: '#8b5cf6' },
+      { id: 'decay', label: 'Decay', color: '#06b6d4' },
+    ];
+
     if (isLiveMode) {
       // Live mode menu - focused on real-time performance
       return [
@@ -323,6 +336,52 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         icon: <ClipboardPaste size={14} />,
         shortcut: 'Alt+V',
         onClick: () => onPasteChannel(channelIndex),
+      },
+      {
+        id: 'paste-special',
+        label: 'Paste Special...',
+        icon: <LayoutGrid size={14} />,
+        submenu: [
+          { 
+            id: 'mask-note', 
+            label: 'Note', 
+            checked: copyMask.note, 
+            onClick: () => setCopyMask({ note: !copyMask.note }) 
+          },
+          { 
+            id: 'mask-inst', 
+            label: 'Instrument', 
+            checked: copyMask.instrument, 
+            onClick: () => setCopyMask({ instrument: !copyMask.instrument }) 
+          },
+          { 
+            id: 'mask-vol', 
+            label: 'Volume', 
+            checked: copyMask.volume, 
+            onClick: () => setCopyMask({ volume: !copyMask.volume }) 
+          },
+          { 
+            id: 'mask-efx', 
+            label: 'Effect', 
+            checked: copyMask.effect, 
+            onClick: () => setCopyMask({ effect: !copyMask.effect }) 
+          },
+          { type: 'divider' },
+          { id: 'paste-now', label: 'Paste Now', icon: <ClipboardPaste size={14} />, onClick: () => onPasteChannel(channelIndex) },
+        ],
+      },
+      { type: 'divider' },
+      // Instrument Remap
+      {
+        id: 'remap',
+        label: 'Remap Instrument',
+        icon: <RefreshCw size={14} />,
+        disabled: currentInstrumentId === null,
+        submenu: [
+          { id: 'remap-track', label: `Track: All → Ins ${currentInstrumentId}`, onClick: () => remapInstrument(0, currentInstrumentId!, 'track') },
+          { id: 'remap-pattern', label: `Pattern: All → Ins ${currentInstrumentId}`, onClick: () => remapInstrument(0, currentInstrumentId!, 'pattern') },
+          { id: 'remap-song', label: `Song: All → Ins ${currentInstrumentId}`, onClick: () => remapInstrument(0, currentInstrumentId!, 'song') },
+        ],
       },
       { type: 'divider' },
       // Transpose submenu

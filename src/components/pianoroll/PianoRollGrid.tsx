@@ -2,7 +2,7 @@
  * PianoRollGrid - Grid background and note rendering area
  */
 
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import { NoteBlock } from './NoteBlock';
 import type { PianoRollNote } from '../../types/pianoRoll';
 import { isBlackKey } from '../../types/pianoRoll';
@@ -43,22 +43,43 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   onScroll,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateDimensions = () => {
+      setDimensions({
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
+    };
+
+    updateDimensions();
+    const observer = new ResizeObserver(updateDimensions);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Calculate visible range
   const visibleRows = useMemo(() => {
-    if (!containerRef.current) return 64;
-    return Math.ceil(containerRef.current.clientWidth / horizontalZoom) + 2;
-  }, [horizontalZoom]);
+    return Math.ceil(dimensions.width / horizontalZoom) + 2;
+  }, [horizontalZoom, dimensions.width]);
 
   const visibleNotes = useMemo(() => {
     // Use passed containerHeight if available, otherwise measure
-    const height = containerHeight || containerRef.current?.clientHeight || 400;
+    const height = containerHeight || dimensions.height;
     return Math.ceil(height / verticalZoom) + 2;
-  }, [verticalZoom, containerHeight]);
+  }, [verticalZoom, containerHeight, dimensions.height]);
 
-  // Handle wheel scroll
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // Handle wheel scroll with native listener to fix passive event warning
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheelNative = (e: WheelEvent) => {
       e.preventDefault();
 
       // Horizontal scroll with shift or trackpad horizontal
@@ -70,9 +91,11 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
       const noteDelta = -deltaY / verticalZoom; // Invert for natural scrolling
 
       onScroll(rowDelta, noteDelta);
-    },
-    [horizontalZoom, verticalZoom, onScroll]
-  );
+    };
+
+    container.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => container.removeEventListener('wheel', onWheelNative);
+  }, [horizontalZoom, verticalZoom, onScroll]);
 
   // Handle click on grid (empty space)
   const handleGridClick = useCallback(
@@ -95,7 +118,7 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   // Generate grid lines
   const gridLines = useMemo(() => {
     const lines: React.ReactNode[] = [];
-    const gridWidth = patternLength * horizontalZoom;
+    const gridWidth = Math.max(dimensions.width, patternLength * horizontalZoom);
     const startRow = Math.floor(scrollX);
     const endRow = Math.ceil(scrollX + visibleRows);
     const gridStep = 4 / gridDivision; // Rows per grid line based on division
@@ -161,7 +184,6 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
     <div
       ref={containerRef}
       className="flex-1 relative overflow-hidden bg-gray-900"
-      onWheel={handleWheel}
       onClick={handleGridClick}
     >
       {/* Grid lines */}

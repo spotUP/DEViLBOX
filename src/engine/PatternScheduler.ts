@@ -1,4 +1,4 @@
-// @ts-nocheck - API method type issues
+import { getToneEngine } from './ToneEngine';
 /**
  * PatternScheduler - Schedule pattern playback with Tone.js Transport
  *
@@ -9,7 +9,6 @@
  */
 
 import * as Tone from 'tone';
-import { getToneEngine } from './ToneEngine';
 import { getEffectProcessor } from './EffectCommands';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -37,9 +36,8 @@ function convertNoteFormat(note: string): string {
 }
 
 export class PatternScheduler {
-  private currentPart: Tone.Part | null = null;
-  private nextPart: Tone.Part | null = null; // Pre-scheduled next pattern
-  private pattern: Pattern | null = null;
+  private partsPool: Array<{ part: Tone.Part; tickPart: Tone.Part; endTime: number }> = [];
+
   private onRowChange: ((row: number) => void) | null = null;
   private onPatternEnd: (() => void) | null = null;
   private onPatternBreak: ((targetRow: number) => void) | null = null;
@@ -49,10 +47,9 @@ export class PatternScheduler {
   private channelActiveInstruments: Map<number, number> = new Map(); // Track active instrument per channel
   private effectProcessor = getEffectProcessor();
   private automationPlayer = getAutomationPlayer();
-  private patternBreakScheduled: boolean = false; // Prevent double pattern breaks
   private currentPatternEndTime: number = 0; // When current pattern ends (transport seconds)
   private nextPatternScheduled: boolean = false; // Track if next pattern is pre-scheduled
-  private tickPart: Tone.Part | null = null; // Separate Part for tick events
+  private patternBreakScheduled: boolean = false; // Prevent double pattern breaks
 
   /**
    * Set automation data
@@ -72,58 +69,6 @@ export class PatternScheduler {
     } else {
       console.log('[PatternScheduler] Automation data is empty');
     }
-  }
-
-  /**
-   * Get automation value for a specific parameter at a specific row
-   */
-  private getAutomationValue(
-    patternId: string,
-    channelIndex: number,
-    parameter: string,
-    row: number
-  ): number | null {
-    const curve = this.automation[patternId]?.[channelIndex]?.[parameter];
-    if (!curve || curve.points.length === 0) return null;
-
-    // Find surrounding points
-    const sortedPoints = [...curve.points].sort((a, b) => a.row - b.row);
-
-    // If before first point
-    if (row < sortedPoints[0].row) return sortedPoints[0].value;
-
-    // If after last point
-    if (row >= sortedPoints[sortedPoints.length - 1].row) {
-      return sortedPoints[sortedPoints.length - 1].value;
-    }
-
-    // Find points around current row
-    let prevPoint = sortedPoints[0];
-    let nextPoint = sortedPoints[sortedPoints.length - 1];
-
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-      if (sortedPoints[i].row <= row && sortedPoints[i + 1].row > row) {
-        prevPoint = sortedPoints[i];
-        nextPoint = sortedPoints[i + 1];
-        break;
-      }
-    }
-
-    // If exactly on a point
-    if (prevPoint.row === row) return prevPoint.value;
-
-    // Interpolate
-    const rowDiff = nextPoint.row - prevPoint.row;
-    const valueDiff = nextPoint.value - prevPoint.value;
-    const t = (row - prevPoint.row) / rowDiff;
-
-    if (curve.interpolation === 'linear') {
-      return prevPoint.value + valueDiff * t;
-    } else if (curve.interpolation === 'exponential') {
-      return prevPoint.value + valueDiff * (t * t);
-    }
-
-    return prevPoint.value;
   }
 
   /**
@@ -257,7 +202,6 @@ export class PatternScheduler {
     if (startOffset === 0) {
       this.clearSchedule();
     }
-    this.pattern = pattern;
     this.onRowChange = onRowChange || null;
     this.nextPatternScheduled = false;
 
@@ -500,20 +444,30 @@ export class PatternScheduler {
     const absolutePatternEnd = startOffset + patternDuration;
     this.currentPatternEndTime = absolutePatternEnd;
 
+    // Clean up finished parts from pool before adding new ones
+    const now = Tone.now();
+    this.partsPool = this.partsPool.filter(p => {
+      if (p.endTime < now - 2) { // 2 second buffer for release tails
+        p.part.dispose();
+        p.tickPart.dispose();
+        return false;
+      }
+      return true;
+    });
+
     console.log(`[PatternScheduler] Pattern duration: ${patternDuration}s, ends at: ${absolutePatternEnd}s, onPatternEnd set: ${!!this.onPatternEnd}`);
 
     // Capture callback reference to avoid issues with 'this' changing
     const patternEndCallback = this.onPatternEnd;
     if (patternEndCallback && !this.nextPatternScheduled) {
-      // Fire callback 250ms before end to give React time to respond
-      // The callback will schedule the next pattern at absolutePatternEnd
-      const callbackTime = absolutePatternEnd - 0.25;
-      console.log(`[PatternScheduler] Scheduling pattern end callback at ${callbackTime}s`);
+      // Fire callback 500ms before end to give React/Audio engine plenty of time to queue the next loop
+      const callbackTime = Math.max(0, absolutePatternEnd - 0.5);
+      console.log(`[PatternScheduler] Scheduling pattern end callback at ${callbackTime}s (lookahead)`);
       events.push({
         time: callbackTime,
         audioCallback: () => {
           if (!this.nextPatternScheduled) {
-            console.log(`[PatternScheduler] Pattern end callback fired! Next pattern should start at ${absolutePatternEnd}s`);
+            console.log(`[PatternScheduler] Lookahead callback fired! Queuing next pattern for ${absolutePatternEnd}s`);
             this.nextPatternScheduled = true;
             patternEndCallback();
           }
@@ -536,63 +490,41 @@ export class PatternScheduler {
       }
       transport.position = 0;
     }
-    // If transitioning, don't stop transport - just add new Part
-
-    // Clean up old Part if starting fresh
-    if (!isTransitioningPattern && this.currentPart) {
-      this.currentPart.stop();
-      this.currentPart.dispose();
-      this.currentPart = null;
-    }
 
     // Create Tone.Part for row events - audio triggers at precise time, UI updates via Draw
     const newPart = new Tone.Part((time, event) => {
       // Trigger audio at exact Transport time
-      event.audioCallback(time);
+      (event as { audioCallback: (time: number) => void; uiCallback: () => void }).audioCallback(time);
       // Schedule UI update separately to not block audio
       Tone.Draw.schedule(() => {
-        event.uiCallback();
+        (event as { audioCallback: (time: number) => void; uiCallback: () => void }).uiCallback();
       }, time);
     }, events.map(e => [e.time, { audioCallback: e.audioCallback, uiCallback: e.uiCallback }]));
 
-    // Part doesn't loop
     newPart.loop = false;
     newPart.start(0);
 
     // Create Tone.Part for tick events (effect processing)
     const newTickPart = new Tone.Part((time, event) => {
-      event.callback(time);
+      (event as { callback: (time: number) => void }).callback(time);
     }, tickEvents.map(e => [e.time, { callback: e.callback }]));
 
     newTickPart.loop = false;
     newTickPart.start(0);
 
-    // Track the Parts
-    if (isTransitioningPattern) {
-      // Keep old Part reference for cleanup, store new one as next
-      if (this.nextPart) {
-        this.nextPart.dispose();
-      }
-      this.nextPart = newPart;
-      // Dispose old tick part if exists
-      if (this.tickPart) {
-        this.tickPart.dispose();
-      }
-      this.tickPart = newTickPart;
-    } else {
-      this.currentPart = newPart;
-      if (this.tickPart) {
-        this.tickPart.dispose();
-      }
-      this.tickPart = newTickPart;
-    }
+    // Track the Parts in the pool
+    this.partsPool.push({
+      part: newPart,
+      tickPart: newTickPart,
+      endTime: absolutePatternEnd
+    });
 
     // Start transport if not running
     if (transport.state !== 'started') {
       transport.start();
     }
 
-    console.log(`Scheduled ${events.length} rows for pattern ${pattern.name}`);
+    console.log(`Scheduled ${events.length} rows for pattern ${pattern.name} at offset ${startOffset}`);
   }
 
   /**
@@ -614,21 +546,13 @@ export class PatternScheduler {
       console.warn('[PatternScheduler] Could not release notes:', e);
     }
 
-    if (this.currentPart) {
-      this.currentPart.stop();
-      this.currentPart.dispose();
-      this.currentPart = null;
-    }
-    if (this.nextPart) {
-      this.nextPart.stop();
-      this.nextPart.dispose();
-      this.nextPart = null;
-    }
-    if (this.tickPart) {
-      this.tickPart.stop();
-      this.tickPart.dispose();
-      this.tickPart = null;
-    }
+    this.partsPool.forEach(p => {
+      p.part.stop();
+      p.part.dispose();
+      p.tickPart.stop();
+      p.tickPart.dispose();
+    });
+    this.partsPool = [];
 
     // Disable Transport loop
     const transport = Tone.getTransport();
@@ -680,7 +604,6 @@ export class PatternScheduler {
    */
   public dispose(): void {
     this.clearSchedule();
-    this.pattern = null;
     this.onRowChange = null;
   }
 }

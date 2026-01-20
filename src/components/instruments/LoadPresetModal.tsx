@@ -23,9 +23,9 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   const categories = Object.keys(PRESET_CATEGORIES) as PresetCategory[];
 
   // Get icon for synth type
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  const getIcon = (iconName: string): LucideIcons.LucideIcon => {
+    const icons = LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>;
+    return icons[iconName] || LucideIcons.Music2;
   };
 
   // Filter presets

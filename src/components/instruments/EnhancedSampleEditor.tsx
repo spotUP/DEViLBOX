@@ -66,8 +66,10 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
   useEffect(() => {
     const sampleUrl = instrument?.parameters?.sampleUrl;
     if (!sampleUrl) {
-      setAudioBuffer(null);
-      setSampleInfo(null);
+      requestAnimationFrame(() => {
+        setAudioBuffer(null);
+        setSampleInfo(null);
+      });
       return;
     }
 
@@ -183,6 +185,9 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
     }
   }, [audioBuffer, zoom, scrollOffset, loopSettings, playbackPosition]);
 
+  const sampleUrl = instrument?.parameters?.sampleUrl;
+  const instrumentParams = instrument?.parameters;
+
   // Handle file drop/select
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('audio/')) {
@@ -197,7 +202,7 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
 
       updateInstrument(instrumentId, {
         parameters: {
-          ...instrument?.parameters,
+          ...instrumentParams,
           sampleUrl: url,
           sampleName: file.name,
         },
@@ -205,7 +210,7 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
     } catch (error) {
       console.error('Failed to load file:', error);
     }
-  }, [instrumentId, instrument?.parameters, updateInstrument]);
+  }, [instrumentId, instrumentParams, updateInstrument]);
 
   // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,7 +227,7 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
 
   // Playback controls
   const handlePlay = useCallback(async () => {
-    if (!instrument?.parameters?.sampleUrl) return;
+    if (!sampleUrl) return;
 
     await Tone.start();
 
@@ -230,11 +235,13 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
       playerRef.current.dispose();
     }
 
+    const duration = sampleInfo?.duration || 0;
+
     playerRef.current = new Tone.Player({
-      url: instrument.parameters.sampleUrl,
+      url: sampleUrl,
       loop: loopSettings.enabled,
-      loopStart: loopSettings.start * (sampleInfo?.duration || 0),
-      loopEnd: loopSettings.end * (sampleInfo?.duration || 0),
+      loopStart: loopSettings.start * duration,
+      loopEnd: loopSettings.end * duration,
       onload: () => {
         playerRef.current?.start();
         setIsPlaying(true);
@@ -244,7 +251,7 @@ export const EnhancedSampleEditor: React.FC<EnhancedSampleEditorProps> = ({
         setPlaybackPosition(0);
       },
     }).toDestination();
-  }, [instrument?.parameters?.sampleUrl, loopSettings, sampleInfo?.duration]);
+  }, [sampleUrl, loopSettings, sampleInfo?.duration]);
 
   const handleStop = useCallback(() => {
     if (playerRef.current) {

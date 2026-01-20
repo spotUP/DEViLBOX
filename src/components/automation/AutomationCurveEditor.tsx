@@ -44,7 +44,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
     lastRow: null,
     lastValue: null,
   });
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [historyIndex, setHistoryIndex] = useState(-1);
 
   const { getAutomation, setAutomation, addPoint, clearPoints } = useAutomationStore();

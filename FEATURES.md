@@ -70,14 +70,12 @@ Full project export including:
 ```json
 {
   "format": "scribbleton-song",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "metadata": {
-    "name": "My Song",
-    "author": "Artist Name",
-    "description": "...",
-    "createdAt": "...",
-    "modifiedAt": "...",
-    "version": "1.0.0"
+    "id": "da-funk",
+    "name": "Da Funk",
+    "author": "Daft Punk",
+    "version": "1.1.0"
   },
   "bpm": 135,
   "instruments": [...],
@@ -93,7 +91,7 @@ Single pattern with one instrument (for sound effects):
 ```json
 {
   "format": "scribbleton-sfx",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Explosion",
   "instrument": {...},
   "pattern": {...},
@@ -107,7 +105,7 @@ Individual instrument preset:
 ```json
 {
   "format": "scribbleton-instrument",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "instrument": {
     "id": 0,
     "name": "TB-303 Classic",

@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { DEFAULT_BPM, MIN_BPM, MAX_BPM } from '@typedefs/audio';
 import type { TransportState } from '@typedefs/audio';
 
 interface TransportStore extends TransportState {
@@ -41,9 +42,9 @@ interface TransportStore extends TransportState {
 }
 
 export const useTransportStore = create<TransportStore>()(
-  immer((set, _get) => ({
-    // Initial state (125 BPM = ProTracker/Amiga default)
-    bpm: 125,
+  immer((set) => ({
+    // Initial State
+    bpm: DEFAULT_BPM,
     timeSignature: [4, 4],
     swing: 0,
     position: '0:0:0',
@@ -61,7 +62,7 @@ export const useTransportStore = create<TransportStore>()(
     setBPM: (bpm) =>
       set((state) => {
         // Clamp BPM between MIN and MAX
-        state.bpm = Math.max(20, Math.min(999, bpm));
+        state.bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, bpm));
       }),
 
     setTimeSignature: (numerator, denominator) =>
@@ -176,7 +177,7 @@ export const useTransportStore = create<TransportStore>()(
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
-        state.bpm = 125;
+        state.bpm = DEFAULT_BPM;
         state.timeSignature = [4, 4];
         state.swing = 0;
         state.position = '0:0:0';

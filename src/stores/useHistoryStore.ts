@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { idGenerator } from '../utils/idGenerator';
 import type { Pattern } from '@typedefs';
 
 export type ActionType =
@@ -74,7 +75,7 @@ export const useHistoryStore = create<HistoryStore>()(
     pushAction: (type, description, patternIndex, beforeState, afterState) =>
       set((state) => {
         const action: HistoryAction = {
-          id: `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: idGenerator.generate('action'),
           type,
           timestamp: Date.now(),
           description,

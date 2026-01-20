@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-17T21:19:22.384Z
+ * Generated: 2026-01-20T00:09:49.187Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,18 +19,22 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '30';
-export const BUILD_HASH = '5eac3fd';
-export const BUILD_DATE = '2026-01-17';
+export const BUILD_VERSION = '1.190.0';
+export const BUILD_NUMBER = '31';
+export const BUILD_HASH = 'a9da8bc';
+export const BUILD_DATE = '2026-01-20';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.0',
+    version: '1.190.0',
     date: '2026-01-17',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix cursor positioning for dual effect columns in pattern editor'
+      },
       {
         type: 'feature',
         description: 'Add dual effect columns support (2x3 character effect commands per note)'
@@ -54,7 +58,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-1',
+    version: '1.190.0-1',
     date: '2026-01-16',
     changes: [
       {
@@ -156,7 +160,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-2',
+    version: '1.190.0-2',
     date: '2026-01-15',
     changes: [
       {

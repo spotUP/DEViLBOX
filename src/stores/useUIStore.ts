@@ -21,6 +21,7 @@ interface UIStore {
   oscilloscopeVisible: boolean;
   compactToolbar: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
+  showDownloadModal: boolean;
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -31,6 +32,7 @@ interface UIStore {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setUseHexNumbers: (useHex: boolean) => void;
+  setShowDownloadModal: (show: boolean) => void;
 
   // Responsive layout actions
   toggleTB303Collapsed: () => void;
@@ -44,8 +46,8 @@ interface UIStore {
 
 export const useUIStore = create<UIStore>()(
   persist(
-    immer((set, _get) => ({
-      // Initial state
+    immer((set) => ({
+      // Initial State
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
       activePanel: 'tracker',
@@ -58,6 +60,7 @@ export const useUIStore = create<UIStore>()(
       oscilloscopeVisible: true,
       compactToolbar: false,
       autoCompactApplied: false,
+      showDownloadModal: false,
 
       // Actions
       togglePanel: (panel) =>
@@ -107,6 +110,11 @@ export const useUIStore = create<UIStore>()(
       setUseHexNumbers: (useHex) =>
         set((state) => {
           state.useHexNumbers = useHex;
+        }),
+
+      setShowDownloadModal: (show) =>
+        set((state) => {
+          state.showDownloadModal = show;
         }),
 
       // Responsive layout actions

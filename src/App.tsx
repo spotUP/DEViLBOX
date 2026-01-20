@@ -9,40 +9,50 @@ import { InstrumentModal } from '@components/instruments/InstrumentModal';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { HelpModal } from '@components/help/HelpModal';
 import { ExportDialog } from '@lib/export/ExportDialog';
-import { PatternManagement } from '@components/pattern/PatternManagement';
 import { MasterEffectsModal, EffectParameterEditor } from '@components/effects';
 import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
-import { WhatsNewModal, useWhatsNew } from '@components/dialogs/WhatsNewModal';
+import WhatsNewModal from '@components/dialogs/WhatsNewModal';
+import { useWhatsNew } from '@hooks/ui/useWhatsNew';
+import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
+import { useElectronMenu } from './hooks/useElectronMenu';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
-import { ChevronDown, ChevronUp, Zap, Music, Sliders, Download, List } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 
 function App() {
   const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore();
   const [initError, setInitError] = useState<string | null>(null);
-  const [showWelcome, setShowWelcome] = useState(true);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [showPatterns, setShowPatterns] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
+  const [showImportModule, setShowImportModule] = useState(false);
   const automationPanelRef = useRef<HTMLDivElement>(null);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
-  const { applyAutoCompact } = useUIStore();
+  const { applyAutoCompact, showDownloadModal, setShowDownloadModal } = useUIStore();
   const { showModal: showWhatsNew, closeModal: closeWhatsNew } = useWhatsNew();
 
   // Register MIDI button mappings for transport/navigation control
   useButtonMappings();
+
+  // Handle native OS menu actions in Electron
+  useElectronMenu({
+    onShowExport: () => setShowExport(true),
+    onShowHelp: () => setShowHelp(true),
+    onShowMasterFX: () => setShowMasterFX(!showMasterFX),
+    onShowInstruments: () => setShowInstrumentModal(true),
+    onImport: () => setShowImportModule(true),
+  });
 
   const { updateMasterEffect } = useAudioStore();
 
@@ -50,6 +60,41 @@ function App() {
   useEffect(() => {
     applyAutoCompact();
   }, [applyAutoCompact]);
+
+  // Handler to start audio context on user interaction
+  const handleStartAudio = useCallback(async () => {
+    if (contextState === 'running') return;
+    try {
+      const engine = getToneEngine();
+      await engine.init();
+      setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
+      
+      // Update visualizer nodes now that they are created
+      if (engine.analyser) setAnalyserNode(engine.analyser);
+      if (engine.fft) setFFTNode(engine.fft);
+      
+      console.log('Audio engine started on user interaction');
+    } catch (error) {
+      console.error('Failed to start audio context:', error);
+    }
+  }, [contextState, setContextState]);
+
+  // Auto-start audio on first click anywhere in the app
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      handleStartAudio();
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, [handleStartAudio]);
 
   // Close automation panel when clicking outside
   useEffect(() => {
@@ -80,8 +125,10 @@ function App() {
 
         // Store engine instance in store
         setToneEngineInstance(engine);
-        setAnalyserNode(engine.analyser);
-        setFFTNode(engine.fft);
+        
+        // Nodes are created on demand, but we should update store if they exist
+        if (engine.analyser) setAnalyserNode(engine.analyser);
+        if (engine.fft) setFFTNode(engine.fft);
 
         // Set initial context state
         setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
@@ -95,7 +142,7 @@ function App() {
     };
 
     initAudio();
-  }, []);
+  }, [setToneEngineInstance, setAnalyserNode, setFFTNode, setContextState, setInitialized]);
 
   // Get undo/redo functions from history store
   const { undo, redo, canUndo, canRedo } = useHistoryStore();
@@ -154,7 +201,6 @@ function App() {
         e.preventDefault();
         if (showHelp) setShowHelp(false);
         else if (showExport) setShowExport(false);
-        else if (showPatterns) setShowPatterns(false);
         return;
       }
 
@@ -169,13 +215,6 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'E') {
         e.preventDefault();
         setShowExport(true);
-        return;
-      }
-
-      // Ctrl+Shift+P: Patterns (changed to avoid conflict with browser commands)
-      if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        setShowPatterns(!showPatterns);
         return;
       }
 
@@ -227,7 +266,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, handleUndo, handleRedo, saveProject]);
+  }, [showHelp, showExport, showInstrumentModal, showMasterFX, handleUndo, handleRedo, saveProject]);
 
   const handleUpdateEffectParameter = (key: string, value: number) => {
     if (!editingEffect) return;
@@ -246,19 +285,6 @@ function App() {
       ...editingEffect,
       effect: { ...editingEffect.effect, wet }
     });
-  };
-
-  // Handler to start audio context on user interaction
-  const handleStartAudio = async () => {
-    try {
-      const engine = getToneEngine();
-      await engine.init();
-      setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
-      setShowWelcome(false); // Show tracker after audio starts
-    } catch (error) {
-      console.error('Failed to start audio context:', error);
-      setInitError(error instanceof Error ? error.message : 'Unknown error');
-    }
   };
 
   if (initError) {
@@ -288,96 +314,6 @@ function App() {
     );
   }
 
-  // Show welcome screen if audio context hasn't been started
-  if (showWelcome && contextState !== 'running') {
-    return (
-      <AppLayout>
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <div className="text-center max-w-2xl">
-            {/* Logo */}
-            <div className="mb-8">
-              <h1 className="text-5xl font-bold text-text-primary mb-2 tracking-tight">
-                DEViLBOX
-              </h1>
-              <p className="text-lg text-text-secondary">
-                TB-303 Acid Tracker with Devil Fish Mod
-              </p>
-            </div>
-
-            {/* Start Button */}
-            <button
-              onClick={handleStartAudio}
-              className="group relative px-8 py-4 bg-accent-primary text-text-inverse font-semibold text-lg rounded-lg
-                         hover:bg-emerald-400 transition-all duration-200 shadow-glow hover:shadow-glow
-                         animate-pulse-glow"
-            >
-              <span className="flex items-center gap-2">
-                <Zap size={20} />
-                Start Audio Engine
-              </span>
-            </button>
-
-            {/* Features Grid */}
-            <div className="mt-12 grid grid-cols-2 gap-4 text-left">
-              <div className="card p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-md bg-accent-primary/20 text-accent-primary">
-                    <Music size={18} />
-                  </div>
-                  <h3 className="font-semibold text-text-primary">22 Synth Engines</h3>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  Including authentic TB-303 with accent and slide
-                </p>
-              </div>
-
-              <div className="card p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-md bg-accent-secondary/20 text-accent-secondary">
-                    <List size={18} />
-                  </div>
-                  <h3 className="font-semibold text-text-primary">Pattern Editor</h3>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  4-16 channels with FT2-style keyboard layout
-                </p>
-              </div>
-
-              <div className="card p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-md bg-accent-warning/20 text-accent-warning">
-                    <Sliders size={18} />
-                  </div>
-                  <h3 className="font-semibold text-text-primary">Automation</h3>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  Real-time parameter curves for filter sweeps
-                </p>
-              </div>
-
-              <div className="card p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-md bg-accent-success/20 text-accent-success">
-                    <Download size={18} />
-                  </div>
-                  <h3 className="font-semibold text-text-primary">36+ Presets</h3>
-                </div>
-                <p className="text-sm text-text-secondary">
-                  Factory sounds for instant acid basslines
-                </p>
-              </div>
-            </div>
-
-            {/* Keyboard hint */}
-            <p className="mt-8 text-sm text-text-muted">
-              Press <kbd className="px-2 py-0.5 rounded bg-dark-bgTertiary border border-dark-border text-text-secondary">?</kbd> anytime for help
-            </p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
   // Show main tracker interface
   return (
     <AppLayout>
@@ -386,22 +322,16 @@ function App() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Left side - Pattern Editor (expands when instrument panel is hidden) */}
           <div className="flex flex-col min-h-0 flex-1">
-            {/* Pattern Management (optional) */}
-            {showPatterns && (
-              <div className="h-48 border-b border-dark-border animate-fade-in">
-                <PatternManagement />
-              </div>
-            )}
             {/* Pattern Editor */}
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <TrackerView
-                onShowPatterns={() => setShowPatterns(!showPatterns)}
                 onShowExport={() => setShowExport(true)}
                 onShowHelp={() => setShowHelp(true)}
                 onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
                 onShowInstruments={() => setShowInstrumentModal(true)}
-                showPatterns={showPatterns}
+                onShowImportModule={() => setShowImportModule(!showImportModule)}
                 showMasterFX={showMasterFX}
+                showImportModule={showImportModule}
               />
             </div>
           </div>
@@ -446,6 +376,7 @@ function App() {
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
       {showWhatsNew && <WhatsNewModal onClose={closeWhatsNew} />}
+      <DownloadModal isOpen={showDownloadModal} onClose={() => setShowDownloadModal(false)} />
 
       {/* Effect Parameter Editor Modal */}
       {editingEffect && (

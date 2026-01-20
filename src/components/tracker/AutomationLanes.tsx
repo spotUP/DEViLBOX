@@ -12,7 +12,8 @@ interface AutomationLanesProps {
   patternLength: number;
   rowHeight: number;
   channelCount: number;
-  channelWidth: number;
+  channelWidths?: number[];
+  channelOffsets?: number[];
   rowNumWidth: number;
   scrollOffset: number;
   parameter?: string;
@@ -80,9 +81,10 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternLength,
   rowHeight,
   channelCount,
-  channelWidth,
+  channelWidths = [],
+  channelOffsets = [],
   rowNumWidth,
-  scrollOffset: _scrollOffset,
+  scrollOffset: _scrollOffset, // eslint-disable-line @typescript-eslint/no-unused-vars
   parameter = 'cutoff',
   prevPatternId,
   prevPatternLength,
@@ -144,12 +146,6 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const prevLen = prevPatternLength || patternLength;
   const nextLen = nextPatternLength || patternLength;
 
-  // Calculate full virtual range (prev + current + next patterns)
-  const prevHeight = prevLen * rowHeight;
-  const currentHeight = patternLength * rowHeight;
-  const nextHeight = nextLen * rowHeight;
-  const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
-
   // Check if any channel has automation data (including adjacent patterns)
   const hasAnyData = curves.some(c => c !== null) ||
                      prevCurves.some(c => c !== null) ||
@@ -171,7 +167,13 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       if (!curve) return null;
 
       // Position this lane at the right edge of the channel
-      const laneLeft = channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
+      const channelWidth = channelWidths[channelIndex] || 120;
+      const channelOffset = (channelOffsets[channelIndex] || (rowNumWidth + channelIndex * 120)) - rowNumWidth;
+
+      // Don't render lane if channel is too narrow (collapsed)
+      if (channelWidth < 50) return null;
+
+      const laneLeft = channelOffset + channelWidth - LANE_WIDTH - 4;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
 
@@ -248,18 +250,16 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   // Previous pattern: virtualIndex from -prevLen to -1
   // Current pattern: virtualIndex from 0 to patternLength-1
   // Next pattern: virtualIndex from patternLength to patternLength+nextLen-1
-  const prevStartRow = -prevLen;
-  // currentStartRow = 0 and nextStartRow = patternLength (implicit)
 
   return (
     <div
       className="automation-lanes pointer-events-none"
       style={{
         position: 'absolute',
-        top: prevStartRow * rowHeight, // Start at negative position for prev pattern
+        top: 0,
         left: rowNumWidth,
         right: 0,
-        height: totalVirtualHeight,
+        height: '100%',
         zIndex: 5,
       }}
     >
@@ -267,19 +267,19 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       {prevCurves.length > 0 && renderPatternCurves(
         prevCurves,
         prevLen,
-        0, // Relative to this container's top (which is already offset)
+        -prevLen,
         0.35,
         'prev'
       )}
 
       {/* Current pattern curves */}
-      {renderPatternCurves(curves, patternLength, prevLen, 1, 'current')}
+      {renderPatternCurves(curves, patternLength, 0, 1, 'current')}
 
       {/* Next pattern curves (ghost, below) */}
       {nextCurves.length > 0 && renderPatternCurves(
         nextCurves,
         nextLen,
-        prevLen + patternLength,
+        patternLength,
         0.35,
         'next'
       )}

@@ -48,7 +48,9 @@ export function useBreakpoint(): BreakpointState {
     if (typeof window === 'undefined') return;
 
     // Update width immediately
-    setWidth(window.innerWidth);
+    requestAnimationFrame(() => {
+      setWidth(window.innerWidth);
+    });
 
     // Debounced resize handler for performance
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -100,7 +102,9 @@ export function useMediaQuery(query: string): boolean {
     if (typeof window === 'undefined') return;
 
     const mediaQuery = window.matchMedia(query);
-    setMatches(mediaQuery.matches);
+    requestAnimationFrame(() => {
+      setMatches(mediaQuery.matches);
+    });
 
     const handler = (event: MediaQueryListEvent) => {
       setMatches(event.matches);
@@ -141,10 +145,12 @@ export function useIsTouchDevice(): boolean {
   const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
-    setIsTouch(
-      'ontouchstart' in window ||
-      navigator.maxTouchPoints > 0
-    );
+    requestAnimationFrame(() => {
+      setIsTouch(
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0
+      );
+    });
   }, []);
 
   return isTouch;

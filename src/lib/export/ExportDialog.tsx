@@ -82,7 +82,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         case 'song': {
           const sequence = patterns.map((p) => p.id);
           // Convert automation curves to export format (nested structure for legacy compat)
-          const automationData: Record<string, any> = {};
+          const automationData: Record<string, Record<number, Record<string, AutomationCurve>>> = {};
           patterns.forEach((pattern) => {
             pattern.channels.forEach((_channel, channelIndex) => {
               const channelCurves = curves.filter(
@@ -97,7 +97,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     acc[curve.parameter] = curve;
                     return acc;
                   },
-                  {} as Record<string, any>
+                  {} as Record<string, AutomationCurve>
                 );
               }
             });
@@ -263,8 +263,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             } else if (data.automation) {
               // Legacy nested format - extract curves from automation data structure
               const allCurves: AutomationCurve[] = [];
-              Object.entries(data.automation).forEach(([_patternId, channels]) => {
-                Object.entries(channels as Record<number, Record<string, AutomationCurve>>).forEach(([_channelIndex, params]) => {
+              Object.entries(data.automation).forEach(([, channels]) => {
+                Object.entries(channels as Record<number, Record<string, AutomationCurve>>).forEach(([, params]) => {
                   Object.values(params).forEach((curve) => {
                     allCurves.push(curve);
                   });

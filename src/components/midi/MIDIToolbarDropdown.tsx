@@ -25,6 +25,7 @@ const PARAMETER_LABELS: Record<TB303Parameter, string> = {
   accent: 'Accent',
   overdrive: 'Overdrive',
   slideTime: 'Slide Time',
+  tuning: 'Tuning',
 };
 
 export const MIDIToolbarDropdown: React.FC = () => {
@@ -60,8 +61,14 @@ export const MIDIToolbarDropdown: React.FC = () => {
   // Initialize MIDI on mount (when isSupported is null, we haven't checked yet)
   useEffect(() => {
     if (!isInitialized && isSupported === null) {
-      setIsInitializing(true);
-      init().finally(() => setIsInitializing(false));
+      requestAnimationFrame(() => {
+        setIsInitializing(true);
+      });
+      init().finally(() => {
+        requestAnimationFrame(() => {
+          setIsInitializing(false);
+        });
+      });
     }
   }, [isInitialized, isSupported, init]);
 
@@ -84,8 +91,14 @@ export const MIDIToolbarDropdown: React.FC = () => {
   const [showActivity, setShowActivity] = useState(false);
   useEffect(() => {
     if (lastActivityTimestamp > 0) {
-      setShowActivity(true);
-      const timer = setTimeout(() => setShowActivity(false), 100);
+      requestAnimationFrame(() => {
+        setShowActivity(true);
+      });
+      const timer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          setShowActivity(false);
+        });
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [lastActivityTimestamp]);
@@ -120,7 +133,9 @@ export const MIDIToolbarDropdown: React.FC = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setProfiles(JSON.parse(stored));
+        requestAnimationFrame(() => {
+          setProfiles(JSON.parse(stored));
+        });
       }
     } catch {
       // Ignore parse errors

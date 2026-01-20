@@ -9,7 +9,7 @@ import { usePresetStore } from '@stores/usePresetStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Settings2, ChevronLeft, ChevronRight, Sparkles, Save } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { SynthIcon } from './SynthIcon';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 interface QuickViewProps {
@@ -29,6 +29,7 @@ interface QuickParam {
   format: (val: number) => string;
   min: number;
   max: number;
+  update?: (inst: InstrumentConfig, val: number) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 // TB303 quick parameters
@@ -142,12 +143,6 @@ export const QuickView: React.FC<QuickViewProps> = ({
     ? TB303_PRESETS.slice(0, 10) // Factory presets
     : [];
 
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
-
   // Scroll carousel
   const scrollCarousel = (direction: 'left' | 'right') => {
     const itemWidth = 100; // Approximate preset item width
@@ -188,8 +183,6 @@ export const QuickView: React.FC<QuickViewProps> = ({
     );
   }
 
-  const IconComponent = getIcon(synthInfo.icon);
-
   return (
     <div className="p-4 space-y-4">
       {/* Current Sound Card */}
@@ -197,7 +190,7 @@ export const QuickView: React.FC<QuickViewProps> = ({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-lg bg-dark-bgTertiary ${synthInfo.color}`}>
-              <IconComponent size={24} />
+              <SynthIcon iconName={synthInfo.icon} size={24} />
             </div>
             <div>
               <h3 className="font-semibold text-text-primary">{currentInstrument.name}</h3>
@@ -333,7 +326,7 @@ export const QuickView: React.FC<QuickViewProps> = ({
                 <button
                   key={preset.id}
                   onClick={() => {
-                    handleLoadPreset(preset.config as any);
+                    handleLoadPreset(preset.config as unknown as Omit<InstrumentConfig, 'id'>);
                     addToRecent(preset.id);
                   }}
                   className="px-3 py-1.5 rounded bg-dark-bgSecondary border border-dark-border text-sm text-text-secondary hover:border-accent-primary hover:text-text-primary transition-colors"

@@ -4,4 +4,5 @@
 
 export { MIDIDeviceSelector } from './MIDIDeviceSelector';
 export { MIDIToolbarDropdown } from './MIDIToolbarDropdown';
-export { MIDILearnButton, useMIDILearnValue } from './MIDILearnButton';
+export { MIDILearnButton } from './MIDILearnButton';
+export { useMIDILearnValue } from '../../hooks/midi/useMIDILearnValue';

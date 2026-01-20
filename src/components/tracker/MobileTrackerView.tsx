@@ -13,22 +13,18 @@ import { Play, Square } from 'lucide-react';
 import { useTransportStore, useTrackerStore } from '@stores';
 
 interface MobileTrackerViewProps {
-  onShowPatterns?: () => void;
   onShowExport?: () => void;
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
   onShowInstruments?: () => void;
-  showPatterns?: boolean;
   showMasterFX?: boolean;
 }
 
 export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
-  onShowPatterns,
   onShowExport,
   onShowHelp,
   onShowMasterFX,
   onShowInstruments,
-  showPatterns,
   showMasterFX,
 }) => {
   const [activeTab, setActiveTab] = useState<MobileTab>('pattern');
@@ -89,12 +85,10 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
             {/* Simplified Toolbar */}
             <div className="p-2">
               <FT2Toolbar
-                onShowPatterns={onShowPatterns}
                 onShowExport={onShowExport}
                 onShowHelp={onShowHelp}
                 onShowMasterFX={onShowMasterFX}
                 onShowInstruments={onShowInstruments}
-                showPatterns={showPatterns}
                 showMasterFX={showMasterFX}
               />
             </div>

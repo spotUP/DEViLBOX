@@ -1,6 +1,6 @@
 {
   "format": "devilbox-song",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "metadata": {
     "id": "josh-wink-higher-state",
     "name": "Higher State of Consciousness - Josh Wink",
@@ -8,7 +8,7 @@
     "description": "Iconic 1995 acid techno track with Devil Fish mod. G & B notes layered at different octaves. BPM 134, square wave. Fast accent sweep, filter tracking, and high resonance for that screaming acid sound.",
     "createdAt": "2026-01-14T00:00:00.000Z",
     "modifiedAt": "2026-01-14T00:00:00.000Z",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "bpm": 130,
   "instruments": [

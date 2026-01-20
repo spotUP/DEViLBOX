@@ -62,7 +62,7 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
     });
   };
 
-  const updateDevilFish = (key: string, value: any) => {
+  const updateDevilFish = (key: string, value: unknown) => {
     const currentDF = config.devilFish || {
       enabled: false,
       normalDecay: 200,
@@ -78,7 +78,7 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
       muffler: 'off' as const,
     };
     onChange({
-      devilFish: { ...currentDF, [key]: value },
+      devilFish: { ...currentDF, [key]: value } as any,
     });
   };
 
@@ -177,6 +177,18 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
         {/* Main Knobs Row */}
         <div className={`rounded-2xl p-6 shadow-inner border mb-6 ${panelBg}`}>
           <div className="flex justify-around items-end">
+            <div className="flex flex-col items-center">
+              <Knob
+                value={config.tuning ?? 0}
+                min={-1200}
+                max={1200}
+                onChange={(v) => onChange({ tuning: v })}
+                label="Tuning"
+                size="lg"
+                color={knobColor}
+                formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}`}
+              />
+            </div>
             <div className="flex flex-col items-center">
               <Knob
                 value={config.filter.cutoff}

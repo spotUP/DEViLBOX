@@ -45,7 +45,9 @@ export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
     useEffect(() => {
       if (isActive && level > 0) {
         const newLevel = Math.min(1, level);
-        setDisplayLevel((prev) => Math.max(prev, newLevel));
+        requestAnimationFrame(() => {
+          setDisplayLevel((prev) => Math.max(prev, newLevel));
+        });
       }
     }, [level, isActive]);
 

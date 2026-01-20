@@ -31,10 +31,13 @@ export const TB303Editor: React.FC<TB303EditorProps> = ({
   };
 
   const handleTuningChange = (cents: number) => {
+    onChange({ tuning: cents });
     if (onTuningChange) {
       onTuningChange(cents);
     }
   };
+
+  const currentTuning = config.tuning ?? tuning;
 
   const handleFilterChange = (field: 'cutoff' | 'resonance', value: number) => {
     onChange({
@@ -133,8 +136,8 @@ export const TB303Editor: React.FC<TB303EditorProps> = ({
           <div className="flex justify-between text-xs">
             <span className="text-text-muted">Pitch Offset</span>
             <span className="text-accent-primary">
-              {tuning > 0 ? '+' : ''}{tuning} cents
-              {Math.abs(tuning) >= 100 && ` (${(tuning / 100).toFixed(1)} semitones)`}
+              {currentTuning > 0 ? '+' : ''}{currentTuning} cents
+              {Math.abs(currentTuning) >= 100 && ` (${(currentTuning / 100).toFixed(1)} semitones)`}
             </span>
           </div>
           <input
@@ -142,7 +145,7 @@ export const TB303Editor: React.FC<TB303EditorProps> = ({
             min="-1200"
             max="1200"
             step="1"
-            value={tuning}
+            value={currentTuning}
             onChange={(e) => handleTuningChange(parseFloat(e.target.value))}
             className="w-full"
           />

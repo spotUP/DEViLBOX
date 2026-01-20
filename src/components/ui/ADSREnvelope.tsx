@@ -3,7 +3,7 @@
  * Drag control points to adjust attack, decay, sustain, release
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
 interface ADSREnvelopeProps {
   attack: number; // ms
@@ -49,7 +49,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   }, []);
 
   // Padding and dimensions
-  const padding = { top: 10, right: 10, bottom: 25, left: 10 };
+  const padding = useMemo(() => ({ top: 10, right: 10, bottom: 25, left: 10 }), []);
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
@@ -60,12 +60,21 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   const timeProportion = 1 - sustainProportion; // Remaining 85% for A, D, R
 
   // Calculate widths for each stage
-  const attackWidth = totalTime > 0 ? (attack / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
-  const decayWidth = totalTime > 0 ? (decay / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
-  const sustainWidth = graphWidth * sustainProportion;
-  const releaseWidth = totalTime > 0 ? (release / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
+  const attackWidth = useMemo(() => 
+    totalTime > 0 ? (attack / totalTime) * graphWidth * timeProportion : graphWidth * 0.25,
+    [totalTime, attack, graphWidth, timeProportion]
+  );
+  const decayWidth = useMemo(() => 
+    totalTime > 0 ? (decay / totalTime) * graphWidth * timeProportion : graphWidth * 0.25,
+    [totalTime, decay, graphWidth, timeProportion]
+  );
+  const sustainWidth = useMemo(() => graphWidth * sustainProportion, [graphWidth]);
+  const releaseWidth = useMemo(() => 
+    totalTime > 0 ? (release / totalTime) * graphWidth * timeProportion : graphWidth * 0.25,
+    [totalTime, release, graphWidth, timeProportion]
+  );
 
-  const levelToY = (level: number) => graphHeight - (level / 100) * graphHeight;
+  const levelToY = useCallback((level: number) => graphHeight - (level / 100) * graphHeight, [graphHeight]);
 
   // Control points - always fill the full width
   const attackX = padding.left + attackWidth;
@@ -151,7 +160,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         break;
       }
     }
-  }, [dragging, attack, decay, onChange, graphWidth, graphHeight, attackWidth, decayWidth, sustainWidth, timeProportion]);
+  }, [dragging, onChange, graphWidth, graphHeight, attackWidth, decayWidth, sustainWidth, timeProportion, padding.left, padding.top]);
 
   // Handle drag end
   const handleMouseUp = useCallback(() => {
@@ -173,13 +182,8 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   // Format time for display
   const formatTime = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 
-  // Control point component
-  const ControlPoint: React.FC<{
-    x: number;
-    y: number;
-    id: typeof dragging;
-    label: string;
-  }> = ({ x, y, id, label }) => (
+  // Control point renderer
+  const renderControlPoint = (x: number, y: number, id: typeof dragging, label: string) => (
     <g
       onMouseDown={handleMouseDown(id)}
       onMouseEnter={() => setHovered(id)}
@@ -275,10 +279,10 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         </g>
 
         {/* Control points */}
-        <ControlPoint x={attackX} y={attackY} id="attack" label={formatTime(attack)} />
-        <ControlPoint x={decayX} y={decayY} id="decay" label={formatTime(decay)} />
-        <ControlPoint x={sustainEndX} y={sustainY} id="sustain" label={`${sustain}%`} />
-        <ControlPoint x={releaseX} y={releaseY} id="release" label={formatTime(release)} />
+        {renderControlPoint(attackX, attackY, 'attack', formatTime(attack))}
+        {renderControlPoint(decayX, decayY, 'decay', formatTime(decay))}
+        {renderControlPoint(sustainEndX, sustainY, 'sustain', `${sustain}%`)}
+        {renderControlPoint(releaseX, releaseY, 'release', formatTime(release))}
       </svg>
 
       {/* Values display */}
