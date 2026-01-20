@@ -3,23 +3,26 @@
  * Single view with synth selection, parameters preview, and name input
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, Check, X } from 'lucide-react';
+import { useInstrumentStore } from '@stores';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
-import { VisualTB303Editor } from './VisualTB303Editor';
-import { VisualSynthEditor } from './VisualSynthEditor';
-import { TestKeyboard } from './TestKeyboard';
-import * as LucideIcons from 'lucide-react';
-import { X, Check, Search } from 'lucide-react';
-import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
-import {
+import type { 
+  InstrumentConfig, 
+  SynthType 
+} from '@typedefs/instrument';
+import { 
+  DEFAULT_TB303,
   DEFAULT_OSCILLATOR,
   DEFAULT_ENVELOPE,
   DEFAULT_FILTER,
-  DEFAULT_TB303,
-  DEFAULT_DRUM_MACHINE,
+  DEFAULT_DRUM_MACHINE 
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
+import { VisualTB303Editor } from './VisualTB303Editor';
+import { VisualSynthEditor } from './VisualSynthEditor';
+import { TestKeyboard } from './TestKeyboard';
+import { SynthIcon } from './SynthIcon';
 
 interface CreateInstrumentModalProps {
   onClose: () => void;
@@ -32,6 +35,14 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
   const [synthSearch, setSynthSearch] = useState('');
   const [instrumentName, setInstrumentName] = useState('303 Classic');
 
+  // Filtered synths based on search
+  const filteredSynths = useMemo(() => {
+    return ALL_SYNTH_TYPES.filter(type => 
+      SYNTH_INFO[type].name.toLowerCase().includes(synthSearch.toLowerCase()) ||
+      SYNTH_INFO[type].description.toLowerCase().includes(synthSearch.toLowerCase())
+    );
+  }, [synthSearch]);
+
   // Create a temporary instrument config for editing
   const [tempInstrument, setTempInstrument] = useState<InstrumentConfig>(() => createTempInstrument('TB303'));
 
@@ -40,25 +51,6 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
     setPreviewInstrument(tempInstrument);
     return () => setPreviewInstrument(null);
   }, [tempInstrument, setPreviewInstrument]);
-
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
-
-  // Filter synths based on search
-  const filteredSynths = ALL_SYNTH_TYPES.filter((synthType) => {
-    if (!synthSearch.trim()) return true;
-    const synth = SYNTH_INFO[synthType];
-    const query = synthSearch.toLowerCase();
-    return (
-      synth.name.toLowerCase().includes(query) ||
-      synth.shortName.toLowerCase().includes(query) ||
-      synth.description.toLowerCase().includes(query) ||
-      synth.bestFor.some((tag) => tag.toLowerCase().includes(query))
-    );
-  });
 
   // Handle synth type selection
   const handleSelectSynth = (synthType: SynthType) => {
@@ -71,10 +63,7 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
   };
 
   // Handle saving the instrument
-  const handleSave = () => {
-    // Clear preview instrument before closing
-    setPreviewInstrument(null);
-
+  const handleSave = useCallback(() => {
     // Create the actual instrument
     const newId = createInstrument();
 
@@ -85,30 +74,28 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
     });
 
     onClose();
-  };
+  }, [instrumentName, tempInstrument, createInstrument, updateInstrument, onClose]);
 
   // Handle close without saving
-  const handleClose = () => {
-    setPreviewInstrument(null);
+  const handleClose = useCallback(() => {
     onClose();
-  };
+  }, [onClose]);
 
   // Update temp instrument
   const handleUpdateInstrument = useCallback((updates: Partial<InstrumentConfig>) => {
     setTempInstrument((prev) => ({ ...prev, ...updates }));
-  }, []);
+  }, [setTempInstrument]);
 
   // Handle TB303 changes
   const handleTB303Change = useCallback((config: Partial<typeof tempInstrument.tb303>) => {
     if (!tempInstrument.tb303) return;
     setTempInstrument((prev) => ({
       ...prev,
-      tb303: { ...prev.tb303!, ...config },
+      tb303: prev.tb303 ? { ...prev.tb303, ...config } : undefined,
     }));
-  }, [tempInstrument.tb303]);
+  }, [tempInstrument]);
 
   const synthInfo = getSynthInfo(selectedSynthType);
-  const IconComponent = getIcon(synthInfo.icon);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
@@ -117,7 +104,7 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
         <div className="flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
           <div className="flex items-center gap-3">
             <div className={`p-1.5 rounded ${synthInfo.color} bg-dark-bgTertiary`}>
-              <IconComponent size={18} />
+              <SynthIcon iconName={synthInfo.icon} size={18} />
             </div>
             <div className="flex items-center gap-3">
               <h2 className="text-text-primary font-bold text-sm">CREATE INSTRUMENT</h2>
@@ -170,7 +157,6 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
             <div className="flex-1 overflow-y-auto scrollbar-modern">
               {filteredSynths.map((synthType) => {
                 const synth = SYNTH_INFO[synthType];
-                const SynthIcon = getIcon(synth.icon);
                 const isSelected = selectedSynthType === synthType;
 
                 return (
@@ -185,7 +171,11 @@ export const CreateInstrumentModal: React.FC<CreateInstrumentModalProps> = ({ on
                       }
                     `}
                   >
-                    <SynthIcon size={14} className={isSelected ? 'text-dark-bg' : synth.color} />
+                    <SynthIcon 
+                      iconName={synth.icon} 
+                      size={14} 
+                      className={isSelected ? 'text-dark-bg' : synth.color} 
+                    />
                     <div className="flex-1 min-w-0">
                       <div className={`font-bold text-xs truncate ${isSelected ? 'text-dark-bg' : 'text-text-primary'}`}>
                         {synth.shortName}

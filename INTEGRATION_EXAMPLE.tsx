@@ -219,7 +219,6 @@ export const MinimalIntegration: React.FC = () => {
  */
 import {
   exportSong,
-  exportSFX,
   exportInstrument,
 } from '@lib/export/exporters';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';

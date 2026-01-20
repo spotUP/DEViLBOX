@@ -8,9 +8,9 @@ import { useInstrumentStore } from '../../stores';
 import { VisualTB303Editor } from './VisualTB303Editor';
 import { VisualSynthEditor } from './VisualSynthEditor';
 import { TestKeyboard } from './TestKeyboard';
+import { SynthIcon } from './SynthIcon';
 import { PRESET_CATEGORIES, BASS_PRESETS, type PresetCategory } from '@constants/factoryPresets';
-import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
-import * as LucideIcons from 'lucide-react';
+import { getSynthInfo, ALL_SYNTH_TYPES, SYNTH_INFO } from '@constants/synthCategories';
 import {
   Plus,
   Copy,
@@ -86,14 +86,6 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
   }
 
   const synthInfo = getSynthInfo(currentInstrument.synthType);
-
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
-
-  const IconComponent = getIcon(synthInfo.icon);
 
   // Filter presets
   const filteredPresets = PRESET_CATEGORIES[presetCategory].filter((preset) => {
@@ -311,7 +303,7 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
                     : 'bg-dark-bgTertiary text-text-primary border-dark-border hover:border-accent-primary'
                 }`}
               >
-                <IconComponent size={18} className={showSynthSelector ? '' : synthInfo.color} />
+                <SynthIcon iconName={synthInfo.icon} size={18} className={showSynthSelector ? '' : synthInfo.color} />
                 <span className="font-medium">{synthInfo.shortName}</span>
                 <ChevronRight size={14} className={showSynthSelector ? 'rotate-90' : ''} />
               </button>
@@ -339,7 +331,6 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
                     <div className="grid grid-cols-2 gap-1">
                       {filteredSynths.map((synthType) => {
                         const synth = SYNTH_INFO[synthType];
-                        const SynthIcon = getIcon(synth.icon);
                         const isActive = currentInstrument.synthType === synthType;
 
                         return (
@@ -352,7 +343,7 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
                                 : 'bg-dark-bg hover:bg-dark-bgHover border-transparent hover:border-accent-primary/50'
                             }`}
                           >
-                            <SynthIcon size={16} className={isActive ? 'text-accent-primary' : synth.color} />
+                            <SynthIcon iconName={synth.icon} size={16} className={isActive ? 'text-accent-primary' : synth.color} />
                             <div className="flex-1 min-w-0">
                               <div className={`font-medium text-sm truncate ${isActive ? 'text-accent-primary' : 'text-text-primary'}`}>
                                 {synth.shortName}
@@ -377,7 +368,7 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
         <div className="px-4 py-3 bg-dark-bg border-b border-dark-border">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-dark-bgSecondary ${synthInfo.color}`}>
-              <IconComponent size={24} />
+              <SynthIcon iconName={synthInfo.icon} size={24} />
             </div>
             <div className="flex-1">
               <div className="font-semibold text-text-primary">{synthInfo.name}</div>

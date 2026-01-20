@@ -2,7 +2,7 @@
  * WhatsNewModal - Shows recent changes on app startup
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { CHANGELOG, CURRENT_VERSION, type ChangelogEntry } from '@generated/changelog';
 
@@ -105,27 +105,5 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean }> = ({ 
     </div>
   );
 };
-
-/**
- * Hook to manage What's New modal visibility
- */
-export function useWhatsNew() {
-  const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    // Check if user has seen the current version
-    const seenVersion = localStorage.getItem(STORAGE_KEY);
-    if (seenVersion !== CURRENT_VERSION) {
-      // Show modal after a short delay so app has time to render
-      const timer = setTimeout(() => setShowModal(true), 500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const closeModal = () => setShowModal(false);
-  const openModal = () => setShowModal(true);
-
-  return { showModal, closeModal, openModal };
-}
 
 export default WhatsNewModal;

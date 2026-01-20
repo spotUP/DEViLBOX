@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import { idGenerator } from '../utils/idGenerator';
 
 interface AudioStore {
   // State
@@ -16,7 +17,7 @@ interface AudioStore {
   masterMuted: boolean;
   analyserNode: Tone.Analyser | null;
   fftNode: Tone.FFT | null;
-  toneEngineInstance: any | null; // Will be ToneEngine class instance
+  toneEngineInstance: any | null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // Master Effects Chain
   masterEffects: EffectConfig[];
@@ -29,7 +30,7 @@ interface AudioStore {
   toggleMasterMute: () => void;
   setAnalyserNode: (node: Tone.Analyser | null) => void;
   setFFTNode: (node: Tone.FFT | null) => void;
-  setToneEngineInstance: (instance: any) => void;
+  setToneEngineInstance: (instance: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // Master Effects Actions
   addMasterEffect: (effectType: EffectType) => void;
@@ -115,7 +116,7 @@ export const useAudioStore = create<AudioStore>()(
     addMasterEffect: (effectType) =>
       set((state) => {
         const newEffect: EffectConfig = {
-          id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: idGenerator.generate('effect'),
           type: effectType,
           enabled: true,
           wet: 50,
