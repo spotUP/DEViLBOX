@@ -17,6 +17,7 @@
  */
 
 import type { TB303Config, DevilFishConfig } from '@typedefs/instrument';
+import { GuitarMLEngine } from './GuitarMLEngine';
 
 export interface TB303AccurateConfig {
   // Basic parameters
@@ -34,6 +35,14 @@ export interface TB303AccurateConfig {
   normalAttack?: number;  // ms
   accentAttack?: number;  // ms
   slideTime?: number;     // ms
+
+  // Overdrive (GuitarML)
+  overdrive?: {
+    enabled?: boolean;
+    modelIndex?: number;
+    drive?: number;       // 0-100 (gain or condition)
+    dryWet?: number;      // 0-100 (mix)
+  };
 }
 
 export class TB303EngineAccurate {
@@ -41,6 +50,10 @@ export class TB303EngineAccurate {
   private workletNode: AudioWorkletNode | null = null;
   private isInitialized: boolean = false;
   private config: TB303AccurateConfig;
+
+  // Overdrive stage (GuitarML neural network)
+  private guitarML: GuitarMLEngine | null = null;
+  private overdriveEnabled: boolean = false;
 
   // Output connection point
   private outputGain: GainNode;
@@ -56,6 +69,9 @@ export class TB303EngineAccurate {
     // Create output gain
     this.outputGain = audioContext.createGain();
     this.outputGain.gain.value = 1.0;
+
+    // Create GuitarML overdrive
+    this.guitarML = new GuitarMLEngine(audioContext);
   }
 
   /**
@@ -99,15 +115,41 @@ export class TB303EngineAccurate {
         outputChannelCount: [1],
       });
 
-      // Connect to output
-      this.workletNode.connect(this.outputGain);
+      // Initialize GuitarML overdrive
+      if (this.guitarML) {
+        await this.guitarML.initialize();
+
+        // Load default model if specified
+        if (this.config.overdrive?.modelIndex !== undefined) {
+          await this.guitarML.loadModel(this.config.overdrive.modelIndex);
+        }
+
+        // Set overdrive parameters
+        if (this.config.overdrive?.drive !== undefined) {
+          this.guitarML.setGain((this.config.overdrive.drive - 50) * 0.36); // Map 0-100 to -18..+18 dB
+          this.guitarML.setCondition(this.config.overdrive.drive / 100);
+        }
+        if (this.config.overdrive?.dryWet !== undefined) {
+          this.guitarML.setDryWet(this.config.overdrive.dryWet / 100);
+        }
+        this.overdriveEnabled = this.config.overdrive?.enabled ?? false;
+        this.guitarML.setEnabled(this.overdriveEnabled);
+      }
+
+      // Connect audio chain: TB303 → GuitarML → Output
+      if (this.overdriveEnabled && this.guitarML) {
+        this.workletNode.connect(this.guitarML.getOutput());
+        this.guitarML.connect(this.outputGain);
+      } else {
+        this.workletNode.connect(this.outputGain);
+      }
 
       // Send initial parameters
       this.updateAllParameters();
 
       this.isInitialized = true;
 
-      console.log('[TB303EngineAccurate] Initialized with Open303 DSP engine');
+      console.log('[TB303EngineAccurate] Initialized with Open303 DSP engine + GuitarML overdrive');
     } catch (error) {
       console.error('[TB303EngineAccurate] Failed to initialize:', error);
       throw error;
@@ -245,12 +287,79 @@ export class TB303EngineAccurate {
   }
 
   /**
+   * Enable/disable overdrive
+   */
+  setOverdriveEnabled(enabled: boolean): void {
+    this.overdriveEnabled = enabled;
+
+    if (this.guitarML) {
+      this.guitarML.setEnabled(enabled);
+    }
+
+    // Reconnect audio chain
+    if (this.workletNode) {
+      this.workletNode.disconnect();
+
+      if (this.overdriveEnabled && this.guitarML) {
+        this.workletNode.connect(this.guitarML.getOutput());
+        if (!this.guitarML.getOutput().numberOfOutputs) {
+          this.guitarML.connect(this.outputGain);
+        }
+      } else {
+        this.workletNode.connect(this.outputGain);
+      }
+    }
+  }
+
+  /**
+   * Load overdrive model
+   */
+  async loadOverdriveModel(modelIndex: number): Promise<void> {
+    if (this.guitarML) {
+      await this.guitarML.loadModel(modelIndex);
+    }
+  }
+
+  /**
+   * Set overdrive drive amount
+   */
+  setOverdriveDrive(drive: number): void {
+    if (this.guitarML) {
+      // Map 0-100 to -18..+18 dB for gain
+      this.guitarML.setGain((drive - 50) * 0.36);
+      // Also set condition for conditioned models
+      this.guitarML.setCondition(drive / 100);
+    }
+  }
+
+  /**
+   * Set overdrive dry/wet mix
+   */
+  setOverdriveMix(mix: number): void {
+    if (this.guitarML) {
+      this.guitarML.setDryWet(mix / 100);
+    }
+  }
+
+  /**
+   * Get GuitarML engine (for direct access)
+   */
+  getGuitarML(): GuitarMLEngine | null {
+    return this.guitarML;
+  }
+
+  /**
    * Dispose and cleanup
    */
   dispose(): void {
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
+    }
+
+    if (this.guitarML) {
+      this.guitarML.dispose();
+      this.guitarML = null;
     }
 
     this.outputGain.disconnect();
