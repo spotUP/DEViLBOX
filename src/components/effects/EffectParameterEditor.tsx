@@ -1,11 +1,13 @@
 /**
  * EffectParameterEditor - Modal/panel for editing effect parameters
  * Works with both master effects and channel effects
+ * Supports dynamic neural parameters from GuitarML models
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { EffectConfig } from '../../types/instrument';
-import { X, Volume2 } from 'lucide-react';
+import { X, Volume2, AlertTriangle } from 'lucide-react';
+import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
 
 interface EffectParameter {
   name: string;
@@ -15,6 +17,7 @@ interface EffectParameter {
   step: number;
   unit: string;
   defaultValue: number;
+  implemented?: boolean; // For neural parameters
 }
 
 const EFFECT_PARAMETERS: Record<string, EffectParameter[]> = {
@@ -123,10 +126,33 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
   onUpdateWet,
   onClose,
 }) => {
-  const parameters = EFFECT_PARAMETERS[effect.type] || [];
+  // Get parameters - either from neural model or Tone.js effect schema
+  const parameters = useMemo((): EffectParameter[] => {
+    // Neural effects - get parameters dynamically from model
+    if (effect.category === 'neural' && effect.neuralModelIndex !== undefined) {
+      const mapper = new NeuralParameterMapper(effect.neuralModelIndex);
+      const neuralParams = mapper.getAvailableParameters();
+
+      return neuralParams.map(param => ({
+        name: param.name,
+        key: param.key,
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: param.unit || '%',
+        defaultValue: param.default,
+        implemented: param.implemented,
+      }));
+    }
+
+    // Tone.js effects - use static schema
+    return EFFECT_PARAMETERS[effect.type] || [];
+  }, [effect.category, effect.neuralModelIndex, effect.type]);
 
   const getParameterValue = (param: EffectParameter): number => {
-    return effect.parameters[param.key] ?? param.defaultValue;
+    const value = effect.parameters[param.key] ?? param.defaultValue;
+    // Handle case where value might be a string (e.g., filter type)
+    return typeof value === 'number' ? value : param.defaultValue;
   };
 
   const formatValue = (value: number, param: EffectParameter): string => {
@@ -167,11 +193,24 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
         ) : (
           parameters.map((param) => {
             const value = getParameterValue(param);
+            const isUnimplemented = param.implemented === false;
+
             return (
               <div key={param.key} className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-text-secondary">{param.name}</label>
-                  <span className="text-xs text-accent-primary font-mono">
+                  <label className={`text-xs font-medium ${
+                    isUnimplemented ? 'text-text-muted' : 'text-text-secondary'
+                  }`}>
+                    {param.name}
+                    {isUnimplemented && (
+                      <span className="ml-1 inline-flex items-center gap-0.5 text-yellow-500" title="Not yet implemented">
+                        <AlertTriangle size={10} />
+                      </span>
+                    )}
+                  </label>
+                  <span className={`text-xs font-mono ${
+                    isUnimplemented ? 'text-text-muted' : 'text-accent-primary'
+                  }`}>
                     {formatValue(value, param)}
                   </span>
                 </div>
@@ -182,19 +221,27 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
                   step={param.step}
                   value={value}
                   onChange={(e) => onUpdateParameter(param.key, Number(e.target.value))}
-                  className="w-full h-2 bg-dark-bgSecondary rounded-lg appearance-none cursor-pointer
+                  disabled={isUnimplemented}
+                  className={`w-full h-2 bg-dark-bgSecondary rounded-lg appearance-none cursor-pointer
                            border border-dark-border
+                           ${isUnimplemented ? 'opacity-50 cursor-not-allowed' : ''}
                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded [&::-webkit-slider-thumb]:bg-accent-primary
                            [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-dark-border
                            [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
                            [&::-moz-range-thumb]:rounded [&::-moz-range-thumb]:bg-accent-primary
-                           [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-dark-border"
+                           [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-dark-border`}
                 />
                 <div className="flex items-center justify-between text-[10px] text-text-muted font-mono">
                   <span>{formatValue(param.min, param)}</span>
                   <span>{formatValue(param.max, param)}</span>
                 </div>
+                {isUnimplemented && (
+                  <div className="text-[10px] text-yellow-500 flex items-center gap-1">
+                    <AlertTriangle size={10} />
+                    <span>Not yet implemented - will be added in future update</span>
+                  </div>
+                )}
               </div>
             );
           })

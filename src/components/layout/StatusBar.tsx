@@ -5,14 +5,23 @@
 import React from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore } from '@stores';
 
-export const StatusBar: React.FC = () => {
-  const { cursor, patterns, currentPatternIndex, currentOctave } = useTrackerStore();
-  const { bpm } = useTransportStore();
+export const StatusBar: React.FC = React.memo(() => {
+  // Optimize: Only subscribe to specific values, not entire patterns array
+  const cursor = useTrackerStore((state) => state.cursor);
+  const currentOctave = useTrackerStore((state) => state.currentOctave);
+  const patternOrderLength = useTrackerStore((state) => state.patternOrder.length);
+  const currentPositionIndex = useTrackerStore((state) => state.currentPositionIndex);
+  const patternLength = useTrackerStore((state) => state.patterns[state.currentPatternIndex]?.length || 64);
+  const patternName = useTrackerStore((state) => state.patterns[state.currentPatternIndex]?.name || 'Untitled');
+
+  const { bpm, position, isPlaying } = useTransportStore();
   const { contextState } = useAudioStore();
 
-  const pattern = patterns[currentPatternIndex];
-  const rowDisplay = `${String(cursor.rowIndex).padStart(2, '0')}/${String(pattern?.length || 64).padStart(2, '0')}`;
+  const rowDisplay = `${String(cursor.rowIndex).padStart(2, '0')}/${String(patternLength).padStart(2, '0')}`;
   const channelDisplay = `Ch ${cursor.channelIndex + 1}`;
+
+  // Format song position (current position in pattern order)
+  const songPositionDisplay = `${currentPositionIndex.toString(16).padStart(2, '0').toUpperCase()}/${patternOrderLength.toString(16).padStart(2, '0').toUpperCase()}`;
 
   return (
     <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
@@ -35,14 +44,28 @@ export const StatusBar: React.FC = () => {
         </span>
       </div>
 
-      {/* Center: Pattern Info */}
+      {/* Center: Song Info (Time, BPM, Pattern, Position) */}
       <div className="flex items-center gap-4">
+        {/* Playback Time */}
         <span className="text-text-secondary">
-          Pattern <span className="text-text-primary">{pattern?.name || 'Untitled'}</span>
+          <span className={`font-semibold ${isPlaying ? 'text-accent-primary' : 'text-text-muted'}`}>
+            {position}
+          </span>
         </span>
         <div className="w-px h-3 bg-dark-border"></div>
+        {/* BPM */}
         <span className="text-text-secondary">
           <span className="text-accent-primary">{bpm}</span> BPM
+        </span>
+        <div className="w-px h-3 bg-dark-border"></div>
+        {/* Pattern Name */}
+        <span className="text-text-secondary">
+          Pattern <span className="text-text-primary">{patternName}</span>
+        </span>
+        <div className="w-px h-3 bg-dark-border"></div>
+        {/* Song Position (Pattern Order Position) */}
+        <span className="text-text-secondary">
+          Pos <span className="text-accent-primary font-semibold">{songPositionDisplay}</span>
         </span>
       </div>
 
@@ -59,4 +82,4 @@ export const StatusBar: React.FC = () => {
       </div>
     </div>
   );
-};
+});

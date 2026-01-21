@@ -1,9 +1,11 @@
 /**
  * Factory Presets - 36+ ready-to-use instrument presets
  * Organized by category: Bass, Leads, Pads, Drums, FX
+ * Includes all TB-303 presets from tb303Presets.ts
  */
 
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { TB303_PRESETS } from './tb303Presets';
 
 // ============================================================================
 // BASS PRESETS (12)
@@ -190,7 +192,12 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       filterEnvelope: { envMod: 80, decay: 350 },
       accent: { amount: 100 },
       slide: { time: 30, mode: 'exponential' },
-      overdrive: { amount: 70 },
+      overdrive: {
+        amount: 70,
+        modelIndex: 0,
+        drive: 70,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 200,
@@ -359,7 +366,12 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       filterEnvelope: { envMod: 85, decay: 80 },
       accent: { amount: 100 },
       slide: { time: 25, mode: 'exponential' },
-      overdrive: { amount: 60 },
+      overdrive: {
+        amount: 60,
+        modelIndex: 0,
+        drive: 60,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 60,
@@ -416,7 +428,12 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       filterEnvelope: { envMod: 45, decay: 200 },
       accent: { amount: 85 },
       slide: { time: 70, mode: 'exponential' },
-      overdrive: { amount: 40 },
+      overdrive: {
+        amount: 40,
+        modelIndex: 0,
+        drive: 40,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 180,
@@ -529,7 +546,12 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       filterEnvelope: { envMod: 95, decay: 400 },
       accent: { amount: 100 },
       slide: { time: 50, mode: 'exponential' },
-      overdrive: { amount: 50 },
+      overdrive: {
+        amount: 50,
+        modelIndex: 0,
+        drive: 50,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 350,
@@ -591,6 +613,10 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     volume: -10,
     pan: 0,
   },
+
+  // === TB-303 PRESETS (from tb303Presets.ts) ===
+  // All comprehensive TB-303 presets including acidbox, dittytoy references, etc.
+  ...TB303_PRESETS,
 ];
 
 // ============================================================================

@@ -100,6 +100,15 @@ export class ToneEngine {
       console.log('[ToneEngine] Audio context already running');
     }
 
+    // Pre-load GuitarML AudioWorklet (prevents async loading delay for neural effects)
+    try {
+      await Tone.getContext().rawContext.audioWorklet.addModule('/TB303.worklet.js');
+      console.log('[ToneEngine] GuitarML worklet pre-loaded successfully');
+    } catch (error) {
+      console.warn('[ToneEngine] Failed to pre-load GuitarML worklet (may not exist yet):', error);
+      // Non-fatal - worklet will be loaded on-demand when neural effects are added
+    }
+
     // Configure Transport lookahead for reliable scheduling at high BPMs
     // Higher lookahead = more latency but more reliable timing
     const transport = Tone.getTransport();
@@ -609,8 +618,11 @@ export class ToneEngine {
     // Track the synth type for proper release handling
     this.instrumentSynthTypes.set(key, config.synthType);
 
-    // Create instrument effect chain and connect (use composite key to avoid disconnecting other channels)
-    this.buildInstrumentEffectChain(key, config.effects || [], instrument);
+    // Create instrument effect chain and connect (fire-and-forget for initial creation)
+    // For effect updates, use rebuildInstrumentEffects() which properly awaits
+    this.buildInstrumentEffectChain(key, config.effects || [], instrument).catch((error) => {
+      console.error('[ToneEngine] Failed to build initial effect chain:', error);
+    });
 
     console.log('[ToneEngine] Instrument created with effect chain', {
       instrumentId,
@@ -731,6 +743,60 @@ export class ToneEngine {
           // Map 0-1 to 0-100% overdrive
           if (instrument instanceof TB303Synth) {
             instrument.setOverdrive(value * 100);
+          }
+          break;
+
+        // Devil Fish parameters
+        case 'normalDecay':
+          // Map 0-1 to 30-3000ms decay time for normal notes
+          if (instrument instanceof TB303Synth) {
+            const decayMs = 30 + value * 2970; // 30 to 3000ms
+            instrument.setNormalDecay(decayMs);
+          }
+          break;
+
+        case 'accentDecay':
+          // Map 0-1 to 30-3000ms decay time for accented notes
+          if (instrument instanceof TB303Synth) {
+            const decayMs = 30 + value * 2970; // 30 to 3000ms
+            instrument.setAccentDecay(decayMs);
+          }
+          break;
+
+        case 'vegDecay':
+          // Map 0-1 to 16-3000ms VEG decay time
+          if (instrument instanceof TB303Synth) {
+            const decayMs = 16 + value * 2984; // 16 to 3000ms
+            instrument.setVegDecay(decayMs);
+          }
+          break;
+
+        case 'vegSustain':
+          // Map 0-1 to 0-100% VEG sustain level
+          if (instrument instanceof TB303Synth) {
+            instrument.setVegSustain(value * 100);
+          }
+          break;
+
+        case 'softAttack':
+          // Map 0-1 to 0.3-30ms soft attack time (logarithmic)
+          if (instrument instanceof TB303Synth) {
+            const attackMs = 0.3 * Math.pow(100, value); // 0.3 to 30ms
+            instrument.setSoftAttack(attackMs);
+          }
+          break;
+
+        case 'filterTracking':
+          // Map 0-1 to 0-200% filter tracking
+          if (instrument instanceof TB303Synth) {
+            instrument.setFilterTracking(value * 200);
+          }
+          break;
+
+        case 'filterFM':
+          // Map 0-1 to 0-100% filter FM amount
+          if (instrument instanceof TB303Synth) {
+            instrument.setFilterFM(value * 100);
           }
           break;
 
@@ -1181,6 +1247,60 @@ export class ToneEngine {
     console.log('[ToneEngine] Updated TB303 parameters for', synths.length, 'instances of instrument', instrumentId);
   }
 
+  /**
+   * Update TB303 pedalboard/GuitarML configuration
+   * Only call this when pedalboard config changes to avoid audio interruptions
+   */
+  public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> {
+    if (!pedalboard) return;
+
+    // Find all channel instances of this instrument
+    const synths: TB303Synth[] = [];
+    this.instruments.forEach((instrument, key) => {
+      if (key.startsWith(`${instrumentId}-`) && instrument instanceof TB303Synth) {
+        synths.push(instrument);
+      }
+    });
+
+    if (synths.length === 0) {
+      console.warn('[ToneEngine] Cannot update TB303 pedalboard - no TB303 instances found for instrument', instrumentId);
+      return;
+    }
+
+    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some(fx => fx.enabled && fx.type === 'neural');
+
+    // Update all instances
+    for (const synth of synths) {
+      if (hasNeuralEffect) {
+        // Find first enabled neural effect
+        const neuralEffect = pedalboard.chain.find(fx => fx.enabled && fx.type === 'neural');
+        if (neuralEffect && neuralEffect.modelIndex !== undefined) {
+          try {
+            // Load GuitarML model and enable
+            await synth.setGuitarMLModel(neuralEffect.modelIndex);
+            await synth.setGuitarMLEnabled(true);
+
+            // Set dry/wet mix if specified
+            if (neuralEffect.parameters?.dryWet !== undefined) {
+              synth.setGuitarMLMix(neuralEffect.parameters.dryWet);
+            }
+          } catch (err) {
+            console.error('[ToneEngine] Failed to update GuitarML:', err);
+          }
+        }
+      } else {
+        // Disable GuitarML if no neural effects
+        try {
+          await synth.setGuitarMLEnabled(false);
+        } catch (err) {
+          console.error('[ToneEngine] Failed to disable GuitarML:', err);
+        }
+      }
+    }
+
+    console.log('[ToneEngine] Updated TB303 pedalboard for', synths.length, 'instances of instrument', instrumentId);
+  }
+
   // ============================================================================
   // METRONOME
   // ============================================================================
@@ -1350,15 +1470,15 @@ export class ToneEngine {
   // ============================================================================
 
   /**
-   * Build or rebuild an instrument's effect chain
+   * Build or rebuild an instrument's effect chain (now async for neural effects)
    * Route: instrument → effects → masterInput
    * @param key - Composite key (instrumentId-channelIndex) for per-channel chains
    */
-  private buildInstrumentEffectChain(
+  private async buildInstrumentEffectChain(
     key: string | number,
     effects: EffectConfig[],
     instrument: Tone.ToneAudioNode
-  ): void {
+  ): Promise<void> {
     // Dispose existing effect chain if any
     const existing = this.instrumentEffectChains.get(key);
     if (existing) {
@@ -1388,8 +1508,10 @@ export class ToneEngine {
       return;
     }
 
-    // Create effect nodes
-    const effectNodes = enabledEffects.map((config) => InstrumentFactory.createEffect(config));
+    // Create effect nodes (async for neural effects)
+    const effectNodes = await Promise.all(
+      enabledEffects.map((config) => InstrumentFactory.createEffect(config))
+    );
 
     // Connect: instrument → effects[0] → effects[n] → output → masterInput
     instrument.connect(effectNodes[0]);
@@ -1408,9 +1530,9 @@ export class ToneEngine {
   }
 
   /**
-   * Rebuild an instrument's effect chain (public method for store to call)
+   * Rebuild an instrument's effect chain (public method for store to call, now async)
    */
-  public rebuildInstrumentEffects(instrumentId: number, effects: EffectConfig[]): void {
+  public async rebuildInstrumentEffects(instrumentId: number, effects: EffectConfig[]): Promise<void> {
     const instrument = this.instruments.get(instrumentId);
     if (!instrument) {
       console.warn('[ToneEngine] Cannot rebuild effects - instrument not found:', instrumentId);
@@ -1424,8 +1546,8 @@ export class ToneEngine {
       // May not be connected
     }
 
-    // Build new effect chain
-    this.buildInstrumentEffectChain(instrumentId, effects, instrument);
+    // Build new effect chain (await for neural effects)
+    await this.buildInstrumentEffectChain(instrumentId, effects, instrument);
   }
 
   /**
@@ -1455,10 +1577,10 @@ export class ToneEngine {
   // ============================================================================
 
   /**
-   * Rebuild entire master effects chain from config array
+   * Rebuild entire master effects chain from config array (now async for neural effects)
    * Called when effects are added, removed, or reordered
    */
-  public rebuildMasterEffects(effects: EffectConfig[]): void {
+  public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     console.log('[ToneEngine] Rebuilding master effects chain', effects.length, 'effects');
 
     // Disconnect current chain
@@ -1484,11 +1606,15 @@ export class ToneEngine {
       return;
     }
 
-    // Create effect nodes
-    enabledEffects.forEach((config) => {
-      const node = InstrumentFactory.createEffect(config);
+    // Create effect nodes (async for neural effects)
+    const effectNodes = await Promise.all(
+      enabledEffects.map((config) => InstrumentFactory.createEffect(config))
+    );
+
+    // Store nodes and configs
+    effectNodes.forEach((node, index) => {
       this.masterEffectsNodes.push(node);
-      this.masterEffectConfigs.set(config.id, { node, config });
+      this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
     });
 
     // Connect chain: masterInput → effects[0] → effects[n] → masterChannel
@@ -1700,11 +1826,12 @@ export class ToneEngine {
   /**
    * Set channel pan
    */
-  public setChannelPan(channelIndex: number, pan: number): void {
+  public setChannelPan(channelIndex: number, pan: number | null | undefined): void {
     const channelOutput = this.channelOutputs.get(channelIndex);
     if (channelOutput) {
-      // Convert -100 to 100 range to -1 to 1
-      channelOutput.channel.pan.value = pan / 100;
+      // Convert -100 to 100 range to -1 to 1, default to 0 if null/undefined
+      const panValue = pan ?? 0;
+      channelOutput.channel.pan.value = panValue / 100;
     }
   }
 

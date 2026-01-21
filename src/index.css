@@ -160,8 +160,8 @@
   }
 
   .btn-primary:hover {
-    background-color: #10b981;
-    border-color: #10b981;
+    background-color: var(--color-accent-secondary);
+    border-color: var(--color-accent-secondary);
   }
 
   .btn-ghost {
@@ -550,12 +550,17 @@
   .tb303-knob-panel {
     position: relative;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 16px;
     padding: 12px 16px;
     background-color: var(--color-bg-secondary);
     border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    /* Allow wrapping on smaller screens */
+    flex-wrap: wrap;
   }
 
   .tb303-knob-panel-header {
@@ -837,14 +842,60 @@
   .tb303-expanded-content {
     display: flex;
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
     gap: 16px;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .tb303-settings-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex-shrink: 0;
+    min-width: min(180px, 100%); /* Responsive minimum width */
   }
 
   .tb303-knobs-container {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
+    flex-shrink: 0;
+    /* Allow wrapping on very small screens */
+    flex-wrap: wrap;
+  }
+
+  /* TB-303 Fullscreen View (when in dedicated tb303 editor mode) */
+  .tb303-fullscreen-view .tb303-knob-panel {
+    flex-direction: column !important;
+    padding: 24px !important;
+    border-bottom: none !important;
+    background-color: var(--color-bg-primary);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .tb303-fullscreen-view .tb303-expanded-content {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 24px !important;
+    width: 100% !important;
+  }
+
+  .tb303-fullscreen-view .tb303-knobs-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)) !important;
+    gap: 24px !important;
+    width: 100% !important;
+    justify-items: center;
+  }
+
+  .tb303-fullscreen-view .devilfish-row {
+    border-left: none !important;
+    border-top: 2px solid var(--color-border);
+    padding-top: 16px !important;
+    padding-left: 0 !important;
+    width: 100% !important;
   }
 
   /* Toggle switch styles */
@@ -1012,8 +1063,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding-left: 16px;
-    border-left: 1px solid var(--color-border);
+    padding-left: 0;
+    width: 100%;
+    overflow-x: auto;
   }
 
   .devilfish-row-header {
@@ -1037,6 +1089,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    overflow-x: auto;
+    width: 100%;
   }
 
   .devilfish-extras {
@@ -1114,23 +1168,26 @@
     -webkit-touch-callout: none;
   }
 
-  /* FT2 Toolbar: Stack sections vertically */
+  /* FT2 Toolbar: Wrap elements on mobile instead of scrolling */
+  .ft2-toolbar {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
   .ft2-toolbar-row {
     display: flex;
-    flex-direction: column;
-    height: auto !important;
+    flex-wrap: wrap !important;
     min-height: auto !important;
-    gap: 2px;
+    gap: 8px;
   }
 
   .ft2-toolbar-row > .ft2-section {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--ft2-border);
+    flex-shrink: 0;
+    border-right: 1px solid var(--ft2-border);
   }
 
   .ft2-toolbar-row > .ft2-section:last-child {
-    border-bottom: none;
+    border-right: none;
   }
 
   /* Hide less essential toolbar sections on mobile */
@@ -1138,7 +1195,7 @@
     display: none !important;
   }
 
-  /* TB303 Knob Panel: 2-column grid */
+  /* TB303 Knob Panel: 2-column grid on mobile */
   .tb303-knob-panel {
     flex-direction: column !important;
     padding: 12px !important;
@@ -1149,6 +1206,7 @@
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 16px !important;
     width: 100% !important;
+    overflow-x: visible !important;
   }
 
   .tb303-knob-wrapper {
@@ -1186,16 +1244,37 @@
   }
 }
 
+/* Large phones / Small tablets (540px - 767px) */
+@media (min-width: 540px) and (max-width: 767px) {
+  /* Increase touch targets slightly */
+  .ft2-button, .touch-btn {
+    min-height: 38px;
+    min-width: 38px;
+  }
+
+  /* TB303 Panel: More compact grid */
+  .tb303-knobs-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+  }
+}
+
 /* Tablet styles (640px - 1024px) */
 @media (min-width: 640px) and (max-width: 1024px) {
-  /* FT2 Toolbar: 2-column grid for some sections */
+  /* FT2 Toolbar: Allow wrapping on tablet */
   .ft2-toolbar-row {
     flex-wrap: wrap;
   }
 
   .ft2-toolbar-row > .ft2-section {
-    flex: 1 1 calc(50% - 1px);
-    min-width: 200px;
+    flex-shrink: 1; /* Allow some shrinking on tablet */
+    min-width: min-content;
+  }
+
+  /* Pattern Order: Reduce columns on tablet */
+  .pattern-order-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
   }
 }
 
@@ -1290,6 +1369,9 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   position: relative;
+  /* Remove overflow-x: auto to prevent horizontal scrolling */
+  width: 100%;
+  overflow-y: visible; /* Allow dropdowns to escape */
 }
 
 .ft2-toolbar-compact {
@@ -1298,11 +1380,14 @@
 }
 
 .ft2-toolbar-row {
-  display: grid;
-  grid-template-columns: 220px 130px 140px min-content auto;
+  display: flex;
   align-items: center;
-  gap: 0;
-  height: 30px;
+  gap: 10px;
+  min-height: 30px;
+  flex-shrink: 0;
+  width: 100%;
+  /* Allow wrapping on smaller screens instead of scrolling */
+  flex-wrap: wrap;
 }
 
 .ft2-toolbar-row-menu {
@@ -1317,6 +1402,10 @@
   padding-left: 10px;
   padding-right: 10px;
   border-right: 1px solid #3a3a42;
+  flex-shrink: 0;
+  white-space: nowrap;
+  /* Allow shrinking on very small screens */
+  min-width: 0;
 }
 
 .ft2-section:first-child {
@@ -1328,22 +1417,26 @@
   padding-right: 0;
 }
 
-/* Fixed-width sections for column alignment */
+/* Sections maintain minimum sizes but don't grow */
 .ft2-section-pos {
   flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .ft2-section-tempo {
   flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .ft2-section-pattern {
   flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .ft2-section-playback {
   flex-shrink: 0;
   border-right: none;
+  min-width: fit-content;
 }
 
 /* Live mode queue indicator */
@@ -1368,7 +1461,7 @@
   font-size: 11px;
   font-weight: 500;
   padding: 5px 8px;
-  width: 88px;
+  min-width: 88px;
   height: 24px;
   display: flex;
   align-items: center;
@@ -1378,31 +1471,31 @@
   white-space: nowrap;
   flex-shrink: 0;
 
-  /* 3D button effect */
-  background: linear-gradient(180deg, #505058 0%, #404048 100%);
-  color: #d0d0d8;
-  border: none;
+  /* 3D button effect - uses theme colors */
+  background: var(--ft2-bg);
+  color: var(--ft2-text);
+  border: 1px solid var(--ft2-border);
   border-radius: 3px;
   box-shadow:
-    inset 1px 1px 0 #707078,
-    inset -1px -1px 0 #282830;
+    inset 1px 1px 0 var(--ft2-highlight),
+    inset -1px -1px 0 var(--ft2-shadow);
 }
 
 .ft2-btn:hover {
-  background: linear-gradient(180deg, #585860 0%, #484850 100%);
-  color: #e8e8f0;
+  background: var(--ft2-header);
+  color: var(--ft2-text);
 }
 
 .ft2-btn:active,
 .ft2-btn-active {
-  background: linear-gradient(180deg, #383840 0%, #303038 100%);
+  background: var(--ft2-shadow);
   box-shadow:
-    inset -1px -1px 0 #505058,
-    inset 1px 1px 0 #202028;
+    inset -1px -1px 0 var(--ft2-border),
+    inset 1px 1px 0 var(--ft2-bg);
 }
 
 .ft2-btn-small {
-  width: 60px;
+  min-width: 60px;
   padding: 5px 6px;
 }
 
@@ -1412,8 +1505,8 @@
 }
 
 .ft2-btn-disabled:hover {
-  background: linear-gradient(180deg, #505058 0%, #404048 100%);
-  color: #d0d0d8;
+  background: var(--ft2-bg);
+  color: var(--ft2-text);
 }
 
 /* FT2 Button Color Accents - Vibrant punchy colors */
@@ -1536,23 +1629,26 @@
   white-space: nowrap;
 }
 
-/* Fixed label widths per column for alignment */
+/* Flexible label widths for better responsiveness */
 .ft2-section-pos .ft2-numeric-label {
   display: inline-block;
-  width: 62px;
+  min-width: 62px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .ft2-section-tempo .ft2-numeric-label {
   display: inline-block;
-  width: 42px;
+  min-width: 42px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .ft2-section-pattern .ft2-numeric-label {
   display: inline-block;
-  width: 52px;
+  min-width: 52px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .ft2-numeric-value {
@@ -1565,7 +1661,8 @@
   border: 1px solid var(--color-border);
   border-radius: 3px;
   text-align: center;
-  width: 38px;
+  min-width: 38px;
+  white-space: nowrap;
 }
 
 .ft2-numeric-arrows {
@@ -1648,6 +1745,14 @@
   border-radius: 3px 3px 0 0;
   opacity: 0.6;
   transition: height 50ms ease-out;
+}
+
+/* ============================================================================
+   GHOST PATTERN ROWS - Universal styling for prev/next pattern preview
+   ============================================================================ */
+
+.ghost-row {
+  opacity: 0.25 !important;
 }
 
 /* ============================================================================
@@ -1762,11 +1867,6 @@
   /* Tracker cells */
   & span.tracker-cell {
     color: #00ffff !important;
-  }
-
-  /* Ghost rows - dimmed more than current pattern */
-  & .ghost-row {
-    opacity: 0.25 !important;
   }
 
   /* Buttons - cyan borders */

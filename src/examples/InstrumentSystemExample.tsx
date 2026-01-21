@@ -11,7 +11,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { EffectChain } from '@components/instruments/EffectChain';
 import { EffectPanel } from '@components/instruments/EffectPanel';
 import { PresetBrowser } from '@components/instruments/PresetBrowser';
-import { InstrumentEditor } from '@components/instruments/InstrumentEditor';
+import { UnifiedInstrumentEditor } from '@components/instruments/UnifiedInstrumentEditor';
 import { TestKeyboard } from '@components/instruments/TestKeyboard';
 import type { EffectConfig } from '@typedefs/instrument';
 import * as Tone from 'tone';
@@ -32,7 +32,7 @@ export const SimpleExample: React.FC = () => {
       <h1 className="text-ft2-highlight text-xl font-bold mb-4">Simple Example</h1>
 
       {/* Instrument parameters */}
-      <InstrumentEditor instrumentId={currentInstrumentId} />
+      <UnifiedInstrumentEditor mode="inline" />
 
       {/* Effect chain */}
       <EffectChain
@@ -132,7 +132,7 @@ export const AdvancedExample: React.FC = () => {
         </button>
       </div>
 
-      <InstrumentEditor instrumentId={currentInstrumentId} />
+      <UnifiedInstrumentEditor mode="inline" />
       <EffectChain
         instrumentId={currentInstrumentId}
         effects={currentInstrument.effects}
@@ -311,7 +311,7 @@ export const CompleteExample: React.FC = () => {
       <div className="flex-1 overflow-hidden flex">
         <div className="flex-1 overflow-y-auto scrollbar-ft2">
           {view === 'presets' && <PresetBrowser instrumentId={currentInstrumentId} />}
-          {view === 'synth' && <InstrumentEditor instrumentId={currentInstrumentId} />}
+          {view === 'synth' && <UnifiedInstrumentEditor mode="inline" />}
           {view === 'effects' && (
             <EffectChain
               instrumentId={currentInstrumentId}

@@ -16,6 +16,7 @@ interface KnobProps {
   unit?: string;
   size?: 'sm' | 'md' | 'lg';
   color?: string;
+  title?: string; // Tooltip text on hover
 
   // From controls/Knob (TB303 automation)
   logarithmic?: boolean;
@@ -43,11 +44,13 @@ const logToLinear = (value: number, min: number, max: number): number => {
   return (Math.log(value) - minLog) / (maxLog - minLog);
 };
 
-export const Knob: React.FC<KnobProps> = ({
+// PERFORMANCE: Memoize Knob to prevent re-renders (30+ instances on TB-303 panel)
+export const Knob: React.FC<KnobProps> = React.memo(({
   value,
   min,
   max,
   label,
+  title,
   unit = '',
   onChange,
   logarithmic = false,
@@ -65,10 +68,17 @@ export const Knob: React.FC<KnobProps> = ({
   const dragStartY = useRef(0);
   const dragStartValue = useRef(0);
 
-  // Theme-aware color: use cyan for cyan-lineart theme
+  // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
   const color = isCyanTheme ? '#00ffff' : colorProp;
+
+  // Theme-aware grey colors
+  const bgTrackColor = isCyanTheme ? '#0a3a3a' : '#2a2a2a';
+  const knobStrokeColor = isCyanTheme ? '#0a4a4a' : '#444';
+  const gradientTop = isCyanTheme ? '#0a4a4a' : '#4a4a4a';
+  const gradientMid = isCyanTheme ? '#0a3a3a' : '#3a3a3a';
+  const gradientBot = isCyanTheme ? '#0a2a2a' : '#2a2a2a';
 
   // Size configurations
   const sizes = {
@@ -153,6 +163,20 @@ export const Knob: React.FC<KnobProps> = ({
 
   // Handle double-click to reset
   const handleDoubleClick = useCallback(() => {
+    if (defaultValue !== undefined) {
+      onChange(defaultValue);
+    } else if (bipolar) {
+      // Reset to center for bipolar
+      onChange((max + min) / 2);
+    } else {
+      // Reset to min for unipolar
+      onChange(min);
+    }
+  }, [defaultValue, bipolar, min, max, onChange]);
+
+  // Handle right-click to reset
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default context menu
     if (defaultValue !== undefined) {
       onChange(defaultValue);
     } else if (bipolar) {
@@ -273,7 +297,7 @@ export const Knob: React.FC<KnobProps> = ({
   };
 
   return (
-    <div className="knob-container" style={{ width: knobSize + 20 }}>
+    <div className="knob-container" style={{ width: knobSize + 20 }} title={title}>
       {/* Label */}
       {label && (
         <div
@@ -295,6 +319,7 @@ export const Knob: React.FC<KnobProps> = ({
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
         role="slider"
         aria-label={`${label || 'Knob'}${unit ? ` (${unit})` : ''}`}
@@ -309,7 +334,7 @@ export const Knob: React.FC<KnobProps> = ({
           <path
             d={describeArc(-135, 135)}
             fill="none"
-            stroke="#2a2a2a"
+            stroke={bgTrackColor}
             strokeWidth={stroke}
             strokeLinecap="round"
           />
@@ -354,7 +379,7 @@ export const Knob: React.FC<KnobProps> = ({
             cy={center}
             r={radius - stroke - 4}
             fill="url(#knobGradient)"
-            stroke="#444"
+            stroke={knobStrokeColor}
             strokeWidth="1"
           />
 
@@ -376,9 +401,9 @@ export const Knob: React.FC<KnobProps> = ({
           {/* Gradient definitions */}
           <defs>
             <linearGradient id="knobGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#4a4a4a" />
-              <stop offset="50%" stopColor="#3a3a3a" />
-              <stop offset="100%" stopColor="#2a2a2a" />
+              <stop offset="0%" stopColor={gradientTop} />
+              <stop offset="50%" stopColor={gradientMid} />
+              <stop offset="100%" stopColor={gradientBot} />
             </linearGradient>
           </defs>
         </svg>
@@ -397,4 +422,18 @@ export const Knob: React.FC<KnobProps> = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for optimal memoization
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.displayValue === nextProps.displayValue &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.min === nextProps.min &&
+    prevProps.max === nextProps.max &&
+    prevProps.label === nextProps.label &&
+    prevProps.color === nextProps.color &&
+    prevProps.size === nextProps.size
+  );
+});
+
+Knob.displayName = 'Knob';

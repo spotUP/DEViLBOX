@@ -1,0 +1,236 @@
+{
+  "metadata": {
+    "name": "Samplab Mathew 303",
+    "author": "Converted from MIDI",
+    "description": "TB-303 bass pattern from Samplab_mathew.mid",
+    "id": "samplab-mathew-303",
+    "createdAt": "2026-01-21T00:00:00.000Z",
+    "modifiedAt": "2026-01-21T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 129,
+  "instruments": [
+    {
+      "id": 0,
+      "name": "Default",
+      "synthType": "Synth",
+      "oscillator": {
+        "type": "sawtooth",
+        "detune": 0
+      },
+      "envelope": {
+        "attack": 10,
+        "decay": 300,
+        "sustain": 0,
+        "release": 100
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 800,
+        "resonance": 65,
+        "envMod": 50
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 1,
+      "name": "TB-303 Bass",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": {
+          "type": "sawtooth"
+        },
+        "filter": {
+          "cutoff": 400,
+          "resonance": 80,
+          "envMod": 75
+        },
+        "filterEnvelope": {
+          "decay": 180
+        },
+        "accent": {
+          "amount": 85
+        },
+        "slide": {
+          "time": 60,
+          "mode": "exponential"
+        }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-samplab-bass",
+      "name": "303 Bass Pattern",
+      "length": 16,
+      "channels": [
+        {
+          "id": "channel-0",
+          "name": "TB-303",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#ef4444",
+          "rows": [
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 34,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 53,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 62,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 63,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 44,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 42,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 39,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 37,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "F#-2",
+              "instrument": 1,
+              "volume": 36,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "format": "devilbox-song",
+  "version": "1.0.0",
+  "sequence": [
+    "pattern-samplab-bass"
+  ]
+}

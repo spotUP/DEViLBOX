@@ -6,7 +6,6 @@ import { useEffect, useCallback } from 'react';
 import { onMenuAction, isElectron } from '@utils/electron';
 import { useTrackerStore, useTransportStore, useProjectStore, useHistoryStore } from '@stores';
 import { useProjectPersistence } from './useProjectPersistence';
-import { getToneEngine } from '@engine/ToneEngine';
 
 export function useElectronMenu(
   callbacks: {
@@ -61,7 +60,7 @@ export function useElectronMenu(
           if (confirm('Create new project? Current unsaved changes will be lost.')) {
             resetProject();
             resetTracker();
-            getToneEngine().resetProject();
+            // getToneEngine().resetProject(); // ToneEngine doesn't have resetProject method
           }
           break;
         case 'open-song':

@@ -20,6 +20,7 @@ import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
+import { PatternOrderList } from '../PatternOrderList';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -109,10 +110,12 @@ interface FT2ToolbarProps {
   onShowExport?: () => void;
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
+  onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onImport?: () => void;
   showPatterns?: boolean;
   showMasterFX?: boolean;
+  showInstrumentFX?: boolean;
 }
 
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
@@ -120,10 +123,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowExport,
   onShowHelp,
   onShowMasterFX,
+  onShowInstrumentFX,
   onShowInstruments,
   onImport,
   showPatterns,
   showMasterFX,
+  showInstrumentFX,
 }) => {
   const {
     patterns,
@@ -168,6 +173,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const demoMenuRef = useRef<HTMLDivElement>(null);
+  const demoButtonRef = useRef<HTMLDivElement>(null);
+  const [demoMenuPosition, setDemoMenuPosition] = useState({ top: 0, left: 0 });
 
   // Demo songs available on the server
   const DEMO_SONGS = [
@@ -180,6 +187,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     { file: 'fast-eddie-acid-thunder.song.json', name: 'Fast Eddie - Acid Thunder' },
     { file: 'dj-tim-misjah-access.song.json', name: 'DJ Tim & Misjah - Access' },
     { file: 'edge-of-motion-setup-707.song.json', name: 'Edge of Motion - 707 Setup' },
+    { file: 'samplab-mathew-303.song.json', name: '🎹 Samplab Mathew 303' },
+    { file: 'samplab-mathew-full.song.json', name: '🎹 Samplab Mathew (Full)' },
+    { file: 'slow-creaky-acid-authentic.song.json', name: '🐌 Slow Creaky (Authentic)' },
+    { file: 'slow-creaky-acid-tempo-relative.song.json', name: '🐌 Slow Creaky (Tempo-Relative)' },
   ];
 
   // Load demo song from server
@@ -197,23 +208,53 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       // Use import.meta.env.BASE_URL for correct path on GitHub Pages
       const basePath = import.meta.env.BASE_URL || '/';
       const response = await fetch(`${basePath}songs/${filename}`);
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const songData = await response.json();
 
+      // Validate song format
+      if (songData.format !== 'devilbox-song') {
+        throw new Error(`Invalid format: expected "devilbox-song", got "${songData.format}"`);
+      }
+
+      // Validate required fields
+      if (!songData.patterns || !Array.isArray(songData.patterns)) {
+        throw new Error('Missing or invalid "patterns" array');
+      }
+      if (!songData.instruments || !Array.isArray(songData.instruments)) {
+        throw new Error('Missing or invalid "instruments" array');
+      }
+      if (!songData.sequence || !Array.isArray(songData.sequence)) {
+        throw new Error('Missing or invalid "sequence" array');
+      }
+
+      // Load song data
       if (songData.patterns) loadPatterns(songData.patterns);
       if (songData.instruments) loadInstruments(songData.instruments);
       if (songData.metadata) setMetadata(songData.metadata);
       if (songData.bpm) setBPM(songData.bpm);
 
+      notify.success(`Loaded: ${songData.metadata?.name || filename}`, 2000);
       console.log(`[Demo] Loaded: ${filename}`);
     } catch (error) {
       console.error('Failed to load demo:', error);
-      alert(`Failed to load demo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      notify.error(`Failed to load ${filename}: ${errorMsg}`, 10000);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Calculate dropdown position when menu opens
+  React.useEffect(() => {
+    if (showDemoMenu && demoButtonRef.current) {
+      const rect = demoButtonRef.current.getBoundingClientRect();
+      setDemoMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+  }, [showDemoMenu]);
 
   // Close demo menu when clicking outside
   React.useEffect(() => {
@@ -298,14 +339,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         const moduleInfo = await loadModuleFile(file);
 
         if (!moduleInfo.metadata.song) {
-          alert(`Module "${moduleInfo.metadata.title}" loaded but no pattern data found.`);
+          notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`, 5000);
           return;
         }
 
         const result = convertModule(moduleInfo.metadata.song);
 
         if (result.patterns.length === 0) {
-          alert(`Module "${moduleInfo.metadata.title}" contains no patterns to import.`);
+          notify.error(`Module "${moduleInfo.metadata.title}" contains no patterns`, 5000);
           return;
         }
 
@@ -340,17 +381,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       } else {
         // JSON song file
         const songData = await importSong(file);
-        if (songData) {
-          loadPatterns(songData.patterns);
-          if (songData.instruments) loadInstruments(songData.instruments);
-          if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
-          setBPM(songData.bpm);
-          setMetadata(songData.metadata);
+        if (!songData) {
+          notify.error('Failed to import song: Invalid or corrupted file', 8000);
+          return;
         }
+
+        // Validate song data
+        if (!songData.patterns || !Array.isArray(songData.patterns)) {
+          notify.error('Invalid song: Missing patterns array', 8000);
+          return;
+        }
+        if (!songData.instruments || !Array.isArray(songData.instruments)) {
+          notify.error('Invalid song: Missing instruments array', 8000);
+          return;
+        }
+
+        // Load song data
+        loadPatterns(songData.patterns);
+        if (songData.instruments) loadInstruments(songData.instruments);
+        if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
+        setBPM(songData.bpm);
+        setMetadata(songData.metadata);
+        notify.success(`Loaded: ${songData.metadata?.name || file.name}`, 2000);
       }
     } catch (error) {
       console.error('Failed to load file:', error);
-      alert(`Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      notify.error(`Failed to load ${file.name}: ${errorMsg}`, 10000);
     } finally {
       setIsLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -645,7 +702,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
 
           {/* Demo Songs Dropdown */}
-          <div className="relative" ref={demoMenuRef}>
+          <div ref={demoButtonRef}>
             <FT2Button
               onClick={() => setShowDemoMenu(!showDemoMenu)}
               small
@@ -655,20 +712,27 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             >
               Demos ▾
             </FT2Button>
-            {showDemoMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-50 min-w-[220px] max-h-[300px] overflow-y-auto">
-                {DEMO_SONGS.map((demo) => (
-                  <button
-                    key={demo.file}
-                    onClick={() => handleLoadDemo(demo.file)}
-                    className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                  >
-                    {demo.name}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
+          {showDemoMenu && (
+            <div
+              ref={demoMenuRef}
+              className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[220px] max-h-[300px] overflow-y-auto"
+              style={{
+                top: `${demoMenuPosition.top}px`,
+                left: `${demoMenuPosition.left}px`,
+              }}
+            >
+              {DEMO_SONGS.map((demo) => (
+                <button
+                  key={demo.file}
+                  onClick={() => handleLoadDemo(demo.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {demo.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <FT2Button onClick={handleSave} small title="Save to browser storage (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
@@ -684,6 +748,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
           <FT2Button onClick={onShowInstruments} small title="Instrument editor (Ctrl+I)">
             Instr
+          </FT2Button>
+          <FT2Button onClick={onShowInstrumentFX} small active={showInstrumentFX} title="Instrument effects (Ctrl+Shift+F)">
+            Instrument FX
           </FT2Button>
           <FT2Button onClick={onShowExport} small title="Export dialog (Ctrl+Shift+E)">
             Export
@@ -710,6 +777,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
         </div>
       </div>
+
+      {/* Pattern Order List - Integrated into toolbar */}
+      {!compactToolbar && <PatternOrderList />}
 
       {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

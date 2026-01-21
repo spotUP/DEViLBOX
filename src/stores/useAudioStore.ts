@@ -33,6 +33,7 @@ interface AudioStore {
 
   // Master Effects Actions
   addMasterEffect: (effectType: EffectType) => void;
+  addMasterEffectConfig: (effect: Omit<EffectConfig, 'id'>) => void;  // For unified effects system
   removeMasterEffect: (effectId: string) => void;
   updateMasterEffect: (effectId: string, updates: Partial<EffectConfig>) => void;
   reorderMasterEffects: (fromIndex: number, toIndex: number) => void;
@@ -116,6 +117,7 @@ export const useAudioStore = create<AudioStore>()(
       set((state) => {
         const newEffect: EffectConfig = {
           id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          category: 'tonejs',  // Master effects are Tone.js by default
           type: effectType,
           enabled: true,
           wet: 50,
@@ -123,10 +125,38 @@ export const useAudioStore = create<AudioStore>()(
         };
         state.masterEffects.push(newEffect);
 
-        // Notify ToneEngine to rebuild master effects chain
+        // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
-          engine.rebuildMasterEffects(state.masterEffects);
+          (async () => {
+            try {
+              await engine.rebuildMasterEffects(state.masterEffects);
+            } catch (error) {
+              console.warn('[AudioStore] Could not rebuild master effects:', error);
+            }
+          })();
+        }
+      }),
+
+    // Add master effect with full configuration (for unified effects system)
+    addMasterEffectConfig: (effect) =>
+      set((state) => {
+        const newEffect: EffectConfig = {
+          ...effect,
+          id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        state.masterEffects.push(newEffect);
+
+        // Notify ToneEngine to rebuild master effects chain (async for neural effects)
+        const engine = get().toneEngineInstance;
+        if (engine) {
+          (async () => {
+            try {
+              await engine.rebuildMasterEffects(state.masterEffects);
+            } catch (error) {
+              console.warn('[AudioStore] Could not rebuild master effects:', error);
+            }
+          })();
         }
       }),
 
@@ -136,10 +166,16 @@ export const useAudioStore = create<AudioStore>()(
         if (index !== -1) {
           state.masterEffects.splice(index, 1);
 
-          // Notify ToneEngine to rebuild master effects chain
+          // Notify ToneEngine to rebuild master effects chain (async for neural effects)
           const engine = get().toneEngineInstance;
           if (engine) {
-            engine.rebuildMasterEffects(state.masterEffects);
+            (async () => {
+              try {
+                await engine.rebuildMasterEffects(state.masterEffects);
+              } catch (error) {
+                console.warn('[AudioStore] Could not rebuild master effects:', error);
+              }
+            })();
           }
         }
       }),
@@ -163,21 +199,40 @@ export const useAudioStore = create<AudioStore>()(
         const [removed] = state.masterEffects.splice(fromIndex, 1);
         state.masterEffects.splice(toIndex, 0, removed);
 
-        // Notify ToneEngine to rebuild master effects chain
+        // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
-          engine.rebuildMasterEffects(state.masterEffects);
+          (async () => {
+            try {
+              await engine.rebuildMasterEffects(state.masterEffects);
+            } catch (error) {
+              console.warn('[AudioStore] Could not rebuild master effects:', error);
+            }
+          })();
         }
       }),
 
     setMasterEffects: (effects) =>
       set((state) => {
-        state.masterEffects = effects;
+        // Migrate old effects without category field (backward compatibility)
+        const migratedEffects = effects.map(effect => ({
+          ...effect,
+          // Add category if missing - default to 'tonejs' for old saved songs
+          category: effect.category || ('tonejs' as const),
+        }));
 
-        // Notify ToneEngine to rebuild master effects chain
+        state.masterEffects = migratedEffects;
+
+        // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
-          engine.rebuildMasterEffects(effects);
+          (async () => {
+            try {
+              await engine.rebuildMasterEffects(migratedEffects);
+            } catch (error) {
+              console.warn('[AudioStore] Could not rebuild master effects:', error);
+            }
+          })();
         }
       }),
   }))

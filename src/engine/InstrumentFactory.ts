@@ -19,9 +19,11 @@ import {
   VOWEL_FORMANTS,
 } from '../types/instrument';
 import { TB303Synth } from './TB303Engine';
+import { TB303AccurateSynth } from './TB303AccurateSynth';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { WavetableSynth } from './WavetableSynth';
+import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 
 export class InstrumentFactory {
   /**
@@ -129,20 +131,49 @@ export class InstrumentFactory {
   }
 
   /**
-   * Create effect chain from config
+   * Create effect chain from config (now async for neural effects)
    */
-  public static createEffectChain(effects: EffectConfig[]): Tone.ToneAudioNode[] {
-    return effects
-      .filter((fx) => fx.enabled)
-      .map((fx) => this.createEffect(fx));
+  public static async createEffectChain(
+    effects: EffectConfig[],
+    audioContext?: AudioContext
+  ): Promise<Tone.ToneAudioNode[]> {
+    const enabled = effects.filter((fx) => fx.enabled);
+    return Promise.all(enabled.map((fx) => this.createEffect(fx, audioContext)));
   }
 
   /**
-   * Create single effect instance
+   * Create single effect instance (now async for neural effects)
    */
-  public static createEffect(config: EffectConfig): Tone.ToneAudioNode {
+  public static async createEffect(
+    config: EffectConfig,
+    audioContext?: AudioContext
+  ): Promise<Tone.ToneAudioNode> {
     const wetValue = config.wet / 100;
 
+    // Neural effects
+    if (config.category === 'neural') {
+      if (config.neuralModelIndex === undefined) {
+        throw new Error('Neural effect requires neuralModelIndex');
+      }
+
+      const context = audioContext || Tone.getContext().rawContext;
+      const wrapper = new NeuralEffectWrapper({
+        modelIndex: config.neuralModelIndex,
+        audioContext: context,
+        wet: wetValue,
+      });
+
+      await wrapper.loadModel();
+
+      // Set all parameters from config
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        wrapper.setParameter(key, value);
+      });
+
+      return wrapper;
+    }
+
+    // Tone.js effects
     switch (config.type) {
       case 'Distortion':
         return new Tone.Distortion({
@@ -550,14 +581,25 @@ export class InstrumentFactory {
     });
   }
 
-  private static createTB303(config: InstrumentConfig): TB303Synth {
+  private static createTB303(config: InstrumentConfig): TB303Synth | TB303AccurateSynth {
     if (!config.tb303) {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
-    const synth = new TB303Synth(config.tb303);
-    synth.setVolume(config.volume || -12);
-    return synth;
+    // Choose engine based on engineType (default: tonejs)
+    const engineType = config.tb303.engineType || 'tonejs';
+
+    if (engineType === 'accurate') {
+      // Use Open303-based accurate engine
+      const synth = new TB303AccurateSynth(config.tb303);
+      synth.setVolume(config.volume || -12);
+      return synth;
+    } else {
+      // Use Tone.js-based classic engine
+      const synth = new TB303Synth(config.tb303);
+      synth.setVolume(config.volume || -12);
+      return synth;
+    }
   }
 
   private static createWavetable(config: InstrumentConfig): WavetableSynth {

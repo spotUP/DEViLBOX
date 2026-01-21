@@ -17,7 +17,7 @@ interface NoteBlockProps {
   onDragStart?: (noteId: string, mode: 'move' | 'resize-end', e: React.MouseEvent) => void;
 }
 
-export const NoteBlock: React.FC<NoteBlockProps> = ({
+const NoteBlockComponent: React.FC<NoteBlockProps> = ({
   note,
   horizontalZoom,
   verticalZoom,
@@ -79,17 +79,19 @@ export const NoteBlock: React.FC<NoteBlockProps> = ({
   return (
     <div
       className={`
-        absolute rounded-sm cursor-pointer
+        absolute rounded-sm cursor-move select-none
         ${bgColor}
-        ${isSelected ? 'ring-2 ring-white ring-opacity-80' : ''}
-        hover:brightness-110 transition-[filter]
+        ${isSelected ? 'ring-2 ring-accent-primary ring-opacity-100 brightness-125 z-10' : 'ring-1 ring-black/30'}
+        hover:brightness-125 hover:ring-accent-primary/50 hover:z-20
+        transition-all duration-75
+        shadow-md hover:shadow-lg
       `}
       style={{
         left: x,
         top: y,
         width: Math.max(4, width - 1), // Minimum visible width, gap between notes
         height: verticalZoom - 1,
-        opacity: 0.7 + (note.velocity / 127) * 0.3, // Velocity affects opacity
+        opacity: 0.8 + (note.velocity / 127) * 0.2, // Velocity affects opacity
       }}
       onMouseDown={handleMouseDown}
     >
@@ -103,10 +105,12 @@ export const NoteBlock: React.FC<NoteBlockProps> = ({
 
       {/* Resize handle */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30"
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 transition-colors"
       />
     </div>
   );
 };
 
+// PERFORMANCE: Wrap in React.memo to prevent unnecessary re-renders
+export const NoteBlock = React.memo(NoteBlockComponent);
 export default NoteBlock;

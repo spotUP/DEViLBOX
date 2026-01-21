@@ -52,6 +52,60 @@ npm run dev
 npm run build
 ```
 
+## Development
+
+### Design System
+
+**IMPORTANT:** This project uses a strict design system. Before writing any UI code:
+
+1. Read [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md)
+2. Use existing components from `src/components/ui/`
+3. **Never** create custom buttons or inline-styled elements
+4. **Always** use CSS variables for colors
+5. **Always** add accessibility (ARIA labels, keyboard support)
+
+#### Quick Reference
+
+```tsx
+// ✅ DO: Use Button component
+<Button variant="primary">Save</Button>
+
+// ❌ DON'T: Create inline-styled buttons
+<button className="px-4 py-2 bg-red-500">Save</button>
+
+// ✅ DO: Use CSS variables
+style={{ color: 'var(--color-accent)' }}
+
+// ❌ DON'T: Hardcode colors
+style={{ color: '#ef4444' }}
+```
+
+See [`.clauderules`](./.clauderules) for complete project rules.
+
+### Versioning
+
+DEViLBOX uses **automatic build number incrementation**. Every git commit increases the build number:
+
+```
+v1.0.0+42 → v1.0.0+43 → v1.0.0+44
+```
+
+- Version format: `MAJOR.MINOR.PATCH+BUILD`
+- Build number = total git commit count
+- Displayed in navbar with build details on hover
+- Auto-generated before every build
+
+See [`docs/VERSIONING.md`](./docs/VERSIONING.md) for complete details.
+
+**Quick commands:**
+```bash
+# Check current version info
+npm run version:info
+
+# Force regenerate changelog/version
+npm run changelog
+```
+
 ## Tech Stack
 
 - React 19

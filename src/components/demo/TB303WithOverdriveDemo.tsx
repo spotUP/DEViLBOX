@@ -9,8 +9,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TB303EngineAccurate } from '@engine/TB303EngineAccurate';
-import { GuitarMLEngine } from '@engine/GuitarMLEngine';
 import type { TB303Config } from '@typedefs/instrument';
+import type { NeuralPedalboard } from '@typedefs/pedalboard';
+import { getModelByIndex, getModelsByCategory } from '@constants/guitarMLRegistry';
 
 export const TB303WithOverdriveDemo: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -56,10 +57,23 @@ export const TB303WithOverdriveDemo: React.FC = () => {
           accent: {
             amount: accent,
           },
+          slide: {
+            time: 60,
+            mode: 'exponential',
+          },
           devilFish: {
+            enabled: false,
             normalDecay: decay,
             accentDecay: decay * 0.5,
-            slideTime: 60,
+            vegDecay: 200,
+            vegSustain: 0,
+            softAttack: 5,
+            filterTracking: 100,
+            filterFM: 0,
+            sweepSpeed: 'normal',
+            accentSweepEnabled: false,
+            highResonance: false,
+            muffler: 'off',
           },
         };
 
@@ -129,30 +143,52 @@ export const TB303WithOverdriveDemo: React.FC = () => {
     }
   }, [accent, isInitialized]);
 
-  // Update overdrive parameters
+  // Update pedalboard enabled state
   useEffect(() => {
     if (engineRef.current && isInitialized) {
-      engineRef.current.setOverdriveEnabled(overdriveEnabled);
+      engineRef.current.setPedalboardEnabled(overdriveEnabled);
     }
   }, [overdriveEnabled, isInitialized]);
 
+  // Update pedalboard when model changes
   useEffect(() => {
     if (engineRef.current && isInitialized && overdriveEnabled) {
-      engineRef.current.loadOverdriveModel(overdriveModel);
+      const modelInfo = getModelByIndex(overdriveModel);
+      const pedalboard: NeuralPedalboard = {
+        enabled: true,
+        inputGain: 100,
+        outputGain: 100,
+        chain: [{
+          id: `effect-${overdriveModel}`,
+          enabled: true,
+          type: 'neural',
+          modelIndex: overdriveModel,
+          modelName: modelInfo?.name ?? 'TS808',
+          parameters: {
+            drive: overdriveDrive,
+            tone: 50,
+            level: 75,
+            dryWet: overdriveMix,
+          },
+        }],
+      };
+      engineRef.current.updatePedalboard(pedalboard);
     }
-  }, [overdriveModel, isInitialized, overdriveEnabled]);
+  }, [overdriveModel, isInitialized, overdriveEnabled, overdriveDrive, overdriveMix]);
 
+  // Update drive parameter
   useEffect(() => {
-    if (engineRef.current && isInitialized) {
-      engineRef.current.setOverdriveDrive(overdriveDrive);
+    if (engineRef.current && isInitialized && overdriveEnabled) {
+      engineRef.current.setEffectParameter(`effect-${overdriveModel}`, 'drive', overdriveDrive);
     }
-  }, [overdriveDrive, isInitialized]);
+  }, [overdriveDrive, isInitialized, overdriveEnabled, overdriveModel]);
 
+  // Update mix parameter
   useEffect(() => {
-    if (engineRef.current && isInitialized) {
-      engineRef.current.setOverdriveMix(overdriveMix);
+    if (engineRef.current && isInitialized && overdriveEnabled) {
+      engineRef.current.setEffectParameter(`effect-${overdriveModel}`, 'dryWet', overdriveMix);
     }
-  }, [overdriveMix, isInitialized]);
+  }, [overdriveMix, isInitialized, overdriveEnabled, overdriveModel]);
 
   // Test note
   const playTestNote = (note: number, accentNote: boolean = false, slideNote: boolean = false) => {
@@ -207,10 +243,10 @@ export const TB303WithOverdriveDemo: React.FC = () => {
     setIsPlaying(false);
   };
 
-  // Group models by type
-  const pedalModels = GuitarMLEngine.BUILT_IN_MODELS.filter((m) => m.type === 'pedal');
-  const ampModels = GuitarMLEngine.BUILT_IN_MODELS.filter((m) => m.type === 'amp');
-  const bassModels = GuitarMLEngine.BUILT_IN_MODELS.filter((m) => m.type === 'bass');
+  // Group models by category
+  const pedalModels = [...getModelsByCategory('overdrive'), ...getModelsByCategory('distortion')];
+  const ampModels = getModelsByCategory('amplifier');
+  const bassModels = getModelsByCategory('bass');
 
   return (
     <div className="p-6 bg-ft2-panel border border-ft2-border rounded">
@@ -388,7 +424,7 @@ export const TB303WithOverdriveDemo: React.FC = () => {
               <>
                 <div>
                   <label className="block text-ft2-textDim text-sm mb-1">
-                    Model: {GuitarMLEngine.BUILT_IN_MODELS[overdriveModel]?.name}
+                    Model: {getModelByIndex(overdriveModel)?.name ?? 'Unknown'}
                   </label>
                   <select
                     value={overdriveModel}
@@ -396,34 +432,25 @@ export const TB303WithOverdriveDemo: React.FC = () => {
                     className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded p-2"
                   >
                     <optgroup label="Pedals">
-                      {pedalModels.map((model, idx) => {
-                        const globalIdx = GuitarMLEngine.BUILT_IN_MODELS.indexOf(model);
-                        return (
-                          <option key={globalIdx} value={globalIdx}>
-                            {model.name}
-                          </option>
-                        );
-                      })}
+                      {pedalModels.map((model) => (
+                        <option key={model.index} value={model.index}>
+                          {model.name}
+                        </option>
+                      ))}
                     </optgroup>
                     <optgroup label="Amps">
-                      {ampModels.map((model, idx) => {
-                        const globalIdx = GuitarMLEngine.BUILT_IN_MODELS.indexOf(model);
-                        return (
-                          <option key={globalIdx} value={globalIdx}>
-                            {model.name}
-                          </option>
-                        );
-                      })}
+                      {ampModels.map((model) => (
+                        <option key={model.index} value={model.index}>
+                          {model.name}
+                        </option>
+                      ))}
                     </optgroup>
                     <optgroup label="Bass">
-                      {bassModels.map((model, idx) => {
-                        const globalIdx = GuitarMLEngine.BUILT_IN_MODELS.indexOf(model);
-                        return (
-                          <option key={globalIdx} value={globalIdx}>
-                            {model.name}
-                          </option>
-                        );
-                      })}
+                      {bassModels.map((model) => (
+                        <option key={model.index} value={model.index}>
+                          {model.name}
+                        </option>
+                      ))}
                     </optgroup>
                   </select>
                 </div>

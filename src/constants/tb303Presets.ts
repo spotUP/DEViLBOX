@@ -24,11 +24,17 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 85 },
       slide: { time: 60, mode: 'exponential' },
-      overdrive: { amount: 73 },
+      overdrive: {
+        amount: 73,
+        modelIndex: 0,
+        drive: 73,
+        dryWet: 100,
+      },
     },
     effects: [
       {
         id: 'delay-dt303',
+        category: 'tonejs',
         type: 'PingPongDelay',
         enabled: true,
         wet: 45,
@@ -163,6 +169,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [
       {
         id: 'distortion-1',
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 35,
@@ -337,6 +344,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [
       {
         id: 'delay-1',
+        category: 'tonejs',
         type: 'Delay',
         enabled: true,
         wet: 25,
@@ -438,6 +446,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [
       {
         id: 'reverb-drone',
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 40,
@@ -462,7 +471,12 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 100 },
       slide: { time: 30, mode: 'exponential' },
-      overdrive: { amount: 70 },
+      overdrive: {
+        amount: 70,
+        modelIndex: 0,
+        drive: 70,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 200,
@@ -653,6 +667,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [
       {
         id: 'reverb-pad',
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 50,
@@ -677,7 +692,12 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 100 },
       slide: { time: 25, mode: 'exponential' },
-      overdrive: { amount: 60 },
+      overdrive: {
+        amount: 60,
+        modelIndex: 0,
+        drive: 60,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 60,
@@ -746,7 +766,12 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 85 },
       slide: { time: 70, mode: 'exponential' },
-      overdrive: { amount: 40 },
+      overdrive: {
+        amount: 40,
+        modelIndex: 0,
+        drive: 40,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 180,
@@ -833,6 +858,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [
       {
         id: 'reverb-ambient',
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 65,
@@ -840,6 +866,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       {
         id: 'delay-ambient',
+        category: 'tonejs',
         type: 'PingPongDelay',
         enabled: true,
         wet: 35,
@@ -898,7 +925,12 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 100 },
       slide: { time: 50, mode: 'exponential' },
-      overdrive: { amount: 50 },
+      overdrive: {
+        amount: 50,
+        modelIndex: 0,
+        drive: 50,
+        dryWet: 100,
+      },
       devilFish: {
         enabled: true,
         normalDecay: 350,

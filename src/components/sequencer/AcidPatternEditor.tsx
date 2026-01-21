@@ -7,7 +7,7 @@
  * - Pattern management (save/load/clear/randomize)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AcidPattern } from '@engine/AcidSequencer';
 
 interface AcidPatternEditorProps {

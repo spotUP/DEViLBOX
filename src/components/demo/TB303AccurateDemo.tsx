@@ -50,10 +50,23 @@ export const TB303AccurateDemo: React.FC = () => {
           accent: {
             amount: accent,
           },
+          slide: {
+            time: slideTime,
+            mode: 'exponential',
+          },
           devilFish: {
+            enabled: false,
             normalDecay: decay,
             accentDecay: decay * 0.5,
-            slideTime,
+            vegDecay: 200,
+            vegSustain: 0,
+            softAttack: 5,
+            filterTracking: 100,
+            filterFM: 0,
+            sweepSpeed: 'normal',
+            accentSweepEnabled: false,
+            highResonance: false,
+            muffler: 'off',
           },
         };
 

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-17T21:19:22.384Z
+ * Generated: 2026-01-21T11:58:05.174Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,17 +20,77 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '30';
-export const BUILD_HASH = '5eac3fd';
-export const BUILD_DATE = '2026-01-17';
+export const BUILD_NUMBER = '42';
+export const BUILD_HASH = '4aa8421';
+export const BUILD_DATE = '2026-01-21';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.0',
+    date: '2026-01-21',
+    changes: [
+      {
+        type: 'feature',
+        description: 'Add TB-303 preset dropdown and vegDecay migration'
+      },
+      {
+        type: 'fix',
+        description: 'Separate filter and VCA envelope decay controls'
+      },
+      {
+        type: 'fix',
+        description: 'Correct Devil Fish default vegDecay to prevent clicks'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve EnvelopeVisualizer size and theme integration'
+      }
+    ]
+  },
+  {
+    version: '1.0.0-1',
+    date: '2026-01-20',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Update summary with Acid Sequencer information'
+      },
+      {
+        type: 'feature',
+        description: 'Add Acid Sequencer for TB-303 Pattern Sequencing'
+      },
+      {
+        type: 'feature',
+        description: 'Add GuitarML Neural Network Overdrive to TB-303 Engine'
+      },
+      {
+        type: 'feature',
+        description: 'Implement 1:1 accurate TB-303 emulation with Open303 DSP engine'
+      },
+      {
+        type: 'feature',
+        description: 'Add dynamic version handling for export/import system (#10)'
+      },
+      {
+        type: 'feature',
+        description: 'Implement virtualized tracker view with @tanstack/react-virtual (#9)'
+      },
+      {
+        type: 'feature',
+        description: 'Add Electron desktop application support (#8)'
+      }
+    ]
+  },
+  {
+    version: '1.0.0-2',
     date: '2026-01-17',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix cursor positioning for dual effect columns in pattern editor'
+      },
       {
         type: 'feature',
         description: 'Add dual effect columns support (2x3 character effect commands per note)'
@@ -54,7 +114,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-1',
+    version: '1.0.0-3',
     date: '2026-01-16',
     changes: [
       {
@@ -156,7 +216,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-2',
+    version: '1.0.0-4',
     date: '2026-01-15',
     changes: [
       {

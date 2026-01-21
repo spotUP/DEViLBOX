@@ -11,7 +11,6 @@ import type {
   BlockSelection,
   ClipboardData,
   ColumnVisibility,
-  TimeSignature,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -46,6 +45,40 @@ const semitoneToNote = (semitone: number): string | null => {
   return `${NOTE_NAMES[noteIndex]}${octave}`;
 };
 
+// FT2-style bitwise mask system for copy/paste/transpose operations
+// Bit 0: Note
+// Bit 1: Instrument
+// Bit 2: Volume
+// Bit 3: Effect
+// Bit 4: Effect2
+const MASK_NOTE = 1 << 0;      // 0b00001
+const MASK_INSTRUMENT = 1 << 1; // 0b00010
+const MASK_VOLUME = 1 << 2;     // 0b00100
+const MASK_EFFECT = 1 << 3;     // 0b01000
+const MASK_EFFECT2 = 1 << 4;    // 0b10000
+const MASK_ALL = 0b11111;       // All columns
+
+// Helper functions for mask operations
+const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
+const toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
+
+// Macro slot structure for rapid data entry (FT2-style)
+interface MacroSlot {
+  note: string | null;
+  instrument: number | null;
+  volume: number | null;
+  effect: string | null;
+  effect2: string | null;
+}
+
+const createEmptyMacroSlot = (): MacroSlot => ({
+  note: null,
+  instrument: null,
+  volume: null,
+  effect: null,
+  effect2: null,
+});
+
 interface TrackerStore {
   // State
   patterns: Pattern[];
@@ -53,18 +86,22 @@ interface TrackerStore {
   cursor: CursorPosition;
   selection: BlockSelection | null;
   clipboard: ClipboardData | null;
+  trackClipboard: TrackerCell[] | null; // FT2: Single-channel clipboard
   followPlayback: boolean;
   showGhostPatterns: boolean; // Show previous/next patterns as ghosts
   columnVisibility: ColumnVisibility;
-  copyMask: {
-    note: boolean;
-    instrument: boolean;
-    volume: boolean;
-    effect: boolean;
-  };
+  // FT2-style bitwise masks for selective operations
+  copyMask: number;      // 5-bit: which columns to copy
+  pasteMask: number;     // 5-bit: which columns to paste
+  transposeMask: number; // 5-bit: which columns to transpose
+  macroSlots: MacroSlot[]; // FT2: 8 quick-entry slots
+  insertMode: boolean;   // FT2: Insert vs overwrite mode
   currentOctave: number; // FT2: F1-F7 selects octave 1-7
   recordMode: boolean; // When true, entering notes advances cursor by editStep
   editStep: number; // Rows to advance after entering a note (1-16)
+  // FT2: Pattern Order List (Song Position List)
+  patternOrder: number[]; // Array of pattern indices for song arrangement
+  currentPositionIndex: number; // Current position in pattern order (for editing)
 
   // Actions
   setCurrentPattern: (index: number) => void;
@@ -81,10 +118,15 @@ interface TrackerStore {
   setFollowPlayback: (enabled: boolean) => void;
   setShowGhostPatterns: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
-  setCopyMask: (mask: Partial<TrackerStore['copyMask']>) => void;
+  // FT2-style mask operations
+  setCopyMask: (mask: number) => void;
+  setPasteMask: (mask: number) => void;
+  setTransposeMask: (mask: number) => void;
+  toggleMaskBit: (maskType: 'copy' | 'paste' | 'transpose', bit: number) => void;
   setCurrentOctave: (octave: number) => void;
   toggleRecordMode: () => void;
   setEditStep: (step: number) => void;
+  toggleInsertMode: () => void;
 
   // Block operations
   startSelection: () => void;
@@ -98,11 +140,23 @@ interface TrackerStore {
   cutSelection: () => void;
   paste: () => void;
 
+  // FT2: Track operations (single-channel)
+  copyTrack: (channelIndex: number) => void;
+  cutTrack: (channelIndex: number) => void;
+  pasteTrack: (channelIndex: number) => void;
+
+  // FT2: Macro slots (quick-entry)
+  writeMacroSlot: (slotIndex: number) => void;  // Store current cell
+  readMacroSlot: (slotIndex: number) => void;   // Paste macro
+
   // Advanced editing
   transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
-  remapInstrument: (oldId: number, newId: number, scope: 'track' | 'pattern' | 'song') => void;
+  remapInstrument: (oldId: number, newId: number, scope: 'block' | 'track' | 'pattern' | 'song') => void;
   interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan', startValue: number, endValue: number) => void;
   humanizeSelection: (volumeVariation: number) => void;
+  // FT2: Volume operations
+  scaleVolume: (scope: 'block' | 'track' | 'pattern', factor: number) => void;
+  fadeVolume: (scope: 'block' | 'track' | 'pattern', startVol: number, endVol: number) => void;
 
   // Pattern management
   addPattern: (length?: number) => void;
@@ -115,15 +169,24 @@ interface TrackerStore {
   shrinkPattern: (index: number) => void;
   reorderPatterns: (oldIndex: number, newIndex: number) => void;
   updatePatternName: (index: number, name: string) => void;
-  updateTimeSignature: (index: number, signature: Partial<TimeSignature>) => void;
-  updateAllTimeSignatures: (signature: Partial<TimeSignature>) => void;
+  // updateTimeSignature: (index: number, signature: Partial<TimeSignature>) => void;
+  // updateAllTimeSignatures: (signature: Partial<TimeSignature>) => void;
+
+  // FT2: Pattern Order List management
+  addToOrder: (patternIndex: number, position?: number) => void;
+  removeFromOrder: (positionIndex: number) => void;
+  insertInOrder: (patternIndex: number, positionIndex: number) => void;
+  duplicatePosition: (positionIndex: number) => void;
+  clearOrder: () => void;
+  reorderPositions: (oldIndex: number, newIndex: number) => void;
+  setCurrentPosition: (positionIndex: number) => void;
 
   // Channel management
   addChannel: () => void;
   removeChannel: (channelIndex: number) => void;
   toggleChannelMute: (channelIndex: number) => void;
   toggleChannelSolo: (channelIndex: number) => void;
-  toggleChannelCollapse: (channelIndex: number) => void;
+  // toggleChannelCollapse: (channelIndex: number) => void;
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
@@ -143,7 +206,6 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
   id: idGenerator.generate('pattern'),
   name: 'Untitled Pattern',
   length,
-  timeSignature: { beatsPerMeasure: 4, stepsPerBeat: 4 },
   channels: Array.from({ length: numChannels }, (_, i) => ({
     id: `channel-${i}`,
     name: `Channel ${i + 1}`,
@@ -154,7 +216,6 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
     pan: 0,
     instrumentId: null,
     color: null,
-    collapsed: false,
   })),
 });
 
@@ -171,18 +232,22 @@ export const useTrackerStore = create<TrackerStore>()(
     },
     selection: null,
     clipboard: null,
+    trackClipboard: null, // FT2: Single-channel clipboard
     followPlayback: false,
     showGhostPatterns: true, // Show ghost patterns by default
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
-    copyMask: {
-      note: true,
-      instrument: true,
-      volume: true,
-      effect: true,
-    },
+    // FT2-style bitwise masks (all columns enabled by default)
+    copyMask: MASK_ALL,
+    pasteMask: MASK_ALL,
+    transposeMask: MASK_NOTE, // Only transpose notes by default
+    macroSlots: Array.from({ length: 8 }, () => createEmptyMacroSlot()), // FT2: 8 macro slots
+    insertMode: false, // FT2: Start in overwrite mode
     currentOctave: 4, // Default octave (F4)
     recordMode: false, // Start with record mode off
     editStep: 1, // Default edit step (advance 1 row after note entry)
+    // FT2: Pattern Order List (Song Position List)
+    patternOrder: [0], // Start with first pattern in order
+    currentPositionIndex: 0, // Start at position 0
 
     // Actions
     setCurrentPattern: (index) =>
@@ -404,9 +469,31 @@ export const useTrackerStore = create<TrackerStore>()(
         Object.assign(state.columnVisibility, visibility);
       }),
 
+    // FT2-style mask operations
     setCopyMask: (mask) =>
       set((state) => {
-        Object.assign(state.copyMask, mask);
+        state.copyMask = mask & MASK_ALL; // Ensure only valid bits
+      }),
+
+    setPasteMask: (mask) =>
+      set((state) => {
+        state.pasteMask = mask & MASK_ALL;
+      }),
+
+    setTransposeMask: (mask) =>
+      set((state) => {
+        state.transposeMask = mask & MASK_ALL;
+      }),
+
+    toggleMaskBit: (maskType, bit) =>
+      set((state) => {
+        if (maskType === 'copy') {
+          state.copyMask = toggleMaskBit(state.copyMask, bit);
+        } else if (maskType === 'paste') {
+          state.pasteMask = toggleMaskBit(state.pasteMask, bit);
+        } else if (maskType === 'transpose') {
+          state.transposeMask = toggleMaskBit(state.transposeMask, bit);
+        }
       }),
 
     setCurrentOctave: (octave) =>
@@ -424,6 +511,11 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         // Clamp edit step to valid range 0-16
         state.editStep = Math.max(0, Math.min(16, step));
+      }),
+
+    toggleInsertMode: () =>
+      set((state) => {
+        state.insertMode = !state.insertMode;
       }),
 
     startSelection: () =>
@@ -562,7 +654,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const pattern = state.patterns[state.currentPatternIndex];
         const { channelIndex, rowIndex } = state.cursor;
         const { data } = state.clipboard;
-        const { copyMask } = state;
+        const { pasteMask } = state;
 
         for (let ch = 0; ch < data.length; ch++) {
           const targetChannel = channelIndex + ch;
@@ -575,20 +667,156 @@ export const useTrackerStore = create<TrackerStore>()(
             const sourceCell = data[ch][row];
             const targetCell = pattern.channels[targetChannel].rows[targetRow];
 
-            // Merge properties based on mask
-            if (copyMask.note) {
+            // Merge properties based on pasteMask
+            if (hasMaskBit(pasteMask, MASK_NOTE)) {
               targetCell.note = sourceCell.note;
             }
-            if (copyMask.instrument) {
+            if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
               targetCell.instrument = sourceCell.instrument;
             }
-            if (copyMask.volume) {
+            if (hasMaskBit(pasteMask, MASK_VOLUME)) {
               targetCell.volume = sourceCell.volume;
             }
-            if (copyMask.effect) {
+            if (hasMaskBit(pasteMask, MASK_EFFECT)) {
               targetCell.effect = sourceCell.effect;
+            }
+            if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
               targetCell.effect2 = sourceCell.effect2;
             }
+          }
+        }
+      }),
+
+    // FT2: Track operations (single-channel copy/paste)
+    copyTrack: (channelIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+
+        const channel = pattern.channels[channelIndex];
+        state.trackClipboard = channel.rows.map(row => ({ ...row }));
+      }),
+
+    cutTrack: (channelIndex) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+
+        const channel = pattern.channels[channelIndex];
+        state.trackClipboard = channel.rows.map(row => ({ ...row }));
+
+        // Clear the track
+        channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
+      }),
+
+    pasteTrack: (channelIndex) =>
+      set((state) => {
+        if (!state.trackClipboard) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+
+        const channel = pattern.channels[channelIndex];
+        const { pasteMask } = state;
+
+        // Paste as many rows as possible
+        const maxRows = Math.min(state.trackClipboard.length, pattern.length);
+        for (let row = 0; row < maxRows; row++) {
+          const sourceCell = state.trackClipboard[row];
+          const targetCell = channel.rows[row];
+
+          // Merge properties based on pasteMask
+          if (hasMaskBit(pasteMask, MASK_NOTE)) {
+            targetCell.note = sourceCell.note;
+          }
+          if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+            targetCell.instrument = sourceCell.instrument;
+          }
+          if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+            targetCell.volume = sourceCell.volume;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+            targetCell.effect = sourceCell.effect;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
+            targetCell.effect2 = sourceCell.effect2;
+          }
+        }
+      }),
+
+    // FT2: Macro slots (quick-entry)
+    writeMacroSlot: (slotIndex) =>
+      set((state) => {
+        if (slotIndex < 0 || slotIndex >= 8) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { channelIndex, rowIndex } = state.cursor;
+        const cell = pattern.channels[channelIndex].rows[rowIndex];
+
+        state.macroSlots[slotIndex] = {
+          note: cell.note,
+          instrument: cell.instrument,
+          volume: cell.volume,
+          effect: cell.effect,
+          effect2: cell.effect2 ?? null,
+        };
+      }),
+
+    readMacroSlot: (slotIndex) =>
+      set((state) => {
+        if (slotIndex < 0 || slotIndex >= 8) return;
+
+        const macro = state.macroSlots[slotIndex];
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { channelIndex, rowIndex } = state.cursor;
+        const { pasteMask } = state;
+
+        if (!state.insertMode) {
+          // Overwrite mode: paste macro to current cell
+          const targetCell = pattern.channels[channelIndex].rows[rowIndex];
+
+          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== null) {
+            targetCell.note = macro.note;
+          }
+          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== null) {
+            targetCell.instrument = macro.instrument;
+          }
+          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== null) {
+            targetCell.volume = macro.volume;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT) && macro.effect !== null) {
+            targetCell.effect = macro.effect;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
+            targetCell.effect2 = macro.effect2;
+          }
+        } else {
+          // Insert mode: shift rows down and insert macro
+          const channel = pattern.channels[channelIndex];
+          const newRow: TrackerCell = { ...EMPTY_CELL };
+
+          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== null) {
+            newRow.note = macro.note;
+          }
+          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== null) {
+            newRow.instrument = macro.instrument;
+          }
+          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== null) {
+            newRow.volume = macro.volume;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT) && macro.effect !== null) {
+            newRow.effect = macro.effect;
+          }
+          if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
+            newRow.effect2 = macro.effect2;
+          }
+
+          // Shift rows down
+          channel.rows.splice(rowIndex, 0, newRow);
+
+          // Remove last row to maintain pattern length
+          if (channel.rows.length > pattern.length) {
+            channel.rows.pop();
           }
         }
       }),
@@ -646,20 +874,31 @@ export const useTrackerStore = create<TrackerStore>()(
     // Swap all occurrences of Instrument A with Instrument B
     remapInstrument: (oldId, newId, scope) =>
       set((state) => {
-        const processPattern = (patt: Pattern, channelIdx?: number) => {
+        const processPattern = (patt: Pattern, channelIdx?: number, rowStart?: number, rowEnd?: number) => {
           const chStart = channelIdx !== undefined ? channelIdx : 0;
           const chEnd = channelIdx !== undefined ? channelIdx : patt.channels.length - 1;
+          const rStart = rowStart !== undefined ? rowStart : 0;
+          const rEnd = rowEnd !== undefined ? rowEnd : patt.length - 1;
 
           for (let ch = chStart; ch <= chEnd; ch++) {
-            patt.channels[ch].rows.forEach(row => {
-              if (row.instrument === oldId) {
-                row.instrument = newId;
+            for (let row = rStart; row <= rEnd; row++) {
+              if (patt.channels[ch].rows[row]?.instrument === oldId) {
+                patt.channels[ch].rows[row].instrument = newId;
               }
-            });
+            }
           }
         };
 
-        if (scope === 'track') {
+        if (scope === 'block' && state.selection) {
+          const minChannel = Math.min(state.selection.startChannel, state.selection.endChannel);
+          const maxChannel = Math.max(state.selection.startChannel, state.selection.endChannel);
+          const minRow = Math.min(state.selection.startRow, state.selection.endRow);
+          const maxRow = Math.max(state.selection.startRow, state.selection.endRow);
+
+          for (let ch = minChannel; ch <= maxChannel; ch++) {
+            processPattern(state.patterns[state.currentPatternIndex], ch, minRow, maxRow);
+          }
+        } else if (scope === 'track') {
           processPattern(state.patterns[state.currentPatternIndex], state.cursor.channelIndex);
         } else if (scope === 'pattern') {
           processPattern(state.patterns[state.currentPatternIndex]);
@@ -743,6 +982,93 @@ export const useTrackerStore = create<TrackerStore>()(
             cell.volume = newVolume;
           }
         }
+      }),
+
+    // FT2: Scale volume (multiply by factor)
+    scaleVolume: (scope, factor) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const getCells = (): TrackerCell[] => {
+          const cells: TrackerCell[] = [];
+
+          if (scope === 'block' && state.selection) {
+            const minChannel = Math.min(state.selection.startChannel, state.selection.endChannel);
+            const maxChannel = Math.max(state.selection.startChannel, state.selection.endChannel);
+            const minRow = Math.min(state.selection.startRow, state.selection.endRow);
+            const maxRow = Math.max(state.selection.startRow, state.selection.endRow);
+
+            for (let ch = minChannel; ch <= maxChannel; ch++) {
+              for (let row = minRow; row <= maxRow; row++) {
+                if (ch < pattern.channels.length && row < pattern.length) {
+                  cells.push(pattern.channels[ch].rows[row]);
+                }
+              }
+            }
+          } else if (scope === 'track') {
+            const ch = state.cursor.channelIndex;
+            if (ch < pattern.channels.length) {
+              cells.push(...pattern.channels[ch].rows);
+            }
+          } else if (scope === 'pattern') {
+            pattern.channels.forEach(channel => {
+              cells.push(...channel.rows);
+            });
+          }
+
+          return cells;
+        };
+
+        const cells = getCells();
+        cells.forEach(cell => {
+          if (cell.volume !== null && cell.volume !== undefined) {
+            cell.volume = Math.min(0x40, Math.max(0, Math.round(cell.volume * factor)));
+          }
+        });
+      }),
+
+    // FT2: Fade volume (linear interpolation)
+    fadeVolume: (scope, startVol, endVol) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const getCells = (): TrackerCell[] => {
+          const cells: TrackerCell[] = [];
+
+          if (scope === 'block' && state.selection) {
+            const minChannel = Math.min(state.selection.startChannel, state.selection.endChannel);
+            const maxChannel = Math.max(state.selection.startChannel, state.selection.endChannel);
+            const minRow = Math.min(state.selection.startRow, state.selection.endRow);
+            const maxRow = Math.max(state.selection.startRow, state.selection.endRow);
+
+            for (let ch = minChannel; ch <= maxChannel; ch++) {
+              for (let row = minRow; row <= maxRow; row++) {
+                if (ch < pattern.channels.length && row < pattern.length) {
+                  cells.push(pattern.channels[ch].rows[row]);
+                }
+              }
+            }
+          } else if (scope === 'track') {
+            const ch = state.cursor.channelIndex;
+            if (ch < pattern.channels.length) {
+              cells.push(...pattern.channels[ch].rows);
+            }
+          } else if (scope === 'pattern') {
+            pattern.channels.forEach(channel => {
+              cells.push(...channel.rows);
+            });
+          }
+
+          return cells;
+        };
+
+        const cells = getCells();
+        const count = cells.length;
+        if (count < 2) return;
+
+        cells.forEach((cell, index) => {
+          const t = index / (count - 1); // 0 to 1
+          const volume = Math.round(startVol + t * (endVol - startVol));
+          cell.volume = Math.min(0x40, Math.max(0, volume));
+        });
       }),
 
     addPattern: (length = DEFAULT_PATTERN_LENGTH) =>
@@ -908,22 +1234,22 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    updateTimeSignature: (index, signature) =>
-      set((state) => {
-        if (index >= 0 && index < state.patterns.length) {
-          const pattern = state.patterns[index];
-          if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
-          Object.assign(pattern.timeSignature, signature);
-        }
-      }),
+    // updateTimeSignature: (index, signature) =>
+    //   set((state) => {
+    //     if (index >= 0 && index < state.patterns.length) {
+    //       const pattern = state.patterns[index];
+    //       if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
+    //       Object.assign(pattern.timeSignature, signature);
+    //     }
+    //   }),
 
-    updateAllTimeSignatures: (signature) =>
-      set((state) => {
-        state.patterns.forEach(pattern => {
-          if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
-          Object.assign(pattern.timeSignature, signature);
-        });
-      }),
+    // updateAllTimeSignatures: (signature) =>
+    //   set((state) => {
+    //     state.patterns.forEach(pattern => {
+    //       if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
+    //       Object.assign(pattern.timeSignature, signature);
+    //     });
+    //   }),
 
     // Channel management
     addChannel: () =>
@@ -947,7 +1273,6 @@ export const useTrackerStore = create<TrackerStore>()(
               pan: 0,
               instrumentId: null,
               color: randomColor,
-              collapsed: false,
             });
           }
         });
@@ -1005,14 +1330,14 @@ export const useTrackerStore = create<TrackerStore>()(
       }
     },
 
-    toggleChannelCollapse: (channelIndex) =>
-      set((state) => {
-        state.patterns.forEach((pattern) => {
-          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-            pattern.channels[channelIndex].collapsed = !pattern.channels[channelIndex].collapsed;
-          }
-        });
-      }),
+    // toggleChannelCollapse: (channelIndex) =>
+    //   set((state) => {
+    //     state.patterns.forEach((pattern) => {
+    //       if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+    //         pattern.channels[channelIndex].collapsed = !pattern.channels[channelIndex].collapsed;
+    //       }
+    //     });
+    //   }),
 
     setChannelVolume: (channelIndex, volume) =>
       set((state) => {
@@ -1102,6 +1427,86 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
+    // FT2: Pattern Order List management
+    addToOrder: (patternIndex, position) =>
+      set((state) => {
+        if (patternIndex >= 0 && patternIndex < state.patterns.length) {
+          if (position !== undefined && position >= 0 && position <= state.patternOrder.length) {
+            state.patternOrder.splice(position, 0, patternIndex);
+          } else {
+            state.patternOrder.push(patternIndex);
+          }
+        }
+      }),
+
+    removeFromOrder: (positionIndex) =>
+      set((state) => {
+        if (positionIndex >= 0 && positionIndex < state.patternOrder.length) {
+          // Don't allow removing the last position
+          if (state.patternOrder.length > 1) {
+            state.patternOrder.splice(positionIndex, 1);
+            // Adjust current position if needed
+            if (state.currentPositionIndex >= state.patternOrder.length) {
+              state.currentPositionIndex = state.patternOrder.length - 1;
+            }
+          }
+        }
+      }),
+
+    insertInOrder: (patternIndex, positionIndex) =>
+      set((state) => {
+        if (patternIndex >= 0 && patternIndex < state.patterns.length) {
+          if (positionIndex >= 0 && positionIndex <= state.patternOrder.length) {
+            state.patternOrder.splice(positionIndex, 0, patternIndex);
+          }
+        }
+      }),
+
+    duplicatePosition: (positionIndex) =>
+      set((state) => {
+        if (positionIndex >= 0 && positionIndex < state.patternOrder.length) {
+          const patternIndex = state.patternOrder[positionIndex];
+          state.patternOrder.splice(positionIndex + 1, 0, patternIndex);
+        }
+      }),
+
+    clearOrder: () =>
+      set((state) => {
+        state.patternOrder = [0]; // Reset to just first pattern
+        state.currentPositionIndex = 0;
+      }),
+
+    reorderPositions: (oldIndex, newIndex) =>
+      set((state) => {
+        if (
+          oldIndex >= 0 &&
+          oldIndex < state.patternOrder.length &&
+          newIndex >= 0 &&
+          newIndex < state.patternOrder.length
+        ) {
+          const [movedPattern] = state.patternOrder.splice(oldIndex, 1);
+          state.patternOrder.splice(newIndex, 0, movedPattern);
+
+          // Update current position if it was affected
+          if (state.currentPositionIndex === oldIndex) {
+            state.currentPositionIndex = newIndex;
+          } else if (oldIndex < state.currentPositionIndex && newIndex >= state.currentPositionIndex) {
+            state.currentPositionIndex--;
+          } else if (oldIndex > state.currentPositionIndex && newIndex <= state.currentPositionIndex) {
+            state.currentPositionIndex++;
+          }
+        }
+      }),
+
+    setCurrentPosition: (positionIndex) =>
+      set((state) => {
+        if (positionIndex >= 0 && positionIndex < state.patternOrder.length) {
+          state.currentPositionIndex = positionIndex;
+          // Also update current pattern to match this position
+          state.currentPatternIndex = state.patternOrder[positionIndex];
+        }
+      }),
+
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
@@ -1115,10 +1520,22 @@ export const useTrackerStore = create<TrackerStore>()(
         };
         state.selection = null;
         state.clipboard = null;
+        state.trackClipboard = null;
         state.currentOctave = 4;
         state.recordMode = false;
         state.editStep = 1;
+        state.insertMode = false;
         state.columnVisibility = { ...DEFAULT_COLUMN_VISIBILITY };
+        state.copyMask = MASK_ALL;
+        state.pasteMask = MASK_ALL;
+        state.transposeMask = MASK_NOTE;
+        state.macroSlots = Array.from({ length: 8 }, () => createEmptyMacroSlot());
+        state.patternOrder = [0];
+        state.currentPositionIndex = 0;
       }),
   }))
 );
+
+// Export mask constants for use in other modules
+export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL, hasMaskBit, toggleMaskBit };
+export type { MacroSlot };

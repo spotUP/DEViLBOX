@@ -1,5 +1,5 @@
 /**
- * PianoRoll - Main piano roll editor container
+ * PianoRoll - Main piano roll editor container (full width)
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +8,7 @@ import { PianoRollGrid } from './PianoRollGrid';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { usePianoRollData } from '../../hooks/pianoroll/usePianoRollData';
 import { useTransportStore } from '../../stores';
+import type { Pattern } from '../../types/tracker';
 import {
   ZoomIn,
   ZoomOut,
@@ -48,7 +49,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const { notes, pattern, addNote, deleteNote, moveNote, resizeNote } = usePianoRollData(
     channelIndex ?? view.channelIndex
   );
-  const { isPlaying, continuousRow } = useTransportStore();
+  const isPlaying = useTransportStore((state) => state.isPlaying);
+  const currentRow = useTransportStore((state) => state.currentRow);
 
   // Container ref for measuring height
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,6 +62,47 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       setChannelIndex(channelIndex);
     }
   }, [channelIndex, setChannelIndex]);
+
+  // Auto-scroll during playback to keep playhead at piano keys edge
+  const prevCurrentRowRef = useRef<number | null>(null);
+  const prevPatternRef = useRef<Pattern | null>(null);
+  useEffect(() => {
+    if (isPlaying && currentRow !== null) {
+      // Check if pattern changed (handles pattern switching in pattern order)
+      const patternChanged = prevPatternRef.current !== pattern;
+
+      if (patternChanged) {
+        // Pattern changed - reset scroll to start
+        usePianoRollStore.setState({
+          view: {
+            ...usePianoRollStore.getState().view,
+            scrollX: 0,
+          },
+        });
+        prevPatternRef.current = pattern;
+        prevCurrentRowRef.current = currentRow;
+      } else if (prevCurrentRowRef.current === null || currentRow >= prevCurrentRowRef.current) {
+        // Normal forward playback - keep playhead at piano keys edge
+        const targetPlayheadX = 48; // Piano keyboard width
+        const currentPlayheadX = (currentRow - view.scrollX) * view.horizontalZoom;
+
+        // If playhead has moved past the target position, scroll forward
+        if (currentPlayheadX > targetPlayheadX + view.horizontalZoom) {
+          const newScrollX = currentRow - (targetPlayheadX / view.horizontalZoom);
+          usePianoRollStore.setState({
+            view: {
+              ...usePianoRollStore.getState().view,
+              scrollX: Math.max(0, newScrollX),
+            },
+          });
+        }
+        prevCurrentRowRef.current = currentRow;
+      }
+    } else {
+      prevCurrentRowRef.current = null;
+      prevPatternRef.current = null;
+    }
+  }, [isPlaying, currentRow, pattern, view.scrollX, view.horizontalZoom]);
 
   // Measure container height on mount and resize
   useEffect(() => {
@@ -91,6 +134,20 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const visibleOctaves = useMemo(() => {
     return Math.floor(visibleNotes / 12);
   }, [visibleNotes]);
+
+  // Track which MIDI notes are currently playing at the playhead
+  const activeNotes = useMemo(() => {
+    if (!isPlaying || currentRow === null) return new Set<number>();
+
+    const active = new Set<number>();
+    notes.forEach((note) => {
+      // Check if currentRow is within note's duration
+      if (currentRow >= note.startRow && currentRow < note.endRow) {
+        active.add(note.midiNote);
+      }
+    });
+    return active;
+  }, [isPlaying, currentRow, notes]);
 
   // Handle note selection
   const handleNoteSelect = useCallback(
@@ -199,7 +256,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const patternLength = pattern?.length || 64;
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full bg-dark-bgSecondary">
+    <div ref={containerRef} className="flex flex-col h-full w-full bg-dark-bgSecondary">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgTertiary shrink-0">
         {/* Tool buttons */}
@@ -355,13 +412,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       </div>
 
       {/* Main editor area */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex w-full overflow-hidden min-h-0">
         {/* Piano keyboard */}
         <PianoKeyboard
           verticalZoom={view.verticalZoom}
           scrollY={view.scrollY}
           visibleNotes={visibleNotes}
           containerHeight={containerHeight}
+          activeNotes={activeNotes}
         />
 
         {/* Grid and notes */}
@@ -375,7 +433,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           gridDivision={view.gridDivision}
           showVelocity={view.showVelocity}
           selectedNotes={selection.notes}
-          playheadRow={isPlaying ? continuousRow : null}
+          playheadRow={isPlaying ? currentRow : null}
           containerHeight={containerHeight}
           onNoteSelect={handleNoteSelect}
           onNoteDragStart={handleNoteDragStart}

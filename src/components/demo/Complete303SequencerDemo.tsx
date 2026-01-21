@@ -14,6 +14,8 @@ import { SequencerEngine } from '@engine/SequencerEngine';
 import { AcidPattern } from '@engine/AcidSequencer';
 import { AcidPatternEditor } from '@components/sequencer/AcidPatternEditor';
 import type { TB303Config } from '@typedefs/instrument';
+import type { NeuralPedalboard } from '@typedefs/pedalboard';
+import { getModelByIndex, GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 
 export const Complete303SequencerDemo: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -28,39 +30,70 @@ export const Complete303SequencerDemo: React.FC = () => {
   const [decay, setDecay] = useState(400);
   const [accent, setAccent] = useState(50);
 
+  // Overdrive Parameters
+  const [overdriveEnabled, setOverdriveEnabled] = useState(false);
+  const [overdriveModel, setOverdriveModel] = useState(0);
+  const [overdriveDrive, setOverdriveDrive] = useState(50);
+  const [overdriveMix, setOverdriveMix] = useState(50);
+
+  // Advanced Parameters
+  const [oversampling, setOversampling] = useState(4);
+
   // Sequencer Parameters
   const [bpm, setBpm] = useState(130);
   const [currentStep, setCurrentStep] = useState(-1);
-  const [activePattern, setActivePattern] = useState(0);
+  // Unused - pattern index for future multi-pattern support
+  // const [activePattern, setActivePattern] = useState(0);
   const [pattern, setPattern] = useState<AcidPattern>(new AcidPattern());
 
   const tb303Ref = useRef<TB303EngineAccurate | null>(null);
   const sequencerRef = useRef<SequencerEngine | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Initialize
-  useEffect(() => {
-    const init = async () => {
-      try {
-        audioContextRef.current = new AudioContext();
+  // Initialize audio (called after user interaction)
+  const initializeAudio = async () => {
+    try {
+      setError(null);
 
-        // Create TB-303
-        const config: TB303Config = {
-          oscillator: { type: 'square' },
-          filter: { cutoff, resonance },
-          filterEnvelope: { envMod, decay },
-          accent: { amount: accent },
-          devilFish: {
-            normalDecay: decay,
-            accentDecay: decay * 0.5,
-            slideTime: 60,
-          },
-        };
+      // Create AudioContext
+      audioContextRef.current = new AudioContext();
 
-        const tb303 = new TB303EngineAccurate(audioContextRef.current, config);
-        await tb303.initialize();
-        tb303.connect(audioContextRef.current.destination);
-        tb303Ref.current = tb303;
+      // Resume if suspended (required for user interaction)
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      // Create TB-303
+      const config: TB303Config = {
+        oscillator: { type: 'square' },
+        filter: { cutoff, resonance },
+        filterEnvelope: { envMod, decay },
+        accent: { amount: accent },
+        slide: { time: 60, mode: 'exponential' },
+        devilFish: {
+          enabled: false,
+          normalDecay: decay,
+          accentDecay: decay * 0.5,
+          vegDecay: 200,
+          vegSustain: 0,
+          softAttack: 5,
+          filterTracking: 100,
+          filterFM: 0,
+          sweepSpeed: 'normal',
+          accentSweepEnabled: false,
+          highResonance: false,
+          muffler: 'off',
+        },
+      };
+
+      const tb303 = new TB303EngineAccurate(audioContextRef.current, config);
+      await tb303.initialize();
+      tb303.connect(audioContextRef.current.destination);
+      tb303Ref.current = tb303;
+
+      // console.log('[Complete303SequencerDemo] TB-303 connected to destination');
+      // console.log('[Complete303SequencerDemo] AudioContext state:', audioContextRef.current.state);
+      // console.log('[Complete303SequencerDemo] AudioContext sample rate:', audioContextRef.current.sampleRate);
 
         // Create Sequencer
         const sequencer = new SequencerEngine(audioContextRef.current, { bpm });
@@ -119,15 +152,15 @@ export const Complete303SequencerDemo: React.FC = () => {
         setPattern(loadedPattern);
         setIsInitialized(true);
 
-        console.log('[Complete303SequencerDemo] Initialized');
+        // console.log('[Complete303SequencerDemo] Initialized');
       } catch (err) {
         console.error('[Complete303SequencerDemo] Init error:', err);
         setError(`Failed to initialize: ${err}`);
       }
     };
 
-    init();
-
+  // Cleanup
+  useEffect(() => {
     return () => {
       if (sequencerRef.current) {
         sequencerRef.current.dispose();
@@ -185,6 +218,60 @@ export const Complete303SequencerDemo: React.FC = () => {
     }
   }, [bpm, isInitialized]);
 
+  // Update pedalboard enabled state
+  useEffect(() => {
+    if (tb303Ref.current && isInitialized) {
+      tb303Ref.current.setPedalboardEnabled(overdriveEnabled);
+    }
+  }, [overdriveEnabled, isInitialized]);
+
+  // Update pedalboard when model changes
+  useEffect(() => {
+    if (tb303Ref.current && isInitialized && overdriveEnabled) {
+      const modelInfo = getModelByIndex(overdriveModel);
+      const pedalboard: NeuralPedalboard = {
+        enabled: true,
+        inputGain: 100,
+        outputGain: 100,
+        chain: [{
+          id: `effect-${overdriveModel}`,
+          enabled: true,
+          type: 'neural',
+          modelIndex: overdriveModel,
+          modelName: modelInfo?.name ?? 'TS808',
+          parameters: {
+            drive: overdriveDrive,
+            tone: 50,
+            level: 75,
+            dryWet: overdriveMix,
+          },
+        }],
+      };
+      tb303Ref.current.updatePedalboard(pedalboard);
+    }
+  }, [overdriveModel, isInitialized, overdriveEnabled, overdriveDrive, overdriveMix]);
+
+  // Update drive parameter
+  useEffect(() => {
+    if (tb303Ref.current && isInitialized && overdriveEnabled) {
+      tb303Ref.current.setEffectParameter(`effect-${overdriveModel}`, 'drive', overdriveDrive);
+    }
+  }, [overdriveDrive, isInitialized, overdriveEnabled, overdriveModel]);
+
+  // Update mix parameter
+  useEffect(() => {
+    if (tb303Ref.current && isInitialized && overdriveEnabled) {
+      tb303Ref.current.setEffectParameter(`effect-${overdriveModel}`, 'dryWet', overdriveMix);
+    }
+  }, [overdriveMix, isInitialized, overdriveEnabled, overdriveModel]);
+
+  // Update oversampling
+  useEffect(() => {
+    if (tb303Ref.current && isInitialized) {
+      tb303Ref.current.setParameter('oversampling', oversampling);
+    }
+  }, [oversampling, isInitialized]);
+
   const handlePlayPause = () => {
     if (!sequencerRef.current) return;
 
@@ -215,7 +302,20 @@ export const Complete303SequencerDemo: React.FC = () => {
       )}
 
       {!isInitialized ? (
-        <div className="text-ft2-textDim">Initializing...</div>
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="text-ft2-text text-lg mb-4">
+            Click below to initialize the TB-303 engine
+          </div>
+          <button
+            onClick={initializeAudio}
+            className="px-8 py-4 bg-green-700 hover:bg-green-600 text-white font-bold text-lg rounded-lg transition-all"
+          >
+            🎵 Initialize TB-303
+          </button>
+          <p className="text-ft2-textDim text-sm mt-4">
+            (Audio requires user interaction to start)
+          </p>
+        </div>
       ) : (
         <>
           {/* Transport Controls */}
@@ -351,11 +451,102 @@ export const Complete303SequencerDemo: React.FC = () => {
             </div>
           </div>
 
+          {/* Overdrive (GuitarML) */}
+          <div className="border-t border-ft2-border pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-ft2-highlight font-bold">Neural Overdrive (GuitarML)</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overdriveEnabled}
+                  onChange={(e) => setOverdriveEnabled(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-ft2-text text-sm">Enabled</span>
+              </label>
+            </div>
+
+            {overdriveEnabled && (
+              <>
+                <div>
+                  <label className="block text-ft2-textDim text-sm mb-1">
+                    Model: {getModelByIndex(overdriveModel)?.name ?? 'Unknown'}
+                  </label>
+                  <select
+                    value={overdriveModel}
+                    onChange={(e) => setOverdriveModel(parseInt(e.target.value))}
+                    className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded px-2 py-1"
+                  >
+                    {GUITARML_MODEL_REGISTRY.map((model) => (
+                      <option key={model.index} value={model.index}>
+                        {model.name} ({model.category})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-ft2-textDim text-sm mb-1">
+                    Drive: {overdriveDrive}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={overdriveDrive}
+                    onChange={(e) => setOverdriveDrive(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-ft2-textDim text-sm mb-1">
+                    Dry/Wet Mix: {overdriveMix}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={overdriveMix}
+                    onChange={(e) => setOverdriveMix(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Advanced Settings */}
+          <div className="border-t border-ft2-border pt-4 space-y-3">
+            <h3 className="text-ft2-highlight font-bold">Advanced</h3>
+
+            <div>
+              <label className="block text-ft2-textDim text-sm mb-1">
+                Oversampling: {oversampling}x {oversampling === 4 ? '(Open303 default)' : ''}
+              </label>
+              <select
+                value={oversampling}
+                onChange={(e) => setOversampling(parseInt(e.target.value))}
+                className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded px-2 py-1"
+              >
+                <option value={1}>1x (No oversampling - fastest)</option>
+                <option value={2}>2x (Moderate quality)</option>
+                <option value={4}>4x (Open303 quality - recommended)</option>
+              </select>
+              <p className="text-ft2-textDim text-xs mt-1">
+                Higher oversampling = better quality, more CPU usage
+              </p>
+            </div>
+          </div>
+
           {/* Info */}
           <div className="border-t border-ft2-border pt-4 text-xs text-ft2-textDim">
             <p>✨ Open303 DSP + Acid Sequencer + Pattern Editor</p>
             <p>✨ 16-step patterns with accents and slides</p>
             <p>✨ Sample-accurate timing via ScriptProcessor</p>
+            <p>✨ 37 Neural amp/pedal models via GuitarML</p>
+            <p>✨ Calibrated envelope modulation from real hardware</p>
+            <p>✨ Additional filters + 4x oversampling (Open303)</p>
           </div>
         </>
       )}

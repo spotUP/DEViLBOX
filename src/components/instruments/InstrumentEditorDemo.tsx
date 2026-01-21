@@ -9,7 +9,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { EffectChain } from './EffectChain';
 import { EffectPanel } from './EffectPanel';
 import { PresetBrowser } from './PresetBrowser';
-import { InstrumentEditor } from './InstrumentEditor';
+import { UnifiedInstrumentEditor } from './UnifiedInstrumentEditor';
 import type { EffectConfig } from '@typedefs/instrument';
 
 export const InstrumentEditorDemo: React.FC = () => {
@@ -111,7 +111,7 @@ export const InstrumentEditorDemo: React.FC = () => {
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto scrollbar-ft2">
             {activeTab === 'synth' ? (
-              <InstrumentEditor instrumentId={currentInstrumentId} />
+              <UnifiedInstrumentEditor mode="inline" />
             ) : (
               <EffectChain
                 instrumentId={currentInstrumentId}

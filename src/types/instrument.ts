@@ -73,7 +73,7 @@ export interface DevilFishConfig {
   accentDecay: number;    // 30-3000ms - MEG decay for accented notes
   vegDecay: number;       // 16-3000ms - VEG (Volume Envelope Generator) decay
   vegSustain: number;     // 0-100% - VEG sustain level (100% = infinite notes)
-  softAttack: number;     // 0.3-30ms - attack time for non-accented notes
+  softAttack: number;     // 0.3-3000ms (exponential) - attack time for non-accented notes
 
   // Filter controls
   filterTracking: number; // 0-200% - filter frequency tracks note pitch
@@ -104,23 +104,27 @@ export interface TB303Config {
     type: 'sawtooth' | 'square';
   };
   filter: {
-    cutoff: number; // 200Hz-20kHz
+    cutoff: number; // Stock: 314-2394Hz (exponential) | Devil Fish: 157-4788Hz (2× range)
     resonance: number; // 0-100%
   };
   filterEnvelope: {
-    envMod: number; // 0-100%
-    decay: number; // 30ms-3s
+    envMod: number; // Stock: 0-100% | Devil Fish: 0-300% (3× modulation depth)
+    decay: number; // Stock: 200-2000ms (controls MEG) | Devil Fish: 16-3000ms (controls VEG when DF enabled)
   };
   accent: {
     amount: number; // 0-100%
   };
   slide: {
-    time: number; // 60ms-360ms (Devil Fish extends original TB-303 range)
+    time: number; // 2-360ms (stock TB-303 was fixed at 60ms, Devil Fish makes it variable)
     mode: 'linear' | 'exponential';
   };
-  // Neural Pedalboard (replaces simple overdrive)
-  pedalboard?: import('@typedefs/pedalboard').NeuralPedalboard;
-  // Devil Fish modifications
+  overdrive?: {
+    amount: number; // 0-100%
+    modelIndex?: number; // GuitarML model index
+    drive?: number; // 0-100%
+    dryWet?: number; // 0-100%
+  };
+  // Devil Fish modifications (optional - for backward compatibility)
   devilFish?: DevilFishConfig;
 }
 
@@ -727,6 +731,9 @@ export const DEFAULT_TB303: TB303Config = {
     time: 60,
     mode: 'exponential',
   },
+  overdrive: {
+    amount: 0,
+  },
 };
 
 /**
@@ -734,26 +741,26 @@ export const DEFAULT_TB303: TB303Config = {
  * Based on manual's "Limiting the Devil Fish to TB-303 sounds" section
  */
 export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
-  enabled: true,         // Always enabled - neutral until knobs are turned
+  enabled: false,
 
-  // NEUTRAL envelope defaults (transparent until adjusted)
+  // Envelope defaults (TB-303 compatible)
   normalDecay: 200,      // Standard MEG decay
-  accentDecay: 200,      // Match normal notes initially
-  vegDecay: 3000,        // Authentic TB-303 VCA decay (~3 seconds)
-  vegSustain: 0,         // No sustain (neutral)
-  softAttack: 0.3,       // MINIMUM (0.3ms) - instant attack like original TB-303
+  accentDecay: 200,      // Accented notes fixed at ~200ms in TB-303
+  vegDecay: 3000,        // TB-303 had fixed ~3-4 second VEG decay
+  vegSustain: 0,         // No sustain in TB-303
+  softAttack: 0.3,       // Minimum (instant attack) - stock TB-303 had fixed ~4ms, DF makes it variable
 
-  // NEUTRAL filter defaults (no effect until turned up)
-  filterTracking: 0,     // No key tracking
-  filterFM: 0,           // No FM
+  // Filter defaults (TB-303 compatible)
+  filterTracking: 0,     // TB-303 filter didn't track pitch
+  filterFM: 0,           // No filter FM in TB-303
 
-  // NEUTRAL accent defaults
-  sweepSpeed: 'normal',  // Standard behavior
-  accentSweepEnabled: false,  // Disabled for neutral behavior
+  // Accent defaults (TB-303 compatible)
+  sweepSpeed: 'normal',  // Standard TB-303 accent behavior
+  accentSweepEnabled: true,
 
-  // NEUTRAL resonance mode
+  // Resonance mode (TB-303 compatible)
   highResonance: false,  // Normal resonance range
 
-  // NEUTRAL output
-  muffler: 'off',        // No distortion
+  // Output (TB-303 compatible)
+  muffler: 'off',        // No muffler in TB-303
 };
