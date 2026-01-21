@@ -6,6 +6,7 @@ import React, { useRef, useCallback, useMemo } from 'react';
 import { NoteBlock } from './NoteBlock';
 import type { PianoRollNote } from '../../types/pianoRoll';
 import { isBlackKey } from '../../types/pianoRoll';
+import { usePianoRollStore } from '../../stores/usePianoRollStore';
 
 interface PianoRollGridProps {
   notes: PianoRollNote[];
@@ -25,7 +26,7 @@ interface PianoRollGridProps {
   onScroll: (deltaX: number, deltaY: number) => void;
 }
 
-export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
+const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
   notes,
   patternLength,
   horizontalZoom,
@@ -44,11 +45,29 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Track container width for proper grid sizing
+  const [containerWidth, setContainerWidth] = React.useState(800);
+
+  React.useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    updateWidth();
+    const resizeObserver = new ResizeObserver(updateWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   // Calculate visible range
   const visibleRows = useMemo(() => {
-    if (!containerRef.current) return 64;
-    return Math.ceil(containerRef.current.clientWidth / horizontalZoom) + 2;
-  }, [horizontalZoom]);
+    return Math.ceil(containerWidth / horizontalZoom) + 2;
+  }, [horizontalZoom, containerWidth]);
 
   const visibleNotes = useMemo(() => {
     // Use passed containerHeight if available, otherwise measure
@@ -95,17 +114,25 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   // Generate grid lines
   const gridLines = useMemo(() => {
     const lines: React.ReactNode[] = [];
-    const gridWidth = patternLength * horizontalZoom;
+    // Grid extends to fill container width OR pattern length, whichever is larger
+    const patternPixelWidth = patternLength * horizontalZoom;
+    const gridWidth = Math.max(containerWidth, patternPixelWidth);
     const startRow = Math.floor(scrollX);
     const endRow = Math.ceil(scrollX + visibleRows);
     const gridStep = 4 / gridDivision; // Rows per grid line based on division
 
+    // Calculate max visible row based on container width (extend beyond pattern for visual continuity)
+    const maxVisibleRow = Math.max(endRow, Math.ceil((containerWidth / horizontalZoom) + scrollX));
+
     // Vertical lines (beat/measure divisions)
-    for (let row = startRow; row <= Math.min(endRow, patternLength); row++) {
+    for (let row = startRow; row <= maxVisibleRow; row++) {
       const x = (row - scrollX) * horizontalZoom;
       const isGridLine = row % gridStep === 0;
       const isBeat = row % 4 === 0;
       const isMeasure = row % 16 === 0;
+
+      // Dim lines beyond pattern length
+      const beyondPattern = row > patternLength;
 
       // Only show lines at grid subdivisions or higher
       if (!isGridLine && !isBeat && !isMeasure) continue;
@@ -114,7 +141,9 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
         <div
           key={`v-${row}`}
           className={`absolute top-0 bottom-0 ${
-            isMeasure
+            beyondPattern
+              ? 'bg-gray-700/20' // Dimmer for extended area
+              : isMeasure
               ? 'bg-gray-500/50'
               : isBeat
               ? 'bg-gray-600/40'
@@ -150,17 +179,23 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
     }
 
     return lines;
-  }, [scrollX, scrollY, horizontalZoom, verticalZoom, patternLength, visibleRows, visibleNotes, gridDivision]);
+  }, [scrollX, scrollY, horizontalZoom, verticalZoom, patternLength, visibleRows, visibleNotes, gridDivision, containerWidth]);
 
   // Playhead position
   const playheadX = playheadRow !== null
     ? (playheadRow - scrollX) * horizontalZoom
     : null;
 
+  // Get current tool from parent context for cursor style
+  const tool = usePianoRollStore((state) => state.tool);
+
+  // Cursor style based on tool
+  const cursorStyle = tool === 'draw' ? 'cursor-crosshair' : tool === 'erase' ? 'cursor-not-allowed' : 'cursor-default';
+
   return (
     <div
       ref={containerRef}
-      className="flex-1 relative overflow-hidden bg-gray-900"
+      className={`flex-1 w-full h-full relative overflow-hidden bg-gray-900 ${cursorStyle}`}
       onWheel={handleWheel}
       onClick={handleGridClick}
     >
@@ -202,4 +237,6 @@ export const PianoRollGrid: React.FC<PianoRollGridProps> = ({
   );
 };
 
+// PERFORMANCE: Wrap in React.memo to prevent unnecessary re-renders
+export const PianoRollGrid = React.memo(PianoRollGridComponent);
 export default PianoRollGrid;

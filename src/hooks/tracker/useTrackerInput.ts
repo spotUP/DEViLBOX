@@ -89,6 +89,10 @@ export const useTrackerInput = () => {
     humanizeSelection,
     recordMode,
     editStep,
+    // FT2: New features
+    writeMacroSlot,
+    readMacroSlot,
+    toggleInsertMode,
   } = useTrackerStore();
 
   const {
@@ -109,6 +113,9 @@ export const useTrackerInput = () => {
 
   // Track held notes by key to enable proper release
   const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
+
+  // Track volume effect prefix state
+  const volumeEffectPrefixRef = useRef<number | null>(null);
 
   // Preview note with attack (called on keydown)
   const previewNote = useCallback(
@@ -290,6 +297,35 @@ export const useTrackerInput = () => {
         e.preventDefault();
         const track = ALT_TRACK_MAP_2[keyLower] % pattern.channels.length;
         moveCursorToChannel(track);
+        return;
+      }
+
+      // ============================================
+      // FT2: Macro Slots (Ctrl+1-8)
+      // ============================================
+
+      // Ctrl+1-8: Read macro slot (Ctrl+Shift+1-8: Write)
+      if ((e.ctrlKey || e.metaKey) && key >= '1' && key <= '8' && !e.altKey) {
+        e.preventDefault();
+        const slotIndex = parseInt(key) - 1;
+        if (e.shiftKey) {
+          // Ctrl+Shift+1-8: Write current cell to macro slot
+          writeMacroSlot(slotIndex);
+        } else {
+          // Ctrl+1-8: Read macro slot to current cell
+          readMacroSlot(slotIndex);
+        }
+        return;
+      }
+
+      // ============================================
+      // FT2: Insert Mode Toggle
+      // ============================================
+
+      // Insert key: Toggle insert/overwrite mode
+      if (key === 'Insert') {
+        e.preventDefault();
+        toggleInsertMode();
         return;
       }
 
@@ -487,10 +523,11 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Escape: Clear selection
+      // Escape: Clear selection and volume effect prefix
       if (key === 'Escape') {
         e.preventDefault();
         clearSelection();
+        volumeEffectPrefixRef.current = null; // Reset volume effect prefix
         return;
       }
 
@@ -607,6 +644,54 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
+      // Volume Effect Prefix Keys (FT2-style)
+      // MUST come before note entry to prevent conflicts
+      // ============================================
+
+      // Volume effect prefix keys (only work in volume column)
+      if (cursor.columnType === 'volume' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat) {
+        const upperKey = key.toUpperCase();
+
+        // Check if we're waiting for a parameter after a prefix
+        if (volumeEffectPrefixRef.current !== null && HEX_DIGITS_ALL.includes(key)) {
+          e.preventDefault();
+          const hexDigit = upperKey;
+          const highNibble = volumeEffectPrefixRef.current;
+          const lowNibble = parseInt(hexDigit, 16);
+          const volumeEffect = (highNibble << 4) | lowNibble;
+
+          setCell(cursor.channelIndex, cursor.rowIndex, { volume: volumeEffect });
+          volumeEffectPrefixRef.current = null; // Reset prefix state
+
+          // Advance cursor
+          if (editStep > 0) {
+            moveCursor(0, editStep);
+          }
+          return;
+        }
+
+        // Prefix key pressed
+        const prefixMap: Record<string, number> = {
+          'V': 0x6, // Volume slide down
+          'U': 0x7, // Volume slide up
+          'P': 0xC, // Set panning
+          'H': 0xB, // Vibrato
+          'G': 0xF, // Porta to note
+        };
+
+        if (prefixMap[upperKey] !== undefined) {
+          e.preventDefault();
+          volumeEffectPrefixRef.current = prefixMap[upperKey];
+          return;
+        }
+      }
+
+      // Reset volume effect prefix if we leave volume column or press modifier keys
+      if (cursor.columnType !== 'volume' || (e.altKey || e.ctrlKey || e.metaKey)) {
+        volumeEffectPrefixRef.current = null;
+      }
+
+      // ============================================
       // Note Entry (Piano Keys)
       // ============================================
 
@@ -646,6 +731,11 @@ export const useTrackerInput = () => {
           cursor.columnType === 'effect' ||
           cursor.columnType === 'effect2')
       ) {
+        // Skip if waiting for volume effect prefix parameter (already handled above)
+        if (cursor.columnType === 'volume' && volumeEffectPrefixRef.current !== null) {
+          return;
+        }
+
         // Skip if it's a note key (numbers 2,3,5,6,7,9,0 are used for notes)
         const isNoteKey = ['2', '3', '5', '6', '7', '9', '0'].includes(key);
         if (isNoteKey && cursor.columnType !== 'instrument' &&

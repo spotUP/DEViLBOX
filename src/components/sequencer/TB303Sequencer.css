@@ -1,0 +1,218 @@
+/* TB303 Sequencer */
+
+.tb303-sequencer {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 6px;
+  padding: 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.tb303-step {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-radius: 3px;
+  min-height: 65px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+  position: relative;
+}
+
+.tb303-step:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-light);
+  transform: translateY(-1px);
+}
+
+.tb303-step:active {
+  transform: translateY(1px);
+}
+
+.tb303-step.active {
+  background: var(--color-bg-active);
+  border-color: var(--color-cell-note);
+}
+
+.tb303-step.current {
+  background: var(--color-tracker-row-current);
+  border-color: var(--color-tracker-cursor);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+  animation: pulse-step 0.2s ease-in-out;
+}
+
+@keyframes pulse-step {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.step-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+}
+
+.tb303-step.active .step-led {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  box-shadow: 0 0 4px var(--color-success);
+}
+
+.tb303-step.current .step-led {
+  background: var(--color-tracker-cursor);
+  border-color: var(--color-tracker-cursor);
+  box-shadow: 0 0 8px var(--color-tracker-cursor);
+  animation: pulse-led 0.4s ease-in-out infinite;
+}
+
+@keyframes pulse-led {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.step-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--color-cell-note);
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  min-width: 20px;
+  text-align: center;
+  transition: all 0.1s ease;
+  border: 1px solid transparent;
+}
+
+.step-note:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-light);
+  transform: scale(1.05);
+}
+
+.tb303-step.active .step-note {
+  color: var(--color-cell-note);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-light);
+}
+
+.step-octave-btns {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  justify-content: center;
+}
+
+.octave-btn {
+  font-size: 8px;
+  font-weight: bold;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.octave-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.octave-btn.active {
+  background: var(--color-cell-instrument);
+  color: var(--color-text-inverse);
+  border-color: var(--color-cell-instrument);
+}
+
+.step-toggles {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  justify-content: center;
+}
+
+.toggle-btn {
+  font-size: 7px;
+  font-weight: bold;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: 2px 3px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.toggle-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.toggle-btn.accent.active {
+  background: var(--color-cell-accent);
+  color: var(--color-text-inverse);
+  border-color: var(--color-cell-accent);
+}
+
+.toggle-btn.slide.active {
+  background: var(--color-cell-slide);
+  color: var(--color-text-inverse);
+  border-color: var(--color-cell-slide);
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+  .tb303-sequencer {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .tb303-step {
+    min-height: 55px;
+    padding: 4px 2px;
+    gap: 3px;
+  }
+
+  .step-note {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+
+  .octave-btn, .toggle-btn {
+    font-size: 7px;
+    padding: 1px 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tb303-sequencer {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .tb303-step {
+    min-height: 50px;
+  }
+}

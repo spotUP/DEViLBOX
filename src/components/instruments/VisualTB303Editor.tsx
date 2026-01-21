@@ -5,6 +5,7 @@
 
 import React from 'react';
 import type { TB303Config } from '@typedefs/instrument';
+// import { DEFAULT_PEDALBOARD } from '@typedefs/pedalboard';
 import { Knob } from '@components/controls/Knob';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { Zap } from 'lucide-react';
@@ -69,7 +70,7 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
       accentDecay: 200,
       vegDecay: 3000,
       vegSustain: 0,
-      softAttack: 4,
+      softAttack: 0.3,  // Devil Fish minimum (instant attack), not stock TB-303 fixed 4ms
       filterTracking: 0,
       filterFM: 0,
       sweepSpeed: 'normal' as const,
@@ -104,12 +105,6 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
             </div>
           </div>
 
-          {/* Devil Fish badge if enabled */}
-          {config.devilFish?.enabled && (
-            <div className={`px-3 py-1 font-black text-sm rounded-full animate-pulse ${isCyanTheme ? 'bg-cyan-600 text-black' : 'bg-red-600 text-white'}`}>
-              DEVIL FISH MOD
-            </div>
-          )}
         </div>
       </div>
 
@@ -215,15 +210,30 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
             </div>
             <div className="flex flex-col items-center">
               <Knob
-                value={config.filterEnvelope.decay}
+                value={
+                  config.devilFish?.enabled
+                    ? (config.devilFish?.vegDecay ?? 3000)
+                    : config.filterEnvelope.decay
+                }
                 min={30}
                 max={3000}
-                onChange={(v) => updateFilterEnvelope('decay', v)}
-                label="Decay"
+                onChange={(v) => {
+                  if (config.devilFish?.enabled) {
+                    // When DF enabled, decay knob controls VEG (amplitude envelope)
+                    updateDevilFish('vegDecay', v);
+                  } else {
+                    // When DF disabled, decay knob controls MEG (filter envelope)
+                    updateFilterEnvelope('decay', v);
+                  }
+                }}
+                label={config.devilFish?.enabled ? 'VEG Decay' : 'MEG Decay'}
                 size="lg"
                 color={knobColor}
                 formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
               />
+              <div className="mt-1 text-xs text-gray-500 text-center">
+                {config.devilFish?.enabled ? '(Amplitude)' : '(Filter)'}
+              </div>
             </div>
             <div className="flex flex-col items-center">
               <Knob
@@ -279,42 +289,107 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
           </div>
 
           {config.devilFish?.enabled && (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                <Knob
-                  value={config.overdrive?.amount || 0}
-                  min={0}
-                  max={100}
-                  onChange={(v) => updateOverdrive(v)}
-                  label="Overdrive"
-                  size="sm"
-                  color={devilFishColor}
-                  formatValue={(v) => `${Math.round(v)}%`}
-                />
+            <div className="space-y-4">
+              {/* Envelope Generators Section */}
+              <div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Envelope Generators</div>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.normalDecay ?? 200}
+                      min={30}
+                      max={3000}
+                      onChange={(v) => updateDevilFish('normalDecay', v)}
+                      label="Normal Decay"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                    />
+                    <div className="mt-1 text-xs text-gray-600 text-center">(MEG Normal)</div>
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.accentDecay ?? 200}
+                      min={30}
+                      max={3000}
+                      onChange={(v) => updateDevilFish('accentDecay', v)}
+                      label="Accent Decay"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                    />
+                    <div className="mt-1 text-xs text-gray-600 text-center">(MEG Accent)</div>
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.softAttack ?? 0.3}
+                      min={0.3}
+                      max={3000}
+                      onChange={(v) => updateDevilFish('softAttack', v)}
+                      label="Soft Attack"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                    />
+                    <div className="mt-1 text-xs text-gray-600 text-center">(Normal Notes)</div>
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.vegSustain ?? 0}
+                      min={0}
+                      max={100}
+                      onChange={(v) => updateDevilFish('vegSustain', v)}
+                      label="VEG Sustain"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => `${Math.round(v)}%`}
+                    />
+                    <div className="mt-1 text-xs text-gray-600 text-center">(Amplitude)</div>
+                  </div>
+                </div>
               </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                <Knob
-                  value={config.devilFish?.filterFM || 0}
-                  min={0}
-                  max={100}
-                  onChange={(v) => updateDevilFish('filterFM', v)}
-                  label="Filter FM"
-                  size="sm"
-                  color={devilFishColor}
-                  formatValue={(v) => `${Math.round(v)}%`}
-                />
-              </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                <Knob
-                  value={config.devilFish?.filterTracking || 0}
-                  min={0}
-                  max={200}
-                  onChange={(v) => updateDevilFish('filterTracking', v)}
-                  label="Key Track"
-                  size="sm"
-                  color={devilFishColor}
-                  formatValue={(v) => `${Math.round(v)}%`}
-                />
+
+              {/* Filter Modulation Section */}
+              <div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Filter Modulation</div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.overdrive?.amount || 0}
+                      min={0}
+                      max={100}
+                      onChange={(v) => updateOverdrive(v)}
+                      label="Overdrive"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => `${Math.round(v)}%`}
+                    />
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.filterFM || 0}
+                      min={0}
+                      max={100}
+                      onChange={(v) => updateDevilFish('filterFM', v)}
+                      label="Filter FM"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => `${Math.round(v)}%`}
+                    />
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
+                    <Knob
+                      value={config.devilFish?.filterTracking || 0}
+                      min={0}
+                      max={200}
+                      onChange={(v) => updateDevilFish('filterTracking', v)}
+                      label="Key Track"
+                      size="sm"
+                      color={devilFishColor}
+                      formatValue={(v) => `${Math.round(v)}%`}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}

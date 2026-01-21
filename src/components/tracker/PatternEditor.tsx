@@ -65,19 +65,38 @@ StatusBar.displayName = 'StatusBar';
 
 const PatternEditorComponent: React.FC = () => {
   const { isMobile } = useResponsiveSafe();
-  const {
-    patterns,
-    currentPatternIndex,
-    cursor,
-    showGhostPatterns,
-    addChannel,
-    removeChannel,
-    toggleChannelMute,
-    toggleChannelSolo,
-    setChannelColor,
-    setCell,
-    moveCursorToChannel,
-  } = useTrackerStore();
+
+  // CRITICAL OPTIMIZATION: Use selectors to prevent re-renders on every pattern change
+  // Only subscribe to specific data needed, not entire patterns array
+  const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
+  const cursor = useTrackerStore((state) => state.cursor);
+  const showGhostPatterns = useTrackerStore((state) => state.showGhostPatterns);
+
+  // Get adjacent patterns for ghost rendering (memoized to prevent flicker)
+  const prevPattern = useTrackerStore((state) => {
+    const prevIndex = state.currentPatternIndex > 0
+      ? state.currentPatternIndex - 1
+      : state.patterns.length - 1;
+    return state.patterns[prevIndex];
+  });
+  const nextPattern = useTrackerStore((state) => {
+    const nextIndex = state.currentPatternIndex < state.patterns.length - 1
+      ? state.currentPatternIndex + 1
+      : 0;
+    return state.patterns[nextIndex];
+  });
+
+  // Get actions (these don't cause re-renders)
+  const addChannel = useTrackerStore((state) => state.addChannel);
+  const removeChannel = useTrackerStore((state) => state.removeChannel);
+  const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
+  const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
+  const setChannelColor = useTrackerStore((state) => state.setChannelColor);
+  const setCell = useTrackerStore((state) => state.setCell);
+  const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
+  const copyTrack = useTrackerStore((state) => state.copyTrack);
+  const cutTrack = useTrackerStore((state) => state.cutTrack);
+  const pasteTrack = useTrackerStore((state) => state.pasteTrack);
   // Use selectors to minimize re-renders during playback
   // Only subscribe to isPlaying and continuousRow - NOT currentRow
   // currentRow updates frequently and is only needed by the StatusBar component
@@ -113,8 +132,6 @@ const PatternEditorComponent: React.FC = () => {
   const playbackStartTimeRef = useRef(0);
   const playbackStartRowRef = useRef(0);
 
-  const pattern = patterns[currentPatternIndex];
-
   // Mobile: Track which channel is currently visible (synced with cursor)
   const mobileChannelIndex = cursor.channelIndex;
 
@@ -141,31 +158,16 @@ const PatternEditorComponent: React.FC = () => {
     onSwipeRight: handleSwipeRight,
   });
 
-  // Debug logging for pattern data
-  useEffect(() => {
-    const firstCell = pattern?.channels?.[0]?.rows?.[0];
-    console.log('[PatternEditor] patterns changed:', {
-      patternsLength: patterns.length,
-      currentPatternIndex,
-      hasPattern: !!pattern,
-      patternLength: pattern?.length,
-      channelsCount: pattern?.channels?.length,
-      firstChannelRowsCount: pattern?.channels?.[0]?.rows?.length,
-      firstCellNote: firstCell?.note,
-      firstCellInstrument: firstCell?.instrument,
-      // Find first non-empty cell
-      firstNonEmptyCell: (() => {
-        if (!pattern) return null;
-        for (const ch of pattern.channels) {
-          for (let i = 0; i < ch.rows.length; i++) {
-            const cell = ch.rows[i];
-            if (cell.note) return { row: i, note: cell.note, instrument: cell.instrument };
-          }
-        }
-        return null;
-      })(),
-    });
-  }, [patterns, currentPatternIndex, pattern]);
+  // Debug logging disabled for performance
+  // Re-enable if needed for debugging pattern data issues
+  // useEffect(() => {
+  //   console.log('[PatternEditor] pattern changed:', {
+  //     currentPatternIndex,
+  //     hasPattern: !!pattern,
+  //     patternLength: pattern?.length,
+  //     channelsCount: pattern?.channels?.length,
+  //   });
+  // }, [currentPatternIndex, pattern]);
 
   // For non-playing state, use cursor position
   // During playback, the animation loop handles scroll directly via DOM
@@ -322,14 +324,9 @@ const PatternEditorComponent: React.FC = () => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Get previous and next patterns for preview during playback
-  const prevPatternIndex = currentPatternIndex > 0 ? currentPatternIndex - 1 : patterns.length - 1;
-  const nextPatternIndex = currentPatternIndex < patterns.length - 1 ? currentPatternIndex + 1 : 0;
-  const prevPattern = patterns[prevPatternIndex];
-  const nextPattern = patterns[nextPatternIndex];
-
   // Calculate which virtual rows are visible (always wraps for seamless looping)
   // During playback, includes rows from previous/next patterns for preview
+  // NOTE: prevPattern and nextPattern are defined via selectors at the top of the component
   const visibleVirtualRows = useMemo(() => {
     const patternLength = pattern?.length || 64;
 
@@ -449,15 +446,18 @@ const PatternEditorComponent: React.FC = () => {
     }
   }, [pattern, setCell]);
 
+  // FT2 track operations - copy/cut/paste entire channel
   const handleCopyChannel = useCallback((channelIndex: number) => {
-    // TODO: Implement channel clipboard
-    console.log('Copy channel', channelIndex);
-  }, []);
+    copyTrack(channelIndex);
+  }, [copyTrack]);
+
+  const handleCutChannel = useCallback((channelIndex: number) => {
+    cutTrack(channelIndex);
+  }, [cutTrack]);
 
   const handlePasteChannel = useCallback((channelIndex: number) => {
-    // TODO: Implement channel clipboard
-    console.log('Paste channel', channelIndex);
-  }, []);
+    pasteTrack(channelIndex);
+  }, [pasteTrack]);
 
   const handleTranspose = useCallback((channelIndex: number, semitones: number) => {
     if (!pattern) return;
@@ -722,6 +722,7 @@ const PatternEditorComponent: React.FC = () => {
                         onFillPattern={handleFillPattern}
                         onClearChannel={handleClearChannel}
                         onCopyChannel={handleCopyChannel}
+                        onCutChannel={handleCutChannel}
                         onPasteChannel={handlePasteChannel}
                         onTranspose={handleTranspose}
                         onHumanize={handleHumanize}

@@ -31,10 +31,10 @@ export const LiveModeIndicator: React.FC<LiveModeIndicatorProps> = ({
       <button
         onClick={toggleLiveMode}
         className={`
-          px-2 py-1 rounded text-xs font-bold uppercase tracking-wider transition-all
+          px-2 py-1 rounded text-xs font-bold uppercase tracking-wider transition-all border
           ${isLiveMode
-            ? 'bg-accent-error/20 text-accent-error animate-pulse'
-            : 'bg-accent-primary/20 text-accent-primary'
+            ? 'bg-accent-error/20 text-accent-error border-accent-error animate-pulse'
+            : 'bg-ft2-bg text-ft2-text border-ft2-border hover:bg-ft2-header'
           }
         `}
         title={`Switch to ${isLiveMode ? 'Edit' : 'Live'} Mode (L)`}
@@ -54,7 +54,7 @@ export const LiveModeIndicator: React.FC<LiveModeIndicatorProps> = ({
           transition-all duration-200 border
           ${isLiveMode
             ? 'bg-accent-error/10 text-accent-error border-accent-error/30 hover:bg-accent-error/20'
-            : 'bg-accent-primary/10 text-accent-primary border-accent-primary/30 hover:bg-accent-primary/20'
+            : 'bg-ft2-bg text-ft2-text border-ft2-border hover:bg-ft2-header'
           }
         `}
         title={`Switch to ${isLiveMode ? 'Edit' : 'Live'} Mode (L)`}
@@ -74,7 +74,7 @@ export const LiveModeIndicator: React.FC<LiveModeIndicatorProps> = ({
 
       {/* Pending pattern indicator */}
       {isLiveMode && hasPending && showCountdown && showQueueCountdown && (
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-accent-warning/10 text-accent-warning rounded text-xs animate-pulse">
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-ft2-bg text-ft2-highlight border border-ft2-border rounded text-xs animate-pulse">
           <Clock size={12} />
           <span>
             Pattern {String(pendingPatternIndex).padStart(2, '0')} in {barsUntilSwitch} bars
@@ -94,15 +94,15 @@ export const LiveModeToggle: React.FC<{ className?: string }> = ({ className = '
       onClick={toggleLiveMode}
       className={`
         relative w-12 h-6 rounded-full transition-colors duration-200
-        ${isLiveMode ? 'bg-accent-error' : 'bg-dark-bgTertiary border border-dark-border'}
+        ${isLiveMode ? 'bg-accent-error' : 'bg-ft2-bg border border-ft2-border'}
         ${className}
       `}
       title={`Switch to ${isLiveMode ? 'Edit' : 'Live'} Mode (L)`}
     >
       <span
         className={`
-          absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200
-          ${isLiveMode ? 'translate-x-7' : 'translate-x-1'}
+          absolute top-1 w-4 h-4 rounded-full transition-transform duration-200
+          ${isLiveMode ? 'bg-white translate-x-7' : 'bg-ft2-text translate-x-1'}
         `}
       />
     </button>

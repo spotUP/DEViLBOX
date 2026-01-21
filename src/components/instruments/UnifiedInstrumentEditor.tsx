@@ -10,7 +10,8 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { InstrumentList } from './InstrumentList';
 import { QuickView } from './QuickView';
 import { CategorizedSynthSelector } from './CategorizedSynthSelector';
-import { GenericSynthEditor } from './GenericSynthEditor';
+import { VisualSynthEditor } from './VisualSynthEditor';
+import { VisualTB303Editor } from './VisualTB303Editor';
 import { EffectChain } from './EffectChain';
 import { SavePresetDialog } from './SavePresetDialog';
 import { getSynthInfo } from '@constants/synthCategories';
@@ -44,7 +45,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     createInstrument,
   } = useInstrumentStore();
 
-  const [activeTab, setActiveTab] = useState<EditorTab>('quick');
+  const [activeTab, setActiveTab] = useState<EditorTab>('sound');
   const [showKeyboard, setShowKeyboard] = useState(initialShowKeyboard);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
@@ -107,10 +108,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const IconComponent = synthInfo ? getIcon(synthInfo.icon) : Music2;
 
   return (
-    <div className={`flex h-full bg-dark-bg ${mode === 'modal' ? '' : 'rounded-lg overflow-hidden'}`}>
+    <div className={`flex h-full bg-ft2-bg ${mode === 'modal' ? '' : 'rounded-lg overflow-hidden'}`}>
       {/* Left Sidebar: Instrument List */}
       {showInstrumentList && (
-        <div className="w-52 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
+        <div className="w-52 border-r border-ft2-border flex-shrink-0 bg-ft2-header">
           <InstrumentList
             maxHeight="100%"
             showActions={true}
@@ -121,9 +122,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-ft2-border bg-ft2-header">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg bg-dark-bgTertiary ${synthInfo?.color || 'text-text-muted'}`}>
+            <div className={`p-2 rounded-lg bg-ft2-bg ${synthInfo?.color || 'text-ft2-text'}`}>
               <IconComponent size={20} />
             </div>
             <div>
@@ -131,9 +132,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                 type="text"
                 value={currentInstrument.name}
                 onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
-                className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
+                className="bg-transparent text-ft2-text font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-ft2-highlight rounded px-1 -ml-1"
               />
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-ft2-textDim">
                 {synthInfo?.name || currentInstrument.synthType} <span className="opacity-50">|</span> ID: {currentInstrument.id.toString(16).toUpperCase().padStart(2, '0')}
               </p>
             </div>
@@ -142,7 +143,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSaveDialog(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bgTertiary hover:bg-dark-bgHover text-text-secondary hover:text-text-primary transition-colors text-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-ft2-bg hover:bg-ft2-shadow text-ft2-text transition-colors text-sm border border-ft2-border"
               title="Save as preset"
             >
               <Save size={14} />
@@ -152,7 +153,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         </div>
 
         {/* Tab Bar */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-dark-border bg-dark-bgSecondary/50">
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-ft2-border bg-ft2-bg">
           {tabs
             .filter((tab) => tab.show)
             .map((tab) => {
@@ -164,10 +165,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
                     ${isActive
-                      ? 'bg-accent-primary/20 text-accent-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
+                      ? 'bg-ft2-header text-ft2-highlight border-ft2-highlight'
+                      : 'text-ft2-textDim hover:text-ft2-text hover:bg-ft2-header border-transparent'
                     }
                   `}
                 >
@@ -179,7 +180,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-modern">
+        <div className="flex-1 overflow-y-auto scrollbar-ft2">
           {activeTab === 'quick' && (
             <QuickView
               onEditSound={handleGoToSound}
@@ -189,11 +190,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           )}
 
           {activeTab === 'sound' && (
-            <div className="p-4">
-              <GenericSynthEditor
-                instrument={currentInstrument}
-                onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
-              />
+            <div className="overflow-y-auto">
+              {currentInstrument.synthType === 'TB303' ? (
+                <VisualTB303Editor
+                  config={currentInstrument.tb303!}
+                  onChange={(tb303Updates) => updateInstrument(currentInstrument.id, {
+                    tb303: { ...currentInstrument.tb303!, ...tb303Updates }
+                  })}
+                />
+              ) : (
+                <VisualSynthEditor
+                  instrument={currentInstrument}
+                  onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
+                />
+              )}
             </div>
           )}
 

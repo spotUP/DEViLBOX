@@ -1484,10 +1484,13 @@ export class TB303Synth {
 
   /**
    * Set output volume
+   * Note: TB-303 has -3dB compensation to normalize with other synths
    */
   public setVolume(volumeDb: number): void {
     this.baseVolume = volumeDb;
-    this.vca.gain.value = Tone.dbToGain(volumeDb);
+    // Apply -3dB compensation to match other synth volumes
+    // TB-303's resonant filter and VCA make it inherently louder
+    this.vca.gain.value = Tone.dbToGain(volumeDb - 3);
   }
 
   /**

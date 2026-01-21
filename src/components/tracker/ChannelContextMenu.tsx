@@ -9,6 +9,7 @@ import {
   Trash2,
   Copy,
   ClipboardPaste,
+  Scissors,
   ArrowUpDown,
   Wand2,
   TrendingUp,
@@ -42,6 +43,7 @@ interface ChannelContextMenuProps {
   onFillPattern: (channelIndex: number, generatorType: GeneratorType) => void;
   onClearChannel: (channelIndex: number) => void;
   onCopyChannel: (channelIndex: number) => void;
+  onCutChannel: (channelIndex: number) => void;
   onPasteChannel: (channelIndex: number) => void;
   onTranspose: (channelIndex: number, semitones: number) => void;
   onHumanize: (channelIndex: number) => void;
@@ -56,6 +58,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onFillPattern,
   onClearChannel,
   onCopyChannel,
+  onCutChannel,
   onPasteChannel,
   onTranspose,
   onHumanize,
@@ -309,19 +312,23 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         icon: <Trash2 size={14} />,
         onClick: () => onClearChannel(channelIndex),
       },
-      // Copy/Paste
+      // Copy/Cut/Paste (FT2 track operations)
       {
         id: 'copy',
-        label: 'Copy Channel',
+        label: 'Copy Track',
         icon: <Copy size={14} />,
-        shortcut: 'Alt+C',
         onClick: () => onCopyChannel(channelIndex),
       },
       {
+        id: 'cut',
+        label: 'Cut Track',
+        icon: <Scissors size={14} />,
+        onClick: () => onCutChannel(channelIndex),
+      },
+      {
         id: 'paste',
-        label: 'Paste Channel',
+        label: 'Paste Track',
         icon: <ClipboardPaste size={14} />,
-        shortcut: 'Alt+V',
         onClick: () => onPasteChannel(channelIndex),
       },
       { type: 'divider' },
@@ -448,6 +455,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     onFillPattern,
     onClearChannel,
     onCopyChannel,
+    onCutChannel,
     onPasteChannel,
     onTranspose,
     onHumanize,

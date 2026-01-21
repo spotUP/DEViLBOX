@@ -39,6 +39,7 @@ interface InstrumentStore {
 
   // Effects
   addEffect: (instrumentId: number, effectType: EffectConfig['type']) => void;
+  addEffectConfig: (instrumentId: number, effect: Omit<EffectConfig, 'id'>) => void;  // For unified effects system
   removeEffect: (instrumentId: number, effectId: string) => void;
   updateEffect: (instrumentId: number, effectId: string, updates: Partial<EffectConfig>) => void;
   reorderEffects: (instrumentId: number, fromIndex: number, toIndex: number) => void;
@@ -159,7 +160,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
           const engine = getToneEngine();
           const updatedInstrument = get().instruments.find((inst) => inst.id === id);
           if (updatedInstrument?.tb303) {
+            // Update core TB303 parameters
             engine.updateTB303Parameters(id, updatedInstrument.tb303);
+
+            // Overdrive updates are handled by updateTB303Parameters
           }
         } catch (error) {
           console.warn('[InstrumentStore] Could not update TB303 parameters:', error);
@@ -272,6 +276,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         if (instrument) {
           const newEffect: EffectConfig = {
             id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            category: 'tonejs',  // Legacy addEffect creates Tone.js effects
             type: effectType,
             enabled: true,
             wet: 50,
@@ -281,15 +286,44 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Rebuild instrument effect chain in audio engine
+      // Rebuild instrument effect chain in audio engine (async for neural effects)
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
       if (instrument) {
-        try {
-          const engine = getToneEngine();
-          engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
-        } catch (error) {
-          console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+        (async () => {
+          try {
+            const engine = getToneEngine();
+            await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+          } catch (error) {
+            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+          }
+        })();
+      }
+    },
+
+    // Add effect with full configuration (for unified effects system)
+    addEffectConfig: (instrumentId, effect) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+        if (instrument) {
+          const newEffect: EffectConfig = {
+            ...effect,
+            id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          };
+          instrument.effects.push(newEffect);
         }
+      });
+
+      // Rebuild instrument effect chain in audio engine (async for neural effects)
+      const instrument = get().instruments.find((inst) => inst.id === instrumentId);
+      if (instrument) {
+        (async () => {
+          try {
+            const engine = getToneEngine();
+            await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+          } catch (error) {
+            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+          }
+        })();
       }
     },
 
@@ -304,15 +338,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Rebuild instrument effect chain in audio engine
+      // Rebuild instrument effect chain in audio engine (async for neural effects)
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
       if (instrument) {
-        try {
-          const engine = getToneEngine();
-          engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
-        } catch (error) {
-          console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
-        }
+        (async () => {
+          try {
+            const engine = getToneEngine();
+            await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+          } catch (error) {
+            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+          }
+        })();
       }
     },
 
@@ -331,12 +367,14 @@ export const useInstrumentStore = create<InstrumentStore>()(
       if (updates.enabled !== undefined) {
         const instrument = get().instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          try {
-            const engine = getToneEngine();
-            engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
-          } catch (error) {
-            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
-          }
+          (async () => {
+            try {
+              const engine = getToneEngine();
+              await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+            } catch (error) {
+              console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+            }
+          })();
         }
       }
     },
@@ -350,15 +388,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Rebuild instrument effect chain in audio engine
+      // Rebuild instrument effect chain in audio engine (async for neural effects)
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
       if (instrument) {
-        try {
-          const engine = getToneEngine();
-          engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
-        } catch (error) {
-          console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
-        }
+        (async () => {
+          try {
+            const engine = getToneEngine();
+            await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+          } catch (error) {
+            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
+          }
+        })();
       }
     },
 
@@ -421,12 +461,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
+      // Migrate old effects without category field (backward compatibility)
+      const migratedInstruments = newInstruments.map(inst => ({
+        ...inst,
+        effects: inst.effects?.map(effect => ({
+          ...effect,
+          // Add category if missing - default to 'tonejs' for old saved songs
+          category: effect.category || ('tonejs' as const),
+        })) || [],
+      }));
+
       set((state) => {
-        state.instruments = newInstruments;
-        state.currentInstrumentId = newInstruments.length > 0 ? newInstruments[0].id : null;
+        state.instruments = migratedInstruments;
+        state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
       });
 
-      console.log('[InstrumentStore] Loaded', newInstruments.length, 'instruments');
+      console.log('[InstrumentStore] Loaded', migratedInstruments.length, 'instruments');
     },
 
     // Reset to initial state (for new project/tab)

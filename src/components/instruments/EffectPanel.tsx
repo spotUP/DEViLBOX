@@ -237,7 +237,9 @@ export const EffectPanel: React.FC<EffectPanelProps> = ({ instrumentId, effect, 
   };
 
   const getParameterValue = (param: EffectParameter): number => {
-    return effect.parameters[param.key] ?? param.defaultValue;
+    const value = effect.parameters[param.key] ?? param.defaultValue;
+    // Handle case where value might be a string (e.g., filter type)
+    return typeof value === 'number' ? value : param.defaultValue;
   };
 
   const formatValue = (value: number, param: EffectParameter): string => {

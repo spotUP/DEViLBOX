@@ -4,18 +4,35 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
-import { APP_VERSION } from '@constants/version';
+import { APP_VERSION, BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
 import { Plus, X, Palette, ChevronUp, ChevronDown, Download } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { isElectron } from '@utils/electron';
 
-export const NavBar: React.FC = () => {
-  const { metadata, isDirty } = useProjectStore();
-  const { masterVolume, setMasterVolume } = useAudioStore();
-  const { tabs, activeTabId, addTab, closeTab, setActiveTab, updateTabName, markTabDirty } = useTabsStore();
-  const { currentThemeId, setTheme, getCurrentTheme } = useThemeStore();
-  const { oscilloscopeVisible, toggleOscilloscopeVisible, setShowDownloadModal } = useUIStore();
+const NavBarComponent: React.FC = () => {
+  // PERFORMANCE OPTIMIZATION: Use individual selectors to prevent unnecessary re-renders
+  const metadata = useProjectStore((state) => state.metadata);
+  const isDirty = useProjectStore((state) => state.isDirty);
+
+  const masterVolume = useAudioStore((state) => state.masterVolume);
+  const setMasterVolume = useAudioStore((state) => state.setMasterVolume);
+
+  const tabs = useTabsStore((state) => state.tabs);
+  const activeTabId = useTabsStore((state) => state.activeTabId);
+  const addTab = useTabsStore((state) => state.addTab);
+  const closeTab = useTabsStore((state) => state.closeTab);
+  const setActiveTab = useTabsStore((state) => state.setActiveTab);
+  const updateTabName = useTabsStore((state) => state.updateTabName);
+  const markTabDirty = useTabsStore((state) => state.markTabDirty);
+
+  const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const setTheme = useThemeStore((state) => state.setTheme);
+  const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
+
+  const oscilloscopeVisible = useUIStore((state) => state.oscilloscopeVisible);
+  const toggleOscilloscopeVisible = useUIStore((state) => state.toggleOscilloscopeVisible);
+
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
@@ -71,7 +88,10 @@ export const NavBar: React.FC = () => {
           <h1 className="font-bold text-lg tracking-tight">
             <span className="text-accent-primary">DEViLBOX</span>
           </h1>
-          <span className="text-xs font-medium text-text-inverse bg-accent-primary px-2 py-0.5 rounded">
+          <span
+            className="text-xs font-medium text-text-inverse bg-accent-primary px-2 py-0.5 rounded cursor-help"
+            title={`Build #${BUILD_NUMBER} • ${BUILD_HASH} • ${BUILD_DATE}`}
+          >
             v{APP_VERSION}
           </span>
         </div>
@@ -81,7 +101,7 @@ export const NavBar: React.FC = () => {
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <button
-              onClick={() => setShowDownloadModal(true)}
+              onClick={() => {/* setShowDownloadModal(true) */}}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bgTertiary hover:bg-dark-bgHover text-accent-primary text-xs font-bold transition-colors rounded border border-accent-primary/30"
               title="Download Desktop App"
             >
@@ -215,3 +235,6 @@ export const NavBar: React.FC = () => {
     </div>
   );
 };
+
+// PERFORMANCE: Wrap in React.memo to prevent unnecessary re-renders
+export const NavBar = React.memo(NavBarComponent);

@@ -26,7 +26,14 @@ export type TB303Parameter =
   | 'decay'
   | 'accent'
   | 'overdrive'
-  | 'slideTime';
+  | 'slideTime'
+  | 'normalDecay'
+  | 'accentDecay'
+  | 'vegDecay'
+  | 'vegSustain'
+  | 'softAttack'
+  | 'filterTracking'
+  | 'filterFM';
 
 export interface CCMapping {
   ccNumber: number;

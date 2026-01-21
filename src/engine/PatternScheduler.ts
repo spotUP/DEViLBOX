@@ -13,6 +13,7 @@ import { getToneEngine } from './ToneEngine';
 import { getEffectProcessor } from './EffectCommands';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { useTransportStore } from '@stores/useTransportStore';
+import { notify } from '@stores/useNotificationStore';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
@@ -48,11 +49,48 @@ export class PatternScheduler {
   private channelNotes: Map<number, Set<string>> = new Map(); // Track active notes per channel
   private channelActiveInstruments: Map<number, number> = new Map(); // Track active instrument per channel
   private effectProcessor = getEffectProcessor();
+
+  // Error tracking
+  private playbackErrors: Map<string, number> = new Map(); // error message -> count
+  private errorNotificationShown: boolean = false;
+  private readonly ERROR_THRESHOLD = 5; // Show notification after 5 errors
   private automationPlayer = getAutomationPlayer();
   private patternBreakScheduled: boolean = false; // Prevent double pattern breaks
   private currentPatternEndTime: number = 0; // When current pattern ends (transport seconds)
   private nextPatternScheduled: boolean = false; // Track if next pattern is pre-scheduled
   private tickPart: Tone.Part | null = null; // Separate Part for tick events
+
+  /**
+   * Track playback errors and notify user if threshold exceeded
+   */
+  private trackPlaybackError(note: string, error: Error): void {
+    const errorKey = error.message.split(':')[0]; // Group similar errors
+    const count = (this.playbackErrors.get(errorKey) || 0) + 1;
+    this.playbackErrors.set(errorKey, count);
+
+    console.error(`Failed to trigger note ${note}:`, error);
+
+    // Show notification if error threshold exceeded (only once per session)
+    const totalErrors = Array.from(this.playbackErrors.values()).reduce((a, b) => a + b, 0);
+    if (totalErrors >= this.ERROR_THRESHOLD && !this.errorNotificationShown) {
+      this.errorNotificationShown = true;
+      const errorList = Array.from(this.playbackErrors.entries())
+        .map(([msg, cnt]) => `${msg} (${cnt}×)`)
+        .join(', ');
+      notify.error(
+        `Playback errors detected: ${errorList}. Check console for details or review SONG_FORMAT.md`,
+        15000
+      );
+    }
+  }
+
+  /**
+   * Reset error tracking (called when stopping playback)
+   */
+  private resetErrorTracking(): void {
+    this.playbackErrors.clear();
+    this.errorNotificationShown = false;
+  }
 
   /**
    * Set automation data
@@ -448,7 +486,7 @@ export class PatternScheduler {
                 this.channelNotes.get(channelIndex)?.delete(toneNote);
               }, duration * 1000);
             } catch (error) {
-              console.error(`Failed to trigger note ${toneNote}:`, error);
+              this.trackPlaybackError(toneNote, error as Error);
             }
           });
 
@@ -505,10 +543,11 @@ export class PatternScheduler {
     // Capture callback reference to avoid issues with 'this' changing
     const patternEndCallback = this.onPatternEnd;
     if (patternEndCallback && !this.nextPatternScheduled) {
-      // Fire callback 250ms before end to give React time to respond
-      // The callback will schedule the next pattern at absolutePatternEnd
-      const callbackTime = absolutePatternEnd - 0.25;
-      console.log(`[PatternScheduler] Scheduling pattern end callback at ${callbackTime}s`);
+      // Fire callback at the EXACT last row to prevent premature pattern switching
+      // Calculate when the last row starts (one row before pattern end)
+      const lastRowTime = absolutePatternEnd - secondsPerRow;
+      const callbackTime = lastRowTime; // Fire at the start of the last row
+      console.log(`[PatternScheduler] Scheduling pattern end callback at ${callbackTime}s (last row start)`);
       events.push({
         time: callbackTime,
         audioCallback: () => {
@@ -633,6 +672,9 @@ export class PatternScheduler {
     // Disable Transport loop
     const transport = Tone.getTransport();
     transport.loop = false;
+
+    // Reset error tracking when stopping
+    this.resetErrorTracking();
 
     // Clear effect processor
     this.effectProcessor.clearAll();

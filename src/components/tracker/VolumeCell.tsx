@@ -1,9 +1,10 @@
 /**
- * VolumeCell - Displays and edits volume column (00-40 hex)
+ * VolumeCell - Displays and edits volume column (00-40 hex + FT2 volume effects)
  */
 
 import React from 'react';
 import type { VolumeValue } from '@typedefs';
+import { formatVolumeColumn, decodeVolumeColumn } from '@engine/EffectProcessor';
 
 interface VolumeCellProps {
   value: VolumeValue;
@@ -13,9 +14,18 @@ interface VolumeCellProps {
 
 export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
   ({ value, isActive, isEmpty }) => {
-    const displayValue = value !== null ? value.toString(16).toUpperCase().padStart(2, '0') : '..';
+    const displayValue = formatVolumeColumn(value);
 
-    const colorClass = isEmpty ? 'text-text-muted' : 'text-emerald-400';
+    // Determine color based on volume type
+    let colorClass = 'text-text-muted';
+    if (!isEmpty && value !== null) {
+      const decoded = decodeVolumeColumn(value);
+      if (decoded?.type === 'set') {
+        colorClass = 'text-emerald-400'; // Regular volume
+      } else {
+        colorClass = 'text-yellow-400'; // Volume effect
+      }
+    }
 
     return (
       <span

@@ -10,7 +10,7 @@ import { SlideCell } from './SlideCell';
 import { AutomationLanes } from './AutomationLanes';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { CellContextMenu } from './CellContextMenu';
-import { VolumeX, Headphones, Circle, ChevronRight, ChevronLeft } from 'lucide-react';
+import { VolumeX, Headphones, Circle } from 'lucide-react';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 
@@ -21,19 +21,42 @@ const OVERSCAN_ROW_COUNT = 16;
 const GHOST_ROWS = 16;
 
 const COLUMN_WIDTH_BASE = 120;
-const COLUMN_WIDTH_COLLAPSED = 40;
 
-export const VirtualizedTrackerView: React.FC = () => {
-  const {
-    patterns, currentPatternIndex, cursor, columnVisibility, setCell,
-    showGhostPatterns, selection, recordMode, editStep, followPlayback,
-    toggleChannelMute, toggleChannelSolo, toggleChannelCollapse,
-    startSelection, updateSelection, endSelection, clearSelection,
-    selectChannel, moveCursorToChannel, moveCursorToRow,
-  } = useTrackerStore();
-  
-  const { currentRow, isPlaying, smoothScrolling, bpm } = useTransportStore();
-  const { instruments } = useInstrumentStore();
+const VirtualizedTrackerViewComponent: React.FC = () => {
+  // PERFORMANCE OPTIMIZATION: Use individual selectors instead of destructuring
+  // This prevents re-renders when unrelated state changes
+  const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
+  const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
+  const patterns = useTrackerStore((state) => state.patterns);
+  const cursor = useTrackerStore((state) => state.cursor);
+  const columnVisibility = useTrackerStore((state) => state.columnVisibility);
+  const showGhostPatterns = useTrackerStore((state) => state.showGhostPatterns);
+  const selection = useTrackerStore((state) => state.selection);
+  const recordMode = useTrackerStore((state) => state.recordMode);
+  const editStep = useTrackerStore((state) => state.editStep);
+  const followPlayback = useTrackerStore((state) => state.followPlayback);
+
+  // Get actions (these don't cause re-renders)
+  const setCell = useTrackerStore((state) => state.setCell);
+  const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
+  const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
+  const startSelection = useTrackerStore((state) => state.startSelection);
+  const updateSelection = useTrackerStore((state) => state.updateSelection);
+  const endSelection = useTrackerStore((state) => state.endSelection);
+  const clearSelection = useTrackerStore((state) => state.clearSelection);
+  const selectChannel = useTrackerStore((state) => state.selectChannel);
+  const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
+  const moveCursorToRow = useTrackerStore((state) => state.moveCursorToRow);
+
+  // Transport store selectors
+  const currentRow = useTransportStore((state) => state.currentRow);
+  const isPlaying = useTransportStore((state) => state.isPlaying);
+  const smoothScrolling = useTransportStore((state) => state.smoothScrolling);
+  const bpm = useTransportStore((state) => state.bpm);
+
+  // Instrument store selector
+  const instruments = useInstrumentStore((state) => state.instruments);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowIndex: number; channelIndex: number } | null>(null);
@@ -46,8 +69,6 @@ export const VirtualizedTrackerView: React.FC = () => {
 
   const [smoothOffset, setSmoothOffset] = useState(0);
   const animationFrameRef = useRef<number | null>(null);
-
-  const pattern = patterns[currentPatternIndex];
 
   // Sync cursor to playback
   useEffect(() => {
@@ -130,8 +151,8 @@ export const VirtualizedTrackerView: React.FC = () => {
   }, [isDragging, updateSelection]);
 
   const numRowsTotal = (pattern?.length || 64) + (showGhostPatterns ? GHOST_ROWS * 2 : 0);
-  const getColumnWidth = useMemo(() => (index: number) => 
-    index === 0 ? ROW_NUMBER_WIDTH : (pattern?.channels[index - 1]?.collapsed ? COLUMN_WIDTH_COLLAPSED : COLUMN_WIDTH_BASE), 
+  const getColumnWidth = useMemo(() => (index: number) =>
+    index === 0 ? ROW_NUMBER_WIDTH : COLUMN_WIDTH_BASE,
   [pattern]);
 
   const rowVirtualizer = useVirtualizer({
@@ -185,23 +206,18 @@ export const VirtualizedTrackerView: React.FC = () => {
             <div key={vCol.key} className={`flex flex-col border-r border-dark-border group transition-colors ${isCurCh ? 'bg-dark-bgActive/50' : 'bg-dark-bgTertiary'}`} style={{ width: vCol.size, height: HEADER_HEIGHT, transform: `translateX(${vCol.start}px)`, position: 'absolute', top: 0, left: 0, borderBottom: isCurCh ? '2px solid var(--color-accent)' : undefined }}>
               <div className="flex items-center justify-between px-2 h-1/2 overflow-hidden border-b border-white/5">
                 <div className="flex items-center gap-1 min-w-0">
-                  <button onClick={(e) => { e.stopPropagation(); toggleChannelCollapse(chIdx); }} className="text-text-muted hover:text-accent-primary flex-shrink-0">{ch.collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}</button>
-                  <span className={`text-[10px] font-bold ${isCurCh ? 'text-accent-primary' : 'text-text-primary'}`}>{ch.collapsed ? (chIdx + 1) : `CH${chIdx + 1}`}</span>
-                  {!ch.collapsed && inst && <span className="text-[8px] opacity-60 truncate font-mono uppercase tracking-tighter">{inst.name}</span>}
+                  <span className={`text-[10px] font-bold ${isCurCh ? 'text-accent-primary' : 'text-text-primary'}`}>{`CH${chIdx + 1}`}</span>
+                  {inst && <span className="text-[8px] opacity-60 truncate font-mono uppercase tracking-tighter">{inst.name}</span>}
                 </div>
-                {!ch.collapsed && (
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); toggleChannelMute(chIdx); }} className={`p-0.5 rounded ${ch.muted ? 'text-accent-error' : 'text-text-muted'}`}><VolumeX size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); toggleChannelSolo(chIdx); }} className={`p-0.5 rounded ${ch.solo ? 'text-accent-primary' : 'text-text-muted'}`}><Headphones size={12} /></button>
-                  </div>
-                )}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={(e) => { e.stopPropagation(); toggleChannelMute(chIdx); }} className={`p-0.5 rounded ${ch.muted ? 'text-accent-error' : 'text-text-muted'}`}><VolumeX size={12} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); toggleChannelSolo(chIdx); }} className={`p-0.5 rounded ${ch.solo ? 'text-accent-primary' : 'text-text-muted'}`}><Headphones size={12} /></button>
+                </div>
               </div>
               <div className="h-1/2 w-full relative bg-dark-bg/20 overflow-hidden">
-                {!ch.collapsed && (
-                  <div className="absolute inset-0 px-1 py-0.5 opacity-50">
-                    <ChannelVUMeters singleChannel={chIdx} channelWidths={channelWidths} channelOffsets={channelOffsets} />
-                  </div>
-                )}
+                <div className="absolute inset-0 px-1 py-0.5 opacity-50">
+                  <ChannelVUMeters channelWidths={channelWidths} channelOffsets={channelOffsets} />
+                </div>
               </div>
             </div>
           );
@@ -234,7 +250,7 @@ export const VirtualizedTrackerView: React.FC = () => {
 
         {/* Automation Overlay */}
         <div style={{ position: 'absolute', top: showGhostPatterns ? GHOST_ROWS * ROW_HEIGHT : 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 15 }}>
-          <AutomationLanes patternId={pattern.id} patternLength={pattern.length} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidths={channelWidths} channelOffsets={channelOffsets} rowNumWidth={ROW_NUMBER_WIDTH} scrollOffset={0} prevPatternId={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].id : undefined} nextPatternId={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].id : undefined} prevPatternLength={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].length : undefined} nextPatternLength={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].length : undefined} />
+          <AutomationLanes patternId={pattern.id} patternLength={pattern.length} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} scrollOffset={0} prevPatternId={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].id : undefined} nextPatternId={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].id : undefined} prevPatternLength={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].length : undefined} nextPatternLength={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].length : undefined} />
         </div>
 
         {/* Rows */}
@@ -273,9 +289,9 @@ export const VirtualizedTrackerView: React.FC = () => {
                 const isCurCh = !isG && cursor.channelIndex === chIdx;
                 const isSel = !isG && selection && rIdx >= Math.min(selection.startRow, selection.endRow) && rIdx <= Math.max(selection.startRow, selection.endRow) && chIdx >= Math.min(selection.startChannel, selection.endChannel) && chIdx <= Math.max(selection.startChannel, selection.endChannel);
                 
-                // Use pattern time signature or default to 4/16 (4 steps per beat, 16 steps per measure)
-                const stepsPerBeat = dPatt.timeSignature?.stepsPerBeat || 4;
-                const stepsPerMeasure = stepsPerBeat * (dPatt.timeSignature?.beatsPerMeasure || 4);
+                // Use default time signature 4/16 (4 steps per beat, 16 steps per measure)
+                const stepsPerBeat = 4;
+                const stepsPerMeasure = stepsPerBeat * 4;
                 
                 const isRowHigh = dRIdx % stepsPerMeasure === 0;
                 const isBeatHigh = dRIdx % stepsPerBeat === 0;
@@ -292,19 +308,15 @@ export const VirtualizedTrackerView: React.FC = () => {
 
                 return (
                   <div key={vCol.key} onMouseDown={() => handleCellMouseDown(chIdx, rIdx)} onMouseEnter={() => handleCellMouseEnter(chIdx, rIdx)} onDoubleClick={() => selectChannel(chIdx)} onContextMenu={(e) => { if (isG) return; e.preventDefault(); if (!isSel) { moveCursorToChannel(chIdx); moveCursorToRow(rIdx); clearSelection(); startSelection(); } setContextMenu({ x: e.clientX, y: e.clientY, rowIndex: rIdx, channelIndex: chIdx }); }} className={`flex items-center gap-0.5 px-2 border-r border-dark-border text-xs font-mono cursor-cell transition-colors ${cellBg} ${!isG && isCurRow && isCurCh ? 'ring-1 ring-inset ring-accent-primary z-10' : ''} ${isSel ? 'ring-1 ring-inset ring-accent-primary/50' : ''}`} style={{ width: vCol.size, height: vRow.size, transform: `translateX(${vCol.start}px)`, position: 'absolute', top: 0, left: 0, backgroundColor: !isG && !isSel && ch.color && !(!isG && isPlaying && currentRow === rIdx) ? `${ch.color}10` : undefined }}>
-                    {!ch.collapsed ? (
-                      <div className={`flex items-center gap-0.5 w-full ${isG ? 'opacity-20 grayscale' : ''}`}>
-                        {columnVisibility.note && <NoteCell value={cell?.note} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'note'} isEmpty={!cell || cell.note === null || cell.note === '...'} isNoteOff={cell?.note === '==='} />}
-                        {columnVisibility.instrument && <InstrumentCell value={cell?.instrument} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'instrument'} isEmpty={!cell || cell.instrument === null} digitIndex={cursor.digitIndex} />}
-                        {columnVisibility.volume && <VolumeCell value={cell?.volume} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'volume'} isEmpty={!cell || cell.volume === null} digitIndex={cursor.digitIndex} />}
-                        {columnVisibility.effect && <EffectCell value={cell?.effect} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect'} isEmpty={!cell || cell.effect === null} digitIndex={cursor.digitIndex} />}
-                        {columnVisibility.effect2 && <EffectCell value={cell?.effect2 || null} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect2'} isEmpty={!cell || cell.effect2 === null || cell.effect2 === undefined} digitIndex={cursor.digitIndex} />}
-                        {columnVisibility.accent && <AccentCell value={cell?.accent} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'accent'} onToggle={() => !isG && setCell(chIdx, dRIdx, { accent: !cell.accent })} />}
-                        {columnVisibility.slide && <SlideCell value={cell?.slide} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'slide'} onToggle={() => !isG && setCell(chIdx, dRIdx, { slide: !cell.slide })} />}
-                      </div>
-                    ) : (
-                      cell?.note && cell.note !== '...' && <div className={`w-1.5 h-1.5 rounded-full bg-accent-primary ${isG ? 'opacity-10' : 'opacity-50'}`} />
-                    )}
+                    <div className={`flex items-center gap-0.5 w-full ${isG ? 'opacity-20 grayscale' : ''}`}>
+                      {columnVisibility.note && <NoteCell value={cell?.note} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'note'} isEmpty={!cell || cell.note === null || cell.note === '...'} isNoteOff={cell?.note === '==='} />}
+                      {columnVisibility.instrument && <InstrumentCell value={cell?.instrument} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'instrument'} isEmpty={!cell || cell.instrument === null} />}
+                      {columnVisibility.volume && <VolumeCell value={cell?.volume} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'volume'} isEmpty={!cell || cell.volume === null} />}
+                      {columnVisibility.effect && <EffectCell value={cell?.effect} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect'} isEmpty={!cell || cell.effect === null} />}
+                      {columnVisibility.effect2 && <EffectCell value={cell?.effect2 || null} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect2'} isEmpty={!cell || cell.effect2 === null || cell.effect2 === undefined} />}
+                      {columnVisibility.accent && <AccentCell value={cell?.accent} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'accent'} onToggle={() => !isG && setCell(chIdx, dRIdx, { accent: !cell.accent })} />}
+                      {columnVisibility.slide && <SlideCell value={cell?.slide} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'slide'} onToggle={() => !isG && setCell(chIdx, dRIdx, { slide: !cell.slide })} />}
+                    </div>
                     {!isG && isCurRow && isCurCh && <div className="absolute inset-0 border-2 border-accent-primary z-10 pointer-events-none shadow-[0_0_8px_var(--color-accent)]" />}
                   </div>
                 );
@@ -320,3 +332,6 @@ export const VirtualizedTrackerView: React.FC = () => {
     </div>
   );
 };
+
+// PERFORMANCE: Wrap in React.memo to prevent unnecessary re-renders
+export const VirtualizedTrackerView = React.memo(VirtualizedTrackerViewComponent);

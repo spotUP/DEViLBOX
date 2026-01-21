@@ -1,10 +1,10 @@
 /**
  * MasterEffectsModal - Full-screen modal for master effects editing
- * Similar to InstrumentModal but for the master effects chain
+ * Now supports both Tone.js and Neural effects in a single unified list
  */
 
 import React, { useState, useCallback } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders } from 'lucide-react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, AlertTriangle } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -25,6 +25,8 @@ import type { EffectConfig, EffectType } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
+import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
+import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 
 // User preset storage key
 const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
@@ -34,40 +36,7 @@ interface UserMasterFxPreset {
   effects: EffectConfig[];
 }
 
-const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[] = [
-  // Dynamics
-  { type: 'Compressor', label: 'Compressor', category: 'Dynamics' },
-  { type: 'EQ3', label: '3-Band EQ', category: 'Dynamics' },
-
-  // Distortion
-  { type: 'Distortion', label: 'Distortion', category: 'Distortion' },
-  { type: 'BitCrusher', label: 'Bit Crusher', category: 'Distortion' },
-  { type: 'Chebyshev', label: 'Chebyshev', category: 'Distortion' },
-
-  // Time-based
-  { type: 'Reverb', label: 'Reverb', category: 'Time' },
-  { type: 'JCReverb', label: 'JC Reverb', category: 'Time' },
-  { type: 'Delay', label: 'Delay', category: 'Time' },
-  { type: 'FeedbackDelay', label: 'Feedback Delay', category: 'Time' },
-  { type: 'PingPongDelay', label: 'Ping Pong Delay', category: 'Time' },
-
-  // Modulation
-  { type: 'Chorus', label: 'Chorus', category: 'Modulation' },
-  { type: 'Phaser', label: 'Phaser', category: 'Modulation' },
-  { type: 'Tremolo', label: 'Tremolo', category: 'Modulation' },
-  { type: 'Vibrato', label: 'Vibrato', category: 'Modulation' },
-  { type: 'AutoFilter', label: 'Auto Filter', category: 'Modulation' },
-  { type: 'AutoPanner', label: 'Auto Panner', category: 'Modulation' },
-  { type: 'AutoWah', label: 'Auto Wah', category: 'Modulation' },
-
-  // Pitch/Filter
-  { type: 'Filter', label: 'Filter', category: 'Filter' },
-  { type: 'PitchShift', label: 'Pitch Shift', category: 'Pitch' },
-  { type: 'FrequencyShifter', label: 'Freq Shifter', category: 'Pitch' },
-
-  // Stereo
-  { type: 'StereoWidener', label: 'Stereo Widener', category: 'Stereo' },
-];
+// AVAILABLE_EFFECTS now imported from unifiedEffects.ts (60 total: 23 Tone.js + 37 Neural)
 
 interface MasterEffectsModalProps {
   isOpen: boolean;
@@ -82,7 +51,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
   const {
     masterEffects,
-    addMasterEffect,
+    addMasterEffectConfig,
     removeMasterEffect,
     updateMasterEffect,
     reorderMasterEffects,
@@ -159,6 +128,49 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     localStorage.setItem(USER_MASTER_FX_PRESETS_KEY, JSON.stringify(userPresets));
   }, [getUserPresets]);
 
+  // Count neural effects for performance warning
+  const neuralEffectCount = masterEffects.filter(fx => fx.category === 'neural').length;
+
+  // Handle adding effect (supports both Tone.js and Neural)
+  const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
+    // User Decision #2: Warn before adding 4th neural effect
+    if (availableEffect.category === 'neural' && neuralEffectCount >= 3) {
+      const proceed = confirm(
+        '⚠️ Performance Warning\n\n' +
+        'You are adding a 4th neural effect to the master chain. Multiple neural effects can cause high CPU usage and audio glitches.\n\n' +
+        'Consider using Tone.js effects or reducing the neural effect count.\n\n' +
+        'Continue anyway?'
+      );
+      if (!proceed) return;
+    }
+
+    // Build new effect config
+    const newEffect: EffectConfig = {
+      id: `master-fx-${Date.now()}`,
+      category: availableEffect.category,
+      type: (availableEffect.type as EffectType) || 'Distortion', // Default to Distortion for neural
+      enabled: true,
+      wet: 100,
+      parameters: {},
+      neuralModelIndex: availableEffect.neuralModelIndex,
+      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
+    };
+
+    // Get default parameters from neural model schema
+    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
+      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
+      if (model?.parameters) {
+        Object.entries(model.parameters).forEach(([key, param]) => {
+          if (param) {
+            newEffect.parameters[key] = param.default;
+          }
+        });
+      }
+    }
+
+    addMasterEffectConfig(newEffect);
+  }, [neuralEffectCount, addMasterEffectConfig]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -201,13 +213,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   }, {} as Record<string, MasterFxPreset[]>);
 
   // Group effects by category for the add menu
-  const effectsByCategory = AVAILABLE_EFFECTS.reduce((acc, effect) => {
-    if (!acc[effect.category]) {
-      acc[effect.category] = [];
-    }
-    acc[effect.category].push(effect);
-    return acc;
-  }, {} as Record<string, typeof AVAILABLE_EFFECTS>);
+  const effectsByGroup = getEffectsByGroup();
 
   if (!isOpen) return null;
 
@@ -304,6 +310,16 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               <Save size={18} />
             </button>
           </div>
+
+          {/* Performance Warning Indicator */}
+          {neuralEffectCount >= 3 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <AlertTriangle size={14} className="text-yellow-500" />
+              <span className="text-xs text-yellow-500 font-medium">
+                {neuralEffectCount} neural effects - High CPU usage
+              </span>
+            </div>
+          )}
 
           {/* Close Button */}
           <button
@@ -444,19 +460,23 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
                   <div className="space-y-4">
-                    {Object.entries(effectsByCategory).map(([category, effects]) => (
-                      <div key={category}>
-                        <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-2">{category}</h4>
+                    {Object.entries(effectsByGroup).map(([group, groupEffects]) => (
+                      <div key={group}>
+                        <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-2">{group}</h4>
                         <div className="grid grid-cols-2 gap-2">
-                          {effects.map(({ type, label }) => (
+                          {groupEffects.map((effect) => (
                             <button
-                              key={type}
-                              onClick={() => addMasterEffect(type)}
+                              key={effect.label}
+                              onClick={() => handleAddEffect(effect)}
                               className="px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
                                        hover:bg-accent-primary hover:text-white hover:border-accent-primary
-                                       transition-colors text-left"
+                                       transition-colors text-left flex items-center justify-between gap-2"
                             >
-                              {label}
+                              <span className="truncate">{effect.label}</span>
+                              {/* User Decision #4: Visual badges */}
+                              {effect.category === 'neural' && (
+                                <Cpu size={12} className="flex-shrink-0 opacity-60" />
+                              )}
                             </button>
                           ))}
                         </div>
@@ -527,7 +547,18 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
 
         {/* Effect Info */}
         <div className="flex-1">
-          <div className="font-medium text-sm text-text-primary">{effect.type}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm text-text-primary">
+              {effect.neuralModelName || effect.type}
+            </span>
+            {/* User Decision #4: Visual badges */}
+            {effect.category === 'neural' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded text-[10px] text-purple-300">
+                <Cpu size={10} />
+                Neural
+              </span>
+            )}
+          </div>
           <div className="text-xs text-text-muted">
             {effect.enabled ? 'Active' : 'Bypassed'} • Wet: {effect.wet}%
           </div>

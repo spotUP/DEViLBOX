@@ -25,9 +25,16 @@ const PARAMETER_LABELS: Record<TB303Parameter, string> = {
   accent: 'Accent',
   overdrive: 'Overdrive',
   slideTime: 'Slide Time',
+  normalDecay: 'Normal Decay',
+  accentDecay: 'Accent Decay',
+  vegDecay: 'VEG Decay',
+  vegSustain: 'VEG Sustain',
+  softAttack: 'Soft Attack',
+  filterTracking: 'Filter Tracking',
+  filterFM: 'Filter FM',
 };
 
-export const MIDIToolbarDropdown: React.FC = () => {
+const MIDIToolbarDropdownComponent: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -36,26 +43,25 @@ export const MIDIToolbarDropdown: React.FC = () => {
   const [profiles, setProfiles] = useState<ControllerProfile[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const {
-    isSupported,
-    isInitialized,
-    lastError,
-    inputDevices,
-    outputDevices,
-    selectedInputId,
-    selectedOutputId,
-    ccMappings,
-    isLearning,
-    learningParameter,
-    lastActivityTimestamp,
-    init,
-    selectInput,
-    selectOutput,
-    startLearn,
-    cancelLearn,
-    resetMappings,
-    openPatternDialog,
-  } = useMIDIStore();
+  // PERFORMANCE OPTIMIZATION: Use individual selectors
+  const isSupported = useMIDIStore((state) => state.isSupported);
+  const isInitialized = useMIDIStore((state) => state.isInitialized);
+  const lastError = useMIDIStore((state) => state.lastError);
+  const inputDevices = useMIDIStore((state) => state.inputDevices);
+  const outputDevices = useMIDIStore((state) => state.outputDevices);
+  const selectedInputId = useMIDIStore((state) => state.selectedInputId);
+  const selectedOutputId = useMIDIStore((state) => state.selectedOutputId);
+  const ccMappings = useMIDIStore((state) => state.ccMappings);
+  const isLearning = useMIDIStore((state) => state.isLearning);
+  const learningParameter = useMIDIStore((state) => state.learningParameter);
+  const lastActivityTimestamp = useMIDIStore((state) => state.lastActivityTimestamp);
+  const init = useMIDIStore((state) => state.init);
+  const selectInput = useMIDIStore((state) => state.selectInput);
+  const selectOutput = useMIDIStore((state) => state.selectOutput);
+  const startLearn = useMIDIStore((state) => state.startLearn);
+  const cancelLearn = useMIDIStore((state) => state.cancelLearn);
+  const resetMappings = useMIDIStore((state) => state.resetMappings);
+  const openPatternDialog = useMIDIStore((state) => state.openPatternDialog);
 
   // Initialize MIDI on mount (when isSupported is null, we haven't checked yet)
   useEffect(() => {
@@ -426,3 +432,6 @@ export const MIDIToolbarDropdown: React.FC = () => {
     </div>
   );
 };
+
+// PERFORMANCE: Wrap in React.memo to prevent unnecessary re-renders
+export const MIDIToolbarDropdown = React.memo(MIDIToolbarDropdownComponent);

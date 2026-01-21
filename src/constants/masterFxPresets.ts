@@ -20,12 +20,14 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Clean',
     effects: [
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.2 },
       },
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
@@ -39,6 +41,7 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Clean',
     effects: [
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -52,12 +55,14 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Clean',
     effects: [
       {
+        category: 'tonejs',
         type: 'StereoWidener',
         enabled: true,
         wet: 100,
         parameters: { width: 0.7 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -73,12 +78,14 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Club',
     effects: [
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
         parameters: { low: 3, mid: -1, high: 2 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -92,18 +99,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Club',
     effects: [
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
         parameters: { low: 4, mid: -2, high: 1 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 },
       },
       {
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 15,
@@ -117,18 +127,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Club',
     effects: [
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -18, ratio: 3.5, attack: 0.01, release: 0.2 },
       },
       {
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 12,
         parameters: { decay: 1.5, preDelay: 0.01 },
       },
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
@@ -142,18 +155,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Club',
     effects: [
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
         parameters: { low: 2, mid: 1, high: -1 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -20, ratio: 2.5, attack: 0.02, release: 0.3 },
       },
       {
+        category: 'tonejs',
         type: 'Chorus',
         enabled: true,
         wet: 15,
@@ -169,18 +185,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Lo-Fi',
     effects: [
       {
+        category: 'tonejs',
         type: 'BitCrusher',
         enabled: true,
         wet: 40,
         parameters: { bits: 8 },
       },
       {
+        category: 'tonejs',
         type: 'Filter',
         enabled: true,
         wet: 100,
         parameters: { frequency: 8000, type: 'lowpass', Q: 1 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -194,18 +213,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Lo-Fi',
     effects: [
       {
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 20,
         parameters: { distortion: 0.2 },
       },
       {
+        category: 'tonejs',
         type: 'Filter',
         enabled: true,
         wet: 100,
         parameters: { frequency: 12000, type: 'lowpass', Q: 0.7 },
       },
       {
+        category: 'tonejs',
         type: 'Chorus',
         enabled: true,
         wet: 8,
@@ -219,24 +241,28 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Lo-Fi',
     effects: [
       {
+        category: 'tonejs',
         type: 'BitCrusher',
         enabled: true,
         wet: 25,
         parameters: { bits: 12 },
       },
       {
+        category: 'tonejs',
         type: 'Vibrato',
         enabled: true,
         wet: 30,
         parameters: { frequency: 4, depth: 0.08 },
       },
       {
+        category: 'tonejs',
         type: 'Filter',
         enabled: true,
         wet: 100,
         parameters: { frequency: 6000, type: 'lowpass', Q: 0.5 },
       },
       {
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 15,
@@ -252,18 +278,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Ambient',
     effects: [
       {
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 45,
         parameters: { decay: 5, preDelay: 0.05 },
       },
       {
+        category: 'tonejs',
         type: 'PingPongDelay',
         enabled: true,
         wet: 30,
         parameters: { delayTime: 0.4, feedback: 0.5 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -277,18 +306,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Ambient',
     effects: [
       {
+        category: 'tonejs',
         type: 'Chorus',
         enabled: true,
         wet: 35,
         parameters: { frequency: 0.3, depth: 0.5 },
       },
       {
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 55,
         parameters: { decay: 6, preDelay: 0.08 },
       },
       {
+        category: 'tonejs',
         type: 'Filter',
         enabled: true,
         wet: 100,
@@ -302,12 +334,14 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Ambient',
     effects: [
       {
+        category: 'tonejs',
         type: 'JCReverb',
         enabled: true,
         wet: 60,
         parameters: { roomSize: 0.9 },
       },
       {
+        category: 'tonejs',
         type: 'Delay',
         enabled: true,
         wet: 20,
@@ -321,18 +355,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Ambient',
     effects: [
       {
+        category: 'tonejs',
         type: 'Filter',
         enabled: true,
         wet: 100,
         parameters: { frequency: 1200, type: 'lowpass', Q: 2 },
       },
       {
+        category: 'tonejs',
         type: 'Chorus',
         enabled: true,
         wet: 40,
         parameters: { frequency: 0.4, depth: 0.6 },
       },
       {
+        category: 'tonejs',
         type: 'Reverb',
         enabled: true,
         wet: 50,
@@ -348,18 +385,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Aggressive',
     effects: [
       {
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 45,
         parameters: { distortion: 0.6 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.08 },
       },
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
@@ -373,18 +413,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Aggressive',
     effects: [
       {
+        category: 'tonejs',
         type: 'BitCrusher',
         enabled: true,
         wet: 60,
         parameters: { bits: 6 },
       },
       {
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 35,
         parameters: { distortion: 0.5 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
@@ -398,18 +441,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Aggressive',
     effects: [
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
         parameters: { low: 5, mid: -1, high: 3 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 },
       },
       {
+        category: 'tonejs',
         type: 'Distortion',
         enabled: true,
         wet: 20,
@@ -423,18 +469,21 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
     category: 'Aggressive',
     effects: [
       {
+        category: 'tonejs',
         type: 'Chebyshev',
         enabled: true,
         wet: 50,
         parameters: { order: 8 },
       },
       {
+        category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
         parameters: { threshold: -6, ratio: 20, attack: 0.0005, release: 0.03 },
       },
       {
+        category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,

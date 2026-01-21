@@ -12,13 +12,17 @@ import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
+import { ScaleVolumeDialog } from './ScaleVolumeDialog';
+import { FadeVolumeDialog } from './FadeVolumeDialog';
+import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
+import { TB303View } from '@components/demo/TB303View';
 import { AdvancedEditPanel } from './AdvancedEditPanel';
 import { MobileTrackerView } from './MobileTrackerView';
 import { LiveModeToggle } from './LiveModeIndicator';
 import { useResponsive } from '@hooks/useResponsive';
-import { List, Grid3X3, Piano, Music2, Eye, EyeOff, Zap } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
@@ -29,6 +33,8 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
+import { downloadPattern } from '@lib/export/PatternExport';
+import { downloadTrack } from '@lib/export/TrackExport';
 
 // Create instruments for imported module, using samples if available
 function createInstrumentsForModule(
@@ -119,33 +125,48 @@ interface TrackerViewProps {
   onShowExport?: () => void;
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
+  onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onShowImportModule?: () => void;
+  onShowPatterns?: () => void;
   showMasterFX?: boolean;
+  showInstrumentFX?: boolean;
   showImportModule?: boolean;
+  showPatterns?: boolean;
 }
 
 export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowExport,
   onShowHelp,
   onShowMasterFX,
+  onShowInstrumentFX,
   onShowInstruments,
   onShowImportModule,
   showMasterFX,
+  showInstrumentFX,
   showImportModule: externalShowImportModule,
 }) => {
   const { isMobile } = useResponsive();
-  const { 
-    patterns, currentPatternIndex, currentOctave, loadPatterns, 
-    cursor, showGhostPatterns, setShowGhostPatterns,
-    resizePattern, updateTimeSignature
-  } = useTrackerStore();
-  const { loadInstruments } = useInstrumentStore();
-  const { setMetadata } = useProjectStore();
-  const { setBPM } = useTransportStore();
+
+  // PERFORMANCE OPTIMIZATION: Use individual selectors to prevent unnecessary re-renders
+  const patterns = useTrackerStore((state) => state.patterns);
+  const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
+  const cursor = useTrackerStore((state) => state.cursor);
+  const showGhostPatterns = useTrackerStore((state) => state.showGhostPatterns);
+
+  // Get actions (these don't cause re-renders)
+  const loadPatterns = useTrackerStore((state) => state.loadPatterns);
+  const setShowGhostPatterns = useTrackerStore((state) => state.setShowGhostPatterns);
+  const scaleVolume = useTrackerStore((state) => state.scaleVolume);
+  const fadeVolume = useTrackerStore((state) => state.fadeVolume);
+  const remapInstrument = useTrackerStore((state) => state.remapInstrument);
+
+  const loadInstruments = useInstrumentStore((state) => state.loadInstruments);
+  const setMetadata = useProjectStore((state) => state.setMetadata);
+  const setBPM = useTransportStore((state) => state.setBPM);
 
   // View mode state
-  type ViewMode = 'tracker' | 'grid' | 'pianoroll';
+  type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
   const [viewMode, setViewMode] = useState<ViewMode>('tracker');
   const [gridChannelIndex, setGridChannelIndex] = useState(0);
 
@@ -154,6 +175,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showHumanize, setShowHumanize] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
+  // FT2 dialogs
+  const [showScaleVolume, setShowScaleVolume] = useState(false);
+  const [showFadeVolume, setShowFadeVolume] = useState(false);
+  const [showRemapInstrument, setShowRemapInstrument] = useState(false);
+  const [volumeOpScope, setVolumeOpScope] = useState<'block' | 'track' | 'pattern'>('block');
+  const [remapOpScope, setRemapOpScope] = useState<'block' | 'track' | 'pattern' | 'song'>('block');
 
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
@@ -324,6 +351,37 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onClose={() => setShowImportModule(false)}
           onImport={handleModuleImport}
         />
+        {/* FT2 Dialogs */}
+        {showScaleVolume && (
+          <ScaleVolumeDialog
+            scope={volumeOpScope}
+            onConfirm={(factor) => {
+              scaleVolume(volumeOpScope, factor);
+              setShowScaleVolume(false);
+            }}
+            onCancel={() => setShowScaleVolume(false)}
+          />
+        )}
+        {showFadeVolume && (
+          <FadeVolumeDialog
+            scope={volumeOpScope}
+            onConfirm={(startVol, endVol) => {
+              fadeVolume(volumeOpScope, startVol, endVol);
+              setShowFadeVolume(false);
+            }}
+            onCancel={() => setShowFadeVolume(false)}
+          />
+        )}
+        {showRemapInstrument && (
+          <RemapInstrumentDialog
+            scope={remapOpScope}
+            onConfirm={(source, dest) => {
+              remapInstrument(source, dest, remapOpScope);
+              setShowRemapInstrument(false);
+            }}
+            onCancel={() => setShowRemapInstrument(false)}
+          />
+        )}
       </>
     );
   }
@@ -331,67 +389,39 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Desktop view
   return (
     <div className="flex-1 flex flex-col bg-dark-bg overflow-hidden">
-      {/* Top Control Bar - Fixed position to prevent being pushed off-screen */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10">
-        <div className="flex items-center gap-6 flex-shrink min-w-0">
-          {/* Pattern Info */}
-          <div className="flex items-center gap-3">
-            <LiveModeToggle />
-            <div className="w-px h-4 bg-dark-border mx-1" />
-            <span className="text-text-muted text-xs font-mono">PATTERN</span>
-            <span className="text-accent-primary font-bold font-mono text-sm">
-              {pattern?.name || 'Untitled'}
-            </span>
-          </div>
-
-          {/* Separator */}
-          <div className="w-px h-4 bg-dark-border" />
-
-          {/* Quick Stats */}
-          <div className="hidden lg:flex items-center gap-4 text-[10px] font-mono">
-            <div className="flex items-center gap-1">
-              <span className="text-text-muted uppercase font-bold">Len:</span>
-              <input 
-                type="number" min="1" max="256"
-                value={pattern?.length || 64}
-                onChange={(e) => resizePattern(currentPatternIndex, parseInt(e.target.value) || 1)}
-                className="w-8 bg-dark-bgTertiary text-text-primary border border-dark-border px-1 focus:outline-none focus:border-accent-primary rounded"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-text-muted uppercase font-bold">Sig:</span>
-              <div className="flex items-center bg-dark-bgTertiary border border-dark-border rounded px-1">
-                <input 
-                  type="number" min="1" max="32"
-                  value={pattern?.timeSignature?.beatsPerMeasure || 4}
-                  onChange={(e) => updateTimeSignature(currentPatternIndex, { beatsPerMeasure: parseInt(e.target.value) || 1 })}
-                  className="w-5 bg-transparent text-accent-primary focus:outline-none text-center"
-                />
-                <span className="text-text-muted">/</span>
-                <input 
-                  type="number" min="1" max="32"
-                  value={pattern?.timeSignature?.stepsPerBeat || 4}
-                  onChange={(e) => updateTimeSignature(currentPatternIndex, { stepsPerBeat: parseInt(e.target.value) || 1 })}
-                  className="w-5 bg-transparent text-accent-primary focus:outline-none text-center"
-                />
-              </div>
-            </div>
-            <span className="text-text-muted uppercase font-bold">
-              Oct: <span className="text-accent-secondary">F{currentOctave}</span>
-            </span>
-          </div>
+      {/* Top Control Bar - Horizontal scroll for overflow */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10 w-full overflow-x-auto">
+        {/* Pattern Info - Flexible with minimum size */}
+        <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+          <LiveModeToggle />
+          <span className="text-accent-primary font-bold font-mono text-xs whitespace-nowrap">
+            {pattern?.name || 'Untitled'}
+          </span>
         </div>
 
-        {/* View Mode Toggle + Channel Selector - Never shrink, always visible */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Channel Selector (grid view only) */}
-          {viewMode === 'grid' && pattern && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">CH</span>
+        {/* View Mode Controls */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* View Mode Dropdown */}
+          <select
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value as ViewMode)}
+            className="px-3 py-1.5 text-sm bg-dark-bgTertiary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+            title="Select editor view"
+          >
+            <option value="tracker">📝 Tracker</option>
+            <option value="grid">🎹 Grid</option>
+            <option value="pianoroll">🎵 Piano Roll</option>
+            <option value="tb303">🔊 TB-303</option>
+          </select>
+
+          {/* Channel Selector (grid and piano roll views) */}
+          {(viewMode === 'grid' || viewMode === 'pianoroll') && pattern && (
+            <>
+              <span className="text-text-secondary text-xs font-medium">CH:</span>
               <select
                 value={gridChannelIndex}
                 onChange={(e) => setGridChannelIndex(Number(e.target.value))}
-                className="px-2 py-1 text-xs bg-dark-bgTertiary border border-dark-border rounded text-text-primary"
+                className="px-3 py-1.5 text-sm bg-dark-bgTertiary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
               >
                 {pattern.channels.map((_, idx) => (
                   <option key={idx} value={idx}>
@@ -399,66 +429,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   </option>
                 ))}
               </select>
-            </div>
+            </>
           )}
-
-          {/* Separator */}
-          {viewMode === 'grid' && <div className="w-px h-4 bg-dark-border" />}
-
-          {/* View Toggle */}
-          <div className="flex items-center bg-dark-bgTertiary rounded-md p-0.5">
-            <button
-              onClick={() => setViewMode('tracker')}
-              className={`
-                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
-                ${viewMode === 'tracker'
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title="Tracker View"
-            >
-              <List size={14} />
-              <span className="hidden sm:inline">Tracker</span>
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`
-                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
-                ${viewMode === 'grid'
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title="Grid View (303-style)"
-            >
-              <Grid3X3 size={14} />
-              <span className="hidden sm:inline">Grid</span>
-            </button>
-            <button
-              onClick={() => setViewMode('pianoroll')}
-              className={`
-                flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
-                ${viewMode === 'pianoroll'
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title="Piano Roll View"
-            >
-              <Piano size={14} />
-              <span className="hidden sm:inline">Piano</span>
-            </button>
-          </div>
 
           {/* Ghost Patterns Toggle (tracker view only) */}
           {viewMode === 'tracker' && (
             <>
-              <div className="w-px h-4 bg-dark-border" />
               <button
                 onClick={() => setShowGhostPatterns(!showGhostPatterns)}
                 className={`
-                  flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                  flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
                   ${showGhostPatterns
                     ? 'bg-accent-primary/20 text-accent-primary'
                     : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
@@ -467,13 +447,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
               >
                 {showGhostPatterns ? <Eye size={14} /> : <EyeOff size={14} />}
-                <span className="hidden sm:inline">Ghosts</span>
+                <span className="hidden lg:inline">Ghosts</span>
               </button>
-              <div className="w-px h-4 bg-dark-border" />
               <button
                 onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
                 className={`
-                  flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors
+                  flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
                   ${showAdvancedEdit
                     ? 'bg-accent-primary/20 text-accent-primary'
                     : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
@@ -482,7 +461,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 title="Toggle Advanced Edit Panel"
               >
                 <Zap size={14} />
-                <span className="hidden sm:inline">Adv Edit</span>
+                <span className="hidden lg:inline">Adv Edit</span>
               </button>
             </>
           )}
@@ -494,30 +473,57 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         onShowExport={onShowExport}
         onShowHelp={onShowHelp}
         onShowMasterFX={onShowMasterFX}
+        onShowInstrumentFX={onShowInstrumentFX}
         onShowInstruments={onShowInstruments}
         onImport={() => setShowImportModule(true)}
         showMasterFX={showMasterFX}
+        showInstrumentFX={showInstrumentFX}
       />
 
-      {/* TB-303 Live Knobs (includes Devil Fish controls) */}
-      <TB303KnobPanel />
+      {/* TB-303 Live Knobs (compact view when not in TB-303 editor mode) */}
+      {viewMode !== 'tb303' && <TB303KnobPanel />}
 
       {/* Main Content Area with Pattern Editor and Instrument Panel */}
       <div className="flex-1 flex min-h-0 overflow-hidden relative z-10">
-        {/* Pattern Editor / Grid Sequencer / Piano Roll - Takes remaining space */}
-        <div className="flex-1 min-w-0 overflow-hidden">
+        {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Takes remaining space */}
+        <div className="flex-1 w-full h-full overflow-hidden">
           {viewMode === 'tracker' ? (
             <PatternEditor />
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
-          ) : (
+          ) : viewMode === 'pianoroll' ? (
             <PianoRoll channelIndex={gridChannelIndex} />
+          ) : (
+            <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-dark-bgPrimary">
+              <TB303View channelIndex={gridChannelIndex} />
+            </div>
           )}
         </div>
 
         {/* Advanced Edit Panel */}
         {showAdvancedEdit && (
-          <AdvancedEditPanel />
+          <AdvancedEditPanel
+            onShowScaleVolume={(scope) => {
+              setVolumeOpScope(scope);
+              setShowScaleVolume(true);
+            }}
+            onShowFadeVolume={(scope) => {
+              setVolumeOpScope(scope);
+              setShowFadeVolume(true);
+            }}
+            onShowRemapInstrument={(scope) => {
+              setRemapOpScope(scope);
+              setShowRemapInstrument(true);
+            }}
+            onExportPattern={() => {
+              const pattern = patterns[currentPatternIndex];
+              downloadPattern(pattern);
+            }}
+            onExportTrack={() => {
+              const pattern = patterns[currentPatternIndex];
+              downloadTrack(cursor.channelIndex, pattern);
+            }}
+          />
         )}
 
         {/* Instrument Panel Toggle Button */}
@@ -534,9 +540,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <Music2 size={14} className={showInstrumentPanel ? '' : 'rotate-180'} />
         </button>
 
-        {/* Instrument List Panel */}
+        {/* Instrument List Panel - Responsive width */}
         {showInstrumentPanel && (
-          <div className="flex-shrink-0 w-64 border-l border-ft2-border animate-fade-in h-full flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 w-64 max-w-[90vw] border-l border-ft2-border animate-fade-in h-full flex flex-col overflow-hidden">
             <InstrumentListPanel onEditInstrument={onShowInstruments} />
           </div>
         )}
@@ -563,6 +569,38 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         onClose={() => setShowImportModule(false)}
         onImport={handleModuleImport}
       />
+
+      {/* FT2 Dialogs */}
+      {showScaleVolume && (
+        <ScaleVolumeDialog
+          scope={volumeOpScope}
+          onConfirm={(factor) => {
+            scaleVolume(volumeOpScope, factor);
+            setShowScaleVolume(false);
+          }}
+          onCancel={() => setShowScaleVolume(false)}
+        />
+      )}
+      {showFadeVolume && (
+        <FadeVolumeDialog
+          scope={volumeOpScope}
+          onConfirm={(startVol, endVol) => {
+            fadeVolume(volumeOpScope, startVol, endVol);
+            setShowFadeVolume(false);
+          }}
+          onCancel={() => setShowFadeVolume(false)}
+        />
+      )}
+      {showRemapInstrument && (
+        <RemapInstrumentDialog
+          scope={remapOpScope}
+          onConfirm={(source, dest) => {
+            remapInstrument(source, dest, remapOpScope);
+            setShowRemapInstrument(false);
+          }}
+          onCancel={() => setShowRemapInstrument(false)}
+        />
+      )}
     </div>
   );
 };

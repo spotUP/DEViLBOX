@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { X, Monitor, Apple, Terminal, Download, ExternalLink } from 'lucide-react';
+import { Button } from '@components/ui/Button';
 
 interface DownloadModalProps {
   isOpen: boolean;
@@ -51,12 +52,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
               <p className="text-xs text-text-muted font-mono">Native Desktop Applications</p>
             </div>
           </div>
-          <button
+          <Button
+            variant="icon"
+            size="icon"
             onClick={onClose}
-            className="p-2 hover:bg-dark-bgHover rounded-full text-text-muted hover:text-text-primary transition-colors"
+            aria-label="Close dialog"
           >
             <X size={20} />
-          </button>
+          </Button>
         </div>
 
         {/* Content */}

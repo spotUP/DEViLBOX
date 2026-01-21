@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
 import { InstrumentModal } from '@components/instruments/InstrumentModal';
@@ -10,7 +11,7 @@ import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { HelpModal } from '@components/help/HelpModal';
 import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
-import { MasterEffectsModal, EffectParameterEditor } from '@components/effects';
+import { MasterEffectsModal, InstrumentEffectsModal, EffectParameterEditor } from '@components/effects';
 import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
 import { WhatsNewModal, useWhatsNew } from '@components/dialogs/WhatsNewModal';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
@@ -23,9 +24,22 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
 import { ChevronDown, ChevronUp, Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
+import { ToastContainer } from '@components/common/ToastContainer';
+import { Button } from '@components/ui/Button';
 
 function App() {
-  const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore();
+  // PERFORMANCE: Use useShallow to prevent re-renders on unrelated audio store changes
+  const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore(
+    useShallow((state) => ({
+      initialized: state.initialized,
+      contextState: state.contextState,
+      setInitialized: state.setInitialized,
+      setContextState: state.setContextState,
+      setToneEngineInstance: state.setToneEngineInstance,
+      setAnalyserNode: state.setAnalyserNode,
+      setFFTNode: state.setFFTNode,
+    }))
+  );
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   const [showAutomation, setShowAutomation] = useState(false);
@@ -33,6 +47,7 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showPatterns, setShowPatterns] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
+  const [showInstrumentFX, setShowInstrumentFX] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
   const automationPanelRef = useRef<HTMLDivElement>(null);
@@ -193,6 +208,13 @@ function App() {
         return;
       }
 
+      // Ctrl+Shift+F: Instrument effects
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setShowInstrumentFX(!showInstrumentFX);
+        return;
+      }
+
       // Ctrl+Shift+M: Toggle master mute
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
@@ -227,7 +249,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, handleUndo, handleRedo, saveProject]);
+  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, showInstrumentFX, handleUndo, handleRedo, saveProject]);
 
   const handleUpdateEffectParameter = (key: string, value: number) => {
     if (!editingEffect) return;
@@ -267,9 +289,9 @@ function App() {
         <div className="panel p-8 max-w-md">
           <h2 className="text-xl font-bold text-accent-error mb-4">Audio Initialization Error</h2>
           <p className="text-text-secondary mb-4">{initError}</p>
-          <button className="btn-primary" onClick={() => window.location.reload()}>
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Reload Application
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -305,17 +327,15 @@ function App() {
             </div>
 
             {/* Start Button */}
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               onClick={handleStartAudio}
-              className="group relative px-8 py-4 bg-accent-primary text-text-inverse font-semibold text-lg rounded-lg
-                         hover:bg-emerald-400 transition-all duration-200 shadow-glow hover:shadow-glow
-                         animate-pulse-glow"
+              icon={<Zap size={20} />}
+              className="shadow-glow animate-pulse-glow"
             >
-              <span className="flex items-center gap-2">
-                <Zap size={20} />
-                Start Audio Engine
-              </span>
-            </button>
+              Start Audio Engine
+            </Button>
 
             {/* Features Grid */}
             <div className="mt-12 grid grid-cols-2 gap-4 text-left">
@@ -399,9 +419,11 @@ function App() {
                 onShowExport={() => setShowExport(true)}
                 onShowHelp={() => setShowHelp(true)}
                 onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
+                onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
                 onShowInstruments={() => setShowInstrumentModal(true)}
                 showPatterns={showPatterns}
                 showMasterFX={showMasterFX}
+                showInstrumentFX={showInstrumentFX}
               />
             </div>
           </div>
@@ -444,6 +466,7 @@ function App() {
       <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />
       <InstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
+      <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
       {showWhatsNew && <WhatsNewModal onClose={closeWhatsNew} />}
 
@@ -463,6 +486,8 @@ function App() {
 
       {/* Toast Notifications */}
       <ToastNotification />
+      {/* Toast Notifications */}
+      <ToastContainer />
     </AppLayout>
   );
 }

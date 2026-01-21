@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Upload, Play, Square, Music, FileAudio, AlertCircle } from 'lucide-react';
+import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
   previewModule,
@@ -111,12 +112,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             <FileAudio size={18} className="text-accent-primary" />
             <h2 className="text-sm font-semibold text-text-primary">Import Tracker Module</h2>
           </div>
-          <button
+          <Button
+            variant="icon"
+            size="icon"
             onClick={handleClose}
-            className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors"
+            aria-label="Close dialog"
           >
             <X size={16} />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -216,28 +219,15 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               )}
 
               {/* Preview button */}
-              <button
+              <Button
+                variant="ghost"
+                fullWidth
                 onClick={handlePreview}
-                className={`
-                  w-full flex items-center justify-center gap-2 px-4 py-2 rounded transition-colors
-                  ${isPlaying
-                    ? 'bg-accent-error/20 text-accent-error hover:bg-accent-error/30'
-                    : 'bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30'
-                  }
-                `}
+                icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
+                className={isPlaying ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}
               >
-                {isPlaying ? (
-                  <>
-                    <Square size={14} />
-                    Stop Preview
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} />
-                    Preview
-                  </>
-                )}
-              </button>
+                {isPlaying ? 'Stop Preview' : 'Preview'}
+              </Button>
             </div>
           )}
 
@@ -252,19 +242,21 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleImport}
             disabled={!moduleInfo}
-            className="px-4 py-2 text-sm bg-accent-primary text-white rounded hover:bg-accent-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Import Module
-          </button>
+          </Button>
         </div>
       </div>
     </div>

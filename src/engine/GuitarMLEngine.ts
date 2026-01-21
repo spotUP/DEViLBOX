@@ -241,14 +241,14 @@ export class GuitarMLEngine {
    * Enable/disable processing
    */
   setEnabled(enabled: boolean): void {
-    this.setParameter('enabled', enabled);
+    this.setParameter('enabled', enabled ? 1 : 0);
   }
 
   /**
    * Enable/disable sample rate correction filter
    */
   setUseSRCFilter(enabled: boolean): void {
-    this.setParameter('useSRCFilter', enabled);
+    this.setParameter('useSRCFilter', enabled ? 1 : 0);
   }
 
   /**
@@ -274,6 +274,16 @@ export class GuitarMLEngine {
    */
   disconnect(): void {
     this.outputGain.disconnect();
+  }
+
+  /**
+   * Get input node (worklet node accepts input)
+   */
+  getInput(): AudioNode {
+    if (!this.workletNode) {
+      throw new Error('GuitarML not initialized - call initialize() first');
+    }
+    return this.workletNode;
   }
 
   /**

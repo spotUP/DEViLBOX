@@ -248,11 +248,13 @@ export class AcidPattern {
 /**
  * Sequencer modes
  */
-export enum SequencerMode {
-  OFF = 0,
-  KEY_SYNC = 1,   // Start on MIDI note
-  HOST_SYNC = 2,  // Start on transport (not implemented in web)
-}
+export const SequencerMode = {
+  OFF: 0,
+  KEY_SYNC: 1,   // Start on MIDI note
+  HOST_SYNC: 2,  // Start on transport (not implemented in web)
+} as const;
+
+export type SequencerMode = typeof SequencerMode[keyof typeof SequencerMode];
 
 /**
  * Event emitted by sequencer
