@@ -111,7 +111,7 @@ const NavBarComponent: React.FC = () => {
               iconPosition="left"
               title="Download Desktop App"
             >
-              <span className="hidden sm:inline uppercase">Desktop App</span>
+              <span className="hidden sm:inline uppercase whitespace-nowrap">Desktop App</span>
             </Button>
           )}
 
