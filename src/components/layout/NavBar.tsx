@@ -9,6 +9,7 @@ import { Plus, X, Palette, ChevronUp, ChevronDown, Download } from 'lucide-react
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
+import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 
 const NavBarComponent: React.FC = () => {
@@ -102,14 +103,16 @@ const NavBarComponent: React.FC = () => {
         <div className="flex items-center gap-4">
           {/* Download Button (Web only) */}
           {!isElectron() && (
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => setShowDownloadModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bgTertiary hover:bg-dark-bgHover text-accent-primary text-xs font-bold transition-colors rounded border border-accent-primary/30"
+              icon={<Download size={14} />}
+              iconPosition="left"
               title="Download Desktop App"
             >
-              <Download size={14} />
               <span className="hidden sm:inline uppercase">Desktop App</span>
-            </button>
+            </Button>
           )}
 
           {/* MIDI Settings */}
