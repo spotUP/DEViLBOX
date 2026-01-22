@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-22T09:23:52.588Z
+ * Generated: 2026-01-22T09:47:00.911Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '43';
-export const BUILD_HASH = 'bc54072';
+export const BUILD_NUMBER = '45';
+export const BUILD_HASH = 'b5401dc';
 export const BUILD_DATE = '2026-01-22';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -29,6 +29,20 @@ export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.0',
+    date: '2026-01-22',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Chore: Configure GitHub Pages deployment'
+      },
+      {
+        type: 'fix',
+        description: 'Pattern editor layout with custom scrollbar and mobile fixes'
+      }
+    ]
+  },
+  {
+    version: '1.0.0-1',
     date: '2026-01-21',
     changes: [
       {
@@ -54,7 +68,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-1',
+    version: '1.0.0-2',
     date: '2026-01-20',
     changes: [
       {
@@ -88,7 +102,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-2',
+    version: '1.0.0-3',
     date: '2026-01-17',
     changes: [
       {
@@ -118,7 +132,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-3',
+    version: '1.0.0-4',
     date: '2026-01-16',
     changes: [
       {
@@ -220,7 +234,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-4',
+    version: '1.0.0-5',
     date: '2026-01-15',
     changes: [
       {
