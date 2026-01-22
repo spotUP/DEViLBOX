@@ -15,7 +15,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   // These should point to your GitHub Releases page or similar
-  const RELEASES_URL = 'https://github.com/spot/DEViLBOX/releases/latest';
+  const RELEASES_URL = 'https://github.com/spotUP/DEViLBOX/releases/latest';
 
   const platforms = [
     {
