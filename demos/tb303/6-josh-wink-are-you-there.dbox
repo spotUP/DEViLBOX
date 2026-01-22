@@ -1,0 +1,184 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "title": "Josh Wink - Are You There",
+    "author": "DEViLBOX",
+    "description": "Classic TB-303 pattern - SQUARE wave",
+    "version": "1.0.0",
+    "created": "2026-01-21T15:50:00.202Z",
+    "modified": "2026-01-21T15:50:00.202Z"
+  },
+  "bpm": 120,
+  "patterns": [
+    {
+      "id": "pattern-5",
+      "name": "Josh Wink - Are You There",
+      "length": 16,
+      "channels": [
+        {
+          "name": "TB-303",
+          "rows": [
+            {
+              "note": "D#3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "C#3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "E-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "E-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "E-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "D#3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 0,
+          "color": "#FFD700"
+        }
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "id": 0,
+      "name": "TB-303 (SQUARE)",
+      "synthType": "TB-303",
+      "volume": -6,
+      "pan": 0,
+      "effects": [],
+      "parameters": {
+        "waveform": "SQUARE",
+        "cutoff": 0.5,
+        "resonance": 0.7,
+        "envMod": 0.6,
+        "decay": 0.4,
+        "accent": 0.8
+      }
+    }
+  ],
+  "masterVolume": 0,
+  "masterEffects": []
+}

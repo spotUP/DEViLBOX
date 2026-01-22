@@ -1,0 +1,196 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "title": "Fatboy Slim - Everybody needs a 303",
+    "author": "DEViLBOX",
+    "description": "Classic TB-303 pattern - SQUARE wave",
+    "version": "1.0.0",
+    "created": "2026-01-21T15:50:00.198Z",
+    "modified": "2026-01-21T15:50:00.200Z"
+  },
+  "bpm": 120,
+  "patterns": [
+    {
+      "id": "pattern-0",
+      "name": "Fatboy Slim - Everybody needs a 303",
+      "length": 16,
+      "channels": [
+        {
+          "name": "TB-303",
+          "rows": [
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": true
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C#2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C#3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "F-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C#3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C#3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 0,
+          "color": "#FFD700"
+        }
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "id": 0,
+      "name": "TB-303 (SQUARE)",
+      "synthType": "TB-303",
+      "volume": -6,
+      "pan": 0,
+      "effects": [],
+      "parameters": {
+        "waveform": "SQUARE",
+        "cutoff": 0.5,
+        "resonance": 0.7,
+        "envMod": 0.6,
+        "decay": 0.4,
+        "accent": 0.8
+      }
+    }
+  ],
+  "masterVolume": 0,
+  "masterEffects": []
+}

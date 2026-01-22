@@ -1,0 +1,184 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "title": "Public Energy - Three o Three (Part 1)",
+    "author": "DEViLBOX",
+    "description": "Classic TB-303 pattern - SAW wave",
+    "version": "1.0.0",
+    "created": "2026-01-21T15:50:00.202Z",
+    "modified": "2026-01-21T15:50:00.202Z"
+  },
+  "bpm": 133,
+  "patterns": [
+    {
+      "id": "pattern-8",
+      "name": "Public Energy - Three o Three (Part 1)",
+      "length": 16,
+      "channels": [
+        {
+          "name": "TB-303",
+          "rows": [
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "A-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "A-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "E-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "G-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 0,
+          "color": "#FFD700"
+        }
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "id": 0,
+      "name": "TB-303 (SAW)",
+      "synthType": "TB-303",
+      "volume": -6,
+      "pan": 0,
+      "effects": [],
+      "parameters": {
+        "waveform": "SAW",
+        "cutoff": 0.5,
+        "resonance": 0.7,
+        "envMod": 0.6,
+        "decay": 0.4,
+        "accent": 0.8
+      }
+    }
+  ],
+  "masterVolume": 0,
+  "masterEffects": []
+}

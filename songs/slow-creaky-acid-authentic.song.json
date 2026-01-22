@@ -1,0 +1,173 @@
+{
+  "format": "devilbox-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "slow-creaky-acid-authentic",
+    "name": "Slow Creaky Acid (Authentic)",
+    "author": "DEViLBOX",
+    "description": "Slow creaky acid using authentic TB-303 behavior: long absolute decay times (2500ms), high resonance, VEG sustain. Tempo-relative OFF - just like real hardware.",
+    "createdAt": "2026-01-20T00:00:00.000Z",
+    "modifiedAt": "2026-01-20T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 60,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Creaky 303 (Authentic)",
+      "synthType": "TB303",
+      "tb303": {
+        "engineType": "accurate",
+        "tempoRelative": false,
+        "oscillator": {
+          "type": "sawtooth"
+        },
+        "filter": {
+          "cutoff": 400,
+          "resonance": 85
+        },
+        "filterEnvelope": {
+          "envMod": 95,
+          "decay": 2500
+        },
+        "accent": {
+          "amount": 80
+        },
+        "slide": {
+          "time": 120,
+          "mode": "exponential"
+        },
+        "devilFish": {
+          "enabled": true,
+          "normalDecay": 2500,
+          "accentDecay": 3000,
+          "vegDecay": 2000,
+          "vegSustain": 100,
+          "softAttack": 5,
+          "filterTracking": 150,
+          "filterFM": 30,
+          "accentSweepEnabled": true,
+          "sweepSpeed": "normal"
+        }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 2,
+      "name": "909 Kick",
+      "synthType": "MembraneSynth",
+      "envelope": {
+        "attack": 2,
+        "decay": 400,
+        "sustain": 0,
+        "release": 100
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0,
+      "parameters": {
+        "pitchDecay": 0.05,
+        "octaves": 6
+      }
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-slow-creaky",
+      "name": "Slow Creaky Pattern",
+      "length": 32,
+      "channels": [
+        {
+          "id": "ch-bass",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            {"note": "D-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": true, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "G-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": true},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "A-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": true, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "D-3", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": true},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "C-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": true, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "F-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": true},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "G-2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": true, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "A#2", "instrument": 1, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": true},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false}
+          ]
+        },
+        {
+          "id": "ch-kick",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#ef4444",
+          "rows": [
+            {"note": "C-2", "instrument": 2, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "C-2", "instrument": 2, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "C-2", "instrument": 2, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": "C-2", "instrument": 2, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false},
+            {"note": null, "instrument": null, "volume": null, "effect": null, "effect2": null, "accent": false, "slide": false}
+          ]
+        }
+      ]
+    }
+  ]
+}

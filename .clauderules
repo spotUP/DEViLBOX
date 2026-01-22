@@ -1,0 +1,126 @@
+# Claude Code Project Rules for DEViLBOX
+
+## 🎨 Design System (MANDATORY)
+
+**CRITICAL:** Before writing ANY UI code, you MUST consult `/DESIGN_SYSTEM.md`
+
+### Core Rules
+
+1. **NEVER create custom buttons** - Always use `<Button>` component from `@components/ui/Button`
+2. **NEVER hardcode colors** - Always use CSS variables (`var(--color-accent)`)
+3. **NEVER create inline-styled elements** - Use existing components
+4. **ALWAYS add accessibility** - Include ARIA labels and keyboard support
+5. **If you need something new** - Add it to DESIGN_SYSTEM.md first, then use it
+
+### Quick Component Reference
+
+```tsx
+// Buttons - ALWAYS use Button component
+import { Button } from '@components/ui/Button';
+<Button variant="primary">Save</Button>
+<Button variant="ghost" icon={<X />} onClick={onClose}>Cancel</Button>
+<Button variant="danger">Delete</Button>
+
+// Modals - ALWAYS use Modal components
+import { Modal, ModalHeader, ModalFooter } from '@components/ui';
+<Modal isOpen={isOpen} onClose={onClose}>
+  <ModalHeader title="Title" onClose={onClose} />
+  <div className="p-6">Content</div>
+  <ModalFooter>
+    <Button variant="ghost" onClick={onClose}>Cancel</Button>
+    <Button variant="primary" onClick={handleSave}>Save</Button>
+  </ModalFooter>
+</Modal>
+
+// Knobs - For continuous values (cutoff, volume, etc.)
+import { Knob } from '@components/controls/Knob';
+<Knob label="Cutoff" value={val} onChange={setVal} color="var(--color-synth-filter)" />
+
+// Toggles - For boolean states
+import { Toggle } from '@components/controls/Toggle';
+<Toggle label="Enable" value={enabled} onChange={setEnabled} />
+
+// Notifications
+import { notify } from '@stores/useNotificationStore';
+notify.success('Saved!');
+notify.error('Failed');
+```
+
+### Color System
+
+**ALWAYS use CSS variables:**
+```tsx
+✅ var(--color-accent)
+✅ var(--color-text-secondary)
+✅ var(--color-synth-filter)
+
+❌ #ef4444
+❌ rgb(239, 68, 68)
+❌ className="bg-red-500"
+```
+
+### Before Writing Code
+
+Check this list:
+- [ ] Did I check DESIGN_SYSTEM.md?
+- [ ] Am I using existing components?
+- [ ] Am I using CSS variables for colors?
+- [ ] Did I add ARIA labels?
+- [ ] Is this keyboard accessible?
+
+## 🏗️ Code Standards
+
+### TypeScript
+- Use strict mode (already enabled)
+- Never use `any` - always type properly
+- Prefer interfaces over types for component props
+
+### React
+- Use functional components with hooks
+- Use useCallback for event handlers
+- Use useMemo for expensive computations
+- Always provide keys for mapped elements
+
+### Accessibility
+- All buttons must have `aria-label` if icon-only
+- All interactive elements must be keyboard accessible
+- Focus states must be visible
+- Use semantic HTML (`role`, `aria-*` attributes)
+
+### File Organization
+- UI components: `src/components/ui/`
+- Controls: `src/components/controls/`
+- Dialogs: `src/components/dialogs/`
+- Stores: `src/stores/`
+
+## 📁 File Naming
+
+- React components: PascalCase (e.g., `Button.tsx`, `ModalHeader.tsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useAudioStore.ts`)
+- Types: PascalCase (e.g., `InstrumentConfig`)
+- CSS: kebab-case (e.g., `index.css`)
+
+## 🚫 Common Mistakes to Avoid
+
+1. Creating `<button className="px-4 py-2 bg-accent...">` - Use `<Button variant="primary">`
+2. Hardcoding `#ef4444` - Use `var(--color-accent)`
+3. Creating custom modals - Use `<Modal>` component
+4. Using `<input type="range">` - Use `<Knob>` component
+5. Using `<input type="checkbox">` - Use `<Toggle>` component
+6. Missing ARIA labels on icon buttons
+7. Not using proper semantic colors (e.g., use `var(--color-synth-filter)` for filter controls)
+
+## 📚 Important Files
+
+- `/DESIGN_SYSTEM.md` - Complete design system documentation
+- `src/index.css` - CSS variables and base styles
+- `src/components/ui/Button.tsx` - Standard button component
+- `src/components/ui/Modal.tsx` - Standard modal component
+- `src/components/controls/` - All control components
+
+## 🎯 When in Doubt
+
+1. Read `/DESIGN_SYSTEM.md`
+2. Look at existing components in `src/components/ui/`
+3. Check `src/index.css` for CSS variables
+4. Ask "Does this already exist?" before creating anything new
