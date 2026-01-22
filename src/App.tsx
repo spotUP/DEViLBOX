@@ -23,10 +23,15 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
+import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { ToastContainer } from '@components/common/ToastContainer';
 import { Button } from '@components/ui/Button';
+import { useVersionCheck } from '@hooks/useVersionCheck';
 
 function App() {
+  // Check for application updates
+  const { updateAvailable, latestVersion, currentVersion, refresh } = useVersionCheck();
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   // PERFORMANCE: Use useShallow to prevent re-renders on unrelated audio store changes
   const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore(
     useShallow((state) => ({
@@ -436,6 +441,16 @@ function App() {
       <ToastNotification />
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* Update Notification */}
+      {updateAvailable && !updateDismissed && (
+        <UpdateNotification
+          onRefresh={refresh}
+          onDismiss={() => setUpdateDismissed(true)}
+          currentVersion={currentVersion.buildNumber}
+          latestVersion={latestVersion?.buildNumber || 'unknown'}
+        />
+      )}
     </AppLayout>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-22T09:58:07.717Z
+ * Generated: 2026-01-22T10:03:35.819Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '46';
-export const BUILD_HASH = '5a6c4b9';
+export const BUILD_NUMBER = '47';
+export const BUILD_HASH = 'd209ccd';
 export const BUILD_DATE = '2026-01-22';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.0',
     date: '2026-01-22',
     changes: [
+      {
+        type: 'improvement',
+        description: 'Chore: Update build number to 46'
+      },
       {
         type: 'improvement',
         description: 'Chore: Update changelog for build 45'
