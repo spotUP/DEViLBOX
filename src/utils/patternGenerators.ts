@@ -4,6 +4,7 @@
  */
 
 import type { TrackerCell, NoteValue } from '@typedefs/tracker';
+import { stringNoteToXM, xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 
 export interface GeneratorOptions {
   patternLength: number;
@@ -15,10 +16,11 @@ export interface GeneratorOptions {
 
 // Create an empty cell
 const emptyCell = (): TrackerCell => ({
-  note: null,
-  instrument: null,
-  volume: null,
-  effect: null,
+  note: 0,
+  instrument: 0,
+  volume: 0,
+  effTyp: 0,
+  eff: 0,
 });
 
 // Create a note cell
@@ -30,8 +32,9 @@ const noteCell = (
 ): TrackerCell => ({
   note,
   instrument,
-  volume,
-  effect: null,
+  volume: 0x10 + volume, // XM volume format (0x10-0x50 = set volume 0-64)
+  effTyp: 0,
+  eff: 0,
   accent,
 });
 
@@ -246,20 +249,18 @@ export function generateWalking(opts: GeneratorOptions): TrackerCell[] {
   const { patternLength, instrumentId, note, velocity = 0x38 } = opts;
   const cells: TrackerCell[] = [];
 
-  // Parse base note to get MIDI-like value
-  const baseNote = note || 'C-4';
-  const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+  // Convert XM note to MIDI for transposition
+  const baseNote = note || stringNoteToXM('C-4');
+  const baseMidiNote = xmNoteToMidi(baseNote);
+  if (baseMidiNote === null) return cells;
 
   const getNote = (semitones: number): NoteValue => {
-    if (!baseNote) return 'C-4';
-    const baseName = baseNote.substring(0, 2);
-    const baseOctave = parseInt(baseNote.substring(2));
-    const baseIndex = noteNames.indexOf(baseName);
-    if (baseIndex === -1) return baseNote;
-
-    const newIndex = (baseIndex + semitones + 12) % 12;
-    const octaveOffset = Math.floor((baseIndex + semitones) / 12);
-    return `${noteNames[newIndex]}${baseOctave + octaveOffset}` as NoteValue;
+    const newMidiNote = baseMidiNote + semitones;
+    // Clamp to valid MIDI range
+    if (newMidiNote >= 12 && newMidiNote <= 107) {
+      return midiToXMNote(newMidiNote);
+    }
+    return baseNote;
   };
 
   // Walk pattern (relative semitones)
@@ -283,16 +284,19 @@ export function generateWalking(opts: GeneratorOptions): TrackerCell[] {
  */
 export function generateHiHats(
   opts: GeneratorOptions,
-  openNote: NoteValue = 'A#3'
+  openNote?: NoteValue
 ): TrackerCell[] {
   const { patternLength, instrumentId, note, velocity = 0x38, accent } = opts;
   const cells: TrackerCell[] = [];
+
+  // Default open note to A#3 if not provided
+  const openNoteValue = openNote || stringNoteToXM('A#3');
 
   for (let i = 0; i < patternLength; i++) {
     if (i % 2 === 0) {
       // Open hat on offbeats (every 8 rows, offset by 4)
       const isOpen = (i + 4) % 8 === 0;
-      const hatNote = isOpen ? openNote : note;
+      const hatNote = isOpen ? openNoteValue : note;
       const vel = isOpen ? velocity : velocity - 8;
       cells.push(noteCell(hatNote, instrumentId, vel, accent));
     } else {

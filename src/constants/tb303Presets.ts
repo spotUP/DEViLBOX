@@ -10,6 +10,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // Source: https://dittytoy.net/ditty/0029103012
   // Settings: cutoff=0.26, res=0.67, envmod=0.13, decay=0.78, overdrive=0.73
   {
+    type: 'synth' as const,
     name: 'DT303 (Dittytoy)',
     synthType: 'TB303',
     tb303: {
@@ -47,6 +48,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === CLASSIC PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Classic',
     synthType: 'TB303',
     tb303: {
@@ -67,6 +69,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Squelchy',
     synthType: 'TB303',
     tb303: {
@@ -87,6 +90,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Deep Sub',
     synthType: 'TB303',
     tb303: {
@@ -109,6 +113,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === SQUARE WAVE PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Square',
     synthType: 'TB303',
     tb303: {
@@ -129,6 +134,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Hollow',
     synthType: 'TB303',
     tb303: {
@@ -151,6 +157,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === AGGRESSIVE PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Screamer',
     synthType: 'TB303',
     tb303: {
@@ -180,6 +187,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Acid Bite',
     synthType: 'TB303',
     tb303: {
@@ -202,6 +210,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === EXPERIMENTAL PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Bubbly',
     synthType: 'TB303',
     tb303: {
@@ -222,6 +231,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Self-Osc',
     synthType: 'TB303',
     tb303: {
@@ -242,6 +252,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Whistler',
     synthType: 'TB303',
     tb303: {
@@ -264,6 +275,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === MINIMAL / TECH PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Plastikman',
     synthType: 'TB303',
     tb303: {
@@ -284,6 +296,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Minimal',
     synthType: 'TB303',
     tb303: {
@@ -306,6 +319,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === LONG DECAY PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Slow Acid',
     synthType: 'TB303',
     tb303: {
@@ -326,6 +340,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Dreamy',
     synthType: 'TB303',
     tb303: {
@@ -357,6 +372,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === SPECIAL PRESETS ===
   {
+    type: 'synth' as const,
     name: '303 Rubber',
     synthType: 'TB303',
     tb303: {
@@ -380,6 +396,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // === DEVIL FISH MOD PRESETS ===
   // Based on Robin Whittle's Devil Fish modifications
   {
+    type: 'synth' as const,
     name: 'DF Classic',
     synthType: 'TB303',
     tb303: {
@@ -414,6 +431,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Infinite Drone',
     synthType: 'TB303',
     tb303: {
@@ -457,6 +475,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Chaos Engine',
     synthType: 'TB303',
     tb303: {
@@ -497,6 +516,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Whistler',
     synthType: 'TB303',
     tb303: {
@@ -531,6 +551,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Muffled Punch',
     synthType: 'TB303',
     tb303: {
@@ -567,6 +588,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // === MORE DEVIL FISH PRESETS ===
   {
+    type: 'synth' as const,
     name: 'DF Acid Low',
     synthType: 'TB303',
     tb303: {
@@ -601,6 +623,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Resonant Sweep',
     synthType: 'TB303',
     tb303: {
@@ -635,6 +658,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Soft Pad',
     synthType: 'TB303',
     tb303: {
@@ -678,6 +702,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Hardstyle',
     synthType: 'TB303',
     tb303: {
@@ -718,6 +743,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Singing Filter',
     synthType: 'TB303',
     tb303: {
@@ -752,6 +778,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Gritty Bass',
     synthType: 'TB303',
     tb303: {
@@ -792,6 +819,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Bubbly Acid',
     synthType: 'TB303',
     tb303: {
@@ -826,6 +854,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Ambient Drone',
     synthType: 'TB303',
     tb303: {
@@ -877,6 +906,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Techno Stab',
     synthType: 'TB303',
     tb303: {
@@ -911,6 +941,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Screaming Lead',
     synthType: 'TB303',
     tb303: {

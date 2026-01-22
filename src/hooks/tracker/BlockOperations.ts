@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTrackerStore } from '@stores';
+import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 // Types imported for future use
 // import type { TrackerCell, BlockSelection } from '@typedefs';
 
@@ -167,42 +168,20 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
-      const noteMap: Record<string, number> = {
-        C: 0,
-        'C#': 1,
-        D: 2,
-        'D#': 3,
-        E: 4,
-        F: 5,
-        'F#': 6,
-        G: 7,
-        'G#': 8,
-        A: 9,
-        'A#': 10,
-        B: 11,
-      };
-
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
         for (let row = bounds.startRow; row <= bounds.endRow; row++) {
           const cell = pattern.channels[ch].rows[row];
-          if (cell.note && cell.note !== '...' && cell.note !== '===') {
-            // Parse note (e.g., "C-4", "D#5")
-            const noteName = cell.note.substring(0, cell.note.lastIndexOf('-'));
-            const octave = parseInt(cell.note.substring(cell.note.lastIndexOf('-') + 1));
-
-            if (noteMap[noteName] !== undefined) {
-              const midiNote = octave * 12 + noteMap[noteName];
+          // Skip empty cells (0) and note-offs (97)
+          if (cell.note && cell.note !== 0 && cell.note !== 97) {
+            // Convert XM note to MIDI
+            const midiNote = xmNoteToMidi(cell.note);
+            if (midiNote !== null) {
               const newMidiNote = midiNote + semitones;
 
-              if (newMidiNote >= 0 && newMidiNote <= 127) {
-                const newOctave = Math.floor(newMidiNote / 12);
-                const newNoteIndex = newMidiNote % 12;
-                const newNoteName = noteNames[newNoteIndex];
-                const newNote = `${newNoteName}-${newOctave}`;
-
-                setCell(ch, row, { note: newNote });
+              // Clamp to valid MIDI range
+              if (newMidiNote >= 12 && newMidiNote <= 107) {
+                const newXmNote = midiToXMNote(newMidiNote);
+                setCell(ch, row, { note: newXmNote });
               }
             }
           }

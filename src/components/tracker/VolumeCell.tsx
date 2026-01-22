@@ -1,10 +1,16 @@
 /**
- * VolumeCell - Displays and edits volume column (00-40 hex + FT2 volume effects)
+ * VolumeCell - Displays and edits volume column (XM format: 0x00-0xFF)
+ * XM volume column format:
+ * - 0x00-0x0F: Nothing
+ * - 0x10-0x50: Set volume 0-64
+ * - 0x60-0xFF: Volume effects (slide, pan, portamento, etc.)
  */
 
 import React from 'react';
 import type { VolumeValue } from '@typedefs';
-import { formatVolumeColumn, decodeVolumeColumn } from '@engine/EffectProcessor';
+import { formatVolumeColumn } from '@/lib/xmConversions';
+import { decodeVolumeColumn } from '@engine/EffectProcessor';
+import { getVolumeColumnDescription } from '@utils/ft2EffectDescriptions';
 
 interface VolumeCellProps {
   value: VolumeValue;
@@ -14,17 +20,23 @@ interface VolumeCellProps {
 }
 
 export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
-  ({ value, isActive, isEmpty, digitIndex = 0 }) => {
+  ({ value, isActive, digitIndex = 0 }) => {
     const displayValue = formatVolumeColumn(value);
+
+    // XM format: 0x00-0x0F = nothing, check if value is actually empty
+    const isEmptyValue = value === null || value === 0 || (typeof value === 'number' && value < 0x10);
+
+    // Get tooltip for volume column
+    const tooltip = !isEmptyValue ? getVolumeColumnDescription(value) : null;
 
     // Determine color based on volume type
     let colorClass = 'text-text-muted';
-    if (!isEmpty && value !== null) {
+    if (!isEmptyValue && value !== null) {
       const decoded = decodeVolumeColumn(value);
-      if (decoded?.type === 'set') {
-        colorClass = 'text-emerald-400'; // Regular volume
+      if (decoded?.type === 'set' || (typeof value === 'number' && value >= 0x10 && value <= 0x50)) {
+        colorClass = 'text-emerald-400'; // Regular volume (0x10-0x50)
       } else {
-        colorClass = 'text-yellow-400'; // Volume effect
+        colorClass = 'text-yellow-400'; // Volume effect (0x60-0xFF)
       }
     }
 
@@ -32,15 +44,21 @@ export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
     if (isActive && displayValue !== '..') {
       const chars = displayValue.split('');
       return (
-        <span className={`tracker-cell ${colorClass}`}>
+        <span
+          className={`tracker-cell ${colorClass}`}
+          title={tooltip || undefined}
+        >
           {chars.map((char, i) => (
             <span
               key={i}
               className={
                 i === digitIndex
-                  ? 'bg-accent-primary text-text-inverse font-bold rounded-sm'
+                  ? 'bg-accent-primary font-bold rounded-sm'
                   : ''
               }
+              style={{
+                color: i === digitIndex ? '#ffffff' : undefined
+              }}
             >
               {char}
             </span>
@@ -52,8 +70,12 @@ export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
     return (
       <span
         className={`tracker-cell ${colorClass} ${
-          isActive ? 'bg-accent-primary text-text-inverse font-bold rounded-sm' : ''
+          isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
+        style={{
+          color: isActive ? '#ffffff' : undefined
+        }}
+        title={tooltip || undefined}
       >
         {displayValue}
       </span>

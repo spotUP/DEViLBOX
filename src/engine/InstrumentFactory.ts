@@ -74,7 +74,21 @@ export class InstrumentFactory {
         break;
 
       case 'Sampler':
-        instrument = this.createSampler(config);
+        // Check if this is a MOD/XM sample that needs period-based playback
+        const hasMODMetadata = config.metadata?.modPlayback?.usePeriodPlayback;
+        console.log(`[InstrumentFactory] Creating ${config.synthType} for instrument ${config.id}:`, {
+          hasMODMetadata,
+          metadataExists: !!config.metadata,
+          modPlaybackExists: !!config.metadata?.modPlayback,
+          usePeriodPlayback: config.metadata?.modPlayback?.usePeriodPlayback,
+        });
+        if (hasMODMetadata) {
+          console.log('[InstrumentFactory] Using Player for MOD/XM period-based playback');
+          instrument = this.createPlayer(config); // Use Player for period-based playback
+        } else {
+          console.log('[InstrumentFactory] Using Sampler for regular sample playback');
+          instrument = this.createSampler(config); // Use Sampler for regular samples
+        }
         break;
 
       case 'Player':
@@ -611,17 +625,39 @@ export class InstrumentFactory {
     // Get sample URL from parameters (base64 data URL from user upload)
     const sampleUrl = config.parameters?.sampleUrl;
 
+    // Get base note from sample config (for MOD/XM imports)
+    const baseNote = config.sample?.baseNote || 'C4';
+
+    // CRITICAL: Check if this is a MOD/XM instrument loaded from localStorage
+    if (!sampleUrl && config.metadata?.importedFrom) {
+      console.error(
+        `[InstrumentFactory] CRITICAL: MOD/XM instrument "${config.name}" has no audio data!`,
+        'This happens when instruments are loaded from localStorage.',
+        'AudioBuffers and blob URLs cannot be serialized to JSON.',
+        'Solution: Re-import the MOD/XM file to restore audio.'
+      );
+    }
+
     if (sampleUrl) {
-      // Use uploaded sample mapped to C4
+      console.log(`[InstrumentFactory] Creating Sampler with sample URL:`, {
+        instrumentId: config.id,
+        baseNote,
+        hasUrl: !!sampleUrl,
+        urlPreview: sampleUrl.substring(0, 50) + '...',
+      });
+
+      // Map sample to its actual base note
+      const urls: { [note: string]: string } = {};
+      urls[baseNote] = sampleUrl;
+
       return new Tone.Sampler({
-        urls: {
-          C4: sampleUrl,
-        },
+        urls,
         volume: config.volume || -12,
       });
     }
 
     // No sample loaded - create empty sampler
+    console.warn(`[InstrumentFactory] Creating empty Sampler (no sample URL provided)`);
     return new Tone.Sampler({
       volume: config.volume || -12,
     });

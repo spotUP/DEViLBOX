@@ -25,10 +25,16 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [hoveredSynth, setHoveredSynth] = useState<SynthType | null>(null);
 
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  // Get icon component dynamically (with full error handling)
+  const getIcon = (iconName: string | undefined) => {
+    if (!iconName) return LucideIcons.Music2;
+    try {
+      const Icon = (LucideIcons as any)[iconName];
+      return Icon || LucideIcons.Music2;
+    } catch (error) {
+      console.warn('[CategorizedSynthSelector] Failed to load icon:', iconName, error);
+      return LucideIcons.Music2;
+    }
   };
 
   // Handle synth selection
@@ -47,7 +53,8 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   };
 
   // Render a single synth card
-  const renderSynthCard = (synth: SynthInfo, isSelected: boolean) => {
+  const renderSynthCard = (synth: SynthInfo | undefined, isSelected: boolean) => {
+    if (!synth || !synth.icon) return null;
     const IconComponent = getIcon(synth.icon);
     void hoveredSynth; // Used for future hover effects
 
@@ -107,12 +114,12 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
   // Compact grid view
   if (compact) {
-    const allSynths = SYNTH_CATEGORIES.flatMap(cat => cat.synths);
+    const allSynths = SYNTH_CATEGORIES.flatMap(cat => cat.synths).filter(s => s && s.icon);
     const uniqueSynths = Array.from(new Map(allSynths.map(s => [s.type, s])).values());
 
     return (
       <div className="grid grid-cols-3 gap-2">
-        {uniqueSynths.map((synth) => {
+        {uniqueSynths.filter(synth => synth && synth.icon).map((synth) => {
           const isSelected = currentInstrument?.synthType === synth.type;
           const IconComponent = getIcon(synth.icon);
 
@@ -167,7 +174,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
           {/* Category Synths */}
           {(expandedCategory === category.id || expandedCategory === null) && (
             <div className="grid grid-cols-2 gap-3">
-              {category.synths.map((synth) => {
+              {category.synths.filter(synth => synth && synth.icon).map((synth) => {
                 const isSelected = currentInstrument?.synthType === synth.type;
                 return renderSynthCard(synth, isSelected);
               })}
@@ -181,6 +188,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-dark-bgTertiary border border-dark-border rounded-lg p-3 shadow-xl z-50 max-w-sm">
           {(() => {
             const info = getSynthInfo(hoveredSynth);
+            if (!info || !info.icon) return null;
             const IconComponent = getIcon(info.icon);
             return (
               <div className="flex gap-3">

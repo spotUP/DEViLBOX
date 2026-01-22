@@ -6,6 +6,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
+import { needsMigration, migrateProject, getMigrationStats } from '@/lib/migration';
 
 const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
@@ -44,6 +45,39 @@ export function saveProjectToStorage(): boolean {
       masterEffects: audioState.masterEffects,
     };
 
+    // CRITICAL FIX: Filter out MOD/XM imported instruments with samples
+    // AudioBuffers and blob URLs can't be serialized to JSON
+    // These instruments will be silent when loaded from localStorage
+    const modInstruments = savedProject.instruments.filter(
+      (inst) => inst.metadata?.importedFrom === 'MOD' || inst.metadata?.importedFrom === 'XM'
+    );
+
+    if (modInstruments.length > 0) {
+      console.warn(
+        `[Persistence] WARNING: ${modInstruments.length} MOD/XM instruments will lose audio data in localStorage.`,
+        'Re-import the MOD/XM file after page reload to restore audio.'
+      );
+
+      // Option 1: Remove MOD/XM instruments from save (user must re-import)
+      // savedProject.instruments = savedProject.instruments.filter(
+      //   (inst) => !inst.metadata?.importedFrom
+      // );
+
+      // Option 2: Keep them but they'll be silent (current behavior)
+      // User will need to re-import after reload
+    }
+
+    // DEBUG: Check what's being saved
+    console.log('[Persistence] Saving instruments:', {
+      count: savedProject.instruments.length,
+      modCount: modInstruments.length,
+      sample0: savedProject.instruments[0],
+      hasSample: !!savedProject.instruments[0]?.sample,
+      hasAudioBuffer: !!savedProject.instruments[0]?.sample?.audioBuffer,
+      hasMetadata: !!savedProject.instruments[0]?.metadata,
+      modPlayback: savedProject.instruments[0]?.metadata?.modPlayback,
+    });
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
     projectState.markAsSaved();
     console.log('[Persistence] Project saved to localStorage');
@@ -73,6 +107,23 @@ export function loadProjectFromStorage(): boolean {
       return false;
     }
 
+    // Check if migration is needed (old format → new XM format)
+    if (needsMigration(project.patterns, project.instruments)) {
+      console.log('[Persistence] Old format detected, migrating to XM format...');
+      const stats = getMigrationStats(project.patterns, project.instruments);
+      console.log('[Persistence] Migration stats:', stats);
+
+      // Perform migration
+      const migrated = migrateProject(project.patterns, project.instruments);
+      project.patterns = migrated.patterns;
+      project.instruments = migrated.instruments;
+
+      console.log('[Persistence] Migration complete!');
+      console.log('[Persistence] - Cells migrated:', stats.cellsToMigrate);
+      console.log('[Persistence] - Instruments remapped:', stats.instrumentsToMigrate);
+      console.log('[Persistence] - Format:', stats.oldFormat, '→', stats.newFormat);
+    }
+
     // Load data into stores
     const trackerStore = useTrackerStore.getState();
     const instrumentStore = useInstrumentStore.getState();
@@ -83,6 +134,16 @@ export function loadProjectFromStorage(): boolean {
 
     // Load patterns
     trackerStore.loadPatterns(project.patterns);
+
+    // DEBUG: Check what's being loaded
+    console.log('[Persistence] Loading instruments:', {
+      count: project.instruments.length,
+      sample0: project.instruments[0],
+      hasSample: !!project.instruments[0]?.sample,
+      hasAudioBuffer: !!project.instruments[0]?.sample?.audioBuffer,
+      hasMetadata: !!project.instruments[0]?.metadata,
+      modPlayback: project.instruments[0]?.metadata?.modPlayback,
+    });
 
     // Load instruments
     instrumentStore.loadInstruments(project.instruments);

@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface EffectChainProps {

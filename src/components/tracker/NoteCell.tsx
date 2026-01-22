@@ -1,9 +1,11 @@
 /**
  * NoteCell - Displays and edits note column (C-4, D#5, ===, etc.)
+ * Supports both numeric XM format (0-97) and legacy string format
  */
 
 import React from 'react';
 import type { NoteValue } from '@typedefs';
+import { xmNoteToString } from '@/lib/xmConversions';
 
 interface NoteCellProps {
   value: NoteValue;
@@ -16,22 +18,15 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
   ({ value, isActive, isEmpty, isNoteOff }) => {
     // Format note to always be 3 characters: C-3, C#3, etc.
     let displayValue = '...';
-    if (value && value !== '...') {
-      if (value === '===') {
-        displayValue = '===';
-      } else {
-        // Input format: "C-4", "C#-4", "D#-5", etc.
-        // Output format: "C-4", "C#4", "D#5", etc. (always 3 chars)
-        if (value.includes('#')) {
-          // Sharp note: "C#-4" -> "C#4" (remove all dashes)
-          displayValue = value.replace(/-/g, '');
-        } else {
-          // Natural note: "C-4" -> "C-4" (keep as is)
-          displayValue = value;
-        }
-        // Ensure exactly 3 characters
-        displayValue = displayValue.substring(0, 3);
-      }
+
+    // Handle numeric XM format (NoteValue is always a number)
+    if (value === 0) {
+      displayValue = '...'; // Empty
+    } else if (value === 97) {
+      displayValue = '==='; // Note off
+    } else if (value >= 1 && value <= 96) {
+      // Convert XM note to string (1 = C-0, 49 = C-4, etc.)
+      displayValue = xmNoteToString(value);
     }
 
     let colorClass = 'text-text-primary';
@@ -44,7 +39,7 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
     return (
       <span
         className={`tracker-cell ${colorClass} ${
-          isActive ? 'bg-accent-primary text-text-inverse font-bold rounded-sm' : ''
+          isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
         style={{
           width: '3ch',
@@ -53,7 +48,8 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
           display: 'inline-block',
           textAlign: 'left',
           overflow: 'hidden',
-          whiteSpace: 'nowrap'
+          whiteSpace: 'nowrap',
+          color: isActive ? '#ffffff' : undefined
         }}
       >
         {displayValue}

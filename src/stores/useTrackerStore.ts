@@ -13,37 +13,10 @@ import type {
   ColumnVisibility,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
+import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import { getToneEngine } from '@engine/ToneEngine';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
-
-// Note names for transpose operations
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-// Parse note string (e.g., "C-4", "D#5") to semitone value (0-127)
-const parseNote = (noteStr: string): number | null => {
-  if (!noteStr || noteStr === '...' || noteStr === '===' || noteStr.length < 3) return null;
-
-  const notePart = noteStr.substring(0, 2);
-  const octave = parseInt(noteStr.substring(2), 10);
-
-  if (isNaN(octave)) return null;
-
-  const noteIndex = NOTE_NAMES.indexOf(notePart);
-  if (noteIndex === -1) return null;
-
-  return octave * 12 + noteIndex;
-};
-
-// Convert semitone value back to note string
-const semitoneToNote = (semitone: number): string | null => {
-  if (semitone < 0 || semitone > 127) return null;
-
-  const octave = Math.floor(semitone / 12);
-  const noteIndex = semitone % 12;
-
-  return `${NOTE_NAMES[noteIndex]}${octave}`;
-};
 
 // FT2-style bitwise mask system for copy/paste/transpose operations
 // Bit 0: Note
@@ -64,18 +37,20 @@ const toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
 
 // Macro slot structure for rapid data entry (FT2-style)
 interface MacroSlot {
-  note: string | null;
-  instrument: number | null;
-  volume: number | null;
-  effect: string | null;
+  note: number;
+  instrument: number;
+  volume: number;
+  effTyp: number;
+  eff: number;
   effect2: string | null;
 }
 
 const createEmptyMacroSlot = (): MacroSlot => ({
-  note: null,
-  instrument: null,
-  volume: null,
-  effect: null,
+  note: 0,
+  instrument: 0,
+  volume: 0,
+  effTyp: 0,
+  eff: 0,
   effect2: null,
 });
 
@@ -305,7 +280,8 @@ export const useTrackerStore = create<TrackerStore>()(
               'note',
               'instrument',
               'volume',
-              'effect',
+              'effTyp',
+              'effParam',
               'effect2',
               'accent',
               'slide',
@@ -334,7 +310,8 @@ export const useTrackerStore = create<TrackerStore>()(
               'note',
               'instrument',
               'volume',
-              'effect',
+              'effTyp',
+              'effParam',
               'effect2',
               'accent',
               'slide',
@@ -571,7 +548,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effect', 'effect2', 'accent', 'slide'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'],
         };
       }),
 
@@ -583,7 +560,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: pattern.channels.length - 1,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effect', 'effect2', 'accent', 'slide'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'],
         };
       }),
 
@@ -679,7 +656,8 @@ export const useTrackerStore = create<TrackerStore>()(
               targetCell.volume = sourceCell.volume;
             }
             if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-              targetCell.effect = sourceCell.effect;
+              targetCell.effTyp = sourceCell.effTyp;
+              targetCell.eff = sourceCell.eff;
             }
             if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
               targetCell.effect2 = sourceCell.effect2;
@@ -737,7 +715,8 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.volume = sourceCell.volume;
           }
           if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-            targetCell.effect = sourceCell.effect;
+            targetCell.effTyp = sourceCell.effTyp;
+            targetCell.eff = sourceCell.eff;
           }
           if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
             targetCell.effect2 = sourceCell.effect2;
@@ -758,7 +737,8 @@ export const useTrackerStore = create<TrackerStore>()(
           note: cell.note,
           instrument: cell.instrument,
           volume: cell.volume,
-          effect: cell.effect,
+          effTyp: cell.effTyp,
+          eff: cell.eff,
           effect2: cell.effect2 ?? null,
         };
       }),
@@ -776,17 +756,18 @@ export const useTrackerStore = create<TrackerStore>()(
           // Overwrite mode: paste macro to current cell
           const targetCell = pattern.channels[channelIndex].rows[rowIndex];
 
-          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== null) {
+          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== 0) {
             targetCell.note = macro.note;
           }
-          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== null) {
+          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== 0) {
             targetCell.instrument = macro.instrument;
           }
-          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== null) {
+          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== 0) {
             targetCell.volume = macro.volume;
           }
-          if (hasMaskBit(pasteMask, MASK_EFFECT) && macro.effect !== null) {
-            targetCell.effect = macro.effect;
+          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+            targetCell.effTyp = macro.effTyp;
+            targetCell.eff = macro.eff;
           }
           if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
             targetCell.effect2 = macro.effect2;
@@ -796,17 +777,18 @@ export const useTrackerStore = create<TrackerStore>()(
           const channel = pattern.channels[channelIndex];
           const newRow: TrackerCell = { ...EMPTY_CELL };
 
-          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== null) {
+          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== 0) {
             newRow.note = macro.note;
           }
-          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== null) {
+          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== 0) {
             newRow.instrument = macro.instrument;
           }
-          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== null) {
+          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== 0) {
             newRow.volume = macro.volume;
           }
-          if (hasMaskBit(pasteMask, MASK_EFFECT) && macro.effect !== null) {
-            newRow.effect = macro.effect;
+          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+            newRow.effTyp = macro.effTyp;
+            newRow.eff = macro.eff;
           }
           if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
             newRow.effect2 = macro.effect2;
@@ -852,21 +834,21 @@ export const useTrackerStore = create<TrackerStore>()(
             if (row >= pattern.length) continue;
 
             const cell = pattern.channels[ch].rows[row];
-            if (!cell.note || cell.note === '...' || cell.note === '===') continue;
+            // Skip empty (0) and note-off (97)
+            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
 
             // If filtering by current instrument, skip others
             if (currentInstrumentOnly && targetInstrumentId !== null && cell.instrument !== targetInstrumentId) {
               continue;
             }
 
-            const semitone = parseNote(cell.note);
-            if (semitone === null) continue;
+            // Convert XM note to MIDI, transpose, convert back
+            const midiNote = xmNoteToMidi(cell.note);
+            if (midiNote === null) continue;
 
-            const newSemitone = semitone + semitones;
-            const newNote = semitoneToNote(newSemitone);
-
-            if (newNote) {
-              cell.note = newNote;
+            const newMidiNote = midiNote + semitones;
+            if (newMidiNote >= 12 && newMidiNote <= 107) {
+              cell.note = midiToXMNote(newMidiNote);
             }
           }
         }
@@ -973,14 +955,18 @@ export const useTrackerStore = create<TrackerStore>()(
 
             const cell = pattern.channels[ch].rows[row];
             // Only humanize cells that have a note and volume
-            if (!cell.note || cell.note === '...' || cell.note === '===') continue;
+            // Skip empty (0) and note-off (97)
+            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
 
-            const currentVolume = cell.volume ?? 64; // Default to max if not set
+            // Extract volume value from XM volume column (0x10-0x50 = set volume 0-64)
+            const hasSetVolume = cell.volume >= 0x10 && cell.volume <= 0x50;
+            const currentVolume = hasSetVolume ? cell.volume - 0x10 : 48; // Default to 48 if not set
             const maxVariation = Math.floor(currentVolume * (volumeVariation / 100));
             const randomOffset = Math.floor(Math.random() * (maxVariation * 2 + 1)) - maxVariation;
-            const newVolume = Math.max(1, Math.min(64, currentVolume + randomOffset));
+            const newVolume = Math.max(0, Math.min(64, currentVolume + randomOffset));
 
-            cell.volume = newVolume;
+            // Store as XM volume (0x10-0x50)
+            cell.volume = 0x10 + newVolume;
           }
         }
       }),

@@ -21,7 +21,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';

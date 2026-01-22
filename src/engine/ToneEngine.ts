@@ -100,13 +100,14 @@ export class ToneEngine {
       console.log('[ToneEngine] Audio context already running');
     }
 
-    // Pre-load GuitarML AudioWorklet (prevents async loading delay for neural effects)
+    // Pre-load TB303 AudioWorklet (prevents async loading delay for TB-303 synth)
     try {
-      await Tone.getContext().rawContext.audioWorklet.addModule('/TB303.worklet.js');
-      console.log('[ToneEngine] GuitarML worklet pre-loaded successfully');
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+      console.log('[ToneEngine] TB303 worklet pre-loaded successfully');
     } catch (error) {
-      console.warn('[ToneEngine] Failed to pre-load GuitarML worklet (may not exist yet):', error);
-      // Non-fatal - worklet will be loaded on-demand when neural effects are added
+      console.warn('[ToneEngine] Failed to pre-load TB303 worklet (may not exist yet):', error);
+      // Non-fatal - worklet will be loaded on-demand when TB-303 synth is used
     }
 
     // Configure Transport lookahead for reliable scheduling at high BPMs
@@ -302,11 +303,25 @@ export class ToneEngine {
    * Create or get instrument (per-channel to avoid automation conflicts)
    */
   public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.PolySynth | Tone.Synth | any {
-    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    // CRITICAL FIX: Samplers and Players don't need per-channel instances
+    // They're already polyphonic and don't have per-channel automation
+    // Creating new instances causes them to reload samples, causing silence
+    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player';
+    const key = isSharedType
+      ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
+      : this.getInstrumentKey(instrumentId, channelIndex);
 
     // Check if instrument already exists for this channel
     if (this.instruments.has(key)) {
-      return this.instruments.get(key);
+      const existingInstrument = this.instruments.get(key);
+      if (isSharedType && channelIndex !== undefined && channelIndex !== -1) {
+        console.log(`[ToneEngine] Reusing preloaded ${config.synthType} for channel ${channelIndex}`, {
+          instrumentId,
+          key,
+          loaded: (existingInstrument as any).loaded,
+        });
+      }
+      return existingInstrument;
     }
 
     // Create new instrument based on config
@@ -512,16 +527,25 @@ export class ToneEngine {
       case 'Sampler': {
         // Sample-based instrument - loads a sample URL and pitches it
         const sampleUrl = config.parameters?.sampleUrl;
-        console.log('[ToneEngine] Creating Sampler instrument', { instrumentId, hasSample: !!sampleUrl });
+        // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
+        const baseNote = config.sample?.baseNote || 'C4';
+        console.log('[ToneEngine] Creating Sampler instrument', {
+          instrumentId,
+          hasSample: !!sampleUrl,
+          baseNote,
+          sampleUrlPreview: sampleUrl?.substring(0, 50),
+        });
 
         if (sampleUrl) {
+          // Map the sample to its actual base note so Tone.Sampler can pitch it correctly
+          const urls: { [note: string]: string } = {};
+          urls[baseNote] = sampleUrl;
+
           instrument = new Tone.Sampler({
-            urls: {
-              C4: sampleUrl,  // Map sample to C4, will be pitched for other notes
-            },
+            urls,
             volume: config.volume || -12,
             onload: () => {
-              console.log(`[ToneEngine] Sampler ${instrumentId} sample loaded successfully`);
+              console.log(`[ToneEngine] Sampler ${instrumentId} (baseNote: ${baseNote}) sample loaded successfully`);
             },
             onerror: (err: Error) => {
               console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
@@ -833,7 +857,8 @@ export class ToneEngine {
     note: string,
     time: number,
     velocity: number = 1,
-    config: InstrumentConfig
+    config: InstrumentConfig,
+    period?: number
   ): void {
     const instrument = this.getInstrument(instrumentId, config);
 
@@ -866,6 +891,37 @@ export class ToneEngine {
           // Silently skip - no sample loaded yet
           return;
         }
+
+        // Check if this is a MOD/XM sample with period-based playback
+        if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
+          // Calculate playback rate from Amiga period
+          // Formula: frequency = AMIGA_PALFREQUENCY_HALF / period
+          //          playbackRate = frequency / audioContext.sampleRate
+          const modPlayback = config.metadata.modPlayback;
+
+          // Apply finetune by adjusting period
+          // ProTracker finetune: -8 to +7 (each step is ~1/8 semitone)
+          // XM finetune: -128 to +127 (finer resolution)
+          let finetunedPeriod = period;
+          if (modPlayback.finetune !== 0) {
+            // Calculate finetune multiplier
+            // XM spec: 2^(finetune / 1536) where 1536 = 128 * 12 semitones
+            // We use 1536 for XM accuracy
+            // Note: finetune > 0 → higher pitch → lower period (divide)
+            const finetuneMultiplier = Math.pow(2, modPlayback.finetune / 1536);
+            finetunedPeriod = period / finetuneMultiplier; // DIVIDE to get correct direction
+          }
+
+          const frequency = modPlayback.periodMultiplier / finetunedPeriod;
+          const playbackRate = frequency / Tone.getContext().sampleRate;
+
+          // Set playback rate before starting
+          player.playbackRate = playbackRate;
+        } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
+          // Warn if period-based playback is enabled but no period provided
+          console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
+        }
+
         player.start(safeTime);
       } else {
         instrument.triggerAttack(note, safeTime, velocity);
@@ -1019,7 +1075,9 @@ export class ToneEngine {
     config: InstrumentConfig,
     accent?: boolean,
     slide?: boolean,
-    channelIndex?: number
+    channelIndex?: number,
+    period?: number,
+    sampleOffset?: number // 9xx effect: start sample at byte offset
   ): void {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
@@ -1052,11 +1110,32 @@ export class ToneEngine {
         // GrainPlayer uses start/stop instead of triggerAttackRelease
         const grainPlayer = instrument as Tone.GrainPlayer;
         if (grainPlayer.buffer && grainPlayer.buffer.loaded) {
-          // Calculate pitch shift from note (C4 = base pitch)
-          const baseNote = Tone.Frequency('C4').toFrequency();
-          const targetFreq = Tone.Frequency(note).toFrequency();
-          const playbackRate = targetFreq / baseNote;
-          grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+          // Check if this is a MOD/XM sample with period-based playback
+          if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
+            // Calculate playback rate from Amiga period
+            const modPlayback = config.metadata.modPlayback;
+            let finetunedPeriod = period;
+
+            if (modPlayback.finetune !== 0) {
+              // Use ProTracker period table lookup for 100% accuracy
+              const { periodToNoteIndex, getPeriod } = require('./effects/PeriodTables');
+              const noteIndex = periodToNoteIndex(period, 0);
+              if (noteIndex >= 0) {
+                // Look up finetuned period from table
+                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+              }
+            }
+
+            const frequency = modPlayback.periodMultiplier / finetunedPeriod;
+            const playbackRate = frequency / Tone.getContext().sampleRate;
+            grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+          } else {
+            // Calculate pitch shift from note (C4 = base pitch)
+            const baseNote = Tone.Frequency('C4').toFrequency();
+            const targetFreq = Tone.Frequency(note).toFrequency();
+            const playbackRate = targetFreq / baseNote;
+            grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+          }
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
         }
@@ -1064,13 +1143,97 @@ export class ToneEngine {
         // Player uses start instead of triggerAttackRelease
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
-          player.start(safeTime);
+          // Check if this is a MOD/XM sample with period-based playback
+          if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
+            // Calculate playback rate from Amiga period
+            const modPlayback = config.metadata.modPlayback;
+            let finetunedPeriod = period;
+
+            if (modPlayback.finetune !== 0) {
+              // Use ProTracker period table lookup for 100% accuracy
+              // Import dynamically to avoid circular dependency
+              const { periodToNoteIndex, getPeriod } = require('./effects/PeriodTables');
+              const noteIndex = periodToNoteIndex(period, 0);
+              if (noteIndex >= 0) {
+                // Look up finetuned period from table
+                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+              }
+            }
+
+            const frequency = modPlayback.periodMultiplier / finetunedPeriod;
+            const playbackRate = frequency / Tone.getContext().sampleRate;
+            player.playbackRate = playbackRate;
+          } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
+            // Warn if period-based playback is enabled but no period provided
+            console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
+          } else {
+            // Normal (non-period) playback - calculate pitch from note
+            const baseNote = Tone.Frequency('C4').toFrequency();
+            const targetFreq = Tone.Frequency(note).toFrequency();
+            const playbackRate = targetFreq / baseNote;
+            player.playbackRate = playbackRate;
+          }
+
+          // Apply sample offset (9xx command) if present
+          const startOffset = sampleOffset && sampleOffset > 0
+            ? sampleOffset / (player.buffer?.sampleRate || Tone.getContext().sampleRate)
+            : 0;
+
+          player.start(safeTime, startOffset);
+          // Stop after duration to prevent samples playing to completion
+          player.stop(safeTime + duration);
         }
       } else if (config.synthType === 'Sampler') {
         // Sampler needs loaded samples
         const sampler = instrument as Tone.Sampler;
+
+        // CRITICAL DEBUG: Check what's inside the sampler
+        const samplerDebug = {
+          instrumentId,
+          note,
+          loaded: sampler.loaded,
+          hasSample: !!config.sample,
+          sampleUrl: config.sample?.url?.substring(0, 50),
+          baseNote: config.sample?.baseNote,
+          sampleOffset,
+          // Check internal Tone.Sampler state
+          samplerHasBuffers: Object.keys((sampler as any)._buffers?._buffers || {}).length > 0,
+          samplerBufferKeys: Object.keys((sampler as any)._buffers?._buffers || {}),
+        };
+        console.log('[ToneEngine] Sampler playback:', samplerDebug);
+
         if (sampler.loaded) {
-          sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+          console.log('[ToneEngine] Triggering:', note, 'duration:', duration, 'offset:', sampleOffset);
+
+          if (sampleOffset && sampleOffset > 0) {
+            // 9xx Sample offset: Use Player approach for offset support
+            // Tone.Sampler doesn't support sample offset, so we need to use internal buffer directly
+            // Convert byte offset to time offset (sample offset is in bytes, need seconds)
+            const buffer = (sampler as any)._buffers?.get(note) || (sampler as any)._buffers?._buffers?.[config.sample?.baseNote || 'C4'];
+            if (buffer && buffer.duration) {
+              const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
+              const timeOffset = sampleOffset / sampleRate;
+
+              // Clamp offset to buffer duration
+              const clampedOffset = Math.min(timeOffset, buffer.duration - 0.001);
+
+              // Trigger with attack at offset, release after duration
+              sampler.triggerAttack(note, safeTime, velocity);
+              sampler.triggerRelease(note, safeTime + duration);
+
+              // TODO: Actually implement offset - Tone.Sampler doesn't support this directly
+              // This would require accessing internal Player nodes or using a custom solution
+              console.warn('[ToneEngine] Sample offset not fully implemented for Sampler type (needs custom Player)');
+            } else {
+              console.warn('[ToneEngine] Cannot apply sample offset - no buffer found');
+              sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+            }
+          } else {
+            // Normal playback without offset
+            sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+          }
+        } else {
+          console.warn('[ToneEngine] Sampler not loaded yet');
         }
       } else if (
         config.synthType === 'SuperSaw' ||

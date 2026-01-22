@@ -9,6 +9,7 @@ import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
+import { xmNoteToString, xmEffectToString, stringNoteToXM, effectStringToXM } from '@/lib/xmConversions';
 
 interface FindReplaceDialogProps {
   isOpen: boolean;
@@ -47,13 +48,21 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
           }
 
           const cell = channel.rows[row];
-          if (searchType === 'note' && cell.note?.toLowerCase().includes(findValue.toLowerCase())) {
-            count++;
-          } else if (searchType === 'instrument' && cell.instrument !== null) {
+          if (searchType === 'note' && cell.note && cell.note !== 0 && cell.note !== 97) {
+            // Convert XM note to string for comparison
+            const noteStr = xmNoteToString(cell.note);
+            if (noteStr.toLowerCase().includes(findValue.toLowerCase())) {
+              count++;
+            }
+          } else if (searchType === 'instrument' && cell.instrument !== 0) {
             const instHex = cell.instrument.toString(16).toUpperCase().padStart(2, '0');
             if (instHex.includes(findValue.toUpperCase())) count++;
-          } else if (searchType === 'effect' && cell.effect?.toLowerCase().includes(findValue.toLowerCase())) {
-            count++;
+          } else if (searchType === 'effect' && (cell.effTyp !== 0 || cell.eff !== 0)) {
+            // Convert XM effect to string for comparison
+            const effectStr = xmEffectToString(cell.effTyp, cell.eff);
+            if (effectStr.toLowerCase().includes(findValue.toLowerCase())) {
+              count++;
+            }
           }
         }
       }
@@ -86,30 +95,39 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
 
             const cell = channel.rows[row];
 
-            if (searchType === 'note' && cell.note?.toLowerCase().includes(findValue.toLowerCase())) {
-              if (replaceValue === '') {
-                cell.note = null;
-              } else {
-                cell.note = replaceValue.toUpperCase();
+            if (searchType === 'note' && cell.note && cell.note !== 0 && cell.note !== 97) {
+              const noteStr = xmNoteToString(cell.note);
+              if (noteStr.toLowerCase().includes(findValue.toLowerCase())) {
+                if (replaceValue === '') {
+                  cell.note = 0; // XM format: 0 = no note
+                } else {
+                  cell.note = stringNoteToXM(replaceValue.toUpperCase());
+                }
+                count++;
               }
-              count++;
-            } else if (searchType === 'instrument' && cell.instrument !== null) {
+            } else if (searchType === 'instrument' && cell.instrument !== 0) {
               const instHex = cell.instrument.toString(16).toUpperCase().padStart(2, '0');
               if (instHex.includes(findValue.toUpperCase())) {
                 if (replaceValue === '') {
-                  cell.instrument = null;
+                  cell.instrument = 0; // XM format: 0 = no instrument
                 } else {
                   cell.instrument = parseInt(replaceValue, 16) || 0;
                 }
                 count++;
               }
-            } else if (searchType === 'effect' && cell.effect?.toLowerCase().includes(findValue.toLowerCase())) {
-              if (replaceValue === '') {
-                cell.effect = null;
-              } else {
-                cell.effect = replaceValue.toUpperCase();
+            } else if (searchType === 'effect' && (cell.effTyp !== 0 || cell.eff !== 0)) {
+              const effectStr = xmEffectToString(cell.effTyp, cell.eff);
+              if (effectStr.toLowerCase().includes(findValue.toLowerCase())) {
+                if (replaceValue === '') {
+                  cell.effTyp = 0; // XM format: 0 = no effect
+                  cell.eff = 0;    // XM format: 0x00 = no parameter
+                } else {
+                  const [newEffTyp, newEff] = effectStringToXM(replaceValue.toUpperCase());
+                  cell.effTyp = newEffTyp;
+                  cell.eff = newEff;
+                }
+                count++;
               }
-              count++;
             }
           }
         }

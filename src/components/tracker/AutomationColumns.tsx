@@ -219,7 +219,9 @@ export const useAutomationColumnInput = (
       if (!isAutomationColumn) return false;
 
       const hexDigit = key.toUpperCase();
-      const currentValue = (cell[cursor.columnType] as number) || 0;
+      // Map cursor columnType to actual cell field name
+      const fieldName = cursor.columnType as keyof Pick<TrackerCell, 'cutoff' | 'resonance' | 'envMod' | 'pan'>;
+      const currentValue = (cell[fieldName] as number) || 0;
       const currentHex = currentValue.toString(16).toUpperCase().padStart(2, '0');
 
       // Shift left and add new digit
@@ -227,7 +229,7 @@ export const useAutomationColumnInput = (
       const newValue = parseInt(newHex, 16);
 
       setCell(channelIndex, rowIndex, {
-        [cursor.columnType]: newValue,
+        [fieldName]: newValue,
       });
 
       // Move down after 2 digits entered

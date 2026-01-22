@@ -610,7 +610,7 @@ export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   brightness: 70,
 };
 
-export type EffectType =
+export type AudioEffectType =
   | 'Distortion'
   | 'Reverb'
   | 'Delay'
@@ -641,7 +641,7 @@ export type EffectCategory = 'tonejs' | 'neural';
 export interface EffectConfig {
   id: string;
   category: EffectCategory;  // Discriminator for effect type
-  type: EffectType;          // For tonejs: existing types; for neural: "Neural"
+  type: AudioEffectType;          // For tonejs: existing types; for neural: "Neural"
   enabled: boolean;
   wet: number; // 0-100%
   parameters: Record<string, number | string>;  // Parameters (numbers are 0-100 normalized, strings for types/modes)
@@ -651,9 +651,56 @@ export interface EffectConfig {
   neuralModelName?: string;    // Display name cache
 }
 
+export interface InstrumentMetadata {
+  importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M';
+  originalEnvelope?: any; // Preserved point-based envelope for future editor
+  autoVibrato?: any; // Preserved auto-vibrato settings
+  preservedSample?: {
+    audioBuffer: ArrayBuffer;
+    url: string;
+    baseNote: string;
+    detune: number;
+    loop: boolean;
+    loopStart: number;
+    loopEnd: number;
+    envelope: EnvelopeConfig;
+  };
+  transformHistory?: Array<{
+    timestamp: string;
+    fromType: SynthType;
+    toType: SynthType;
+  }>;
+  // MOD/XM period-based playback
+  modPlayback?: {
+    usePeriodPlayback: boolean; // If true, use period-based playback (Amiga)
+    periodMultiplier: number; // AMIGA_PALFREQUENCY_HALF = 3546895
+    finetune: number; // -8 to +7 (ProTracker) or -128 to +127 (XM)
+  };
+}
+
+export interface SampleConfig {
+  audioBuffer?: ArrayBuffer;
+  url: string;
+  baseNote: string; // "C-4"
+  detune: number; // -100 to +100 cents
+  loop: boolean;
+  loopStart: number; // Sample frame index
+  loopEnd: number; // Sample frame index
+  reverse: boolean;
+  playbackRate: number; // 0.25-4x
+}
+
+/**
+ * Instrument type discriminator for XM compatibility
+ * - 'sample': Standard XM sampled instrument
+ * - 'synth': DEViLBOX synthesizer (extension)
+ */
+export type InstrumentType = 'sample' | 'synth';
+
 export interface InstrumentConfig {
-  id: number; // 0x00-0xFF
-  name: string;
+  id: number;                   // 1-128 (XM-compatible range, 1-indexed)
+  name: string;                 // Max 22 characters (XM limit)
+  type: InstrumentType;         // 'sample' or 'synth' (for XM export handling)
   synthType: SynthType;
   oscillator?: OscillatorConfig;
   envelope?: EnvelopeConfig;
@@ -671,10 +718,13 @@ export interface InstrumentConfig {
   pwmSynth?: PWMSynthConfig;
   stringMachine?: StringMachineConfig;
   formantSynth?: FormantSynthConfig;
+  // Sampler config
+  sample?: SampleConfig;
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100
   parameters?: Record<string, any>; // Additional synth-specific parameters (e.g., sample URLs)
+  metadata?: InstrumentMetadata; // Import metadata and transformation history
 }
 
 export interface InstrumentPreset {

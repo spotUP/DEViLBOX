@@ -30,7 +30,8 @@ import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
-import { convertModule } from '@lib/import/ModuleConverter';
+import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
+import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
 import { encodeWav } from '@lib/import/WavEncoder';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -69,6 +70,7 @@ function createInstrumentsForModule(
       instruments.push({
         id: instNum,
         name: name.trim() || `Sample ${instNum}`,
+        type: 'sample' as const,
         synthType: 'Sampler',
         effects: [],
         volume: -6,
@@ -80,6 +82,7 @@ function createInstrumentsForModule(
       instruments.push({
         id: instNum,
         name: name.trim() || `Instrument ${instNum}`,
+        type: 'synth' as const,
         synthType: 'Synth',
         oscillator: { ...DEFAULT_OSCILLATOR, type: oscType },
         envelope: { ...DEFAULT_ENVELOPE },
@@ -99,6 +102,7 @@ function createInstrumentsForModule(
         instruments.push({
           id: defaultId,
           name: defaultId === 0 ? 'Default' : 'Sample 01',
+          type: 'sample' as const,
           synthType: 'Sampler',
           effects: [],
           volume: -6,
@@ -109,6 +113,7 @@ function createInstrumentsForModule(
         instruments.push({
           id: defaultId,
           name: defaultId === 0 ? 'Default' : 'Instrument 01',
+          type: 'synth' as const,
           synthType: 'Synth',
           oscillator: { ...DEFAULT_OSCILLATOR, type: 'sawtooth' },
           envelope: { ...DEFAULT_ENVELOPE },
@@ -269,10 +274,88 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // Module import handler - used by both mobile and desktop views
   const handleModuleImport = useCallback(async (info: ModuleInfo) => {
+    // Check if native parser data is available (XM/MOD)
+    if (info.nativeData) {
+      const { format, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
+
+      console.log(`[Import] Using native ${format} parser`);
+      console.log(`[Import] ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
+
+      // Convert patterns using native converter
+      const result = format === 'XM'
+        ? convertXMModule(
+            patterns,
+            importMetadata.originalChannelCount,
+            importMetadata,
+            parsedInstruments.map(i => i.name)
+          )
+        : convertMODModule(
+            patterns,
+            importMetadata.originalChannelCount,
+            importMetadata,
+            parsedInstruments.map(i => i.name)
+          );
+
+      if (result.patterns.length === 0) {
+        alert(`Module "${info.metadata.title}" contains no patterns to import.`);
+        return;
+      }
+
+      // Convert instruments using native converter
+      const instruments: InstrumentConfig[] = [];
+      for (let i = 0; i < parsedInstruments.length; i++) {
+        const converted = convertToInstrument(parsedInstruments[i], i, format);
+        instruments.push(...converted);
+      }
+
+      // Load instruments first, then patterns
+      loadInstruments(instruments);
+      loadPatterns(result.patterns);
+
+      // Update project metadata
+      setMetadata({
+        name: info.metadata.title,
+        author: '',
+        description: `Imported from ${info.file?.name || 'module'} (${format})`,
+      });
+
+      // Set BPM from module (or default to 125)
+      setBPM(importMetadata.modData?.initialBPM || 125);
+
+      const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
+      console.log('Imported module:', info.metadata.title, {
+        format,
+        patterns: result.patterns.length,
+        channels: importMetadata.originalChannelCount,
+        instruments: instruments.length,
+        samplers: samplerCount,
+      });
+
+      // Pre-load all instruments (especially samplers) to ensure they're ready
+      if (samplerCount > 0) {
+        console.log('[Import] Preloading samples...');
+        await getToneEngine().preloadInstruments(instruments);
+        console.log('[Import] Samples ready for playback');
+      }
+
+      alert(`Module "${info.metadata.title}" imported!\n\n` +
+        `Format: ${format}\n` +
+        `Patterns: ${result.patterns.length}\n` +
+        `Channels: ${importMetadata.originalChannelCount}\n` +
+        `Instruments: ${instruments.length}\n` +
+        `Samplers: ${samplerCount}\n\n` +
+        `✨ Native parser used - full sample extraction and FT2 effects preserved!`);
+
+      return;
+    }
+
+    // Fallback to libopenmpt path for other formats (IT, S3M, etc.)
     if (!info.metadata.song) {
       alert(`Module "${info.metadata.title}" loaded but no pattern data found.\n\nThe module metadata was extracted but pattern data is not available.`);
       return;
     }
+
+    console.log('[Import] Using libopenmpt fallback');
 
     // Convert the module data to our pattern format
     const result = convertModule(info.metadata.song);

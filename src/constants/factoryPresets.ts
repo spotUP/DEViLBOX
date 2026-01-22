@@ -14,6 +14,7 @@ import { TB303_PRESETS } from './tb303Presets';
 export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // TB-303 Acid Bass (8 presets)
   {
+    type: 'synth' as const,
     name: '303 Classic',
     synthType: 'TB303',
     tb303: {
@@ -28,6 +29,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Squelchy',
     synthType: 'TB303',
     tb303: {
@@ -42,6 +44,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Deep',
     synthType: 'TB303',
     tb303: {
@@ -56,6 +59,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Square',
     synthType: 'TB303',
     tb303: {
@@ -70,6 +74,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Screamer',
     synthType: 'TB303',
     tb303: {
@@ -84,6 +89,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Bubbly',
     synthType: 'TB303',
     tb303: {
@@ -98,6 +104,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Self-Osc',
     synthType: 'TB303',
     tb303: {
@@ -112,6 +119,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '303 Plastikman',
     synthType: 'TB303',
     tb303: {
@@ -128,6 +136,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // Devil Fish TB-303 Presets (15 presets)
   {
+    type: 'synth' as const,
     name: 'DF Classic',
     synthType: 'TB303',
     tb303: {
@@ -156,6 +165,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Infinite Drone',
     synthType: 'TB303',
     tb303: {
@@ -184,6 +194,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Chaos Engine',
     synthType: 'TB303',
     tb303: {
@@ -218,6 +229,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Whistler',
     synthType: 'TB303',
     tb303: {
@@ -246,6 +258,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Muffled Punch',
     synthType: 'TB303',
     tb303: {
@@ -274,6 +287,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Acid Low',
     synthType: 'TB303',
     tb303: {
@@ -302,6 +316,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Resonant Sweep',
     synthType: 'TB303',
     tb303: {
@@ -330,6 +345,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Soft Pad',
     synthType: 'TB303',
     tb303: {
@@ -358,6 +374,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Hardstyle',
     synthType: 'TB303',
     tb303: {
@@ -392,6 +409,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Singing Filter',
     synthType: 'TB303',
     tb303: {
@@ -420,6 +438,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Gritty Bass',
     synthType: 'TB303',
     tb303: {
@@ -454,6 +473,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Bubbly Acid',
     synthType: 'TB303',
     tb303: {
@@ -482,6 +502,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Ambient Drone',
     synthType: 'TB303',
     tb303: {
@@ -510,6 +531,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Techno Stab',
     synthType: 'TB303',
     tb303: {
@@ -538,6 +560,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DF Screaming Lead',
     synthType: 'TB303',
     tb303: {
@@ -574,6 +597,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
   // Non-303 Bass (4 presets)
   {
+    type: 'synth' as const,
     name: '808 Sub',
     synthType: 'MonoSynth',
     oscillator: { type: 'sine', detune: 0, octave: -1 },
@@ -584,6 +608,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Reese Bass',
     synthType: 'DuoSynth',
     oscillator: { type: 'sawtooth', detune: 15, octave: 0 },
@@ -594,6 +619,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'House Pluck',
     synthType: 'PluckSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
@@ -604,6 +630,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Wobble Bass',
     synthType: 'FMSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
@@ -625,6 +652,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
 export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   {
+    type: 'synth' as const,
     name: 'Supersaw Lead',
     synthType: 'DuoSynth',
     oscillator: { type: 'sawtooth', detune: 20, octave: 0 },
@@ -635,6 +663,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Acid Lead',
     synthType: 'MonoSynth',
     oscillator: { type: 'square', detune: 0, octave: 0 },
@@ -645,6 +674,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'FM Stab',
     synthType: 'FMSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
@@ -655,6 +685,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Sync Lead',
     synthType: 'Synth',
     oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
@@ -665,6 +696,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Chip Lead',
     synthType: 'Synth',
     oscillator: { type: 'square', detune: 0, octave: 0 },
@@ -675,6 +707,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Trance Pluck',
     synthType: 'PluckSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 },
@@ -685,6 +718,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Detuned Lead',
     synthType: 'DuoSynth',
     oscillator: { type: 'sawtooth', detune: 25, octave: 0 },
@@ -695,6 +729,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Filtered Lead',
     synthType: 'MonoSynth',
     oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
@@ -712,6 +747,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
 export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   {
+    type: 'synth' as const,
     name: 'Ambient Pad',
     synthType: 'Synth',
     oscillator: { type: 'sine', detune: 3, octave: 0 },
@@ -722,6 +758,7 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Dark Pad',
     synthType: 'DuoSynth',
     oscillator: { type: 'triangle', detune: 8, octave: 0 },
@@ -732,6 +769,7 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'String Pad',
     synthType: 'Synth',
     oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
@@ -742,6 +780,7 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Noise Sweep',
     synthType: 'NoiseSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 }, // NoiseSynth doesn't use waveform type
@@ -759,6 +798,7 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
 export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   {
+    type: 'synth' as const,
     name: '808 Kick',
     synthType: 'MembraneSynth',
     oscillator: { type: 'sine', detune: 0, octave: -2 },
@@ -769,6 +809,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: '909 Kick',
     synthType: 'MembraneSynth',
     oscillator: { type: 'sine', detune: 0, octave: -2 },
@@ -779,6 +820,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Hardcore Kick',
     synthType: 'MembraneSynth',
     oscillator: { type: 'sine', detune: 0, octave: -2 },
@@ -789,6 +831,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'DnB Snare',
     synthType: 'NoiseSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 }, // NoiseSynth doesn't use waveform type
@@ -799,6 +842,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Clap',
     synthType: 'NoiseSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 }, // NoiseSynth doesn't use waveform type
@@ -809,6 +853,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Closed Hat',
     synthType: 'MetalSynth',
     oscillator: { type: 'square', detune: 0, octave: 0 },
@@ -819,6 +864,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Open Hat',
     synthType: 'MetalSynth',
     oscillator: { type: 'square', detune: 0, octave: 0 },
@@ -829,6 +875,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Crash',
     synthType: 'MetalSynth',
     oscillator: { type: 'square', detune: 0, octave: 0 },
@@ -847,6 +894,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // Classic chiptune leads with arpeggios
   {
+    type: 'synth' as const,
     name: 'NES Major Lead',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -863,6 +911,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'C64 Minor Arp',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -879,6 +928,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'SID Dim7 Pad',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -895,6 +945,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Gameboy Sus4',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -911,6 +962,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Atari Dom7',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -927,6 +979,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Amiga Power Oct',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -942,6 +995,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Fast Maj9 Stab',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -958,6 +1012,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Slow Min7 Sweep',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -975,6 +1030,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   },
   // Non-arpeggio chip sounds
   {
+    type: 'synth' as const,
     name: 'Chip Square Lead',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -991,6 +1047,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Triangle Bass',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -1006,6 +1063,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Noise Snare',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -1021,6 +1079,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Octave Jump',
     synthType: 'ChipSynth',
     chipSynth: {
@@ -1044,6 +1103,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 
 export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   {
+    type: 'synth' as const,
     name: 'Riser',
     synthType: 'NoiseSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 }, // NoiseSynth doesn't use waveform type
@@ -1054,6 +1114,7 @@ export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Downlifter',
     synthType: 'MonoSynth',
     oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
@@ -1064,6 +1125,7 @@ export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Impact',
     synthType: 'NoiseSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 }, // NoiseSynth doesn't use waveform type
@@ -1074,6 +1136,7 @@ export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
   },
   {
+    type: 'synth' as const,
     name: 'Laser Zap',
     synthType: 'FMSynth',
     oscillator: { type: 'sine', detune: 0, octave: 0 },

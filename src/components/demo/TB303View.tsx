@@ -12,6 +12,7 @@ import { useTrackerStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { Play, Square, Shuffle, Trash2, Wand2 } from 'lucide-react';
+import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 import './TB303View.css';
 
 // Note name to MIDI note number mapping (C3 = middle C = 60)
@@ -20,37 +21,60 @@ const NOTE_TO_MIDI: Record<string, number> = {
   'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
 };
 
-// Parse tracker note format (e.g., "C-4", "D#5") to TB303Step format
-const parseTrackerNote = (noteStr: string | null): { note: string; octave: number } => {
-  if (!noteStr || noteStr === '...' || noteStr === '===' || noteStr.length < 3) {
-    return { note: 'C', octave: 2 };
+// Parse tracker note (numeric XM or legacy string) to TB303Step format
+const parseTrackerNote = (noteValue: number | string | null): { note: string; octave: number } => {
+  // Handle numeric XM format
+  if (typeof noteValue === 'number') {
+    if (noteValue === 0 || noteValue === 97) {
+      return { note: 'C', octave: 2 };
+    }
+    // Convert to string first
+    const noteStr = xmNoteToString(noteValue);
+    const notePart = noteStr.substring(0, 2); // "C-", "C#", etc.
+    const octavePart = noteStr.substring(2); // "4", "5", etc.
+    const octaveNum = parseInt(octavePart, 10);
+
+    // Convert tracker octave to TB-303 octave (1=down, 2=mid, 3=up)
+    let tb303Octave = 2; // Default to middle
+    if (octaveNum <= 2) tb303Octave = 1; // Low
+    else if (octaveNum >= 4) tb303Octave = 3; // High
+
+    // Clean up note name (remove dash)
+    const noteName = notePart.replace('-', '');
+    return { note: noteName, octave: tb303Octave };
   }
 
-  const notePart = noteStr.substring(0, 2); // "C-", "C#", etc.
-  const octavePart = noteStr.substring(2); // "4", "5", etc.
-  const octaveNum = parseInt(octavePart, 10);
+  // Handle legacy string format
+  if (typeof noteValue === 'string') {
+    if (!noteValue || noteValue === '...' || noteValue === '===') {
+      return { note: 'C', octave: 2 };
+    }
+    const notePart = noteValue.substring(0, 2); // "C-", "C#", etc.
+    const octavePart = noteValue.substring(2); // "4", "5", etc.
+    const octaveNum = parseInt(octavePart, 10);
 
-  // Convert tracker octave to TB-303 octave (1=down, 2=mid, 3=up)
-  // Tracker uses 0-9, TB-303 uses octave 2-4 typically
-  let tb303Octave = 2; // Default to middle
-  if (octaveNum <= 2) tb303Octave = 1; // Low
-  else if (octaveNum >= 4) tb303Octave = 3; // High
+    let tb303Octave = 2;
+    if (octaveNum <= 2) tb303Octave = 1;
+    else if (octaveNum >= 4) tb303Octave = 3;
 
-  // Clean up note name (remove dash)
-  const noteName = notePart.replace('-', '');
+    const noteName = notePart.replace('-', '');
+    return { note: noteName, octave: tb303Octave };
+  }
 
-  return { note: noteName, octave: tb303Octave };
+  return { note: 'C', octave: 2 };
 };
 
-// Convert TB303Step to tracker note format
-const tb303ToTrackerNote = (note: string, octave: number): string => {
+// Convert TB303Step to tracker note (XM numeric format)
+const tb303ToTrackerNote = (note: string, octave: number): number => {
   // Convert TB-303 octave (1-3) to tracker octave
   const trackerOctave = octave === 1 ? 2 : octave === 2 ? 3 : 4;
 
   // Add dash if needed
   const noteStr = note.length === 1 ? `${note}-` : note;
+  const noteString = `${noteStr}${trackerOctave}`;
 
-  return `${noteStr}${trackerOctave}`;
+  // Convert to XM numeric format
+  return stringNoteToXM(noteString);
 };
 
 interface TB303ViewProps {
@@ -103,7 +127,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     // Read first 16 rows
     for (let i = 0; i < 16; i++) {
       const row = channel.rows[i];
-      const hasNote = !!(row && row.note && row.note !== '...' && row.note !== '===');
+      // XM format: 0 = no note, 97 = note off
+      const hasNote = !!(row && row.note && row.note !== 0 && row.note !== 97);
       const { note, octave } = hasNote ? parseTrackerNote(row.note) : { note: 'C', octave: 2 };
 
       result.push({
@@ -297,7 +322,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const handleClearPattern = () => {
     // Clear first 16 rows of the current channel
     for (let i = 0; i < 16; i++) {
-      setCell(channelIndex, i, { note: '...', accent: false, slide: false });
+      setCell(channelIndex, i, { note: 0, accent: false, slide: false }); // XM format: 0 = no note
     }
   };
 
@@ -311,7 +336,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
       const slide = Math.random() > 0.8;
 
       setCell(channelIndex, i, {
-        note: active ? tb303ToTrackerNote(note, octave) : '...',
+        note: active ? tb303ToTrackerNote(note, octave) : 0, // XM format: 0 = no note
         accent,
         slide,
       });
@@ -321,7 +346,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Step callbacks - write to tracker store
   const handleStepChange = useCallback((stepIndex: number, step: TB303Step) => {
     setCell(channelIndex, stepIndex, {
-      note: step.active ? tb303ToTrackerNote(step.note, step.octave) : '...',
+      note: step.active ? tb303ToTrackerNote(step.note, step.octave) : 0, // XM format: 0 = no note
       accent: step.accent,
       slide: step.slide,
     });
@@ -332,7 +357,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     const newActive = !currentStep.active;
 
     setCell(channelIndex, stepIndex, {
-      note: newActive ? tb303ToTrackerNote(currentStep.note, currentStep.octave) : '...',
+      note: newActive ? tb303ToTrackerNote(currentStep.note, currentStep.octave) : 0, // XM format: 0 = no note
       accent: currentStep.accent,
       slide: currentStep.slide,
     });

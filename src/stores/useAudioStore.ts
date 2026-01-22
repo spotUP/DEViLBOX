@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
-import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 
 interface AudioStore {
   // State

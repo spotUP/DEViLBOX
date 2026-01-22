@@ -30,7 +30,7 @@ import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/
 import type { Pattern } from '@typedefs';
 
 // Build accept string for file input
-const ACCEPTED_FORMATS = ['.json', '.song.json', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
+const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
 // Create instruments for imported module
 function createInstrumentsForModule(
@@ -61,6 +61,7 @@ function createInstrumentsForModule(
       instruments.push({
         id: instNum,
         name: name.trim() || `Sample ${instNum}`,
+        type: 'sample' as const,
         synthType: 'Sampler',
         effects: [],
         volume: -6,
@@ -72,6 +73,7 @@ function createInstrumentsForModule(
       instruments.push({
         id: instNum,
         name: name.trim() || `Instrument ${instNum}`,
+        type: 'synth' as const,
         synthType: 'Synth',
         oscillator: { ...DEFAULT_OSCILLATOR, type: oscType },
         envelope: { ...DEFAULT_ENVELOPE },
@@ -89,6 +91,7 @@ function createInstrumentsForModule(
       instruments.push({
         id: defaultId,
         name: defaultId === 0 ? 'Default' : 'Instrument 01',
+        type: 'synth' as const,
         synthType: 'Synth',
         oscillator: { ...DEFAULT_OSCILLATOR, type: 'sawtooth' },
         envelope: { ...DEFAULT_ENVELOPE },
@@ -176,23 +179,39 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const demoButtonRef = useRef<HTMLDivElement>(null);
   const [demoMenuPosition, setDemoMenuPosition] = useState({ top: 0, left: 0 });
 
-  // Demo songs available on the server
-  const DEMO_SONGS = [
-    { file: 'classic-303-acid-demo.song.json', name: '🎛️ Classic 303 Acid Demo' },
-    { file: 'phuture-acid-tracks.song.json', name: 'Phuture - Acid Tracks' },
-    { file: 'hardfloor-funalogue.song.json', name: 'Hardfloor - Funalogue' },
-    { file: 'josh-wink-higher-state.song.json', name: 'Josh Wink - Higher State' },
-    { file: 'dittytoy-303.song.json', name: 'Dittytoy 303' },
-    { file: 'new-order-confusion.song.json', name: 'New Order - Confusion' },
-    { file: 'fatboy-slim-everyone-needs-303.song.json', name: 'Fatboy Slim - Everyone Needs a 303' },
-    { file: 'fast-eddie-acid-thunder.song.json', name: 'Fast Eddie - Acid Thunder' },
-    { file: 'dj-tim-misjah-access.song.json', name: 'DJ Tim & Misjah - Access' },
-    { file: 'edge-of-motion-setup-707.song.json', name: 'Edge of Motion - 707 Setup' },
-    { file: 'samplab-mathew-303.song.json', name: '🎹 Samplab Mathew 303' },
-    { file: 'samplab-mathew-full.song.json', name: '🎹 Samplab Mathew (Full)' },
-    { file: 'slow-creaky-acid-authentic.song.json', name: '🐌 Slow Creaky (Authentic)' },
-    { file: 'slow-creaky-acid-tempo-relative.song.json', name: '🐌 Slow Creaky (Tempo-Relative)' },
-  ];
+  // Demo songs organized by category
+  const DEMO_SONGS = {
+    acid: [
+      { file: 'acid/classic-303-acid-demo.dbox', name: '🎛️ Classic 303 Acid Demo' },
+      { file: 'acid/phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' },
+      { file: 'acid/hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue' },
+      { file: 'acid/josh-wink-higher-state.dbox', name: 'Josh Wink - Higher State' },
+      { file: 'acid/dittytoy-303.dbox', name: 'Dittytoy 303' },
+      { file: 'acid/fatboy-slim-everyone-needs-303.dbox', name: 'Fatboy Slim - Everyone Needs a 303' },
+      { file: 'acid/fast-eddie-acid-thunder.dbox', name: 'Fast Eddie - Acid Thunder' },
+      { file: 'acid/dj-tim-misjah-access.dbox', name: 'DJ Tim & Misjah - Access' },
+      { file: 'acid/samplab-mathew-303.dbox', name: '🎹 Samplab Mathew 303' },
+      { file: 'acid/samplab-mathew-full.dbox', name: '🎹 Samplab Mathew (Full)' },
+      { file: 'acid/slow-creaky-acid-authentic.dbox', name: '🐌 Slow Creaky (Authentic)' },
+      { file: 'acid/slow-creaky-acid-tempo-relative.dbox', name: '🐌 Slow Creaky (Tempo-Relative)' },
+    ],
+    tb303: [
+      { file: 'tb303/1-fatboy-slim-everybody-needs-a-303.dbox', name: 'Fatboy Slim - Everybody needs a 303' },
+      { file: 'tb303/2-josh-wink-high-state-of-consciousness.dbox', name: 'Josh Wink - High State of Consciousness' },
+      { file: 'tb303/3-christophe-just-i-m-a-disco-dancer-part-1-.dbox', name: 'Christophe Just - I\'m a Disco Dancer (Part 1)' },
+      { file: 'tb303/4-christophe-just-i-m-a-disco-dancer-part-2-.dbox', name: 'Christophe Just - I\'m a Disco Dancer (Part 2)' },
+      { file: 'tb303/5-claustrophobic-sting-the-prodigy.dbox', name: 'Claustrophobic Sting - The Prodigy' },
+      { file: 'tb303/6-josh-wink-are-you-there.dbox', name: 'Josh Wink - Are You There' },
+      { file: 'tb303/7-cut-paste-forget-it-part-1-.dbox', name: 'Cut Paste - Forget It (Part 1)' },
+      { file: 'tb303/8-cut-paste-forget-it-part-2-.dbox', name: 'Cut Paste - Forget It (Part 2)' },
+      { file: 'tb303/9-public-energy-three-o-three-part-1-.dbox', name: 'Public Energy - Three O Three (Part 1)' },
+      { file: 'tb303/10-public-energy-three-o-three-part-2-.dbox', name: 'Public Energy - Three O Three (Part 2)' },
+    ],
+    general: [
+      { file: 'general/new-order-confusion.dbox', name: 'New Order - Confusion' },
+      { file: 'general/edge-of-motion-setup-707.dbox', name: 'Edge of Motion - 707 Setup' },
+    ],
+  };
 
   // Load demo song from server
   const handleLoadDemo = async (filename: string) => {
@@ -208,14 +227,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     try {
       // Use import.meta.env.BASE_URL for correct path on GitHub Pages
       const basePath = import.meta.env.BASE_URL || '/';
-      const response = await fetch(`${basePath}songs/${filename}`);
+      const response = await fetch(`${basePath}demos/${filename}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const songData = await response.json();
 
-      // Validate song format
-      if (songData.format !== 'devilbox-song') {
-        throw new Error(`Invalid format: expected "devilbox-song", got "${songData.format}"`);
+      // Validate song format (support both .dbox and .song.json formats)
+      if (songData.format !== 'devilbox-dbox' && songData.format !== 'devilbox-song') {
+        throw new Error(`Invalid format: expected "devilbox-dbox" or "devilbox-song", got "${songData.format}"`);
       }
 
       // Validate required fields
@@ -229,9 +248,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         throw new Error('Missing or invalid "sequence" array');
       }
 
+      // CRITICAL: Migrate old format demo songs to new XM format
+      // Demo songs use old format (string notes, null values, old effects)
+      // Must migrate before loading to avoid runtime errors
+      const { needsMigration, migrateProject } = await import('@/lib/migration');
+      let patterns = songData.patterns;
+      let instruments = songData.instruments;
+
+      if (needsMigration(patterns, instruments)) {
+        console.log('[Demo] Old format detected, migrating to XM format...');
+        const migrated = migrateProject(patterns, instruments);
+        patterns = migrated.patterns;
+        instruments = migrated.instruments;
+        console.log('[Demo] Migration complete!');
+      }
+
       // Load song data
-      if (songData.patterns) loadPatterns(songData.patterns);
-      if (songData.instruments) loadInstruments(songData.instruments);
+      if (patterns) loadPatterns(patterns);
+      if (instruments) loadInstruments(instruments);
       if (songData.metadata) setMetadata(songData.metadata);
       if (songData.bpm) setBPM(songData.bpm);
 
@@ -420,9 +454,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           return;
         }
 
+        // CRITICAL: Migrate old format song files to new XM format
+        // User-saved songs may use old format (string notes, null values, old effects)
+        // Must migrate before loading to avoid runtime errors
+        const { needsMigration, migrateProject } = await import('@/lib/migration');
+        let patterns = songData.patterns;
+        let instruments = songData.instruments;
+
+        if (needsMigration(patterns, instruments)) {
+          console.log('[Import] Old format detected, migrating to XM format...');
+          const migrated = migrateProject(patterns, instruments);
+          patterns = migrated.patterns;
+          instruments = migrated.instruments;
+          console.log('[Import] Migration complete!');
+        }
+
         // Load song data
-        loadPatterns(songData.patterns);
-        if (songData.instruments) loadInstruments(songData.instruments);
+        loadPatterns(patterns);
+        if (instruments) loadInstruments(instruments);
         if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
         setBPM(songData.bpm);
         setMetadata(songData.metadata);
@@ -740,7 +789,39 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 left: `${demoMenuPosition.left}px`,
               }}
             >
-              {DEMO_SONGS.map((demo) => (
+              {/* Acid Demos */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">
+                🎛️ Acid / 303
+              </div>
+              {DEMO_SONGS.acid.map((demo) => (
+                <button
+                  key={demo.file}
+                  onClick={() => handleLoadDemo(demo.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {demo.name}
+                </button>
+              ))}
+
+              {/* TB-303 Pattern Demos */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
+                🎹 TB-303 Patterns
+              </div>
+              {DEMO_SONGS.tb303.map((demo) => (
+                <button
+                  key={demo.file}
+                  onClick={() => handleLoadDemo(demo.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {demo.name}
+                </button>
+              ))}
+
+              {/* General Demos */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
+                🎵 General
+              </div>
+              {DEMO_SONGS.general.map((demo) => (
                 <button
                   key={demo.file}
                   onClick={() => handleLoadDemo(demo.file)}

@@ -9,6 +9,7 @@
 
 import type { TD3Note, TD3Step } from '../types';
 import type { TrackerCell } from '@typedefs/tracker';
+import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 
 // TD-3 supports notes from C2 to C5 (3 octaves + upper C)
 const TD3_BASE_OCTAVE = 2;
@@ -114,11 +115,14 @@ export function td3NoteToTracker(td3Note: TD3Note, baseOctave: number = TD3_BASE
  * Convert a TrackerCell to a TD3Step
  */
 export function trackerCellToTD3Step(cell: TrackerCell, baseOctave: number = TD3_BASE_OCTAVE): TD3Step {
-  // Check for rest (no note or note off)
-  const isRest = !cell.note || cell.note === '===' || cell.note === '---';
+  // Check for rest (empty = 0, note off = 97)
+  const isRest = cell.note === 0 || cell.note === 97;
+
+  // Convert XM note to string for TD3 conversion
+  const noteStr = !isRest ? xmNoteToString(cell.note) : '';
 
   const step: TD3Step = {
-    note: isRest ? null : trackerNoteToTD3(cell.note, baseOctave),
+    note: isRest ? null : trackerNoteToTD3(noteStr, baseOctave),
     accent: cell.accent || false,
     slide: cell.slide || false,
     tie: false, // TODO: Implement tie detection based on consecutive same notes
@@ -131,11 +135,16 @@ export function trackerCellToTD3Step(cell: TrackerCell, baseOctave: number = TD3
  * Convert a TD3Step to a TrackerCell
  */
 export function td3StepToTrackerCell(step: TD3Step, baseOctave: number = TD3_BASE_OCTAVE): TrackerCell {
+  // Convert TD3 note to tracker string, then to XM format
+  const noteStr = step.note ? td3NoteToTracker(step.note, baseOctave) : '';
+  const note = noteStr ? stringNoteToXM(noteStr) : 0;
+
   const cell: TrackerCell = {
-    note: step.note ? td3NoteToTracker(step.note, baseOctave) : null,
-    instrument: null,
-    volume: null,
-    effect: null,
+    note,
+    instrument: 0,
+    volume: 0,
+    effTyp: 0,
+    eff: 0,
     accent: step.accent,
     slide: step.slide,
   };
@@ -163,9 +172,10 @@ export function trackerPatternToTD3Steps(
     const cell = cells[i];
     const step = trackerCellToTD3Step(cell, baseOctave);
 
-    // Check if note was out of range
-    if (cell.note && !step.note && cell.note !== '===' && cell.note !== '---') {
-      warnings.push(`Row ${i + 1}: Note ${cell.note} is out of TD-3 range (C2-C5)`);
+    // Check if note was out of range (skip empty = 0, note off = 97)
+    if (cell.note && cell.note !== 0 && cell.note !== 97 && !step.note) {
+      const noteStr = xmNoteToString(cell.note);
+      warnings.push(`Row ${i + 1}: Note ${noteStr} is out of TD-3 range (C2-C5)`);
     }
 
     steps.push(step);
@@ -201,10 +211,13 @@ export function suggestBaseOctave(cells: TrackerCell[]): number {
   const octaveCounts = new Map<number, number>();
 
   for (const cell of cells) {
-    const parsed = parseTrackerNote(cell.note || '');
-    if (parsed) {
-      const count = octaveCounts.get(parsed.octave) || 0;
-      octaveCounts.set(parsed.octave, count + 1);
+    if (cell.note && cell.note !== 0 && cell.note !== 97) {
+      const noteStr = xmNoteToString(cell.note);
+      const parsed = parseTrackerNote(noteStr);
+      if (parsed) {
+        const count = octaveCounts.get(parsed.octave) || 0;
+        octaveCounts.set(parsed.octave, count + 1);
+      }
     }
   }
 
@@ -249,8 +262,10 @@ export function validatePatternForTD3Export(cells: TrackerCell[], baseOctave: nu
 
   for (let i = 0; i < Math.min(cells.length, 16); i++) {
     const cell = cells[i];
-    if (cell.note && cell.note !== '===' && cell.note !== '---') {
-      const td3Note = trackerNoteToTD3(cell.note, baseOctave);
+    // Check notes that aren't empty (0) or note-off (97)
+    if (cell.note && cell.note !== 0 && cell.note !== 97) {
+      const noteStr = xmNoteToString(cell.note);
+      const td3Note = trackerNoteToTD3(noteStr, baseOctave);
       if (!td3Note) {
         notesOutOfRange++;
       }

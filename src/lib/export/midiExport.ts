@@ -4,7 +4,7 @@
 
 import type { Pattern, ChannelData, TrackerCell } from '../../types/tracker';
 import type { AutomationCurve } from '../../types/automation';
-import { trackerNoteToMidi } from '../../midi/types';
+import { xmNoteToMidi } from '../xmConversions';
 import {
   MIDI_TICKS_PER_QUARTER_NOTE,
   ROWS_PER_BEAT,
@@ -203,13 +203,14 @@ function channelToEvents(
 
   for (let row = 0; row < patternLength; row++) {
     const cell = channel.rows[row];
-    if (!cell.note || cell.note === '---') continue;
+    // Skip empty cells (0)
+    if (!cell.note || cell.note === 0) continue;
 
-    // Note-off marker
-    if (cell.note === '===') continue;
+    // Note-off marker (97)
+    if (cell.note === 97) continue;
 
     // Parse note
-    const midiNote = trackerNoteToMidi(cell.note);
+    const midiNote = xmNoteToMidi(cell.note);
     if (midiNote === null) continue;
 
     // Calculate tick position
@@ -252,12 +253,12 @@ function calculateNoteDuration(
 ): number {
   for (let row = startRow + 1; row < patternLength; row++) {
     const cell = rows[row];
-    // Note-off marker ends the note
-    if (cell.note === '===') {
+    // Note-off marker ends the note (97)
+    if (cell.note === 97) {
       return row - startRow;
     }
-    // Next note starts (not a tie/hold)
-    if (cell.note && cell.note !== '---' && cell.note !== '===') {
+    // Next note starts (not empty)
+    if (cell.note && cell.note !== 0 && cell.note !== 97) {
       return row - startRow;
     }
   }

@@ -68,6 +68,7 @@ export const usePresetStore = create<PresetStore>()(
             updatedAt: Date.now(),
             config: {
               name: instrument.name,
+              type: instrument.type,
               synthType: instrument.synthType,
               oscillator: instrument.oscillator,
               envelope: instrument.envelope,

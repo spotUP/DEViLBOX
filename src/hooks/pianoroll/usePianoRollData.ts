@@ -6,7 +6,7 @@ import { useMemo, useCallback } from 'react';
 import { useTrackerStore } from '../../stores';
 import type { Pattern, TrackerCell } from '../../types/tracker';
 import type { PianoRollNote } from '../../types/pianoRoll';
-import { trackerNoteToMidi } from '../../midi/types';
+import { xmNoteToMidi, midiToXMNote } from '../../lib/xmConversions';
 
 /**
  * Generate a unique ID for a note based on its position
@@ -25,12 +25,12 @@ function calculateNoteDuration(
 ): number {
   for (let row = startRow + 1; row < patternLength; row++) {
     const cell = rows[row];
-    // Note-off marker ends the note
-    if (cell.note === '===') {
+    // Note-off marker ends the note (97 = note off)
+    if (cell.note === 97) {
       return row - startRow;
     }
     // Next note starts (not empty or note-off)
-    if (cell.note && cell.note !== '---' && cell.note !== '===') {
+    if (cell.note && cell.note !== 0 && cell.note !== 97) {
       return row - startRow;
     }
   }
@@ -56,21 +56,23 @@ export function patternToPianoRollNotes(
     for (let row = 0; row < channel.rows.length; row++) {
       const cell = channel.rows[row];
 
-      // Skip empty cells, rests, and note-offs
-      if (!cell.note || cell.note === '---' || cell.note === '===') {
+      // Skip empty cells (0), rests (0), and note-offs (97)
+      if (!cell.note || cell.note === 0 || cell.note === 97) {
         continue;
       }
 
       // Parse note to MIDI
-      const midiNote = trackerNoteToMidi(cell.note);
+      const midiNote = xmNoteToMidi(cell.note);
       if (midiNote === null) continue;
 
       // Calculate duration
       const duration = calculateNoteDuration(channel.rows, row, pattern.length);
 
-      // Convert volume to velocity (tracker volume is 0x00-0x40, velocity is 0-127)
-      const velocity = cell.volume !== null
-        ? Math.round((cell.volume / 64) * 127)
+      // Convert volume to velocity (XM volume 0x10-0x50 = 0-64, velocity is 0-127)
+      // Volume column 0x10-0x50 is set volume 0-64
+      const hasSetVolume = cell.volume >= 0x10 && cell.volume <= 0x50;
+      const velocity = hasSetVolume
+        ? Math.round(((cell.volume - 0x10) / 64) * 127)
         : 100; // Default velocity
 
       notes.push({
@@ -106,23 +108,19 @@ export function usePianoRollData(channelIndex?: number) {
     (midiNote: number, startRow: number, duration: number, velocity: number = 100, chIndex?: number) => {
       const targetChannel = chIndex ?? channelIndex ?? 0;
 
-      // Convert MIDI note to tracker note string
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const octave = Math.floor(midiNote / 12) - 1;
-      const noteName = noteNames[midiNote % 12];
-      const trackerNote = noteName.includes('#')
-        ? `${noteName}${octave}`
-        : `${noteName}-${octave}`;
+      // Convert MIDI note to XM note number
+      const xmNote = midiToXMNote(midiNote);
 
-      // Convert velocity to volume (0-127 -> 0x00-0x40)
-      const volume = Math.round((velocity / 127) * 64);
+      // Convert velocity to volume (0-127 -> 0x10-0x50, XM set volume range)
+      const volumeValue = Math.round((velocity / 127) * 64);
+      const volume = 0x10 + volumeValue; // 0x10-0x50 = set volume 0-64
 
       // Set the note
-      setCell(targetChannel, startRow, { note: trackerNote, volume });
+      setCell(targetChannel, startRow, { note: xmNote, volume });
 
       // Add note-off at end if within pattern
       if (startRow + duration < (pattern?.length || 64)) {
-        setCell(targetChannel, startRow + duration, { note: '===' });
+        setCell(targetChannel, startRow + duration, { note: 97 }); // 97 = note off
       }
     },
     [channelIndex, pattern, setCell]
@@ -139,14 +137,14 @@ export function usePianoRollData(channelIndex?: number) {
       const note = notes.find((n) => n.id === noteId);
       if (!note) return;
 
-      // Clear the note cell
-      setCell(chIndex, startRow, { note: '---', volume: null });
+      // Clear the note cell (0 = empty, 0 = no volume)
+      setCell(chIndex, startRow, { note: 0, volume: 0 });
 
       // Clear any note-off that might be at the end
       if (note.endRow < (pattern?.length || 64)) {
         const endCell = pattern?.channels[chIndex]?.rows[note.endRow];
-        if (endCell?.note === '===') {
-          setCell(chIndex, note.endRow, { note: '---' });
+        if (endCell?.note === 97) { // 97 = note off
+          setCell(chIndex, note.endRow, { note: 0 }); // 0 = empty
         }
       }
     },
@@ -196,7 +194,9 @@ export function usePianoRollData(channelIndex?: number) {
       const chIndex = parseInt(chIndexStr, 10);
       const startRow = parseInt(startRowStr, 10);
 
-      const volume = Math.round((velocity / 127) * 64);
+      // Convert velocity to XM volume (0-127 -> 0x10-0x50)
+      const volumeValue = Math.round((velocity / 127) * 64);
+      const volume = 0x10 + volumeValue; // 0x10-0x50 = set volume 0-64
       setCell(chIndex, startRow, { volume });
     },
     [setCell]

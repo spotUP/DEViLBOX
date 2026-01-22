@@ -237,6 +237,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
   const base: InstrumentConfig = {
     id: -1, // Temp ID
     name: getSynthInfo(synthType).name,
+    type: 'synth' as const,
     synthType,
     volume: -6,
     pan: 0,

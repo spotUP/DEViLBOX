@@ -55,10 +55,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   const handleCut = useCallback(() => {
     handleCopy();
     setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
+      note: 0,        // XM format: 0 = no note
+      instrument: 0,  // XM format: 0 = no instrument
+      volume: 0,      // XM format: 0x00 = nothing
+      effTyp: 0,      // XM format: 0 = no effect
+      eff: 0,         // XM format: 0x00 = no parameter
     });
   }, [handleCopy, setCell, channelIndex, rowIndex]);
 
@@ -78,10 +79,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   // Clear cell
   const handleClear = useCallback(() => {
     setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
+      note: 0,        // XM format: 0 = no note
+      instrument: 0,  // XM format: 0 = no instrument
+      volume: 0,      // XM format: 0x00 = nothing
+      effTyp: 0,      // XM format: 0 = no effect
+      eff: 0,         // XM format: 0x00 = no parameter
     });
   }, [setCell, channelIndex, rowIndex]);
 
@@ -95,10 +97,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     }
     // Clear current row
     setCell(channelIndex, rowIndex, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
+      note: 0,        // XM format: 0 = no note
+      instrument: 0,  // XM format: 0 = no instrument
+      volume: 0,      // XM format: 0x00 = nothing
+      effTyp: 0,      // XM format: 0 = no effect
+      eff: 0,         // XM format: 0x00 = no parameter
     });
   }, [pattern, channelIndex, rowIndex, setCell]);
 
@@ -112,10 +115,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     }
     // Clear last row
     setCell(channelIndex, pattern.length - 1, {
-      note: null,
-      instrument: null,
-      volume: null,
-      effect: null,
+      note: 0,        // XM format: 0 = no note
+      instrument: 0,  // XM format: 0 = no instrument
+      volume: 0,      // XM format: 0x00 = nothing
+      effTyp: 0,      // XM format: 0 = no effect
+      eff: 0,         // XM format: 0x00 = no parameter
     });
   }, [pattern, channelIndex, rowIndex, setCell]);
 

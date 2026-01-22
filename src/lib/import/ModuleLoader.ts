@@ -1,9 +1,13 @@
 /**
  * ModuleLoader - Loads and parses tracker module files (MOD, XM, IT, S3M)
- * Uses libopenmpt via custom ChiptunePlayer for parsing and metadata extraction
+ * Uses native parsers (XM/MOD) for full sample/envelope extraction
+ * Falls back to libopenmpt for other formats (IT, S3M, etc.)
  */
 
 import { ChiptunePlayer } from './ChiptunePlayer';
+import { parseXM } from './formats/XMParser';
+import { parseMOD } from './formats/MODParser';
+import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
 
 // Raw pattern cell data from libopenmpt
 // Command indices: 0=NOTE, 1=INSTRUMENT, 2=VOLUMEEFFECT, 3=EFFECT, 4=VOLUME, 5=PARAMETER
@@ -46,10 +50,18 @@ export interface ModuleInfo {
   arrayBuffer: ArrayBuffer;
   player: ChiptunePlayer;
   file: File;  // Original file for sample extraction
+  // Native parser data (if available)
+  nativeData?: {
+    format: 'XM' | 'MOD';
+    importMetadata: ImportMetadata;
+    instruments: ParsedInstrument[];
+    patterns: any[][];  // XMNote[][] or MODNote[][]
+  };
 }
 
 /**
  * Load a module file and extract metadata
+ * Tries native parser first for XM/MOD, falls back to libopenmpt
  */
 export async function loadModuleFile(file: File): Promise<ModuleInfo> {
   return new Promise((resolve, reject) => {
@@ -62,39 +74,51 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
         return;
       }
 
+      // Determine file type
+      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      const useNativeParser = ext === '.xm' || ext === '.mod';
+
       try {
-        // Create a player instance to extract metadata
-        const player = new ChiptunePlayer({
-          repeatCount: 0, // Don't loop
-        });
+        // Try native parser for XM/MOD
+        if (useNativeParser) {
+          try {
+            const nativeData = await loadWithNativeParser(arrayBuffer, ext, file.name);
+            if (nativeData) {
+              // Create metadata for compatibility
+              const metadata: ModuleMetadata = {
+                title: nativeData.importMetadata.sourceFile,
+                type: nativeData.format,
+                channels: nativeData.importMetadata.originalChannelCount,
+                patterns: nativeData.importMetadata.originalPatternCount,
+                orders: nativeData.importMetadata.modData?.songLength || 1,
+                instruments: nativeData.importMetadata.originalInstrumentCount,
+                samples: nativeData.importMetadata.originalInstrumentCount,
+                duration: 0,
+                message: nativeData.importMetadata.modData?.songMessage,
+              };
 
-        // Wait for player initialization with timeout and error handling
-        const initSuccess = await new Promise<boolean>((initResolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('[ModuleLoader] ChiptunePlayer initialization timed out');
-            initResolve(false);
-          }, 10000);
+              // Also load with libopenmpt for playback
+              const player = await loadWithLibopenmpt(arrayBuffer, file);
 
-          player.onInitialized(() => {
-            clearTimeout(timeout);
-            initResolve(true);
-          });
-
-          player.onError((err: any) => {
-            if (err.type === 'init') {
-              clearTimeout(timeout);
-              initResolve(false);
+              resolve({
+                metadata,
+                arrayBuffer,
+                player,
+                file,
+                nativeData,
+              });
+              return;
             }
-          });
-        });
-
-        if (!initSuccess) {
-          reject(new Error('Module player not available. The audio worklet failed to load. Module file import (.mod, .xm, .it, etc.) is not supported in this browser/configuration.'));
-          return;
+          } catch (nativeError) {
+            console.warn(`[ModuleLoader] Native parser failed, falling back to libopenmpt:`, nativeError);
+          }
         }
 
+        // Fall back to libopenmpt
+        const player = await loadWithLibopenmpt(arrayBuffer, file);
+
         // Set up metadata handler
-        const metadataPromise = new Promise<ModuleMetadata>((metaResolve, metaReject) => {
+        const metadata = await new Promise<ModuleMetadata>((metaResolve, metaReject) => {
           const timeout = setTimeout(() => {
             metaReject(new Error('Timeout waiting for metadata'));
           }, 5000);
@@ -135,15 +159,6 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           });
         });
 
-        // Load the file
-        await player.play(arrayBuffer);
-
-        // Wait for metadata
-        const metadata = await metadataPromise;
-
-        // Stop playback (we just wanted metadata)
-        player.stop();
-
         resolve({
           metadata,
           arrayBuffer,
@@ -172,6 +187,83 @@ export async function previewModule(info: ModuleInfo): Promise<void> {
  */
 export function stopPreview(info: ModuleInfo): void {
   info.player.stop();
+}
+
+/**
+ * Load using native parser (XM or MOD)
+ */
+async function loadWithNativeParser(
+  buffer: ArrayBuffer,
+  ext: string,
+  _filename: string
+): Promise<ModuleInfo['nativeData'] | null> {
+  try {
+    if (ext === '.xm') {
+      const result = await parseXM(buffer);
+      return {
+        format: 'XM',
+        importMetadata: result.metadata,
+        instruments: result.instruments,
+        patterns: result.patterns as any,
+      };
+    } else if (ext === '.mod') {
+      const result = await parseMOD(buffer);
+      return {
+        format: 'MOD',
+        importMetadata: result.metadata,
+        instruments: result.instruments,
+        patterns: result.patterns as any,
+      };
+    }
+  } catch (error) {
+    console.error('[ModuleLoader] Native parser error:', error);
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Load using libopenmpt (legacy path)
+ */
+async function loadWithLibopenmpt(
+  arrayBuffer: ArrayBuffer,
+  _file: File
+): Promise<ChiptunePlayer> {
+  const player = new ChiptunePlayer({
+    repeatCount: 0, // Don't loop
+  });
+
+  // Wait for player initialization with timeout and error handling
+  const initSuccess = await new Promise<boolean>((initResolve) => {
+    const timeout = setTimeout(() => {
+      console.warn('[ModuleLoader] ChiptunePlayer initialization timed out');
+      initResolve(false);
+    }, 10000);
+
+    player.onInitialized(() => {
+      clearTimeout(timeout);
+      initResolve(true);
+    });
+
+    player.onError((err: any) => {
+      if (err.type === 'init') {
+        clearTimeout(timeout);
+        initResolve(false);
+      }
+    });
+  });
+
+  if (!initSuccess) {
+    throw new Error('Module player not available. The audio worklet failed to load.');
+  }
+
+  // Load the file
+  await player.play(arrayBuffer);
+
+  // Stop playback (we just wanted metadata)
+  player.stop();
+
+  return player;
 }
 
 /**
