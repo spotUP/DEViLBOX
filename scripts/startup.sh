@@ -2,6 +2,17 @@
 
 # DEViLBOX Startup & Build Script
 # This script ensures a fresh environment and provides build options for Web and Electron.
+#
+# Usage:
+#   ./scripts/startup.sh [target]
+#
+# Targets:
+#   web       - Web (Production Preview) - DEFAULT for CI/CD
+#   electron  - Electron (Local Native App)
+#   both      - Both (Web + Electron)
+#   dev       - Development (Vite Dev Server)
+#
+# If no target is specified, defaults to 'web' (GitHub Pages build)
 
 echo "--- DEViLBOX Build System ---"
 
@@ -22,26 +33,24 @@ if [ -d "node_modules/.vite" ]; then
     rm -rf node_modules/.vite
 fi
 
-# 3. Prompt for build target
-echo ""
-echo "Select build target:"
-echo "1) Web (Production Preview)"
-echo "2) Electron (Local Native App)"
-echo "3) Both (Web + Electron)"
-echo "4) Development (Vite Dev Server)"
-read -p "Enter choice [1-4]: " choice
+# 3. Determine build target (default: web for GitHub Pages)
+TARGET="${1:-web}"
 
-case $choice in
-    1)
-        echo "Building for Web..."
+echo ""
+echo "Build target: $TARGET"
+echo ""
+
+case $TARGET in
+    web|1)
+        echo "Building for Web (GitHub Pages)..."
         npm run build
         if [ $? -eq 0 ]; then
             echo "--- Web Build Successful ---"
-            echo "Starting production preview server..."
-            npm run preview -- --open
+            echo "Build artifacts ready in 'dist/' directory"
+            echo "To preview locally: npm run preview"
         fi
         ;;
-    2)
+    electron|2)
         echo "Building for Electron..."
         npm run electron:build
         if [ $? -eq 0 ]; then
@@ -49,7 +58,7 @@ case $choice in
             echo "Native app available in 'dist_electron' directory."
         fi
         ;;
-    3)
+    both|3)
         echo "Building both Web and Electron..."
         npm run build && npm run electron:build
         if [ $? -eq 0 ]; then
@@ -58,12 +67,15 @@ case $choice in
             npm run preview -- --open
         fi
         ;;
-    4)
+    dev|4)
         echo "Starting Development Mode..."
         npm run dev
         ;;
     *)
-        echo "Invalid choice. Exiting."
+        echo "Invalid target: $TARGET"
+        echo ""
+        echo "Usage: $0 [target]"
+        echo "Targets: web (default), electron, both, dev"
         exit 1
         ;;
 esac
