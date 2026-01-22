@@ -1,10 +1,39 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
+
+// Plugin to generate version.json for cache busting
+function generateVersionFile() {
+  return {
+    name: 'generate-version-file',
+    closeBundle() {
+      const changelogPath = path.resolve(__dirname, 'src/generated/changelog.ts');
+      const distPath = path.resolve(__dirname, 'dist/version.json');
+
+      try {
+        const changelogContent = fs.readFileSync(changelogPath, 'utf-8');
+        const buildNumberMatch = changelogContent.match(/BUILD_NUMBER = '(\d+)'/);
+        const buildHashMatch = changelogContent.match(/BUILD_HASH = '([^']+)'/);
+
+        const versionData = {
+          buildNumber: buildNumberMatch ? buildNumberMatch[1] : '0',
+          buildHash: buildHashMatch ? buildHashMatch[1] : 'unknown',
+          timestamp: new Date().toISOString(),
+        };
+
+        fs.writeFileSync(distPath, JSON.stringify(versionData, null, 2));
+        console.log('Generated version.json:', versionData);
+      } catch (error) {
+        console.error('Failed to generate version.json:', error);
+      }
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), generateVersionFile()],
   base: '/DEViLBOX/',
   resolve: {
     alias: {
