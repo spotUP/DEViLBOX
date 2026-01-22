@@ -34,7 +34,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "spot",
+      "owner": "spotUP",
       "repo": "DEViLBOX"
     },
     "files": [
