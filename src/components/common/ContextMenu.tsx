@@ -115,6 +115,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   if (!position) return null;
 
   const renderMenuItem = (item: MenuItemType, index: number) => {
+    // Guard against undefined items
+    if (!item) return null;
+
     if (item.type === 'divider') {
       return (
         <div

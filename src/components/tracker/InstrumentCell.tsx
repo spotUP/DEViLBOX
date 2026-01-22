@@ -1,5 +1,6 @@
 /**
- * InstrumentCell - Displays and edits instrument number (00-FF)
+ * InstrumentCell - Displays and edits instrument number (01-80 hex, 01-128 decimal)
+ * XM-compatible: 0 = no instrument, 1-128 = valid instruments
  */
 
 import React from 'react';
@@ -16,7 +17,9 @@ interface InstrumentCellProps {
 export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
   ({ value, isActive, isEmpty, digitIndex = 0 }) => {
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
-    const displayValue = value !== null
+
+    // XM format: 0 = no instrument, 1-128 = valid
+    const displayValue = value !== null && value !== 0
       ? useHexNumbers
         ? value.toString(16).toUpperCase().padStart(2, '0')
         : value.toString(10).padStart(2, '0')
@@ -34,9 +37,12 @@ export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
               key={i}
               className={
                 i === digitIndex
-                  ? 'bg-accent-primary text-text-inverse font-bold rounded-sm'
+                  ? 'bg-accent-primary font-bold rounded-sm'
                   : ''
               }
+              style={{
+                color: i === digitIndex ? '#ffffff' : undefined
+              }}
             >
               {char}
             </span>
@@ -48,8 +54,11 @@ export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
     return (
       <span
         className={`tracker-cell ${colorClass} ${
-          isActive ? 'bg-accent-primary text-text-inverse font-bold rounded-sm' : ''
+          isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
+        style={{
+          color: isActive ? '#ffffff' : undefined
+        }}
       >
         {displayValue}
       </span>

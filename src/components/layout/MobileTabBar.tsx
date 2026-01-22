@@ -32,7 +32,7 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-bgSecondary border-t border-dark-border safe-area-bottom">
       <div className="flex items-stretch">
-        {tabs.map((tab) => {
+        {tabs.filter(tab => tab && tab.icon).map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button

@@ -63,7 +63,8 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
           const actualChannelIndex = baseChannelIndex + localIndex;
           // Cursor is now a fixed overlay - cells don't need active state
           const isChannelActive = false;
-          const isNoteOff = cell.note === '===';
+          // XM format: note 97 = note off
+          const isNoteOff = cell.note === 97;
           const channelColor = channelColors[localIndex];
 
           return (
@@ -85,7 +86,7 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               <NoteCell
                 value={cell.note}
                 isActive={isChannelActive && cursor.columnType === 'note'}
-                isEmpty={cell.note === null}
+                isEmpty={cell.note === 0}
                 isNoteOff={isNoteOff}
               />
 
@@ -93,28 +94,29 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               <InstrumentCell
                 value={cell.instrument}
                 isActive={isChannelActive && cursor.columnType === 'instrument'}
-                isEmpty={cell.instrument === null}
+                isEmpty={cell.instrument === 0}
               />
 
               {/* Volume */}
               <VolumeCell
                 value={cell.volume}
                 isActive={isChannelActive && cursor.columnType === 'volume'}
-                isEmpty={cell.volume === null}
+                isEmpty={cell.volume === 0 || cell.volume < 0x10}
               />
 
               {/* Effect 1 */}
               <EffectCell
-                value={cell.effect}
-                isActive={isChannelActive && cursor.columnType === 'effect'}
-                isEmpty={cell.effect === null}
+                effTyp={cell.effTyp}
+                eff={cell.eff}
+                isActive={isChannelActive && (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam')}
+                isEmpty={cell.effTyp === 0 && cell.eff === 0}
               />
 
               {/* Effect 2 */}
               <EffectCell
-                value={cell.effect2 || null}
+                value={cell.effect2}
                 isActive={isChannelActive && cursor.columnType === 'effect2'}
-                isEmpty={cell.effect2 === null || cell.effect2 === undefined}
+                isEmpty={!cell.effect2}
               />
 
               {/* Accent */}

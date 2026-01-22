@@ -1,70 +1,140 @@
 /**
- * ModuleConverter - Converts libopenmpt raw song data to our Pattern format
+ * ModuleConverter - Converts MOD/XM/IT data to our Pattern format
+ * Supports both libopenmpt (legacy) and native parsers (XM/MOD)
  */
 
-import type { Pattern, TrackerCell, ChannelData } from '@typedefs';
+import type { Pattern, TrackerCell, ChannelData, ImportMetadata } from '@typedefs';
 import type { RawSongData, RawPatternCell } from './ModuleLoader';
-
-// Note names for conversion
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-// Effect command letters (FT2/IT style)
-const EFFECT_LETTERS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+import type { XMNote } from './formats/XMParser';
+import type { MODNote } from './formats/MODParser';
+import { convertMODEffect } from './formats/MODParser';
+import { periodToXMNote, effectStringToXM } from '@/lib/xmConversions';
 
 /**
- * Convert libopenmpt note number to note string
- * libopenmpt notes: 0=empty, 1-120=C-0 to B-9, 254=note cut, 255=note off
- *
- * Note: libopenmpt reports Amiga MOD notes 2 octaves higher than traditional
- * tracker notation (C-4 in ProTracker = C-6 in libopenmpt), so we subtract 2.
- */
-function convertNote(noteNum: number): string | null {
-  if (noteNum === 0) return null; // No note
-  if (noteNum === 254 || noteNum === 255) return '==='; // Note off/cut
-  if (noteNum < 1 || noteNum > 120) return null; // Invalid
-
-  // Note 1 = C-0, Note 13 = C-1, etc.
-  const semitone = (noteNum - 1) % 12;
-  let octave = Math.floor((noteNum - 1) / 12);
-
-  // Adjust for Amiga MOD octave offset (libopenmpt reports 1 octave higher)
-  octave = Math.max(0, octave - 1);
-
-  return `${NOTE_NAMES[semitone]}${octave}`;
-}
-
-/**
- * Convert libopenmpt effect to effect string
- * Format: XYY where X is effect letter, YY is hex parameter
- */
-function convertEffect(effectType: number, parameter: number): string | null {
-  if (effectType === 0 && parameter === 0) return null; // No effect
-
-  // Effect type 0-35 maps to 0-9, A-Z
-  const effectLetter = effectType < EFFECT_LETTERS.length
-    ? EFFECT_LETTERS[effectType]
-    : '?';
-
-  // Format parameter as 2-digit hex
-  const paramHex = parameter.toString(16).toUpperCase().padStart(2, '0');
-
-  return `${effectLetter}${paramHex}`;
-}
-
-/**
- * Convert a raw pattern cell to our TrackerCell format
+ * Convert a raw pattern cell to our TrackerCell format (libopenmpt legacy)
  */
 function convertCell(rawCell: RawPatternCell): TrackerCell {
   const [noteNum, instrument, _volumeEffect, effectType, volume, parameter] = rawCell;
 
+  // Convert note number to XM format
+  let xmNote = 0;
+  if (noteNum > 0 && noteNum <= 120) {
+    // Note 1 = C-0, Note 13 = C-1, etc.
+    // libopenmpt reports 1 octave higher, so subtract 12
+    xmNote = Math.max(1, noteNum - 12);
+  } else if (noteNum === 254 || noteNum === 255) {
+    xmNote = 97; // Note off
+  }
+
+  // Convert volume to XM format (0x10-0x50 = volume 0-64)
+  const xmVolume = volume > 0 ? Math.min(0x10 + Math.min(volume, 64), 0x50) : 0;
+
   const cell: TrackerCell = {
-    note: convertNote(noteNum),
-    instrument: instrument > 0 ? instrument : null,
-    volume: volume > 0 ? Math.min(volume, 64) : null, // Volume column (0-64)
-    effect: convertEffect(effectType, parameter),
+    note: xmNote,
+    instrument: instrument > 0 ? instrument : 0,
+    volume: xmVolume,
+    effTyp: effectType,
+    eff: parameter,
   };
 
   return cell;
+}
+
+/**
+ * Convert XM note to TrackerCell (native XM parser)
+ * Direct 1:1 mapping - XM format is now our native format
+ */
+function convertXMNote(xmNote: XMNote): TrackerCell {
+  // XM notes are already in the correct format (0 = empty, 1-96 = notes, 97 = note off)
+  const note = xmNote.note;
+
+  // XM effects are already in the correct format (effTyp 0-35, eff 0x00-0xFF)
+  const effTyp = xmNote.effectType;
+  const eff = xmNote.effectParam;
+
+  // XM volume column is already in the correct format (0x00-0xFF)
+  const volume = xmNote.volume;
+
+  // XM instrument numbers are 1-indexed (0 = no instrument, 1-128 = valid)
+  const instrument = xmNote.instrument;
+
+  // Legacy effect2 field - can be used for volume column effects if needed
+  let effect2: string | undefined = undefined;
+  if (volume >= 0x60) {
+    // Volume column effect - optionally store as effect2 string for compatibility
+    const converted = convertVolumeColumnEffect(volume);
+    effect2 = converted !== null ? converted : undefined;
+  }
+
+  return {
+    note,
+    instrument,
+    volume,
+    effTyp,
+    eff,
+    effect2,
+  };
+}
+
+/**
+ * Convert XM volume column to effect string
+ */
+function convertVolumeColumnEffect(volumeByte: number): string | null {
+  const type = volumeByte >> 4;
+  const param = volumeByte & 0x0F;
+
+  switch (type) {
+    case 0x6: // Volume slide down
+      return `A0${param.toString(16).toUpperCase()}`;
+    case 0x7: // Volume slide up
+      return `A${param.toString(16).toUpperCase()}0`;
+    case 0x8: // Fine volume down
+      return `EB${param.toString(16).toUpperCase()}`;
+    case 0x9: // Fine volume up
+      return `EA${param.toString(16).toUpperCase()}`;
+    case 0xB: // Vibrato (depth)
+      return `40${param.toString(16).toUpperCase()}`;
+    case 0xC: // Set panning
+      return `8${(param * 17).toString(16).toUpperCase().padStart(2, '0')}`;
+    case 0xD: // Panning slide left
+      return `P0${param.toString(16).toUpperCase()}`; // Custom panning slide
+    case 0xE: // Panning slide right
+      return `P${param.toString(16).toUpperCase()}0`; // Custom panning slide
+    case 0xF: // Tone portamento
+      const speed = param > 0 ? param * 16 : 0;
+      return `3${speed.toString(16).toUpperCase().padStart(2, '0')}`;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Convert MOD note to TrackerCell (native MOD parser)
+ * MOD instruments are 1-31, mapped directly to XM range (1-31)
+ */
+function convertMODNote(modNote: MODNote): TrackerCell {
+  // Convert Amiga period to XM note number (0 = empty, 1-96 = notes)
+  const note = periodToXMNote(modNote.period);
+
+  // MOD instrument numbers are 1-31 (1-indexed, like XM)
+  // 0 = no instrument
+  const instrument = modNote.instrument;
+
+  // MOD doesn't have volume column
+  const volume = 0;
+
+  // Convert MOD effect to XM effect format
+  const effectStr = convertMODEffect(modNote.effect, modNote.effectParam);
+  const [effTyp, eff] = effectStr ? effectStringToXM(effectStr) : [0, 0];
+
+  return {
+    note,
+    instrument,
+    volume,
+    effTyp,
+    eff,
+    period: modNote.period, // Store raw period for accurate playback
+  };
 }
 
 /**
@@ -102,24 +172,27 @@ export function convertSongToPatterns(song: RawSongData): Pattern[] {
         if (rawRow && rawRow[chIdx]) {
           const cell = convertCell(rawRow[chIdx] as RawPatternCell);
 
-          // Track last used instrument for this channel
-          if (cell.instrument !== null) {
+          // Track last used instrument for this channel (0 = no instrument in XM format)
+          if (cell.instrument !== 0) {
             lastInstrument = cell.instrument;
           }
 
           rows.push(cell);
         } else {
+          // Empty cell (XM format)
           rows.push({
-            note: null,
-            instrument: null,
-            volume: null,
-            effect: null,
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effTyp: 0,
+            eff: 0,
           });
         }
       }
 
       // Find the first instrument used in this channel, or default to 1
-      const defaultInstrument = lastInstrument !== null ? lastInstrument : 1;
+      // Default to instrument 1 if none was used in this channel (0 = no instrument)
+      const defaultInstrument = lastInstrument !== null && lastInstrument !== 0 ? lastInstrument : 1;
 
       channels.push({
         id: `import-ch-${patIdx}-${chIdx}-${Date.now()}`,
@@ -175,6 +248,7 @@ export interface ConversionResult {
   instrumentNames: string[];
   sampleNames: string[];
   channelCount: number;
+  metadata?: ImportMetadata;
 }
 
 /**
@@ -221,5 +295,184 @@ export function convertModule(song: RawSongData): ConversionResult {
     instrumentNames: getInstrumentNames(song),
     sampleNames: getSampleNames(song),
     channelCount: song.channels?.length || 4,
+  };
+}
+
+/**
+ * Convert XM file using native parser
+ */
+export function convertXMModule(
+  patterns: XMNote[][][],
+  channelCount: number,
+  metadata: ImportMetadata,
+  instrumentNames: string[]
+): ConversionResult {
+  const convertedPatterns: Pattern[] = [];
+
+  // Convert each pattern
+  for (let patIdx = 0; patIdx < patterns.length; patIdx++) {
+    const xmPattern = patterns[patIdx];
+    const numRows = xmPattern.length;
+
+    // Create channel data structures
+    const channels: ChannelData[] = [];
+
+    for (let chIdx = 0; chIdx < channelCount; chIdx++) {
+      const rows: TrackerCell[] = [];
+
+      // Track last used instrument
+      let lastInstrument: number | null = null;
+
+      for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
+        const xmNote = xmPattern[rowIdx]?.[chIdx];
+        if (xmNote) {
+          const cell = convertXMNote(xmNote);
+          if (cell.instrument !== null) {
+            lastInstrument = cell.instrument;
+          }
+          rows.push(cell);
+        } else {
+          rows.push({
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effTyp: 0,
+            eff: 0,
+          });
+        }
+      }
+
+      // Default to first instrument (ID 0) if none was used in this channel
+      const defaultInstrument = lastInstrument !== null ? lastInstrument : 0;
+
+      channels.push({
+        id: `xm-ch-${patIdx}-${chIdx}-${Date.now()}`,
+        name: metadata.modData?.channelNames[chIdx] || `Channel ${chIdx + 1}`,
+        rows,
+        muted: false,
+        solo: false,
+        volume: 80,
+        pan: 0,
+        instrumentId: defaultInstrument,
+        color: null,
+        channelMeta: {
+          importedFromMOD: true,
+          originalIndex: chIdx,
+          channelType: 'sample',
+        },
+      });
+    }
+
+    convertedPatterns.push({
+      id: `xm-pat-${patIdx}-${Date.now()}`,
+      name: `Pattern ${patIdx}`,
+      length: numRows,
+      channels,
+      importMetadata: metadata,
+    });
+  }
+
+  // Build pattern order from metadata (NOT sequential!)
+  // XM files use a pattern order table - patterns can repeat
+  // e.g., patternOrderTable = [0, 1, 0, 2] means pattern 0 plays twice
+  const order = metadata.modData?.patternOrderTable ||
+    Array.from({ length: convertedPatterns.length }, (_, i) => i);
+
+  return {
+    patterns: convertedPatterns,
+    order,
+    instrumentNames,
+    sampleNames: instrumentNames,
+    channelCount,
+    metadata,
+  };
+}
+
+/**
+ * Convert MOD file using native parser
+ */
+export function convertMODModule(
+  patterns: MODNote[][][],
+  channelCount: number,
+  metadata: ImportMetadata,
+  instrumentNames: string[]
+): ConversionResult {
+  const convertedPatterns: Pattern[] = [];
+
+  // Convert each pattern
+  for (let patIdx = 0; patIdx < patterns.length; patIdx++) {
+    const modPattern = patterns[patIdx];
+
+    // Create channel data structures
+    const channels: ChannelData[] = [];
+
+    for (let chIdx = 0; chIdx < channelCount; chIdx++) {
+      const rows: TrackerCell[] = [];
+
+      // Track last used instrument
+      let lastInstrument: number | null = null;
+
+      for (let rowIdx = 0; rowIdx < 64; rowIdx++) {
+        const modNote = modPattern[rowIdx]?.[chIdx];
+        if (modNote) {
+          const cell = convertMODNote(modNote);
+          if (cell.instrument !== null) {
+            lastInstrument = cell.instrument;
+          }
+          rows.push(cell);
+        } else {
+          rows.push({
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effTyp: 0,
+            eff: 0,
+          });
+        }
+      }
+
+      // Default to first instrument (ID 0) if none was used in this channel
+      const defaultInstrument = lastInstrument !== null ? lastInstrument : 0;
+
+      channels.push({
+        id: `mod-ch-${patIdx}-${chIdx}-${Date.now()}`,
+        name: metadata.modData?.channelNames[chIdx] || `Channel ${chIdx + 1}`,
+        rows,
+        muted: false,
+        solo: false,
+        volume: 80,
+        pan: 0,
+        instrumentId: defaultInstrument,
+        color: null,
+        channelMeta: {
+          importedFromMOD: true,
+          originalIndex: chIdx,
+          channelType: 'sample',
+        },
+      });
+    }
+
+    convertedPatterns.push({
+      id: `mod-pat-${patIdx}-${Date.now()}`,
+      name: `Pattern ${patIdx}`,
+      length: 64, // MOD patterns are always 64 rows
+      channels,
+      importMetadata: metadata,
+    });
+  }
+
+  // Build pattern order from metadata (NOT sequential!)
+  // MOD files use a pattern order table - patterns can repeat
+  // e.g., patternOrderTable = [0, 1, 0, 2] means pattern 0 plays twice
+  const order = metadata.modData?.patternOrderTable ||
+    Array.from({ length: convertedPatterns.length }, (_, i) => i);
+
+  return {
+    patterns: convertedPatterns,
+    order,
+    instrumentNames,
+    sampleNames: instrumentNames,
+    channelCount,
+    metadata,
   };
 }

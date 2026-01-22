@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useTrackerStore } from '../stores/useTrackerStore';
 import type { TrackerCell } from '@typedefs/tracker';
+import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 
 // Note names for the grid (one octave)
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -37,15 +38,19 @@ const EMPTY_STEP: GridStep = {
 };
 
 /**
- * Parse tracker note string to grid format
+ * Parse tracker note (numeric XM format) to grid format
  */
-function parseTrackerNote(note: string | null, baseOctave: number): { noteIndex: number; octaveShift: number } | null {
-  if (!note || note === '===' || note === '---') {
+function parseTrackerNote(xmNote: number, baseOctave: number): { noteIndex: number; octaveShift: number } | null {
+  // Skip empty (0) and note-off (97)
+  if (!xmNote || xmNote === 0 || xmNote === 97) {
     return null;
   }
 
+  // Convert XM note to string for parsing
+  const noteStr = xmNoteToString(xmNote);
+
   // Parse note like "C-4", "F#3", "D#5"
-  const match = note.match(/^([A-G])(#?)(-?\d)$/);
+  const match = noteStr.match(/^([A-G])(#?)(-?\d)$/);
   if (!match) return null;
 
   const [, noteLetter, sharp, octaveStr] = match;
@@ -67,21 +72,25 @@ function parseTrackerNote(note: string | null, baseOctave: number): { noteIndex:
 }
 
 /**
- * Convert grid step to tracker note string
+ * Convert grid step to tracker note (numeric XM format)
  */
-function gridStepToTrackerNote(step: GridStep, baseOctave: number): string | null {
+function gridStepToTrackerNote(step: GridStep, baseOctave: number): number {
   if (step.noteIndex === null) {
-    return null;
+    return 0; // Empty cell
   }
 
   const noteName = NOTE_NAMES[step.noteIndex];
   const octave = baseOctave + step.octaveShift;
 
-  // Format with separator for natural notes
+  // Format with separator for natural notes, then convert to XM
+  let noteStr: string;
   if (noteName.includes('#')) {
-    return `${noteName}${octave}`;
+    noteStr = `${noteName}${octave}`;
+  } else {
+    noteStr = `${noteName}-${octave}`;
   }
-  return `${noteName}-${octave}`;
+
+  return stringNoteToXM(noteStr);
 }
 
 /**
@@ -120,15 +129,23 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
 /**
  * Convert GridPattern to TrackerCell[]
  */
-export function gridToTrackerCells(pattern: GridPattern): TrackerCell[] {
-  return pattern.steps.map((step) => ({
-    note: gridStepToTrackerNote(step, pattern.baseOctave),
-    instrument: null,
-    volume: step.noteIndex !== null ? step.velocity : null, // Only set volume for notes, not rests
-    effect: null,
-    accent: step.accent,
-    slide: step.slide,
-  }));
+export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 1): TrackerCell[] {
+  return pattern.steps.map((step) => {
+    const note = gridStepToTrackerNote(step, pattern.baseOctave);
+    // Convert velocity to XM volume (0-127 -> 0x10-0x50)
+    const volumeValue = step.noteIndex !== null ? Math.round((step.velocity / 127) * 64) : 0;
+    const volume = step.noteIndex !== null ? 0x10 + volumeValue : 0;
+
+    return {
+      note,
+      instrument: note !== 0 ? instrumentId : 0, // Use instrumentId for notes, 0 for empty cells
+      volume,
+      effTyp: 0,
+      eff: 0,
+      accent: step.accent,
+      slide: step.slide,
+    };
+  });
 }
 
 /**
@@ -166,11 +183,21 @@ export function useGridPattern(channelIndex: number) {
       const note =
         noteIndex !== null
           ? gridStepToTrackerNote({ noteIndex, octaveShift, accent: false, slide: false, tie: false, velocity: 100 }, baseOctave)
-          : null;
+          : 0; // 0 = empty cell
 
-      setCell(channelIndex, stepIndex, { note });
+      // When setting a note, ensure instrument is set if currently 0 (no instrument)
+      const currentCell = cells[stepIndex];
+      const currentInstrument = currentCell?.instrument || 0;
+
+      // If note is being set (not cleared) and current instrument is 0, use channel default or 1
+      if (note !== 0 && currentInstrument === 0) {
+        const instrument = channel?.instrumentId ?? 1;
+        setCell(channelIndex, stepIndex, { note, instrument });
+      } else {
+        setCell(channelIndex, stepIndex, { note });
+      }
     },
-    [channelIndex, setCell, baseOctave, maxSteps]
+    [channelIndex, setCell, baseOctave, maxSteps, cells, channel]
   );
 
   // Toggle accent at step
@@ -219,7 +246,7 @@ export function useGridPattern(channelIndex: number) {
   const clearStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex < 0 || stepIndex >= maxSteps) return;
-      setCell(channelIndex, stepIndex, { note: null, accent: false, slide: false });
+      setCell(channelIndex, stepIndex, { note: 0, accent: false, slide: false }); // 0 = empty cell
     },
     [channelIndex, setCell, maxSteps]
   );
@@ -227,7 +254,7 @@ export function useGridPattern(channelIndex: number) {
   // Clear all steps
   const clearAll = useCallback(() => {
     for (let i = 0; i < maxSteps; i++) {
-      setCell(channelIndex, i, { note: null, accent: false, slide: false });
+      setCell(channelIndex, i, { note: 0, accent: false, slide: false }); // 0 = empty cell
     }
   }, [channelIndex, setCell, maxSteps]);
 

@@ -154,8 +154,10 @@ export async function renderPatternToAudio(
       const defaultInstrumentId = channel.instrumentId ?? 0;
 
       channel.rows.forEach((cell, rowIndex) => {
-        if (!cell.note || cell.note === '...') return;
-        if (cell.note === '===') return; // Note off handled below
+        // Skip empty cells (note 0 = no note in XM format)
+        if (cell.note === 0) return;
+        // Skip note off (note 97 in XM format)
+        if (cell.note === 97) return;
 
         const time = rowIndex * secondsPerRow;
         const instrumentId = cell.instrument ?? defaultInstrumentId;

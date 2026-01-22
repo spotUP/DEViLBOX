@@ -212,14 +212,39 @@ export function periodToNoteIndex(period: number, finetune: number = 0): number 
 }
 
 /**
+ * Snap period to semitone (for glissando control E3x)
+ * PT2.3D behavior: Find first period in table that is <= current period
+ * This is NOT the closest period - it rounds DOWN to the nearest semitone
+ */
+export function snapPeriodToSemitone(period: number, finetune: number = 0): number {
+  if (period <= 0) return period;
+
+  const ftIndex = finetuneToIndex(finetune);
+  const table = PERIOD_TABLE[ftIndex];
+
+  // Find first period that is <= current period (PT2.3D accurate)
+  // Periods are sorted high to low (C-1 = 856, C-3 = 214)
+  for (let i = 0; i < table.length; i++) {
+    if (period >= table[i]) {
+      return table[i];
+    }
+  }
+
+  // If period is lower than all entries, return the lowest (highest note)
+  return table[table.length - 1];
+}
+
+/**
  * Convert period to frequency (Hz)
  * PAL Amiga: freq = 3546895 / (period * 2)
  * NTSC Amiga: freq = 3579545 / (period * 2)
  */
 export function periodToFrequency(period: number, ntsc: boolean = false): number {
   if (period <= 0) return 0;
-  const clock = ntsc ? 3579545 : 3546895;
-  return clock / (period * 2);
+  // Use HALF frequency constant (3546895 = 7093790 / 2)
+  // Do NOT divide period by 2 - the constant is already halved
+  const halfClock = ntsc ? 3579545 : 3546895;
+  return halfClock / period;
 }
 
 /**

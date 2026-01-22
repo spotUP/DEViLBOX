@@ -14,6 +14,7 @@ import { getEffectProcessor } from './EffectCommands';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { useTransportStore } from '@stores/useTransportStore';
 import { notify } from '@stores/useNotificationStore';
+import { xmNoteToToneJS } from '@/lib/xmConversions';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
@@ -27,11 +28,22 @@ interface AutomationData {
 }
 
 /**
- * Convert tracker note format (C-4) to Tone.js format (C4)
+ * Convert tracker note to Tone.js format
+ * Supports both old string format ("C-4") and new XM numeric format (49)
+ *
+ * @param note Note value (string or number)
+ * @returns Tone.js note string ("C4", "D#5", etc.) or null
  */
-function convertNoteFormat(note: string): string {
-  // Handle note off
-  if (note === '===' || note === '...') return note;
+function convertNoteFormat(note: string | number): string | null {
+  // New XM numeric format
+  if (typeof note === 'number') {
+    return xmNoteToToneJS(note);
+  }
+
+  // Old string format (backward compatibility)
+  if (note === '===' || note === '...' || !note) {
+    return null;
+  }
 
   // Remove dash from note format: "C-4" -> "C4", "C#-4" -> "C#4"
   return note.replace('-', '');
@@ -59,6 +71,9 @@ export class PatternScheduler {
   private currentPatternEndTime: number = 0; // When current pattern ends (transport seconds)
   private nextPatternScheduled: boolean = false; // Track if next pattern is pre-scheduled
   private tickPart: Tone.Part | null = null; // Separate Part for tick events
+  // Deferred pattern control: pattern breaks/jumps execute at END of row, not immediately
+  private pendingPatternBreak: { position: number } | null = null;
+  private pendingPositionJump: number | null = null;
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -302,11 +317,28 @@ export class PatternScheduler {
     console.log('[PatternScheduler] Scheduling pattern:', pattern.name, 'at offset', startOffset, 'with', instruments.length, 'instruments');
     instruments.forEach(inst => console.log(`  - Instrument ${inst.id}: ${inst.name} (${inst.synthType})`));
 
+    const engine = getToneEngine();
+
+    // Apply initial BPM/speed from MOD/XM metadata (only on first pattern)
+    if (startOffset === 0 && pattern.importMetadata?.modData) {
+      const modData = pattern.importMetadata.modData;
+
+      console.log(`[PatternScheduler] Applying MOD/XM metadata: speed=${modData.initialSpeed}, BPM=${modData.initialBPM}`);
+
+      // Set initial speed (ticks per row)
+      if (modData.initialSpeed) {
+        this.effectProcessor.ticksPerRow = modData.initialSpeed;
+      }
+
+      // Set initial BPM
+      if (modData.initialBPM) {
+        engine.setBPM(modData.initialBPM);
+      }
+    }
+
     // Set pattern in automation player
     this.automationPlayer.setPattern(pattern);
     this.automationPlayer.setAutomationData(this.automation);
-
-    const engine = getToneEngine();
     const events: Array<{ time: number; audioCallback: (time: number) => void; uiCallback: () => void }> = [];
 
     const secondsPerRow = this.getSecondsPerRow();
@@ -335,19 +367,44 @@ export class PatternScheduler {
           // Process automation for all channels at this row
           this.automationPlayer.processPatternRow(row);
 
+          // TEMPO PRE-SCAN: Process all Fxx effects BEFORE any other effects
+          // This matches BassoonTracker's implementation and ensures tempo changes
+          // affect all channels in the same row consistently
+          pattern.channels.forEach((channel, channelIndex) => {
+            const cell = channel.rows[row];
+            const effects = [cell.effect, cell.effect2].filter(e => e && e !== '...');
+
+            for (const effect of effects) {
+              if (effect && effect.toUpperCase().startsWith('F')) {
+                const param = parseInt(effect.substring(1), 16);
+                if (param === 0) {
+                  console.log('[PatternScheduler] F00: Stop song (not implemented)');
+                } else if (param < 0x20) {
+                  console.log(`[PatternScheduler] Tempo pre-scan: F${effect.substring(1)}: Setting speed to ${param} ticks/row`);
+                  this.effectProcessor.ticksPerRow = param;
+                } else {
+                  console.log(`[PatternScheduler] Tempo pre-scan: F${effect.substring(1)}: Setting BPM to ${param}`);
+                  engine.setBPM(param);
+                }
+              }
+            }
+          });
+
           // First pass: Process notes and effects for all channels
           pattern.channels.forEach((channel, channelIndex) => {
             const cell = channel.rows[row];
-            const instrumentId = cell.instrument !== null ? cell.instrument : channel.instrumentId;
+            // XM-compatible instrument resolution (0 = no instrument, 1-128 = valid)
+            const cellInstrument = cell.instrument ?? 0;
+            const instrumentId = cellInstrument !== 0 ? cellInstrument : (channel.instrumentId ?? 0);
 
-            // Skip empty cells
-            if (!cell.note || cell.note === '...') return;
+            // Skip empty cells (note 0 = no note in XM format)
+            if (cell.note === 0) return;
 
-            // Handle note off
-            if (cell.note === '===') {
+            // Handle note off (note 97 in XM format)
+            if (cell.note === 97) {
               // Release all notes on this channel at precise time
               const activeNotes = this.channelNotes.get(channelIndex);
-              if (activeNotes && instrumentId !== null) {
+              if (activeNotes && instrumentId !== 0) {
                 activeNotes.forEach((activeNote) => {
                   engine.releaseNote(instrumentId, activeNote, transportTime, channelIndex);
                 });
@@ -356,23 +413,37 @@ export class PatternScheduler {
               return;
             }
 
-            // Check if instrument exists
-            if (instrumentId === null) return;
+            // Check if instrument exists (0 = no instrument in XM format)
+            if (instrumentId === 0) return;
 
             const instrument = instruments.find((i) => i.id === instrumentId);
             if (!instrument) return;
 
-            // Calculate velocity from volume
+            // Calculate velocity from volume column
             let velocity = 0.8; // Default velocity
-            if (cell.volume !== null) {
-              velocity = cell.volume / 0x40; // Normalize 0x00-0x40 to 0-1
+            if (cell.volume !== 0 && cell.volume !== null) {
+              // XM volume column: 0x10-0x50 = set volume 0-64
+              if (cell.volume >= 0x10 && cell.volume <= 0x50) {
+                const vol = cell.volume - 0x10; // Extract volume (0-64)
+                velocity = vol / 64; // Normalize to 0-1
+              }
+              // For backward compatibility with old format (direct 0-64 values)
+              else if (cell.volume <= 64) {
+                velocity = cell.volume / 64;
+              }
+              // Other volume column effects (0x60-0xFF) don't set initial velocity
             }
 
             // Calculate note duration (until next note or end of pattern)
             let duration = secondsPerRow;
             for (let nextRow = row + 1; nextRow < pattern.length; nextRow++) {
               const nextCell = pattern.channels[channelIndex].rows[nextRow];
-              if (nextCell.note && nextCell.note !== '...') {
+              // Check for next note (XM: note !== 0, legacy: note && note !== '...')
+              const hasNote = typeof nextCell.note === 'number'
+                ? nextCell.note !== 0
+                : (nextCell.note && nextCell.note !== '...');
+
+              if (hasNote) {
                 duration = (nextRow - row) * secondsPerRow;
                 break;
               }
@@ -381,8 +452,9 @@ export class PatternScheduler {
             // 50ms minimum allows envelope to trigger properly
             duration = Math.max(duration, 0.05);
 
-            // Convert note format from tracker (C-4) to Tone.js (C4)
+            // Convert note to Tone.js format (handles both string and XM numeric format)
             const toneNote = convertNoteFormat(cell.note);
+            if (!toneNote) return; // Invalid note
 
             // Track active notes for this channel
             if (!this.channelNotes.has(channelIndex)) {
@@ -403,8 +475,14 @@ export class PatternScheduler {
             // Process effect commands if present (supports dual effects)
             const effects = [cell.effect, cell.effect2].filter(e => e && e !== '...');
             let preventNoteTrigger = false;
+            let sampleOffset: number | undefined = undefined; // Track 9xx sample offset
             for (const effect of effects) {
               if (effect && effect !== '...') {
+                // Skip Fxx effects - already processed in tempo pre-scan
+                if (effect.toUpperCase().startsWith('F')) {
+                  continue;
+                }
+
                 const effectResult = this.effectProcessor.processRowStart(
                   channelIndex,
                   cell.note,
@@ -418,29 +496,24 @@ export class PatternScheduler {
                   velocity = effectResult.setVolume / 64;
                 }
 
-                if (effectResult.setBPM !== undefined) {
-                  console.log(`[PatternScheduler] Effect Fxx: Setting BPM to ${effectResult.setBPM}`);
-                  engine.setBPM(effectResult.setBPM);
+                // 9xx - Sample offset
+                if (effectResult.sampleOffset !== undefined) {
+                  sampleOffset = effectResult.sampleOffset;
                 }
 
-                if (effectResult.patternBreak && !this.patternBreakScheduled) {
-                  // Dxx - Pattern break: jump to next pattern at specified row
-                  console.log(`[PatternScheduler] Effect Dxx: Pattern break to row ${effectResult.patternBreak.position}`);
-                  this.patternBreakScheduled = true;
-                  if (this.onPatternBreak) {
-                    this.onPatternBreak(effectResult.patternBreak.position);
-                  } else if (this.onPatternEnd) {
-                    // Fallback: just advance to next pattern (row 0)
-                    this.onPatternEnd();
-                  }
+                // Note: setSpeed and setBPM should not be set here anymore
+                // as Fxx effects are handled in pre-scan above
+
+                // Dxx - Pattern break: DEFER execution to end of row (not immediate)
+                if (effectResult.patternBreak && !this.pendingPatternBreak) {
+                  console.log(`[PatternScheduler] Effect Dxx: Deferring pattern break to row ${effectResult.patternBreak.position} until end of row`);
+                  this.pendingPatternBreak = effectResult.patternBreak;
                 }
 
-                if (effectResult.jumpToPosition !== undefined) {
-                  // Bxx - Jump to song position
-                  console.log(`[PatternScheduler] Effect Bxx: Jump to position ${effectResult.jumpToPosition}`);
-                  if (this.onPositionJump) {
-                    this.onPositionJump(effectResult.jumpToPosition);
-                  }
+                // Bxx - Position jump: DEFER execution to end of row (not immediate)
+                if (effectResult.jumpToPosition !== undefined && this.pendingPositionJump === null) {
+                  console.log(`[PatternScheduler] Effect Bxx: Deferring position jump to ${effectResult.jumpToPosition} until end of row`);
+                  this.pendingPositionJump = effectResult.jumpToPosition;
                 }
 
                 const effectCmdNum = parseInt(effect[0], 16);
@@ -475,7 +548,9 @@ export class PatternScheduler {
                 instrument,
                 cell.accent || false,
                 useSlide, // Use slide flag (includes 3xx tone portamento)
-                channelIndex // Per-channel instrument instance
+                channelIndex, // Per-channel instrument instance
+                cell.period, // Pass period for MOD/XM period-based playback
+                sampleOffset // Pass 9xx sample offset if present
               );
 
               // Trigger VU meter for this channel (real-time visual feedback)
@@ -494,6 +569,27 @@ export class PatternScheduler {
           // which uses the correct value mappings for all parameters.
           // Do NOT add duplicate automation handling here - ToneEngine uses different
           // formulas that don't match the UI control ranges.
+
+          // DEFERRED PATTERN CONTROL: Execute pattern breaks/jumps at END of row
+          // This matches BassoonTracker timing - Bxx/Dxx happen after all notes/effects
+          if (this.pendingPositionJump !== null) {
+            console.log(`[PatternScheduler] Executing deferred position jump to ${this.pendingPositionJump}`);
+            if (this.onPositionJump) {
+              this.onPositionJump(this.pendingPositionJump);
+            }
+            this.pendingPositionJump = null;
+          }
+
+          if (this.pendingPatternBreak && !this.patternBreakScheduled) {
+            console.log(`[PatternScheduler] Executing deferred pattern break to row ${this.pendingPatternBreak.position}`);
+            this.patternBreakScheduled = true;
+            if (this.onPatternBreak) {
+              this.onPatternBreak(this.pendingPatternBreak.position);
+            } else if (this.onPatternEnd) {
+              this.onPatternEnd();
+            }
+            this.pendingPatternBreak = null;
+          }
         },
         // UI callback for visual updates (row highlighting)
         uiCallback: () => {
@@ -687,6 +783,8 @@ export class PatternScheduler {
     this.patternBreakScheduled = false;
     this.nextPatternScheduled = false;
     this.currentPatternEndTime = 0;
+    this.pendingPatternBreak = null;
+    this.pendingPositionJump = null;
   }
 
   /**

@@ -51,6 +51,7 @@ export interface ChannelState {
   // Portamento
   portamentoSpeed: number;    // Tone portamento speed
   portamentoTarget: number;   // Target period/frequency
+  glissando: boolean;         // Glissando control (E3x) - snap to semitones
 
   // Tremor (Ixy/Txy)
   tremorOnTime: number;       // Ticks sound is on
@@ -113,6 +114,7 @@ export interface TickResult {
   triggerNote?: boolean;      // (Re)trigger note
   cutNote?: boolean;          // Cut note (set volume to 0)
   keyOff?: boolean;           // Key off (start release)
+  preventNoteTrigger?: boolean; // Prevent note trigger on tick 0 (for note delay)
   delayedNote?: {             // Delayed note trigger
     tick: number;
     note: string;
@@ -192,6 +194,7 @@ export function createDefaultChannelState(): ChannelState {
 
     portamentoSpeed: 0,
     portamentoTarget: 0,
+    glissando: false,
 
     tremorOnTime: 1,
     tremorOffTime: 1,

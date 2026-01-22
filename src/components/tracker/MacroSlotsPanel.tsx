@@ -27,10 +27,11 @@ export const MacroSlotsPanel: React.FC = () => {
 
       <div className="space-y-2">
         {macroSlots.map((slot, index) => {
-          const isEmpty = slot.note === null &&
-                          slot.instrument === null &&
-                          slot.volume === null &&
-                          slot.effect === null &&
+          const isEmpty = slot.note === 0 &&
+                          slot.instrument === 0 &&
+                          slot.volume === 0 &&
+                          slot.effTyp === 0 &&
+                          slot.eff === 0 &&
                           slot.effect2 === null;
 
           return (
@@ -52,8 +53,10 @@ export const MacroSlotsPanel: React.FC = () => {
                 <span className={slot.volume !== null ? 'text-yellow-400' : 'text-neutral-600'}>
                   {formatCellValue(slot.volume)}
                 </span>
-                <span className={slot.effect ? 'text-purple-400' : 'text-neutral-600'}>
-                  {slot.effect || '...'}
+                <span className={slot.effTyp !== 0 || slot.eff !== 0 ? 'text-purple-400' : 'text-neutral-600'}>
+                  {slot.effTyp !== 0 || slot.eff !== 0
+                    ? `${slot.effTyp.toString(16).toUpperCase()}${slot.eff.toString(16).padStart(2, '0').toUpperCase()}`
+                    : '...'}
                 </span>
                 <span className={slot.effect2 ? 'text-pink-400' : 'text-neutral-600'}>
                   {slot.effect2 || '...'}

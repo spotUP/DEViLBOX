@@ -88,8 +88,9 @@ export class GuitarMLEngine {
     }
 
     try {
-      // Load the worklet module
-      await this.audioContext.audioWorklet.addModule('/GuitarML.worklet.js');
+      // Load the worklet module (use BASE_URL for proper path in dev/prod)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      await this.audioContext.audioWorklet.addModule(`${baseUrl}GuitarML.worklet.js`);
 
       // Create worklet node
       this.workletNode = new AudioWorkletNode(this.audioContext, 'guitarml-processor', {

@@ -121,8 +121,9 @@ export class TB303EngineAccurate {
     }
 
     try {
-      // Load the worklet module
-      await this.audioContext.audioWorklet.addModule('/TB303.worklet.js');
+      // Load the worklet module (use BASE_URL for proper path in dev/prod)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      await this.audioContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
 
       // Create worklet node
       this.workletNode = new AudioWorkletNode(this.audioContext, 'tb303-processor', {

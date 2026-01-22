@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { X, Settings, Sliders, Cpu, AlertTriangle } from 'lucide-react';
-import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';

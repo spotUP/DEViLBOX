@@ -125,6 +125,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const rowNumbersRef = useRef<HTMLDivElement>(null); // Row numbers container
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(600);
@@ -199,9 +200,18 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
     const newTriggers: ChannelTrigger[] = pattern.channels.map((channel) => {
       const cell = channel.rows[targetRow];
-      const hasNote = cell?.note && cell.note !== '...' && cell.note !== '===';
+      // XM format: note 0 = empty, 97 = note off, 1-96 = valid notes
+      const hasNote = cell?.note && cell.note !== 0 && cell.note !== 97;
       // Use volume if set, otherwise default to 0.8
-      const volume = cell?.volume != null ? cell.volume / 64 : 0.8;
+      // XM volume: 0x10-0x50 = volume 0-64, need to extract actual volume
+      let volume = 0.8;
+      if (cell?.volume != null && cell.volume > 0) {
+        if (cell.volume >= 0x10 && cell.volume <= 0x50) {
+          volume = (cell.volume - 0x10) / 64;
+        } else {
+          volume = cell.volume / 64;
+        }
+      }
 
       return {
         level: hasNote ? Math.min(1, volume * 1.2) : 0,
@@ -242,11 +252,16 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     }
 
     const contentEl = contentRef.current;
+    const rowNumbersEl = rowNumbersRef.current;
     // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
     const currentHeight = containerRef.current?.clientHeight || containerHeight;
     const halfContainer = currentHeight / 2;
     const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
     contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+    // Also update row numbers to stay in sync
+    if (rowNumbersEl) {
+      rowNumbersEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+    }
   }, [isPlaying, pattern, smoothScrolling, currentRow, containerHeight]);
 
   // Smooth scrolling animation (continuous, doesn't restart on row changes)
@@ -263,6 +278,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     const contentEl = contentRef.current;
     const patternLength = pattern.length;
     const transport = Tone.getTransport();
+
+    const rowNumbersEl = rowNumbersRef.current;
 
     const animate = () => {
       if (!contentEl || !containerRef.current) return;
@@ -288,6 +305,11 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       const halfContainer = currentHeight / 2;
       const offset = halfContainer - (wrappedRowPosition * ROW_HEIGHT) - (ROW_HEIGHT / 2);
       contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+
+      // Also update row numbers to stay in sync during smooth scrolling
+      if (rowNumbersEl) {
+        rowNumbersEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+      }
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
@@ -558,7 +580,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     const cells = generator.generate({
       patternLength: pattern.length,
       instrumentId,
-      note: 'C-4', // Default note
+      note: 49, // XM format: C-4 = (4 * 12) + 0 + 1 = 49
       velocity: 0x40,
     });
 
@@ -571,10 +593,11 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     if (!pattern) return;
     for (let row = 0; row < pattern.length; row++) {
       setCell(channelIndex, row, {
-        note: null,
-        instrument: null,
-        volume: null,
-        effect: null,
+        note: 0,        // XM format: 0 = no note
+        instrument: 0,  // XM format: 0 = no instrument
+        volume: 0,      // XM format: 0x00 = nothing
+        effTyp: 0,      // XM format: 0 = no effect
+        eff: 0,         // XM format: 0x00 = no parameter
       });
     }
   }, [pattern, setCell]);
@@ -594,22 +617,20 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
   const handleTranspose = useCallback((channelIndex: number, semitones: number) => {
     if (!pattern) return;
-    const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
     for (let row = 0; row < pattern.length; row++) {
       const cell = pattern.channels[channelIndex].rows[row];
-      if (cell.note && cell.note !== '===' && cell.note !== '...') {
-        const noteName = cell.note.substring(0, 2);
-        const octave = parseInt(cell.note.substring(2));
-        const noteIndex = noteNames.indexOf(noteName);
-        if (noteIndex === -1) continue;
 
-        const newNoteIndex = (noteIndex + semitones + 120) % 12;
-        const octaveOffset = Math.floor((noteIndex + semitones) / 12);
-        const newOctave = Math.max(0, Math.min(9, octave + octaveOffset));
-        const newNote = `${noteNames[newNoteIndex]}${newOctave}`;
+      // XM format: 0 = no note, 97 = note off, 1-96 = valid notes
+      if (cell.note && cell.note !== 0 && cell.note !== 97) {
+        // XM note format: (octave * 12) + semitone + 1
+        // So to transpose, we just add/subtract semitones
+        let newNote = cell.note + semitones;
 
-        setCell(channelIndex, row, { ...cell, note: newNote as any });
+        // Clamp to valid XM range (1-96)
+        newNote = Math.max(1, Math.min(96, newNote));
+
+        setCell(channelIndex, row, { ...cell, note: newNote });
       }
     }
   }, [pattern, setCell]);
@@ -1113,7 +1134,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
             case 'volume':
               caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP;
               break;
-            case 'effect':
+            case 'effTyp':
+            case 'effParam':
               caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
               break;
             case 'effect2':
@@ -1133,7 +1155,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
             // 2-digit columns: highlight one character at digitIndex
             caretX += cursor.digitIndex * CHAR_WIDTH;
             caretWidth = CHAR_WIDTH;
-          } else if (cursor.columnType === 'effect' || cursor.columnType === 'effect2') {
+          } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam' || cursor.columnType === 'effect2') {
             // 3-character columns (effect): highlight one character at digitIndex
             caretX += cursor.digitIndex * CHAR_WIDTH;
             caretWidth = CHAR_WIDTH;
@@ -1187,7 +1209,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           }}
         />
 
-        {/* Fixed row numbers column - non-scrolling */}
+        {/* Fixed row numbers column - scrolls in sync with pattern */}
         {!isMobile && (
           <div
             className="absolute left-0 overflow-hidden z-5"
@@ -1198,6 +1220,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
             }}
           >
             <div
+              ref={rowNumbersRef}
               className="relative"
               style={{
                 height: containerHeight || 600,

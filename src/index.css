@@ -30,9 +30,9 @@
     --color-success: #10b981;
     --color-warning: #f59e0b;
 
-    /* Tracker row colors */
-    --color-tracker-row-even: #0f0c0c;
-    --color-tracker-row-odd: #131010;
+    /* Tracker row colors - simplified to 2 tones for better readability */
+    --color-tracker-row-even: #0a0808;
+    --color-tracker-row-odd: #0a0808;
     --color-tracker-row-highlight: #181414;
     --color-tracker-row-current: #2a1a1a;
     --color-tracker-row-cursor: #251010;
@@ -1827,9 +1827,9 @@
     background-color: #030808 !important;
   }
 
-  /* Tracker row backgrounds - dark cyan */
-  --color-tracker-row-even: #030808 !important;
-  --color-tracker-row-odd: #041010 !important;
+  /* Tracker row backgrounds - dark cyan - simplified to 2 tones */
+  --color-tracker-row-even: #020606 !important;
+  --color-tracker-row-odd: #020606 !important;
   --color-tracker-row-highlight: #061414 !important;
 
   /* Override synth/automation colors to cyan */

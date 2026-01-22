@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { EffectConfig, EffectType } from '../../types/instrument';
+import type { EffectConfig, AudioEffectType as EffectType } from '../../types/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { Settings, Volume2, X, GripVertical, Power, Sliders, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';

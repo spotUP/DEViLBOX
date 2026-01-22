@@ -51,6 +51,14 @@ interface InstrumentStore {
   // Import
   loadInstruments: (instruments: InstrumentConfig[]) => void;
 
+  // Transformation (MOD/XM import)
+  transformInstrument: (
+    instrumentId: number,
+    targetSynthType: InstrumentConfig['synthType'],
+    mappingStrategy: 'analyze' | 'default'
+  ) => void;
+  revertToSample: (instrumentId: number) => void;
+
   // Reset to initial state
   reset: () => void;
 }
@@ -58,6 +66,7 @@ interface InstrumentStore {
 const createDefaultInstrument = (id: number): InstrumentConfig => ({
   id,
   name: `TB303 ${String(id).padStart(2, '0')}`,
+  type: 'synth', // DEViLBOX synth instrument
   synthType: 'TB303',
   tb303: { ...DEFAULT_TB303 },
   oscillator: { ...DEFAULT_OSCILLATOR },
@@ -68,22 +77,25 @@ const createDefaultInstrument = (id: number): InstrumentConfig => ({
   pan: 0,
 });
 
-// Find next available instrument ID (0-255)
+/**
+ * Find next available instrument ID (1-128, XM-compatible range)
+ * IDs are 1-indexed: 1-128 for valid instruments, 0 = no instrument
+ */
 const findNextId = (existingIds: number[]): number => {
-  for (let id = 0; id < 256; id++) {
+  for (let id = 1; id <= 128; id++) {
     if (!existingIds.includes(id)) {
       return id;
     }
   }
-  console.warn('Maximum number of instruments reached (256)');
-  return 0;
+  console.warn('Maximum number of instruments reached (128)');
+  return 1; // Return 1 as fallback (not 0, which means "no instrument")
 };
 
 export const useInstrumentStore = create<InstrumentStore>()(
   immer((set, get) => ({
-    // Initial state - Start with TB-303 Classic preset
-    instruments: [{ ...TB303_PRESETS[0], id: 0 } as InstrumentConfig],
-    currentInstrumentId: 0,
+    // Initial state - Start with TB-303 Classic preset (ID 1, XM-compatible)
+    instruments: [{ ...TB303_PRESETS[0], id: 1, type: 'synth' } as InstrumentConfig],
+    currentInstrumentId: 1,
     get currentInstrument() {
       const state = get();
       return state.instruments.find((inst) => inst.id === state.currentInstrumentId) || null;
@@ -434,6 +446,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             author: 'User',
             config: {
               name: instrument.name,
+              type: instrument.type,
               synthType: instrument.synthType,
               oscillator: instrument.oscillator,
               envelope: instrument.envelope,
@@ -461,9 +474,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Migrate old effects without category field (backward compatibility)
+      // Migrate old instruments (backward compatibility)
       const migratedInstruments = newInstruments.map(inst => ({
         ...inst,
+        // Add type field if missing (backward compatibility)
+        // Sampler = sample, everything else = synth
+        type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
+        // Migrate old effects without category field
         effects: inst.effects?.map(effect => ({
           ...effect,
           // Add category if missing - default to 'tonejs' for old saved songs
@@ -479,6 +496,234 @@ export const useInstrumentStore = create<InstrumentStore>()(
       console.log('[InstrumentStore] Loaded', migratedInstruments.length, 'instruments');
     },
 
+    // Transform sample instrument to synth (MOD/XM import feature)
+    transformInstrument: (instrumentId, targetSynthType, mappingStrategy) => {
+      const instrument = get().instruments.find((inst) => inst.id === instrumentId);
+
+      if (!instrument) {
+        console.error('[InstrumentStore] Instrument not found:', instrumentId);
+        return;
+      }
+
+      if (instrument.synthType !== 'Sampler') {
+        console.error('[InstrumentStore] Can only transform Sampler instruments');
+        return;
+      }
+
+      // Preserve original sample configuration
+      const preservedSample = instrument.sample
+        ? {
+            ...instrument.sample,
+            envelope: instrument.envelope || { ...DEFAULT_ENVELOPE },
+          }
+        : undefined;
+
+      if (!preservedSample) {
+        console.error('[InstrumentStore] No sample data to preserve');
+        return;
+      }
+
+      // Get suggested config based on strategy
+      let synthConfig: any;
+
+      if (mappingStrategy === 'analyze') {
+        // Import analysis functions (dynamic import to avoid circular dependencies)
+        import('@/lib/import/InstrumentConverter').then(({ analyzeSample, suggestSynthConfig }) => {
+          // Analyze sample if we have the data
+          const analysis = analyzeSample(
+            {
+              id: instrumentId,
+              name: instrument.name,
+              pcmData: preservedSample.audioBuffer || new ArrayBuffer(0),
+              loopStart: preservedSample.loopStart,
+              loopLength: preservedSample.loopEnd - preservedSample.loopStart,
+              loopType: preservedSample.loop ? 'forward' : 'none',
+              volume: 64,
+              finetune: 0,
+              relativeNote: 0,
+              panning: 128,
+              bitDepth: 16,
+              sampleRate: 44100,
+              length: 1000,
+            },
+            instrument.metadata?.originalEnvelope
+          );
+
+          synthConfig = suggestSynthConfig(targetSynthType, analysis);
+
+          // Update the instrument with analyzed config
+          performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample, instrument);
+        });
+      } else {
+        // Use default config
+        synthConfig = getDefaultConfigForSynthType(targetSynthType);
+        performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample, instrument);
+      }
+
+      function performTransformation(
+        id: number,
+        synthType: InstrumentConfig['synthType'],
+        config: any,
+        preserved: any,
+        _originalInst: InstrumentConfig
+      ) {
+        set((state) => {
+          const inst = state.instruments.find((i) => i.id === id);
+          if (!inst) return;
+
+          // Clear synth-specific configs
+          delete inst.tb303;
+          delete inst.polySynth;
+          delete inst.wavetable;
+          delete inst.granular;
+          delete inst.superSaw;
+          delete inst.organ;
+          delete inst.drumMachine;
+          delete inst.chipSynth;
+          delete inst.pwmSynth;
+          delete inst.stringMachine;
+          delete inst.formantSynth;
+          delete inst.sample;
+
+          // Set new synth type and config
+          inst.type = 'synth'; // Transformed to synth
+          inst.synthType = synthType;
+
+          // Assign synth-specific config
+          const synthKey = synthType.toLowerCase();
+          (inst as any)[synthKey] = config;
+
+          // Update metadata
+          if (!inst.metadata) {
+            inst.metadata = {};
+          }
+
+          inst.metadata.preservedSample = preserved;
+
+          if (!inst.metadata.transformHistory) {
+            inst.metadata.transformHistory = [];
+          }
+
+          inst.metadata.transformHistory.push({
+            timestamp: new Date().toISOString(),
+            fromType: 'Sampler',
+            toType: synthType,
+          });
+        });
+
+        // Invalidate instrument in audio engine
+        try {
+          const engine = getToneEngine();
+          engine.invalidateInstrument(id);
+          console.log(
+            `[InstrumentStore] Transformed instrument ${id} from Sampler to ${synthType}`
+          );
+        } catch (error) {
+          console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+        }
+      }
+
+      function getDefaultConfigForSynthType(synthType: InstrumentConfig['synthType']): any {
+        switch (synthType) {
+          case 'TB303':
+            return { ...DEFAULT_TB303 };
+          case 'PolySynth':
+            return {
+              voiceCount: 8,
+              voiceType: 'Synth' as const,
+              stealMode: 'oldest' as const,
+              oscillator: { ...DEFAULT_OSCILLATOR },
+              envelope: { ...DEFAULT_ENVELOPE },
+              portamento: 0,
+            };
+          case 'Wavetable':
+            return {
+              wavetableId: 'basic-saw',
+              morphPosition: 0,
+              morphModSource: 'none' as const,
+              morphModAmount: 50,
+              morphLFORate: 2,
+              unison: { voices: 1, detune: 10, stereoSpread: 50 },
+              envelope: { ...DEFAULT_ENVELOPE },
+              filter: { ...DEFAULT_FILTER, cutoff: 8000, resonance: 20, envelopeAmount: 0 },
+              filterEnvelope: { ...DEFAULT_ENVELOPE },
+            };
+          case 'ChipSynth':
+            return {
+              channel: 'pulse1' as const,
+              pulse: { duty: 50 as const },
+              bitDepth: 8,
+              sampleRate: 22050,
+              envelope: { ...DEFAULT_ENVELOPE, attack: 5, decay: 300 },
+              vibrato: { speed: 6, depth: 0, delay: 200 },
+              arpeggio: { enabled: false, speed: 15, pattern: [0, 4, 7] },
+            };
+          default:
+            return { oscillator: { ...DEFAULT_OSCILLATOR }, envelope: { ...DEFAULT_ENVELOPE } };
+        }
+      }
+    },
+
+    // Revert synth instrument back to original sample
+    revertToSample: (instrumentId) => {
+      const instrument = get().instruments.find((inst) => inst.id === instrumentId);
+
+      if (!instrument) {
+        console.error('[InstrumentStore] Instrument not found:', instrumentId);
+        return;
+      }
+
+      const preservedSample = instrument.metadata?.preservedSample;
+
+      if (!preservedSample) {
+        console.error('[InstrumentStore] No preserved sample data to revert to');
+        return;
+      }
+
+      set((state) => {
+        const inst = state.instruments.find((i) => i.id === instrumentId);
+        if (!inst) return;
+
+        // Clear all synth-specific configs
+        delete inst.tb303;
+        delete inst.polySynth;
+        delete inst.wavetable;
+        delete inst.granular;
+        delete inst.superSaw;
+        delete inst.organ;
+        delete inst.drumMachine;
+        delete inst.chipSynth;
+        delete inst.pwmSynth;
+        delete inst.stringMachine;
+        delete inst.formantSynth;
+
+        // Restore Sampler config
+        inst.type = 'sample'; // Reverted to sample
+        inst.synthType = 'Sampler';
+        inst.sample = {
+          audioBuffer: preservedSample.audioBuffer,
+          url: preservedSample.url,
+          baseNote: preservedSample.baseNote,
+          detune: preservedSample.detune,
+          loop: preservedSample.loop,
+          loopStart: preservedSample.loopStart,
+          loopEnd: preservedSample.loopEnd,
+          reverse: false,
+          playbackRate: 1.0,
+        };
+        inst.envelope = preservedSample.envelope;
+      });
+
+      // Invalidate instrument in audio engine
+      try {
+        const engine = getToneEngine();
+        engine.invalidateInstrument(instrumentId);
+        console.log(`[InstrumentStore] Reverted instrument ${instrumentId} to original sample`);
+      } catch (error) {
+        console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+      }
+    },
+
     // Reset to initial state (for new project/tab)
     reset: () => {
       // First invalidate all existing instruments in the engine
@@ -492,8 +737,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
       set((state) => {
-        state.instruments = [{ ...TB303_PRESETS[0], id: 0 } as InstrumentConfig];
-        state.currentInstrumentId = 0;
+        state.instruments = [{ ...TB303_PRESETS[0], id: 1, type: 'synth' } as InstrumentConfig];
+        state.currentInstrumentId = 1;
         state.presets = [];
       });
 

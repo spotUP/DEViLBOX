@@ -16,6 +16,7 @@ import {
   periodToFrequency,
   noteStringToPeriod,
   getArpeggioPeriod,
+  snapPeriodToSemitone,
 } from './PeriodTables';
 
 // Effect constants
@@ -132,7 +133,16 @@ export class MODHandler extends BaseFormatHandler {
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
       // In ProTracker, instrument change resets volume
-      state.volume = 64;
+      // UNLESS it's a tone portamento (3xx) which preserves volume
+      const parsed = this.parseEffect(effect);
+      const isTonePorta = parsed && (
+        parsed.command === MOD_EFFECTS.TONE_PORTA ||
+        parsed.command === MOD_EFFECTS.TONE_PORTA_VOL_SLIDE
+      );
+      if (!isTonePorta) {
+        state.volume = 64;
+        result.setVolume = state.volume;
+      }
     }
 
     // Handle note
@@ -175,7 +185,7 @@ export class MODHandler extends BaseFormatHandler {
 
     // Process effect command
     if (effect) {
-      const effectResult = this.processEffectTick0(channel, effect, state, note);
+      const effectResult = this.processEffectTick0(channel, effect, state, note, instrument);
       Object.assign(result, effectResult);
     }
 
@@ -189,7 +199,8 @@ export class MODHandler extends BaseFormatHandler {
     channel: number,
     effect: string,
     state: ChannelState,
-    note: string | null
+    note: string | null,
+    _instrument: number | null // Kept for signature consistency, unused after 9xx simplification
   ): TickResult {
     const result: TickResult = {};
     const parsed = this.parseEffect(effect);
@@ -221,6 +232,7 @@ export class MODHandler extends BaseFormatHandler {
       // 3xx - Tone portamento
       case MOD_EFFECTS.TONE_PORTA:
         if (param > 0) state.lastTonePortaSpeed = param;
+        // Note: Volume reset for instrument change with 3xx is handled in processRowStart()
         this.activeEffects.set(channel, { type: 'tonePorta', param: state.lastTonePortaSpeed, x, y });
         break;
 
@@ -258,11 +270,27 @@ export class MODHandler extends BaseFormatHandler {
         result.setPan = param;
         break;
 
-      // 9xx - Sample offset
-      case MOD_EFFECTS.SAMPLE_OFFSET:
-        if (param > 0) state.lastSampleOffset = param;
-        result.sampleOffset = state.lastSampleOffset * 256;
+      // 9xx - Sample offset (PT2.3D accurate implementation)
+      case MOD_EFFECTS.SAMPLE_OFFSET: {
+        /* PT2.3D behavior (from pt2-clone source):
+         * - If param > 0, store it for future use
+         * - If param = 0, use previously stored value
+         * - Offset = stored_param * 256 bytes (128 words * 2 bytes/word)
+         * - No doubling bugs, no PT1/2 quirks
+         */
+
+        // Store param if > 0, otherwise use cached value
+        if (param > 0) {
+          state.lastSampleOffset = param;
+        }
+
+        // Calculate offset: param * 256 bytes
+        // PT2 does: (param << 7) for words, then << 1 for bytes = 256
+        const offsetValue = state.lastSampleOffset << 8;
+
+        result.sampleOffset = offsetValue;
         break;
+      }
 
       // Axy - Volume slide
       case MOD_EFFECTS.VOLUME_SLIDE:
@@ -356,8 +384,9 @@ export class MODHandler extends BaseFormatHandler {
 
       // E3x - Glissando control
       case MOD_E_COMMANDS.GLISSANDO:
-        // y=1: Round tone portamento to nearest semitone
-        // Not fully implemented - would need to modify tone porta behavior
+        // y=0: Off (smooth portamento)
+        // y=1: On (round tone portamento to nearest semitone)
+        state.glissando = (y !== 0);
         break;
 
       // E4x - Vibrato waveform
@@ -437,6 +466,7 @@ export class MODHandler extends BaseFormatHandler {
           state.noteDelayTick = y;
           this.activeEffects.set(channel, { type: 'noteDelay', param: y, x: 0, y });
           // Note will be triggered later, so prevent immediate trigger
+          result.preventNoteTrigger = true;
         }
         break;
 
@@ -494,12 +524,12 @@ export class MODHandler extends BaseFormatHandler {
 
       case 'tonePortaVolSlide':
         this.processTonePorta(state, state.lastTonePortaSpeed, result);
-        this.processVolumeSlide(state, x, y, result);
+        this.processVolumeSlide(state, x, y, result, tick);
         break;
 
       case 'vibratoVolSlide':
         this.processVibrato(state, result);
-        this.processVolumeSlide(state, x, y, result);
+        this.processVolumeSlide(state, x, y, result, tick);
         break;
 
       case 'tremolo':
@@ -507,7 +537,7 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case 'volumeSlide':
-        this.processVolumeSlide(state, x, y, result);
+        this.processVolumeSlide(state, x, y, result, tick);
         break;
 
       case 'retrig':
@@ -603,6 +633,7 @@ export class MODHandler extends BaseFormatHandler {
   private processTonePorta(state: ChannelState, speed: number, result: TickResult): void {
     if (state.period <= 0 || state.portamentoTarget <= 0) return;
 
+    // Slide period towards target
     if (state.period < state.portamentoTarget) {
       state.period += speed;
       if (state.period > state.portamentoTarget) {
@@ -615,8 +646,14 @@ export class MODHandler extends BaseFormatHandler {
       }
     }
 
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
+    // Apply glissando (E3x) - snap to nearest semitone
+    let finalPeriod = state.period;
+    if (state.glissando) {
+      finalPeriod = snapPeriodToSemitone(state.period, state.finetune);
+    }
+
+    state.frequency = periodToFrequency(finalPeriod);
+    result.setPeriod = finalPeriod;
     result.setFrequency = state.frequency;
   }
 
@@ -629,47 +666,62 @@ export class MODHandler extends BaseFormatHandler {
     // Get waveform value (-1 to 1)
     const waveValue = this.getWaveformValue(state.vibratoWaveform, state.vibratoPos);
 
-    // Calculate period delta
-    // In ProTracker, depth is in 1/16 of a period
-    const delta = Math.floor(waveValue * state.vibratoDepth);
+    // PT2.3D vibrato scaling: (waveValue * depth) >> 7
+    // Since waveValue is normalized (-1 to 1), we multiply by depth * 2
+    // to match PT2's (255 * depth / 128) ≈ depth * 2 formula
+    const delta = Math.floor(waveValue * state.vibratoDepth * 2);
 
     // Apply to period (don't modify base period, just output)
     const newPeriod = state.period + delta;
     result.setPeriod = newPeriod;
     result.setFrequency = periodToFrequency(newPeriod);
 
-    // Advance vibrato position
-    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
+    // Advance vibrato position: PT2 uses (speed >> 2) & 0x3C
+    // With speed stored as nibble (0-15), this becomes speed * 4
+    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed * 4) & 0x3F;
   }
 
   /**
    * Process tremolo (7xy)
-   * Note: In original ProTracker, tremolo uses vibratoPos (bug)
+   * Note: In original ProTracker, tremolo uses vibratoPos (bug in ramp waveform)
    */
   private processTremolo(state: ChannelState, result: TickResult): void {
     // Get waveform value
     const pos = this.emulatePTBugs ? state.vibratoPos : state.tremoloPos;
     const waveValue = this.getWaveformValue(state.tremoloWaveform, pos);
 
-    // Calculate volume delta (depth is in volume units)
-    const delta = Math.floor(waveValue * state.tremoloDepth);
+    // PT2.3D tremolo scaling: (waveValue * depth) >> 6
+    // Since waveValue is normalized (-1 to 1), we multiply by depth * 4
+    // to match PT2's (255 * depth / 64) ≈ depth * 4 formula
+    const delta = Math.floor(waveValue * state.tremoloDepth * 4);
 
     // Apply to volume
     const newVolume = this.clampVolume(state.volume + delta);
     result.setVolume = newVolume;
 
-    // Advance tremolo position
+    // Advance tremolo position: PT2 uses (speed >> 2) & 0x3C
+    // With speed stored as nibble (0-15), this becomes speed * 4
     if (this.emulatePTBugs) {
-      state.vibratoPos = (state.vibratoPos + state.tremoloSpeed) & 0x3F;
+      state.vibratoPos = (state.vibratoPos + state.tremoloSpeed * 4) & 0x3F;
     } else {
-      state.tremoloPos = (state.tremoloPos + state.tremoloSpeed) & 0x3F;
+      state.tremoloPos = (state.tremoloPos + state.tremoloSpeed * 4) & 0x3F;
     }
   }
 
   /**
-   * Process volume slide (Axy)
+   * Process volume slide (Axy, 5xy, 6xy)
+   * Note: Volume slides should NOT happen on tick 0
    */
-  private processVolumeSlide(state: ChannelState, up: number, down: number, result: TickResult): void {
+  private processVolumeSlide(
+    state: ChannelState,
+    up: number,
+    down: number,
+    result: TickResult,
+    tick?: number
+  ): void {
+    // Volume slides don't happen on tick 0 in ProTracker
+    if (tick === 0) return;
+
     if (up > 0) {
       state.volume = this.clampVolume(state.volume + up);
     } else if (down > 0) {

@@ -1,26 +1,94 @@
 /**
  * Tracker Types - Pattern Editor Data Structures
+ * Aligned with FastTracker II / XM format with DEViLBOX extensions
  */
 
-export type NoteValue = string | null; // "C-4", "D#5", "===", null
-export type InstrumentValue = number | null; // 0x00-0xFF
-export type VolumeValue = number | null; // 0x00-0x40
-export type EffectValue = string | null; // "A0F", "486", null
+/**
+ * XM-Compatible Note Value
+ * 0 = no note (empty)
+ * 1-96 = notes (1 = C-0, 13 = C-1, 25 = C-2, ..., 97 = C-8)
+ * 97 = note off (key release)
+ *
+ * Note encoding: (octave * 12) + semitone + 1
+ * Example: C-4 = (4 * 12) + 0 + 1 = 49
+ */
+export type NoteValue = number; // 0-97 (XM format)
 
+/**
+ * XM-Compatible Instrument Value
+ * 0 = no instrument
+ * 1-128 = instrument number (XM range)
+ */
+export type InstrumentValue = number; // 0-128 (XM format)
+
+/**
+ * XM-Compatible Volume Column Value
+ * 0x00-0x0F = nothing
+ * 0x10-0x50 = set volume 0-64
+ * 0x60-0x6F = volume slide down
+ * 0x70-0x7F = volume slide up
+ * 0x80-0x8F = fine volume down
+ * 0x90-0x9F = fine volume up
+ * 0xA0-0xAF = set vibrato speed
+ * 0xB0-0xBF = vibrato
+ * 0xC0-0xCF = set panning
+ * 0xD0-0xDF = pan slide left
+ * 0xE0-0xEF = pan slide right
+ * 0xF0-0xFF = tone portamento
+ */
+export type VolumeValue = number; // 0x00-0xFF (XM volume column)
+
+/**
+ * XM-Compatible Effect Type
+ * 0-35 = FastTracker II effect types
+ */
+export type EffectType = number; // 0-35 (XM effect type)
+
+/**
+ * XM-Compatible Effect Parameter
+ * 0x00-0xFF = effect parameter value
+ */
+export type EffectParam = number; // 0x00-0xFF
+
+/**
+ * TrackerCell - Core pattern data cell
+ *
+ * XM-Compatible Core (5 bytes):
+ * - note: Note value (0-97)
+ * - instrument: Instrument number (0-128)
+ * - volume: Volume column (0x00-0xFF)
+ * - effTyp: Effect type (0-35)
+ * - eff: Effect parameter (0x00-0xFF)
+ *
+ * DEViLBOX Extensions:
+ * - effect2: Second effect (string format for now)
+ * - accent/slide: TB-303 controls
+ * - cutoff/resonance/envMod/pan: Automation lanes
+ * - period: Amiga period for accurate MOD playback
+ */
 export interface TrackerCell {
-  note: NoteValue;
-  instrument: InstrumentValue;
-  volume: VolumeValue;
-  effect: EffectValue; // Effect 1 (backward compatibility)
-  effect2?: EffectValue; // Effect 2 (optional for now)
+  // XM-compatible core (5 bytes)
+  note: NoteValue;              // 0 = empty, 1-96 = notes, 97 = note off
+  instrument: InstrumentValue;  // 0 = no instrument, 1-128 = instrument
+  volume: VolumeValue;          // 0x00-0xFF (volume column effects)
+  effTyp: EffectType;           // 0-35 (effect type)
+  eff: EffectParam;             // 0x00-0xFF (effect parameter)
+
+  // DEViLBOX extensions (stored in extended format)
+  effect2?: string;             // Second effect (legacy string format)
+
   // TB-303 specific columns
   accent?: boolean;
   slide?: boolean;
+
   // Automation columns (optional)
-  cutoff?: number; // 0x00-0xFF
-  resonance?: number; // 0x00-0xFF
-  envMod?: number; // 0x00-0xFF
-  pan?: number; // 0x00-0xFF
+  cutoff?: number;              // 0x00-0xFF
+  resonance?: number;           // 0x00-0xFF
+  envMod?: number;              // 0x00-0xFF
+  pan?: number;                 // 0x00-0xFF
+
+  // MOD/XM period (for accurate Amiga playback)
+  period?: number;              // Amiga period (113-856 for MOD)
 }
 
 export interface TrackerRow {
@@ -37,6 +105,12 @@ export interface ChannelData {
   pan: number; // -100 to 100
   instrumentId: number | null;
   color: string | null; // Channel background color (CSS color value)
+  channelMeta?: {
+    importedFromMOD: boolean;
+    originalIndex?: number; // Original position in MOD/XM
+    addedAfterImport?: boolean;
+    channelType?: 'sample' | 'synth' | 'hybrid';
+  };
 }
 
 // Channel color palette - muted colors that work on dark backgrounds
@@ -60,6 +134,106 @@ export interface Pattern {
   length: number; // 16, 32, 64, 128
   channels: ChannelData[];
   bpm?: number; // Optional override
+  importMetadata?: ImportMetadata; // MOD/XM import metadata
+}
+
+/**
+ * Envelope point structure for XM/IT envelopes
+ * Point-based envelope with sustain/loop support
+ */
+export interface EnvelopePoint {
+  tick: number; // X position (tick count)
+  value: number; // Y position (0-64 for volume, 0-64 for pan where 32=center)
+}
+
+export interface EnvelopePoints {
+  enabled: boolean;
+  points: EnvelopePoint[];
+  sustainPoint: number | null; // Index of sustain point
+  loopStartPoint: number | null; // Index of loop start
+  loopEndPoint: number | null; // Index of loop end
+}
+
+export interface AutoVibrato {
+  type: 'sine' | 'square' | 'rampDown' | 'rampUp';
+  sweep: number; // 0-255 - Speed of vibrato ramp-up
+  depth: number; // 0-15 - Vibrato depth
+  rate: number; // 0-63 - Vibrato rate
+}
+
+export interface ParsedSample {
+  id: number;
+  name: string;
+  pcmData: ArrayBuffer;
+  loopStart: number; // Sample frame index
+  loopLength: number; // Loop length in frames
+  loopType: 'none' | 'forward' | 'pingpong';
+  volume: number; // 0-64
+  finetune: number; // -128 to +127
+  relativeNote: number; // -48 to +48 semitones
+  panning: number; // 0-255 (128=center)
+  bitDepth: 8 | 16;
+  sampleRate: number;
+  length: number; // Total sample length in frames
+}
+
+export interface ParsedInstrument {
+  id: number;
+  name: string;
+  samples: ParsedSample[];
+  volumeEnvelope?: EnvelopePoints;
+  panningEnvelope?: EnvelopePoints;
+  autoVibrato?: AutoVibrato;
+  fadeout: number; // Volume fadeout speed (0-4095)
+  volumeType: 'envelope' | 'none';
+  panningType: 'envelope' | 'none';
+}
+
+/**
+ * Import metadata for MOD/XM files
+ * Preserves original module data for editing and re-export
+ */
+export interface ImportMetadata {
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M';
+  sourceFile: string;
+  importedAt: string;
+  originalChannelCount: number;
+  originalPatternCount: number;
+  originalInstrumentCount: number;
+
+  // MOD/XM specific metadata
+  modData?: {
+    moduleType: string; // 'M.K.', 'FLT4', '6CHN', '8CHN', etc.
+    initialSpeed: number; // Ticks per row
+    initialBPM: number; // Beats per minute
+    amigaPeriods: boolean; // true=Amiga frequency table, false=Linear frequency
+    channelNames: string[];
+    songMessage?: string; // Module message/comment
+    songLength: number; // Number of patterns in order list
+    restartPosition: number; // Pattern to restart at on loop
+    patternOrderTable: number[]; // Pattern playback order (0-255 entries)
+  };
+
+  // Preserve original samples
+  originalSamples?: {
+    [instrumentId: number]: ParsedSample;
+  };
+
+  // Preserve envelope data
+  envelopes?: {
+    [instrumentId: number]: {
+      volumeEnvelope?: EnvelopePoints;
+      panningEnvelope?: EnvelopePoints;
+      autoVibrato?: AutoVibrato;
+      fadeout: number;
+    };
+  };
+
+  // XM-specific data
+  xmData?: {
+    frequencyType: 'amiga' | 'linear';
+    defaultPanning: number[]; // Per-channel panning (0-255)
+  };
 }
 
 export interface PatternSequence {
@@ -70,7 +244,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effect' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
+  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 
@@ -129,17 +303,17 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
 };
 
 export const EMPTY_CELL: TrackerCell = {
-  note: null,
-  instrument: null,
-  volume: null,
-  effect: null,
-  effect2: null,
+  note: 0,        // 0 = no note
+  instrument: 0,  // 0 = no instrument
+  volume: 0,      // 0x00 = nothing
+  effTyp: 0,      // 0 = no effect (arpeggio with 00 param = no effect)
+  eff: 0,         // 0x00 = no parameter
 };
 
 export const NOTE_OFF: TrackerCell = {
-  note: '===',
-  instrument: null,
-  volume: null,
-  effect: null,
-  effect2: null,
+  note: 97,       // 97 = note off (key release)
+  instrument: 0,  // 0 = no instrument
+  volume: 0,      // 0x00 = nothing
+  effTyp: 0,      // 0 = no effect
+  eff: 0,         // 0x00 = no parameter
 };

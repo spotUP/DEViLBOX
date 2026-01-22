@@ -49,28 +49,45 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [showKeyboard, setShowKeyboard] = useState(initialShowKeyboard);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
-  // Get synth info for current instrument
-  const synthInfo = currentInstrument ? getSynthInfo(currentInstrument.synthType) : null;
+  // Get synth info for current instrument (with null safety)
+  const synthInfo = currentInstrument && currentInstrument.synthType
+    ? getSynthInfo(currentInstrument.synthType)
+    : null;
 
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
+  // Get icon component dynamically (with full error handling)
+  const getIcon = (iconName: string | undefined) => {
+    if (!iconName) return LucideIcons.Music2;
+    try {
+      const Icon = (LucideIcons as any)[iconName];
+      return Icon || LucideIcons.Music2;
+    } catch (error) {
+      console.warn('[UnifiedInstrumentEditor] Failed to load icon:', iconName, error);
+      return LucideIcons.Music2;
+    }
   };
 
-  // Tab definitions
-  const tabs: { id: EditorTab; label: string; icon: React.ElementType; show: boolean }[] = [
-    { id: 'quick', label: 'Quick', icon: Zap, show: true },
-    { id: 'sound', label: 'Sound', icon: Settings, show: true },
+  // Tab definitions - ensure all icons are valid React components
+  const rawTabs = [
+    { id: 'quick' as const, label: 'Quick', icon: Zap ?? Music2, show: true },
+    { id: 'sound' as const, label: 'Sound', icon: Settings ?? Music2, show: true },
     {
-      id: 'sample',
+      id: 'sample' as const,
       label: 'Sample',
-      icon: FileAudio,
+      icon: FileAudio ?? Music2,
       show: currentInstrument?.synthType === 'Sampler' || currentInstrument?.synthType === 'Player',
     },
-    { id: 'effects', label: 'Effects', icon: Sparkles, show: true },
-    { id: 'browse', label: 'Browse', icon: Music2, show: true },
+    { id: 'effects' as const, label: 'Effects', icon: Sparkles ?? Music2, show: true },
+    { id: 'browse' as const, label: 'Browse', icon: Music2, show: true },
   ];
+
+  // Filter out any invalid tabs with debugging
+  const tabs = rawTabs.filter((tab, index) => {
+    const isValid = Boolean(tab && typeof tab === 'object' && tab.icon && typeof tab.icon === 'function');
+    if (!isValid) {
+      console.error('[UnifiedInstrumentEditor] Invalid tab at index', index, ':', tab);
+    }
+    return isValid;
+  }) as { id: EditorTab; label: string; icon: React.ElementType; show: boolean }[];
 
   // Handle tab navigation from QuickView
   const handleGoToSound = useCallback(() => setActiveTab('sound'), []);
@@ -105,7 +122,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     );
   }
 
-  const IconComponent = synthInfo ? getIcon(synthInfo.icon) : Music2;
+  const IconComponent = synthInfo && synthInfo.icon ? getIcon(synthInfo.icon) : Music2;
 
   return (
     <div className={`flex h-full bg-ft2-bg ${mode === 'modal' ? '' : 'rounded-lg overflow-hidden'}`}>
@@ -154,8 +171,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
         {/* Tab Bar */}
         <div className="flex items-center gap-1 px-4 py-2 border-b border-ft2-border bg-ft2-bg">
-          {tabs
-            .filter((tab) => tab.show)
+          {Array.isArray(tabs) && tabs.length > 0 && tabs
+            .filter((tab) => {
+              // Comprehensive validation: tab exists, has icon, icon is callable, and tab should show
+              return Boolean(
+                tab &&
+                typeof tab === 'object' &&
+                tab.icon &&
+                typeof tab.icon === 'function' &&
+                tab.id &&
+                tab.label &&
+                tab.show
+              );
+            })
             .map((tab) => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.id;

@@ -116,10 +116,11 @@ const getInitialState = (): TabState => {
         id: `channel-${i}`,
         name: `Channel ${i + 1}`,
         rows: Array.from({ length: 64 }, () => ({
-          note: null,
-          instrument: null,
-          volume: null,
-          effect: null,
+          note: 0,
+          instrument: 0,
+          volume: 0,
+          effTyp: 0,
+          eff: 0,
         })),
         muted: false,
         solo: false,
@@ -133,6 +134,7 @@ const getInitialState = (): TabState => {
     instruments: [{
       id: 0,
       name: 'TB303 Classic',
+      type: 'synth' as const,
       synthType: 'TB303',
       tb303: {
         oscillator: { type: 'sawtooth' },

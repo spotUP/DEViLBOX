@@ -445,12 +445,15 @@ export class EffectProcessor {
       case 0xF:
         if (param === 0) {
           // F00 = stop song (not implemented)
+          console.log('[EffectCommands] F00: Stop song (not implemented)');
         } else if (param < 0x20) {
           // 01-1F: Set speed (ticks per row)
+          console.log(`[EffectCommands] F${param.toString(16).padStart(2,'0').toUpperCase()}: Set speed to ${param} ticks/row`);
           this.ticksPerRow = param;
           result.setSpeed = param;
         } else {
           // 20-FF: Set BPM
+          console.log(`[EffectCommands] F${param.toString(16).padStart(2,'0').toUpperCase()}: Set BPM to ${param}`);
           result.setBPM = param;
         }
         break;
