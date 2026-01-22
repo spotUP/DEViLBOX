@@ -2,12 +2,11 @@
  * App - Main application component
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
 import { InstrumentModal } from '@components/instruments/InstrumentModal';
-import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { HelpModal } from '@components/help/HelpModal';
 import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
@@ -22,7 +21,7 @@ import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
-import { ChevronDown, ChevronUp, Zap, Music, Sliders, Download, List } from 'lucide-react';
+import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { ToastContainer } from '@components/common/ToastContainer';
 import { Button } from '@components/ui/Button';
@@ -42,7 +41,6 @@ function App() {
   );
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [showAutomation, setShowAutomation] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showPatterns, setShowPatterns] = useState(false);
@@ -50,7 +48,6 @@ function App() {
   const [showInstrumentFX, setShowInstrumentFX] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
-  const automationPanelRef = useRef<HTMLDivElement>(null);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
   const { applyAutoCompact } = useUIStore();
@@ -66,25 +63,6 @@ function App() {
     applyAutoCompact();
   }, [applyAutoCompact]);
 
-  // Close automation panel when clicking outside
-  useEffect(() => {
-    if (!showAutomation) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Check if click is outside the automation panel and toggle button
-      if (
-        automationPanelRef.current &&
-        !automationPanelRef.current.contains(target) &&
-        !target.closest('[data-automation-toggle]')
-      ) {
-        setShowAutomation(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showAutomation]);
   const { save: saveProject } = useProjectPersistence();
 
   useEffect(() => {
@@ -401,11 +379,11 @@ function App() {
   // Show main tracker interface
   return (
     <AppLayout>
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">
           {/* Left side - Pattern Editor (expands when instrument panel is hidden) */}
-          <div className="flex flex-col min-h-0 flex-1">
+          <div className="flex flex-col min-h-0 min-w-0 flex-1">
             {/* Pattern Management (optional) */}
             {showPatterns && (
               <div className="h-48 border-b border-dark-border animate-fade-in">
@@ -413,7 +391,7 @@ function App() {
               </div>
             )}
             {/* Pattern Editor */}
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 min-w-0 flex flex-col">
               <TrackerView
                 onShowPatterns={() => setShowPatterns(!showPatterns)}
                 onShowExport={() => setShowExport(true)}
@@ -429,36 +407,6 @@ function App() {
           </div>
 
         </div>
-
-        {/* Bottom: Automation Panel (toggleable) */}
-        {showAutomation && (
-          <div
-            ref={automationPanelRef}
-            className="h-80 flex-shrink-0 border-t border-dark-border overflow-y-auto scrollbar-modern animate-fade-in"
-          >
-            <AutomationPanel />
-          </div>
-        )}
-
-        {/* Automation Toggle Button */}
-        <button
-          data-automation-toggle
-          onClick={() => setShowAutomation(!showAutomation)}
-          className={`
-            w-full px-4 py-2 flex items-center justify-between text-sm font-medium
-            border-t border-dark-border transition-all duration-150
-            ${showAutomation
-              ? 'bg-dark-bgTertiary text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary'
-            }
-          `}
-        >
-          <span className="flex items-center gap-2">
-            <Sliders size={16} />
-            Automation Editor
-          </span>
-          {showAutomation ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
       </div>
 
       {/* Modals */}

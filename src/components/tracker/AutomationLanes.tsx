@@ -75,6 +75,42 @@ const getParameterColor = (parameter: string): string => {
 
 const LANE_WIDTH = 20;
 
+// Generate SVG path strings for a single curve (memoizable)
+const generateCurvePaths = (
+  curve: AutomationCurve,
+  pLength: number,
+  rowHeight: number
+): { linePath: string; fillPath: string } => {
+  const pathPoints: string[] = [];
+  const fillPoints: string[] = [`M ${LANE_WIDTH} ${pLength * rowHeight}`];
+
+  // Build line path
+  for (let row = 0; row < pLength; row++) {
+    const value = getInterpolatedValue(curve, row);
+    if (value !== null) {
+      const x = value * (LANE_WIDTH - 2) + 1;
+      const y = row * rowHeight + rowHeight / 2;
+      pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+    }
+  }
+
+  // Build fill path (going backwards)
+  for (let row = pLength - 1; row >= 0; row--) {
+    const value = getInterpolatedValue(curve, row);
+    if (value !== null) {
+      const x = value * (LANE_WIDTH - 2) + 1;
+      const y = row * rowHeight + rowHeight / 2;
+      fillPoints.push(`L ${x} ${y}`);
+    }
+  }
+  fillPoints.push(`L ${LANE_WIDTH} 0 Z`);
+
+  return {
+    linePath: pathPoints.join(' '),
+    fillPath: fillPoints.join(' '),
+  };
+};
+
 export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternId,
   patternLength,
@@ -140,15 +176,28 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return result;
   }, [nextPatternId, channelCount, parameter, allCurves]);
 
-  const color = getParameterColor(parameter);
-  const prevLen = prevPatternLength || patternLength;
-  const nextLen = nextPatternLength || patternLength;
+  // Memoize SVG path generation for current pattern curves
+  const currentPaths = useMemo(() => {
+    return curves.map(curve =>
+      curve ? generateCurvePaths(curve, patternLength, rowHeight) : null
+    );
+  }, [curves, patternLength, rowHeight]);
 
-  // Calculate full virtual range (prev + current + next patterns)
-  const prevHeight = prevLen * rowHeight;
-  const currentHeight = patternLength * rowHeight;
-  const nextHeight = nextLen * rowHeight;
-  const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
+  // Memoize SVG path generation for previous pattern curves
+  const prevLen = prevPatternLength || patternLength;
+  const prevPaths = useMemo(() => {
+    return prevCurves.map(curve =>
+      curve ? generateCurvePaths(curve, prevLen, rowHeight) : null
+    );
+  }, [prevCurves, prevLen, rowHeight]);
+
+  // Memoize SVG path generation for next pattern curves
+  const nextLen = nextPatternLength || patternLength;
+  const nextPaths = useMemo(() => {
+    return nextCurves.map(curve =>
+      curve ? generateCurvePaths(curve, nextLen, rowHeight) : null
+    );
+  }, [nextCurves, nextLen, rowHeight]);
 
   // Check if any channel has automation data (including adjacent patterns)
   const hasAnyData = curves.some(c => c !== null) ||
@@ -159,9 +208,18 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return null; // Don't render anything if no automation data
   }
 
-  // Helper to render curves for a single pattern at a virtual y position
+  const color = getParameterColor(parameter);
+
+  // Calculate full virtual range (prev + current + next patterns)
+  const prevHeight = prevLen * rowHeight;
+  const currentHeight = patternLength * rowHeight;
+  const nextHeight = nextLen * rowHeight;
+  const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
+
+  // Helper to render curves using pre-computed paths
   const renderPatternCurves = (
     patternCurves: (AutomationCurve | null)[],
+    paths: ({ linePath: string; fillPath: string } | null)[],
     pLength: number,
     startVirtualRow: number, // Virtual row index where this pattern starts
     opacity: number,
@@ -170,34 +228,13 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return patternCurves.map((curve, channelIndex) => {
       if (!curve) return null;
 
+      const pathData = paths[channelIndex];
+      if (!pathData) return null;
+
       // Position this lane at the right edge of the channel
       const laneLeft = channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
-
-      // Build SVG path
-      const pathPoints: string[] = [];
-      const fillPoints: string[] = [`M ${LANE_WIDTH} ${pHeight}`];
-
-      for (let row = 0; row < pLength; row++) {
-        const value = getInterpolatedValue(curve, row);
-        if (value !== null) {
-          const x = value * (LANE_WIDTH - 2) + 1;
-          const y = row * rowHeight + rowHeight / 2;
-          pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
-        }
-      }
-
-      // Build fill path (going backwards)
-      for (let row = pLength - 1; row >= 0; row--) {
-        const value = getInterpolatedValue(curve, row);
-        if (value !== null) {
-          const x = value * (LANE_WIDTH - 2) + 1;
-          const y = row * rowHeight + rowHeight / 2;
-          fillPoints.push(`L ${x} ${y}`);
-        }
-      }
-      fillPoints.push(`L ${LANE_WIDTH} 0 Z`);
 
       return (
         <div
@@ -213,13 +250,13 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
           <svg width={LANE_WIDTH} height={pHeight}>
             {/* Fill */}
             <path
-              d={fillPoints.join(' ')}
+              d={pathData.fillPath}
               fill={color}
               fillOpacity={0.1 * opacity}
             />
             {/* Line */}
             <path
-              d={pathPoints.join(' ')}
+              d={pathData.linePath}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
@@ -266,6 +303,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       {/* Previous pattern curves (ghost, above) */}
       {prevCurves.length > 0 && renderPatternCurves(
         prevCurves,
+        prevPaths,
         prevLen,
         0, // Relative to this container's top (which is already offset)
         0.35,
@@ -273,11 +311,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       )}
 
       {/* Current pattern curves */}
-      {renderPatternCurves(curves, patternLength, prevLen, 1, 'current')}
+      {renderPatternCurves(curves, currentPaths, patternLength, prevLen, 1, 'current')}
 
       {/* Next pattern curves (ghost, below) */}
       {nextCurves.length > 0 && renderPatternCurves(
         nextCurves,
+        nextPaths,
         nextLen,
         prevLen + patternLength,
         0.35,

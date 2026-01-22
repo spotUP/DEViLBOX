@@ -14,24 +14,23 @@ import { FT2Button } from './FT2Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
-import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
-import { PatternOrderList } from '../PatternOrderList';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
 import { encodeWav } from '@lib/import/WavEncoder';
+import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 
 // Build accept string for file input
-const ACCEPTED_FORMATS = ['.json', '.song.json', ...getSupportedExtensions()].join(',');
+const ACCEPTED_FORMATS = ['.json', '.song.json', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
 // Create instruments for imported module
 function createInstrumentsForModule(
@@ -112,6 +111,7 @@ interface FT2ToolbarProps {
   onShowMasterFX?: () => void;
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
+  onShowPatternOrder?: () => void;
   onImport?: () => void;
   showPatterns?: boolean;
   showMasterFX?: boolean;
@@ -125,6 +125,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowMasterFX,
   onShowInstrumentFX,
   onShowInstruments,
+  onShowPatternOrder,
   onImport,
   showPatterns,
   showMasterFX,
@@ -164,7 +165,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { instruments, loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, useHexNumbers } = useUIStore();
-  const { isLiveMode, toggleLiveMode, pendingPatternIndex } = useLiveModeStore();
   const { curves } = useAutomationStore();
 
   const engine = getToneEngine();
@@ -178,6 +178,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   // Demo songs available on the server
   const DEMO_SONGS = [
+    { file: 'classic-303-acid-demo.song.json', name: '🎛️ Classic 303 Acid Demo' },
     { file: 'phuture-acid-tracks.song.json', name: 'Phuture - Acid Tracks' },
     { file: 'hardfloor-funalogue.song.json', name: 'Hardfloor - Funalogue' },
     { file: 'josh-wink-higher-state.song.json', name: 'Josh Wink - Higher State' },
@@ -335,7 +336,30 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
     setIsLoading(true);
     try {
-      if (isSupportedModule(file.name)) {
+      if (isMIDIFile(file.name)) {
+        // MIDI file import
+        const midiResult = await importMIDIFile(file, {
+          quantize: 1,
+          mergeChannels: false,
+          velocityToVolume: true,
+          defaultPatternLength: 64,
+        });
+
+        // Create instruments for MIDI (simple oscillators)
+        const instruments = createInstrumentsForModule(midiResult.patterns, [], undefined);
+
+        // Load patterns and instruments
+        loadPatterns(midiResult.patterns);
+        loadInstruments(instruments);
+        setMetadata({
+          name: midiResult.metadata.name,
+          author: '',
+          description: `Imported from ${file.name} (${midiResult.metadata.tracks} MIDI tracks)`,
+        });
+        setBPM(midiResult.bpm);
+
+        notify.success(`Loaded MIDI: ${midiResult.metadata.name} (${midiResult.patterns.length} patterns)`, 3000);
+      } else if (isSupportedModule(file.name)) {
         const moduleInfo = await loadModuleFile(file);
 
         if (!moduleInfo.metadata.song) {
@@ -489,7 +513,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   return (
-    <div className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}>
+    <div
+      className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}
+      style={compactToolbar ? {
+        maxHeight: '80px',
+        minHeight: '80px',
+        height: '80px',
+        overflow: 'hidden'
+      } : undefined}
+    >
       {/* Toolbar Compact Toggle - consistent right-side position */}
       <button
         className="panel-collapse-toggle"
@@ -572,20 +604,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           >
             {recordMode ? '● Rec' : 'Rec'}
           </FT2Button>
-          <FT2Button
-            onClick={toggleLiveMode}
-            active={isLiveMode}
-            colorAccent={isLiveMode ? 'yellow' : undefined}
-            title={isLiveMode ? 'Switch to Edit mode (L)' : 'Switch to Live mode - pattern queueing (L)'}
-          >
-            {isLiveMode ? '● LIVE' : 'Live'}
-          </FT2Button>
-          {/* Show queued pattern indicator */}
-          {isLiveMode && pendingPatternIndex !== null && (
-            <span className="ft2-queue-indicator animate-pulse">
-              ⏳ {pendingPatternIndex.toString(16).toUpperCase().padStart(2, '0')}
-            </span>
-          )}
         </div>
       </div>
 
@@ -746,6 +764,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list (Ctrl+Shift+P)">
             Patterns
           </FT2Button>
+          <FT2Button onClick={onShowPatternOrder} small title="Pattern order editor">
+            Order
+          </FT2Button>
           <FT2Button onClick={onShowInstruments} small title="Instrument editor (Ctrl+I)">
             Instr
           </FT2Button>
@@ -777,9 +798,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </FT2Button>
         </div>
       </div>
-
-      {/* Pattern Order List - Integrated into toolbar */}
-      {!compactToolbar && <PatternOrderList />}
 
       {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

@@ -37,7 +37,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const pattern = patterns[currentPatternIndex];
 
   return (
-    <div className="flex flex-col h-full bg-dark-bg">
+    <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
       {/* Compact header with essential info */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border">
         <div className="flex items-center gap-2">

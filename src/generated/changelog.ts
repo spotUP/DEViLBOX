@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-21T11:58:05.174Z
+ * Generated: 2026-01-22T09:23:52.588Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '42';
-export const BUILD_HASH = '4aa8421';
-export const BUILD_DATE = '2026-01-21';
+export const BUILD_NUMBER = '43';
+export const BUILD_HASH = 'bc54072';
+export const BUILD_DATE = '2026-01-22';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.0',
     date: '2026-01-21',
     changes: [
+      {
+        type: 'feature',
+        description: 'Song format documentation, error handling, and volume normalization'
+      },
       {
         type: 'feature',
         description: 'Add TB-303 preset dropdown and vegDecay migration'

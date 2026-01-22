@@ -39,7 +39,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-fade-in backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-fade-in">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-slide-in-up">
         {/* Header */}
         <div className="bg-dark-bgTertiary px-6 py-4 flex items-center justify-between border-b border-dark-border">

@@ -330,7 +330,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in">
         {/* Header */}
         <div className="bg-dark-bgTertiary border-b border-dark-border px-5 py-4 flex items-center justify-between">

@@ -32,7 +32,7 @@ export const ToastNotification: React.FC = () => {
           key={notification.id}
           className={`
             flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg
-            backdrop-blur-sm animate-slide-in-right
+            animate-slide-in-right
             ${colorMap[notification.type]}
           `}
           role="alert"

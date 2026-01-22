@@ -5,13 +5,9 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useTrackerStore, useThemeStore } from '@stores';
+import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-
-interface ChannelVUMetersProps {
-  channelWidths?: number[];
-  channelOffsets?: number[];
-}
+import { useAnimationFrame } from '@hooks/useAnimationCoordinator';
 
 const DECAY_RATE = 0.88;
 const SWING_RANGE = 50;
@@ -41,12 +37,10 @@ const getSegmentColor = (ratio: number, isLit: boolean, hue: number = 0): { bg: 
   };
 };
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({
-  channelWidths: _channelWidths = [],
-  channelOffsets: _channelOffsets = [],
-}) => {
+export const ChannelVUMeters: React.FC = () => {
   const { patterns, currentPatternIndex } = useTrackerStore();
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const performanceQuality = useUIStore((state) => state.performanceQuality);
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,8 +56,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({
       direction: i % 2 === 0 ? 1 : -1
     }))
   );
-  const animationRef = useRef<number | null>(null);
-
   // Measure container height
   useEffect(() => {
     const updateHeight = () => {
@@ -79,10 +71,11 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const engine = getToneEngine();
-
-    const animate = () => {
+  // Centralized animation loop for meter updates
+  useAnimationFrame(
+    'channel-vu-meters',
+    () => {
+      const engine = getToneEngine();
       const triggerLevels = engine.getChannelTriggerLevels(numChannels);
 
       setMeters(prev => {
@@ -122,18 +115,14 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({
           return { level: newLevel, position: newPosition, direction: newDirection };
         });
       });
+    },
+    [numChannels]
+  );
 
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [numChannels]);
+  // Disable VU meters on low quality (after all hooks)
+  if (performanceQuality === 'low') {
+    return null;
+  }
 
   const ROW_NUM_WIDTH = 48;
   const CHANNEL_WIDTH = 260;

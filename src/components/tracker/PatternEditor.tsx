@@ -13,9 +13,10 @@ import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { AutomationLanes } from './AutomationLanes';
 import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
+import { useUIStore } from '@stores/useUIStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { useShallow } from 'zustand/react/shallow';
-import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsDownUp } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import type { TrackerCell } from '@typedefs';
@@ -28,6 +29,10 @@ interface ChannelTrigger {
 const ROW_HEIGHT = 28; // Height of each row in pixels
 const VISIBLE_ROWS_BUFFER = 10; // Extra rows to render above/below viewport
 
+interface PatternEditorProps {
+  onAcidGenerator?: (channelIndex: number) => void;
+}
+
 // Separate component for status bar to isolate currentRow subscription
 // This prevents the entire grid from re-rendering when currentRow changes
 const StatusBar: React.FC<{
@@ -39,6 +44,7 @@ const StatusBar: React.FC<{
     useShallow((state) => ({ isPlaying: state.isPlaying, currentRow: state.currentRow }))
   );
   const cursorRow = useTrackerStore((state) => state.cursor.rowIndex);
+  const insertMode = useTrackerStore((state) => state.insertMode);
   const displayRow = isPlaying ? currentRow : cursorRow;
 
   return (
@@ -52,6 +58,9 @@ const StatusBar: React.FC<{
           Ch: <span className="text-accent-primary">{(cursorChannel + 1).toString().padStart(2, '0')}</span>
           /<span className="text-text-secondary">{channelCount.toString().padStart(2, '0')}</span>
         </span>
+        <span className="text-text-muted" title={insertMode ? 'Insert mode: new data shifts rows down (press Insert to toggle)' : 'Overwrite mode: new data replaces existing (press Insert to toggle)'}>
+          Mode: <span className={insertMode ? 'text-accent-warning' : 'text-accent-primary'}>{insertMode ? 'INS' : 'OVR'}</span>
+        </span>
       </div>
       <div className="flex items-center gap-2 text-text-muted">
         <span className={isPlaying ? 'text-accent-success' : ''}>
@@ -63,7 +72,7 @@ const StatusBar: React.FC<{
 });
 StatusBar.displayName = 'StatusBar';
 
-const PatternEditorComponent: React.FC = () => {
+const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator }) => {
   const { isMobile } = useResponsiveSafe();
 
   // CRITICAL OPTIMIZATION: Use selectors to prevent re-renders on every pattern change
@@ -123,6 +132,12 @@ const PatternEditorComponent: React.FC = () => {
   const [channelTriggers, setChannelTriggers] = useState<ChannelTrigger[]>([]);
   const lastTriggerRowRef = useRef<number>(-1);
   const isScrollSyncing = useRef(false);
+
+  // Custom scrollbar state
+  const [customScrollThumbLeft, setCustomScrollThumbLeft] = useState(0);
+  const [customScrollThumbWidth, setCustomScrollThumbWidth] = useState(100);
+  const customScrollTrackRef = useRef<HTMLDivElement>(null);
+  const isDraggingScrollbar = useRef(false);
 
   // Cell context menu
   const cellContextMenu = useCellContextMenu();
@@ -294,7 +309,7 @@ const PatternEditorComponent: React.FC = () => {
   // Calculate the scroll offset for the pattern
   // Active row is ALWAYS centered at the edit bar, pattern wraps seamlessly
   const scrollOffset = useMemo(() => {
-    if (!isReady || !pattern) return 0;
+    if (!isReady || !pattern || !containerHeight || containerHeight <= 0) return 0;
 
     const halfContainer = containerHeight / 2;
     // Center the scroll row under the edit bar
@@ -304,25 +319,138 @@ const PatternEditorComponent: React.FC = () => {
 
   // Track container size using ResizeObserver for accurate sizing
   // This properly handles when other elements (like TB303KnobPanel) resize
+  // Enhanced with debouncing to handle rapid layout changes
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      console.log('[PatternEditor] containerRef.current is null!');
+      return;
+    }
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        if (height > 0) {
-          setContainerHeight(height);
-        }
+    console.log('[PatternEditor] Setting up ResizeObserver on:', containerRef.current);
+
+    let frameId: number | null = null;
+    let debounceTimer: number | null = null;
+
+    const updateHeight = () => {
+      if (!containerRef.current) return;
+
+      const height = containerRef.current.clientHeight;
+      console.log('[PatternEditor] Updating containerHeight:', height);
+
+      if (height > 0) {
+        setContainerHeight(height);
+      } else {
+        console.warn('[PatternEditor] Measured 0 height, retrying...');
+        // Retry on next frame
+        frameId = requestAnimationFrame(updateHeight);
       }
+    };
+
+    const debouncedUpdate = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (frameId) cancelAnimationFrame(frameId);
+
+      // Wait for layout to settle before measuring (one frame ~16ms)
+      debounceTimer = setTimeout(() => {
+        frameId = requestAnimationFrame(updateHeight);
+      }, 16); // One frame delay to let flex layout complete
+    };
+
+    // ResizeObserver for container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      debouncedUpdate();
     });
 
     resizeObserver.observe(containerRef.current);
 
     // Initial measurement
-    setContainerHeight(containerRef.current.clientHeight);
+    frameId = requestAnimationFrame(updateHeight);
+
+    // Cleanup
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Immediately update height when mobile/desktop layout changes
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Use requestAnimationFrame to measure after layout completes
+    const frameId = requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const height = containerRef.current.clientHeight;
+      if (height > 0) {
+        console.log('[PatternEditor] isMobile changed, updating height:', height);
+        setContainerHeight(height);
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isMobile]);
+
+  // Sync custom scrollbar dimensions when header or channels change
+  useEffect(() => {
+    if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+
+    const updateScrollbarDimensions = () => {
+      if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+
+      const scrollWidth = headerScrollRef.current.scrollWidth;
+      const clientWidth = headerScrollRef.current.clientWidth;
+      const scrollLeft = headerScrollRef.current.scrollLeft;
+      const trackWidth = customScrollTrackRef.current.clientWidth;
+
+      if (scrollWidth > clientWidth) {
+        const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
+        const maxScroll = scrollWidth - clientWidth;
+        const maxThumbLeft = trackWidth - thumbWidth;
+        const scrollPercent = scrollLeft / maxScroll;
+
+        setCustomScrollThumbWidth(thumbWidth);
+        setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
+      } else {
+        // No scrolling needed, hide thumb by making it full width
+        setCustomScrollThumbWidth(trackWidth);
+        setCustomScrollThumbLeft(0);
+      }
+    };
+
+    // Update immediately
+    updateScrollbarDimensions();
+
+    // Update on resize
+    const resizeObserver = new ResizeObserver(updateScrollbarDimensions);
+    resizeObserver.observe(headerScrollRef.current);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [pattern?.channels.length]);
+
+  // Validate containerHeight matches actual rendered height (development only)
+  useEffect(() => {
+    if (import.meta.env.MODE === 'production') return;
+
+    const validateHeight = () => {
+      if (!containerRef.current) return;
+
+      const actualHeight = containerRef.current.clientHeight;
+      const diff = Math.abs(actualHeight - containerHeight);
+
+      if (diff > 10) {
+        console.error('[PatternEditor] HEIGHT MISMATCH!', {
+          containerHeight,
+          actualHeight,
+          difference: diff,
+          containerStyles: window.getComputedStyle(containerRef.current)
+        });
+      }
+    };
+
+    const interval = setInterval(validateHeight, 2000);
+    return () => clearInterval(interval);
+  }, [containerHeight]);
 
   // Calculate which virtual rows are visible (always wraps for seamless looping)
   // During playback, includes rows from previous/next patterns for preview
@@ -402,12 +530,17 @@ const PatternEditorComponent: React.FC = () => {
     if (!isReady) return 1;
     // During playback, use full opacity - the CSS fade overlays handle edge fading
     if (isPlaying) return 1;
+    // Guard against invalid containerHeight
+    if (!containerHeight || containerHeight <= 0) return 1;
 
     // Calculate where this virtual row appears in the viewport
     const rowTop = virtualIndex * ROW_HEIGHT + scrollOffset;
     const viewportCenter = containerHeight / 2;
     const distanceFromCenter = Math.abs(rowTop + ROW_HEIGHT / 2 - viewportCenter);
     const maxDistance = containerHeight / 2;
+
+    // Guard against division by zero
+    if (maxDistance <= 0) return 1;
 
     // Gentle fade at edges, full opacity in center
     const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDistance) * 0.6);
@@ -508,38 +641,136 @@ const PatternEditorComponent: React.FC = () => {
     }
   }, [isPlaying, cursor.rowIndex, pattern?.length]);
 
-  // Sync horizontal scroll between header and content
+  // Sync horizontal scroll between header and content with debouncing
+  const scrollSyncTimeoutRef = useRef<number | null>(null);
+
   const handleHeaderScroll = useCallback(() => {
     if (isScrollSyncing.current) return;
     if (headerScrollRef.current && contentScrollRef.current) {
+      const scrollLeft = headerScrollRef.current.scrollLeft;
+
+      // Clear any pending sync
+      if (scrollSyncTimeoutRef.current !== null) {
+        cancelAnimationFrame(scrollSyncTimeoutRef.current);
+      }
+
+      // Sync immediately but debounce the unlock
       isScrollSyncing.current = true;
-      contentScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
-      requestAnimationFrame(() => { isScrollSyncing.current = false; });
+      contentScrollRef.current.scrollLeft = scrollLeft;
+
+      // Update custom scrollbar thumb position
+      if (!isDraggingScrollbar.current) {
+        const scrollWidth = headerScrollRef.current.scrollWidth;
+        const clientWidth = headerScrollRef.current.clientWidth;
+        const maxScroll = scrollWidth - clientWidth;
+        if (maxScroll > 0) {
+          const scrollPercent = scrollLeft / maxScroll;
+          const trackWidth = customScrollTrackRef.current?.clientWidth || clientWidth;
+          const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
+          const maxThumbLeft = trackWidth - thumbWidth;
+          setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
+          setCustomScrollThumbWidth(thumbWidth);
+        }
+      }
+
+      scrollSyncTimeoutRef.current = requestAnimationFrame(() => {
+        scrollSyncTimeoutRef.current = null;
+        isScrollSyncing.current = false;
+      });
     }
   }, []);
 
   const handleContentScroll = useCallback(() => {
     if (isScrollSyncing.current) return;
     if (headerScrollRef.current && contentScrollRef.current) {
+      const scrollLeft = contentScrollRef.current.scrollLeft;
+
+      // Clear any pending sync
+      if (scrollSyncTimeoutRef.current !== null) {
+        cancelAnimationFrame(scrollSyncTimeoutRef.current);
+      }
+
+      // Sync immediately but debounce the unlock
       isScrollSyncing.current = true;
-      headerScrollRef.current.scrollLeft = contentScrollRef.current.scrollLeft;
-      requestAnimationFrame(() => { isScrollSyncing.current = false; });
+      headerScrollRef.current.scrollLeft = scrollLeft;
+
+      scrollSyncTimeoutRef.current = requestAnimationFrame(() => {
+        scrollSyncTimeoutRef.current = null;
+        isScrollSyncing.current = false;
+      });
     }
   }, []);
+
+  // Custom scrollbar handlers
+  const handleCustomScrollbarMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+
+    e.preventDefault();
+    isDraggingScrollbar.current = true;
+
+    const track = customScrollTrackRef.current;
+    const trackRect = track.getBoundingClientRect();
+    const clickX = e.clientX - trackRect.left;
+    const thumbWidth = customScrollThumbWidth;
+
+    // If clicking on thumb, start dragging from current position
+    const thumbLeft = customScrollThumbLeft;
+    const clickedOnThumb = clickX >= thumbLeft && clickX <= thumbLeft + thumbWidth;
+
+    const startDragX = clickedOnThumb ? clickX - thumbLeft : thumbWidth / 2;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+
+      const moveX = moveEvent.clientX - trackRect.left;
+      const newThumbLeft = Math.max(0, Math.min(trackRect.width - thumbWidth, moveX - startDragX));
+      const scrollPercent = newThumbLeft / (trackRect.width - thumbWidth);
+
+      const scrollWidth = headerScrollRef.current.scrollWidth;
+      const clientWidth = headerScrollRef.current.clientWidth;
+      const maxScroll = scrollWidth - clientWidth;
+
+      headerScrollRef.current.scrollLeft = scrollPercent * maxScroll;
+      setCustomScrollThumbLeft(newThumbLeft);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingScrollbar.current = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // If clicked on track (not thumb), jump to that position
+    if (!clickedOnThumb) {
+      const newThumbLeft = Math.max(0, Math.min(trackRect.width - thumbWidth, clickX - thumbWidth / 2));
+      const scrollPercent = newThumbLeft / (trackRect.width - thumbWidth);
+
+      const scrollWidth = headerScrollRef.current.scrollWidth;
+      const clientWidth = headerScrollRef.current.clientWidth;
+      const maxScroll = scrollWidth - clientWidth;
+
+      headerScrollRef.current.scrollLeft = scrollPercent * maxScroll;
+      setCustomScrollThumbLeft(newThumbLeft);
+    }
+  }, [customScrollThumbLeft, customScrollThumbWidth]);
 
   // Calculate total width needed for all channels (includes accent/slide columns)
   const CHANNEL_WIDTH = 260;
   const ROW_NUM_WIDTH = 48;
-  const ADD_BTN_WIDTH = 48;
+
+  // Calculate explicit total content width for scrolling
+  // Both header and content use channels-only width since row numbers are outside scroll area
+  const channelsOnlyWidth = useMemo(() => {
+    if (!pattern) return 0;
+    return pattern.channels.length * CHANNEL_WIDTH;
+  }, [pattern?.channels.length]);
 
   // Mobile: Use full width minus row numbers for single channel
   const [containerWidth, setContainerWidth] = useState(0);
   const mobileChannelWidth = Math.max(260, containerWidth - ROW_NUM_WIDTH - 16); // 16px padding
-
-  const totalContentWidth = isMobile
-    ? ROW_NUM_WIDTH + mobileChannelWidth
-    : ROW_NUM_WIDTH + (pattern?.channels.length || 0) * CHANNEL_WIDTH +
-      ((pattern?.channels.length || 0) < 16 ? ADD_BTN_WIDTH : 0);
 
   // Track container width for mobile
   useEffect(() => {
@@ -574,7 +805,12 @@ const PatternEditorComponent: React.FC = () => {
 
   return (
     <div
-      className="flex-1 flex flex-col bg-dark-bg overflow-hidden min-w-0"
+      className="w-full flex flex-col bg-dark-bg"
+      style={{
+        flex: '1 1 0%',
+        minHeight: 0,
+        overflowY: 'hidden'
+      }}
       {...(isMobile ? swipeHandlers : {})}
     >
       {/* Mobile Channel Header */}
@@ -665,27 +901,28 @@ const PatternEditorComponent: React.FC = () => {
 
       {/* Desktop Channel Header - Sticky with controls */}
       {!isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20 min-w-0">
-          <div className="flex min-w-0">
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
+          <div className="flex" style={{ width: '100%' }}>
             {/* Row number column header */}
             <div className="flex-shrink-0 w-12 px-2 py-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center">
               ROW
             </div>
 
-            {/* Scrollable channel headers - scrollbar hidden, synced with content */}
+            {/* Scrollable channel headers - synced with content with forced scrollbar */}
             <div
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
-              className="flex-1 min-w-0 overflow-x-auto scrollbar-hidden"
+              className="overflow-x-scroll scrollbar-hidden"
+              style={{ flexGrow: 1, minWidth: 0 }}
             >
-              <div className="flex" style={{ minWidth: totalContentWidth - ROW_NUM_WIDTH }}>
+              <div className="flex" style={{ width: `${channelsOnlyWidth}px`, minWidth: `${channelsOnlyWidth}px` }}>
                 {pattern.channels.map((channel, idx) => {
                 const trigger = channelTriggers[idx] || { level: 0, triggered: false };
                 return (
                   <div
                     key={channel.id}
                     className={`
-                      flex-shrink-0 min-w-[260px] flex items-center justify-between gap-2 px-3 py-1.5
+                      flex-shrink-0 w-[260px] flex items-center justify-between gap-2 px-3 py-1.5
                       border-r border-dark-border transition-colors relative
                       ${channel.muted ? 'opacity-50' : ''}
                       ${channel.solo ? 'bg-accent-primary/10' : ''}
@@ -713,6 +950,13 @@ const PatternEditorComponent: React.FC = () => {
 
                     {/* Channel controls */}
                     <div className="flex items-center gap-1">
+                      {/* Collapse channel button */}
+                      <button
+                        className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+                        title="Collapse/Expand Channel"
+                      >
+                        <ChevronsDownUp size={12} />
+                      </button>
                       {/* Channel context menu dropdown */}
                       <ChannelContextMenu
                         channelIndex={idx}
@@ -727,6 +971,7 @@ const PatternEditorComponent: React.FC = () => {
                         onTranspose={handleTranspose}
                         onHumanize={handleHumanize}
                         onInterpolate={handleInterpolate}
+                        onAcidGenerator={onAcidGenerator || (() => {})}
                       />
                       <ChannelColorPicker
                         currentColor={channel.color}
@@ -786,13 +1031,44 @@ const PatternEditorComponent: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Custom always-visible scrollbar */}
+        <div className="flex w-full">
+          {/* Spacer for row number column */}
+          <div className="flex-shrink-0 w-12" />
+
+          {/* Custom scrollbar track */}
+          <div
+            ref={customScrollTrackRef}
+            className="flex-1 bg-dark-bgSecondary border-t border-dark-border cursor-pointer"
+            style={{ height: '12px', minWidth: 0 }}
+            onMouseDown={handleCustomScrollbarMouseDown}
+          >
+            {/* Custom scrollbar thumb */}
+            <div
+              className="bg-accent-primary hover:bg-accent-primary/80 transition-colors"
+              style={{
+                height: '100%',
+                width: `${customScrollThumbWidth}px`,
+                transform: `translateX(${customScrollThumbLeft}px)`,
+                borderRadius: '2px',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        </div>
       </div>
       )}
 
       {/* Pattern Grid with smooth scrolling */}
       <div
         ref={containerRef}
-        className="flex-1 relative overflow-hidden"
+        className="relative"
+        style={{
+          flex: '1 1 0%',
+          minHeight: 0,
+          overflowY: 'hidden'
+        }}
         onWheel={handleWheel}
       >
         {/* Fixed center edit bar - always vertically centered using CSS */}
@@ -807,6 +1083,7 @@ const PatternEditorComponent: React.FC = () => {
         />
 
         {/* Fixed caret overlay - never moves vertically, only horizontally */}
+        {/* FT2-style: Highlights individual characters within cells */}
         {!isPlaying && pattern && (() => {
           const ROW_NUM_WIDTH = 48; // Width of row number column
           const CHANNEL_WIDTH = isMobile ? mobileChannelWidth : 260;
@@ -818,6 +1095,7 @@ const PatternEditorComponent: React.FC = () => {
           const VOLUME_WIDTH = 28; // 2ch
           const EFFECT_WIDTH = 42; // 3ch
           const ACCENT_WIDTH = 24;
+          const CHAR_WIDTH = 14; // Approximate width of one monospace character
 
           // Base position: row number + channel offset
           const channelIndex = isMobile ? 0 : cursor.channelIndex; // Mobile always shows channel at index 0
@@ -849,24 +1127,20 @@ const PatternEditorComponent: React.FC = () => {
               break;
           }
 
-          // Get cell width for the current column
+          // FT2: Add character-level offset for editable columns
           let caretWidth = NOTE_WIDTH;
-          switch (cursor.columnType) {
-            case 'instrument':
-              caretWidth = INSTRUMENT_WIDTH;
-              break;
-            case 'volume':
-              caretWidth = VOLUME_WIDTH;
-              break;
-            case 'effect':
-            case 'effect2':
-              caretWidth = EFFECT_WIDTH;
-              break;
-            case 'accent':
-            case 'slide':
-              caretWidth = ACCENT_WIDTH;
-              break;
+          if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
+            // 2-digit columns: highlight one character at digitIndex
+            caretX += cursor.digitIndex * CHAR_WIDTH;
+            caretWidth = CHAR_WIDTH;
+          } else if (cursor.columnType === 'effect' || cursor.columnType === 'effect2') {
+            // 3-character columns (effect): highlight one character at digitIndex
+            caretX += cursor.digitIndex * CHAR_WIDTH;
+            caretWidth = CHAR_WIDTH;
+          } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
+            caretWidth = ACCENT_WIDTH;
           }
+          // Note column keeps full width highlighting
 
           return (
             <div
@@ -913,18 +1187,86 @@ const PatternEditorComponent: React.FC = () => {
           }}
         />
 
+        {/* Fixed row numbers column - non-scrolling */}
+        {!isMobile && (
+          <div
+            className="absolute left-0 overflow-hidden z-5"
+            style={{
+              width: `${ROW_NUM_WIDTH}px`,
+              top: 0,
+              bottom: 0,
+            }}
+          >
+            <div
+              className="relative"
+              style={{
+                height: containerHeight || 600,
+                transform: isPlaying ? undefined : `translate3d(0, ${scrollOffset}px, 0)`,
+                transition: 'none',
+                willChange: 'transform',
+              }}
+            >
+              {visibleVirtualRows.map(({ virtualIndex, actualIndex, patternType }) => {
+                const useHexNumbers = useUIStore.getState().useHexNumbers;
+                const rowNumber = useHexNumbers
+                  ? actualIndex.toString(16).toUpperCase().padStart(2, '0')
+                  : actualIndex.toString(10).padStart(2, '0');
+
+                const rowTop = virtualIndex * ROW_HEIGHT;
+                let opacity = getRowOpacity(virtualIndex);
+                const isGhostRow = patternType !== 'current';
+                if (isGhostRow && isLooping) {
+                  opacity = isCyanTheme ? 1 : opacity * 0.5;
+                }
+
+                const getRowBgClass = () => {
+                  if (actualIndex % 4 === 0) return 'bg-tracker-row-highlight';
+                  return actualIndex % 2 === 0 ? 'bg-tracker-row-even' : 'bg-tracker-row-odd';
+                };
+
+                return (
+                  <div
+                    key={`rownum-${patternType}-${virtualIndex}`}
+                    className={`absolute flex items-center justify-center text-xs font-mono border-r border-dark-border ${getRowBgClass()} ${isGhostRow ? 'ghost-row' : ''}`}
+                    style={{
+                      top: `${rowTop}px`,
+                      left: 0,
+                      width: `${ROW_NUM_WIDTH}px`,
+                      height: `${ROW_HEIGHT}px`,
+                      opacity,
+                      color: actualIndex % 4 === 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+                      fontWeight: actualIndex % 4 === 0 ? 'bold' : 'normal',
+                    }}
+                  >
+                    {rowNumber}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Scrollable content with horizontal scroll */}
         <div
           ref={contentScrollRef}
           onScroll={handleContentScroll}
-          className="h-full overflow-x-auto overflow-y-hidden scrollbar-modern relative z-0"
+          className="absolute overflow-y-hidden scrollbar-modern z-0"
+          style={{
+            left: isMobile ? 0 : `${ROW_NUM_WIDTH}px`,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            overflowX: 'auto'
+          }}
         >
           <div
             ref={contentRef}
             className="relative"
             style={{
-              height: containerHeight,
-              minWidth: totalContentWidth,
+              width: `${isMobile ? (ROW_NUM_WIDTH + mobileChannelWidth) : (ROW_NUM_WIDTH + channelsOnlyWidth)}px`,
+              minWidth: `${isMobile ? (ROW_NUM_WIDTH + mobileChannelWidth) : (ROW_NUM_WIDTH + channelsOnlyWidth)}px`,
+              height: containerHeight || 600, // Fallback to 600px
+              minHeight: containerHeight || 600,
               // During playback, animation loop handles transform directly via DOM
               // When stopped, use React-managed scrollOffset
               transform: isPlaying ? undefined : `translate3d(0, ${scrollOffset}px, 0)`,
@@ -994,12 +1336,12 @@ const PatternEditorComponent: React.FC = () => {
               return (
                 <div
                   key={`row-${patternType}-${virtualIndex}`}
-                  className={`absolute left-0 flex ${isGhostRow ? 'ghost-row' : ''}`}
+                  className={`absolute inline-flex ${isGhostRow ? 'ghost-row' : ''}`}
                   data-pattern-type={patternType}
                   style={{
+                    left: isMobile ? 0 : -ROW_NUM_WIDTH,
                     top: rowTop,
                     height: ROW_HEIGHT,
-                    minWidth: totalContentWidth,
                     opacity,
                     transition: isReady ? 'opacity 0.08s linear' : 'none',
                     contain: 'layout style paint',

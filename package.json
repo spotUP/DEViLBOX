@@ -66,6 +66,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@p5-wrapper/react": "^5.0.2",
     "@tanstack/react-virtual": "^3.13.18",
+    "@tonejs/midi": "^2.0.28",
     "chiptune3": "^0.8.4",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",

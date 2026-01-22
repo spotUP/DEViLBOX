@@ -11,12 +11,12 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
-    <div className="h-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">
+    <div className="h-screen flex flex-col bg-dark-bg text-text-primary overflow-y-hidden">
       {/* Top Navigation Bar */}
       <NavBar />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex min-h-0 overflow-y-hidden">
         {children}
       </main>
     </div>

@@ -10,7 +10,8 @@ import { TB303Sequencer, type TB303Step } from '@components/sequencer/TB303Seque
 import { Knob } from '@components/controls/Knob';
 import { useTrackerStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-import { Play, Square, Shuffle, Trash2 } from 'lucide-react';
+import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
+import { Play, Square, Shuffle, Trash2, Wand2 } from 'lucide-react';
 import './TB303View.css';
 
 // Note name to MIDI note number mapping (C3 = middle C = 60)
@@ -70,6 +71,9 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm] = useState(130);
+
+  // Acid pattern generator state
+  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
   // Get TB-303 parameters from instrument config
   const tb303Config = instrument?.tb303;
@@ -398,6 +402,11 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
 
             <div className="transport-spacer" />
 
+            <button onClick={() => setShowAcidGenerator(true)} className="pattern-btn acid">
+              <Wand2 size={16} />
+              <span>Acid</span>
+            </button>
+
             <button onClick={handleRandomizePattern} className="pattern-btn randomize">
               <Shuffle size={16} />
               <span>Random</span>
@@ -515,6 +524,14 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
           </div>
 
       </>
+
+      {/* Acid Pattern Generator Dialog */}
+      {showAcidGenerator && (
+        <AcidPatternGeneratorDialog
+          channelIndex={channelIndex}
+          onClose={() => setShowAcidGenerator(false)}
+        />
+      )}
     </div>
   );
 };

@@ -278,27 +278,52 @@
     border-bottom-color: var(--color-accent);
   }
 
-  /* Scrollbar styles */
+  /* Scrollbar styles - Always visible */
+  /* Hide native scrollbar completely */
+  .scrollbar-hidden {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+
   .scrollbar-modern {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-border) var(--color-bg-secondary);
+    scrollbar-color: var(--color-accent) var(--color-bg-secondary);
+    scrollbar-gutter: stable; /* Reserve space for scrollbar */
   }
 
   .scrollbar-modern::-webkit-scrollbar {
-    width: 8px;
+    width: 14px;
+    height: 14px;
+    -webkit-appearance: none; /* Override macOS defaults */
   }
 
   .scrollbar-modern::-webkit-scrollbar-track {
     background: var(--color-bg-secondary);
+    border-radius: 6px;
   }
 
   .scrollbar-modern::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 4px;
+    background-color: var(--color-accent);
+    border-radius: 6px;
+    border: 2px solid var(--color-bg-secondary);
+    min-height: 40px; /* Ensure thumb is always grabbable */
+    min-width: 40px; /* Ensure horizontal thumb is grabbable */
   }
 
   .scrollbar-modern::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-border-light);
+    background-color: var(--color-accent-hover);
+  }
+
+  .scrollbar-modern::-webkit-scrollbar-thumb:active {
+    background-color: var(--color-accent-primary);
+  }
+
+  .scrollbar-modern::-webkit-scrollbar-corner {
+    background: var(--color-bg-secondary);
   }
 
   /* Hidden scrollbar utility */
@@ -839,30 +864,35 @@
     white-space: nowrap;
   }
 
-  .tb303-expanded-content {
+  .tb303-settings-row {
     display: flex;
-    flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     gap: 16px;
     width: 100%;
-    overflow-x: auto;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
   }
 
-  .tb303-settings-column {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    flex-shrink: 0;
-    min-width: min(180px, 100%); /* Responsive minimum width */
-  }
-
-  .tb303-knobs-container {
+  .tb303-all-knobs-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-shrink: 0;
-    /* Allow wrapping on very small screens */
+    width: 100%;
+    overflow-x: auto;
     flex-wrap: wrap;
+    padding: 8px 0;
+  }
+
+  .tb303-visualizers-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 12px 0;
+    border-top: 1px solid var(--color-border);
+    margin-top: 12px;
   }
 
   /* TB-303 Fullscreen View (when in dedicated tb303 editor mode) */
@@ -2092,4 +2122,27 @@ html[data-theme="cyan-lineart"] #root {
 
 html[data-theme="cyan-lineart"] #root > * {
   background-color: #030808;
+}
+
+/* Force collapsed/compact panels to minimal height */
+.tb303-knob-panel-collapsed {
+  max-height: 40px !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  overflow: hidden !important;
+  flex-wrap: nowrap !important;
+}
+
+.tb303-knob-panel-collapsed .tb303-collapsed-values {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.ft2-toolbar-compact {
+  max-height: 38px !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  overflow: hidden !important;
+  flex-wrap: nowrap !important;
 }

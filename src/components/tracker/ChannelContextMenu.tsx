@@ -48,6 +48,7 @@ interface ChannelContextMenuProps {
   onTranspose: (channelIndex: number, semitones: number) => void;
   onHumanize: (channelIndex: number) => void;
   onInterpolate: (channelIndex: number) => void;
+  onAcidGenerator: (channelIndex: number) => void;
 }
 
 export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
@@ -63,6 +64,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onTranspose,
   onHumanize,
   onInterpolate,
+  onAcidGenerator,
 }) => {
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
   const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, patterns } = useTrackerStore();
@@ -279,6 +281,12 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
             label: GENERATORS.random.name,
             onClick: () => onFillPattern(channelIndex, 'random'),
           },
+          {
+            id: 'fill-acid',
+            label: '🎛️ Acid Generator...',
+            icon: <Wand2 size={14} />,
+            onClick: () => onAcidGenerator(channelIndex),
+          },
           { type: 'divider' },
           // Bass category
           {
@@ -460,6 +468,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     onTranspose,
     onHumanize,
     onInterpolate,
+    onAcidGenerator,
     toggleChannelMute,
     toggleChannelSolo,
     removeChannel,

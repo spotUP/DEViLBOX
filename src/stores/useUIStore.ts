@@ -7,6 +7,8 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import type { PanelType } from '@typedefs/project';
 
+export type PerformanceQuality = 'high' | 'medium' | 'low';
+
 interface UIStore {
   // State
   visiblePanels: PanelType[];
@@ -21,6 +23,10 @@ interface UIStore {
   oscilloscopeVisible: boolean;
   compactToolbar: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
+  uiVersion: number; // Track UI migrations
+
+  // Performance settings
+  performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -40,6 +46,9 @@ interface UIStore {
   toggleCompactToolbar: () => void;
   setCompactToolbar: (compact: boolean) => void;
   applyAutoCompact: () => void; // Auto-collapse panels on small screens
+
+  // Performance actions
+  setPerformanceQuality: (quality: PerformanceQuality) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -54,10 +63,14 @@ export const useUIStore = create<UIStore>()(
       useHexNumbers: true, // Default to hex numbers (FT2 style)
 
       // Responsive layout state (default to expanded/visible)
-      tb303Collapsed: false,
+      tb303Collapsed: true,
       oscilloscopeVisible: true,
-      compactToolbar: false,
+      compactToolbar: true,
       autoCompactApplied: false,
+      uiVersion: 0,
+
+      // Performance settings (default to high quality)
+      performanceQuality: 'high',
 
       // Actions
       togglePanel: (panel) =>
@@ -142,18 +155,29 @@ export const useUIStore = create<UIStore>()(
 
       applyAutoCompact: () =>
         set((state) => {
-          // Only apply once per session and only if screen is small
+          const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+
+          // Version 3: Force collapse panels for all users (inline styles fix)
+          if (state.uiVersion < 3) {
+            state.uiVersion = 3;
+            state.tb303Collapsed = true;
+            state.compactToolbar = true;
+          }
+
+          // Only apply once per session
           if (state.autoCompactApplied) return;
           state.autoCompactApplied = true;
 
-          const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
-
-          // If screen height is less than 800px, enable compact mode
+          // If screen height is less than 800px, also hide oscilloscope
           if (screenHeight < 800) {
-            state.tb303Collapsed = true;
             state.oscilloscopeVisible = false;
-            state.compactToolbar = true;
           }
+        }),
+
+      // Performance actions
+      setPerformanceQuality: (quality) =>
+        set((state) => {
+          state.performanceQuality = quality;
         }),
     })),
     {
@@ -166,6 +190,8 @@ export const useUIStore = create<UIStore>()(
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,
         useHexNumbers: state.useHexNumbers,
+        performanceQuality: state.performanceQuality,
+        uiVersion: state.uiVersion,
       }),
     }
   )

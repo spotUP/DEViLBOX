@@ -1,11 +1,13 @@
 /**
  * GridControls - Control bar for the grid sequencer
  *
- * Provides octave selection, pattern length, clear, and random generation.
+ * Provides octave selection, pattern length, scale selection, clear, and random generation.
  */
 
-import React from 'react';
-import { Trash2, Shuffle, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Shuffle, ChevronUp, ChevronDown, Cable, Wand2 } from 'lucide-react';
+import { ScaleSelector } from './ScaleSelector';
+import { MIDILearnPanel } from './MIDILearnPanel';
 
 interface GridControlsProps {
   baseOctave: number;
@@ -13,8 +15,13 @@ interface GridControlsProps {
   maxSteps: number;
   onMaxStepsChange: (steps: number) => void;
   onResizeAllPatterns: (steps: number) => void;
+  scaleKey: string;
+  rootNote: number;
+  onScaleChange: (scaleKey: string) => void;
+  onRootNoteChange: (rootNote: number) => void;
   onClearAll: () => void;
   onRandomize?: () => void;
+  onAcidGenerator?: () => void;
 }
 
 export const GridControls: React.FC<GridControlsProps> = ({
@@ -23,11 +30,19 @@ export const GridControls: React.FC<GridControlsProps> = ({
   maxSteps,
   onMaxStepsChange,
   onResizeAllPatterns,
+  scaleKey,
+  rootNote,
+  onScaleChange,
+  onRootNoteChange,
   onClearAll,
   onRandomize,
+  onAcidGenerator,
 }) => {
+  const [showMIDIPanel, setShowMIDIPanel] = useState(false);
+
   return (
-    <div className="flex items-center gap-4 p-2 bg-dark-bgSecondary border-b border-dark-border">
+    <>
+      <div className="flex items-center gap-4 p-2 bg-dark-bgSecondary border-b border-dark-border">
       {/* Base Octave */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-text-muted uppercase">Octave</span>
@@ -86,8 +101,41 @@ export const GridControls: React.FC<GridControlsProps> = ({
       {/* Separator */}
       <div className="w-px h-6 bg-dark-border" />
 
+      {/* Scale Selection */}
+      <ScaleSelector
+        scaleKey={scaleKey}
+        rootNote={rootNote}
+        onScaleChange={onScaleChange}
+        onRootNoteChange={onRootNoteChange}
+      />
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-dark-border" />
+
       {/* Actions */}
       <div className="flex items-center gap-1">
+        <button
+          onClick={() => setShowMIDIPanel(!showMIDIPanel)}
+          className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+            showMIDIPanel
+              ? 'bg-accent-primary text-white'
+              : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgActive'
+          }`}
+          title="MIDI Learn"
+        >
+          <Cable size={12} />
+          MIDI
+        </button>
+        {onAcidGenerator && (
+          <button
+            onClick={onAcidGenerator}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-dark-bgActive rounded transition-colors"
+            title="Generate 303 acid pattern"
+          >
+            <Wand2 size={12} />
+            Acid
+          </button>
+        )}
         {onRandomize && (
           <button
             onClick={onRandomize}
@@ -108,5 +156,13 @@ export const GridControls: React.FC<GridControlsProps> = ({
         </button>
       </div>
     </div>
+
+    {/* MIDI Learn Panel (collapsible) */}
+    {showMIDIPanel && (
+      <div className="border-b border-dark-border p-3 bg-dark-bg">
+        <MIDILearnPanel onClose={() => setShowMIDIPanel(false)} />
+      </div>
+    )}
+    </>
   );
 };

@@ -747,28 +747,108 @@ export const useTrackerInput = () => {
         const hexDigit = key.toUpperCase();
         const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
 
+        // FT2-style character-by-character editing
+        // Replace the character at cursor.digitIndex, then advance cursor
         if (cursor.columnType === 'instrument') {
           const currentValue = currentCell.instrument || 0;
           const currentHex = currentValue.toString(16).toUpperCase().padStart(2, '0');
-          const newHex = (currentHex[1] + hexDigit).padStart(2, '0');
+          const chars = currentHex.split('');
+
+          // Replace character at digitIndex
+          chars[cursor.digitIndex] = hexDigit;
+
+          const newHex = chars.join('');
           const newValue = parseInt(newHex, 16);
           setCell(cursor.channelIndex, cursor.rowIndex, { instrument: newValue });
+
+          // Advance cursor to next digit or next column
+          if (cursor.digitIndex < 1) {
+            // Move to next digit within same column
+            moveCursor('right');
+          } else {
+            // At last digit - move to next column and advance row if editStep > 0
+            moveCursor('right');
+            if (editStep > 0) {
+              const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+              moveCursorToRow(newRow);
+            }
+          }
         } else if (cursor.columnType === 'volume') {
           const currentValue = currentCell.volume || 0;
           const currentHex = currentValue.toString(16).toUpperCase().padStart(2, '0');
-          const newHex = (currentHex[1] + hexDigit).padStart(2, '0');
-          const newValue = Math.min(0x40, parseInt(newHex, 16));
+          const chars = currentHex.split('');
+
+          // Replace character at digitIndex
+          chars[cursor.digitIndex] = hexDigit;
+
+          const newHex = chars.join('');
+          const newValue = parseInt(newHex, 16);
           setCell(cursor.channelIndex, cursor.rowIndex, { volume: newValue });
+
+          // Advance cursor
+          if (cursor.digitIndex < 1) {
+            moveCursor('right');
+          } else {
+            moveCursor('right');
+            if (editStep > 0) {
+              const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+              moveCursorToRow(newRow);
+            }
+          }
         } else if (cursor.columnType === 'effect') {
           const currentValue = currentCell.effect || '...';
-          const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
-          const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
+          let currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
+          const chars = currentStr.split('');
+
+          // For effect column: digit 0 is the command letter, digits 1-2 are hex parameters
+          if (cursor.digitIndex === 0) {
+            // Effect command letter (0-9, A-Z)
+            chars[0] = hexDigit;
+          } else {
+            // Effect parameters (hex digits)
+            chars[cursor.digitIndex] = hexDigit;
+          }
+
+          const newStr = chars.join('');
           setCell(cursor.channelIndex, cursor.rowIndex, { effect: newStr });
+
+          // Advance cursor
+          if (cursor.digitIndex < 2) {
+            moveCursor('right');
+          } else {
+            moveCursor('right');
+            if (editStep > 0) {
+              const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+              moveCursorToRow(newRow);
+            }
+          }
         } else if (cursor.columnType === 'effect2') {
           const currentValue = currentCell.effect2 || '...';
-          const currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
-          const newStr = (currentStr[1] + currentStr[2] + hexDigit).slice(-3);
+          let currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
+          const chars = currentStr.split('');
+
+          // For effect column: digit 0 is the command letter, digits 1-2 are hex parameters
+          if (cursor.digitIndex === 0) {
+            // Effect command letter
+            chars[0] = hexDigit;
+          } else {
+            // Effect parameters (hex digits)
+            chars[cursor.digitIndex] = hexDigit;
+          }
+
+          const newStr = chars.join('');
           setCell(cursor.channelIndex, cursor.rowIndex, { effect2: newStr });
+
+          // Advance cursor
+          if (cursor.digitIndex < 2) {
+            moveCursor('right');
+          } else {
+            moveCursor('right');
+            if (editStep > 0) {
+              const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+              moveCursorToRow(newRow);
+            }
+          }
         }
         return;
       }

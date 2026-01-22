@@ -7,7 +7,19 @@
  * - Right-click context menu
  */
 
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+
+// MIDI velocity constants
+const MIDI_VELOCITY_MIN = 1;
+const MIDI_VELOCITY_MAX = 127;
+const VELOCITY_WHEEL_STEP = 5;
+
+// Velocity opacity visualization constants
+const VELOCITY_OPACITY_MIN = 0.3;
+const VELOCITY_OPACITY_MAX = 1.0;
+const VELOCITY_OPACITY_RANGE = VELOCITY_OPACITY_MAX - VELOCITY_OPACITY_MIN;
 
 interface GridCellProps {
   isActive: boolean;
@@ -63,9 +75,11 @@ interface NoteContextMenuProps {
   accent: boolean;
   slide: boolean;
   octaveShift: number;
+  velocity: number;
   onToggleAccent: () => void;
   onToggleSlide: () => void;
   onSetOctave: (shift: number) => void;
+  onSetVelocity: (velocity: number) => void;
   onClose: () => void;
 }
 
@@ -75,18 +89,39 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
   accent,
   slide,
   octaveShift,
+  velocity,
   onToggleAccent,
   onToggleSlide,
   onSetOctave,
+  onSetVelocity,
   onClose,
 }) => {
+  const [localVelocity, setLocalVelocity] = useState(velocity);
+
+  const handleVelocityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVel = parseInt(e.target.value, 10);
+    setLocalVelocity(newVel);
+    onSetVelocity(newVel);
+  };
+
+  // Add Escape key handler for accessibility
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
   return (
     <>
       {/* Backdrop to close menu */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
       {/* Menu */}
       <div
-        className="fixed z-50 bg-dark-bgSecondary border border-dark-border rounded shadow-lg py-1 min-w-[120px]"
+        className="fixed z-50 bg-dark-bgSecondary border border-dark-border rounded shadow-lg py-1 min-w-[160px]"
         style={{ left: x, top: y }}
       >
         <button
@@ -125,6 +160,42 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
           <span className={`w-3 h-3 rounded-sm ${octaveShift === -1 ? 'bg-accent-primary ring-2 ring-pink-400 ring-inset' : 'border border-text-muted'}`} />
           Oct- {octaveShift === -1 && '✓'}
         </button>
+        <div className="border-t border-dark-border my-1" />
+        {/* Velocity slider */}
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-text-secondary">Velocity</span>
+            <span className="text-xs text-text-primary font-mono">{localVelocity}</span>
+          </div>
+          <input
+            type="range"
+            min={MIDI_VELOCITY_MIN}
+            max={MIDI_VELOCITY_MAX}
+            value={localVelocity}
+            onChange={handleVelocityChange}
+            className="w-full h-1 bg-dark-bgTertiary rounded-lg appearance-none cursor-pointer accent-accent-primary"
+          />
+          <div className="flex justify-between mt-1 text-[10px] text-text-muted">
+            <button
+              onClick={() => { onSetVelocity(64); setLocalVelocity(64); }}
+              className="hover:text-text-secondary"
+            >
+              50%
+            </button>
+            <button
+              onClick={() => { onSetVelocity(100); setLocalVelocity(100); }}
+              className="hover:text-text-secondary"
+            >
+              Default
+            </button>
+            <button
+              onClick={() => { onSetVelocity(MIDI_VELOCITY_MAX); setLocalVelocity(MIDI_VELOCITY_MAX); }}
+              className="hover:text-text-secondary"
+            >
+              Max
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -136,13 +207,17 @@ interface NoteCellProps {
   stepIndex: number;
   isActive: boolean;
   isCurrentStep: boolean;
+  isFocused?: boolean;
   accent?: boolean;
   slide?: boolean;
   octaveShift?: number;
+  velocity?: number;
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
   onSetOctave?: (stepIndex: number, shift: number) => void;
+  onSetVelocity?: (stepIndex: number, velocity: number) => void;
+  onFocus?: () => void;
 }
 
 export const NoteGridCell: React.FC<NoteCellProps> = memo(({
@@ -150,13 +225,17 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   stepIndex,
   isActive,
   isCurrentStep,
+  isFocused = false,
   accent = false,
   slide = false,
   octaveShift = 0,
+  velocity = 100,
   onClick,
   onToggleAccent,
   onToggleSlide,
   onSetOctave,
+  onSetVelocity,
+  onFocus,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -208,6 +287,29 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
     onSetOctave?.(stepIndex, shift);
   }, [onSetOctave, stepIndex]);
 
+  const handleSetVelocity = useCallback((vel: number) => {
+    onSetVelocity?.(stepIndex, vel);
+  }, [onSetVelocity, stepIndex]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!isActive || !onSetVelocity) return;
+    e.preventDefault();
+
+    // Adjust velocity by ±5 per scroll step
+    const delta = e.deltaY > 0 ? -VELOCITY_WHEEL_STEP : VELOCITY_WHEEL_STEP;
+    const newVelocity = Math.max(MIDI_VELOCITY_MIN, Math.min(MIDI_VELOCITY_MAX, velocity + delta));
+    onSetVelocity(stepIndex, newVelocity);
+  }, [isActive, onSetVelocity, stepIndex, velocity]);
+
+  const handleFocus = useCallback(() => {
+    onFocus?.();
+  }, [onFocus]);
+
+  // Calculate velocity-based opacity (30-100% range for better visibility)
+  const velocityToOpacity = (vel: number) => {
+    return VELOCITY_OPACITY_MIN + (vel / MIDI_VELOCITY_MAX) * VELOCITY_OPACITY_RANGE;
+  };
+
   // Determine base color based on state
   const getBaseClasses = () => {
     if (!isActive) {
@@ -234,13 +336,21 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
       <button
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onWheel={handleWheel}
+        onFocus={handleFocus}
+        tabIndex={isFocused ? 0 : -1}
         className={`
           w-7 h-7 rounded transition-all duration-75 border relative
           ${getBaseClasses()}
           ${isCurrentStep ? 'ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg' : getOctaveBorderClasses()}
+          ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
           ${isActive ? 'shadow-sm' : ''}
+          focus:outline-none
         `}
-        title={isActive ? 'Shift+click: accent, Ctrl+click: slide, Alt+click: octave' : ''}
+        style={isActive ? { opacity: velocityToOpacity(velocity) } : undefined}
+        title={isActive ? `Velocity: ${velocity} | Shift+click: accent, Ctrl+click: slide, Alt+click: octave, Scroll: velocity` : ''}
+        aria-label={`Step ${stepIndex + 1}, Note ${NOTE_NAMES[noteIndex]}${isActive ? `, Active` : ''}`}
+        aria-pressed={isActive}
       >
         {/* Slide indicator - diagonal line */}
         {isActive && slide && (
@@ -258,9 +368,11 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           accent={accent}
           slide={slide}
           octaveShift={octaveShift}
+          velocity={velocity}
           onToggleAccent={handleToggleAccent}
           onToggleSlide={handleToggleSlide}
           onSetOctave={handleSetOctave}
+          onSetVelocity={handleSetVelocity}
           onClose={handleCloseMenu}
         />
       )}

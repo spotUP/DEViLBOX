@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useTransportStore, useInstrumentStore, useUIStore } from '@stores';
+import { useAnimationFrame } from '@hooks/useAnimationCoordinator';
 import { NoteCell } from './NoteCell';
 import { InstrumentCell } from './InstrumentCell';
 import { VolumeCell } from './VolumeCell';
@@ -66,9 +67,10 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   const [scrollLeft, setScrollLeft] = useState(0);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const scrollIntervalRef = useRef<number | null>(null);
+  const mouseMoveHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
 
   const [smoothOffset, setSmoothOffset] = useState(0);
-  const animationFrameRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   // Sync cursor to playback
   useEffect(() => {
@@ -77,26 +79,33 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
     }
   }, [isPlaying, followPlayback, currentRow, cursor.rowIndex, moveCursorToRow]);
 
-  // Smooth scroll animation
+  // Check performance quality for smooth scrolling
+  const performanceQuality = useUIStore((state) => state.performanceQuality);
+  const smoothScrollingEnabled = smoothScrolling && performanceQuality === 'high';
+
+  // Reset smooth scroll animation when currentRow changes
   useEffect(() => {
-    if (!isPlaying || !smoothScrolling) {
+    if (isPlaying && smoothScrollingEnabled) {
+      startTimeRef.current = performance.now();
       setSmoothOffset(0);
-      return;
+    } else {
+      setSmoothOffset(0);
     }
-    const startTime = performance.now();
-    const speed = 6;
-    const secondsPerRow = (2.5 / bpm) * speed;
-    const durationMs = secondsPerRow * 1000;
-    const animate = () => {
-      const elapsed = performance.now() - startTime;
+  }, [currentRow, isPlaying, smoothScrollingEnabled]);
+
+  // Centralized smooth scroll animation (only on high quality)
+  useAnimationFrame(
+    'pattern-smooth-scroll',
+    isPlaying && smoothScrollingEnabled ? () => {
+      const speed = 6;
+      const secondsPerRow = (2.5 / bpm) * speed;
+      const durationMs = secondsPerRow * 1000;
+      const elapsed = performance.now() - startTimeRef.current;
       const progress = Math.min(elapsed / durationMs, 1);
       setSmoothOffset(progress);
-      if (progress < 1) animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = requestAnimationFrame(animate);
-    return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); };
-  }, [currentRow, isPlaying, smoothScrolling, bpm]);
+    } : null,
+    [isPlaying, smoothScrollingEnabled, bpm]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -110,11 +119,34 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
 
   useEffect(() => {
     const handleMouseUp = () => {
-      if (isDragging) { setIsDragging(false); endSelection(); }
-      if (scrollIntervalRef.current) { window.clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; }
+      if (isDragging) {
+        setIsDragging(false);
+        endSelection();
+      }
+
+      // Clean up scroll interval
+      if (scrollIntervalRef.current) {
+        window.clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+
+      // Clean up mousemove listener
+      if (mouseMoveHandlerRef.current) {
+        window.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+        mouseMoveHandlerRef.current = null;
+      }
     };
     window.addEventListener('mouseup', handleMouseUp);
-    return () => window.removeEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+      // Ensure cleanup happens even on unmount
+      if (scrollIntervalRef.current) {
+        window.clearInterval(scrollIntervalRef.current);
+      }
+      if (mouseMoveHandlerRef.current) {
+        window.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+      }
+    };
   }, [isDragging, endSelection]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => setScrollLeft(e.currentTarget.scrollLeft);
@@ -132,7 +164,19 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
     updateSelection(channelIndex, rowIndex);
     const container = containerRef.current;
     if (!container) return;
-    if (scrollIntervalRef.current) { window.clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null; }
+
+    // Clean up previous scroll interval
+    if (scrollIntervalRef.current) {
+      window.clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    // Clean up previous mousemove listener to prevent memory leak
+    if (mouseMoveHandlerRef.current) {
+      window.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+      mouseMoveHandlerRef.current = null;
+    }
+
     const rect = container.getBoundingClientRect();
     const threshold = 40;
     const checkScroll = (clientY: number) => {
@@ -142,18 +186,21 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
       if (speed !== 0 && !scrollIntervalRef.current) {
         scrollIntervalRef.current = window.setInterval(() => { container.scrollTop += speed; }, 16);
       } else if (speed === 0 && scrollIntervalRef.current) {
-        window.clearInterval(scrollIntervalRef.current); scrollIntervalRef.current = null;
+        window.clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
       }
     };
+
+    // Store the handler so we can clean it up later
     const move = (e: MouseEvent) => checkScroll(e.clientY);
+    mouseMoveHandlerRef.current = move;
     window.addEventListener('mousemove', move);
-    return () => window.removeEventListener('mousemove', move);
   }, [isDragging, updateSelection]);
 
   const numRowsTotal = (pattern?.length || 64) + (showGhostPatterns ? GHOST_ROWS * 2 : 0);
   const getColumnWidth = useMemo(() => (index: number) =>
     index === 0 ? ROW_NUMBER_WIDTH : COLUMN_WIDTH_BASE,
-  [pattern]);
+  []);
 
   const rowVirtualizer = useVirtualizer({
     count: numRowsTotal, getScrollElement: () => containerRef.current, estimateSize: () => ROW_HEIGHT, overscan: OVERSCAN_ROW_COUNT,
@@ -168,7 +215,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   useEffect(() => {
     if (isPlaying) {
       const baseIdx = showGhostPatterns ? currentRow + GHOST_ROWS : currentRow;
-      if (smoothScrolling) {
+      if (smoothScrollingEnabled) {
         const offset = (baseIdx + smoothOffset) * ROW_HEIGHT - (dimensions.height / 2) + (ROW_HEIGHT / 2);
         containerRef.current?.scrollTo({ top: offset, behavior: 'auto' });
       } else {
@@ -178,15 +225,9 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
       const idx = cursor.rowIndex;
       rowVirtualizer.scrollToIndex(showGhostPatterns ? idx + GHOST_ROWS : idx, { align: 'center' });
     }
-  }, [cursor.rowIndex, currentRow, isPlaying, rowVirtualizer, showGhostPatterns, smoothScrolling, smoothOffset, dimensions.height]);
+  }, [cursor.rowIndex, currentRow, isPlaying, rowVirtualizer, showGhostPatterns, smoothScrollingEnabled, smoothOffset, dimensions.height]);
 
   if (!pattern) return <div className="flex-1 flex items-center justify-center text-text-muted font-mono">No pattern loaded</div>;
-
-  const channelWidths = pattern.channels.map((_, i) => getColumnWidth(i + 1));
-  const channelOffsets = pattern.channels.reduce((acc, _, i) => {
-    acc.push(i === 0 ? ROW_NUMBER_WIDTH : acc[i - 1] + channelWidths[i - 1]);
-    return acc;
-  }, [] as number[]);
 
   const selectionInfo = selection ? { rows: Math.abs(selection.endRow - selection.startRow) + 1, channels: Math.abs(selection.endChannel - selection.startChannel) + 1 } : null;
 
@@ -216,7 +257,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
               </div>
               <div className="h-1/2 w-full relative bg-dark-bg/20 overflow-hidden">
                 <div className="absolute inset-0 px-1 py-0.5 opacity-50">
-                  <ChannelVUMeters channelWidths={channelWidths} channelOffsets={channelOffsets} />
+                  <ChannelVUMeters />
                 </div>
               </div>
             </div>
@@ -236,14 +277,14 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
         <div className="sticky bottom-0 w-full h-0 pointer-events-none z-50 overflow-visible" style={{ transform: `translateX(${scrollLeft}px)` }}>
           <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2" style={{ width: 'max-content' }}>
             {selection && selectionInfo && (
-              <div className="px-3 py-1.5 rounded border border-accent-primary/50 bg-dark-bgSecondary/90 backdrop-blur-md text-accent-primary flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-200 pointer-events-auto shadow-xl">
+              <div className="px-3 py-1.5 rounded border border-accent-primary/50 bg-dark-bgSecondary/90 text-accent-primary flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-200 pointer-events-auto shadow-xl">
                 <div className="flex flex-col"><span className="text-[10px] font-bold leading-none">BLOCK: {selectionInfo.rows}x{selectionInfo.channels}</span><span className="text-[8px] opacity-70 font-mono tracking-tight">R{Math.min(selection.startRow, selection.endRow)}-{Math.max(selection.startRow, selection.endRow)} | C{Math.min(selection.startChannel, selection.endChannel)}-{Math.max(selection.startChannel, selection.endChannel)}</span></div>
                 <button onClick={(e) => { e.stopPropagation(); clearSelection(); }} className="p-1 hover:bg-accent-primary/20 rounded text-accent-primary"><Circle size={12} className="rotate-45" strokeWidth={3} /></button>
               </div>
             )}
             <div className="flex items-center gap-2 pointer-events-auto">
-              <div className={`px-2 py-1 rounded border flex items-center gap-2 bg-dark-bgSecondary/80 backdrop-blur-sm ${recordMode ? 'border-accent-error/50 text-accent-error' : 'border-dark-border text-text-muted'}`}><Circle size={10} fill={recordMode ? 'currentColor' : 'transparent'} /><span className="text-[10px] font-bold tracking-wider uppercase">{recordMode ? 'REC' : 'EDIT'}</span></div>
-              <div className="px-2 py-1 rounded border border-dark-border bg-dark-bgSecondary/80 backdrop-blur-sm text-text-muted"><span className="text-[10px] font-bold">STEP: {editStep}</span></div>
+              <div className={`px-2 py-1 rounded border flex items-center gap-2 bg-dark-bgSecondary/80 ${recordMode ? 'border-accent-error/50 text-accent-error' : 'border-dark-border text-text-muted'}`}><Circle size={10} fill={recordMode ? 'currentColor' : 'transparent'} /><span className="text-[10px] font-bold tracking-wider uppercase">{recordMode ? 'REC' : 'EDIT'}</span></div>
+              <div className="px-2 py-1 rounded border border-dark-border bg-dark-bgSecondary/80 text-text-muted"><span className="text-[10px] font-bold">STEP: {editStep}</span></div>
             </div>
           </div>
         </div>

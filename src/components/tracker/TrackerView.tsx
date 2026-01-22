@@ -8,6 +8,7 @@ import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
+import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
@@ -15,16 +16,19 @@ import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
+import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
+import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
+import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
-import { AdvancedEditPanel } from './AdvancedEditPanel';
 import { MobileTrackerView } from './MobileTrackerView';
 import { LiveModeToggle } from './LiveModeIndicator';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Eye, EyeOff, Zap } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Menu, Activity } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
+import { AutomationPanel } from '@components/automation/AutomationPanel';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
@@ -146,7 +150,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   showInstrumentFX,
   showImportModule: externalShowImportModule,
 }) => {
-  const { isMobile } = useResponsive();
+  const { isMobile, width: windowWidth } = useResponsive();
 
   // PERFORMANCE OPTIMIZATION: Use individual selectors to prevent unnecessary re-renders
   const patterns = useTrackerStore((state) => state.patterns);
@@ -181,6 +185,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showRemapInstrument, setShowRemapInstrument] = useState(false);
   const [volumeOpScope, setVolumeOpScope] = useState<'block' | 'track' | 'pattern'>('block');
   const [remapOpScope, setRemapOpScope] = useState<'block' | 'track' | 'pattern' | 'song'>('block');
+  // Acid generator dialog
+  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
+  const [acidGeneratorChannel, setAcidGeneratorChannel] = useState(0);
+  // Pattern order modal
+  const [showPatternOrder, setShowPatternOrder] = useState(false);
 
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
@@ -189,6 +198,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Instrument panel state
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
+
+  // FPS monitoring and auto-degradation
+  const { fps, averageFps, quality } = useFPSMonitor({
+    enableAutoDegradation: true,
+    degradeThreshold: 40,
+    recoverThreshold: 55,
+    checkInterval: 2000,
+  });
 
   // Sync grid channel with tracker cursor when switching views
   useEffect(() => {
@@ -329,6 +347,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       `Samplers: ${samplerCount}`);
   }, [loadInstruments, loadPatterns, setMetadata, setBPM]);
 
+  // Acid generator handler
+  const handleAcidGenerator = useCallback((channelIndex: number) => {
+    setAcidGeneratorChannel(channelIndex);
+    setShowAcidGenerator(true);
+  }, []);
+
   const pattern = patterns[currentPatternIndex];
 
   // Mobile view with tabbed interface
@@ -382,37 +406,75 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             onCancel={() => setShowRemapInstrument(false)}
           />
         )}
+        {showAcidGenerator && (
+          <AcidPatternGeneratorDialog
+            channelIndex={acidGeneratorChannel}
+            onClose={() => setShowAcidGenerator(false)}
+          />
+        )}
       </>
     );
   }
 
   // Desktop view
   return (
-    <div className="flex-1 flex flex-col bg-dark-bg overflow-hidden">
-      {/* Top Control Bar - Horizontal scroll for overflow */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10 w-full overflow-x-auto">
-        {/* Pattern Info - Flexible with minimum size */}
-        <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+    <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
+      {/* Top Control Bar - Simple pattern info */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10">
+        <div className="flex items-center gap-2">
           <LiveModeToggle />
           <span className="text-accent-primary font-bold font-mono text-xs whitespace-nowrap">
             {pattern?.name || 'Untitled'}
           </span>
         </div>
+      </div>
 
-        {/* View Mode Controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+      {/* FT2 Style Toolbar */}
+      <div className="flex-shrink-0">
+        <FT2Toolbar
+          onShowExport={onShowExport}
+          onShowHelp={onShowHelp}
+          onShowMasterFX={onShowMasterFX}
+          onShowInstrumentFX={onShowInstrumentFX}
+          onShowInstruments={onShowInstruments}
+          onShowPatternOrder={() => setShowPatternOrder(true)}
+          onImport={() => setShowImportModule(true)}
+          showMasterFX={showMasterFX}
+          showInstrumentFX={showInstrumentFX}
+        />
+      </div>
+
+      {/* TB-303 Live Knobs (compact view when not in TB-303 editor mode) */}
+      {viewMode !== 'tb303' && (
+        <div className="flex-shrink-0 max-h-[120px] overflow-y-auto">
+          <TB303KnobPanel />
+        </div>
+      )}
+
+      {/* Editor Controls Toolbar */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
+        <div className="flex items-center gap-3">
+          {/* Menu icon */}
+          <Menu size={16} className="text-text-muted" />
+
           {/* View Mode Dropdown */}
-          <select
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value as ViewMode)}
-            className="px-3 py-1.5 text-sm bg-dark-bgTertiary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
-            title="Select editor view"
-          >
-            <option value="tracker">📝 Tracker</option>
-            <option value="grid">🎹 Grid</option>
-            <option value="pianoroll">🎵 Piano Roll</option>
-            <option value="tb303">🔊 TB-303</option>
-          </select>
+          <div className="flex items-center gap-1.5">
+            {viewMode === 'tracker' && <List size={16} className="text-text-secondary" />}
+            {viewMode === 'grid' && <Grid3x3 size={16} className="text-text-secondary" />}
+            {viewMode === 'pianoroll' && <Piano size={16} className="text-text-secondary" />}
+            {viewMode === 'tb303' && <Radio size={16} className="text-text-secondary" />}
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as ViewMode)}
+              className="px-3 py-1.5 text-sm bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+              title="Select editor view"
+            >
+              <option value="tracker">Tracker</option>
+              <option value="grid">Grid</option>
+              <option value="pianoroll">Piano Roll</option>
+              <option value="tb303">TB-303</option>
+            </select>
+          </div>
 
           {/* Channel Selector (grid and piano roll views) */}
           {(viewMode === 'grid' || viewMode === 'pianoroll') && pattern && (
@@ -421,7 +483,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <select
                 value={gridChannelIndex}
                 onChange={(e) => setGridChannelIndex(Number(e.target.value))}
-                className="px-3 py-1.5 text-sm bg-dark-bgTertiary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+                className="px-3 py-1.5 text-sm bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
               >
                 {pattern.channels.map((_, idx) => (
                   <option key={idx} value={idx}>
@@ -434,115 +496,112 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Ghost Patterns Toggle (tracker view only) */}
           {viewMode === 'tracker' && (
-            <>
-              <button
-                onClick={() => setShowGhostPatterns(!showGhostPatterns)}
-                className={`
-                  flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
-                  ${showGhostPatterns
-                    ? 'bg-accent-primary/20 text-accent-primary'
-                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
-                  }
-                `}
-                title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
-              >
-                {showGhostPatterns ? <Eye size={14} /> : <EyeOff size={14} />}
-                <span className="hidden lg:inline">Ghosts</span>
-              </button>
-              <button
-                onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
-                className={`
-                  flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
-                  ${showAdvancedEdit
-                    ? 'bg-accent-primary/20 text-accent-primary'
-                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary'
-                  }
-                `}
-                title="Toggle Advanced Edit Panel"
-              >
-                <Zap size={14} />
-                <span className="hidden lg:inline">Adv Edit</span>
-              </button>
-            </>
+            <button
+              onClick={() => setShowGhostPatterns(!showGhostPatterns)}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors
+                ${showGhostPatterns
+                  ? 'bg-accent-primary/20 text-accent-primary'
+                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
+            >
+              {showGhostPatterns ? <Eye size={16} /> : <EyeOff size={16} />}
+              <span>Ghosts</span>
+            </button>
           )}
+
+          {/* Advanced Edit Toggle (tracker view only) */}
+          {viewMode === 'tracker' && (
+            <button
+              onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors
+                ${showAdvancedEdit
+                  ? 'bg-accent-primary/20 text-accent-primary'
+                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title="Toggle Advanced Edit Panel"
+            >
+              <Zap size={16} />
+              <span>Adv Edit</span>
+            </button>
+          )}
+
+          {/* Automation Editor Toggle (tracker view only) */}
+          {viewMode === 'tracker' && (
+            <button
+              onClick={() => setShowAutomation(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+              title="Open Automation Editor"
+            >
+              <Activity size={16} />
+              <span>Automation</span>
+            </button>
+          )}
+        </div>
+
+        {/* FPS / Quality Indicator */}
+        <div
+          className={`
+            flex items-center gap-1.5 px-3 py-1.5 text-sm rounded font-mono
+            ${quality === 'low'
+              ? 'bg-accent-error/20 text-accent-error'
+              : quality === 'medium'
+              ? 'bg-orange-500/20 text-orange-400'
+              : 'bg-green-500/20 text-green-400'
+            }
+          `}
+          title={`Performance: ${quality.toUpperCase()} | Avg FPS: ${averageFps} | Current: ${fps}`}
+        >
+          <span className="font-bold">{averageFps}</span>
+          <span className="text-xs opacity-70">FPS</span>
+          <div className={`w-2 h-2 rounded-full ${
+            quality === 'low' ? 'bg-accent-error' :
+            quality === 'medium' ? 'bg-orange-400' :
+            'bg-green-400'
+          } animate-pulse`} />
         </div>
       </div>
 
-      {/* FT2 Style Toolbar */}
-      <FT2Toolbar
-        onShowExport={onShowExport}
-        onShowHelp={onShowHelp}
-        onShowMasterFX={onShowMasterFX}
-        onShowInstrumentFX={onShowInstrumentFX}
-        onShowInstruments={onShowInstruments}
-        onImport={() => setShowImportModule(true)}
-        showMasterFX={showMasterFX}
-        showInstrumentFX={showInstrumentFX}
-      />
-
-      {/* TB-303 Live Knobs (compact view when not in TB-303 editor mode) */}
-      {viewMode !== 'tb303' && <TB303KnobPanel />}
-
-      {/* Main Content Area with Pattern Editor and Instrument Panel */}
-      <div className="flex-1 flex min-h-0 overflow-hidden relative z-10">
-        {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Takes remaining space */}
-        <div className="flex-1 w-full h-full overflow-hidden">
+      {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
+      <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
+        {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            <PatternEditor />
+            <PatternEditor onAcidGenerator={handleAcidGenerator} />
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
           ) : viewMode === 'pianoroll' ? (
             <PianoRoll channelIndex={gridChannelIndex} />
           ) : (
-            <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-dark-bgPrimary">
+            <div className="flex-1 w-full overflow-y-auto overflow-x-hidden bg-dark-bgPrimary">
               <TB303View channelIndex={gridChannelIndex} />
             </div>
           )}
         </div>
 
-        {/* Advanced Edit Panel */}
-        {showAdvancedEdit && (
-          <AdvancedEditPanel
-            onShowScaleVolume={(scope) => {
-              setVolumeOpScope(scope);
-              setShowScaleVolume(true);
-            }}
-            onShowFadeVolume={(scope) => {
-              setVolumeOpScope(scope);
-              setShowFadeVolume(true);
-            }}
-            onShowRemapInstrument={(scope) => {
-              setRemapOpScope(scope);
-              setShowRemapInstrument(true);
-            }}
-            onExportPattern={() => {
-              const pattern = patterns[currentPatternIndex];
-              downloadPattern(pattern);
-            }}
-            onExportTrack={() => {
-              const pattern = patterns[currentPatternIndex];
-              downloadTrack(cursor.channelIndex, pattern);
-            }}
-          />
+        {/* Instrument Panel Toggle Button - Flex item 2 - Hide on narrow windows */}
+        {windowWidth >= 900 && (
+          <button
+            onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
+            className={`
+              flex-shrink-0 w-6 flex items-center justify-center
+              bg-ft2-header border-l border-ft2-border
+              hover:bg-ft2-border transition-colors
+              ${showInstrumentPanel ? 'text-ft2-highlight' : 'text-ft2-textDim'}
+            `}
+            title={showInstrumentPanel ? 'Hide Instruments' : 'Show Instruments'}
+          >
+            <Music2 size={14} className={showInstrumentPanel ? '' : 'rotate-180'} />
+          </button>
         )}
 
-        {/* Instrument Panel Toggle Button */}
-        <button
-          onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}
-          className={`
-            flex-shrink-0 w-6 flex items-center justify-center
-            bg-ft2-header border-l border-ft2-border
-            hover:bg-ft2-border transition-colors
-            ${showInstrumentPanel ? 'text-ft2-highlight' : 'text-ft2-textDim'}
-          `}
-          title={showInstrumentPanel ? 'Hide Instruments' : 'Show Instruments'}
-        >
-          <Music2 size={14} className={showInstrumentPanel ? '' : 'rotate-180'} />
-        </button>
-
-        {/* Instrument List Panel - Responsive width */}
-        {showInstrumentPanel && (
-          <div className="flex-shrink-0 w-64 max-w-[90vw] border-l border-ft2-border animate-fade-in h-full flex flex-col overflow-hidden">
+        {/* Instrument List Panel - Flex item 3 - Hide on narrow windows */}
+        {windowWidth >= 900 && showInstrumentPanel && (
+          <div className="flex-shrink-0 w-64 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
             <InstrumentListPanel onEditInstrument={onShowInstruments} />
           </div>
         )}
@@ -600,6 +659,66 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           }}
           onCancel={() => setShowRemapInstrument(false)}
         />
+      )}
+      {showPatternOrder && (
+        <PatternOrderModal onClose={() => setShowPatternOrder(false)} />
+      )}
+      {showAdvancedEdit && (
+        <AdvancedEditModal
+          onClose={() => setShowAdvancedEdit(false)}
+          onShowScaleVolume={(scope) => {
+            setVolumeOpScope(scope);
+            setShowScaleVolume(true);
+          }}
+          onShowFadeVolume={(scope) => {
+            setVolumeOpScope(scope);
+            setShowFadeVolume(true);
+          }}
+          onShowRemapInstrument={(scope) => {
+            setRemapOpScope(scope);
+            setShowRemapInstrument(true);
+          }}
+          onExportPattern={() => {
+            const pattern = patterns[currentPatternIndex];
+            downloadPattern(pattern);
+          }}
+          onExportTrack={() => {
+            const pattern = patterns[currentPatternIndex];
+            downloadTrack(cursor.channelIndex, pattern);
+          }}
+        />
+      )}
+      {showAcidGenerator && (
+        <AcidPatternGeneratorDialog
+          channelIndex={acidGeneratorChannel}
+          onClose={() => setShowAcidGenerator(false)}
+        />
+      )}
+      {showAutomation && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">
+              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                <Activity size={20} className="text-accent-primary" />
+                Automation Editor
+              </h2>
+              <button
+                onClick={() => setShowAutomation(false)}
+                className="p-2 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
+                title="Close"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto scrollbar-modern">
+              <AutomationPanel />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
