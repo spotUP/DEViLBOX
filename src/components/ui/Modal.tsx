@@ -14,7 +14,6 @@ interface ModalProps {
   theme?: 'modern' | 'retro'; // dark-* vs ft2-*
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
   backdropOpacity?: 'light' | 'medium' | 'dark'; // 50 | 60 | 80
-  backdropBlur?: boolean;
   rounded?: boolean; // true for modern, false for retro
 
   // Behavior
@@ -35,7 +34,6 @@ export const Modal: React.FC<ModalProps> = ({
   theme = 'modern',
   size = 'md',
   backdropOpacity = 'medium',
-  backdropBlur = false,
   rounded = true,
   closeOnBackdropClick = true,
   closeOnEscape = true,
@@ -75,7 +73,6 @@ export const Modal: React.FC<ModalProps> = ({
   const backdropClasses = `
     fixed inset-0 z-50 flex items-center justify-center p-4
     ${backdropOpacityMap[backdropOpacity]}
-    ${backdropBlur ? 'backdrop-blur-sm' : ''}
   `;
 
   // Size classes

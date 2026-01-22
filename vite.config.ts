@@ -24,10 +24,22 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['chiptune3'],
   },
+  server: {
+    // Reduce resource usage for better performance when running multiple servers
+    watch: {
+      usePolling: false, // Disable polling to reduce CPU usage
+      ignored: ['**/node_modules/**', '**/dist/**'],
+    },
+    hmr: {
+      overlay: false, // Reduce DOM operations
+    },
+  },
   build: {
     rollupOptions: {
       // Ensure worklet files are copied to output
       external: (id) => id.includes('chiptune3.worklet') || id.includes('libopenmpt.worklet'),
     },
+    // Reduce memory during build
+    chunkSizeWarningLimit: 1000,
   },
 })

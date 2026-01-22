@@ -190,6 +190,7 @@ interface TrackerStore {
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
+  setChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
 
   // Import/Export
   loadPatterns: (patterns: Pattern[]) => void;
@@ -1364,6 +1365,19 @@ export const useTrackerStore = create<TrackerStore>()(
             pattern.channels[channelIndex].color = color;
           }
         });
+      }),
+
+    setChannelRows: (channelIndex, rows) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+          // Ensure rows array matches pattern length
+          const paddedRows = [...rows];
+          while (paddedRows.length < pattern.length) {
+            paddedRows.push({ ...EMPTY_CELL });
+          }
+          pattern.channels[channelIndex].rows = paddedRows.slice(0, pattern.length);
+        }
       }),
 
     // Import/Export

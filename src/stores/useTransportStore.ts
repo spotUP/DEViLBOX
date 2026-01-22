@@ -32,6 +32,7 @@ interface TransportStore extends TransportState {
   togglePlayPause: () => void;
   setIsLooping: (looping: boolean) => void;
   setCurrentRow: (row: number, patternLength?: number) => void;
+  setCurrentRowThrottled: (row: number, patternLength?: number) => void; // NEW: Throttled version for playback
   setCurrentPattern: (index: number) => void;
   setSmoothScrolling: (smooth: boolean) => void;
   setMetronomeEnabled: (enabled: boolean) => void;
@@ -39,6 +40,13 @@ interface TransportStore extends TransportState {
   toggleMetronome: () => void;
   reset: () => void;
 }
+
+// Throttle state (outside Zustand store to avoid triggering re-renders)
+let lastUpdateTime = 0;
+let pendingRow: number | null = null;
+let pendingPatternLength: number | undefined = undefined;
+let throttleTimer: number | null = null;
+const THROTTLE_INTERVAL = 83; // ~12 updates per second (1000ms / 12 = 83ms)
 
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({
@@ -147,6 +155,41 @@ export const useTransportStore = create<TransportStore>()(
           // The play()/stop() actions handle resetting continuousRow when appropriate
         }
       }),
+
+    // Throttled version of setCurrentRow for playback (reduces re-renders from 60/sec to 12/sec)
+    setCurrentRowThrottled: (row, patternLength) => {
+      const now = performance.now();
+
+      // Store the latest pending values
+      pendingRow = row;
+      pendingPatternLength = patternLength;
+
+      // If enough time has passed, update immediately
+      if (now - lastUpdateTime >= THROTTLE_INTERVAL) {
+        lastUpdateTime = now;
+        _get().setCurrentRow(row, patternLength);
+        pendingRow = null;
+        pendingPatternLength = undefined;
+
+        // Clear any pending timer
+        if (throttleTimer !== null) {
+          clearTimeout(throttleTimer);
+          throttleTimer = null;
+        }
+      } else if (throttleTimer === null) {
+        // Schedule an update for the next throttle interval
+        throttleTimer = window.setTimeout(() => {
+          if (pendingRow !== null) {
+            lastUpdateTime = performance.now();
+            _get().setCurrentRow(pendingRow, pendingPatternLength);
+            pendingRow = null;
+            pendingPatternLength = undefined;
+          }
+          throttleTimer = null;
+        }, THROTTLE_INTERVAL - (now - lastUpdateTime));
+      }
+      // If timer is already scheduled, just update the pending values (already done above)
+    },
 
     setCurrentPattern: (index) =>
       set((state) => {

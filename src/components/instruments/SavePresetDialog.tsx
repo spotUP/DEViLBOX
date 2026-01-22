@@ -66,7 +66,6 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       size="sm"
       theme="modern"
       backdropOpacity="dark"
-      backdropBlur={true}
       closeOnBackdropClick={true}
       closeOnEscape={true}
     >

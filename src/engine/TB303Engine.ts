@@ -23,8 +23,11 @@ import * as Tone from 'tone';
 import type { TB303Config, DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
 import { GuitarMLEngine } from './GuitarMLEngine';
+import type { PerformanceQuality } from '@stores/useUIStore';
 
 export class TB303Synth {
+  // Performance quality level
+  private qualityLevel: PerformanceQuality = 'high';
   // Oscillator
   private oscillator: Tone.Oscillator;
   private oscillatorAsymmetry: Tone.WaveShaper; // Adds authentic 303 waveform character
@@ -146,6 +149,7 @@ export class TB303Synth {
     // === CASCADED FILTERS ===
     // Two 2-pole filters in series = 4-pole (24dB/oct) response
     // This gives a more authentic 303 filter sound
+    // Quality: Medium/Low uses single filter to save CPU
     const filterQ = this.resonanceToQ(this.config.filter.resonance);
 
     this.filter1 = new Tone.Filter({
@@ -1854,4 +1858,216 @@ export class TB303Synth {
   public isDevilFishEnabled(): boolean {
     return this.devilFish.enabled;
   }
+
+  // ============================================
+  // PERFORMANCE QUALITY MANAGEMENT
+  // ============================================
+
+  /**
+   * Set performance quality level
+   * Dynamically reconfigures signal chain to reduce CPU usage on slower systems
+   * while maintaining characteristic TB-303 sound
+   *
+   * - High: Full chain (cascaded filters, all processing)
+   * - Medium: Simplified chain (single filter, no GuitarML, reduced extra filters)
+   * - Low: Minimal chain (basic oscillator + filter + VCA only)
+   */
+  public setQuality(quality: PerformanceQuality): void {
+    if (this.qualityLevel === quality) return; // Already at this quality level
+
+    console.log(`[TB303Synth] Changing quality from ${this.qualityLevel} to ${quality}`);
+    this.qualityLevel = quality;
+
+    // Disconnect all nodes
+    this.disconnectSignalChain();
+
+    // Reconnect based on quality level
+    switch (quality) {
+      case 'high':
+        this.connectHighQuality();
+        break;
+      case 'medium':
+        this.connectMediumQuality();
+        break;
+      case 'low':
+        this.connectLowQuality();
+        break;
+    }
+
+    console.log(`[TB303Synth] Quality set to ${quality}`);
+  }
+
+  /**
+   * Get current quality level
+   */
+  public getQuality(): PerformanceQuality {
+    return this.qualityLevel;
+  }
+
+  /**
+   * Disconnect entire signal chain
+   */
+  private disconnectSignalChain(): void {
+    // Disconnect all nodes safely
+    try {
+      this.oscillator.disconnect();
+      this.oscillatorAsymmetry.disconnect();
+      this.preFilterHP.disconnect();
+      this.filter1.disconnect();
+      this.filter2.disconnect();
+      this.filterSaturation.disconnect();
+      this.allpassFilter.disconnect();
+      this.postFilterHP.disconnect();
+      this.notchFilter.disconnect();
+      this.overdriveGain.disconnect();
+      this.overdrive.disconnect();
+      this.guitarMLBypass.disconnect();
+      this.vca.disconnect();
+      this.accentGain.disconnect();
+      this.accentClick.disconnect();
+      this.vcaEnvelope.disconnect();
+      this.vcaBleed.disconnect();
+      this.muffler.disconnect();
+
+      // Disconnect GuitarML if active
+      if (this.guitarML && this.guitarML.isReady()) {
+        this.guitarML.disconnect();
+      }
+    } catch (error) {
+      console.warn('[TB303Synth] Error disconnecting nodes:', error);
+    }
+  }
+
+  /**
+   * Connect HIGH QUALITY signal chain
+   * Full TB-303 emulation with all processing stages
+   *
+   * Chain: Oscillator → Asymmetry → PreHP → Filter1 → Filter2 → FilterSaturation →
+   *        Allpass → PostHP → Notch → OverdriveGain → [Overdrive OR GuitarML] →
+   *        VCA → AccentGain → AccentClick → VCAEnvelope → Muffler → Output
+   *        VCA → VCABleed → Output (parallel path)
+   */
+  private connectHighQuality(): void {
+    // Full signal chain (as in constructor)
+    this.oscillator.connect(this.oscillatorAsymmetry);
+    this.oscillatorAsymmetry.connect(this.preFilterHP);
+    this.preFilterHP.connect(this.filter1);
+    this.filter1.connect(this.filter2);
+    this.filter2.connect(this.filterSaturation);
+    this.filterSaturation.connect(this.allpassFilter);
+    this.allpassFilter.connect(this.postFilterHP);
+    this.postFilterHP.connect(this.notchFilter);
+    this.notchFilter.connect(this.overdriveGain);
+
+    // Overdrive routing: waveshaper or GuitarML
+    if (this.guitarMLEnabled && this.guitarML && this.guitarML.isReady()) {
+      this.overdriveGain.connect(this.guitarML.getInput());
+      this.guitarML.connect(this.guitarMLBypass);
+    } else {
+      this.overdriveGain.connect(this.overdrive);
+      this.overdrive.connect(this.guitarMLBypass);
+    }
+
+    this.guitarMLBypass.connect(this.vca);
+    this.vca.connect(this.accentGain);
+    this.accentGain.connect(this.accentClick);
+    this.accentClick.connect(this.vcaEnvelope);
+    this.vcaEnvelope.connect(this.muffler);
+    this.muffler.connect(this.output);
+
+    // VCA bleed path (parallel)
+    this.vca.connect(this.vcaBleed);
+    this.vcaBleed.connect(this.output);
+
+    // Reconnect filter envelopes to BOTH filters
+    this.filterEnvelope.disconnect();
+    this.filterEnvelope.connect(this.filter1.frequency);
+    this.filterEnvelope.connect(this.filter2.frequency);
+  }
+
+  /**
+   * Connect MEDIUM QUALITY signal chain
+   * Simplified processing - maintains TB-303 character with reduced CPU usage
+   *
+   * Optimizations:
+   * - Single filter instead of cascaded dual filters (saves ~40% filter CPU)
+   * - Bypass allpass and notch filters (subtle phase/rumble correction)
+   * - Disable GuitarML neural network (heavy processing)
+   * - Keep essential: oscillator asymmetry, pre/post HP, filter saturation
+   *
+   * Chain: Oscillator → Asymmetry → PreHP → Filter1 → FilterSaturation →
+   *        PostHP → OverdriveGain → Overdrive → VCA → AccentGain → AccentClick →
+   *        VCAEnvelope → Muffler → Output
+   *        VCA → VCABleed → Output (parallel path)
+   */
+  private connectMediumQuality(): void {
+    // Simplified chain - bypass second filter, allpass, notch, and GuitarML
+    this.oscillator.connect(this.oscillatorAsymmetry);
+    this.oscillatorAsymmetry.connect(this.preFilterHP);
+    this.preFilterHP.connect(this.filter1);
+    // Skip filter2 - use single filter (saves CPU)
+    this.filter1.connect(this.filterSaturation);
+    // Skip allpassFilter and notchFilter
+    this.filterSaturation.connect(this.postFilterHP);
+    this.postFilterHP.connect(this.overdriveGain);
+
+    // Always use waveshaper overdrive (skip GuitarML for medium quality)
+    this.overdriveGain.connect(this.overdrive);
+    this.overdrive.connect(this.guitarMLBypass);
+
+    this.guitarMLBypass.connect(this.vca);
+    this.vca.connect(this.accentGain);
+    this.accentGain.connect(this.accentClick);
+    this.accentClick.connect(this.vcaEnvelope);
+    this.vcaEnvelope.connect(this.muffler);
+    this.muffler.connect(this.output);
+
+    // VCA bleed path (parallel)
+    this.vca.connect(this.vcaBleed);
+    this.vcaBleed.connect(this.output);
+
+    // Connect filter envelope to single filter only
+    this.filterEnvelope.disconnect();
+    this.filterEnvelope.connect(this.filter1.frequency);
+
+    // Compensate for single filter by slightly boosting Q for similar character
+    // (cascaded filters have cumulative resonance response)
+    const currentQ = this.filter1.Q.value;
+    this.filter1.Q.value = currentQ * 1.15; // +15% to compensate for missing filter2
+  }
+
+  /**
+   * Connect LOW QUALITY signal chain
+   * Minimal processing - basic TB-303 sound with maximum CPU savings
+   *
+   * Optimizations:
+   * - Bypass all extra processing (asymmetry, extra filters, saturation, overdrive)
+   * - Single simple filter
+   * - Basic VCA envelope
+   * - Saves ~70% CPU compared to high quality
+   *
+   * Chain: Oscillator → Filter1 → VCA → VCAEnvelope → Output
+   */
+  private connectLowQuality(): void {
+    // Minimal chain - just oscillator → filter → VCA
+    this.oscillator.connect(this.filter1);
+    this.filter1.connect(this.vca);
+    this.vca.connect(this.vcaEnvelope);
+    this.vcaEnvelope.connect(this.output);
+
+    // No bleed path for low quality (saves CPU)
+
+    // Connect filter envelope
+    this.filterEnvelope.disconnect();
+    this.filterEnvelope.connect(this.filter1.frequency);
+
+    // Boost Q and slightly reduce cutoff to compensate for missing saturation/overdrive
+    const currentQ = this.filter1.Q.value;
+    this.filter1.Q.value = Math.min(currentQ * 1.3, 35); // +30% Q, cap at 35
+    this.filter1.frequency.value = this.baseCutoff * 0.9; // Slightly lower cutoff for warmth
+  }
+
+  // ============================================
+  // END PERFORMANCE QUALITY MANAGEMENT
+  // ============================================
 }

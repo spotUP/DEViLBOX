@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useAnimationFrame } from '@hooks/useAnimationCoordinator';
 
 interface ChannelVUMeterProps {
   level: number; // 0-1, triggered level
@@ -39,7 +40,6 @@ const getSegmentColor = (index: number, total: number, isLit: boolean): string =
 export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
   ({ level, isActive }) => {
     const [displayLevel, setDisplayLevel] = useState(0);
-    const decayRef = useRef<number | null>(null);
 
     // When a new level comes in, set it immediately if higher
     useEffect(() => {
@@ -49,23 +49,25 @@ export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
       }
     }, [level, isActive]);
 
-    // Decay animation
-    useEffect(() => {
-      const decay = () => {
-        setDisplayLevel((prev) => {
-          const next = prev * DECAY_RATE;
-          if (next < 0.02) return 0;
-          return next;
-        });
-      };
+    // Decay animation using centralized coordinator
+    const lastDecayTime = useRef(0);
+    useAnimationFrame(
+      `vu-meter-decay-${level}-${isActive}`,
+      (deltaTime) => {
+        lastDecayTime.current += deltaTime;
 
-      decayRef.current = window.setInterval(decay, DECAY_INTERVAL);
-      return () => {
-        if (decayRef.current) {
-          clearInterval(decayRef.current);
+        // Only decay every DECAY_INTERVAL ms
+        if (lastDecayTime.current >= DECAY_INTERVAL) {
+          lastDecayTime.current = 0;
+          setDisplayLevel((prev) => {
+            const next = prev * DECAY_RATE;
+            if (next < 0.02) return 0;
+            return next;
+          });
         }
-      };
-    }, []);
+      },
+      []
+    );
 
     const activeSegments = Math.round(displayLevel * NUM_SEGMENTS);
 

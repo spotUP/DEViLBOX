@@ -314,8 +314,11 @@ export class ToneEngine {
 
     switch (config.synthType) {
       case 'Synth':
+        // Adjust polyphony based on quality level for CPU savings
+        const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                               this.currentPerformanceQuality === 'medium' ? 8 : 4;
         instrument = new Tone.PolySynth(Tone.Synth, {
-          maxPolyphony: 16, // Increased for high BPM playback
+          maxPolyphony: synthPolyphony,
           oscillator: {
             type: config.oscillator?.type || 'sawtooth',
           },
@@ -371,8 +374,11 @@ export class ToneEngine {
         break;
 
       case 'FMSynth':
+        // FMSynth is CPU-intensive, reduce polyphony on lower quality
+        const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                            this.currentPerformanceQuality === 'medium' ? 6 : 3;
         instrument = new Tone.PolySynth(Tone.FMSynth, {
-          maxPolyphony: 16, // Increased for high BPM playback
+          maxPolyphony: fmPolyphony,
           oscillator: { type: config.oscillator?.type || 'sine' },
           envelope: {
             attack: (config.envelope?.attack ?? 10) / 1000,
@@ -386,8 +392,11 @@ export class ToneEngine {
         break;
 
       case 'AMSynth':
+        // AMSynth has dual oscillators, reduce polyphony on lower quality
+        const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                            this.currentPerformanceQuality === 'medium' ? 8 : 4;
         instrument = new Tone.PolySynth(Tone.AMSynth, {
-          maxPolyphony: 16, // Increased for high BPM playback
+          maxPolyphony: amPolyphony,
           oscillator: { type: config.oscillator?.type || 'sine' },
           envelope: {
             attack: (config.envelope?.attack ?? 10) / 1000,
@@ -400,8 +409,10 @@ export class ToneEngine {
         break;
 
       case 'PluckSynth':
+        const pluckPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                               this.currentPerformanceQuality === 'medium' ? 8 : 4;
         instrument = new Tone.PolySynth(Tone.PluckSynth, {
-          maxPolyphony: 16, // Increased for high BPM playback
+          maxPolyphony: pluckPolyphony,
           attackNoise: 1,
           dampening: config.filter?.frequency || 4000,
           resonance: 0.7,
@@ -1967,6 +1978,100 @@ export class ToneEngine {
   public getFFT(): Float32Array {
     return this.fft.getValue() as Float32Array;
   }
+
+  // ============================================
+  // PERFORMANCE QUALITY MANAGEMENT
+  // ============================================
+
+  private currentPerformanceQuality: 'high' | 'medium' | 'low' = 'high';
+
+  /**
+   * Set performance quality for all synth engines
+   * Dynamically reconfigures demanding synths (TB-303, etc.) to reduce CPU usage
+   * while maintaining characteristic sound
+   *
+   * Quality levels:
+   * - High: Full processing (cascaded filters, all effects), max polyphony
+   * - Medium: Simplified processing (~40-50% CPU reduction), reduced polyphony
+   * - Low: Minimal processing (~70% CPU reduction), minimal polyphony
+   */
+  public setPerformanceQuality(quality: 'high' | 'medium' | 'low'): void {
+    if (this.currentPerformanceQuality === quality) return;
+
+    console.log(`[ToneEngine] Setting performance quality: ${this.currentPerformanceQuality} → ${quality}`);
+    this.currentPerformanceQuality = quality;
+
+    // Update all TB-303 synths (can reconfigure dynamically)
+    let tb303Count = 0;
+    this.instruments.forEach((instrument, key) => {
+      if (instrument instanceof TB303Synth) {
+        instrument.setQuality(quality);
+        tb303Count++;
+      }
+    });
+
+    // For PolySynths, we need to track which ones need recreation
+    // Store configs so we can recreate them with new polyphony settings
+    const polySynthsToRecreate: Array<{
+      key: string;
+      instrumentId: number;
+      channelIndex: number | undefined;
+      config: any;
+    }> = [];
+
+    this.instruments.forEach((instrument, key) => {
+      // Check if it's a PolySynth (has maxPolyphony property)
+      if (instrument && typeof instrument === 'object' && 'maxPolyphony' in instrument) {
+        // Parse key to get instrumentId and channelIndex
+        const parts = key.split('-');
+        const instrumentId = parseInt(parts[0], 10);
+        const channelIndex = parts[1] === '-1' ? undefined : parseInt(parts[1], 10);
+
+        // Get synth type from instrumentSynthTypes map
+        const synthType = this.instrumentSynthTypes.get(key);
+
+        if (synthType && ['Synth', 'FMSynth', 'AMSynth', 'PluckSynth'].includes(synthType)) {
+          polySynthsToRecreate.push({
+            key,
+            instrumentId,
+            channelIndex,
+            config: { synthType } // We'll need to recreate with full config
+          });
+        }
+      }
+    });
+
+    // Dispose PolySynths that need recreation
+    // They'll be recreated with new polyphony settings the next time they're used
+    if (polySynthsToRecreate.length > 0) {
+      console.log(`[ToneEngine] Disposing ${polySynthsToRecreate.length} PolySynths for quality change (will recreate on next use)`);
+      polySynthsToRecreate.forEach(({ key }) => {
+        const instrument = this.instruments.get(key);
+        if (instrument && typeof instrument.dispose === 'function') {
+          try {
+            instrument.dispose();
+          } catch (error) {
+            console.warn(`[ToneEngine] Error disposing instrument ${key}:`, error);
+          }
+        }
+        this.instruments.delete(key);
+        this.instrumentSynthTypes.delete(key);
+      });
+    }
+
+    console.log(`[ToneEngine] Performance quality set to ${quality} (updated ${tb303Count} TB-303s, disposed ${polySynthsToRecreate.length} PolySynths)`);
+  }
+
+  /**
+   * Get current performance quality level
+   */
+  public getPerformanceQuality(): 'high' | 'medium' | 'low' {
+    return this.currentPerformanceQuality;
+  }
+
+  // ============================================
+  // END PERFORMANCE QUALITY MANAGEMENT
+  // ============================================
 }
 
 // Export singleton instance getter

@@ -9,6 +9,7 @@ import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { usePianoRollData } from '../../hooks/pianoroll/usePianoRollData';
 import { useTransportStore } from '../../stores';
 import type { Pattern } from '../../types/tracker';
+import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import {
   ZoomIn,
   ZoomOut,
@@ -20,6 +21,7 @@ import {
   EyeOff,
   Maximize2,
   Minimize2,
+  Wand2,
 } from 'lucide-react';
 
 interface PianoRollProps {
@@ -55,6 +57,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   // Container ref for measuring height
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(400);
+
+  // Acid pattern generator state
+  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
   // Sync channel index from props
   useEffect(() => {
@@ -382,6 +387,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           {view.showVelocity ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
 
+        <div className="w-px h-4 bg-dark-border" />
+
+        {/* Acid Pattern Generator */}
+        <button
+          onClick={() => setShowAcidGenerator(true)}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded transition-colors"
+          title="Generate 303 acid pattern"
+        >
+          <Wand2 size={12} />
+          Acid
+        </button>
+
         {/* Channel selector (if not passed as prop) */}
         {channelIndex === undefined && pattern && (
           <>
@@ -441,6 +458,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           onScroll={handleScroll}
         />
       </div>
+
+      {/* Acid Pattern Generator Dialog */}
+      {showAcidGenerator && (
+        <AcidPatternGeneratorDialog
+          channelIndex={channelIndex ?? view.channelIndex}
+          onClose={() => setShowAcidGenerator(false)}
+        />
+      )}
     </div>
   );
 };

@@ -18,6 +18,7 @@ export interface GridStep {
   accent: boolean;
   slide: boolean;
   tie: boolean;
+  velocity: number;          // 0-127 (MIDI velocity)
 }
 
 export interface GridPattern {
@@ -32,6 +33,7 @@ const EMPTY_STEP: GridStep = {
   accent: false,
   slide: false,
   tie: false,
+  velocity: 100, // Default velocity
 };
 
 /**
@@ -104,6 +106,7 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
       accent: cell.accent || false,
       slide: cell.slide || false,
       tie: false, // TODO: Implement tie detection
+      velocity: cell.volume ?? 100, // Convert volume (0-64) to velocity (0-127) - or use as-is if already MIDI velocity
     });
   }
 
@@ -121,7 +124,7 @@ export function gridToTrackerCells(pattern: GridPattern): TrackerCell[] {
   return pattern.steps.map((step) => ({
     note: gridStepToTrackerNote(step, pattern.baseOctave),
     instrument: null,
-    volume: null,
+    volume: step.noteIndex !== null ? step.velocity : null, // Only set volume for notes, not rests
     effect: null,
     accent: step.accent,
     slide: step.slide,
@@ -162,7 +165,7 @@ export function useGridPattern(channelIndex: number) {
 
       const note =
         noteIndex !== null
-          ? gridStepToTrackerNote({ noteIndex, octaveShift, accent: false, slide: false, tie: false }, baseOctave)
+          ? gridStepToTrackerNote({ noteIndex, octaveShift, accent: false, slide: false, tie: false, velocity: 100 }, baseOctave)
           : null;
 
       setCell(channelIndex, stepIndex, { note });
@@ -203,7 +206,7 @@ export function useGridPattern(channelIndex: number) {
 
       // Calculate new note with shifted octave
       const newNote = gridStepToTrackerNote(
-        { noteIndex: parsed.noteIndex, octaveShift: shift, accent: false, slide: false, tie: false },
+        { noteIndex: parsed.noteIndex, octaveShift: shift, accent: false, slide: false, tie: false, velocity: 100 },
         baseOctave
       );
 
@@ -228,6 +231,16 @@ export function useGridPattern(channelIndex: number) {
     }
   }, [channelIndex, setCell, maxSteps]);
 
+  // Set velocity at step
+  const setVelocity = useCallback(
+    (stepIndex: number, velocity: number) => {
+      if (stepIndex < 0 || stepIndex >= cells.length) return;
+      const clampedVelocity = Math.max(0, Math.min(127, velocity));
+      setCell(channelIndex, stepIndex, { volume: clampedVelocity });
+    },
+    [channelIndex, cells, setCell]
+  );
+
   return {
     gridPattern,
     baseOctave,
@@ -239,6 +252,7 @@ export function useGridPattern(channelIndex: number) {
     toggleAccent,
     toggleSlide,
     setOctaveShift,
+    setVelocity,
     clearStep,
     clearAll,
   };
