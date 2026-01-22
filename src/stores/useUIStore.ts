@@ -65,7 +65,7 @@ export const useUIStore = create<UIStore>()(
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: true,
       oscilloscopeVisible: true,
-      compactToolbar: true,
+      compactToolbar: false, // FT2 toolbar expanded by default
       autoCompactApplied: false,
       uiVersion: 0,
 
@@ -157,11 +157,11 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
 
-          // Version 3: Force collapse panels for all users (inline styles fix)
-          if (state.uiVersion < 3) {
-            state.uiVersion = 3;
+          // Version 4: FT2 toolbar expanded by default
+          if (state.uiVersion < 4) {
+            state.uiVersion = 4;
             state.tb303Collapsed = true;
-            state.compactToolbar = true;
+            state.compactToolbar = false; // Expand FT2 toolbar
           }
 
           // Only apply once per session
