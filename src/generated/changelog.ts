@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-22T19:02:27.845Z
+ * Generated: 2026-01-22T19:08:17.062Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '48';
-export const BUILD_HASH = '328d34f';
+export const BUILD_NUMBER = '50';
+export const BUILD_HASH = '7e36b5b';
 export const BUILD_DATE = '2026-01-22';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.0',
     date: '2026-01-22',
     changes: [
+      {
+        type: 'feature',
+        description: 'Make startup.sh non-interactive with CLI arguments'
+      },
+      {
+        type: 'fix',
+        description: 'Add missing source files and fix all demo files for CI/CD deployment'
+      },
       {
         type: 'feature',
         description: 'Add automatic version check and update notifications'

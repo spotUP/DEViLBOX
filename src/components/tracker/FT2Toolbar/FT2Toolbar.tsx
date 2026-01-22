@@ -144,6 +144,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     shrinkPattern,
     resizePattern,
     loadPatterns,
+    setPatternOrder,
     recordMode,
     editStep,
     toggleRecordMode,
@@ -264,7 +265,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       }
 
       // Load song data
-      if (patterns) loadPatterns(patterns);
+      if (patterns) {
+        loadPatterns(patterns);
+
+        // Convert sequence (pattern IDs) to pattern order (indices)
+        if (songData.sequence && Array.isArray(songData.sequence)) {
+          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
+          const order = songData.sequence
+            .map((patternId: string) => patternIdToIndex.get(patternId))
+            .filter((index: number | undefined): index is number => index !== undefined);
+
+          if (order.length > 0) {
+            setPatternOrder(order);
+            console.log('[Demo] Loaded pattern order:', order);
+          }
+        }
+      }
       if (instruments) loadInstruments(instruments);
       if (songData.metadata) setMetadata(songData.metadata);
       if (songData.bpm) setBPM(songData.bpm);
@@ -471,6 +487,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
         // Load song data
         loadPatterns(patterns);
+
+        // Convert sequence (pattern IDs) to pattern order (indices)
+        if (songData.sequence && Array.isArray(songData.sequence)) {
+          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
+          const order = songData.sequence
+            .map((patternId: string) => patternIdToIndex.get(patternId))
+            .filter((index: number | undefined): index is number => index !== undefined);
+
+          if (order.length > 0) {
+            setPatternOrder(order);
+            console.log('[Import] Loaded pattern order:', order);
+          }
+        }
+
         if (instruments) loadInstruments(instruments);
         if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
         setBPM(songData.bpm);

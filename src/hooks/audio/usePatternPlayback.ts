@@ -9,7 +9,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getPatternScheduler } from '@engine/PatternScheduler';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern } = useTrackerStore();
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, setCurrentPosition } = useTrackerStore();
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
   const { instruments } = useInstrumentStore();
   const { automation } = useAutomationStore();
@@ -80,30 +80,39 @@ export const usePatternPlayback = () => {
       }, patternEndTime);
       // Don't change pattern index - stay on current
     } else {
-      const nextIndex = actualCurrentIndex + 1;
+      // Use pattern order if available, otherwise advance through patterns sequentially
+      const currentPosIndex = patternOrder.indexOf(actualCurrentIndex);
+      const nextPosIndex = currentPosIndex >= 0 ? currentPosIndex + 1 : actualCurrentIndex + 1;
 
-      if (nextIndex < patterns.length) {
-        // Advance to next pattern - schedule at the exact end time for seamless transition
-        console.log(`[Playback] Advancing to pattern ${nextIndex}/${patterns.length} at time ${patternEndTime}s`);
+      if (nextPosIndex < patternOrder.length) {
+        // Advance to next position in pattern order
+        const nextPatternIndex = patternOrder[nextPosIndex];
+        const nextPattern = patterns[nextPatternIndex];
 
-        // Schedule next pattern at the exact end time (before React state updates)
-        const nextPattern = patterns[nextIndex];
-        scheduler.schedulePattern(nextPattern, instruments, (row) => {
-          setCurrentRowThrottled(row, nextPattern.length);
-          // Update UI state when first row of new pattern plays
-          if (row === 0) {
-            setCurrentPattern(nextIndex);
-          }
-        }, patternEndTime);
+        if (nextPattern) {
+          console.log(`[Playback] Advancing to position ${nextPosIndex} (pattern ${nextPatternIndex}) at time ${patternEndTime}s`);
+
+          scheduler.schedulePattern(nextPattern, instruments, (row) => {
+            setCurrentRowThrottled(row, nextPattern.length);
+            // Update UI state when first row of new pattern plays
+            if (row === 0) {
+              setCurrentPattern(nextPatternIndex);
+              if (setCurrentPosition) setCurrentPosition(nextPosIndex);
+            }
+          }, patternEndTime);
+        }
       } else {
-        // End of song - loop back to beginning
-        console.log('[Playback] End of song, looping to beginning');
-        const firstPattern = patterns[0];
+        // End of song - loop back to beginning of pattern order
+        console.log('[Playback] End of song, looping to beginning of pattern order');
+        const firstPatternIndex = patternOrder[0] ?? 0;
+        const firstPattern = patterns[firstPatternIndex];
+
         scheduler.schedulePattern(firstPattern, instruments, (row) => {
           setCurrentRowThrottled(row, firstPattern.length);
           // Update UI state when first row of new pattern plays
           if (row === 0) {
-            setCurrentPattern(0);
+            setCurrentPattern(firstPatternIndex);
+            if (setCurrentPosition) setCurrentPosition(0);
           }
         }, patternEndTime);
       }
@@ -115,7 +124,7 @@ export const usePatternPlayback = () => {
       isAdvancingRef.current = false;
       advancingTimeoutRef.current = null;
     }, 100);
-  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRowThrottled]);
+  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRowThrottled, patternOrder, setCurrentPosition]);
 
   // Handle pattern break (Dxx command) - advance to next pattern
   const handlePatternBreak = useCallback((targetRow: number) => {
@@ -124,21 +133,34 @@ export const usePatternPlayback = () => {
 
     // Use ref to get CURRENT pattern index (not stale closure value)
     const actualCurrentIndex = currentPatternIndexRef.current;
-    const nextIndex = actualCurrentIndex + 1;
     const patternEndTime = scheduler.getPatternEndTime();
     console.log(`[Playback] Pattern break to next pattern at time ${patternEndTime}s, target row ${targetRow}`);
 
-    if (nextIndex < patterns.length) {
-      const nextPattern = patterns[nextIndex];
-      scheduler.schedulePattern(nextPattern, instruments, (row) => {
-        setCurrentRowThrottled(row, nextPattern.length);
-        if (row === 0) setCurrentPattern(nextIndex);
-      }, patternEndTime);
+    // Use pattern order if available
+    const currentPosIndex = patternOrder.indexOf(actualCurrentIndex);
+    const nextPosIndex = currentPosIndex >= 0 ? currentPosIndex + 1 : actualCurrentIndex + 1;
+
+    if (nextPosIndex < patternOrder.length) {
+      const nextPatternIndex = patternOrder[nextPosIndex];
+      const nextPattern = patterns[nextPatternIndex];
+      if (nextPattern) {
+        scheduler.schedulePattern(nextPattern, instruments, (row) => {
+          setCurrentRowThrottled(row, nextPattern.length);
+          if (row === 0) {
+            setCurrentPattern(nextPatternIndex);
+            if (setCurrentPosition) setCurrentPosition(nextPosIndex);
+          }
+        }, patternEndTime);
+      }
     } else if (isLooping) {
-      const firstPattern = patterns[0];
+      const firstPatternIndex = patternOrder[0] ?? 0;
+      const firstPattern = patterns[firstPatternIndex];
       scheduler.schedulePattern(firstPattern, instruments, (row) => {
         setCurrentRowThrottled(row, firstPattern.length);
-        if (row === 0) setCurrentPattern(0);
+        if (row === 0) {
+          setCurrentPattern(firstPatternIndex);
+          if (setCurrentPosition) setCurrentPosition(0);
+        }
       }, patternEndTime);
     } else {
       engine.stop();
@@ -182,7 +204,7 @@ export const usePatternPlayback = () => {
       isAdvancingRef.current = false;
       advancingTimeoutRef.current = null;
     }, 100);
-  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRowThrottled]);
+  }, [patterns, instruments, isLooping, setCurrentPattern, setCurrentRowThrottled, patternOrder, setCurrentPosition]);
 
   // Keep automation in sync during playback
   // This ensures automation changes are applied even after playback has started

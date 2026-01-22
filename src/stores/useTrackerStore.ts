@@ -170,6 +170,7 @@ interface TrackerStore {
   // Import/Export
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
+  setPatternOrder: (order: number[]) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -1398,6 +1399,16 @@ export const useTrackerStore = create<TrackerStore>()(
           };
           state.selection = null;
           state.clipboard = null;
+        }
+      }),
+
+    setPatternOrder: (order) =>
+      set((state) => {
+        console.log('[TrackerStore] setPatternOrder called with', order.length, 'positions');
+        if (order.length > 0) {
+          state.patternOrder = order;
+          state.currentPositionIndex = 0;
+          console.log('[TrackerStore] Pattern order set:', order);
         }
       }),
 
