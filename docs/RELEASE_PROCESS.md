@@ -2,11 +2,33 @@
 
 This document explains how to create a new release with Electron desktop app binaries.
 
-## Automatic Release Workflow
+## Automated Release Script (Recommended)
 
-The repository is configured to automatically build and publish Electron apps when you push a version tag.
+The easiest way to create a release is using the automated script:
 
-### Step-by-Step Release Process
+```bash
+# Patch release (1.0.0 -> 1.0.1)
+./scripts/release.sh patch
+
+# Minor release (1.0.0 -> 1.1.0)
+./scripts/release.sh minor
+
+# Major release (1.0.0 -> 2.0.0)
+./scripts/release.sh major
+```
+
+The script will:
+1. ✅ Check that working directory is clean
+2. ✅ Bump version in package.json
+3. ✅ Commit the version change
+4. ✅ Create an annotated git tag
+5. ✅ Push to GitHub and trigger the release workflow
+
+Then just wait 10-15 minutes for the builds to complete!
+
+## Manual Release Process
+
+If you prefer to do it manually:
 
 1. **Update version in package.json**
    ```bash
@@ -16,7 +38,7 @@ The repository is configured to automatically build and publish Electron apps wh
 
 2. **Commit your changes**
    ```bash
-   git add .
+   git add package.json
    git commit -m "chore: Release v1.0.1"
    ```
 
@@ -25,7 +47,8 @@ The repository is configured to automatically build and publish Electron apps wh
    # Create a tag (must start with 'v')
    git tag v1.0.1
 
-   # Push the tag to GitHub
+   # Push the commit and tag to GitHub
+   git push origin main
    git push origin v1.0.1
    ```
 
