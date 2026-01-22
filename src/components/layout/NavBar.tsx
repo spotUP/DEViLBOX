@@ -8,6 +8,7 @@ import { APP_VERSION, BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/ve
 import { Plus, X, Palette, ChevronUp, ChevronDown, Download } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
+import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { isElectron } from '@utils/electron';
 
 const NavBarComponent: React.FC = () => {
@@ -35,6 +36,7 @@ const NavBarComponent: React.FC = () => {
 
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   const currentTheme = getCurrentTheme();
 
@@ -101,7 +103,7 @@ const NavBarComponent: React.FC = () => {
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <button
-              onClick={() => {/* setShowDownloadModal(true) */}}
+              onClick={() => setShowDownloadModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bgTertiary hover:bg-dark-bgHover text-accent-primary text-xs font-bold transition-colors rounded border border-accent-primary/30"
               title="Download Desktop App"
             >
@@ -232,6 +234,12 @@ const NavBarComponent: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Download Modal */}
+      <DownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+      />
     </div>
   );
 };
