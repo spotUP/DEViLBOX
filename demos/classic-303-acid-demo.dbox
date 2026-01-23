@@ -1,0 +1,671 @@
+{
+  "format": "devilbox-dbox",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Classic 303 Acid Demo",
+    "author": "DEViLBOX",
+    "description": "Classic TB-303 acid bassline patterns demonstrating slides, accents, and classic sequencing"
+  },
+  "bpm": 130,
+  "instruments": [
+    {
+      "id": 0,
+      "name": "TB-303 Bass",
+      "synthType": "TB303",
+      "parameters": {
+        "cutoff": 0.45,
+        "resonance": 0.75,
+        "envMod": 0.65,
+        "decay": 0.4,
+        "accent": 0.7,
+        "overdrive": 0.3,
+        "slideTime": 0.05,
+        "normalDecay": 0.25,
+        "accentDecay": 0.15,
+        "vegDecay": 0.2,
+        "vegSustain": 0.1
+      },
+      "effects": [],
+      "volume": -3,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-001",
+      "name": "Acid Pattern 1 - Classic Slide",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-001",
+          "name": "303 Bass",
+          "instrumentId": 0,
+          "color": "#ef4444",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "rows": [
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": null,
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-002",
+      "name": "Acid Pattern 2 - Staccato",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-002",
+          "name": "303 Bass",
+          "instrumentId": 0,
+          "color": "#ef4444",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "rows": [
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": false
+            },
+            {
+              "note": "===",
+              "instrument": null,
+              "volume": null,
+              "effect": null,
+              "effect2": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-003",
+      "name": "Acid Pattern 3 - Wobble",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-003",
+          "name": "303 Bass",
+          "instrumentId": 0,
+          "color": "#ef4444",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "rows": [
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "A#1",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "D-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-004",
+      "name": "Acid Pattern 4 - Full Throttle",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-004",
+          "name": "303 Bass",
+          "instrumentId": 0,
+          "color": "#ef4444",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "rows": [
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "D-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "A#2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "F-2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-2",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            },
+            {
+              "note": "D#2",
+              "instrument": 0,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "G-2",
+              "instrument": 0,
+              "volume": 56,
+              "effect": null,
+              "effect2": null,
+              "accent": false,
+              "slide": true
+            },
+            {
+              "note": "C-3",
+              "instrument": 0,
+              "volume": 64,
+              "effect": null,
+              "effect2": null,
+              "accent": true,
+              "slide": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": [
+    "pattern-001",
+    "pattern-001",
+    "pattern-002",
+    "pattern-002",
+    "pattern-003",
+    "pattern-003",
+    "pattern-004",
+    "pattern-004"
+  ],
+  "masterVolume": 0,
+  "masterEffects": []
+}

@@ -16,151 +16,167 @@
       "length": 16,
       "channels": [
         {
-          "name": "TB-303",
+          "name": "TB303",
           "rows": [
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-1",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 20,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "B-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 36,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "B-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 36,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "B-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 36,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "G-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 32,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "B-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 36,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             }
           ],
           "muted": false,
@@ -175,9 +191,9 @@
   ],
   "instruments": [
     {
-      "id": 0,
+      "id": 1,
       "name": "TB-303 (SAW)",
-      "synthType": "TB-303",
+      "synthType": "TB303",
       "volume": -6,
       "pan": 0,
       "effects": [],
@@ -192,5 +208,9 @@
     }
   ],
   "masterVolume": 0,
-  "masterEffects": []
+  "masterEffects": [],
+  "format": "devilbox-dbox",
+  "sequence": [
+    0
+  ]
 }

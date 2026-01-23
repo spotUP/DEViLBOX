@@ -16,139 +16,155 @@
       "length": 16,
       "channels": [
         {
-          "name": "TB-303",
+          "name": "TB303",
           "rows": [
             {
-              "note": "D#3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 40,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "D-3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 39,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "C#3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 38,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "D-3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 39,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "E-3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 41,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "E-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 29,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "E-2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 29,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "D#3",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 40,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "C#2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 26,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": true
+              "slide": true,
+              "effTyp": 0,
+              "eff": 0
             },
             {
-              "note": "D#2",
-              "instrument": 0,
-              "volume": 48,
-              "effect": null,
+              "note": 28,
+              "instrument": 1,
+              "volume": 64,
               "effect2": null,
               "accent": false,
-              "slide": false
+              "slide": false,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             },
             {
               "note": null,
               "instrument": null,
               "volume": null,
-              "effect": null,
-              "effect2": null
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0
             }
           ],
           "muted": false,
@@ -163,9 +179,9 @@
   ],
   "instruments": [
     {
-      "id": 0,
+      "id": 1,
       "name": "TB-303 (SQUARE)",
-      "synthType": "TB-303",
+      "synthType": "TB303",
       "volume": -6,
       "pan": 0,
       "effects": [],
@@ -180,5 +196,9 @@
     }
   ],
   "masterVolume": 0,
-  "masterEffects": []
+  "masterEffects": [],
+  "format": "devilbox-dbox",
+  "sequence": [
+    0
+  ]
 }
