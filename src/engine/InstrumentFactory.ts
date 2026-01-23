@@ -24,6 +24,7 @@ import { TapeSaturation } from './effects/TapeSaturation';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
+import { ArpeggioEngine } from './ArpeggioEngine';
 
 export class InstrumentFactory {
   /**
@@ -1808,9 +1809,6 @@ export class InstrumentFactory {
     if (chipConfig.channel === 'triangle') {
       oscillatorType = 'triangle';
     }
-
-    // Import ArpeggioEngine dynamically to avoid circular dependency
-    const { ArpeggioEngine } = require('./ArpeggioEngine');
 
     if (chipConfig.channel === 'noise') {
       // Noise channel uses NoiseSynth
