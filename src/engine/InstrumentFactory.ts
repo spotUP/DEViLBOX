@@ -1876,11 +1876,11 @@ export class InstrumentFactory {
     });
     synth.connect(bitCrusher);
 
-    // Create ArpeggioEngine if arpeggio is configured
+    // Create ArpeggioEngine only if arpeggio is ENABLED (not just configured)
     let arpeggioEngine: InstanceType<typeof ArpeggioEngine> | null = null;
     let lastArpNote: string | null = null;
 
-    if (arpeggioConfig) {
+    if (arpeggioConfig?.enabled) {
       arpeggioEngine = new ArpeggioEngine({
         config: arpeggioConfig,
         onNoteOn: (note: string, velocity: number, duration: number) => {
