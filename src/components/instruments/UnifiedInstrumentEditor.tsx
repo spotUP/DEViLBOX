@@ -80,13 +80,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     { id: 'browse' as const, label: 'Browse', icon: Music2, show: true },
   ];
 
-  // Filter out any invalid tabs with debugging
-  const tabs = rawTabs.filter((tab, index) => {
-    const isValid = Boolean(tab && typeof tab === 'object' && tab.icon && typeof tab.icon === 'function');
-    if (!isValid) {
-      console.error('[UnifiedInstrumentEditor] Invalid tab at index', index, ':', tab);
-    }
-    return isValid;
+  // Filter out any invalid tabs (icons can be functions or ForwardRef objects)
+  const tabs = rawTabs.filter((tab) => {
+    return Boolean(tab && typeof tab === 'object' && tab.icon);
   }) as { id: EditorTab; label: string; icon: React.ElementType; show: boolean }[];
 
   // Handle tab navigation from QuickView
