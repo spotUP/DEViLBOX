@@ -317,12 +317,18 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                         const isCurrentlyPlaying = playingSample === sample.url;
 
                         return (
-                          <button
+                          <div
                             key={sample.url}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSelectedSample(sample)}
                             onDoubleClick={() => handleLoadSample(sample)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleLoadSample(sample);
+                              if (e.key === ' ') setSelectedSample(sample);
+                            }}
                             className={`
-                              p-2 rounded border text-left transition-all group
+                              p-2 rounded border text-left transition-all group cursor-pointer
                               ${
                                 isSelected
                                   ? 'bg-ft2-cursor text-ft2-bg border-ft2-cursor'
@@ -369,7 +375,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                                 {sample.name}
                               </span>
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

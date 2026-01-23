@@ -34,6 +34,50 @@ interface PatternEditorProps {
   onAcidGenerator?: (channelIndex: number) => void;
 }
 
+// PERFORMANCE: Separate component for stepped scrolling to isolate currentRow subscription
+// This prevents the entire grid from re-rendering when currentRow changes (~12x/sec during playback)
+// The component only updates CSS transforms directly, no React re-rendering needed
+const SteppedScroller: React.FC<{
+  contentRef: React.RefObject<HTMLDivElement | null>;
+  rowNumbersRef: React.RefObject<HTMLDivElement | null>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  containerHeight: number;
+  patternExists: boolean;
+}> = React.memo(({ contentRef, rowNumbersRef, containerRef, containerHeight, patternExists }) => {
+  const { isPlaying, smoothScrolling, currentRow } = useTransportStore(
+    useShallow((state) => ({
+      isPlaying: state.isPlaying,
+      smoothScrolling: state.smoothScrolling,
+      currentRow: state.currentRow,
+    }))
+  );
+
+  useEffect(() => {
+    // Only active in stepped scrolling mode during playback
+    if (!isPlaying || !patternExists || !contentRef.current || smoothScrolling) {
+      return;
+    }
+
+    const contentEl = contentRef.current;
+    const rowNumbersEl = rowNumbersRef.current;
+
+    // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
+    const currentHeight = containerRef.current?.clientHeight || containerHeight;
+    const halfContainer = currentHeight / 2;
+    const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
+
+    contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+
+    // Also update row numbers to stay in sync
+    if (rowNumbersEl) {
+      rowNumbersEl.style.transform = `translate3d(0, ${offset}px, 0)`;
+    }
+  }, [isPlaying, patternExists, smoothScrolling, currentRow, containerHeight, contentRef, rowNumbersRef, containerRef]);
+
+  // This component renders nothing - it only manages transforms
+  return null;
+});
+
 // Separate component for status bar to isolate currentRow subscription
 // This prevents the entire grid from re-rendering when currentRow changes
 const StatusBar: React.FC<{
@@ -107,16 +151,14 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const copyTrack = useTrackerStore((state) => state.copyTrack);
   const cutTrack = useTrackerStore((state) => state.cutTrack);
   const pasteTrack = useTrackerStore((state) => state.pasteTrack);
-  // Use selectors to minimize re-renders during playback
-  // Only subscribe to isPlaying and continuousRow - NOT currentRow
-  // currentRow updates frequently and is only needed by the StatusBar component
-  const { isPlaying, continuousRow, isLooping, smoothScrolling, currentRow, speed } = useTransportStore(
+  // PERFORMANCE: Only subscribe to state that doesn't change frequently during playback
+  // currentRow is now handled by SteppedScroller component to avoid full re-renders
+  const { isPlaying, continuousRow, isLooping, smoothScrolling, speed } = useTransportStore(
     useShallow((state) => ({
       isPlaying: state.isPlaying,
       continuousRow: state.continuousRow,
       isLooping: state.isLooping,
       smoothScrolling: state.smoothScrolling,
-      currentRow: state.currentRow, // Needed for stepped scrolling mode
       speed: state.speed, // Ticks per row for accurate visual sync
     }))
   );
@@ -226,12 +268,14 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   }, [cursor.rowIndex, pattern, isPlaying]);
 
   // When PLAYING: poll ToneEngine for real-time trigger levels
-  const vuPollRef = useRef<number | null>(null);
+  // VU polling re-enabled after PatternEditor/FT2Toolbar re-render fixes
+  const DISABLE_VU_POLLING = false;
+  const vuPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    if (!isPlaying || !pattern) {
-      // Clear polling when not playing
+    if (DISABLE_VU_POLLING || !isPlaying || !pattern) {
+      // Clear polling when not playing or disabled
       if (vuPollRef.current) {
-        cancelAnimationFrame(vuPollRef.current);
+        clearInterval(vuPollRef.current);
         vuPollRef.current = null;
       }
       return;
@@ -247,14 +291,14 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
         triggered: level > 0.01,
       }));
       setChannelTriggers(newTriggers);
-      vuPollRef.current = requestAnimationFrame(pollTriggers);
     };
 
-    vuPollRef.current = requestAnimationFrame(pollTriggers);
+    // Poll at 10fps (100ms) instead of 60fps - still smooth enough for VU meters
+    vuPollRef.current = setInterval(pollTriggers, 100);
 
     return () => {
       if (vuPollRef.current) {
-        cancelAnimationFrame(vuPollRef.current);
+        clearInterval(vuPollRef.current);
         vuPollRef.current = null;
       }
     };
@@ -288,24 +332,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     }
   }, [isPlaying, smoothScrolling, continuousRow]);
 
-  // Stepped scrolling effect (updates on row changes)
-  useEffect(() => {
-    if (!isPlaying || !pattern || !contentRef.current || smoothScrolling) {
-      return;
-    }
-
-    const contentEl = contentRef.current;
-    const rowNumbersEl = rowNumbersRef.current;
-    // STEPPED SCROLLING MODE: Classic tracker style, jumps row-by-row
-    const currentHeight = containerRef.current?.clientHeight || containerHeight;
-    const halfContainer = currentHeight / 2;
-    const offset = halfContainer - (currentRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
-    contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
-    // Also update row numbers to stay in sync
-    if (rowNumbersEl) {
-      rowNumbersEl.style.transform = `translate3d(0, ${offset}px, 0)`;
-    }
-  }, [isPlaying, pattern, smoothScrolling, currentRow, containerHeight]);
+  // NOTE: Stepped scrolling is now handled by SteppedScroller component
+  // to avoid re-rendering the entire PatternEditor on currentRow changes
 
   // Smooth scrolling animation (continuous, doesn't restart on row changes)
   useEffect(() => {
@@ -1184,6 +1212,15 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
         }}
         onWheel={handleWheel}
       >
+        {/* PERFORMANCE: Stepped scrolling handled by separate component to avoid full re-renders */}
+        <SteppedScroller
+          contentRef={contentRef}
+          rowNumbersRef={rowNumbersRef}
+          containerRef={containerRef}
+          containerHeight={containerHeight}
+          patternExists={!!pattern}
+        />
+
         {/* Fixed center edit bar - always vertically centered using CSS */}
         <div
           className="absolute left-0 right-0 pointer-events-none z-40"

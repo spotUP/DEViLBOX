@@ -32,6 +32,26 @@ import type { Pattern } from '@typedefs';
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
+// PERFORMANCE: Separate component for row display to isolate currentRow subscription
+// This prevents the entire toolbar from re-rendering on every row change (~12x/sec during playback)
+const RowDisplay: React.FC = React.memo(() => {
+  const currentRow = useTransportStore((state) => state.currentRow);
+  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+
+  return (
+    <div className="ft2-section ft2-section-playback">
+      <span className="ft2-row-display">
+        Row: <span className="ft2-row-value">
+          {useHexNumbers
+            ? currentRow.toString(16).toUpperCase().padStart(2, '0')
+            : currentRow.toString(10).padStart(2, '0')
+          }
+        </span>
+      </span>
+    </div>
+  );
+});
+
 // Create instruments for imported module
 function createInstrumentsForModule(
   patterns: Pattern[],
@@ -154,6 +174,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setEditStep,
   } = useTrackerStore();
 
+  // PERFORMANCE: currentRow removed - now handled by RowDisplay component
   const {
     isPlaying,
     isLooping,
@@ -162,7 +183,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setIsLooping,
     play,
     stop,
-    currentRow,
     smoothScrolling,
     setSmoothScrolling,
   } = useTransportStore();
@@ -171,7 +191,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { save: saveProject } = useProjectPersistence();
   const { instruments, loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
-  const { compactToolbar, toggleCompactToolbar, useHexNumbers } = useUIStore();
+  const { compactToolbar, toggleCompactToolbar } = useUIStore();
   const { curves } = useAutomationStore();
 
   const engine = getToneEngine();
@@ -814,17 +834,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             </FT2Button>
           </div>
 
-          {/* Row indicator */}
-          <div className="ft2-section ft2-section-playback">
-            <span className="ft2-row-display">
-              Row: <span className="ft2-row-value">
-                {useHexNumbers
-                  ? currentRow.toString(16).toUpperCase().padStart(2, '0')
-                  : currentRow.toString(10).padStart(2, '0')
-                }
-              </span>
-            </span>
-          </div>
+          {/* Row indicator - separate component to avoid toolbar re-renders */}
+          <RowDisplay />
         </div>
       )}
 

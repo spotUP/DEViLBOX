@@ -39,6 +39,9 @@ const getSegmentColor = (index: number, total: number, isLit: boolean): string =
 
 export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
   ({ level, isActive }) => {
+    // TEMP: Disable to test performance
+    return null;
+
     const [displayLevel, setDisplayLevel] = useState(0);
 
     // ProTracker behavior: Instantly jump to triggered note volume, then decay
