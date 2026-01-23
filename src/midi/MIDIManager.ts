@@ -87,7 +87,6 @@ class MIDIManager {
         this.notifyDeviceChange();
       };
 
-      console.log('[MIDIManager] Initialized successfully');
       return true;
     } catch (error) {
       console.error('[MIDIManager] Failed to initialize:', error);
@@ -106,14 +105,12 @@ class MIDIManager {
     this.outputs.clear();
 
     // Populate inputs
-    console.log('[MIDI] Available inputs:');
     this.midiAccess.inputs.forEach((input, id) => {
       console.log(`  - ${input.name} (${id}) state: ${input.state}, connection: ${input.connection}`);
       this.inputs.set(id, input);
     });
 
     // Populate outputs
-    console.log('[MIDI] Available outputs:');
     this.midiAccess.outputs.forEach((output, id) => {
       console.log(`  - ${output.name} (${id})`);
       this.outputs.set(id, output);
@@ -237,13 +234,11 @@ class MIDIManager {
         try {
           // Explicitly open the port first
           await input.open();
-          console.log(`[MIDI] Input opened: ${input.name} (state: ${input.state}, connection: ${input.connection})`);
 
           // Attach message handler (use onmidimessage for simplicity)
           this.boundMessageHandler = this.handleMIDIMessage.bind(this);
           input.onmidimessage = this.boundMessageHandler;
 
-          console.log(`[MIDI] Handler attached to ${input.name}`);
         } catch (error) {
           console.error(`[MIDI] Failed to open input ${input.name}:`, error);
         }
@@ -260,7 +255,6 @@ class MIDIManager {
     if (deviceId) {
       const output = this.outputs.get(deviceId);
       if (output) {
-        console.log(`[MIDIManager] Selected output: ${output.name}`);
       }
     }
   }
@@ -322,15 +316,10 @@ class MIDIManager {
 
     // Log parsed messages (except clock which is too frequent)
     if (message.type === 'cc') {
-      console.log(`[MIDI] CC ${message.cc} = ${message.value} (ch ${message.channel})`);
     } else if (message.type === 'noteOn') {
-      console.log(`[MIDI] Note ON ${message.note} vel ${message.velocity} (ch ${message.channel})`);
     } else if (message.type === 'noteOff') {
-      console.log(`[MIDI] Note OFF ${message.note} (ch ${message.channel})`);
     } else if (message.type === 'pitchBend') {
-      console.log(`[MIDI] Pitch Bend ${message.pitchBend} (ch ${message.channel})`);
     } else if (message.type === 'programChange') {
-      console.log(`[MIDI] Program Change ${message.program} (ch ${message.channel})`);
     }
 
     // Dispatch to all handlers
@@ -386,7 +375,6 @@ class MIDIManager {
    * Process transport command (start/stop/continue)
    */
   private processTransportCommand(command: 'start' | 'stop' | 'continue'): void {
-    console.log(`[MIDI] Transport: ${command}`);
 
     // Reset clock on start
     if (command === 'start') {
@@ -545,7 +533,6 @@ class MIDIManager {
 
     try {
       output.send(data);
-      console.log('[MIDIManager] SysEx sent:', data.length, 'bytes');
     } catch (error) {
       console.error('[MIDIManager] Failed to send SysEx:', error);
       throw error;
@@ -627,7 +614,6 @@ class MIDIManager {
       this.lastClockTimestamp = 0;
       this.clockBPM = 0;
     }
-    console.log(`[MIDIManager] Clock sync ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**

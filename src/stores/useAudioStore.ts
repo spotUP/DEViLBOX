@@ -125,12 +125,15 @@ export const useAudioStore = create<AudioStore>()(
         };
         state.masterEffects.push(newEffect);
 
+        // Clone effects before async to avoid Immer proxy revocation
+        const effectsCopy = JSON.parse(JSON.stringify(state.masterEffects));
+
         // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
           (async () => {
             try {
-              await engine.rebuildMasterEffects(state.masterEffects);
+              await engine.rebuildMasterEffects(effectsCopy);
             } catch (error) {
               console.warn('[AudioStore] Could not rebuild master effects:', error);
             }
@@ -147,12 +150,15 @@ export const useAudioStore = create<AudioStore>()(
         };
         state.masterEffects.push(newEffect);
 
+        // Clone effects before async to avoid Immer proxy revocation
+        const effectsCopy = JSON.parse(JSON.stringify(state.masterEffects));
+
         // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
           (async () => {
             try {
-              await engine.rebuildMasterEffects(state.masterEffects);
+              await engine.rebuildMasterEffects(effectsCopy);
             } catch (error) {
               console.warn('[AudioStore] Could not rebuild master effects:', error);
             }
@@ -166,12 +172,15 @@ export const useAudioStore = create<AudioStore>()(
         if (index !== -1) {
           state.masterEffects.splice(index, 1);
 
+          // Clone effects before async to avoid Immer proxy revocation
+          const effectsCopy = JSON.parse(JSON.stringify(state.masterEffects));
+
           // Notify ToneEngine to rebuild master effects chain (async for neural effects)
           const engine = get().toneEngineInstance;
           if (engine) {
             (async () => {
               try {
-                await engine.rebuildMasterEffects(state.masterEffects);
+                await engine.rebuildMasterEffects(effectsCopy);
               } catch (error) {
                 console.warn('[AudioStore] Could not rebuild master effects:', error);
               }
@@ -199,12 +208,15 @@ export const useAudioStore = create<AudioStore>()(
         const [removed] = state.masterEffects.splice(fromIndex, 1);
         state.masterEffects.splice(toIndex, 0, removed);
 
+        // Clone effects before async to avoid Immer proxy revocation
+        const effectsCopy = JSON.parse(JSON.stringify(state.masterEffects));
+
         // Notify ToneEngine to rebuild master effects chain (async for neural effects)
         const engine = get().toneEngineInstance;
         if (engine) {
           (async () => {
             try {
-              await engine.rebuildMasterEffects(state.masterEffects);
+              await engine.rebuildMasterEffects(effectsCopy);
             } catch (error) {
               console.warn('[AudioStore] Could not rebuild master effects:', error);
             }

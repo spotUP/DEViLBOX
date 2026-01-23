@@ -19,6 +19,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsDownUp } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
+import { getToneEngine } from '@engine/ToneEngine';
 import type { TrackerCell } from '@typedefs';
 
 interface ChannelTrigger {
@@ -109,13 +110,14 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   // Use selectors to minimize re-renders during playback
   // Only subscribe to isPlaying and continuousRow - NOT currentRow
   // currentRow updates frequently and is only needed by the StatusBar component
-  const { isPlaying, continuousRow, isLooping, smoothScrolling, currentRow } = useTransportStore(
+  const { isPlaying, continuousRow, isLooping, smoothScrolling, currentRow, speed } = useTransportStore(
     useShallow((state) => ({
       isPlaying: state.isPlaying,
       continuousRow: state.continuousRow,
       isLooping: state.isLooping,
       smoothScrolling: state.smoothScrolling,
       currentRow: state.currentRow, // Needed for stepped scrolling mode
+      speed: state.speed, // Ticks per row for accurate visual sync
     }))
   );
 
@@ -147,6 +149,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartTimeRef = useRef(0);
   const playbackStartRowRef = useRef(0);
+  const speedRef = useRef(speed); // Track speed without restarting animation
+  const containerHeightRef = useRef(0); // Cache container height to avoid layout thrashing
 
   // Mobile: Track which channel is currently visible (synced with cursor)
   const mobileChannelIndex = cursor.channelIndex;
@@ -177,7 +181,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   // Debug logging disabled for performance
   // Re-enable if needed for debugging pattern data issues
   // useEffect(() => {
-  //   console.log('[PatternEditor] pattern changed:', {
   //     currentPatternIndex,
   //     hasPattern: !!pattern,
   //     patternLength: pattern?.length,
@@ -190,7 +193,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const scrollRow = cursor.rowIndex;
 
   // Track note triggers for VU meters - only when stopped (editing)
-  // During playback, skip updates to avoid re-renders causing flicker
+  // When NOT playing: update triggers based on cursor row (pattern preview)
   useEffect(() => {
     if (!pattern || isPlaying) return;
 
@@ -222,6 +225,41 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     setChannelTriggers(newTriggers);
   }, [cursor.rowIndex, pattern, isPlaying]);
 
+  // When PLAYING: poll ToneEngine for real-time trigger levels
+  const vuPollRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isPlaying || !pattern) {
+      // Clear polling when not playing
+      if (vuPollRef.current) {
+        cancelAnimationFrame(vuPollRef.current);
+        vuPollRef.current = null;
+      }
+      return;
+    }
+
+    const engine = getToneEngine();
+    const numChannels = pattern.channels.length;
+
+    const pollTriggers = () => {
+      const levels = engine.getChannelTriggerLevels(numChannels);
+      const newTriggers: ChannelTrigger[] = levels.map((level) => ({
+        level,
+        triggered: level > 0.01,
+      }));
+      setChannelTriggers(newTriggers);
+      vuPollRef.current = requestAnimationFrame(pollTriggers);
+    };
+
+    vuPollRef.current = requestAnimationFrame(pollTriggers);
+
+    return () => {
+      if (vuPollRef.current) {
+        cancelAnimationFrame(vuPollRef.current);
+        vuPollRef.current = null;
+      }
+    };
+  }, [isPlaying, pattern]);
+
   // Wait for first proper measurement before enabling transitions
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 100);
@@ -231,6 +269,11 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   // Initialize animation when playback starts (only once per playback session)
   const isPlayingRef = useRef(isPlaying);
   const smoothScrollingRef = useRef(smoothScrolling);
+
+  // Update speed ref when it changes (without restarting animation)
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   useEffect(() => {
     const wasPlaying = isPlayingRef.current;
@@ -281,12 +324,20 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
     const rowNumbersEl = rowNumbersRef.current;
 
-    const animate = () => {
-      if (!contentEl || !containerRef.current) return;
+    // Cache container height once at start (avoid layout thrashing every frame)
+    if (containerRef.current) {
+      containerHeightRef.current = containerRef.current.clientHeight;
+    }
 
-      const bpm = transport.bpm.value;
-      const beatsPerRow = 0.25; // 4 rows per beat (standard tracker timing)
-      const secondsPerRow = (60 / bpm) * beatsPerRow;
+    const animate = () => {
+      if (!contentEl) return;
+
+      // Use actual tracker timing: tickInterval = 2.5 / BPM, secondsPerRow = tickInterval * speed
+      // This matches TrackerReplayer's timing exactly
+      // Use speedRef to get live speed updates without restarting animation
+      const currentBpm = transport.bpm.value;
+      const tickInterval = 2.5 / currentBpm;
+      const secondsPerRow = tickInterval * speedRef.current;
 
       // Calculate elapsed time since animation started
       const elapsedMs = performance.now() - playbackStartTimeRef.current;
@@ -300,9 +351,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       // Use modulo to wrap, keeping scroll in valid range
       const wrappedRowPosition = rawRowPosition % patternLength;
 
-      // Read actual container height from DOM for accuracy
-      const currentHeight = containerRef.current.clientHeight;
-      const halfContainer = currentHeight / 2;
+      // Use cached container height to avoid layout thrashing
+      const halfContainer = containerHeightRef.current / 2;
       const offset = halfContainer - (wrappedRowPosition * ROW_HEIGHT) - (ROW_HEIGHT / 2);
       contentEl.style.transform = `translate3d(0, ${offset}px, 0)`;
 
@@ -326,6 +376,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       }
     };
     // Only restart when playback state or pattern changes, NOT on row updates
+    // Speed is tracked via ref so animation doesn't restart on Fxx commands
   }, [isPlaying, pattern, smoothScrolling]);
 
   // Calculate the scroll offset for the pattern
@@ -344,11 +395,9 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   // Enhanced with debouncing to handle rapid layout changes
   useEffect(() => {
     if (!containerRef.current) {
-      console.log('[PatternEditor] containerRef.current is null!');
       return;
     }
 
-    console.log('[PatternEditor] Setting up ResizeObserver on:', containerRef.current);
 
     let frameId: number | null = null;
     let debounceTimer: number | null = null;
@@ -357,7 +406,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       if (!containerRef.current) return;
 
       const height = containerRef.current.clientHeight;
-      console.log('[PatternEditor] Updating containerHeight:', height);
 
       if (height > 0) {
         setContainerHeight(height);
@@ -381,12 +429,18 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver(() => {
       debouncedUpdate();
+      // Also update cached height for smooth scrolling animation
+      if (containerRef.current) {
+        containerHeightRef.current = containerRef.current.clientHeight;
+      }
     });
 
     resizeObserver.observe(containerRef.current);
 
     // Initial measurement
     frameId = requestAnimationFrame(updateHeight);
+    // Initialize cached height for smooth scrolling
+    containerHeightRef.current = containerRef.current.clientHeight;
 
     // Cleanup
     return () => {
@@ -405,7 +459,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       if (!containerRef.current) return;
       const height = containerRef.current.clientHeight;
       if (height > 0) {
-        console.log('[PatternEditor] isMobile changed, updating height:', height);
         setContainerHeight(height);
       }
     });
@@ -648,9 +701,48 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   }, [pattern, setCell]);
 
   const handleInterpolate = useCallback((channelIndex: number) => {
-    // TODO: Open interpolate dialog
-    console.log('Interpolate channel', channelIndex);
-  }, []);
+    // Interpolate volume values across the channel
+    // Find first and last non-zero volume values and interpolate between them
+    if (!pattern) return;
+
+    const channel = pattern.channels[channelIndex];
+    if (!channel) return;
+
+    let firstRow = -1;
+    let lastRow = -1;
+    let firstVolume = 0;
+    let lastVolume = 0;
+
+    // Find first and last cells with volume data
+    for (let row = 0; row < pattern.length; row++) {
+      const cell = channel.rows[row];
+      if (cell.volume !== null && cell.volume >= 0x10 && cell.volume <= 0x50) {
+        if (firstRow === -1) {
+          firstRow = row;
+          firstVolume = cell.volume;
+        }
+        lastRow = row;
+        lastVolume = cell.volume;
+      }
+    }
+
+    // Need at least 2 rows with volume to interpolate
+    if (firstRow === -1 || lastRow === -1 || lastRow - firstRow < 2) {
+      console.log('Interpolate: Need at least 2 rows with volume data');
+      return;
+    }
+
+    // Interpolate volume values between first and last
+    const rowCount = lastRow - firstRow;
+    for (let row = firstRow + 1; row < lastRow; row++) {
+      const t = (row - firstRow) / rowCount;
+      const interpolatedVolume = Math.round(firstVolume + (lastVolume - firstVolume) * t);
+      const cell = channel.rows[row];
+      setCell(channelIndex, row, { ...cell, volume: interpolatedVolume });
+    }
+
+    console.log(`Interpolated volume ${firstVolume}→${lastVolume} across rows ${firstRow}→${lastRow}`);
+  }, [pattern, setCell]);
 
   // Handle manual scroll to allow user override
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -929,11 +1021,11 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
               ROW
             </div>
 
-            {/* Scrollable channel headers - synced with content with forced scrollbar */}
+            {/* Scrollable channel headers - synced with content */}
             <div
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
-              className="overflow-x-scroll scrollbar-hidden"
+              className="overflow-x-auto scrollbar-hidden"
               style={{ flexGrow: 1, minWidth: 0 }}
             >
               <div className="flex" style={{ width: `${channelsOnlyWidth}px`, minWidth: `${channelsOnlyWidth}px` }}>

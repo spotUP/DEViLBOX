@@ -125,7 +125,7 @@ export function trackerCellToTD3Step(cell: TrackerCell, baseOctave: number = TD3
     note: isRest ? null : trackerNoteToTD3(noteStr, baseOctave),
     accent: cell.accent || false,
     slide: cell.slide || false,
-    tie: false, // TODO: Implement tie detection based on consecutive same notes
+    tie: false, // Note: Tie detection is handled in trackerPatternToTD3Steps which has access to previous cells
   };
 
   return step;
@@ -176,6 +176,18 @@ export function trackerPatternToTD3Steps(
     if (cell.note && cell.note !== 0 && cell.note !== 97 && !step.note) {
       const noteStr = xmNoteToString(cell.note);
       warnings.push(`Row ${i + 1}: Note ${noteStr} is out of TD-3 range (C2-C5)`);
+    }
+
+    // Tie detection: check if current note is the same as the previous note
+    // A tie means the note sustains from the previous step without retriggering
+    if (i > 0 && step.note && cells[i - 1]) {
+      const prevCell = cells[i - 1];
+      if (prevCell.note && prevCell.note !== 0 && prevCell.note !== 97) {
+        // Compare XM note values directly - same note means tie
+        if (prevCell.note === cell.note) {
+          step.tie = true;
+        }
+      }
     }
 
     steps.push(step);

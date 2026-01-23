@@ -77,8 +77,12 @@ export async function exportAsMOD(
     }
 
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
-      // TODO: Render synth to sample
+      warnings.push(`Synth instrument "${inst.name}" cannot be exported to MOD (synth rendering not supported).`);
+      // Note: Rendering synths to samples would require:
+      // 1. OfflineAudioContext to render synth audio
+      // 2. Converting rendered audio to 8-bit signed PCM
+      // 3. Properly handling loop points and sample length limits
+      // This is complex and platform-dependent, so synths export as empty samples
       modSamples.push(createEmptySample());
     } else if (inst.synthType === 'Sampler') {
       const modSample = await convertSamplerToMODSample(inst, importMetadata);

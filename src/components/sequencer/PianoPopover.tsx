@@ -3,7 +3,10 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import * as Tone from 'tone';
 import type { TB303Step } from './TB303Sequencer';
+import { getToneEngine } from '@engine/ToneEngine';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import './PianoPopover.css';
 
 interface PianoPopoverProps {
@@ -57,8 +60,24 @@ export const PianoPopover: React.FC<PianoPopoverProps> = ({
 
   const handleNoteClick = useCallback((note: string) => {
     onChange({ note });
-    // TODO: Preview sound if enabled
-  }, [onChange, previewEnabled]);
+    // Preview sound if enabled
+    if (previewEnabled) {
+      try {
+        const engine = getToneEngine();
+        const instrument = useInstrumentStore.getState().instruments.find(i => i.id === unitId);
+        if (instrument && engine) {
+          // Build full note with octave (default octave 2 for TB-303 range)
+          const noteOctave = step.octave ?? 2;
+          const fullNote = `${note}${noteOctave}`;
+          // Trigger a short preview note
+          engine.triggerNote(unitId, fullNote, 0.2, Tone.now(), 0.8, instrument, step.accent, step.slide);
+        }
+      } catch (e) {
+        // Silently ignore preview errors
+        console.debug('[PianoPopover] Preview error:', e);
+      }
+    }
+  }, [onChange, previewEnabled, unitId, step.octave, step.accent, step.slide]);
 
   const handleOctaveClick = useCallback((targetOct: number) => {
     const newOct = step.octave === targetOct ? 2 : targetOct;

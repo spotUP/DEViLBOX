@@ -355,61 +355,238 @@ export const DEFAULT_ORGAN: OrganConfig = {
 
 /**
  * DrumMachine Configuration (808/909 style)
+ * Based on authentic TR-808 synthesis from io-808 and TR-909 from er-99 emulator
  */
-export type DrumType = 'kick' | 'snare' | 'clap' | 'hihat' | 'tom' | 'cymbal' | 'cowbell' | 'rimshot';
+export type DrumType = 'kick' | 'snare' | 'clap' | 'hihat' | 'tom' | 'cymbal' | 'cowbell' | 'rimshot' | 'conga' | 'clave' | 'maracas';
+
+// Drum machine type selector (affects overall synthesis character)
+export type DrumMachineType = '808' | '909';
 
 export interface DrumMachineConfig {
   drumType: DrumType;
+  machineType?: DrumMachineType; // '808' or '909' - affects synthesis character
   kick?: {
-    pitch: number;              // 30-80 Hz
-    pitchDecay: number;         // 0-500ms
-    tone: number;               // 0-100% click/thump balance
-    decay: number;              // 50-2000ms
-    drive: number;              // 0-100% saturation
+    pitch: number;              // 30-100 Hz base frequency (808: 48Hz, 909: 80Hz)
+    pitchDecay: number;         // 0-500ms pitch envelope duration
+    tone: number;               // 0-100% tone/click (808: filter cutoff, 909: noise)
+    toneDecay: number;          // 0-100ms tone decay (909: 20ms)
+    decay: number;              // 50-2000ms amplitude decay (808: 50-300ms, 909: 300ms)
+    drive: number;              // 0-100% saturation (808: 60%, 909: 50%)
+    envAmount: number;          // 1-10x pitch envelope (808: ~2x from 98Hz to 48Hz, 909: 2.5)
+    envDuration: number;        // 0-200ms pitch envelope (808: 110ms attack, 909: 50ms)
+    filterFreq: number;         // Lowpass filter cutoff (808: 200-300Hz, 909: 3000Hz)
   };
   snare?: {
-    pitch: number;              // 100-300 Hz
-    tone: number;               // 0-100% body/snap
+    pitch: number;              // 100-500 Hz body frequency (808: 238Hz low + 476Hz high, 909: 220Hz)
+    pitchHigh?: number;         // 808 only: high oscillator (476Hz)
+    tone: number;               // 0-100% body/snap balance
+    toneDecay: number;          // Noise decay in ms (808: 75ms, 909: 250ms)
     snappy: number;             // 0-100% noise amount
-    decay: number;              // 50-500ms
+    decay: number;              // 50-500ms amplitude decay (808: 100ms, 909: 100ms)
+    envAmount: number;          // 1-10x pitch envelope (909: 4.0, 808: ~1 - no pitch env)
+    envDuration: number;        // 0-50ms pitch envelope (909: 10ms, 808: 100ms)
+    filterType: 'lowpass' | 'highpass' | 'bandpass' | 'notch'; // 808: highpass, 909: notch
+    filterFreq: number;         // Filter frequency (808: 800-1800Hz highpass, 909: 1000Hz notch)
   };
   hihat?: {
     tone: number;               // 0-100% dark/bright
-    decay: number;              // 10-1000ms
+    decay: number;              // 10-1000ms (808 closed: 50ms, open: 90-450ms)
     metallic: number;           // 0-100%
+    // 808 uses 6 square oscillators at inharmonic freqs: [263, 400, 421, 474, 587, 845]
+    // Then bandpass at 10kHz + highpass at 8kHz
   };
   clap?: {
-    tone: number;               // 0-100%
-    decay: number;              // 50-500ms
-    spread: number;             // 0-100% multiple hit spread
+    tone: number;               // 0-100% filter frequency (808: 1000Hz bandpass, 909: 2200Hz)
+    decay: number;              // 50-500ms overall decay (808: 115ms reverb, 909: 80ms)
+    toneDecay: number;          // Individual burst decay (808: sawtooth repeats, 909: 250ms)
+    spread: number;             // 0-100ms burst spacing (808: 100ms sawtooth, 909: 10ms)
+    filterFreqs: [number, number]; // Serial filters (808: 1000Hz bandpass, 909: [900, 1200])
+    modulatorFreq: number;      // Sawtooth modulator frequency (909: 40Hz)
+  };
+  tom?: {
+    pitch: number;              // 100-400 Hz (808 Low: 80-100Hz, Mid: 120-160Hz, Hi: 165-220Hz)
+    decay: number;              // 100-500ms (808: 180-200ms)
+    tone: number;               // 0-100% noise amount (808: pink noise 0.2 amp, 909: 5%)
+    toneDecay: number;          // Noise decay (808: 100-155ms, 909: 100ms)
+    envAmount: number;          // 1-5x pitch envelope (909: 2.0, 808: ~1)
+    envDuration: number;        // 50-200ms pitch envelope (808: 100ms, 909: 100ms)
+  };
+  // 808-specific: Conga (like tom but higher pitched, no noise)
+  conga?: {
+    pitch: number;              // 165-455 Hz (808 Low: 165-220Hz, Mid: 250-310Hz, Hi: 370-455Hz)
+    decay: number;              // 100-300ms (808: 180ms)
+    tuning: number;             // 0-100% pitch interpolation within range
+  };
+  cowbell?: {
+    decay: number;              // 10-500ms (808: 15ms short + 400ms tail)
+    filterFreq: number;         // Bandpass center (808: 2640Hz)
+    // 808: Two square oscillators at 540Hz and 800Hz
+  };
+  rimshot?: {
+    decay: number;              // 10-100ms (808: 40ms, 909: 30ms)
+    filterFreqs: [number, number, number]; // Bandpass freqs (808: [480, 1750, 2450], 909: [220, 500, 950])
+    filterQ: number;            // Resonance (808: ~5, 909: 10.5)
+    saturation: number;         // 1-5x saturation (808: high via swing VCA, 909: 3.0)
+  };
+  // 808-specific: Clave (similar to rimshot but different frequencies)
+  clave?: {
+    decay: number;              // 10-60ms (808: 40ms)
+    pitch: number;              // Primary pitch (808: 2450Hz triangle)
+    pitchSecondary: number;     // Secondary pitch (808: 1750Hz sine)
+    filterFreq: number;         // Bandpass center (808: 2450Hz)
+  };
+  // 808-specific: Maracas
+  maracas?: {
+    decay: number;              // 10-100ms (808: 30ms)
+    filterFreq: number;         // Highpass cutoff (808: 5000Hz)
+  };
+  // 808-specific: Cymbal (more complex than hihat)
+  cymbal?: {
+    tone: number;               // 0-100% low/high band balance
+    decay: number;              // 500-7000ms (808: 700-6800ms for low band)
+    // 808: 3-band filtering with separate envelopes per band
   };
 }
 
 export const DEFAULT_DRUM_MACHINE: DrumMachineConfig = {
   drumType: 'kick',
+  machineType: '909', // Default to 909 for backwards compatibility
+  // TR-909 accurate kick parameters (808 values in comments)
   kick: {
-    pitch: 50,
-    pitchDecay: 100,
-    tone: 50,
-    decay: 500,
-    drive: 0,
+    pitch: 80,              // 909: 80Hz, 808: 48Hz base
+    pitchDecay: 50,         // Legacy: kept for compatibility
+    tone: 50,               // Noise/click amount
+    toneDecay: 20,          // 909: 20ms noise decay
+    decay: 300,             // 909: 300ms, 808: 50-300ms (user controlled)
+    drive: 50,              // 909: moderate saturation, 808: 60%
+    envAmount: 2.5,         // 909: 2.5x, 808: ~2x (98Hz to 48Hz)
+    envDuration: 50,        // 909: 50ms, 808: 110ms attack then decay
+    filterFreq: 3000,       // 909: 3000Hz, 808: 200-300Hz (user controlled via tone)
   },
+  // TR-909 accurate snare parameters (808 values in comments)
   snare: {
-    pitch: 200,
-    tone: 50,
-    snappy: 70,
-    decay: 200,
+    pitch: 220,             // 909: 220Hz, 808: 238Hz (low osc)
+    pitchHigh: 476,         // 808: 476Hz (high osc), 909 doesn't use this
+    tone: 25,               // 909: 25%, 808: controlled by snappy
+    toneDecay: 250,         // 909: 250ms, 808: 75ms noise decay
+    snappy: 70,             // Noise amount
+    decay: 100,             // 909: 100ms, 808: ~100ms
+    envAmount: 4.0,         // 909: 4.0x, 808: ~1 (no pitch envelope)
+    envDuration: 10,        // 909: 10ms, 808: 100ms
+    filterType: 'notch',    // 909: notch, 808: highpass
+    filterFreq: 1000,       // 909: 1000Hz notch, 808: 800-1800Hz highpass
   },
+  // 808-style hi-hat (6 square oscillators at inharmonic frequencies)
   hihat: {
-    tone: 50,
-    decay: 100,
-    metallic: 50,
+    tone: 50,               // Dark/bright control
+    decay: 100,             // 808 closed: 50ms, open: 90-450ms
+    metallic: 50,           // Harmonicity control
   },
+  // TR-909 accurate clap parameters (808 uses sawtooth envelope for reverb effect)
   clap: {
-    tone: 50,
-    decay: 200,
-    spread: 50,
+    tone: 55,               // 909: ~2200Hz, 808: 1000Hz bandpass
+    decay: 80,              // 909: 80ms, 808: 115ms reverb tail
+    toneDecay: 250,         // 909: 250ms, 808: sawtooth repeating
+    spread: 10,             // 909: 10ms, 808: 100ms sawtooth spacing
+    filterFreqs: [900, 1200], // 909: serial bandpass, 808: 1000Hz single
+    modulatorFreq: 40,      // 909: 40Hz sawtooth
   },
+  // Tom parameters (808 uses pink noise, 909 uses little noise)
+  tom: {
+    pitch: 200,             // Mid tom default (808: 120-160Hz, 909: 200Hz)
+    decay: 200,             // 909: 200ms, 808: 180-200ms
+    tone: 5,                // 909: 5%, 808: pink noise 0.2 amplitude
+    toneDecay: 100,         // 909: 100ms, 808: 100-155ms
+    envAmount: 2.0,         // 909: 2.0x, 808: ~1 (minimal pitch sweep)
+    envDuration: 100,       // 909: 100ms, 808: 100ms
+  },
+  // 808-specific: Conga (higher pitched tom, no noise)
+  conga: {
+    pitch: 310,             // Mid conga default (808: 250-310Hz range)
+    decay: 180,             // 808: 180ms
+    tuning: 50,             // 0-100% pitch interpolation
+  },
+  // 808-specific: Cowbell (dual square oscillators through bandpass)
+  cowbell: {
+    decay: 400,             // 808: 15ms short attack + 400ms tail
+    filterFreq: 2640,       // 808: 2640Hz bandpass center
+  },
+  // Rimshot parameters (808/909 differ in frequencies and character)
+  rimshot: {
+    decay: 30,              // 909: 30ms, 808: 40ms
+    filterFreqs: [220, 500, 950], // 909: parallel resonant, 808: [480, 1750, 2450]
+    filterQ: 10.5,          // 909: very high Q, 808: lower Q ~5
+    saturation: 3.0,        // 909: heavy, 808: via swing VCA distortion
+  },
+  // 808-specific: Clave (higher pitched than rimshot, woodblock character)
+  clave: {
+    decay: 40,              // 808: 40ms
+    pitch: 2450,            // 808: 2450Hz triangle
+    pitchSecondary: 1750,   // 808: 1750Hz sine
+    filterFreq: 2450,       // 808: 2450Hz bandpass
+  },
+  // 808-specific: Maracas (highpass filtered noise)
+  maracas: {
+    decay: 30,              // 808: 30ms (quick shake)
+    filterFreq: 5000,       // 808: 5000Hz highpass
+  },
+  // 808-specific: Cymbal (complex 3-band filtering)
+  cymbal: {
+    tone: 50,               // Low/high band balance
+    decay: 2000,            // 808: 700-6800ms (variable low band decay)
+  },
+};
+
+/**
+ * Advanced Arpeggio Step Configuration
+ * Each step in the arpeggio pattern with per-step controls
+ */
+export interface ArpeggioStep {
+  noteOffset: number;           // -24 to +36 semitones
+  volume?: number;              // 0-100% (default 100)
+  gate?: number;                // 0-100% gate length (default 100)
+  effect?: 'none' | 'accent' | 'slide' | 'skip';  // Per-step effects
+}
+
+/**
+ * Arpeggio Speed Unit Types
+ */
+export type ArpeggioSpeedUnit = 'hz' | 'ticks' | 'division';
+
+/**
+ * Arpeggio Playback Mode
+ */
+export type ArpeggioMode = 'loop' | 'pingpong' | 'oneshot' | 'random';
+
+/**
+ * Advanced Arpeggio Configuration
+ * Full-featured arpeggiator with tracker-style controls
+ */
+export interface ArpeggioConfig {
+  enabled: boolean;
+  speed: number;                // Speed value (interpretation depends on speedUnit)
+  speedUnit: ArpeggioSpeedUnit; // 'hz' | 'ticks' | 'division'
+  steps: ArpeggioStep[];        // Up to 16 steps with per-step controls
+  mode: ArpeggioMode;           // Playback mode
+  swing?: number;               // 0-100% swing amount (default 0)
+  // Legacy support: simple pattern array
+  pattern?: number[];           // Simple semitone offsets (for backwards compat)
+}
+
+/**
+ * Default Arpeggio Configuration
+ */
+export const DEFAULT_ARPEGGIO: ArpeggioConfig = {
+  enabled: false,
+  speed: 15,                    // 15 Hz (typical chiptune speed)
+  speedUnit: 'hz',
+  steps: [
+    { noteOffset: 0 },
+    { noteOffset: 4 },
+    { noteOffset: 7 },
+  ],
+  mode: 'loop',
+  swing: 0,
 };
 
 /**
@@ -426,11 +603,7 @@ export interface ChipSynthConfig {
   };
   bitDepth: number;             // 4-16 bits
   sampleRate: number;           // 4000-44100 Hz
-  arpeggio?: {
-    enabled: boolean;
-    speed: number;              // Hz
-    pattern: number[];          // Semitone offsets
-  };
+  arpeggio?: ArpeggioConfig;    // Advanced arpeggio config
   envelope: EnvelopeConfig;
   vibrato: {
     speed: number;              // 0-20 Hz
@@ -459,8 +632,15 @@ export const DEFAULT_CHIP_SYNTH: ChipSynthConfig = {
   },
   arpeggio: {
     enabled: false,
-    speed: 15,           // 15 Hz (typical chiptune arpeggio speed)
-    pattern: [0, 4, 7],  // Major chord (root, major third, fifth)
+    speed: 15,              // 15 Hz (typical chiptune arpeggio speed)
+    speedUnit: 'hz',
+    steps: [
+      { noteOffset: 0 },    // Root
+      { noteOffset: 4 },    // Major third
+      { noteOffset: 7 },    // Fifth
+    ],
+    mode: 'loop',
+    swing: 0,
   },
 };
 
@@ -686,6 +866,7 @@ export interface SampleConfig {
   loop: boolean;
   loopStart: number; // Sample frame index
   loopEnd: number; // Sample frame index
+  sampleRate?: number; // For converting loop points to seconds (default 8363 Hz for MOD)
   reverse: boolean;
   playbackRate: number; // 0.25-4x
 }

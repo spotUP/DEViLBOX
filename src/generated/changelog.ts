@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-22T19:08:17.062Z
+ * Generated: 2026-01-23T13:43:55.486Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,18 +19,50 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.0';
-export const BUILD_NUMBER = '50';
-export const BUILD_HASH = '7e36b5b';
-export const BUILD_DATE = '2026-01-22';
+export const BUILD_VERSION = '1.0.1';
+export const BUILD_NUMBER = '58';
+export const BUILD_HASH = '6080166';
+export const BUILD_DATE = '2026-01-23';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.0',
+    version: '1.0.1',
     date: '2026-01-22',
     changes: [
+      {
+        type: 'fix',
+        description: 'Prevent Desktop App button text from wrapping'
+      },
+      {
+        type: 'improvement',
+        description: 'Chore: Release v1.0.1'
+      },
+      {
+        type: 'fix',
+        description: 'Implement pattern sequence/order playback for proper song arrangement'
+      },
+      {
+        type: 'feature',
+        description: 'Add automated release script with version bumping'
+      },
+      {
+        type: 'feature',
+        description: 'Expand FT2 toolbar by default for better UX'
+      },
+      {
+        type: 'feature',
+        description: 'Add automated Electron app release workflow'
+      },
+      {
+        type: 'fix',
+        description: 'Use design system Button component for Desktop App button'
+      },
+      {
+        type: 'feature',
+        description: 'Wire up Desktop App button to show download modal with Electron binaries'
+      },
       {
         type: 'feature',
         description: 'Make startup.sh non-interactive with CLI arguments'
@@ -62,7 +94,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-1',
+    version: '1.0.1-1',
     date: '2026-01-21',
     changes: [
       {
@@ -88,7 +120,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-2',
+    version: '1.0.1-2',
     date: '2026-01-20',
     changes: [
       {
@@ -122,7 +154,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-3',
+    version: '1.0.1-3',
     date: '2026-01-17',
     changes: [
       {
@@ -152,7 +184,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.0-4',
+    version: '1.0.1-4',
     date: '2026-01-16',
     changes: [
       {
@@ -222,44 +254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Record while playing: enter notes at playback position'
-      },
-      {
-        type: 'feature',
-        description: 'Add record mode feature'
-      },
-      {
-        type: 'fix',
-        description: 'Fix save button feedback and auto-collapse automation panel'
-      },
-      {
-        type: 'feature',
-        description: 'Add Demo Songs dropdown to load example songs'
-      },
-      {
-        type: 'fix',
-        description: 'Fix TypeScript build errors for GitHub Pages deployment'
-      },
-      {
-        type: 'feature',
-        description: 'Add GitHub Pages deployment'
-      },
-      {
-        type: 'improvement',
-        description: 'Rename from Scribbleton to DEViLBOX'
-      },
-      {
-        type: 'feature',
-        description: 'Add Live Performance Mode, context menus, and multi-tab support'
-      }
-    ]
-  },
-  {
-    version: '1.0.0-5',
-    date: '2026-01-15',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Initial commit: DEViLBOX - TB-303 Acid Tracker'
       }
     ]
   }

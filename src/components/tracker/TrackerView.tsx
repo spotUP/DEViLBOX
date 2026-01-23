@@ -165,6 +165,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // Get actions (these don't cause re-renders)
   const loadPatterns = useTrackerStore((state) => state.loadPatterns);
+  const setPatternOrder = useTrackerStore((state) => state.setPatternOrder);
   const setShowGhostPatterns = useTrackerStore((state) => state.setShowGhostPatterns);
   const scaleVolume = useTrackerStore((state) => state.scaleVolume);
   const fadeVolume = useTrackerStore((state) => state.fadeVolume);
@@ -302,15 +303,26 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       }
 
       // Convert instruments using native converter
+      // Preserve original instrument IDs from MOD/XM (already 1-indexed)
       const instruments: InstrumentConfig[] = [];
       for (let i = 0; i < parsedInstruments.length; i++) {
-        const converted = convertToInstrument(parsedInstruments[i], i, format);
+        // Use the original instrument ID from the parsed data (already correct: 1-31 for MOD, 1-128 for XM)
+        const converted = convertToInstrument(parsedInstruments[i], parsedInstruments[i].id, format);
         instruments.push(...converted);
       }
 
       // Load instruments first, then patterns
       loadInstruments(instruments);
       loadPatterns(result.patterns);
+
+      // Set pattern order from module (song position list)
+      console.log('[Import] result.order:', result.order);
+      if (result.order && result.order.length > 0) {
+        setPatternOrder(result.order);
+        console.log('[Import] Pattern order set:', result.order.length, 'positions, first 10:', result.order.slice(0, 10));
+      } else {
+        console.warn('[Import] No pattern order found in result!');
+      }
 
       // Update project metadata
       setMetadata({
@@ -397,6 +409,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     // Load instruments first, then patterns
     loadInstruments(instruments);
     loadPatterns(result.patterns);
+
+    // Set pattern order from module (song position list)
+    if (result.order && result.order.length > 0) {
+      setPatternOrder(result.order);
+      console.log('[Import] Pattern order set:', result.order.length, 'positions');
+    }
 
     // Update project metadata
     setMetadata({

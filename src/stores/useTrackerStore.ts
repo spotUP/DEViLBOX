@@ -73,7 +73,19 @@ interface TrackerStore {
   insertMode: boolean;   // FT2: Insert vs overwrite mode
   currentOctave: number; // FT2: F1-F7 selects octave 1-7
   recordMode: boolean; // When true, entering notes advances cursor by editStep
-  editStep: number; // Rows to advance after entering a note (1-16)
+  editStep: number; // Rows to advance after entering a note (0-16)
+  // FT2: Multi-channel recording features
+  multiRecEnabled: boolean;    // FT2: Distribute notes across enabled channels during recording
+  multiEditEnabled: boolean;   // FT2: Distribute notes across enabled channels during edit
+  multiRecChannels: boolean[]; // FT2: Per-channel recording enable (max 32 channels)
+  multiKeyJazz: boolean;       // FT2: Multi-channel jamming when not editing
+  recQuantEnabled: boolean;    // FT2: Quantize notes to row boundaries during recording
+  recQuantRes: number;         // FT2: Quantization resolution (1, 2, 4, 8, 16 rows)
+  recReleaseEnabled: boolean;  // FT2: Record note-off when keys are released
+  keyOnTab: number[];          // FT2: Track which note (XM) is playing on each channel
+  keyOffTime: number[];        // FT2: Track keyoff timing for channel allocation
+  keyOffCounter: number;       // FT2: Global counter for keyOffTime allocation
+  ptnJumpPos: number[];        // FT2: 4 stored jump positions for F9-F12 (Shift to store, Ctrl to jump)
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
@@ -102,6 +114,22 @@ interface TrackerStore {
   toggleRecordMode: () => void;
   setEditStep: (step: number) => void;
   toggleInsertMode: () => void;
+  // FT2: Multi-channel recording actions
+  setMultiRecEnabled: (enabled: boolean) => void;
+  setMultiEditEnabled: (enabled: boolean) => void;
+  toggleMultiRecChannel: (channelIndex: number) => void;
+  setMultiKeyJazz: (enabled: boolean) => void;
+  setRecQuantEnabled: (enabled: boolean) => void;
+  setRecQuantRes: (res: number) => void;
+  setRecReleaseEnabled: (enabled: boolean) => void;
+  // FT2: Key tracking for multi-channel recording
+  setKeyOn: (channelIndex: number, noteNum: number) => void;
+  setKeyOff: (channelIndex: number) => void;
+  findBestChannel: () => number; // Find least-recently-used channel for note allocation
+  resetKeyTracking: () => void;
+  // FT2: Jump position storage
+  setPtnJumpPos: (index: number, row: number) => void;
+  getPtnJumpPos: (index: number) => number;
 
   // Block operations
   startSelection: () => void;
@@ -222,6 +250,18 @@ export const useTrackerStore = create<TrackerStore>()(
     currentOctave: 4, // Default octave (F4)
     recordMode: false, // Start with record mode off
     editStep: 1, // Default edit step (advance 1 row after note entry)
+    // FT2: Multi-channel recording features
+    multiRecEnabled: false,
+    multiEditEnabled: false,
+    multiRecChannels: Array(MAX_CHANNELS).fill(true), // All channels enabled by default
+    multiKeyJazz: false,
+    recQuantEnabled: false,
+    recQuantRes: 16, // Default quantization: 16 rows (1 beat at speed 6)
+    recReleaseEnabled: false,
+    keyOnTab: Array(MAX_CHANNELS).fill(0), // 0 = no note playing
+    keyOffTime: Array(MAX_CHANNELS).fill(0),
+    keyOffCounter: 0,
+    ptnJumpPos: [0, 0, 0, 0], // FT2: 4 stored jump positions (F9-F12)
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
@@ -496,6 +536,115 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         state.insertMode = !state.insertMode;
       }),
+
+    // FT2: Multi-channel recording actions
+    setMultiRecEnabled: (enabled) =>
+      set((state) => {
+        state.multiRecEnabled = enabled;
+      }),
+
+    setMultiEditEnabled: (enabled) =>
+      set((state) => {
+        state.multiEditEnabled = enabled;
+      }),
+
+    toggleMultiRecChannel: (channelIndex) =>
+      set((state) => {
+        if (channelIndex >= 0 && channelIndex < state.multiRecChannels.length) {
+          state.multiRecChannels[channelIndex] = !state.multiRecChannels[channelIndex];
+        }
+      }),
+
+    setMultiKeyJazz: (enabled) =>
+      set((state) => {
+        state.multiKeyJazz = enabled;
+      }),
+
+    setRecQuantEnabled: (enabled) =>
+      set((state) => {
+        state.recQuantEnabled = enabled;
+      }),
+
+    setRecQuantRes: (res) =>
+      set((state) => {
+        // Valid values: 1, 2, 4, 8, 16
+        if ([1, 2, 4, 8, 16].includes(res)) {
+          state.recQuantRes = res;
+        }
+      }),
+
+    setRecReleaseEnabled: (enabled) =>
+      set((state) => {
+        state.recReleaseEnabled = enabled;
+      }),
+
+    // FT2: Key tracking for multi-channel recording
+    setKeyOn: (channelIndex, noteNum) =>
+      set((state) => {
+        if (channelIndex >= 0 && channelIndex < state.keyOnTab.length) {
+          state.keyOnTab[channelIndex] = noteNum;
+        }
+      }),
+
+    setKeyOff: (channelIndex) =>
+      set((state) => {
+        if (channelIndex >= 0 && channelIndex < state.keyOnTab.length) {
+          state.keyOffCounter++;
+          state.keyOnTab[channelIndex] = 0;
+          state.keyOffTime[channelIndex] = state.keyOffCounter;
+        }
+      }),
+
+    findBestChannel: () => {
+      const state = get();
+      const pattern = state.patterns[state.currentPatternIndex];
+      const numChannels = pattern?.channels.length || 1;
+
+      // If multi-rec/multi-edit not enabled, use cursor channel
+      if (!state.multiRecEnabled && !state.multiEditEnabled) {
+        return state.cursor.channelIndex;
+      }
+
+      // Find channel with lowest keyOffTime that has no note playing and is enabled
+      let bestChannel = state.cursor.channelIndex;
+      let bestTime = Infinity;
+
+      for (let i = 0; i < numChannels; i++) {
+        if (
+          state.multiRecChannels[i] && // Channel is enabled for multi-rec
+          state.keyOnTab[i] === 0 &&   // No note currently playing
+          state.keyOffTime[i] < bestTime
+        ) {
+          bestChannel = i;
+          bestTime = state.keyOffTime[i];
+        }
+      }
+
+      return bestChannel;
+    },
+
+    resetKeyTracking: () =>
+      set((state) => {
+        state.keyOnTab = state.keyOnTab.map(() => 0);
+        state.keyOffTime = state.keyOffTime.map(() => 0);
+        state.keyOffCounter = 0;
+      }),
+
+    // FT2: Jump position storage
+    setPtnJumpPos: (index, row) =>
+      set((state) => {
+        if (index >= 0 && index < 4) {
+          state.ptnJumpPos[index] = row;
+        }
+      }),
+
+    getPtnJumpPos: (index) => {
+      const state = get();
+      if (index >= 0 && index < 4) {
+        return state.ptnJumpPos[index];
+      }
+      return 0;
+    },
 
     startSelection: () =>
       set((state) => {
@@ -1370,15 +1519,7 @@ export const useTrackerStore = create<TrackerStore>()(
     // Import/Export
     loadPatterns: (patterns) =>
       set((state) => {
-        console.log('[TrackerStore] loadPatterns called with', patterns.length, 'patterns');
         if (patterns.length > 0) {
-          console.log('[TrackerStore] First pattern:', {
-            id: patterns[0].id,
-            name: patterns[0].name,
-            length: patterns[0].length,
-            channels: patterns[0].channels.length,
-            firstChannelRows: patterns[0].channels[0]?.rows?.length,
-          });
           // Ensure all channels have required properties (color) and length is valid
           const normalizedPatterns = patterns.map((pattern) => ({
             ...pattern,
@@ -1390,7 +1531,6 @@ export const useTrackerStore = create<TrackerStore>()(
           }));
           state.patterns = normalizedPatterns;
           state.currentPatternIndex = 0;
-          console.log('[TrackerStore] Patterns loaded, currentPatternIndex:', 0);
           state.cursor = {
             channelIndex: 0,
             rowIndex: 0,
@@ -1404,11 +1544,9 @@ export const useTrackerStore = create<TrackerStore>()(
 
     setPatternOrder: (order) =>
       set((state) => {
-        console.log('[TrackerStore] setPatternOrder called with', order.length, 'positions');
         if (order.length > 0) {
           state.patternOrder = order;
           state.currentPositionIndex = 0;
-          console.log('[TrackerStore] Pattern order set:', order);
         }
       }),
 

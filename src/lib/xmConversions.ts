@@ -262,6 +262,11 @@ export function formatVolumeColumn(volume: number): string {
  * @returns XM note number (1-96)
  */
 export function periodToXMNote(period: number, _finetune: number = 0): number {
+  // Period 0 = empty cell (no note)
+  if (period === 0) {
+    return 0;
+  }
+
   // ProTracker period table for C-1 to B-3 (finetune 0)
   const PT_PERIODS = [
     1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,  // Octave 1

@@ -872,61 +872,124 @@ export class InstrumentFactory {
   }
 
   /**
-   * DrumMachine - 808/909 style drum synthesis
-   * Note: These drums use FIXED frequencies for authentic sound regardless of input note
+   * DrumMachine - TR-909 style drum synthesis
+   * Based on authentic TR-909 parameters from the er-99 web emulator
+   * Key characteristics:
+   * - Kick: Sine with pitch envelope (2.5x multiplier, 50ms duration), saturation, 3kHz lowpass
+   * - Snare: Pitched body (220Hz, 4x env, 10ms fast drop) + noise with notch filter at 1000Hz
+   * - Clap: Multiple delayed noise bursts (10ms spread) with serial bandpass + modulator
+   * - Rimshot: Parallel resonant bandpass filters (220/500/950Hz) with high Q and saturation
+   * - Toms: Pitched body with 2x envelope, varying frequencies (100/200/300Hz)
    */
   private static createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {
     const dmConfig = config.drumMachine || DEFAULT_DRUM_MACHINE;
 
     switch (dmConfig.drumType) {
       case 'kick': {
-        const kickConfig = dmConfig.kick || DEFAULT_DRUM_MACHINE.kick!;
-        // 808 kick: pitched sine with pitch envelope
-        // Transpose down 2 octaves so C3 plays like C1 (proper kick range)
+        const kickConfig = {
+          pitch: 80,
+          pitchDecay: 50,
+          tone: 50,
+          toneDecay: 20,
+          decay: 300,
+          drive: 50,
+          envAmount: 2.5,
+          envDuration: 50,
+          filterFreq: 3000,
+          ...dmConfig.kick
+        };
+
+        // TR-909 kick: sine oscillator with pitch envelope and saturation
+        // Using MembraneSynth as base for pitch envelope capability
         const synth = new Tone.MembraneSynth({
-          pitchDecay: (kickConfig.pitchDecay || 100) / 1000,
-          octaves: 6,
+          // pitchDecay controls how fast pitch drops - use envDuration
+          pitchDecay: kickConfig.envDuration / 1000,
+          // octaves controls pitch envelope depth - derive from envAmount
+          // envAmount 2.5 means start at freq*2.5, so ~1.3 octaves above base
+          octaves: Math.log2(kickConfig.envAmount) * 2,
           oscillator: { type: 'sine' },
           envelope: {
             attack: 0.001,
-            decay: (kickConfig.decay || 500) / 1000,
+            decay: kickConfig.decay / 1000,
             sustain: 0,
             release: 0.1,
           },
           volume: config.volume ?? -6,
         });
 
-        // Transpose note down 2 octaves for kick range
-        const transposeNote = (note: string, semitones: number): string => {
-          const freq = Tone.Frequency(note).toFrequency();
-          return Tone.Frequency(freq * Math.pow(2, semitones / 12)).toNote();
-        };
+        // Add saturation via waveshaper if drive > 0
+        let output: Tone.ToneAudioNode = synth;
+        let saturation: Tone.Distortion | null = null;
+        let filter: Tone.Filter | null = null;
+
+        if (kickConfig.drive > 0) {
+          saturation = new Tone.Distortion({
+            distortion: (kickConfig.drive / 100) * 0.5, // Scale to reasonable range
+            oversample: '2x',
+            wet: 1,
+          });
+        }
+
+        // Add lowpass filter (909: 3000Hz)
+        filter = new Tone.Filter({
+          type: 'lowpass',
+          frequency: kickConfig.filterFreq,
+          Q: 1,
+          rolloff: -24,
+        });
+
+        // Connect chain: synth -> saturation (if any) -> filter
+        if (saturation) {
+          synth.connect(saturation);
+          saturation.connect(filter);
+        } else {
+          synth.connect(filter);
+        }
+        output = filter;
+
+        // Use fixed 909 frequency (80Hz) regardless of note
+        const baseNote = Tone.Frequency(kickConfig.pitch, 'hz').toNote();
 
         return {
-          triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-            synth.triggerAttackRelease(transposeNote(note, -24), duration, time, velocity);
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            synth.triggerAttackRelease(baseNote, duration, time, velocity);
           },
-          triggerAttack: (note: string, time?: number, velocity?: number) => {
-            synth.triggerAttack(transposeNote(note, -24), time, velocity);
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            synth.triggerAttack(baseNote, time, velocity);
           },
           triggerRelease: (_note: string, time?: number) => {
             synth.triggerRelease(time);
           },
           releaseAll: () => { try { synth.triggerRelease(); } catch { /* ignore */ } },
-          connect: (dest: Tone.InputNode) => synth.connect(dest),
-          disconnect: () => synth.disconnect(),
-          dispose: () => synth.dispose(),
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            synth.dispose();
+            saturation?.dispose();
+            filter?.dispose();
+          },
           volume: synth.volume,
         } as any;
       }
 
       case 'snare': {
-        const snareConfig = dmConfig.snare || { pitch: 200, tone: 50, snappy: 70, decay: 200 };
-        // Snare: pitched oscillator + noise
-        // Transpose down 1 octave so C3 plays like C2 (proper snare range)
+        const snareConfig = {
+          pitch: 220,
+          tone: 25,
+          toneDecay: 250,
+          snappy: 70,
+          decay: 100,
+          envAmount: 4.0,
+          envDuration: 10,
+          filterType: 'notch' as const,
+          filterFreq: 1000,
+          ...dmConfig.snare
+        };
+
+        // TR-909 snare: pitched body with aggressive pitch envelope + filtered noise
         const body = new Tone.MembraneSynth({
-          pitchDecay: 0.05,
-          octaves: 4,
+          pitchDecay: snareConfig.envDuration / 1000, // 909: 10ms fast pitch drop
+          octaves: Math.log2(snareConfig.envAmount) * 2, // 909: 4x = ~2 octaves
           oscillator: { type: 'sine' },
           envelope: {
             attack: 0.001,
@@ -936,34 +999,41 @@ export class InstrumentFactory {
           },
           volume: config.volume ?? -6,
         });
+
+        // Noise component for snare "snap"
         const noise = new Tone.NoiseSynth({
           noise: { type: 'white' },
           envelope: {
             attack: 0.001,
-            decay: snareConfig.decay / 1500,
+            decay: snareConfig.toneDecay / 1000, // 909: 250ms
             sustain: 0,
             release: 0.05,
           },
-          volume: (config.volume ?? -6) + (snareConfig.snappy / 10 - 5),
+          volume: (config.volume ?? -6) + (snareConfig.snappy / 15 - 3),
+        });
+
+        // 909 uses notch filter at 1000Hz on snare
+        const filter = new Tone.Filter({
+          type: snareConfig.filterType,
+          frequency: snareConfig.filterFreq,
+          Q: 2,
         });
 
         const output = new Tone.Gain(1);
         body.connect(output);
-        noise.connect(output);
+        noise.connect(filter);
+        filter.connect(output);
 
-        // Transpose note down 1 octave for snare range
-        const transposeNote = (note: string, semitones: number): string => {
-          const freq = Tone.Frequency(note).toFrequency();
-          return Tone.Frequency(freq * Math.pow(2, semitones / 12)).toNote();
-        };
+        // Use fixed 909 frequency
+        const baseNote = Tone.Frequency(snareConfig.pitch, 'hz').toNote();
 
         return {
-          triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-            body.triggerAttackRelease(transposeNote(note, -12), duration, time, velocity);
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            body.triggerAttackRelease(baseNote, duration, time, velocity);
             noise.triggerAttackRelease(duration, time, velocity);
           },
-          triggerAttack: (note: string, time?: number, velocity?: number) => {
-            body.triggerAttack(transposeNote(note, -12), time, velocity);
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            body.triggerAttack(baseNote, time, velocity);
             noise.triggerAttack(time, velocity);
           },
           triggerRelease: (_note: string, time?: number) => {
@@ -979,6 +1049,7 @@ export class InstrumentFactory {
           dispose: () => {
             body.dispose();
             noise.dispose();
+            filter.dispose();
             output.dispose();
           },
           volume: body.volume,
@@ -987,7 +1058,7 @@ export class InstrumentFactory {
 
       case 'hihat': {
         const hhConfig = dmConfig.hihat || { tone: 50, decay: 100, metallic: 50 };
-        // Hi-hat: metal synth with short decay
+        // Hi-hat: metal synth (909 uses samples, but MetalSynth is a good approximation)
         return new Tone.MetalSynth({
           frequency: 200 + hhConfig.tone * 2,
           envelope: {
@@ -1004,8 +1075,22 @@ export class InstrumentFactory {
       }
 
       case 'clap': {
-        const clapConfig = dmConfig.clap || { tone: 50, decay: 200, spread: 50 };
-        // Clap: filtered noise with multiple triggers
+        const clapConfig = {
+          tone: 55,
+          decay: 80,
+          toneDecay: 250,
+          spread: 10,
+          filterFreqs: [900, 1200] as [number, number],
+          modulatorFreq: 40,
+          ...dmConfig.clap
+        };
+
+        // TR-909 clap: Multiple delayed noise bursts with modulation
+        // The 909 creates the "clap" effect by triggering noise at slightly
+        // offset times (10ms spread) creating a richer, more realistic clap
+        const output = new Tone.Gain(1);
+
+        // Create noise source for the sustained clap tail
         const noise = new Tone.NoiseSynth({
           noise: { type: 'white' },
           envelope: {
@@ -1014,14 +1099,547 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.05,
           },
-          volume: config.volume || -12,
+          volume: config.volume ?? -10,
         });
 
-        const filter = new Tone.Filter({
+        // Serial bandpass filters (909: highpass 900Hz -> bandpass 1200Hz)
+        const filter1 = new Tone.Filter({
+          type: 'highpass',
+          frequency: clapConfig.filterFreqs[0],
+          Q: 1.2,
+        });
+        const filter2 = new Tone.Filter({
           type: 'bandpass',
-          frequency: 1000 + clapConfig.tone * 20,
+          frequency: clapConfig.filterFreqs[1],
+          Q: 0.7,
+        });
+
+        // Tone filter for the initial burst character (909: 2200Hz bandpass)
+        const toneFilter = new Tone.Filter({
+          type: 'bandpass',
+          frequency: 1000 + clapConfig.tone * 24, // Scale 0-100 to ~1000-3400Hz
           Q: 2,
         });
+
+        noise.connect(toneFilter);
+        toneFilter.connect(filter1);
+        filter1.connect(filter2);
+        filter2.connect(output);
+
+        // Create additional noise bursts for the "spread" effect
+        // In hardware this is done with delay lines; we simulate with timed triggers
+        const burstNoises: Tone.NoiseSynth[] = [];
+        const numBursts = 4;
+        for (let i = 0; i < numBursts; i++) {
+          const burstNoise = new Tone.NoiseSynth({
+            noise: { type: 'white' },
+            envelope: {
+              attack: 0.001,
+              decay: (clapConfig.toneDecay / 1000) / (i + 1), // Each burst shorter
+              sustain: 0,
+              release: 0.02,
+            },
+            volume: (config.volume ?? -10) - (i * 3), // Each burst quieter
+          });
+          burstNoise.connect(toneFilter);
+          burstNoises.push(burstNoise);
+        }
+
+        return {
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const spreadMs = clapConfig.spread / 1000;
+            // Trigger the delayed bursts
+            burstNoises.forEach((burst, i) => {
+              const burstTime = t + (i * spreadMs);
+              const burstVel = (velocity ?? 1) * (1 - i * 0.15);
+              burst.triggerAttackRelease(duration / (i + 1), burstTime, burstVel);
+            });
+            // Main sustain comes last
+            noise.triggerAttackRelease(duration, t + (numBursts * spreadMs), velocity);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const spreadMs = clapConfig.spread / 1000;
+            burstNoises.forEach((burst, i) => {
+              burst.triggerAttack(t + (i * spreadMs), (velocity ?? 1) * (1 - i * 0.15));
+            });
+            noise.triggerAttack(t + (numBursts * spreadMs), velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            noise.triggerRelease(time);
+            burstNoises.forEach(burst => burst.triggerRelease(time));
+          },
+          releaseAll: () => {
+            try { noise.triggerRelease(); } catch { /* ignore */ }
+            burstNoises.forEach(burst => {
+              try { burst.triggerRelease(); } catch { /* ignore */ }
+            });
+          },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            noise.dispose();
+            burstNoises.forEach(burst => burst.dispose());
+            filter1.dispose();
+            filter2.dispose();
+            toneFilter.dispose();
+            output.dispose();
+          },
+          volume: noise.volume,
+        } as any;
+      }
+
+      case 'tom': {
+        const tomConfig = {
+          pitch: 200,
+          decay: 200,
+          tone: 5,
+          toneDecay: 100,
+          envAmount: 2.0,
+          envDuration: 100,
+          ...dmConfig.tom
+        };
+
+        // TR-909 tom: pitched sine with moderate pitch envelope
+        const synth = new Tone.MembraneSynth({
+          pitchDecay: tomConfig.envDuration / 1000,
+          octaves: Math.log2(tomConfig.envAmount) * 2,
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.001,
+            decay: tomConfig.decay / 1000,
+            sustain: 0,
+            release: 0.1,
+          },
+          volume: config.volume ?? -6,
+        });
+
+        // Small amount of noise for attack character
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: {
+            attack: 0.001,
+            decay: tomConfig.toneDecay / 1000,
+            sustain: 0,
+            release: 0.02,
+          },
+          volume: (config.volume ?? -6) - 20 + (tomConfig.tone / 5), // Very subtle noise
+        });
+
+        const output = new Tone.Gain(1);
+        synth.connect(output);
+        noise.connect(output);
+
+        const baseNote = Tone.Frequency(tomConfig.pitch, 'hz').toNote();
+
+        return {
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            synth.triggerAttackRelease(baseNote, duration, time, velocity);
+            noise.triggerAttackRelease(duration * 0.3, time, velocity);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            synth.triggerAttack(baseNote, time, velocity);
+            noise.triggerAttack(time, velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            synth.triggerRelease(time);
+            noise.triggerRelease(time);
+          },
+          releaseAll: () => {
+            try { synth.triggerRelease(); } catch { /* ignore */ }
+            try { noise.triggerRelease(); } catch { /* ignore */ }
+          },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            synth.dispose();
+            noise.dispose();
+            output.dispose();
+          },
+          volume: synth.volume,
+        } as any;
+      }
+
+      case 'rimshot': {
+        const rimConfig = {
+          decay: 30,
+          filterFreqs: [220, 500, 950] as [number, number, number],
+          filterQ: 10.5,
+          saturation: 3.0,
+          ...dmConfig.rimshot
+        };
+
+        // TR-909 rimshot: Parallel resonant bandpass filters with saturation
+        // The high Q creates the characteristic "ping" of the rimshot
+        // Uses a short noise impulse to excite the resonant filters
+
+        // Create noise burst as impulse source
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: {
+            attack: 0.001,
+            decay: rimConfig.decay / 1000,
+            sustain: 0,
+            release: 0.01,
+          },
+          volume: config.volume ?? -10,
+        });
+
+        // Three parallel resonant bandpass filters (909 characteristic)
+        const filter1 = new Tone.Filter({
+          type: 'bandpass',
+          frequency: rimConfig.filterFreqs[0],
+          Q: rimConfig.filterQ,
+        });
+        const filter2 = new Tone.Filter({
+          type: 'bandpass',
+          frequency: rimConfig.filterFreqs[1],
+          Q: rimConfig.filterQ,
+        });
+        const filter3 = new Tone.Filter({
+          type: 'bandpass',
+          frequency: rimConfig.filterFreqs[2],
+          Q: rimConfig.filterQ,
+        });
+
+        // Mix the parallel filters
+        const filterMix = new Tone.Gain(1);
+        noise.connect(filter1);
+        noise.connect(filter2);
+        noise.connect(filter3);
+        filter1.connect(filterMix);
+        filter2.connect(filterMix);
+        filter3.connect(filterMix);
+
+        // Saturation for the punchy 909 rimshot character
+        const saturation = new Tone.Distortion({
+          distortion: (rimConfig.saturation / 5) * 0.8, // Scale saturation
+          oversample: '2x',
+          wet: 1,
+        });
+
+        // Highpass to remove mud
+        const highpass = new Tone.Filter({
+          type: 'highpass',
+          frequency: 100,
+          Q: 0.5,
+        });
+
+        filterMix.connect(saturation);
+        saturation.connect(highpass);
+
+        return {
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            noise.triggerAttackRelease(duration, time, velocity);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            noise.triggerAttack(time, velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            noise.triggerRelease(time);
+          },
+          releaseAll: () => {
+            try { noise.triggerRelease(); } catch { /* ignore */ }
+          },
+          connect: (dest: Tone.InputNode) => highpass.connect(dest),
+          disconnect: () => highpass.disconnect(),
+          dispose: () => {
+            noise.dispose();
+            filter1.dispose();
+            filter2.dispose();
+            filter3.dispose();
+            filterMix.dispose();
+            saturation.dispose();
+            highpass.dispose();
+          },
+          volume: noise.volume,
+        } as any;
+      }
+
+      // =========================================================================
+      // TR-808 SPECIFIC DRUM TYPES
+      // Based on io-808 web emulator - 100% synthesized (no samples)
+      // =========================================================================
+
+      case 'conga': {
+        // TR-808 Conga: Pure sine oscillator (higher pitched than tom, no noise)
+        const congaConfig = {
+          pitch: 310,           // Mid conga default
+          decay: 180,           // 808: 180ms
+          tuning: 50,           // 0-100% pitch interpolation
+          ...dmConfig.conga
+        };
+
+        // 808 congas are pure sine - no noise component like toms
+        const synth = new Tone.Synth({
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.001,
+            decay: congaConfig.decay / 1000,
+            sustain: 0,
+            release: 0.1,
+          },
+          volume: config.volume ?? -8,
+        });
+
+        // Lowpass filter for warmth
+        const filter = new Tone.Filter({
+          type: 'lowpass',
+          frequency: 10000,
+          Q: 1,
+        });
+
+        synth.connect(filter);
+        const baseNote = Tone.Frequency(congaConfig.pitch, 'hz').toNote();
+
+        return {
+          triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
+            synth.triggerAttackRelease(baseNote, duration, time, velocity);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            synth.triggerAttack(baseNote, time, velocity);
+          },
+          triggerRelease: (_note: string, time?: number) => {
+            synth.triggerRelease(time);
+          },
+          releaseAll: () => {
+            try { synth.triggerRelease(); } catch { /* ignore */ }
+          },
+          connect: (dest: Tone.InputNode) => filter.connect(dest),
+          disconnect: () => filter.disconnect(),
+          dispose: () => {
+            synth.dispose();
+            filter.dispose();
+          },
+          volume: synth.volume,
+        } as any;
+      }
+
+      case 'cowbell': {
+        // TR-808 Cowbell: Dual square oscillators at 540Hz and 800Hz through bandpass
+        // Dual envelope: short attack + longer exponential tail
+        const cowbellConfig = {
+          decay: 400,           // 808: 15ms short + 400ms tail
+          filterFreq: 2640,     // 808: 2640Hz bandpass center
+          ...dmConfig.cowbell
+        };
+
+        // Two square oscillators at fixed 808 frequencies
+        const osc1 = new Tone.Oscillator({
+          type: 'square',
+          frequency: 540,
+          volume: -6,
+        });
+        const osc2 = new Tone.Oscillator({
+          type: 'square',
+          frequency: 800,
+          volume: -6,
+        });
+
+        // Short envelope for attack transient
+        const shortVCA = new Tone.Gain(0);
+        // Long envelope for sustaining tail
+        const longVCA = new Tone.Gain(0);
+
+        // Bandpass filter for cowbell character
+        const filter = new Tone.Filter({
+          type: 'bandpass',
+          frequency: cowbellConfig.filterFreq,
+          Q: 1,
+        });
+
+        // Mix oscillators
+        const oscMix = new Tone.Gain(0.3);
+        osc1.connect(oscMix);
+        osc2.connect(oscMix);
+
+        // Split to short and long VCAs
+        oscMix.connect(shortVCA);
+        oscMix.connect(longVCA);
+
+        // Output mix
+        const output = new Tone.Gain(1);
+        shortVCA.connect(filter);
+        longVCA.connect(filter);
+        filter.connect(output);
+
+        // Start oscillators
+        osc1.start();
+        osc2.start();
+
+        return {
+          triggerAttackRelease: (_note: string, _duration: number, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            // Short attack envelope: 0 -> 0.375 over 2ms, then decay to 0 over 15ms
+            shortVCA.gain.cancelScheduledValues(t);
+            shortVCA.gain.setValueAtTime(0, t);
+            shortVCA.gain.linearRampToValueAtTime(0.375 * vel, t + 0.002);
+            shortVCA.gain.linearRampToValueAtTime(0, t + 0.017);
+            // Long tail envelope: 0 -> 0.125 over 2ms, exponential decay over cowbell decay
+            longVCA.gain.cancelScheduledValues(t);
+            longVCA.gain.setValueAtTime(0.001, t + 0.015);
+            longVCA.gain.exponentialRampToValueAtTime(0.125 * vel, t + 0.017);
+            longVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.017 + cowbellConfig.decay / 1000);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            shortVCA.gain.cancelScheduledValues(t);
+            shortVCA.gain.setValueAtTime(0, t);
+            shortVCA.gain.linearRampToValueAtTime(0.375 * vel, t + 0.002);
+            shortVCA.gain.linearRampToValueAtTime(0, t + 0.017);
+            longVCA.gain.cancelScheduledValues(t);
+            longVCA.gain.setValueAtTime(0.001, t + 0.015);
+            longVCA.gain.exponentialRampToValueAtTime(0.125 * vel, t + 0.017);
+            longVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.017 + cowbellConfig.decay / 1000);
+          },
+          triggerRelease: (_note: string, _time?: number) => {
+            // Cowbell doesn't respond to release - it's a one-shot
+          },
+          releaseAll: () => {
+            // One-shot, nothing to release
+          },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            osc1.stop();
+            osc2.stop();
+            osc1.dispose();
+            osc2.dispose();
+            shortVCA.dispose();
+            longVCA.dispose();
+            oscMix.dispose();
+            filter.dispose();
+            output.dispose();
+          },
+          volume: new Tone.Param({ value: config.volume ?? -10, units: 'decibels' }),
+        } as any;
+      }
+
+      case 'clave': {
+        // TR-808 Clave: Triangle (2450Hz) + Sine (1750Hz) through bandpass + distortion
+        // Creates woody "click" character
+        const claveConfig = {
+          decay: 40,            // 808: 40ms
+          pitch: 2450,          // 808: 2450Hz triangle
+          pitchSecondary: 1750, // 808: 1750Hz sine
+          filterFreq: 2450,     // 808: 2450Hz bandpass
+          ...dmConfig.clave
+        };
+
+        // Primary triangle oscillator
+        const osc1 = new Tone.Oscillator({
+          type: 'triangle',
+          frequency: claveConfig.pitch,
+          volume: -6,
+        });
+        // Secondary sine oscillator
+        const osc2 = new Tone.Oscillator({
+          type: 'sine',
+          frequency: claveConfig.pitchSecondary,
+          volume: -8,
+        });
+
+        // VCAs for envelope
+        const vca1 = new Tone.Gain(0);
+        const vca2 = new Tone.Gain(0);
+
+        // Bandpass filter
+        const filter = new Tone.Filter({
+          type: 'bandpass',
+          frequency: claveConfig.filterFreq,
+          Q: 5,
+        });
+
+        // Distortion for punch (808 "swing VCA" - half-wave rectifier + soft clip)
+        const distortion = new Tone.Distortion({
+          distortion: 0.5,
+          oversample: '2x',
+          wet: 1,
+        });
+
+        const output = new Tone.Gain(1);
+
+        osc1.connect(vca1);
+        osc2.connect(vca2);
+        vca1.connect(filter);
+        vca2.connect(filter);
+        filter.connect(distortion);
+        distortion.connect(output);
+
+        osc1.start();
+        osc2.start();
+
+        return {
+          triggerAttackRelease: (_note: string, _duration: number, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            // Fast exponential decay
+            vca1.gain.cancelScheduledValues(t);
+            vca1.gain.setValueAtTime(0.7 * vel, t);
+            vca1.gain.exponentialRampToValueAtTime(0.001, t + claveConfig.decay / 1000);
+            vca2.gain.cancelScheduledValues(t);
+            vca2.gain.setValueAtTime(0.5 * vel, t);
+            vca2.gain.exponentialRampToValueAtTime(0.001, t + claveConfig.decay / 1000);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            vca1.gain.cancelScheduledValues(t);
+            vca1.gain.setValueAtTime(0.7 * vel, t);
+            vca1.gain.exponentialRampToValueAtTime(0.001, t + claveConfig.decay / 1000);
+            vca2.gain.cancelScheduledValues(t);
+            vca2.gain.setValueAtTime(0.5 * vel, t);
+            vca2.gain.exponentialRampToValueAtTime(0.001, t + claveConfig.decay / 1000);
+          },
+          triggerRelease: (_note: string, _time?: number) => { /* one-shot */ },
+          releaseAll: () => { /* one-shot */ },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            osc1.stop();
+            osc2.stop();
+            osc1.dispose();
+            osc2.dispose();
+            vca1.dispose();
+            vca2.dispose();
+            filter.dispose();
+            distortion.dispose();
+            output.dispose();
+          },
+          volume: new Tone.Param({ value: config.volume ?? -10, units: 'decibels' }),
+        } as any;
+      }
+
+      case 'maracas': {
+        // TR-808 Maracas: White noise through highpass filter (5kHz)
+        // Very short decay for "shake" character
+        const maracasConfig = {
+          decay: 30,            // 808: 30ms (quick shake)
+          filterFreq: 5000,     // 808: 5000Hz highpass
+          ...dmConfig.maracas
+        };
+
+        const noise = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: {
+            attack: 0.001,
+            decay: maracasConfig.decay / 1000,
+            sustain: 0,
+            release: 0.01,
+          },
+          volume: config.volume ?? -12,
+        });
+
+        // Highpass filter removes low frequencies, keeps bright rattle
+        const filter = new Tone.Filter({
+          type: 'highpass',
+          frequency: maracasConfig.filterFreq,
+          Q: 1,
+        });
+
         noise.connect(filter);
 
         return {
@@ -1047,15 +1665,127 @@ export class InstrumentFactory {
         } as any;
       }
 
+      case 'cymbal': {
+        // TR-808 Cymbal: Same 6-oscillator bank as hi-hat but with 3-band processing
+        // Complex multi-band filtering with separate envelopes per band
+        const cymbalConfig = {
+          tone: 50,             // Low/high band balance
+          decay: 2000,          // 808: variable from 700-6800ms for low band
+          ...dmConfig.cymbal
+        };
+
+        // 808 metallic oscillator bank - 6 square waves at inharmonic frequencies
+        const oscFreqs = [263, 400, 421, 474, 587, 845];
+        const oscillators: Tone.Oscillator[] = [];
+        const oscMix = new Tone.Gain(0.3);
+
+        for (const freq of oscFreqs) {
+          const osc = new Tone.Oscillator({
+            type: 'square',
+            frequency: freq,
+            volume: -10,
+          });
+          osc.connect(oscMix);
+          osc.start();
+          oscillators.push(osc);
+        }
+
+        // 3-band filtering with separate VCAs
+        // Low band: 5kHz bandpass, long decay
+        const lowFilter = new Tone.Filter({ type: 'bandpass', frequency: 5000, Q: 1 });
+        const lowVCA = new Tone.Gain(0);
+        // Mid band: 10kHz bandpass, medium decay
+        const midFilter = new Tone.Filter({ type: 'bandpass', frequency: 10000, Q: 1 });
+        const midVCA = new Tone.Gain(0);
+        // High band: 8kHz highpass, short decay
+        const highFilter = new Tone.Filter({ type: 'highpass', frequency: 8000, Q: 1 });
+        const highVCA = new Tone.Gain(0);
+
+        oscMix.connect(lowFilter);
+        oscMix.connect(midFilter);
+        oscMix.connect(highFilter);
+
+        lowFilter.connect(lowVCA);
+        midFilter.connect(midVCA);
+        highFilter.connect(highVCA);
+
+        const output = new Tone.Gain(1);
+        lowVCA.connect(output);
+        midVCA.connect(output);
+        highVCA.connect(output);
+
+        // Calculate envelope amounts based on tone parameter
+        const lowEnvAmt = 0.666 - (cymbalConfig.tone / 100) * 0.666;
+        const midEnvAmt = 0.333;
+        const highEnvAmt = 0.666 - (1 - cymbalConfig.tone / 100) * 0.666;
+
+        return {
+          triggerAttackRelease: (_note: string, _duration: number, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            // Low band: longest decay (variable based on config)
+            lowVCA.gain.cancelScheduledValues(t);
+            lowVCA.gain.setValueAtTime(0.001, t);
+            lowVCA.gain.exponentialRampToValueAtTime(lowEnvAmt * vel, t + 0.01);
+            lowVCA.gain.exponentialRampToValueAtTime(0.001, t + cymbalConfig.decay / 1000);
+            // Mid band: medium decay (400ms)
+            midVCA.gain.cancelScheduledValues(t);
+            midVCA.gain.setValueAtTime(0.001, t);
+            midVCA.gain.exponentialRampToValueAtTime(midEnvAmt * vel, t + 0.01);
+            midVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            // High band: short decay (150ms)
+            highVCA.gain.cancelScheduledValues(t);
+            highVCA.gain.setValueAtTime(0.001, t);
+            highVCA.gain.exponentialRampToValueAtTime(highEnvAmt * vel, t + 0.01);
+            highVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          },
+          triggerAttack: (_note: string, time?: number, velocity?: number) => {
+            const t = time ?? Tone.now();
+            const vel = velocity ?? 1;
+            lowVCA.gain.cancelScheduledValues(t);
+            lowVCA.gain.setValueAtTime(0.001, t);
+            lowVCA.gain.exponentialRampToValueAtTime(lowEnvAmt * vel, t + 0.01);
+            lowVCA.gain.exponentialRampToValueAtTime(0.001, t + cymbalConfig.decay / 1000);
+            midVCA.gain.cancelScheduledValues(t);
+            midVCA.gain.setValueAtTime(0.001, t);
+            midVCA.gain.exponentialRampToValueAtTime(midEnvAmt * vel, t + 0.01);
+            midVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            highVCA.gain.cancelScheduledValues(t);
+            highVCA.gain.setValueAtTime(0.001, t);
+            highVCA.gain.exponentialRampToValueAtTime(highEnvAmt * vel, t + 0.01);
+            highVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          },
+          triggerRelease: (_note: string, _time?: number) => { /* one-shot */ },
+          releaseAll: () => { /* one-shot */ },
+          connect: (dest: Tone.InputNode) => output.connect(dest),
+          disconnect: () => output.disconnect(),
+          dispose: () => {
+            oscillators.forEach(osc => {
+              osc.stop();
+              osc.dispose();
+            });
+            oscMix.dispose();
+            lowFilter.dispose();
+            midFilter.dispose();
+            highFilter.dispose();
+            lowVCA.dispose();
+            midVCA.dispose();
+            highVCA.dispose();
+            output.dispose();
+          },
+          volume: new Tone.Param({ value: config.volume ?? -12, units: 'decibels' }),
+        } as any;
+      }
+
       default:
-        // Default to kick
+        // Default to 808/909-style kick
         return new Tone.MembraneSynth({
           pitchDecay: 0.05,
-          octaves: 10,
+          octaves: 3,
           envelope: {
             attack: 0.001,
-            decay: 0.4,
-            sustain: 0.01,
+            decay: 0.3,
+            sustain: 0,
             release: 0.1,
           },
           volume: config.volume || -12,
@@ -1066,9 +1796,11 @@ export class InstrumentFactory {
   /**
    * ChipSynth - 8-bit video game console sounds
    * Uses square/triangle waves with bit crushing for authentic lo-fi character
+   * Now includes integrated ArpeggioEngine for true chiptune-style arpeggios
    */
   private static createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const chipConfig = config.chipSynth || DEFAULT_CHIP_SYNTH;
+    const arpeggioConfig = chipConfig.arpeggio;
 
     // Create base oscillator based on channel type
     // Note: 'pulse' channels use 'square' since Tone.Synth doesn't support pulse width
@@ -1076,6 +1808,9 @@ export class InstrumentFactory {
     if (chipConfig.channel === 'triangle') {
       oscillatorType = 'triangle';
     }
+
+    // Import ArpeggioEngine dynamically to avoid circular dependency
+    const { ArpeggioEngine } = require('./ArpeggioEngine');
 
     if (chipConfig.channel === 'noise') {
       // Noise channel uses NoiseSynth
@@ -1143,25 +1878,90 @@ export class InstrumentFactory {
     });
     synth.connect(bitCrusher);
 
-    return {
+    // Create ArpeggioEngine if arpeggio is configured
+    let arpeggioEngine: InstanceType<typeof ArpeggioEngine> | null = null;
+    let lastArpNote: string | null = null;
+
+    if (arpeggioConfig) {
+      arpeggioEngine = new ArpeggioEngine({
+        config: arpeggioConfig,
+        onNoteOn: (note: string, velocity: number, duration: number) => {
+          // Release last arpeggio note before playing new one
+          if (lastArpNote) {
+            synth.triggerRelease(lastArpNote, Tone.now());
+          }
+          synth.triggerAttackRelease(note, duration, Tone.now(), velocity);
+          lastArpNote = note;
+        },
+        onNoteOff: (note: string) => {
+          synth.triggerRelease(note, Tone.now());
+          if (lastArpNote === note) {
+            lastArpNote = null;
+          }
+        },
+      });
+    }
+
+    // Wrapper object with arpeggio support
+    const chipSynthWrapper = {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-        synth.triggerAttackRelease(note, duration, time, velocity);
+        if (arpeggioEngine && arpeggioConfig?.enabled) {
+          // Start arpeggiator instead of direct note
+          arpeggioEngine.start(note, velocity ?? 1);
+          // Schedule stop after duration
+          if (duration && typeof duration === 'number') {
+            const stopTime = (time ?? Tone.now()) + duration;
+            Tone.getTransport().scheduleOnce(() => {
+              arpeggioEngine.stop(note);
+            }, stopTime);
+          }
+        } else {
+          synth.triggerAttackRelease(note, duration, time, velocity);
+        }
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
-        synth.triggerAttack(note, time, velocity);
+        if (arpeggioEngine && arpeggioConfig?.enabled) {
+          arpeggioEngine.start(note, velocity ?? 1);
+        } else {
+          synth.triggerAttack(note, time, velocity);
+        }
       },
       triggerRelease: (note: string, time?: number) => {
-        synth.triggerRelease(note, time);
+        if (arpeggioEngine && arpeggioConfig?.enabled) {
+          arpeggioEngine.stop(note);
+        } else {
+          synth.triggerRelease(note, time);
+        }
       },
-      releaseAll: () => synth.releaseAll(),
+      releaseAll: () => {
+        if (arpeggioEngine) {
+          arpeggioEngine.stopAll();
+        }
+        synth.releaseAll();
+        lastArpNote = null;
+      },
       connect: (dest: Tone.InputNode) => bitCrusher.connect(dest),
       disconnect: () => bitCrusher.disconnect(),
       dispose: () => {
+        if (arpeggioEngine) {
+          arpeggioEngine.dispose();
+        }
         synth.dispose();
         bitCrusher.dispose();
       },
       volume: synth.volume,
-    } as any;
+      // Expose methods for real-time arpeggio updates
+      updateArpeggio: (newConfig: typeof arpeggioConfig) => {
+        if (arpeggioEngine && newConfig) {
+          arpeggioEngine.updateConfig(newConfig);
+        }
+      },
+      getArpeggioEngine: () => arpeggioEngine,
+      getCurrentArpeggioStep: () => arpeggioEngine?.getCurrentStep() ?? 0,
+      isArpeggioPlaying: () => arpeggioEngine?.getIsPlaying() ?? false,
+    };
+
+    return chipSynthWrapper as any;
   }
 
   /**

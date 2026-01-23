@@ -19,6 +19,11 @@ export function useVersionCheck(checkIntervalMs: number = 5 * 60 * 1000) {
   const [latestVersion, setLatestVersion] = useState<VersionInfo | null>(null);
 
   const checkForUpdates = async () => {
+    // Skip version check in development mode
+    if (import.meta.env.DEV) {
+      return;
+    }
+
     try {
       // Add timestamp to prevent caching
       const response = await fetch(`/DEViLBOX/version.json?t=${Date.now()}`, {

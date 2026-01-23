@@ -20,6 +20,8 @@ interface TransportStore extends TransportState {
   // Metronome state
   metronomeEnabled: boolean;
   metronomeVolume: number; // 0-100
+  // Tracker timing (for visual sync)
+  speed: number; // Ticks per row (1-31, default 6)
 
   // Actions
   setBPM: (bpm: number) => void;
@@ -38,6 +40,7 @@ interface TransportStore extends TransportState {
   setMetronomeEnabled: (enabled: boolean) => void;
   setMetronomeVolume: (volume: number) => void;
   toggleMetronome: () => void;
+  setSpeed: (speed: number) => void;
   reset: () => void;
 }
 
@@ -64,6 +67,7 @@ export const useTransportStore = create<TransportStore>()(
     smoothScrolling: true, // Default to smooth scrolling (can be toggled by user)
     metronomeEnabled: false,
     metronomeVolume: 75, // Default to 75%
+    speed: 6, // Default speed (ticks per row) - ProTracker default
 
     // Actions
     setBPM: (bpm) =>
@@ -216,6 +220,12 @@ export const useTransportStore = create<TransportStore>()(
         state.metronomeEnabled = !state.metronomeEnabled;
       }),
 
+    setSpeed: (speed) =>
+      set((state) => {
+        // Clamp speed to valid tracker range (1-31)
+        state.speed = Math.max(1, Math.min(31, speed));
+      }),
+
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
@@ -229,6 +239,7 @@ export const useTransportStore = create<TransportStore>()(
         state.currentRow = 0;
         state.currentPatternIndex = 0;
         state.continuousRow = 0;
+        state.speed = 6;
       }),
   }))
 );

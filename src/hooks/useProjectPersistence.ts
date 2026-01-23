@@ -6,7 +6,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
-import { needsMigration, migrateProject, getMigrationStats } from '@/lib/migration';
+import { needsMigration, migrateProject } from '@/lib/migration';
 
 const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
@@ -17,6 +17,7 @@ interface SavedProject {
   metadata: ReturnType<typeof useProjectStore.getState>['metadata'];
   bpm: number;
   patterns: ReturnType<typeof useTrackerStore.getState>['patterns'];
+  patternOrder?: number[]; // Song arrangement - which patterns play in which order
   instruments: ReturnType<typeof useInstrumentStore.getState>['instruments'];
   automation?: AutomationCurve[];
   masterEffects?: EffectConfig[];
@@ -40,6 +41,7 @@ export function saveProjectToStorage(): boolean {
       metadata: projectState.metadata,
       bpm: transportState.bpm,
       patterns: trackerState.patterns,
+      patternOrder: trackerState.patternOrder,
       instruments: instrumentState.instruments,
       automation: automationState.curves,
       masterEffects: audioState.masterEffects,
@@ -67,20 +69,8 @@ export function saveProjectToStorage(): boolean {
       // User will need to re-import after reload
     }
 
-    // DEBUG: Check what's being saved
-    console.log('[Persistence] Saving instruments:', {
-      count: savedProject.instruments.length,
-      modCount: modInstruments.length,
-      sample0: savedProject.instruments[0],
-      hasSample: !!savedProject.instruments[0]?.sample,
-      hasAudioBuffer: !!savedProject.instruments[0]?.sample?.audioBuffer,
-      hasMetadata: !!savedProject.instruments[0]?.metadata,
-      modPlayback: savedProject.instruments[0]?.metadata?.modPlayback,
-    });
-
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
     projectState.markAsSaved();
-    console.log('[Persistence] Project saved to localStorage');
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to save project:', error);
@@ -95,7 +85,6 @@ export function loadProjectFromStorage(): boolean {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
-      console.log('[Persistence] No saved project found');
       return false;
     }
 
@@ -109,19 +98,11 @@ export function loadProjectFromStorage(): boolean {
 
     // Check if migration is needed (old format → new XM format)
     if (needsMigration(project.patterns, project.instruments)) {
-      console.log('[Persistence] Old format detected, migrating to XM format...');
-      const stats = getMigrationStats(project.patterns, project.instruments);
-      console.log('[Persistence] Migration stats:', stats);
-
       // Perform migration
       const migrated = migrateProject(project.patterns, project.instruments);
       project.patterns = migrated.patterns;
       project.instruments = migrated.instruments;
 
-      console.log('[Persistence] Migration complete!');
-      console.log('[Persistence] - Cells migrated:', stats.cellsToMigrate);
-      console.log('[Persistence] - Instruments remapped:', stats.instrumentsToMigrate);
-      console.log('[Persistence] - Format:', stats.oldFormat, '→', stats.newFormat);
     }
 
     // Load data into stores
@@ -135,15 +116,10 @@ export function loadProjectFromStorage(): boolean {
     // Load patterns
     trackerStore.loadPatterns(project.patterns);
 
-    // DEBUG: Check what's being loaded
-    console.log('[Persistence] Loading instruments:', {
-      count: project.instruments.length,
-      sample0: project.instruments[0],
-      hasSample: !!project.instruments[0]?.sample,
-      hasAudioBuffer: !!project.instruments[0]?.sample?.audioBuffer,
-      hasMetadata: !!project.instruments[0]?.metadata,
-      modPlayback: project.instruments[0]?.metadata?.modPlayback,
-    });
+    // Load pattern order (song arrangement)
+    if (project.patternOrder && project.patternOrder.length > 0) {
+      trackerStore.setPatternOrder(project.patternOrder);
+    }
 
     // Load instruments
     instrumentStore.loadInstruments(project.instruments);
@@ -165,7 +141,6 @@ export function loadProjectFromStorage(): boolean {
     }
 
     projectStore.markAsSaved();
-    console.log('[Persistence] Project loaded from localStorage:', project.metadata.name);
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to load project:', error);
@@ -191,7 +166,6 @@ export function hasSavedProject(): boolean {
 export function clearSavedProject(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    console.log('[Persistence] Saved project cleared');
   } catch (error) {
     console.error('[Persistence] Failed to clear saved project:', error);
   }

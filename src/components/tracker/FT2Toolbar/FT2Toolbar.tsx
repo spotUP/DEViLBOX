@@ -19,11 +19,11 @@ import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
+import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { importSong, exportSong } from '@lib/export/exporters';
-import { loadModuleFile, isSupportedModule, getSupportedExtensions } from '@lib/import/ModuleLoader';
+import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
-import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
-import { encodeWav } from '@lib/import/WavEncoder';
+import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
@@ -145,6 +145,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     resizePattern,
     loadPatterns,
     setPatternOrder,
+    patternOrder,
+    currentPositionIndex,
+    setCurrentPosition,
     recordMode,
     editStep,
     toggleRecordMode,
@@ -176,6 +179,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const demoMenuRef = useRef<HTMLDivElement>(null);
   const demoButtonRef = useRef<HTMLDivElement>(null);
   const [demoMenuPosition, setDemoMenuPosition] = useState({ top: 0, left: 0 });
@@ -373,10 +377,94 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     }
   };
 
+  // Handle module import from dialog
+  const handleModuleImport = async (moduleInfo: ModuleInfo) => {
+    // CRITICAL: Stop playback before loading new song to prevent audio glitches
+    if (isPlaying) {
+      stop();
+      engine.releaseAll(); // Release any held notes
+    }
+
+    setIsLoading(true);
+    try {
+      if (!moduleInfo.metadata.song) {
+        notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`, 5000);
+        return;
+      }
+
+      const result = convertModule(moduleInfo.metadata.song);
+
+      if (result.patterns.length === 0) {
+        notify.error(`Module "${moduleInfo.metadata.title}" contains no patterns`, 5000);
+        return;
+      }
+
+      // Use the parsed instruments from the native parser, or create from pattern data
+      let instruments: InstrumentConfig[];
+      if (moduleInfo.nativeData?.instruments) {
+        // Convert ParsedInstruments to InstrumentConfig
+        const parsedInstruments = moduleInfo.nativeData.instruments;
+        const format = moduleInfo.nativeData.format;
+        instruments = parsedInstruments.flatMap((parsed, index) =>
+          convertToInstrument(parsed, index + 1, format)
+        );
+      } else {
+        instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, undefined);
+      }
+
+      console.log('[Import]', instruments.length, 'instruments,', result.patterns.length, 'patterns');
+
+      loadInstruments(instruments);
+      loadPatterns(result.patterns);
+
+      // Set pattern order from module
+      if (result.order && result.order.length > 0) {
+        setPatternOrder(result.order);
+        console.log('[Import] Pattern order set:', result.order.length, 'positions');
+
+        // CRITICAL: Set current pattern to the first pattern in the order (position 0)
+        // This ensures playback starts from the beginning of the song
+        const firstPatternIndex = result.order[0];
+        setCurrentPattern(firstPatternIndex);
+        console.log(`[Import] Set current pattern to position 0: pattern ${firstPatternIndex}`);
+      }
+
+      setMetadata({ name: moduleInfo.metadata.title, author: '', description: `Imported from ${moduleInfo.metadata.type}` });
+
+      // Apply initial BPM from module metadata (if available)
+      const initialBPM = moduleInfo.nativeData?.importMetadata.modData?.initialBPM;
+      if (initialBPM) {
+        setBPM(initialBPM);
+      }
+
+      notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
+
+      // Preload samples
+      console.log('[Import] Preloading samples...');
+      await engine.preloadInstruments(instruments);
+      console.log('[Import] Samples ready for playback');
+
+    } catch (err) {
+      notify.error(`Failed to import module: ${err instanceof Error ? err.message : String(err)}`, 8000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // File load handler (like NavBar)
   const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset the file input so the same file can be selected again
+    e.target.value = '';
+
+    // For MOD/XM files, open the import dialog instead
+    if (isSupportedModule(file.name)) {
+      setShowImportDialog(true);
+      // The dialog will handle the file selection
+      return;
+    }
 
     // CRITICAL: Stop playback before loading new song to prevent audio glitches
     if (isPlaying) {
@@ -409,49 +497,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         setBPM(midiResult.bpm);
 
         notify.success(`Loaded MIDI: ${midiResult.metadata.name} (${midiResult.patterns.length} patterns)`, 3000);
-      } else if (isSupportedModule(file.name)) {
-        const moduleInfo = await loadModuleFile(file);
-
-        if (!moduleInfo.metadata.song) {
-          notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`, 5000);
-          return;
-        }
-
-        const result = convertModule(moduleInfo.metadata.song);
-
-        if (result.patterns.length === 0) {
-          notify.error(`Module "${moduleInfo.metadata.title}" contains no patterns`, 5000);
-          return;
-        }
-
-        // Try to extract samples
-        let sampleUrls: Map<number, string> | undefined;
-        if (canExtractSamples(file.name)) {
-          try {
-            const extraction = await extractSamples(file);
-            sampleUrls = new Map();
-            for (let i = 0; i < extraction.samples.length; i++) {
-              const sample = extraction.samples[i];
-              if (sample.pcmData.length > 0) {
-                const wavUrl = encodeWav(sample);
-                sampleUrls.set(i + 1, wavUrl);
-              }
-            }
-          } catch (err) {
-            console.warn('[Import] Could not extract samples:', err);
-          }
-        }
-
-        const instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, sampleUrls);
-        loadInstruments(instruments);
-        loadPatterns(result.patterns);
-        setMetadata({ name: moduleInfo.metadata.title, author: '', description: `Imported from ${file.name}` });
-        setBPM(125);
-
-        const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-        if (samplerCount > 0) {
-          await engine.preloadInstruments(instruments);
-        }
       } else {
         // JSON song file
         const songData = await importSong(file);
@@ -616,10 +661,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         <div className="ft2-section ft2-section-pos">
           <FT2NumericInput
             label="Position"
-            value={currentPatternIndex}
-            onChange={handlePositionChange}
+            value={currentPositionIndex}
+            onChange={(pos) => {
+              // When position changes, update both position and pattern
+              setCurrentPosition(pos);
+              const patternIdx = patternOrder[pos] ?? pos;
+              setCurrentPattern(patternIdx);
+            }}
             min={0}
-            max={songLength - 1}
+            max={patternOrder.length - 1}
             format="hex"
           />
           <FT2Button onClick={handleInsertPosition} small title="Insert position (duplicate current)">
@@ -644,10 +694,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         <div className="ft2-section ft2-section-pattern">
           <FT2NumericInput
             label="Pattern"
-            value={currentPatternIndex}
+            value={patternOrder[currentPositionIndex] ?? currentPatternIndex}
             onChange={handlePatternChange}
             min={0}
-            max={songLength - 1}
+            max={patterns.length - 1}
             format="hex"
           />
         </div>
@@ -790,7 +840,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             className="hidden"
           />
           <FT2Button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowImportDialog(true)}
             small
             disabled={isLoading}
             title="Load song or module (Ctrl+O)"
@@ -912,6 +962,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
       {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {/* Import Module Dialog */}
+      <ImportModuleDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImport={handleModuleImport}
+      />
     </div>
   );
 };

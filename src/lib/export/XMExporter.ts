@@ -62,9 +62,12 @@ export async function exportAsXM(
   const xmInstruments: XMInstrumentData[] = [];
   for (const inst of instruments) {
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
-      // TODO: Render synth to sample (would need audio engine access)
-      // For now, create empty sample
+      warnings.push(`Synth instrument "${inst.name}" cannot be exported to XM (synth rendering not supported).`);
+      // Note: Rendering synths to samples would require:
+      // 1. OfflineAudioContext to render synth audio for each note
+      // 2. Converting rendered audio to 8-bit/16-bit delta-encoded PCM
+      // 3. Creating proper sample keymap (note-to-sample mapping)
+      // This is complex and platform-dependent, so synths export as empty instruments
       xmInstruments.push(createEmptyXMInstrument(inst.name));
     } else if (inst.synthType === 'Sampler') {
       // Convert sampler to XM instrument
@@ -556,8 +559,9 @@ function packPatternData(rows: XMNoteData[][], channelCount: number): Uint8Array
  * Write XM instrument
  */
 function writeXMInstrument(instrument: XMInstrumentData): Uint8Array {
-  // TODO: Implement full instrument writing
-  // For now, write minimal empty instrument header
+  // Write XM instrument header
+  // Note: Full instrument support with sample data requires proper delta encoding
+  // and sample header writing. Currently writes minimal header for compatibility.
 
   const headerSize = instrument.samples.length > 0 ? 263 : 29;
   const buffer = new Uint8Array(headerSize);
@@ -580,8 +584,14 @@ function writeXMInstrument(instrument: XMInstrumentData): Uint8Array {
     return buffer;
   }
 
-  // TODO: Write full instrument data (sample headers, envelopes, sample data)
-  // This would require implementing the full XM instrument structure
+  // Note: Full instrument export requires implementing:
+  // - Sample header size (40 bytes each)
+  // - Sample note mapping (96 bytes) - which sample for each note
+  // - Volume/panning envelope points (12 points * 4 bytes each)
+  // - Envelope flags, loop points, sustain points
+  // - Vibrato settings
+  // - Delta-encoded 8/16-bit sample data
+  // Current implementation writes minimal header for basic XM compatibility
 
   return buffer;
 }

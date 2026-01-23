@@ -171,6 +171,11 @@ const TB303KnobPanelComponent: React.FC = () => {
   // Devil Fish state
   const [devilFishConfig, setDevilFishConfig] = useState<DevilFishConfig>({ ...DEFAULT_DEVIL_FISH });
 
+  // Track if initial sync from store is complete - after this, local state is source of truth
+  const initialSyncDoneRef = useRef(false);
+  // Track the first TB303 instrument ID to detect when a new project is loaded
+  const lastTB303IdRef = useRef<number | null>(null);
+
   // Visualization state
   const [envelopePosition, setEnvelopePosition] = useState<number>(0);
   const [envelopeActive, setEnvelopeActive] = useState<boolean>(false);
@@ -226,7 +231,22 @@ const TB303KnobPanelComponent: React.FC = () => {
   const tb303ConfigKey = firstTB303Config ? JSON.stringify(firstTB303Config) : '';
 
   useEffect(() => {
+    // Detect if a new TB303 instrument was loaded (e.g., new project)
+    const firstTB303Id = tb303Instruments[0]?.id ?? null;
+    if (lastTB303IdRef.current !== null && lastTB303IdRef.current !== firstTB303Id) {
+      // Different instrument - reset sync flag to allow re-sync
+      initialSyncDoneRef.current = false;
+    }
+    lastTB303IdRef.current = firstTB303Id;
+
+    // Only sync from store on initial load - after that, local state is source of truth
+    // This prevents knob values from resetting when the user turns multiple knobs
+    if (initialSyncDoneRef.current) {
+      return;
+    }
+
     if (firstTB303Config) {
+      initialSyncDoneRef.current = true;
       const currentDecay = firstTB303Config.filterEnvelope?.decay ?? DEFAULT_PARAMS.decay;
 
       setParams({
@@ -264,12 +284,6 @@ const TB303KnobPanelComponent: React.FC = () => {
             : currentDecay,
         };
 
-        console.log('[TB303KnobPanel] Initializing Devil Fish config:', {
-          savedVegDecay,
-          fixedVegDecay,
-          finalConfig
-        });
-
         setDevilFishConfig(finalConfig);
       } else {
         // No Devil Fish config - sync decay times to current Decay knob
@@ -281,7 +295,7 @@ const TB303KnobPanelComponent: React.FC = () => {
         });
       }
     }
-  }, [tb303ConfigKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tb303ConfigKey, tb303Instruments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ensure synth instances have Devil Fish config (always enabled)
   useEffect(() => {

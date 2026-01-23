@@ -47,7 +47,10 @@ case $TARGET in
         if [ $? -eq 0 ]; then
             echo "--- Web Build Successful ---"
             echo "Build artifacts ready in 'dist/' directory"
-            echo "To preview locally: npm run preview"
+            echo ""
+            echo "Starting preview server..."
+            echo "App will be available at: http://localhost:4173"
+            npm run preview
         fi
         ;;
     electron|2)
@@ -64,11 +67,16 @@ case $TARGET in
         if [ $? -eq 0 ]; then
             echo "--- Full Build Successful ---"
             echo "Web preview ready, native app in 'dist_electron'."
+            echo ""
+            echo "Starting preview server..."
+            echo "App will be available at: http://localhost:4173"
             npm run preview -- --open
         fi
         ;;
     dev|4)
         echo "Starting Development Mode..."
+        echo "Dev server will start at: http://localhost:5173 (typically)"
+        echo ""
         npm run dev
         ;;
     *)

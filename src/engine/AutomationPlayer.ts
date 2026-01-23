@@ -71,7 +71,17 @@ export class AutomationPlayer {
         rawValue = cell.pan;
         break;
       case 'volume':
-        rawValue = cell.volume !== null ? cell.volume : undefined;
+        // XM volume column format:
+        // 0x00-0x0F: nothing (no volume data)
+        // 0x10-0x50: set volume 0-64 (value = volumeByte - 0x10)
+        // 0x60+: volume effects (handled separately)
+        if (cell.volume !== null && cell.volume >= 0x10 && cell.volume <= 0x50) {
+          // Extract volume value (0-64) and return it (will be normalized below)
+          rawValue = cell.volume - 0x10;
+        } else {
+          // Skip automation for 0x00-0x0F (nothing) and effects (0x60+)
+          rawValue = undefined;
+        }
         break;
       default:
         return null;
@@ -81,7 +91,7 @@ export class AutomationPlayer {
 
     // Normalize to 0-1
     if (parameter === 'volume') {
-      return rawValue / 0x40; // Volume is 0x00-0x40
+      return rawValue / 0x40; // Volume is 0-64 (0x40), normalize to 0-1
     } else {
       return rawValue / 0xff; // Others are 0x00-0xFF
     }
