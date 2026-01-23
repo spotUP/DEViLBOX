@@ -309,6 +309,14 @@ export class ToneEngine {
       return this.instruments.get(key);
     }
 
+    // PERFORMANCE FIX: Check for shared/legacy instrument before creating new one
+    // Preload creates instruments with key ${id}--1, but playback uses ${id}-${channel}
+    // Reuse the shared instance instead of creating expensive new synths per channel
+    const legacyKey = this.getInstrumentKey(instrumentId, -1);
+    if (!isSharedType && this.instruments.has(legacyKey)) {
+      return this.instruments.get(legacyKey);
+    }
+
     // Create new instrument based on config
     let instrument: any;
 
