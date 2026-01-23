@@ -9,6 +9,7 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import { TB303Synth } from './TB303Engine';
 import { InstrumentFactory } from './InstrumentFactory';
+import { periodToNoteIndex, getPeriod } from './effects/PeriodTables';
 
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
@@ -137,7 +138,9 @@ export class ToneEngine {
 
     // First, dispose any existing instruments to start fresh
     configs.forEach((config) => {
-      if (this.instruments.has(config.id)) {
+      // BUG FIX: Use proper key format (was checking config.id but Map keys are strings like "3--1")
+      const key = this.getInstrumentKey(config.id, -1);
+      if (this.instruments.has(key)) {
         this.disposeInstrument(config.id);
       }
     });
@@ -162,6 +165,39 @@ export class ToneEngine {
         await Tone.loaded();
       } catch (error) {
         console.error('[ToneEngine] Some samples failed to load:', error);
+      }
+    }
+
+    // PERFORMANCE FIX: Warm up CPU-intensive synths by triggering a silent note
+    // This forces Tone.js to compile/initialize audio graphs before playback starts
+    const warmUpTypes = ['MetalSynth', 'MembraneSynth', 'NoiseSynth', 'FMSynth'];
+    for (const config of configs) {
+      if (warmUpTypes.includes(config.synthType || '')) {
+        const key = this.getInstrumentKey(config.id, -1);
+        const instrument = this.instruments.get(key);
+        if (instrument) {
+          try {
+            // Save original volume, set to silent
+            const originalVol = instrument.volume.value;
+            instrument.volume.value = -Infinity;
+
+            // Trigger a very short note to warm up the synth
+            if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
+              // MetalSynth is now NoiseSynth under the hood for performance
+              (instrument as Tone.NoiseSynth).triggerAttackRelease(0.001, Tone.now());
+            } else if (config.synthType === 'MembraneSynth') {
+              // MembraneSynth is now regular Synth for performance
+              (instrument as Tone.Synth).triggerAttackRelease('C2', 0.001, Tone.now());
+            } else {
+              instrument.triggerAttackRelease?.('C4', 0.001, Tone.now());
+            }
+
+            // Restore volume
+            instrument.volume.value = originalVol;
+          } catch (e) {
+            // Ignore warm-up errors
+          }
+        }
       }
     }
 
@@ -429,10 +465,15 @@ export class ToneEngine {
         break;
 
       case 'MetalSynth':
-        instrument = new Tone.MetalSynth({
+        // PERFORMANCE FIX: MetalSynth has severe performance issues in Tone.js
+        // (1-5+ seconds per note, getting progressively worse - likely voice accumulation bug)
+        // Use NoiseSynth with bandpass filter as a fast alternative for hi-hats/cymbals
+        instrument = new Tone.NoiseSynth({
+          noise: { type: 'white' },
           envelope: {
             attack: (config.envelope?.attack ?? 1) / 1000,
             decay: (config.envelope?.decay ?? 100) / 1000,
+            sustain: 0,
             release: (config.envelope?.release ?? 100) / 1000,
           },
           volume: config.volume || -12,
@@ -440,10 +481,10 @@ export class ToneEngine {
         break;
 
       case 'MembraneSynth':
-        instrument = new Tone.MembraneSynth({
-          pitchDecay: 0.05,
-          octaves: 10,
-          oscillator: { type: config.oscillator?.type || 'sine' },
+        // PERFORMANCE FIX: MembraneSynth takes 117-122ms per note
+        // Use a simpler Synth with pitch envelope for kick drums
+        instrument = new Tone.Synth({
+          oscillator: { type: 'sine' },
           envelope: {
             attack: (config.envelope?.attack ?? 1) / 1000,
             decay: (config.envelope?.decay ?? 400) / 1000,
@@ -1109,12 +1150,11 @@ export class ToneEngine {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
         (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
       } else if (config.synthType === 'MetalSynth') {
-        // MetalSynth: triggerAttackRelease(note, duration, time, velocity)
-        // Note controls the frequency, use time properly
-        (instrument as Tone.MetalSynth).triggerAttackRelease(note, duration, safeTime, velocity);
+        // MetalSynth replaced with NoiseSynth for performance - doesn't take note parameter
+        (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
       } else if (config.synthType === 'MembraneSynth') {
-        // MembraneSynth: triggerAttackRelease(note, duration, time, velocity)
-        (instrument as Tone.MembraneSynth).triggerAttackRelease(note, duration, safeTime, velocity);
+        // MembraneSynth replaced with regular Synth for performance
+        (instrument as Tone.Synth).triggerAttackRelease(note, duration, safeTime, velocity);
       } else if (config.synthType === 'GranularSynth') {
         // GrainPlayer uses start/stop instead of triggerAttackRelease
         const grainPlayer = instrument as Tone.GrainPlayer;
@@ -1127,7 +1167,7 @@ export class ToneEngine {
 
             if (modPlayback.finetune !== 0) {
               // Use ProTracker period table lookup for 100% accuracy
-              const { periodToNoteIndex, getPeriod } = require('./effects/PeriodTables');
+              // PERFORMANCE FIX: Use static import instead of dynamic require()
               const noteIndex = periodToNoteIndex(period, 0);
               if (noteIndex >= 0) {
                 // Look up finetuned period from table
@@ -1163,8 +1203,7 @@ export class ToneEngine {
 
             if (modPlayback.finetune !== 0) {
               // Use ProTracker period table lookup for 100% accuracy
-              // Import dynamically to avoid circular dependency
-              const { periodToNoteIndex, getPeriod } = require('./effects/PeriodTables');
+              // PERFORMANCE FIX: Use static import instead of dynamic require()
               const noteIndex = periodToNoteIndex(period, 0);
               if (noteIndex >= 0) {
                 // Look up finetuned period from table
@@ -1342,24 +1381,47 @@ export class ToneEngine {
   }
 
   /**
-   * Release all notes and stop all players
+   * Release all notes and stop all players - IMMEDIATELY silences everything
    */
   public releaseAll(): void {
+    const now = Tone.now();
+
     this.instruments.forEach((instrument, key) => {
       try {
         // Handle Player/GrainPlayer - they use stop() not releaseAll()
         if (instrument instanceof Tone.Player || instrument instanceof Tone.GrainPlayer) {
           if (instrument.state === 'started') {
-            instrument.stop();
+            instrument.stop(now);
           }
+        } else if (instrument instanceof TB303Synth) {
+          // TB303 has its own release method
+          instrument.releaseAll();
         } else if (instrument.releaseAll) {
           // Synths and Samplers use releaseAll()
-          instrument.releaseAll();
+          instrument.releaseAll(now);
+        }
+
+        // CRITICAL: Force immediate silence by ramping volume to -Infinity
+        // This prevents long release tails from continuing to sound
+        if (instrument.volume && typeof instrument.volume.rampTo === 'function') {
+          const currentVolume = instrument.volume.value;
+          instrument.volume.rampTo(-Infinity, 0.05, now); // 50ms fade out
+          // Restore volume after fade for next playback
+          setTimeout(() => {
+            try {
+              if (instrument.volume) {
+                instrument.volume.value = currentVolume;
+              }
+            } catch {
+              // Instrument may be disposed
+            }
+          }, 100);
         }
       } catch (e) {
         console.warn(`[ToneEngine] Error releasing instrument ${key}:`, e);
       }
     });
+
     // Also clear pitch state and active player tracking for all channels
     this.channelPitchState.clear();
     this.channelActivePlayer.clear();

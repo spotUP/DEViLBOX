@@ -337,12 +337,19 @@ export class TrackerReplayer {
       this.tickLoop = null;
     }
 
+    // Cancel ALL scheduled transport events (prevents lingering scheduled notes)
+    Tone.getTransport().cancel();
     Tone.getTransport().stop();
 
-    // Stop all channels
+    // Stop all channels individually (for proper release envelopes)
     for (const ch of this.channels) {
       this.stopChannel(ch);
     }
+
+    // CRITICAL: Force-release ALL sounds immediately via ToneEngine
+    // This catches any notes that weren't properly tracked or have long release times
+    const engine = getToneEngine();
+    engine.releaseAll();
 
     // Clear note tracking
     this.lastNotePerChannel.clear();
