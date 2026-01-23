@@ -185,6 +185,9 @@ export class TrackerReplayer {
   // Channels
   private channels: ChannelState[] = [];
 
+  // Instrument lookup map for O(1) access (built from song.instruments)
+  private instrumentMap: Map<number, InstrumentConfig> = new Map();
+
   // Tick timer
   private tickLoop: Tone.Loop | null = null;
 
@@ -238,6 +241,12 @@ export class TrackerReplayer {
     this.pBreakFlag = false;
     this.posJumpFlag = false;
     this.patternDelay = 0;
+
+    // Build instrument lookup map for O(1) access during playback
+    this.instrumentMap.clear();
+    for (const inst of song.instruments) {
+      this.instrumentMap.set(inst.id, inst);
+    }
 
     // Pre-load all sample buffers
     this.preloadSamples(song.instruments);
@@ -445,10 +454,10 @@ export class TrackerReplayer {
     ch.accent = row.accent ?? false;
     ch.slide = row.slide ?? false;
 
-    // Handle instrument change
+    // Handle instrument change (O(1) lookup from pre-built map)
     const instNum = row.instrument ?? 0;
     if (instNum > 0) {
-      const instrument = this.song.instruments.find(i => i.id === instNum);
+      const instrument = this.instrumentMap.get(instNum);
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
