@@ -32,12 +32,13 @@ export function convertToInstrument(
 
   // XM instruments can have multiple samples
   // Create one DEViLBOX instrument per sample (simplest approach)
+  // Use sequential IDs: instrumentId, instrumentId+1, instrumentId+2, etc.
   for (let i = 0; i < parsed.samples.length; i++) {
     const sample = parsed.samples[i];
     const instrument = convertSampleToInstrument(
       sample,
       parsed,
-      instrumentId * 100 + i, // Unique ID
+      instrumentId + i, // Sequential ID (1-128 XM-compatible range)
       sourceFormat
     );
     instruments.push(instrument);
@@ -65,12 +66,15 @@ function convertSampleToInstrument(
   const detune = (sample.finetune * 100) / 128;
 
   // Convert volume envelope to ADSR
+  // If no envelope, uses sustain=100 to let sample play fully (MOD samples)
   const envelope = convertEnvelopeToADSR(
-    parentInstrument.volumeEnvelope,
-    0 // Tracker-style: decay to silence
+    parentInstrument.volumeEnvelope
   );
 
   // Create sample config
+  // IMPORTANT: loopStart/loopEnd are in sample units, not seconds
+  // ToneEngine will convert using sampleRate
+  const sampleRate = sample.sampleRate || 8363; // Amiga C-2 rate
   const sampleConfig: SampleConfig = {
     audioBuffer,
     url: blobUrl,
@@ -79,6 +83,7 @@ function convertSampleToInstrument(
     loop: sample.loopType !== 'none',
     loopStart: sample.loopStart,
     loopEnd: sample.loopStart + sample.loopLength,
+    sampleRate: sampleRate, // For converting loop points to seconds
     reverse: false,
     playbackRate: 1.0,
   };
@@ -165,7 +170,12 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
   }
 
   // Create WAV file from AudioBuffer for Tone.js Sampler
-  const wavBlob = audioBufferToWav(audioBuffer);
+  // Include loop points if sample has a loop
+  const loopInfo = sample.loopType !== 'none' ? {
+    start: sample.loopStart,
+    end: sample.loopStart + sample.loopLength,
+  } : undefined;
+  const wavBlob = audioBufferToWav(audioBuffer, loopInfo);
   const blobUrl = URL.createObjectURL(wavBlob);
 
   return {
@@ -176,12 +186,18 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
 
 /**
  * Convert AudioBuffer to WAV blob for Tone.js
+ * Optionally includes SMPL chunk for loop points (ProTracker/MOD support)
  */
-function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
+function audioBufferToWav(audioBuffer: AudioBuffer, loopInfo?: { start: number; end: number }): Blob {
   const numberOfChannels = audioBuffer.numberOfChannels;
-  const length = audioBuffer.length * numberOfChannels * 2;
+  const dataLength = audioBuffer.length * numberOfChannels * 2;
   const sampleRate = audioBuffer.sampleRate;
-  const buffer = new ArrayBuffer(44 + length);
+
+  // Calculate total size (header + data + optional SMPL chunk)
+  // SMPL chunk: 4 (ID) + 4 (size) + 36 (sampler data) + 24 (loop data) = 68 bytes
+  const smplChunkSize = loopInfo ? 68 : 0;
+  const totalSize = 44 + dataLength + smplChunkSize;
+  const buffer = new ArrayBuffer(totalSize);
   const view = new DataView(buffer);
 
   // Write WAV header
@@ -192,7 +208,7 @@ function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
   };
 
   writeString(0, 'RIFF');
-  view.setUint32(4, 36 + length, true);
+  view.setUint32(4, totalSize - 8, true); // File size - 8
   writeString(8, 'WAVE');
   writeString(12, 'fmt ');
   view.setUint32(16, 16, true); // fmt chunk size
@@ -203,7 +219,7 @@ function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
   view.setUint16(32, numberOfChannels * 2, true); // block align
   view.setUint16(34, 16, true); // bits per sample
   writeString(36, 'data');
-  view.setUint32(40, length, true);
+  view.setUint32(40, dataLength, true);
 
   // Write PCM data
   const channelData = audioBuffer.getChannelData(0);
@@ -214,20 +230,47 @@ function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
     offset += 2;
   }
 
+  // Write SMPL chunk if loop points provided (ProTracker/MOD loop support)
+  if (loopInfo) {
+    writeString(offset, 'smpl');
+    view.setUint32(offset + 4, 60, true); // SMPL chunk size: 36 (sampler data) + 24 (loop data)
+    view.setUint32(offset + 8, 0, true); // Manufacturer
+    view.setUint32(offset + 12, 0, true); // Product
+    view.setUint32(offset + 16, Math.floor(1000000000 / sampleRate), true); // Sample period (nanoseconds)
+    view.setUint32(offset + 20, 60, true); // MIDI unity note (middle C)
+    view.setUint32(offset + 24, 0, true); // MIDI pitch fraction
+    view.setUint32(offset + 28, 0, true); // SMPTE format
+    view.setUint32(offset + 32, 0, true); // SMPTE offset
+    view.setUint32(offset + 36, 1, true); // Number of sample loops (1)
+    view.setUint32(offset + 40, 0, true); // Sampler data
+
+    // Loop data (24 bytes)
+    view.setUint32(offset + 44, 0, true); // Cue point ID
+    view.setUint32(offset + 48, 0, true); // Loop type (0 = forward loop)
+    view.setUint32(offset + 52, loopInfo.start, true); // Loop start (sample frames)
+    view.setUint32(offset + 56, loopInfo.end - 1, true); // Loop end (sample frames, inclusive)
+    view.setUint32(offset + 60, 0, true); // Fraction
+    view.setUint32(offset + 64, 0, true); // Play count (0 = infinite)
+  }
+
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
 /**
  * Calculate base note from relative note offset
- * MOD: No relative note, samples play at C4 (standard tuning)
+ * MOD: No relative note, samples play at C3 (Amiga C-2 = period 428 = 8287 Hz)
  * XM: Relative note offset (-96 to +95 semitones from C-4)
+ *
+ * From pt2_replayer.c period table:
+ * - Amiga C-2 (period 428) = modern C3 (MIDI 48)
+ * - Sample recorded at 8363 Hz plays at natural pitch when triggered at period 428
  */
 function calculateBaseNote(relativeNote: number, _finetune: number): string {
-  // Both MOD and XM samples are mapped to C4 by default
-  // The Amiga 8363 Hz corresponds to middle C in modern tuning
-  const baseNoteNum = 60 + relativeNote; // C4 = MIDI 60
+  // Amiga C-2 base note = modern C3 (MIDI 48)
+  // ProTracker period table: C-3 (period 428) = MIDI 48 = C3 in scientific notation
+  const baseNoteNum = 48 + relativeNote; // C3 = MIDI 48 (Amiga C-2 reference)
 
-  // Convert MIDI note number to note name (Tone.js format: "C4", not "C-4")
+  // Convert MIDI note number to note name (Tone.js format: "C3", not "C-2")
   const octave = Math.floor(baseNoteNum / 12) - 1;
   const noteIndex = baseNoteNum % 12;
   const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

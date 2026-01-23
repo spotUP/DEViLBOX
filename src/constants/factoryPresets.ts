@@ -904,7 +904,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 250, sustain: 0, release: 150 },
       vibrato: { speed: 5, depth: 15, delay: 200 },
-      arpeggio: { enabled: true, speed: 15, pattern: [0, 4, 7, 12] },
+      arpeggio: { enabled: true, speed: 15, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 4 }, { noteOffset: 7 }, { noteOffset: 12 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -921,7 +921,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 300, sustain: 0, release: 200 },
       vibrato: { speed: 4, depth: 10, delay: 300 },
-      arpeggio: { enabled: true, speed: 12, pattern: [0, 3, 7, 12] },
+      arpeggio: { enabled: true, speed: 12, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 3 }, { noteOffset: 7 }, { noteOffset: 12 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -938,7 +938,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 50, decay: 600, sustain: 0, release: 500 },
       vibrato: { speed: 3, depth: 8, delay: 100 },
-      arpeggio: { enabled: true, speed: 8, pattern: [0, 3, 6, 9] },
+      arpeggio: { enabled: true, speed: 8, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 3 }, { noteOffset: 6 }, { noteOffset: 9 }], mode: 'loop' },
     },
     effects: [],
     volume: -12,
@@ -955,7 +955,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 16384,
       envelope: { attack: 1, decay: 200, sustain: 0, release: 100 },
       vibrato: { speed: 6, depth: 20, delay: 150 },
-      arpeggio: { enabled: true, speed: 18, pattern: [0, 5, 7] },
+      arpeggio: { enabled: true, speed: 18, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 5 }, { noteOffset: 7 }], mode: 'loop' },
     },
     effects: [],
     volume: -8,
@@ -972,7 +972,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 15720,
       envelope: { attack: 1, decay: 300, sustain: 0, release: 200 },
       vibrato: { speed: 0, depth: 0, delay: 0 },
-      arpeggio: { enabled: true, speed: 20, pattern: [0, 4, 7, 10] },
+      arpeggio: { enabled: true, speed: 20, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 4 }, { noteOffset: 7 }, { noteOffset: 10 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -988,7 +988,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 28867,
       envelope: { attack: 5, decay: 300, sustain: 0, release: 250 },
       vibrato: { speed: 4, depth: 12, delay: 200 },
-      arpeggio: { enabled: true, speed: 14, pattern: [0, 7, 12] },
+      arpeggio: { enabled: true, speed: 14, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 7 }, { noteOffset: 12 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -1005,7 +1005,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 150, sustain: 0, release: 80 },
       vibrato: { speed: 0, depth: 0, delay: 0 },
-      arpeggio: { enabled: true, speed: 30, pattern: [0, 4, 7, 11, 14] },
+      arpeggio: { enabled: true, speed: 30, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 4 }, { noteOffset: 7 }, { noteOffset: 11 }, { noteOffset: 14 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -1022,7 +1022,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 100, decay: 800, sustain: 0, release: 600 },
       vibrato: { speed: 3, depth: 15, delay: 500 },
-      arpeggio: { enabled: true, speed: 4, pattern: [0, 3, 7, 10] },
+      arpeggio: { enabled: true, speed: 4, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 3 }, { noteOffset: 7 }, { noteOffset: 10 }], mode: 'loop' },
     },
     effects: [],
     volume: -12,
@@ -1040,7 +1040,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 5, decay: 300, sustain: 0, release: 200 },
       vibrato: { speed: 6, depth: 15, delay: 200 },
-      arpeggio: { enabled: false, speed: 15, pattern: [0, 4, 7] },
+      arpeggio: { enabled: false, speed: 15, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 4 }, { noteOffset: 7 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -1056,7 +1056,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 400, sustain: 0, release: 150 },
       vibrato: { speed: 0, depth: 0, delay: 0 },
-      arpeggio: { enabled: false, speed: 15, pattern: [0, 12] },
+      arpeggio: { enabled: false, speed: 15, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 12 }], mode: 'loop' },
     },
     effects: [],
     volume: -6,
@@ -1072,7 +1072,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 100, sustain: 0, release: 50 },
       vibrato: { speed: 0, depth: 0, delay: 0 },
-      arpeggio: { enabled: false, speed: 15, pattern: [0] },
+      arpeggio: { enabled: false, speed: 15, speedUnit: 'hz', steps: [{ noteOffset: 0 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
@@ -1089,10 +1089,524 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       sampleRate: 22050,
       envelope: { attack: 1, decay: 250, sustain: 0, release: 150 },
       vibrato: { speed: 5, depth: 10, delay: 250 },
-      arpeggio: { enabled: true, speed: 10, pattern: [0, 12, 24] },
+      arpeggio: { enabled: true, speed: 10, speedUnit: 'hz', steps: [{ noteOffset: 0 }, { noteOffset: 12 }, { noteOffset: 24 }], mode: 'loop' },
     },
     effects: [],
     volume: -10,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// TR-909 PRESETS (11) - Authentic Roland TR-909 drum machine sounds
+// Based on er-99 web emulator analysis with accurate synthesis parameters
+// ============================================================================
+
+export const TR909_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: '909 Kick',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'kick',
+      kick: {
+        pitch: 80,              // 909: 80Hz base frequency
+        pitchDecay: 50,         // Legacy parameter
+        tone: 50,               // Click/noise amount
+        toneDecay: 20,          // 909: 20ms noise decay
+        decay: 300,             // 909: 300ms body decay
+        drive: 50,              // 909: moderate saturation
+        envAmount: 2.5,         // 909: 2.5x pitch envelope multiplier
+        envDuration: 50,        // 909: 50ms pitch envelope
+        filterFreq: 3000,       // 909: 3000Hz lowpass
+      },
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Snare',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'snare',
+      snare: {
+        pitch: 220,             // 909: 220Hz body frequency
+        tone: 25,               // 909: 25% body/snap balance
+        toneDecay: 250,         // 909: 250ms noise decay
+        snappy: 70,             // Noise amount
+        decay: 100,             // 909: 100ms body decay
+        envAmount: 4.0,         // 909: 4.0x aggressive pitch envelope
+        envDuration: 10,        // 909: 10ms very fast pitch drop
+        filterType: 'notch',    // 909: notch filter characteristic
+        filterFreq: 1000,       // 909: 1000Hz notch
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Clap',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'clap',
+      clap: {
+        tone: 55,               // ~2200Hz bandpass
+        decay: 80,              // 909: 80ms overall decay
+        toneDecay: 250,         // 909: 250ms individual burst decay
+        spread: 10,             // 909: 10ms burst spacing (creates the clap texture)
+        filterFreqs: [900, 1200], // 909: serial bandpass filters
+        modulatorFreq: 40,      // 909: 40Hz sawtooth modulator
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Rim',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'rimshot',
+      rimshot: {
+        decay: 30,              // 909: 30ms (very short, punchy)
+        filterFreqs: [220, 500, 950], // 909: parallel resonant bandpass
+        filterQ: 10.5,          // 909: very high Q for metallic resonance
+        saturation: 3.0,        // 909: heavy saturation for punch
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Low Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      tom: {
+        pitch: 100,             // 909: 100Hz (with +100Hz offset)
+        decay: 200,             // 909: 200ms
+        tone: 5,                // 909: 5% noise
+        toneDecay: 100,         // 909: 100ms noise decay
+        envAmount: 2.0,         // 909: 2.0x pitch envelope
+        envDuration: 100,       // 909: 100ms pitch envelope
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Mid Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      tom: {
+        pitch: 200,             // 909: 200Hz (with -50Hz offset)
+        decay: 200,             // 909: 200ms
+        tone: 5,                // 909: 5% noise
+        toneDecay: 100,         // 909: 100ms noise decay
+        envAmount: 2.0,         // 909: 2.0x pitch envelope
+        envDuration: 100,       // 909: 100ms pitch envelope
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Hi Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      tom: {
+        pitch: 300,             // 909: 300Hz (with -80Hz offset)
+        decay: 200,             // 909: 200ms
+        tone: 5,                // 909: 5% noise
+        toneDecay: 100,         // 909: 100ms noise decay
+        envAmount: 2.0,         // 909: 2.0x pitch envelope
+        envDuration: 100,       // 909: 100ms pitch envelope
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Closed Hat',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'hihat',
+      hihat: {
+        tone: 60,
+        decay: 50,              // Short decay for closed
+        metallic: 65,
+      },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Open Hat',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'hihat',
+      hihat: {
+        tone: 55,
+        decay: 350,             // Longer decay for open
+        metallic: 60,
+      },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Ride',
+    synthType: 'MetalSynth',
+    oscillator: { type: 'square', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 800, sustain: 0.1, release: 500 },
+    filter: { type: 'highpass', frequency: 5000, Q: 1, rolloff: -12 },
+    effects: [],
+    volume: -14,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '909 Crash',
+    synthType: 'MetalSynth',
+    oscillator: { type: 'square', detune: 0, octave: 0 },
+    envelope: { attack: 5, decay: 2000, sustain: 0.05, release: 1500 },
+    filter: { type: 'highpass', frequency: 4000, Q: 1, rolloff: -12 },
+    effects: [],
+    volume: -14,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// TR-808 PRESETS (16) - Classic Roland TR-808 drum machine sounds
+// Based on io-808 web emulator - 100% synthesized (no samples)
+// Key characteristics:
+// - Kick: 48Hz sine with pitch sweep (98Hz->48Hz), soft clipping
+// - Snare: Dual oscillators (238Hz + 476Hz) + highpass filtered noise
+// - Clap: Bandpass filtered noise with sawtooth envelope for reverb effect
+// - Hi-Hat: 6 square oscillators at inharmonic freqs through bandpass
+// - Toms/Congas: Pure sine with optional pink noise
+// - Cowbell: Dual squares (540Hz + 800Hz) through 2640Hz bandpass
+// - Clave: Triangle + sine through bandpass with distortion
+// - Rimshot: Similar to clave with different filter topology
+// - Maracas: Highpass filtered white noise
+// - Cymbal: 6-oscillator bank with 3-band filtering
+// ============================================================================
+
+export const TR808_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: '808 Kick',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'kick',
+      machineType: '808',
+      kick: {
+        pitch: 48,              // 808: 48Hz base frequency
+        pitchDecay: 110,        // 808: 110ms attack phase
+        tone: 50,               // Filter cutoff control (200-300Hz)
+        toneDecay: 20,          // Click decay
+        decay: 200,             // 808: 50-300ms (user controlled)
+        drive: 60,              // 808: soft clipping at 0.6 drive
+        envAmount: 2.0,         // 808: pitch sweeps from ~98Hz to 48Hz
+        envDuration: 110,       // 808: 110ms attack for pitch envelope
+        filterFreq: 250,        // 808: ~200-300Hz lowpass (tone controlled)
+      },
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Snare',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'snare',
+      machineType: '808',
+      snare: {
+        pitch: 238,             // 808: 238Hz low oscillator
+        pitchHigh: 476,         // 808: 476Hz high oscillator (harmonic)
+        tone: 50,               // Snappy parameter controls noise/body mix
+        toneDecay: 75,          // 808: 75ms noise decay
+        snappy: 50,             // Noise amount (controlled by snappy knob)
+        decay: 100,             // 808: ~100ms amplitude decay
+        envAmount: 1.0,         // 808: no pitch envelope (flat)
+        envDuration: 100,       // 808: 100ms
+        filterType: 'highpass', // 808: highpass on noise
+        filterFreq: 1300,       // 808: 800-1800Hz highpass (tone controlled)
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Clap',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'clap',
+      machineType: '808',
+      clap: {
+        tone: 50,               // 808: 1000Hz bandpass
+        decay: 115,             // 808: 115ms reverb tail decay
+        toneDecay: 200,         // 808: sawtooth envelope repeating
+        spread: 100,            // 808: 100ms sawtooth spacing (creates reverb)
+        filterFreqs: [1000, 1000], // 808: single 1000Hz bandpass
+        modulatorFreq: 10,      // Slower modulation than 909
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Rimshot',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'rimshot',
+      machineType: '808',
+      rimshot: {
+        decay: 40,              // 808: 40ms
+        filterFreqs: [480, 1750, 2450], // 808: different from 909
+        filterQ: 5,             // 808: lower Q than 909
+        saturation: 2.5,        // 808: swing VCA distortion
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Clave',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'clave',
+      machineType: '808',
+      clave: {
+        decay: 40,              // 808: 40ms
+        pitch: 2450,            // 808: 2450Hz triangle
+        pitchSecondary: 1750,   // 808: 1750Hz sine
+        filterFreq: 2450,       // 808: 2450Hz bandpass
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Cowbell',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'cowbell',
+      machineType: '808',
+      cowbell: {
+        decay: 400,             // 808: 15ms short + 400ms exponential tail
+        filterFreq: 2640,       // 808: 2640Hz bandpass
+      },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Maracas',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'maracas',
+      machineType: '808',
+      maracas: {
+        decay: 30,              // 808: 30ms quick shake
+        filterFreq: 5000,       // 808: 5000Hz highpass
+      },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Low Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      machineType: '808',
+      tom: {
+        pitch: 90,              // 808: 80-100Hz range
+        decay: 200,             // 808: 180-200ms
+        tone: 20,               // 808: pink noise at 0.2 amplitude
+        toneDecay: 155,         // 808: 100-155ms noise decay
+        envAmount: 1.0,         // 808: minimal pitch sweep
+        envDuration: 100,       // 808: 100ms
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Mid Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      machineType: '808',
+      tom: {
+        pitch: 140,             // 808: 120-160Hz range
+        decay: 190,             // 808: slightly shorter
+        tone: 20,               // 808: pink noise
+        toneDecay: 130,         // 808: noise decay
+        envAmount: 1.0,         // 808: minimal pitch sweep
+        envDuration: 100,       // 808: 100ms
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Hi Tom',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'tom',
+      machineType: '808',
+      tom: {
+        pitch: 190,             // 808: 165-220Hz range
+        decay: 180,             // 808: 180ms
+        tone: 20,               // 808: pink noise
+        toneDecay: 100,         // 808: noise decay
+        envAmount: 1.0,         // 808: minimal pitch sweep
+        envDuration: 100,       // 808: 100ms
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Low Conga',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'conga',
+      machineType: '808',
+      conga: {
+        pitch: 190,             // 808: 165-220Hz range
+        decay: 180,             // 808: 180ms
+        tuning: 50,             // Mid-range tuning
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Mid Conga',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'conga',
+      machineType: '808',
+      conga: {
+        pitch: 280,             // 808: 250-310Hz range
+        decay: 180,             // 808: 180ms
+        tuning: 50,             // Mid-range tuning
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Hi Conga',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'conga',
+      machineType: '808',
+      conga: {
+        pitch: 410,             // 808: 370-455Hz range
+        decay: 180,             // 808: 180ms
+        tuning: 50,             // Mid-range tuning
+      },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Closed Hat',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'hihat',
+      machineType: '808',
+      hihat: {
+        tone: 50,               // Dark/bright balance
+        decay: 50,              // 808: 50ms (closed - muted)
+        metallic: 50,           // 6-oscillator metallic character
+      },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Open Hat',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'hihat',
+      machineType: '808',
+      hihat: {
+        tone: 50,               // Dark/bright balance
+        decay: 270,             // 808: 90-450ms (decay × 3.6 + 90)
+        metallic: 50,           // 6-oscillator metallic character
+      },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '808 Cymbal',
+    synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: 'cymbal',
+      machineType: '808',
+      cymbal: {
+        tone: 50,               // Low/high band balance
+        decay: 3000,            // 808: 700-6800ms variable
+      },
+    },
+    effects: [],
+    volume: -14,
     pan: 0,
   },
 ];
@@ -1149,6 +1663,935 @@ export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 ];
 
 // ============================================================================
+// TR-505 PRESETS (16) - Roland TR-505 sample-based drum machine
+// Classic 12-bit digital drum sounds from 1986
+// ============================================================================
+
+export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: '505 Kick',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-kick.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Snare',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-snare.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Clap',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-clap.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Closed Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-hihat-closed.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Open Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-hihat-open.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Rim',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-rim.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Low Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-tom-l.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: -30,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Mid Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-tom-m.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 High Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-tom-h.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 30,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Crash',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-crash.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: -20,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Ride',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-ride.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 20,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Low Cowbell',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-cowb-l.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 High Cowbell',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-cowb-h.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Low Conga',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-conga-l.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: -20,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 High Conga',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-conga-h.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 20,
+  },
+  {
+    type: 'synth' as const,
+    name: '505 Timbale',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr505/tr505-timbal.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// TR-707 PRESETS (15) - Roland TR-707 sample-based drum machine
+// Classic digital drum sounds from 1985 with rumble variants
+// ============================================================================
+
+export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: '707 Kick',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-kick.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Kick Rumble',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-kick-rumble.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Snare',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-snare.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Clap',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-clap.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Closed Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-hihat-closed.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Open Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-hihat-open.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Rim',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-rim.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Low Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-tom-l.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: -30,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Low Tom Rumble',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-tom-l-rumble.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: -30,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Mid Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-tom-m.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 High Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-tom-h.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 30,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Cowbell',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-cowbell.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Crash',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-crash.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: -20,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Ride',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-ride.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 20,
+  },
+  {
+    type: 'synth' as const,
+    name: '707 Tambourine',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/tr707/tr707-tambourine.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// DRUMNIBUS SAMPLE PACK - Featured Samples (by Legowelt)
+// Full pack available in Sample Packs browser (229 samples)
+// ============================================================================
+
+export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  // Kicks
+  {
+    type: 'synth' as const,
+    name: 'DN 808 A1200',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Electro Kick',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/kicks/BD_Electro1shorter.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN SubThud',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/kicks/BD_SubThud.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Punchtron Kick',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/kicks/BD_Punchtron.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  // Snares
+  {
+    type: 'synth' as const,
+    name: 'DN 808 Snare',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/snares/SD_808A1200.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Analog Noise',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/snares/SD_Analog%20Noise1.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Electro 7000',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/snares/SD_electro7000.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Wolf Snare',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/snares/SD_Wolf1.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  // Hi-Hats
+  {
+    type: 'synth' as const,
+    name: 'DN Closed Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/hihats/CH_Digidap.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Open Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/hihats/OH_Digidap.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Analog Hat',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/hihats/OH_AnalogHihat1.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Cymbal',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/hihats/CYM_Synthique.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  // Percussion
+  {
+    type: 'synth' as const,
+    name: 'DN Clap',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/percussion/CLAP_Punchtron.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Clave',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/percussion/CLAVE_Simple.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Tom',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/percussion/TOM_Magnotron.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Lazer',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/percussion/LAZ_R900.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  // FX
+  {
+    type: 'synth' as const,
+    name: 'DN Sonar',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/fx/FX_Sonar.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Laser',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/fx/FX_NomiLaser1.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DN Burst',
+    synthType: 'Sampler',
+    sample: {
+      url: '/samples/packs/drumnibus/fx/FX_Burst1.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      reverse: false,
+      playbackRate: 1,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+];
+
+// ============================================================================
 // COMBINED FACTORY PRESETS
 // ============================================================================
 
@@ -1157,8 +2600,13 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...LEAD_PRESETS,
   ...PAD_PRESETS,
   ...DRUM_PRESETS,
+  ...TR808_PRESETS,
+  ...TR909_PRESETS,
+  ...TR707_PRESETS,
+  ...TR505_PRESETS,
   ...CHIP_PRESETS,
   ...FX_PRESETS,
+  ...DRUMNIBUS_PRESETS,
 ];
 
 // Preset categories for browsing
@@ -1167,8 +2615,13 @@ export const PRESET_CATEGORIES = {
   Leads: LEAD_PRESETS,
   Pads: PAD_PRESETS,
   Drums: DRUM_PRESETS,
+  'TR-808': TR808_PRESETS,
+  'TR-909': TR909_PRESETS,
+  'TR-707': TR707_PRESETS,
+  'TR-505': TR505_PRESETS,
   Chip: CHIP_PRESETS,
   FX: FX_PRESETS,
+  Drumnibus: DRUMNIBUS_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;

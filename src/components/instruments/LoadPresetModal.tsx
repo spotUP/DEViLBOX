@@ -52,8 +52,13 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       Leads: 'text-yellow-400',
       Pads: 'text-purple-400',
       Drums: 'text-red-400',
+      'TR-808': 'text-red-500',
+      'TR-909': 'text-orange-400',
+      'TR-707': 'text-rose-400',
+      'TR-505': 'text-amber-400',
       Chip: 'text-cyan-400',
       FX: 'text-green-400',
+      Drumnibus: 'text-emerald-400',
     };
     return colors[category] || 'text-ft2-highlight';
   };

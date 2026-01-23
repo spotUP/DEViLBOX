@@ -415,6 +415,7 @@ export class EffectProcessor {
           up: mem.volumeSlideUp || 0,
           down: mem.volumeSlideDown || 0,
         };
+        console.log(`[EffectCommands] Axy setup ch${channelIndex}: volumeSlide up=${state.volumeSlide.up}, down=${state.volumeSlide.down}, currentVol=${mem.volume}`);
         break;
 
       // ========== Bxx - Jump to Song Position ==========
@@ -627,13 +628,15 @@ export class EffectProcessor {
 
       // EAx - Fine Volume Slide Up
       case 0xA:
-        mem.volume = Math.min(64, (mem.volume || 64) + y);
+        // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
+        mem.volume = Math.min(64, (mem.volume ?? 64) + y);
         result.setVolume = mem.volume;
         break;
 
       // EBx - Fine Volume Slide Down
       case 0xB:
-        mem.volume = Math.max(0, (mem.volume || 64) - y);
+        // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
+        mem.volume = Math.max(0, (mem.volume ?? 64) - y);
         result.setVolume = mem.volume;
         break;
 
@@ -745,14 +748,17 @@ export class EffectProcessor {
     // Volume Slide
     if (state.volumeSlide) {
       const { up, down } = state.volumeSlide;
-      mem.volume = Math.max(0, Math.min(64, (mem.volume || 64) + up - down));
+      // CRITICAL: Use ?? instead of || because 0 is a valid volume (0 || 64 = 64, but 0 ?? 64 = 0)
+      const currentVol = mem.volume ?? 64;
+      mem.volume = Math.max(0, Math.min(64, currentVol + up - down));
       result.volumeSet = mem.volume;
     }
 
     // Panning Slide
     if (state.panSlide) {
       const { right, left } = state.panSlide;
-      mem.pan = Math.max(0, Math.min(255, (mem.pan || 128) + right - left));
+      // CRITICAL: Use ?? instead of || because 0 is a valid pan value (full left)
+      mem.pan = Math.max(0, Math.min(255, (mem.pan ?? 128) + right - left));
       result.panSet = mem.pan;
     }
 
@@ -770,9 +776,11 @@ export class EffectProcessor {
           const volMults: number[] = [1, 1, 1, 1, 1, 1, 2/3, 0.5, 1, 1, 1, 1, 1, 1, 1.5, 2];
 
           if (vc <= 5 || (vc >= 9 && vc <= 13)) {
-            mem.volume = Math.max(0, Math.min(64, (mem.volume || 64) + volChanges[vc]));
+            // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
+            mem.volume = Math.max(0, Math.min(64, (mem.volume ?? 64) + volChanges[vc]));
           } else if (vc === 6 || vc === 7 || vc === 14 || vc === 15) {
-            mem.volume = Math.max(0, Math.min(64, Math.floor((mem.volume || 64) * volMults[vc])));
+            // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
+            mem.volume = Math.max(0, Math.min(64, Math.floor((mem.volume ?? 64) * volMults[vc])));
           }
           result.volumeSet = mem.volume;
         }

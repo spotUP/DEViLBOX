@@ -12,6 +12,7 @@ import { InstrumentFactory } from './InstrumentFactory';
 
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
+  private static tb303WorkletLoaded: boolean = false; // Track if TB303 worklet is loaded
 
   // Master routing chain: instruments → masterInput → masterEffects → masterChannel → analyzers → destination
   public masterInput: Tone.Gain; // Where instruments connect
@@ -36,6 +37,18 @@ export class ToneEngine {
 
   // Channel mute/solo state for quick lookup during playback
   private channelMuteStates: Map<number, boolean> = new Map(); // true = should be muted
+
+  // Per-channel pitch state for ProTracker effects (arpeggio, portamento, vibrato)
+  // Tracks: active instrument key, base playback rate, current pitch offset
+  private channelPitchState: Map<number, {
+    instrumentKey: string;
+    basePlaybackRate: number;  // For samplers/players
+    baseFrequency: number;     // For synths (Hz)
+    currentPitchMult: number;  // Current pitch multiplier (1.0 = no change)
+  }> = new Map();
+
+  // Track active looping players per channel (to stop when new note triggers)
+  private channelActivePlayer: Map<number, Tone.Player> = new Map();
 
   // Metronome synth and state
   private metronomeSynth: Tone.MembraneSynth | null = null;
@@ -88,33 +101,25 @@ export class ToneEngine {
    * Initialize audio context (must be called after user interaction)
    */
   public async init(): Promise<void> {
-    console.log('[ToneEngine] init() called, context state:', Tone.getContext().state);
     if (Tone.getContext().state === 'suspended') {
       await Tone.start();
-      console.log('[ToneEngine] Audio context started successfully', {
-        contextState: Tone.getContext().state,
-        sampleRate: Tone.getContext().sampleRate,
-        currentTime: Tone.getContext().currentTime
-      });
-    } else {
-      console.log('[ToneEngine] Audio context already running');
     }
 
     // Pre-load TB303 AudioWorklet (prevents async loading delay for TB-303 synth)
-    try {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
-      console.log('[ToneEngine] TB303 worklet pre-loaded successfully');
-    } catch (error) {
-      console.warn('[ToneEngine] Failed to pre-load TB303 worklet (may not exist yet):', error);
-      // Non-fatal - worklet will be loaded on-demand when TB-303 synth is used
+    // Only load once - AudioWorklet processors can only be registered once
+    if (!ToneEngine.tb303WorkletLoaded) {
+      try {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+        ToneEngine.tb303WorkletLoaded = true;
+      } catch (error) {
+        // Non-fatal - worklet will be loaded on-demand when TB-303 synth is used
+      }
     }
 
     // Configure Transport lookahead for reliable scheduling at high BPMs
-    // Higher lookahead = more latency but more reliable timing
     const transport = Tone.getTransport();
-    transport.context.lookAhead = 0.1; // 100ms lookahead (default is ~0.05)
-    console.log('[ToneEngine] Transport lookahead set to:', transport.context.lookAhead);
+    transport.context.lookAhead = 0.1;
   }
 
   /**
@@ -129,7 +134,6 @@ export class ToneEngine {
    * Call this after importing a module to ensure samples are loaded before playback
    */
   public async preloadInstruments(configs: InstrumentConfig[]): Promise<void> {
-    console.log('[ToneEngine] Preloading', configs.length, 'instruments...');
 
     // First, dispose any existing instruments to start fresh
     configs.forEach((config) => {
@@ -154,16 +158,13 @@ export class ToneEngine {
 
     // Wait for all audio buffers to load
     if (samplerConfigs.length > 0) {
-      console.log('[ToneEngine] Waiting for', samplerConfigs.length, 'samples to load...');
       try {
         await Tone.loaded();
-        console.log('[ToneEngine] All samples loaded successfully');
       } catch (error) {
         console.error('[ToneEngine] Some samples failed to load:', error);
       }
     }
 
-    console.log('[ToneEngine] Preload complete:', this.instruments.size, 'instruments ready');
   }
 
   /**
@@ -206,17 +207,10 @@ export class ToneEngine {
   public async start(): Promise<void> {
     // Ensure audio context is running (may have suspended due to inactivity)
     if (Tone.getContext().state === 'suspended') {
-      console.log('[ToneEngine] Resuming suspended audio context...');
       await Tone.start();
     }
 
     Tone.getTransport().start();
-    console.log('[ToneEngine] Transport started', {
-      bpm: Tone.getTransport().bpm.value,
-      position: Tone.getTransport().position,
-      state: Tone.getTransport().state,
-      contextState: Tone.getContext().state
-    });
   }
 
   /**
@@ -226,7 +220,6 @@ export class ToneEngine {
     // Release all active notes before stopping to prevent hanging notes
     this.releaseAll();
     Tone.getTransport().stop();
-    console.log('[ToneEngine] Transport stopped');
   }
 
   /**
@@ -313,15 +306,7 @@ export class ToneEngine {
 
     // Check if instrument already exists for this channel
     if (this.instruments.has(key)) {
-      const existingInstrument = this.instruments.get(key);
-      if (isSharedType && channelIndex !== undefined && channelIndex !== -1) {
-        console.log(`[ToneEngine] Reusing preloaded ${config.synthType} for channel ${channelIndex}`, {
-          instrumentId,
-          key,
-          loaded: (existingInstrument as any).loaded,
-        });
-      }
-      return existingInstrument;
+      return this.instruments.get(key);
     }
 
     // Create new instrument based on config
@@ -512,7 +497,6 @@ export class ToneEngine {
 
       case 'TB303':
         // Authentic TB-303 acid bass synthesizer
-        console.log('[ToneEngine] Creating TB-303 instrument', { instrumentId, config });
         if (config.tb303) {
           instrument = new TB303Synth(config.tb303);
           instrument.setVolume(config.volume || -12);
@@ -521,36 +505,60 @@ export class ToneEngine {
           instrument = new TB303Synth(DEFAULT_TB303);
           instrument.setVolume(config.volume || -12);
         }
-        console.log('[ToneEngine] TB-303 created successfully');
         break;
 
       case 'Sampler': {
         // Sample-based instrument - loads a sample URL and pitches it
-        const sampleUrl = config.parameters?.sampleUrl;
+        // Check both parameters.sampleUrl (legacy) and sample.url (new standard)
+        let sampleUrl = config.parameters?.sampleUrl || config.sample?.url;
         // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
         const baseNote = config.sample?.baseNote || 'C4';
-        console.log('[ToneEngine] Creating Sampler instrument', {
-          instrumentId,
-          hasSample: !!sampleUrl,
-          baseNote,
-          sampleUrlPreview: sampleUrl?.substring(0, 50),
-        });
+        const hasLoop = config.sample?.loop === true;
+        const loopStart = config.sample?.loopStart || 0;
+        const loopEnd = config.sample?.loopEnd || 0;
+
+        // Prepend BASE_URL for relative paths (handles /DEViLBOX/ prefix in production)
+        if (sampleUrl && sampleUrl.startsWith('/') && !sampleUrl.startsWith('//')) {
+          const baseUrl = import.meta.env.BASE_URL || '/';
+          // Avoid double slashes - BASE_URL includes trailing slash
+          sampleUrl = baseUrl.endsWith('/') && sampleUrl.startsWith('/')
+            ? baseUrl + sampleUrl.slice(1)
+            : baseUrl + sampleUrl;
+        }
 
         if (sampleUrl) {
-          // Map the sample to its actual base note so Tone.Sampler can pitch it correctly
-          const urls: { [note: string]: string } = {};
-          urls[baseNote] = sampleUrl;
+          // CRITICAL: For looping samples (chiptunes, MOD), use Tone.Player with loop
+          // Tone.Sampler doesn't support proper looping for single-cycle waveforms
+          if (hasLoop) {
+            instrument = new Tone.Player({
+              url: sampleUrl,
+              loop: true,
+              loopStart: loopStart / (config.sample?.sampleRate || 8363), // Convert samples to seconds
+              loopEnd: loopEnd / (config.sample?.sampleRate || 8363),
+              volume: config.volume || -12,
+              onload: () => {
+              },
+              onerror: (err: Error) => {
+                console.error(`[ToneEngine] Looping Player ${instrumentId} failed to load sample:`, err);
+              },
+            });
+            // Store as 'Player' type for proper handling in other methods
+            this.instrumentSynthTypes.set(key, 'Player');
+          } else {
+            // Non-looping: Use Tone.Sampler for pitch shifting
+            const urls: { [note: string]: string } = {};
+            urls[baseNote] = sampleUrl;
 
-          instrument = new Tone.Sampler({
-            urls,
-            volume: config.volume || -12,
-            onload: () => {
-              console.log(`[ToneEngine] Sampler ${instrumentId} (baseNote: ${baseNote}) sample loaded successfully`);
-            },
-            onerror: (err: Error) => {
-              console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
-            },
-          });
+            instrument = new Tone.Sampler({
+              urls,
+              volume: config.volume || -12,
+              onload: () => {
+              },
+              onerror: (err: Error) => {
+                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
+              },
+            });
+          }
         } else {
           // No sample - create empty sampler (will be silent)
           console.warn(`[ToneEngine] Sampler ${instrumentId} has no sample URL`);
@@ -564,14 +572,12 @@ export class ToneEngine {
       case 'Player': {
         // One-shot player (doesn't pitch)
         const playerUrl = config.parameters?.sampleUrl;
-        console.log('[ToneEngine] Creating Player instrument', { instrumentId, hasSample: !!playerUrl });
 
         if (playerUrl) {
           instrument = new Tone.Player({
             url: playerUrl,
             volume: config.volume || -12,
             onload: () => {
-              console.log(`[ToneEngine] Player ${instrumentId} sample loaded successfully`);
             },
             onerror: (err: Error) => {
               console.error(`[ToneEngine] Player ${instrumentId} failed to load sample:`, err);
@@ -589,7 +595,6 @@ export class ToneEngine {
         // Granular synthesis from sample
         const granularUrl = config.granular?.sampleUrl || config.parameters?.sampleUrl;
         const granularConfig = config.granular;
-        console.log('[ToneEngine] Creating GranularSynth instrument', { instrumentId, hasSample: !!granularUrl });
 
         if (granularUrl) {
           instrument = new Tone.GrainPlayer({
@@ -602,7 +607,6 @@ export class ToneEngine {
             loop: true,
             volume: config.volume || -12,
             onload: () => {
-              console.log(`[ToneEngine] GranularSynth ${instrumentId} sample loaded successfully`);
             },
             onerror: (err: Error) => {
               console.error(`[ToneEngine] GranularSynth ${instrumentId} failed to load sample:`, err);
@@ -628,7 +632,6 @@ export class ToneEngine {
       case 'PWMSynth':
       case 'StringMachine':
       case 'FormantSynth': {
-        console.log(`[ToneEngine] Creating ${config.synthType} instrument via InstrumentFactory`, { instrumentId });
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
@@ -657,16 +660,6 @@ export class ToneEngine {
     // For effect updates, use rebuildInstrumentEffects() which properly awaits
     this.buildInstrumentEffectChain(key, config.effects || [], instrument).catch((error) => {
       console.error('[ToneEngine] Failed to build initial effect chain:', error);
-    });
-
-    console.log('[ToneEngine] Instrument created with effect chain', {
-      instrumentId,
-      channelIndex,
-      key,
-      synthType: config.synthType,
-      effectCount: config.effects?.length || 0,
-      masterVolume: this.masterChannel.volume.value,
-      masterMuted: this.masterChannel.mute
     });
 
     return instrument;
@@ -858,7 +851,9 @@ export class ToneEngine {
     time: number,
     velocity: number = 1,
     config: InstrumentConfig,
-    period?: number
+    period?: number,
+    accent?: boolean,
+    slide?: boolean
   ): void {
     const instrument = this.getInstrument(instrumentId, config);
 
@@ -873,7 +868,10 @@ export class ToneEngine {
     }
 
     try {
-      if (config.synthType === 'NoiseSynth') {
+      // Handle TB-303 with accent/slide support
+      if (instrument instanceof TB303Synth) {
+        instrument.triggerAttack(note, safeTime, velocity, accent, slide);
+      } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
         (instrument as Tone.NoiseSynth).triggerAttack(safeTime, velocity);
       } else if (config.synthType === 'Sampler') {
@@ -1082,14 +1080,17 @@ export class ToneEngine {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument) {
+      console.warn(`[ToneEngine] triggerNote: No instrument found for id=${instrumentId} type=${config.synthType}`);
       return;
     }
 
     // Get safe time for the note
     const safeTime = this.getSafeTime(time);
     if (safeTime === null) {
+      console.warn(`[ToneEngine] triggerNote: Audio context not ready`);
       return; // Audio context not ready
     }
+
 
     try {
       // Handle different synth types with their specific APIs
@@ -1127,7 +1128,9 @@ export class ToneEngine {
             }
 
             const frequency = modPlayback.periodMultiplier / finetunedPeriod;
-            const playbackRate = frequency / Tone.getContext().sampleRate;
+            // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
+            const sampleRate = config.sample?.sampleRate || 8363;
+            const playbackRate = frequency / sampleRate;
             grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
           } else {
             // Calculate pitch shift from note (C4 = base pitch)
@@ -1139,8 +1142,9 @@ export class ToneEngine {
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
         }
-      } else if (config.synthType === 'Player') {
+      } else if (config.synthType === 'Player' || (config.synthType === 'Sampler' && config.sample?.loop)) {
         // Player uses start instead of triggerAttackRelease
+        // Also handle looping Samplers which are converted to Players at creation time
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
           // Check if this is a MOD/XM sample with period-based playback
@@ -1161,7 +1165,9 @@ export class ToneEngine {
             }
 
             const frequency = modPlayback.periodMultiplier / finetunedPeriod;
-            const playbackRate = frequency / Tone.getContext().sampleRate;
+            // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
+            const sampleRate = config.sample?.sampleRate || 8363;
+            const playbackRate = frequency / sampleRate;
             player.playbackRate = playbackRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided
@@ -1179,12 +1185,27 @@ export class ToneEngine {
             ? sampleOffset / (player.buffer?.sampleRate || Tone.getContext().sampleRate)
             : 0;
 
-          player.start(safeTime, startOffset);
-          // Stop after duration to prevent samples playing to completion
-          player.stop(safeTime + duration);
+          // For looping samples: DON'T schedule a stop - let them loop until new note or stop button
+          // For non-looping samples: Stop after duration
+          if (player.loop) {
+            // Stop any previously playing looping sample on this channel
+            if (channelIndex !== undefined) {
+              const prevPlayer = this.channelActivePlayer.get(channelIndex);
+              if (prevPlayer && prevPlayer.state === 'started') {
+                prevPlayer.stop(safeTime); // Stop at the same time new note starts
+              }
+              this.channelActivePlayer.set(channelIndex, player);
+            }
+            player.start(safeTime, startOffset);
+            // Looping samples play until replaced by a new note or explicit stop
+          } else {
+            player.start(safeTime, startOffset);
+            player.stop(safeTime + duration);
+          }
         }
-      } else if (config.synthType === 'Sampler') {
-        // Sampler needs loaded samples
+      } else if (config.synthType === 'Sampler' && !config.sample?.loop) {
+        // Non-looping Sampler needs loaded samples
+        // (Looping samples are handled as Players above)
         const sampler = instrument as Tone.Sampler;
 
         // CRITICAL DEBUG: Check what's inside the sampler
@@ -1200,30 +1221,51 @@ export class ToneEngine {
           samplerHasBuffers: Object.keys((sampler as any)._buffers?._buffers || {}).length > 0,
           samplerBufferKeys: Object.keys((sampler as any)._buffers?._buffers || {}),
         };
-        console.log('[ToneEngine] Sampler playback:', samplerDebug);
 
         if (sampler.loaded) {
-          console.log('[ToneEngine] Triggering:', note, 'duration:', duration, 'offset:', sampleOffset);
 
           if (sampleOffset && sampleOffset > 0) {
-            // 9xx Sample offset: Use Player approach for offset support
-            // Tone.Sampler doesn't support sample offset, so we need to use internal buffer directly
-            // Convert byte offset to time offset (sample offset is in bytes, need seconds)
-            const buffer = (sampler as any)._buffers?.get(note) || (sampler as any)._buffers?._buffers?.[config.sample?.baseNote || 'C4'];
+            // 9xx Sample offset: Use Player for offset support
+            // Tone.Sampler doesn't support sample offset, so we create a one-shot Player
+            const baseNote = config.sample?.baseNote || 'C4';
+            const buffer = (sampler as any)._buffers?.get(baseNote) ||
+                           (sampler as any)._buffers?._buffers?.[baseNote];
+
             if (buffer && buffer.duration) {
               const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
-              const timeOffset = sampleOffset / sampleRate;
+              // Sample offset in MOD format is in 256-byte units, convert to seconds
+              const timeOffset = (sampleOffset * 256) / sampleRate;
 
               // Clamp offset to buffer duration
               const clampedOffset = Math.min(timeOffset, buffer.duration - 0.001);
 
-              // Trigger with attack at offset, release after duration
-              sampler.triggerAttack(note, safeTime, velocity);
-              sampler.triggerRelease(note, safeTime + duration);
+              // Create a one-shot Player for this offset playback
+              try {
+                const offsetPlayer = new Tone.Player({
+                  url: buffer,
+                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                }).toDestination();
 
-              // TODO: Actually implement offset - Tone.Sampler doesn't support this directly
-              // This would require accessing internal Player nodes or using a custom solution
-              console.warn('[ToneEngine] Sample offset not fully implemented for Sampler type (needs custom Player)');
+                // Calculate pitch adjustment for the note (relative to base note)
+                const baseFreq = Tone.Frequency(baseNote).toFrequency();
+                const targetFreq = Tone.Frequency(note).toFrequency();
+                const playbackRate = targetFreq / baseFreq;
+
+                offsetPlayer.playbackRate = playbackRate;
+
+                // Start at offset, stop after duration
+                offsetPlayer.start(safeTime, clampedOffset);
+                offsetPlayer.stop(safeTime + duration);
+
+                // Dispose after playback completes
+                Tone.getTransport().scheduleOnce(() => {
+                  offsetPlayer.dispose();
+                }, safeTime + duration + 0.1);
+
+              } catch (e) {
+                console.warn('[ToneEngine] Sample offset Player creation failed, falling back:', e);
+                sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+              }
             } else {
               console.warn('[ToneEngine] Cannot apply sample offset - no buffer found');
               sampler.triggerAttackRelease(note, duration, safeTime, velocity);
@@ -1292,14 +1334,27 @@ export class ToneEngine {
   }
 
   /**
-   * Release all notes
+   * Release all notes and stop all players
    */
   public releaseAll(): void {
-    this.instruments.forEach((instrument) => {
-      if (instrument.releaseAll) {
-        instrument.releaseAll();
+    this.instruments.forEach((instrument, key) => {
+      try {
+        // Handle Player/GrainPlayer - they use stop() not releaseAll()
+        if (instrument instanceof Tone.Player || instrument instanceof Tone.GrainPlayer) {
+          if (instrument.state === 'started') {
+            instrument.stop();
+          }
+        } else if (instrument.releaseAll) {
+          // Synths and Samplers use releaseAll()
+          instrument.releaseAll();
+        }
+      } catch (e) {
+        console.warn(`[ToneEngine] Error releasing instrument ${key}:`, e);
       }
     });
+    // Also clear pitch state and active player tracking for all channels
+    this.channelPitchState.clear();
+    this.channelActivePlayer.clear();
   }
 
   /**
@@ -1330,7 +1385,6 @@ export class ToneEngine {
     });
 
     if (keysToDelete.length > 0) {
-      console.log(`[ToneEngine] Disposed ${keysToDelete.length} channel instances for instrument ${instrumentId}`);
     }
   }
 
@@ -1339,7 +1393,6 @@ export class ToneEngine {
    * Call this when instrument config changes
    */
   public invalidateInstrument(instrumentId: number): void {
-    console.log('[ToneEngine] Invalidating instrument', instrumentId);
     this.disposeInstrument(instrumentId);
   }
 
@@ -1347,7 +1400,6 @@ export class ToneEngine {
    * Update instrument with new config (dispose old, create new)
    */
   public updateInstrument(instrumentId: number, config: InstrumentConfig): void {
-    console.log('[ToneEngine] Updating instrument', instrumentId, config.synthType);
     // Dispose old instrument
     this.disposeInstrument(instrumentId);
     // Create new instrument with updated config
@@ -1417,8 +1469,6 @@ export class ToneEngine {
       }
     }
     }); // End synths.forEach
-
-    console.log('[ToneEngine] Updated TB303 parameters for', synths.length, 'instances of instrument', instrumentId);
   }
 
   /**
@@ -1471,8 +1521,52 @@ export class ToneEngine {
         }
       }
     }
+  }
 
-    console.log('[ToneEngine] Updated TB303 pedalboard for', synths.length, 'instances of instrument', instrumentId);
+  /**
+   * Update ChipSynth arpeggio configuration in real-time
+   * @param instrumentId - Instrument ID
+   * @param arpeggioConfig - New arpeggio configuration
+   */
+  public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void {
+    if (!arpeggioConfig) return;
+
+    // Find all channel instances of this instrument
+    this.instruments.forEach((instrument, key) => {
+      if (key.startsWith(`${instrumentId}-`) && instrument.updateArpeggio) {
+        instrument.updateArpeggio(arpeggioConfig);
+      }
+    });
+  }
+
+  /**
+   * Get current arpeggio step for a ChipSynth instrument (for UI visualization)
+   * @param instrumentId - Instrument ID
+   * @returns Current step index or 0 if not found/playing
+   */
+  public getChipSynthArpeggioStep(instrumentId: number): number {
+    // Find first channel instance with arpeggio engine
+    for (const [key, instrument] of this.instruments.entries()) {
+      if (key.startsWith(`${instrumentId}-`) && instrument.getCurrentArpeggioStep) {
+        return instrument.getCurrentArpeggioStep();
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Check if ChipSynth arpeggio is currently playing
+   * @param instrumentId - Instrument ID
+   * @returns True if arpeggio is actively playing
+   */
+  public isChipSynthArpeggioPlaying(instrumentId: number): boolean {
+    // Find first channel instance with arpeggio engine
+    for (const [key, instrument] of this.instruments.entries()) {
+      if (key.startsWith(`${instrumentId}-`) && instrument.isArpeggioPlaying) {
+        return instrument.isArpeggioPlaying();
+      }
+    }
+    return false;
   }
 
   // ============================================================================
@@ -1505,7 +1599,6 @@ export class ToneEngine {
     this.metronomeSynth.connect(this.metronomeVolume);
     this.metronomeVolume.connect(this.masterChannel);
 
-    console.log('[ToneEngine] Metronome initialized');
   }
 
   /**
@@ -1516,7 +1609,6 @@ export class ToneEngine {
     if (enabled) {
       this.initMetronome();
     }
-    console.log(`[ToneEngine] Metronome ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -1698,9 +1790,6 @@ export class ToneEngine {
     output.connect(this.masterInput);
 
     this.instrumentEffectChains.set(key, { effects: effectNodes, output });
-
-    console.log(`[ToneEngine] Instrument ${key} effect chain built:`,
-      enabledEffects.map((e) => e.type).join(' → ') || 'direct');
   }
 
   /**
@@ -1755,7 +1844,8 @@ export class ToneEngine {
    * Called when effects are added, removed, or reordered
    */
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
-    console.log('[ToneEngine] Rebuilding master effects chain', effects.length, 'effects');
+    // Deep clone effects to avoid Immer proxy revocation issues during async operations
+    const effectsCopy = JSON.parse(JSON.stringify(effects)) as EffectConfig[];
 
     // Disconnect current chain
     this.masterInput.disconnect();
@@ -1771,12 +1861,11 @@ export class ToneEngine {
     this.masterEffectConfigs.clear();
 
     // Filter to only enabled effects
-    const enabledEffects = effects.filter((fx) => fx.enabled);
+    const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
     if (enabledEffects.length === 0) {
       // No effects - direct connection
       this.masterInput.connect(this.masterChannel);
-      console.log('[ToneEngine] No master effects, direct routing');
       return;
     }
 
@@ -1800,7 +1889,6 @@ export class ToneEngine {
 
     this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
 
-    console.log('[ToneEngine] Master effects chain rebuilt:', enabledEffects.map((e) => e.type).join(' → '));
   }
 
   /**
@@ -1829,7 +1917,6 @@ export class ToneEngine {
       // Update stored config
       effectData.config = config;
 
-      console.log('[ToneEngine] Updated master effect:', config.type, config.parameters);
     } catch (error) {
       console.error('[ToneEngine] Failed to update effect params:', error);
     }
@@ -1981,7 +2068,6 @@ export class ToneEngine {
         meter,
       });
 
-      console.log(`[ToneEngine] Created channel output for channel ${channelIndex}`);
     }
 
     return this.channelOutputs.get(channelIndex)!.input;
@@ -2006,6 +2092,104 @@ export class ToneEngine {
       // Convert -100 to 100 range to -1 to 1, default to 0 if null/undefined
       const panValue = pan ?? 0;
       channelOutput.channel.pan.value = panValue / 100;
+    }
+  }
+
+  /**
+   * Set channel pitch for ProTracker effects (arpeggio, portamento, vibrato)
+   * @param channelIndex - Channel to modify
+   * @param pitchMultiplier - Pitch multiplier (1.0 = no change, 2.0 = octave up, 0.5 = octave down)
+   */
+  public setChannelPitch(channelIndex: number, pitchMultiplier: number): void {
+    const pitchState = this.channelPitchState.get(channelIndex);
+    if (!pitchState) {
+      // Pitch state not initialized - normal for channels without active notes
+      return;
+    }
+
+    const instrument = this.instruments.get(pitchState.instrumentKey);
+    if (!instrument) {
+      console.warn(`[ToneEngine] setChannelPitch: No instrument found for key ${pitchState.instrumentKey}`);
+      return;
+    }
+
+    // Update current pitch multiplier
+    pitchState.currentPitchMult = pitchMultiplier;
+
+    // Apply pitch based on instrument type
+    const synthType = this.instrumentSynthTypes.get(pitchState.instrumentKey);
+    const cents = 1200 * Math.log2(pitchMultiplier);
+
+    if (synthType === 'Player' || synthType === 'GranularSynth') {
+      // For Players/GrainPlayers: multiply base playback rate
+      const newRate = pitchState.basePlaybackRate * pitchMultiplier;
+      if (instrument.playbackRate !== undefined) {
+        instrument.playbackRate = newRate;
+      }
+    } else if (synthType === 'Sampler') {
+      // For Sampler: use detune in cents
+      if (instrument.detune !== undefined) {
+        instrument.detune = cents;
+      }
+    } else {
+      // For synths: use detune property (most Tone.js synths have this)
+      let applied = false;
+      if (instrument.detune !== undefined) {
+        instrument.detune.value = cents;
+        applied = true;
+      } else if (instrument.oscillator?.detune !== undefined) {
+        instrument.oscillator.detune.value = cents;
+        applied = true;
+      }
+      if (applied) {
+      }
+    }
+  }
+
+  /**
+   * Set channel pitch using frequency directly (for portamento/arpeggio)
+   * @param channelIndex - Channel to modify
+   * @param frequency - Target frequency in Hz
+   */
+  public setChannelFrequency(channelIndex: number, frequency: number): void {
+    const pitchState = this.channelPitchState.get(channelIndex);
+    if (!pitchState || pitchState.baseFrequency === 0) {
+      // No pitch state - normal for channels without active notes
+      return;
+    }
+
+    // Calculate pitch multiplier from frequency ratio
+    const pitchMultiplier = frequency / pitchState.baseFrequency;
+    this.setChannelPitch(channelIndex, pitchMultiplier);
+  }
+
+  /**
+   * Initialize pitch state when a note is triggered on a channel
+   * Called from PatternScheduler when a note starts
+   */
+  public initChannelPitch(
+    channelIndex: number,
+    instrumentKey: string,
+    baseFrequency: number,
+    basePlaybackRate: number = 1
+  ): void {
+    this.channelPitchState.set(channelIndex, {
+      instrumentKey,
+      basePlaybackRate,
+      baseFrequency,
+      currentPitchMult: 1.0,
+    });
+  }
+
+  /**
+   * Clear pitch state for a channel (on note off or channel reset)
+   */
+  public clearChannelPitch(channelIndex: number): void {
+    const pitchState = this.channelPitchState.get(channelIndex);
+    if (pitchState) {
+      // Reset pitch to normal before clearing
+      this.setChannelPitch(channelIndex, 1.0);
+      this.channelPitchState.delete(channelIndex);
     }
   }
 
@@ -2041,10 +2225,6 @@ export class ToneEngine {
       // Also update channel output if it exists
       this.setChannelMute(idx, shouldMute);
     });
-
-    console.log('[ToneEngine] Updated mute states:',
-      Array.from(this.channelMuteStates.entries()).map(([ch, muted]) => `ch${ch}:${muted ? 'muted' : 'playing'}`).join(', ')
-    );
   }
 
   /**
@@ -2161,7 +2341,6 @@ export class ToneEngine {
   public setPerformanceQuality(quality: 'high' | 'medium' | 'low'): void {
     if (this.currentPerformanceQuality === quality) return;
 
-    console.log(`[ToneEngine] Setting performance quality: ${this.currentPerformanceQuality} → ${quality}`);
     this.currentPerformanceQuality = quality;
 
     // Update all TB-303 synths (can reconfigure dynamically)
@@ -2207,7 +2386,6 @@ export class ToneEngine {
     // Dispose PolySynths that need recreation
     // They'll be recreated with new polyphony settings the next time they're used
     if (polySynthsToRecreate.length > 0) {
-      console.log(`[ToneEngine] Disposing ${polySynthsToRecreate.length} PolySynths for quality change (will recreate on next use)`);
       polySynthsToRecreate.forEach(({ key }) => {
         const instrument = this.instruments.get(key);
         if (instrument && typeof instrument.dispose === 'function') {
@@ -2222,7 +2400,6 @@ export class ToneEngine {
       });
     }
 
-    console.log(`[ToneEngine] Performance quality set to ${quality} (updated ${tb303Count} TB-303s, disposed ${polySynthsToRecreate.length} PolySynths)`);
   }
 
   /**

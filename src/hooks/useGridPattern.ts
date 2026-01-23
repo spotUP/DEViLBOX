@@ -109,12 +109,24 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
 
     const parsed = parseTrackerNote(cell.note, baseOctave);
 
+    // Tie detection: check if current note is the same as the previous note
+    // A tie means the note sustains from the previous step without retriggering
+    let isTie = false;
+    if (i > 0 && parsed && cells[i - 1]) {
+      const prevParsed = parseTrackerNote(cells[i - 1].note, baseOctave);
+      if (prevParsed &&
+          prevParsed.noteIndex === parsed.noteIndex &&
+          prevParsed.octaveShift === parsed.octaveShift) {
+        isTie = true;
+      }
+    }
+
     steps.push({
       noteIndex: parsed?.noteIndex ?? null,
       octaveShift: parsed?.octaveShift ?? 0,
       accent: cell.accent || false,
       slide: cell.slide || false,
-      tie: false, // TODO: Implement tie detection
+      tie: isTie,
       velocity: cell.volume ?? 100, // Convert volume (0-64) to velocity (0-127) - or use as-is if already MIDI velocity
     });
   }

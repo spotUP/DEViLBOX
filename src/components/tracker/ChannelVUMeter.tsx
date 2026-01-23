@@ -41,11 +41,12 @@ export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
   ({ level, isActive }) => {
     const [displayLevel, setDisplayLevel] = useState(0);
 
-    // When a new level comes in, set it immediately if higher
+    // ProTracker behavior: Instantly jump to triggered note volume, then decay
     useEffect(() => {
       if (isActive && level > 0) {
         const newLevel = Math.min(1, level);
-        setDisplayLevel((prev) => Math.max(prev, newLevel));
+        // Instant jump to new level (no Math.max - allows both up AND down jumps)
+        setDisplayLevel(newLevel);
       }
     }, [level, isActive]);
 

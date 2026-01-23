@@ -89,7 +89,6 @@ class ButtonMapManager {
     // Load saved mappings
     this.loadMappings();
 
-    console.log('[ButtonMapManager] Initialized');
   }
 
   /**
@@ -142,7 +141,6 @@ class ButtonMapManager {
       // Found a match - trigger the action
       const handler = this.actionHandlers.get(mapping.action);
       if (handler) {
-        console.log(`[ButtonMapManager] Triggering action: ${mapping.action}`);
         handler();
       }
       return;
@@ -174,7 +172,6 @@ class ButtonMapManager {
         }
       };
 
-      console.log(`[ButtonMapManager] Learning started for action: ${action}`);
     });
   }
 
@@ -185,7 +182,6 @@ class ButtonMapManager {
     this.isLearning = false;
     this.learningAction = null;
     this.learnCallback = null;
-    console.log('[ButtonMapManager] Learning cancelled');
   }
 
   /**
@@ -220,7 +216,6 @@ class ButtonMapManager {
     this.mappings.set(mapping.id, mapping);
     this.saveMappings();
     this.notifyMappingChange();
-    console.log(`[ButtonMapManager] Mapping set: ${mapping.displayName} -> ${mapping.action}`);
   }
 
   /**
@@ -325,7 +320,6 @@ class ButtonMapManager {
         mappings.forEach((mapping) => {
           this.mappings.set(mapping.id, mapping);
         });
-        console.log(`[ButtonMapManager] Loaded ${mappings.length} mappings`);
       }
     } catch (error) {
       console.error('[ButtonMapManager] Failed to load mappings:', error);

@@ -99,7 +99,6 @@ class CCMapManager {
     // Load persisted mappings
     this.loadMappings();
 
-    console.log('[CCMapManager] Initialized');
   }
 
   /**
@@ -199,7 +198,6 @@ class CCMapManager {
       };
 
       this.notifyLearnChange(true, parameterPath);
-      console.log(`[CCMapManager] Learning started for ${displayName} (${parameterPath})`);
     });
   }
 
@@ -219,7 +217,6 @@ class CCMapManager {
         callback: null,
       };
       this.notifyLearnChange(false, null);
-      console.log('[CCMapManager] Learning cancelled');
     }
   }
 
@@ -258,7 +255,6 @@ class CCMapManager {
     this.mappings.set(mapping.id, mapping);
     this.saveMappings();
     this.notifyMappingChange();
-    console.log(`[CCMapManager] Mapping set: CC${mapping.ccNumber} -> ${mapping.parameterPath}`);
   }
 
   /**
@@ -269,7 +265,6 @@ class CCMapManager {
       this.mappings.delete(id);
       this.saveMappings();
       this.notifyMappingChange();
-      console.log(`[CCMapManager] Mapping removed: ${id}`);
     }
   }
 
@@ -289,7 +284,6 @@ class CCMapManager {
     if (toRemove.length > 0) {
       this.saveMappings();
       this.notifyMappingChange();
-      console.log(`[CCMapManager] Removed ${toRemove.length} mappings for instrument ${instrumentId}`);
     }
   }
 
@@ -332,7 +326,6 @@ class CCMapManager {
     this.mappings.clear();
     this.saveMappings();
     this.notifyMappingChange();
-    console.log('[CCMapManager] All mappings cleared');
   }
 
   // ==========================================================================
@@ -421,7 +414,6 @@ class CCMapManager {
         mappings.forEach((mapping) => {
           this.mappings.set(mapping.id, mapping);
         });
-        console.log(`[CCMapManager] Loaded ${mappings.length} mappings`);
       }
     } catch (error) {
       console.error('[CCMapManager] Failed to load mappings:', error);

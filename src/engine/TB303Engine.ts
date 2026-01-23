@@ -322,15 +322,6 @@ export class TB303Synth {
     this.setVolume(this.baseVolume);
     this.setOverdrive(this.config.overdrive?.amount ?? 0);
 
-    console.log('[TB303Synth] Created with Open303-improved filters + GuitarML', {
-      oscillator: this.config.oscillator.type,
-      cutoff: this.config.filter.cutoff,
-      resonance: this.config.filter.resonance,
-      envMod: this.config.filterEnvelope.envMod,
-      decay: this.config.filterEnvelope.decay,
-      improvements: 'exponential modulation + additional filters (pre-HP, post-HP, allpass, notch) + neural overdrive',
-    });
-
     // GuitarML will be lazy-loaded when first enabled
   }
 
@@ -341,7 +332,6 @@ export class TB303Synth {
     if (!this.guitarML || this.guitarMLInitialized) return;
 
     try {
-      console.log('[TB303Synth] Lazy loading GuitarML...');
       await this.guitarML.initialize();
 
       // Load model if specified in config
@@ -363,7 +353,6 @@ export class TB303Synth {
       }
 
       this.guitarMLInitialized = true;
-      console.log('[TB303Synth] GuitarML lazy loaded successfully with dry/wet:', this.config.overdrive?.dryWet ?? 100);
     } catch (error) {
       console.error('[TB303Synth] Failed to initialize GuitarML:', error);
       throw error;
@@ -499,7 +488,6 @@ export class TB303Synth {
     // The slide time is FIXED regardless of interval (C2→C3 same time as C2→C4)
     // This is different from typical portamento which uses V/oct exponential ramps
     if (slide && this.currentNote && this.currentNote !== note) {
-      console.log('[TB303] SLIDE to', note, 'from', this.currentNote);
       // Fixed ~60ms RC time constant like real 303 (can be adjusted with slide.time knob)
       const slideTimeMs = this.config.slide.time; // Default 60ms
       const slideTimeSec = slideTimeMs / 1000;
@@ -960,7 +948,6 @@ export class TB303Synth {
 
     // If enabling GuitarML, wait for it to be ready
     if (enabled && !this.guitarML.isReady()) {
-      console.log('[TB303Synth] Waiting for GuitarML to initialize...');
       // Wait up to 5 seconds for initialization
       const startTime = Date.now();
       while (!this.guitarML.isReady() && (Date.now() - startTime) < 5000) {
@@ -972,7 +959,6 @@ export class TB303Synth {
         this.guitarMLEnabled = false;
         return;
       }
-      console.log('[TB303Synth] GuitarML ready');
     }
 
     // Disconnect current routing
@@ -982,7 +968,6 @@ export class TB303Synth {
 
     if (this.guitarMLEnabled && this.guitarML.isReady()) {
       // Route: overdriveGain → GuitarML → bypass → vca
-      console.log('[TB303Synth] Routing through GuitarML');
       this.overdriveGain.connect(this.guitarML.getInput());
       this.guitarML.connect(this.guitarMLBypass);
       this.guitarMLBypass.connect(this.vca);
@@ -992,17 +977,14 @@ export class TB303Synth {
       // Ensure dry/wet is set to 100% (full wet) if not specified
       if (this.config.overdrive?.dryWet === undefined) {
         this.guitarML.setDryWet(1.0); // 100% wet
-        console.log('[TB303Synth] GuitarML dry/wet set to 100%');
       }
 
       // Set gain/condition from overdrive amount
       const drive = this.config.overdrive?.amount ?? 50;
       this.guitarML.setGain((drive - 50) * 0.36);
       this.guitarML.setCondition(drive / 100);
-      console.log('[TB303Synth] GuitarML gain/condition set:', { drive });
     } else {
       // Route: overdriveGain → waveshaper → bypass → vca
-      console.log('[TB303Synth] Routing through waveshaper');
       this.overdriveGain.connect(this.overdrive);
       this.overdrive.connect(this.guitarMLBypass);
       this.guitarMLBypass.connect(this.vca);
@@ -1012,7 +994,6 @@ export class TB303Synth {
       }
     }
 
-    console.log('[TB303Synth] GuitarML', enabled ? 'enabled' : 'disabled', '- ready:', this.guitarML.isReady());
   }
 
   /**
@@ -1029,7 +1010,6 @@ export class TB303Synth {
 
       await this.guitarML.loadModel(modelIndex);
       this.config.overdrive = { ...this.config.overdrive, modelIndex };
-      console.log('[TB303Synth] Loaded GuitarML model:', modelIndex);
     } catch (error) {
       console.error('[TB303Synth] Failed to load GuitarML model:', error);
     }
@@ -1074,7 +1054,6 @@ export class TB303Synth {
     this.updateMufflerCurve();
     this.setFilterFM(this.devilFish.filterFM);
     this.updateResonanceMode();
-    console.log('[TB303Synth] Devil Fish', enabled ? 'enabled' : 'disabled', this.devilFish);
   }
 
   /**
@@ -1875,7 +1854,6 @@ export class TB303Synth {
   public setQuality(quality: PerformanceQuality): void {
     if (this.qualityLevel === quality) return; // Already at this quality level
 
-    console.log(`[TB303Synth] Changing quality from ${this.qualityLevel} to ${quality}`);
     this.qualityLevel = quality;
 
     // Disconnect all nodes
@@ -1894,7 +1872,6 @@ export class TB303Synth {
         break;
     }
 
-    console.log(`[TB303Synth] Quality set to ${quality}`);
   }
 
   /**

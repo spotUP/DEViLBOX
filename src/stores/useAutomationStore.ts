@@ -180,15 +180,6 @@ export const useAutomationStore = create<AutomationStore>()(
             if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
             state.automation[c.patternId][c.channelIndex][c.parameter] = c;
           });
-          // Debug logging
-          console.log('[AutomationStore] addPoint - rebuilt automation:', {
-            curveId,
-            parameter: curve.parameter,
-            patternId: curve.patternId,
-            channelIndex: curve.channelIndex,
-            pointCount: curve.points.length,
-            automationKeys: Object.keys(state.automation),
-          });
         }
       }),
 
@@ -351,21 +342,9 @@ export const useAutomationStore = create<AutomationStore>()(
         if (existingIndex !== -1) {
           // Update existing curve
           state.curves[existingIndex] = curve;
-          console.log('[AutomationStore] setAutomation - updated existing curve:', {
-            curveId: curve.id,
-            parameter,
-            pointCount: curve.points.length,
-          });
         } else {
           // Add new curve
           state.curves.push(curve);
-          console.log('[AutomationStore] setAutomation - added new curve:', {
-            curveId: curve.id,
-            patternId,
-            channelIndex,
-            parameter,
-            pointCount: curve.points.length,
-          });
         }
 
         // Rebuild automation data
@@ -378,19 +357,6 @@ export const useAutomationStore = create<AutomationStore>()(
             state.automation[c.patternId][c.channelIndex] = {};
           }
           state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-        });
-
-        // Debug log the rebuilt automation
-        console.log('[AutomationStore] Rebuilt automation object:', {
-          totalCurves: state.curves.length,
-          automationPatterns: Object.keys(state.automation),
-          automationSummary: Object.entries(state.automation).map(([pid, channels]) => ({
-            patternId: pid,
-            channels: Object.entries(channels).map(([ch, params]) => ({
-              channel: ch,
-              params: Object.keys(params)
-            }))
-          }))
         });
       }),
 
@@ -425,7 +391,6 @@ export const useAutomationStore = create<AutomationStore>()(
           state.automation[c.patternId][c.channelIndex][c.parameter] = c;
         });
 
-        console.log('[AutomationStore] Loaded', newCurves.length, 'automation curves');
       }),
 
     getCurves: () => get().curves,

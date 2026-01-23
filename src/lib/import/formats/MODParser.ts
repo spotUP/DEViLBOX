@@ -104,7 +104,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     offset += sampleHeader.length * 2; // Length is in words
 
     const sample: ParsedSample = {
-      id: i,
+      id: i + 1, // MOD instruments are 1-31 (1-indexed)
       name: sampleHeader.name,
       pcmData: sampleData,
       loopStart: sampleHeader.loopStart,
@@ -122,7 +122,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     };
 
     instruments.push({
-      id: i,
+      id: i + 1, // MOD instruments are 1-31 (1-indexed, matching pattern cell references)
       name: sampleHeader.name,
       samples: [sample],
       fadeout: 0,

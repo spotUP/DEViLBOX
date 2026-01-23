@@ -63,7 +63,7 @@ export const useUIStore = create<UIStore>()(
       useHexNumbers: true, // Default to hex numbers (FT2 style)
 
       // Responsive layout state (default to expanded/visible)
-      tb303Collapsed: true,
+      tb303Collapsed: false, // TB-303 panel expanded by default
       oscilloscopeVisible: true,
       compactToolbar: false, // FT2 toolbar expanded by default
       autoCompactApplied: false,
@@ -158,9 +158,10 @@ export const useUIStore = create<UIStore>()(
           const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
 
           // Version 4: FT2 toolbar expanded by default
-          if (state.uiVersion < 4) {
-            state.uiVersion = 4;
-            state.tb303Collapsed = true;
+          // Version 5: TB-303 panel expanded by default
+          if (state.uiVersion < 5) {
+            state.uiVersion = 5;
+            state.tb303Collapsed = false; // Expand TB-303 panel
             state.compactToolbar = false; // Expand FT2 toolbar
           }
 

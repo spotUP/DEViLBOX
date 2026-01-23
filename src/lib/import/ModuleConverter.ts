@@ -467,6 +467,13 @@ export function convertMODModule(
   const order = metadata.modData?.patternOrderTable ||
     Array.from({ length: convertedPatterns.length }, (_, i) => i);
 
+  console.log('[ModuleConverter] Pattern order from metadata:', {
+    hasModData: !!metadata.modData,
+    patternOrderTable: metadata.modData?.patternOrderTable,
+    songLength: metadata.modData?.songLength,
+    resultOrder: order,
+  });
+
   return {
     patterns: convertedPatterns,
     order,

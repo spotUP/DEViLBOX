@@ -188,11 +188,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         try {
           const engine = getToneEngine();
           engine.invalidateInstrument(id);
-          console.log('[InstrumentStore] Invalidated instrument', id, {
-            synthTypeChanging,
-            isPresetLoad,
-            soundParamsChanging
-          });
         } catch (error) {
           console.warn('[InstrumentStore] Could not invalidate instrument:', error);
         }
@@ -275,7 +270,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       try {
         const engine = getToneEngine();
         engine.invalidateInstrument(id);
-        console.log('[InstrumentStore] Reset instrument', id, 'to default');
       } catch (error) {
         console.warn('[InstrumentStore] Could not invalidate instrument:', error);
       }
@@ -428,7 +422,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       try {
         const engine = getToneEngine();
         engine.invalidateInstrument(targetInstrumentId);
-        console.log('[InstrumentStore] Preset loaded, invalidated instrument', targetInstrumentId);
       } catch (error) {
         console.warn('[InstrumentStore] Could not invalidate instrument:', error);
       }
@@ -493,7 +486,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
       });
 
-      console.log('[InstrumentStore] Loaded', migratedInstruments.length, 'instruments');
     },
 
     // Transform sample instrument to synth (MOD/XM import feature)
@@ -718,7 +710,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       try {
         const engine = getToneEngine();
         engine.invalidateInstrument(instrumentId);
-        console.log(`[InstrumentStore] Reverted instrument ${instrumentId} to original sample`);
       } catch (error) {
         console.warn('[InstrumentStore] Could not invalidate instrument:', error);
       }
@@ -742,7 +733,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.presets = [];
       });
 
-      console.log('[InstrumentStore] Reset to initial state');
     },
   }))
 );

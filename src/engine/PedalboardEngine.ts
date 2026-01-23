@@ -351,21 +351,84 @@ export class PedalboardEngine {
   }
 
   /**
-   * Update entire pedalboard configuration
+   * Update entire pedalboard configuration with smart diff
+   * Only modifies effects that have actually changed
    */
   async updateConfig(newConfig: NeuralPedalboard): Promise<void> {
-    // TODO: Implement smart diff to only update changed effects
-    // For now, rebuild the entire chain
+    const oldConfig = this.config;
 
-    // Dispose current chain
-    this.dispose();
+    // Check if we can do an incremental update
+    if (!this.isInitialized) {
+      // Not initialized yet, just set config and init
+      this.config = newConfig;
+      await this.initialize();
+      return;
+    }
 
-    // Apply new config
+    // Update global gain settings
+    if (newConfig.inputGain !== oldConfig.inputGain) {
+      this.inputGain.gain.value = newConfig.inputGain / 100;
+    }
+    if (newConfig.outputGain !== oldConfig.outputGain) {
+      this.outputGain.gain.value = newConfig.outputGain / 100;
+    }
+    if (newConfig.enabled !== oldConfig.enabled) {
+      this.setEnabled(newConfig.enabled);
+    }
+
+    // Build maps for efficient comparison
+    const oldEffectsMap = new Map(oldConfig.chain.map(e => [e.id, e]));
+    const newEffectsMap = new Map(newConfig.chain.map(e => [e.id, e]));
+    const newOrder = newConfig.chain.map(e => e.id);
+
+    // Find effects to remove (in old but not in new)
+    for (const oldEffect of oldConfig.chain) {
+      if (!newEffectsMap.has(oldEffect.id)) {
+        this.removeEffect(oldEffect.id);
+      }
+    }
+
+    // Find effects to add (in new but not in old) or update (in both)
+    for (const newEffect of newConfig.chain) {
+      const oldEffect = oldEffectsMap.get(newEffect.id);
+
+      if (!oldEffect) {
+        // New effect - add it
+        await this.addEffect(newEffect);
+      } else {
+        // Existing effect - check if parameters changed
+        const processor = this.effectProcessors.get(newEffect.id);
+        if (processor) {
+          // Update enabled state
+          if (newEffect.enabled !== oldEffect.enabled) {
+            this.setEffectEnabled(newEffect.id, newEffect.enabled);
+          }
+
+          // Update parameters if changed
+          if (JSON.stringify(newEffect.parameters) !== JSON.stringify(oldEffect.parameters)) {
+            this.applyEffectParameters(processor.engine, newEffect);
+          }
+
+          // Update model if changed
+          if (newEffect.modelIndex !== oldEffect.modelIndex && newEffect.modelIndex !== undefined) {
+            await processor.engine.loadModel(newEffect.modelIndex);
+            this.applyEffectParameters(processor.engine, newEffect);
+          }
+        }
+      }
+    }
+
+    // Check if chain order changed and reconnect if needed
+    const orderChanged = this.chainOrder.length !== newOrder.length ||
+      !this.chainOrder.every((id, i) => id === newOrder[i]);
+
+    if (orderChanged) {
+      this.chainOrder = newOrder;
+      this.reconnectChain();
+    }
+
+    // Update config reference
     this.config = newConfig;
-    this.isInitialized = false;
-
-    // Reinitialize
-    await this.initialize();
   }
 
   /**

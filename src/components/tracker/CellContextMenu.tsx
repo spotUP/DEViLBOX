@@ -40,6 +40,8 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     currentPatternIndex,
     setCell,
     cursor,
+    selectColumn,
+    selectChannel,
   } = useTrackerStore();
 
   const pattern = patterns[currentPatternIndex];
@@ -125,15 +127,15 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
   // Select entire column
   const handleSelectColumn = useCallback(() => {
-    // TODO: Implement block selection for column
-    console.log('Select column', channelIndex, cursor.columnType);
-  }, [channelIndex, cursor.columnType]);
+    selectColumn(channelIndex, cursor.columnType);
+    onClose();
+  }, [channelIndex, cursor.columnType, selectColumn, onClose]);
 
   // Select entire channel
   const handleSelectChannel = useCallback(() => {
-    // TODO: Implement block selection for channel
-    console.log('Select channel', channelIndex);
-  }, [channelIndex]);
+    selectChannel(channelIndex);
+    onClose();
+  }, [channelIndex, selectChannel, onClose]);
 
   const menuItems = useMemo((): MenuItemType[] => [
     // Cut/Copy/Paste
