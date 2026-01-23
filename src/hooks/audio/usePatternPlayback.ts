@@ -29,6 +29,11 @@ export const usePatternPlayback = () => {
   // Track if we've started playback
   const hasStartedRef = useRef(false);
 
+  // Track last pattern/position/speed to avoid unnecessary state updates
+  const lastPatternRef = useRef(-1);
+  const lastPositionRef = useRef(-1);
+  const lastSpeedRef = useRef(-1);
+
   // Sync BPM changes to engine (for visualization, metronome, etc.)
   useEffect(() => {
     engine.setBPM(bpm);
@@ -86,12 +91,21 @@ export const usePatternPlayback = () => {
         // Set callbacks for UI updates
         replayer.onRowChange = (row, patternNum, position) => {
           setCurrentRowThrottled(row, patterns[patternNum]?.length ?? 64);
-          // Sync speed on every row change (in case Fxx command changed it)
-          getSetSpeed()(replayer.getSpeed());
-          // Always update pattern and position - not just on row 0!
-          // Pattern jumps (Bxx) and breaks (Dxx) can change the pattern mid-row
-          setCurrentPattern(patternNum);
-          setCurrentPosition(position);
+          // Sync speed only when it changes (Fxx command)
+          const currentSpeed = replayer.getSpeed();
+          if (currentSpeed !== lastSpeedRef.current) {
+            lastSpeedRef.current = currentSpeed;
+            getSetSpeed()(currentSpeed);
+          }
+          // Only update pattern/position when they actually change (avoid unnecessary re-renders)
+          if (patternNum !== lastPatternRef.current) {
+            lastPatternRef.current = patternNum;
+            setCurrentPattern(patternNum);
+          }
+          if (position !== lastPositionRef.current) {
+            lastPositionRef.current = position;
+            setCurrentPosition(position);
+          }
         };
 
         replayer.onSongEnd = () => {
@@ -109,6 +123,9 @@ export const usePatternPlayback = () => {
     } else if (!isPlaying && hasStartedRef.current) {
       // Stop playback
       hasStartedRef.current = false;
+      lastPatternRef.current = -1;
+      lastPositionRef.current = -1;
+      lastSpeedRef.current = -1;
       replayer.stop();
       replayer.onRowChange = null;
       replayer.onSongEnd = null;
