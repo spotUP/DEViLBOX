@@ -18,10 +18,15 @@ import { useEffect, useRef } from 'react';
 
 type AnimationCallback = (deltaTime: number) => void;
 
+// PERF: Lock animations to 60fps to reduce main thread load
+const TARGET_FPS = 60;
+const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
 class AnimationCoordinator {
   private callbacks: Map<string, AnimationCallback> = new Map();
   private rafId: number | null = null;
   private lastTime: number = 0;
+  private lastFrameTime: number = 0;
   private isRunning: boolean = false;
 
   subscribe(id: string, callback: AnimationCallback): () => void {
@@ -47,7 +52,9 @@ class AnimationCoordinator {
     if (this.isRunning) return;
 
     this.isRunning = true;
-    this.lastTime = performance.now();
+    const now = performance.now();
+    this.lastTime = now;
+    this.lastFrameTime = now;
     this.animate();
   }
 
@@ -63,6 +70,20 @@ class AnimationCoordinator {
 
   private animate = () => {
     const currentTime = performance.now();
+
+    // PERF: Limit to target FPS (60fps) - skip frame if too soon
+    const elapsed = currentTime - this.lastFrameTime;
+    if (elapsed < FRAME_INTERVAL) {
+      // Schedule next check but don't process callbacks yet
+      if (this.isRunning) {
+        this.rafId = requestAnimationFrame(this.animate);
+      }
+      return;
+    }
+
+    // Adjust for frame timing drift
+    this.lastFrameTime = currentTime - (elapsed % FRAME_INTERVAL);
+
     const deltaTime = currentTime - this.lastTime;
     this.lastTime = currentTime;
 

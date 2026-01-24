@@ -67,7 +67,7 @@ interface MeterState {
 }
 
 export const ChannelVUMeters: React.FC = () => {
-  // VU meters re-enabled after PatternEditor/FT2Toolbar re-render fixes
+  // VU meters re-enabled - not the cause of FPS issues
   const DISABLE_VU_METERS = false;
 
   const { patterns, currentPatternIndex } = useTrackerStore();

@@ -206,13 +206,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
 
-  // FPS monitoring and auto-degradation
-  const { fps, averageFps, quality } = useFPSMonitor({
-    enableAutoDegradation: true,
-    degradeThreshold: 40,
-    recoverThreshold: 55,
-    checkInterval: 2000,
-  });
+  // FPS monitoring (simplified - no longer does active measurement)
+  const { fps, averageFps, quality } = useFPSMonitor();
 
   // Sync grid channel with tracker cursor when switching views
   useEffect(() => {
