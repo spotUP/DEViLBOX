@@ -49,7 +49,7 @@ let lastUpdateTime = 0;
 let pendingRow: number | null = null;
 let pendingPatternLength: number | undefined = undefined;
 let throttleTimer: number | null = null;
-const THROTTLE_INTERVAL = 83; // ~12 updates per second (1000ms / 12 = 83ms)
+const THROTTLE_INTERVAL = 33; // ~30 updates per second for smoother stepped scrolling
 
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({

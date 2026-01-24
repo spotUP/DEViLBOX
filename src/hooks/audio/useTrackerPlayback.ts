@@ -71,11 +71,9 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
       options.onSongEnd?.();
     };
 
+    // PERF: Don't update React state on every tick - it blocks audio scheduling!
+    // currentTick is not used in any UI components, so we only call the optional callback
     replayer.onTickProcess = (tick, row) => {
-      setState(prev => ({
-        ...prev,
-        currentTick: tick,
-      }));
       options.onTickProcess?.(tick, row);
     };
 

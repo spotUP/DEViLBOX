@@ -268,8 +268,9 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   }, [cursor.rowIndex, pattern, isPlaying]);
 
   // When PLAYING: poll ToneEngine for real-time trigger levels
-  // VU polling re-enabled after PatternEditor/FT2Toolbar re-render fixes
-  const DISABLE_VU_POLLING = false;
+  // DISABLED: ChannelVUMeter returns null, so polling causes unnecessary re-renders
+  // The ChannelVUMeters overlay component handles VU display independently
+  const DISABLE_VU_POLLING = true;
   const vuPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (DISABLE_VU_POLLING || !isPlaying || !pattern) {
@@ -357,6 +358,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       containerHeightRef.current = containerRef.current.clientHeight;
     }
 
+    // Smooth scroll runs at native refresh rate - transform updates are GPU-accelerated and cheap
     const animate = () => {
       if (!contentEl) return;
 
@@ -530,6 +532,46 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
     return () => resizeObserver.disconnect();
   }, [pattern?.channels.length]);
+
+  // Scroll horizontally to keep cursor channel visible (for Tab navigation, etc.)
+  useEffect(() => {
+    if (isMobile || !headerScrollRef.current || !contentScrollRef.current) return;
+
+    const CHANNEL_WIDTH = 260;
+    const channelLeft = cursor.channelIndex * CHANNEL_WIDTH;
+    const channelRight = channelLeft + CHANNEL_WIDTH;
+
+    const scrollContainer = headerScrollRef.current;
+    const scrollLeft = scrollContainer.scrollLeft;
+    const clientWidth = scrollContainer.clientWidth;
+    const scrollRight = scrollLeft + clientWidth;
+
+    // Check if channel is outside visible area
+    if (channelLeft < scrollLeft) {
+      // Channel is to the left of visible area - scroll left
+      scrollContainer.scrollLeft = channelLeft;
+      contentScrollRef.current.scrollLeft = channelLeft;
+    } else if (channelRight > scrollRight) {
+      // Channel is to the right of visible area - scroll right
+      const newScrollLeft = channelRight - clientWidth;
+      scrollContainer.scrollLeft = newScrollLeft;
+      contentScrollRef.current.scrollLeft = newScrollLeft;
+    }
+
+    // Update custom scrollbar thumb position
+    if (customScrollTrackRef.current) {
+      const scrollWidth = scrollContainer.scrollWidth;
+      const newScrollLeft = scrollContainer.scrollLeft;
+      const maxScroll = scrollWidth - clientWidth;
+      if (maxScroll > 0) {
+        const scrollPercent = newScrollLeft / maxScroll;
+        const trackWidth = customScrollTrackRef.current.clientWidth;
+        const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
+        const maxThumbLeft = trackWidth - thumbWidth;
+        setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
+      }
+    }
+  }, [cursor.channelIndex, isMobile]);
 
   // Validate containerHeight matches actual rendered height (development only)
   useEffect(() => {

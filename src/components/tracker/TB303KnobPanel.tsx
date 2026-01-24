@@ -77,7 +77,7 @@ const DEFAULT_PARAMS: TB303Params = {
   decay: 200,
   accent: 70,
   overdrive: 0,
-  tuning: 440,
+  tuning: 0, // Cents offset from A4=440Hz
   engineType: 'tonejs',
   overdriveModel: 0, // Default to TS9
   useNeuralOverdrive: false, // Default to waveshaper
@@ -143,6 +143,10 @@ const TB303KnobPanelComponent: React.FC = () => {
   const { width: windowWidth } = useResponsiveSafe();
 
   const [params, setParams] = useState<TB303Params>(DEFAULT_PARAMS);
+  // Keep a ref to always have the latest params (avoids stale closure issues)
+  const paramsRef = useRef<TB303Params>(params);
+  paramsRef.current = params;
+
   const [_showPresetMenu, _setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
@@ -150,6 +154,7 @@ const TB303KnobPanelComponent: React.FC = () => {
   // Consolidated live modulation state using useReducer for better performance
   const [liveModulation, dispatchLiveModulation] = useReducer(liveModulationReducer, {});
   const animationRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number>(0);
 
   // Destructure live values for easier access
   const {
@@ -388,7 +393,18 @@ const TB303KnobPanelComponent: React.FC = () => {
     const secondsPerTick = 2.5 / bpm;
     const secondsPerRow = secondsPerTick * ticksPerRow;
 
-    const pollLiveValues = () => {
+    // PERF: Limit polling to 30fps - automation doesn't need 60fps updates
+    const POLL_INTERVAL = 1000 / 30;
+
+    const pollLiveValues = (timestamp: number) => {
+      // Skip frame if too soon
+      const elapsed = timestamp - lastFrameTimeRef.current;
+      if (elapsed < POLL_INTERVAL) {
+        animationRef.current = requestAnimationFrame(pollLiveValues);
+        return;
+      }
+      lastFrameTimeRef.current = timestamp - (elapsed % POLL_INTERVAL);
+
       // Get current transport position and calculate fractional row
       const transport = Tone.getTransport();
       const transportSeconds = transport.seconds;
@@ -528,7 +544,8 @@ const TB303KnobPanelComponent: React.FC = () => {
       animationRef.current = requestAnimationFrame(pollLiveValues);
     };
 
-    // Start polling
+    // Start polling - initialize lastFrameTime
+    lastFrameTimeRef.current = performance.now();
     animationRef.current = requestAnimationFrame(pollLiveValues);
 
     return () => {
@@ -566,7 +583,9 @@ const TB303KnobPanelComponent: React.FC = () => {
   }, [currentBPM, updateAllTB303]);
 
   // Persist TB303 params to instrument store (so they get saved with the tune)
+  // Uses paramsRef to always get latest local state, avoiding stale closure issues
   const persistToStore = useCallback((paramUpdates: Partial<TB303Params>) => {
+    const currentParams = paramsRef.current; // Always latest local state
     tb303Instruments.forEach(inst => {
       const currentTb303 = inst.tb303;
       if (!currentTb303) return; // Skip if no TB303 config
@@ -576,17 +595,18 @@ const TB303KnobPanelComponent: React.FC = () => {
           ...currentTb303,
           filter: {
             ...currentTb303.filter,
-            cutoff: paramUpdates.cutoff ?? currentTb303.filter?.cutoff ?? 800,
-            resonance: paramUpdates.resonance ?? currentTb303.filter?.resonance ?? 65,
+            // Use local state as fallback, not stale store values
+            cutoff: paramUpdates.cutoff ?? currentParams.cutoff,
+            resonance: paramUpdates.resonance ?? currentParams.resonance,
           },
           filterEnvelope: {
             ...currentTb303.filterEnvelope,
-            envMod: paramUpdates.envMod ?? currentTb303.filterEnvelope?.envMod ?? 60,
-            decay: paramUpdates.decay ?? currentTb303.filterEnvelope?.decay ?? 200,
+            envMod: paramUpdates.envMod ?? currentParams.envMod,
+            decay: paramUpdates.decay ?? currentParams.decay,
           },
           accent: {
             ...currentTb303.accent,
-            amount: paramUpdates.accent ?? currentTb303.accent?.amount ?? 70,
+            amount: paramUpdates.accent ?? currentParams.accent,
           },
           overdrive: paramUpdates.overdrive !== undefined ? {
             ...currentTb303.overdrive,
@@ -679,22 +699,25 @@ const TB303KnobPanelComponent: React.FC = () => {
   );
 
 
-  const handleTuningChange = useCallback((value: number) => {
-    setParams(p => ({ ...p, tuning: value }));
-    updateAllTB303(synth => synth.setTuning?.(value));
+  const handleTuningChange = useCallback(
+    throttle((value: number) => {
+      setParams(p => ({ ...p, tuning: value }));
+      updateAllTB303(synth => synth.setTuning?.(value));
 
-    // Persist tuning to store
-    tb303Instruments.forEach(inst => {
-      const currentTb303 = inst.tb303;
-      if (!currentTb303) return;
-      updateInstrument(inst.id, {
-        tb303: {
-          ...currentTb303,
-          tuning: value,
-        },
+      // Persist tuning to store
+      tb303Instruments.forEach(inst => {
+        const currentTb303 = inst.tb303;
+        if (!currentTb303) return;
+        updateInstrument(inst.id, {
+          tb303: {
+            ...currentTb303,
+            tuning: value,
+          },
+        });
       });
-    });
-  }, [updateAllTB303, tb303Instruments, updateInstrument]);
+    }, 16),
+    [updateAllTB303, tb303Instruments, updateInstrument]
+  );
 
   const handleTempoRelativeChange = useCallback((enabled: boolean) => {
     setParams(p => ({ ...p, tempoRelative: enabled }));
@@ -747,7 +770,7 @@ const TB303KnobPanelComponent: React.FC = () => {
 
     if (!presetTB303) return;
 
-    // Apply preset to all TB303 instruments
+    // Apply preset to all TB303 instruments in store
     tb303Instruments.forEach(inst => {
       updateInstrument(inst.id, {
         tb303: {
@@ -763,26 +786,32 @@ const TB303KnobPanelComponent: React.FC = () => {
       });
     });
 
-    // Update local state to reflect preset
-    if (presetTB303.filter && presetTB303.filterEnvelope && presetTB303.accent) {
-      setParams({
-        ...params,
-        cutoff: presetTB303.filter.cutoff ?? 800,
-        resonance: presetTB303.filter.resonance ?? 65,
-        envMod: presetTB303.filterEnvelope.envMod ?? 60,
-        decay: presetTB303.filterEnvelope.decay ?? 200,
-        accent: presetTB303.accent.amount ?? 70,
-      });
-    }
+    // Update local state to reflect preset (use functional update to avoid stale closure)
+    setParams(prev => ({
+      ...prev,
+      cutoff: presetTB303.filter?.cutoff ?? 800,
+      resonance: presetTB303.filter?.resonance ?? 65,
+      envMod: presetTB303.filterEnvelope?.envMod ?? 60,
+      decay: presetTB303.filterEnvelope?.decay ?? 200,
+      accent: presetTB303.accent?.amount ?? 70,
+      overdrive: presetTB303.overdrive?.amount ?? 0,
+    }));
 
-    if (presetTB303.devilFish) {
-      setDevilFishConfig({
-        ...DEFAULT_DEVIL_FISH,
-        ...presetTB303.devilFish,
-        enabled: true, // Always enabled
+    // Update Devil Fish config (always enabled)
+    setDevilFishConfig({
+      ...DEFAULT_DEVIL_FISH,
+      ...(presetTB303.devilFish || {}),
+      enabled: true,
+    });
+
+    // Invalidate synth instances AFTER store update to force fresh recreation
+    // Use setTimeout to let React batch the state updates first
+    setTimeout(() => {
+      tb303Instruments.forEach(inst => {
+        engine.invalidateInstrument(inst.id);
       });
-    }
-  }, [tb303Instruments, updateInstrument, params]);
+    }, 0);
+  }, [tb303Instruments, updateInstrument, engine]);
 
   // Devil Fish handlers (always enabled, throttled for smooth audio)
   const handleNormalDecayChange = useCallback(
@@ -1131,7 +1160,7 @@ const TB303KnobPanelComponent: React.FC = () => {
 
           {/* All knobs in one horizontal row */}
           <div className="tb303-all-knobs-row">
-            <Knob label="Tuning" value={params.tuning} min={430} max={450} unit="Hz" onChange={handleTuningChange} defaultValue={440} color="var(--color-synth-modulation)" />
+            <Knob label="Tuning" value={params.tuning} min={-100} max={100} unit="¢" onChange={handleTuningChange} defaultValue={0} color="var(--color-synth-modulation)" bipolar />
             <Knob label="Cutoff" value={params.cutoff} min={50} max={18000} unit="Hz" onChange={handleCutoffChange} logarithmic defaultValue={800} color="var(--color-synth-filter)" displayValue={liveCutoff} isActive={isPlaying && liveCutoff !== undefined} />
             <Knob label="Reso" value={params.resonance} min={0} max={100} unit="%" onChange={handleResonanceChange} defaultValue={65} color="var(--color-synth-filter)" displayValue={liveResonance} isActive={isPlaying && liveResonance !== undefined} />
             <Knob label="EnvMod" value={params.envMod} min={0} max={100} unit="%" onChange={handleEnvModChange} defaultValue={60} color="var(--color-synth-envelope)" displayValue={liveEnvMod} isActive={isPlaying && liveEnvMod !== undefined} />
