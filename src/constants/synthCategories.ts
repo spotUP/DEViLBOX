@@ -222,6 +222,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Mic',
     color: 'text-fuchsia-400',
   },
+  ChiptuneModule: {
+    type: 'ChiptuneModule',
+    name: 'Chiptune Module',
+    shortName: 'MOD',
+    description: 'Libopenmpt-powered playback for MOD/XM/IT/S3M files',
+    bestFor: ['Tracker modules', 'Retro game music', 'Sample-accurate playback'],
+    icon: 'Gamepad2',
+    color: 'text-lime-400',
+  },
 };
 
 // Organized categories

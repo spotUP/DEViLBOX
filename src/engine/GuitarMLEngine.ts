@@ -319,7 +319,5 @@ export class GuitarMLEngine {
 
     this.outputGain.disconnect();
     this.isInitialized = false;
-
-    console.log('[GuitarMLEngine] Disposed');
   }
 }

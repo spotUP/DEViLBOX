@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { stringNoteToXM } from '@/lib/xmConversions';
@@ -100,51 +101,66 @@ const EFFECT_TYPE_KEY_MAP: Record<string, number> = {
 };
 
 export const useTrackerInput = () => {
+  // PERFORMANCE: Use useShallow to prevent re-renders when state references haven't changed
+  // Actions (functions) are always stable, only state values can cause re-renders
   const {
     cursor,
-    moveCursor,
-    moveCursorToRow,
-    moveCursorToChannel,
-    moveCursorToColumn: _moveCursorToColumn,
-    setCell,
-    clearCell,
     patterns,
     currentPatternIndex,
-    setCurrentPattern,
     selection,
-    startSelection,
-    endSelection,
-    clearSelection,
-    copySelection,
-    cutSelection,
-    paste,
     currentOctave,
-    setCurrentOctave,
-    transposeSelection,
-    interpolateSelection,
-    humanizeSelection,
     recordMode,
-    toggleRecordMode,
     editStep,
-    setEditStep,
     insertMode,
-    // FT2: New features
-    writeMacroSlot,
-    readMacroSlot,
-    toggleInsertMode,
-    // FT2: Multi-channel recording
     multiRecEnabled,
     multiEditEnabled,
     multiRecChannels,
     recReleaseEnabled,
-    setKeyOn,
-    setKeyOff,
-    findBestChannel,
-    insertRow,
-    deleteRow,
-    setPtnJumpPos,
-    getPtnJumpPos,
-  } = useTrackerStore();
+  } = useTrackerStore(useShallow((state) => ({
+    cursor: state.cursor,
+    patterns: state.patterns,
+    currentPatternIndex: state.currentPatternIndex,
+    selection: state.selection,
+    currentOctave: state.currentOctave,
+    recordMode: state.recordMode,
+    editStep: state.editStep,
+    insertMode: state.insertMode,
+    multiRecEnabled: state.multiRecEnabled,
+    multiEditEnabled: state.multiEditEnabled,
+    multiRecChannels: state.multiRecChannels,
+    recReleaseEnabled: state.recReleaseEnabled,
+  })));
+
+  // Actions are stable and don't cause re-renders - get them separately
+  const moveCursor = useTrackerStore((state) => state.moveCursor);
+  const moveCursorToRow = useTrackerStore((state) => state.moveCursorToRow);
+  const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
+  const _moveCursorToColumn = useTrackerStore((state) => state.moveCursorToColumn);
+  const setCell = useTrackerStore((state) => state.setCell);
+  const clearCell = useTrackerStore((state) => state.clearCell);
+  const setCurrentPattern = useTrackerStore((state) => state.setCurrentPattern);
+  const startSelection = useTrackerStore((state) => state.startSelection);
+  const endSelection = useTrackerStore((state) => state.endSelection);
+  const clearSelection = useTrackerStore((state) => state.clearSelection);
+  const copySelection = useTrackerStore((state) => state.copySelection);
+  const cutSelection = useTrackerStore((state) => state.cutSelection);
+  const paste = useTrackerStore((state) => state.paste);
+  const setCurrentOctave = useTrackerStore((state) => state.setCurrentOctave);
+  const transposeSelection = useTrackerStore((state) => state.transposeSelection);
+  const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
+  const humanizeSelection = useTrackerStore((state) => state.humanizeSelection);
+  const toggleRecordMode = useTrackerStore((state) => state.toggleRecordMode);
+  const setEditStep = useTrackerStore((state) => state.setEditStep);
+  const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
+  const readMacroSlot = useTrackerStore((state) => state.readMacroSlot);
+  const toggleInsertMode = useTrackerStore((state) => state.toggleInsertMode);
+  const setKeyOn = useTrackerStore((state) => state.setKeyOn);
+  const setKeyOff = useTrackerStore((state) => state.setKeyOff);
+  const findBestChannel = useTrackerStore((state) => state.findBestChannel);
+  const insertRow = useTrackerStore((state) => state.insertRow);
+  const deleteRow = useTrackerStore((state) => state.deleteRow);
+  const setPtnJumpPos = useTrackerStore((state) => state.setPtnJumpPos);
+  const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
 
   const {
     isPlaying,
@@ -152,7 +168,13 @@ export const useTrackerInput = () => {
     stop,
     play,
     togglePlayPause: _togglePlayPause,
-  } = useTransportStore();
+  } = useTransportStore(useShallow((state) => ({
+    isPlaying: state.isPlaying,
+    currentRow: state.currentRow,
+    stop: state.stop,
+    play: state.play,
+    togglePlayPause: state.togglePlayPause,
+  })));
 
   const {
     instruments,
@@ -402,16 +424,22 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Tab/Shift+Tab: Jump to next/previous track
+      // Tab/Shift+Tab: Jump to next/previous track (with wrapping)
       if (key === 'Tab') {
         e.preventDefault();
         if (e.shiftKey) {
+          // Shift+Tab: Previous channel, wrap to last if at first
           if (cursor.channelIndex > 0) {
             moveCursorToChannel(cursor.channelIndex - 1);
+          } else {
+            moveCursorToChannel(pattern.channels.length - 1);
           }
         } else {
+          // Tab: Next channel, wrap to first if at last
           if (cursor.channelIndex < pattern.channels.length - 1) {
             moveCursorToChannel(cursor.channelIndex + 1);
+          } else {
+            moveCursorToChannel(0);
           }
         }
         return;
@@ -478,8 +506,8 @@ export const useTrackerInput = () => {
       // Transpose Selection (Ctrl+Arrow)
       // ============================================
 
-      // Ctrl+Up: Transpose selection up 1 semitone
-      if ((e.ctrlKey || e.metaKey) && key === 'ArrowUp' && !e.altKey) {
+      // Ctrl+Up: Transpose selection up 1 semitone (requires edit mode)
+      if (recordMode && (e.ctrlKey || e.metaKey) && key === 'ArrowUp' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
           // Ctrl+Shift+Up: Transpose up 12 semitones (octave)
@@ -491,8 +519,8 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Ctrl+Down: Transpose selection down 1 semitone
-      if ((e.ctrlKey || e.metaKey) && key === 'ArrowDown' && !e.altKey) {
+      // Ctrl+Down: Transpose selection down 1 semitone (requires edit mode)
+      if (recordMode && (e.ctrlKey || e.metaKey) && key === 'ArrowDown' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
           // Ctrl+Shift+Down: Transpose down 12 semitones (octave)
@@ -558,8 +586,8 @@ export const useTrackerInput = () => {
       // 5.2 Cut/Copy/Paste
       // ============================================
 
-      // Delete: Different behaviors based on modifiers
-      if (key === 'Delete') {
+      // Delete: Different behaviors based on modifiers (requires edit mode)
+      if (key === 'Delete' && recordMode) {
         e.preventDefault();
         if (e.shiftKey) {
           // Shift+Del: Delete note, instrument, volume and effect (FT2-style)
@@ -602,8 +630,8 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Backspace: Delete previous note/line
-      if (key === 'Backspace') {
+      // Backspace: Delete previous note/line (requires edit mode)
+      if (key === 'Backspace' && recordMode) {
         e.preventDefault();
         if (e.shiftKey) {
           // Shift+Backspace: Delete previous line (FT2: shifts rows up)
@@ -871,8 +899,8 @@ export const useTrackerInput = () => {
         // This also sets up the target channel for multi-channel recording
         previewNote(note, octave, keyLower);
 
-        // Enter note if on note column or in edit/record mode
-        if (cursor.columnType === 'note' || recordMode) {
+        // FT2: Only enter notes when in edit/record mode
+        if (recordMode) {
           // FT2: Get the channel that was allocated by previewNote for multi-channel
           const heldNote = heldNotesRef.current.get(keyLower);
           const targetChannel = heldNote?.channelIndex;
@@ -897,12 +925,13 @@ export const useTrackerInput = () => {
 
       // ============================================
       // FT2-Style Data Entry (Instrument/Volume/Effect)
+      // Requires recordMode to be enabled (FT2: Edit mode)
       // ============================================
 
       const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
 
       // ---------- INSTRUMENT COLUMN (hex digits only) ----------
-      if (cursor.columnType === 'instrument' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (recordMode && cursor.columnType === 'instrument' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const hexDigit = parseInt(key, 16);
         const currentValue = currentCell.instrument || 0;
@@ -934,7 +963,7 @@ export const useTrackerInput = () => {
       }
 
       // ---------- VOLUME COLUMN (FT2 VOL1 special keys + VOL2 hex) ----------
-      if (cursor.columnType === 'volume' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (recordMode && cursor.columnType === 'volume' && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const currentValue = currentCell.volume || 0;
 
         if (cursor.digitIndex === 0) {
@@ -979,7 +1008,7 @@ export const useTrackerInput = () => {
       }
 
       // ---------- EFFECT TYPE (EFX0): FT2 effect command keys (0-9, A-Z) ----------
-      if (cursor.columnType === 'effTyp' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (recordMode && cursor.columnType === 'effTyp' && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
         if (effKey !== undefined) {
           e.preventDefault();
@@ -990,7 +1019,7 @@ export const useTrackerInput = () => {
       }
 
       // ---------- EFFECT PARAMETER (EFX1/EFX2): Hex digits only ----------
-      if (cursor.columnType === 'effParam' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (recordMode && cursor.columnType === 'effParam' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const hexDigit = parseInt(key, 16);
         const currentValue = currentCell.eff || 0;
@@ -1020,7 +1049,7 @@ export const useTrackerInput = () => {
       }
 
       // ---------- EFFECT2 (DEViLBOX extension): String-based for now ----------
-      if (cursor.columnType === 'effect2' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (recordMode && cursor.columnType === 'effect2' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const hexDigit = key.toUpperCase();
         const currentValue = currentCell.effect2 || '...';

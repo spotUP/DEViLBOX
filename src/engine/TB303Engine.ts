@@ -484,21 +484,20 @@ export class TB303Synth {
     // In tracker notation: slide flag on current note means "slide FROM previous note TO this note"
     // The previous note does NOT need a slide flag - only the target note does
     //
-    // TB-303 AUTHENTIC SLIDE: Real 303 uses RC circuit with ~60ms time constant
-    // The slide time is FIXED regardless of interval (C2→C3 same time as C2→C4)
-    // This is different from typical portamento which uses V/oct exponential ramps
+    // TB-303 AUTHENTIC SLIDE: RC circuit with exponential approach
+    // Real 303 uses ~60ms RC time constant for characteristic slide feel
+    // The slide starts fast and eases into the target (not linear interpolation)
     if (slide && this.currentNote && this.currentNote !== note) {
-      // Fixed ~60ms RC time constant like real 303 (can be adjusted with slide.time knob)
       const slideTimeMs = this.config.slide.time; // Default 60ms
-      const slideTimeSec = slideTimeMs / 1000;
+      // Divide by 4 so slide is 98% complete at slideTime (4 time constants = 98.2%)
+      // This gives authentic RC curve while feeling "done" at the expected time
+      const timeConstant = (slideTimeMs / 1000) / 4;
 
-      // Use linear ramp for authentic RC circuit behavior
-      // RC circuits slew voltage linearly in Hz (not exponentially in V/oct)
-      // This makes the slide sound consistent regardless of interval size
+      // setTargetAtTime creates exponential asymptotic approach like real RC circuit
       const currentFreq = this.oscillator.frequency.value;
       this.oscillator.frequency.cancelScheduledValues(now);
       this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
+      this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
 
       this.currentNote = note;
       this.isSliding = true; // Mark that we're in a slide
@@ -660,16 +659,17 @@ export class TB303Synth {
     this.currentNoteFreq = targetFreq;
 
     // Slide: portamento from previous note without retriggering envelopes
-    // TB-303 AUTHENTIC SLIDE: Fixed RC time constant (~60ms)
+    // TB-303 AUTHENTIC SLIDE: RC circuit with exponential approach
     if (slide && this.currentNote && this.currentNote !== note) {
       const slideTimeMs = this.config.slide.time;
-      const slideTimeSec = slideTimeMs / 1000;
+      // Divide by 4 so slide is 98% complete at slideTime
+      const timeConstant = (slideTimeMs / 1000) / 4;
 
-      // Linear ramp for authentic RC circuit behavior
+      // setTargetAtTime creates exponential asymptotic approach like real RC circuit
       const currentFreq = this.oscillator.frequency.value;
       this.oscillator.frequency.cancelScheduledValues(now);
       this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.linearRampToValueAtTime(targetFreq, now + slideTimeSec);
+      this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
 
       this.currentNote = note;
       this.isSliding = true;
@@ -806,13 +806,18 @@ export class TB303Synth {
   /**
    * Set filter cutoff frequency
    * With Open303-style exponential modulation
+   * Uses smooth ramping to avoid zipper noise when turning knobs
    */
   public setCutoff(frequency: number): void {
     this.baseCutoff = Math.min(Math.max(frequency, 50), 18000);
     this.config.filter.cutoff = this.baseCutoff;
 
-    // Update the envelope's base frequency - envelope handles smoothing
+    // Smooth ramp to avoid zipper noise (30ms ramp time)
+    // Use linearRampTo instead of rampTo - exponential ramps fail near zero
+    const rampTime = 0.03;
     this.filterEnvelope.baseFrequency = this.baseCutoff;
+    this.filter1.frequency.linearRampTo(this.baseCutoff, rampTime);
+    this.filter2.frequency.linearRampTo(this.baseCutoff, rampTime);
 
     // Recalculate envelope modulation calibration
     this.calculateEnvModScalerAndOffset();
@@ -822,6 +827,7 @@ export class TB303Synth {
   /**
    * Set filter resonance
    * Based on dittytoy: kq = 1 - resonance * 0.9 - accent * 0.1
+   * Uses smooth ramping to avoid zipper noise when turning knobs
    */
   public setResonance(resonancePercent: number): void {
     const resonance = Math.min(Math.max(resonancePercent, 0), 100);
@@ -831,9 +837,11 @@ export class TB303Synth {
       ? this.resonanceToQHighRes(resonance)
       : this.resonanceToQ(resonance);
 
-    // Direct set - resonance changes should be immediate for acid character
-    this.filter1.Q.value = q;
-    this.filter2.Q.value = q * 0.7;
+    // Smooth ramp to avoid zipper noise (30ms ramp time)
+    // Use linearRampTo instead of rampTo - exponential ramps fail near zero
+    const rampTime = 0.03;
+    this.filter1.Q.linearRampTo(q, rampTime);
+    this.filter2.Q.linearRampTo(q * 0.7, rampTime);
   }
 
   /**
@@ -899,10 +907,14 @@ export class TB303Synth {
   /**
    * Set overdrive amount (0-100)
    * Works for both waveshaper and GuitarML modes
+   * Uses smooth ramping to avoid zipper noise when turning knobs
    */
   public setOverdrive(amount: number): void {
     this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
     this.config.overdrive = { ...this.config.overdrive, amount: this.overdriveAmount * 100 };
+
+    // Smooth ramp time to avoid zipper noise
+    const rampTime = 0.03;
 
     if (this.guitarMLEnabled && this.guitarML) {
       // GuitarML mode: control drive and condition
@@ -918,8 +930,9 @@ export class TB303Synth {
         return Math.tanh(x * drive) / Math.tanh(drive);
       });
 
-      // Boost input gain to drive the overdrive harder
-      this.overdriveGain.gain.value = 1 + this.overdriveAmount * 2;
+      // Boost input gain to drive the overdrive harder - use ramp for smooth transition
+      // Use linearRampTo instead of rampTo - exponential ramps fail near zero
+      this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, rampTime);
     }
   }
 
@@ -1231,18 +1244,20 @@ export class TB303Synth {
 
   /**
    * Update resonance curve based on mode
+   * Uses smooth ramping to avoid zipper noise
    */
   private updateResonanceMode(): void {
+    const rampTime = 0.03;
     if (this.devilFish.enabled && this.devilFish.highResonance) {
       // High resonance mode: allow self-oscillation
       const q = this.resonanceToQHighRes(this.config.filter.resonance);
-      this.filter1.Q.value = q;
-      this.filter2.Q.value = q * 0.7;
+      this.filter1.Q.linearRampTo(q, rampTime);
+      this.filter2.Q.linearRampTo(q * 0.7, rampTime);
     } else {
       // Normal mode
       const q = this.resonanceToQ(this.config.filter.resonance);
-      this.filter1.Q.value = q;
-      this.filter2.Q.value = q * 0.7;
+      this.filter1.Q.linearRampTo(q, rampTime);
+      this.filter2.Q.linearRampTo(q * 0.7, rampTime);
     }
   }
 
@@ -1317,6 +1332,7 @@ export class TB303Synth {
    *
    * Reference: C2 (65.41 Hz) = 2V is the center point (no change)
    * Notes below this cause filter to DROP, notes above cause it to RISE
+   * Uses smooth ramping to avoid zipper noise
    */
   private applyFilterTracking(noteFreq: number): void {
     if (!this.devilFish.enabled || this.devilFish.filterTracking === 0) {
@@ -1326,8 +1342,10 @@ export class TB303Synth {
     const trackingOffset = this.getFilterTrackingOffset(noteFreq);
     const targetCutoff = Math.min(Math.max(this.baseCutoff + trackingOffset, 50), 18000);
 
-    this.filter1.frequency.value = targetCutoff;
-    this.filter2.frequency.value = targetCutoff;
+    // Use a short ramp for filter tracking (10ms for note-triggered changes)
+    const rampTime = 0.01;
+    this.filter1.frequency.linearRampTo(targetCutoff, rampTime);
+    this.filter2.frequency.linearRampTo(targetCutoff, rampTime);
   }
 
   /**
@@ -1444,10 +1462,13 @@ export class TB303Synth {
 
   /**
    * Set tuning offset in cents
+   * Uses smooth ramping to avoid zipper noise
    */
   public setTuning(cents: number): void {
     this.tuningCents = Math.min(Math.max(cents, -1200), 1200);
-    this.oscillator.detune.value = this.tuningCents;
+    // Smooth ramp to avoid zipper noise (30ms ramp time)
+    // Use linearRampTo because detune can be 0 (exponential ramp fails near zero)
+    this.oscillator.detune.linearRampTo(this.tuningCents, 0.03);
   }
 
   /**
@@ -1468,12 +1489,15 @@ export class TB303Synth {
   /**
    * Set output volume
    * Note: TB-303 has -3dB compensation to normalize with other synths
+   * Uses smooth ramping to avoid zipper noise
    */
   public setVolume(volumeDb: number): void {
     this.baseVolume = volumeDb;
     // Apply -3dB compensation to match other synth volumes
     // TB-303's resonant filter and VCA make it inherently louder
-    this.vca.gain.value = Tone.dbToGain(volumeDb - 3);
+    // Smooth ramp to avoid zipper noise (30ms ramp time)
+    // Use linearRampTo because gain can be near zero (exponential ramp fails near zero)
+    this.vca.gain.linearRampTo(Tone.dbToGain(volumeDb - 3), 0.03);
   }
 
   /**

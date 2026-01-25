@@ -108,6 +108,7 @@ function convertSampleToInstrument(
       usePeriodPlayback: true, // Use period-based playback for accuracy
       periodMultiplier: 3546895, // AMIGA_PALFREQUENCY_HALF (PAL Amiga)
       finetune: sample.finetune, // Store original finetune
+      defaultVolume: sample.volume, // Sample's default volume (0-64) for channel init
     },
   };
 
@@ -120,9 +121,10 @@ function convertSampleToInstrument(
     sample: sampleConfig,
     envelope,
     effects: [],
-    // Convert MOD volume (0-64) to decibels (-60 to 0 dB)
-    // Formula: dB = 20 * log10(volume / 64)
-    volume: sample.volume > 0 ? 20 * Math.log10(sample.volume / 64) : -60,
+    // Set to unity gain (0 dB) - volume is controlled via channel volume (velocity)
+    // Sample's default volume is stored in metadata for TrackerReplayer to use
+    // when initializing channel volume on note trigger
+    volume: 0,
     pan: ((sample.panning - 128) / 127) * 100, // Convert 0-255 to -100 to +100
     metadata,
     // IMPORTANT: Tone.Sampler looks for sampleUrl in parameters
@@ -157,9 +159,10 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
 
     for (let i = 0; i < length; i++) {
       // If already Float32, copy directly; otherwise normalize
+      // 8-bit signed: -128 to +127 → divide by 128 for symmetric -1.0 to ~+1.0
       channelData[i] = pcmData instanceof Float32Array
         ? pcmData[i]
-        : pcmData[i] / 127.0; // ProTracker normalization (127 not 128)
+        : pcmData[i] / 128.0;
     }
   } else if (sample.bitDepth === 16) {
     // 16-bit signed PCM: -32768 to +32767

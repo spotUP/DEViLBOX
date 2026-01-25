@@ -2,7 +2,7 @@
  * LoadPresetModal - Modal for loading factory presets into current instrument
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
 import { getSynthInfo } from '@constants/synthCategories';
@@ -22,14 +22,39 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
   const categories = Object.keys(PRESET_CATEGORIES) as PresetCategory[];
 
+  // Handle category change - reset selection and search
+  const handleCategoryChange = (category: PresetCategory) => {
+    setActiveCategory(category);
+    setSelectedPreset(null);
+    setSearchQuery('');
+  };
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Get icon for synth type
   const getIcon = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
     return Icon || LucideIcons.Music2;
   };
 
-  // Filter presets
-  const filteredPresets = PRESET_CATEGORIES[activeCategory].filter((preset) => {
+  // Filter presets based on active category
+  const categoryPresets = PRESET_CATEGORIES[activeCategory];
+  if (!categoryPresets) {
+    console.error('[LoadPresetModal] Invalid category:', activeCategory);
+  }
+  console.log('[LoadPresetModal] Category:', activeCategory, '| Presets:', categoryPresets?.length, '| First:', categoryPresets?.[0]?.name);
+
+  const filteredPresets = (categoryPresets || []).filter((preset) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -102,7 +127,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             return (
               <button
                 key={category}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => handleCategoryChange(category)}
                 className={`
                   px-4 py-1.5 text-xs font-bold rounded transition-colors
                   ${isActive
@@ -118,21 +143,21 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         </div>
 
         {/* Preset Grid */}
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2">
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-ft2" key={activeCategory}>
           {filteredPresets.length === 0 ? (
             <div className="flex items-center justify-center h-full text-ft2-textDim">
               No presets found matching "{searchQuery}"
             </div>
           ) : (
             <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {filteredPresets.map((preset) => {
+              {filteredPresets.map((preset, index) => {
                 const synthInfo = getSynthInfo(preset.synthType);
                 const IconComponent = getIcon(synthInfo.icon);
                 const isSelected = selectedPreset === preset.name;
 
                 return (
                   <button
-                    key={preset.name}
+                    key={`${activeCategory}-${preset.name}-${index}`}
                     onClick={() => setSelectedPreset(preset.name)}
                     onDoubleClick={() => handleLoadPreset(preset)}
                     className={`

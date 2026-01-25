@@ -6,9 +6,23 @@
 import React, { useState } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
-import type { SynthType } from '@typedefs/instrument';
+import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
+import {
+  DEFAULT_TB303,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_WAVETABLE,
+  DEFAULT_GRANULAR,
+  DEFAULT_SUPERSAW,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_ORGAN,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_FORMANT_SYNTH,
+} from '@typedefs/instrument';
 import * as LucideIcons from 'lucide-react';
 import { Check, ChevronRight } from 'lucide-react';
+import { ToneEngine } from '@engine/ToneEngine';
 
 interface CategorizedSynthSelectorProps {
   /** Callback when synth type is selected */
@@ -41,14 +55,64 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   const handleSelectSynth = (synthType: SynthType) => {
     if (!currentInstrument) return;
 
-    // Update current instrument's synth type
-    updateInstrument(currentInstrument.id, {
-      synthType,
-      // Reset synth-specific configs
-      tb303: synthType === 'TB303' ? currentInstrument.tb303 : undefined,
-      wavetable: synthType === 'Wavetable' ? currentInstrument.wavetable : undefined,
-    });
+    // Invalidate cached instrument so ToneEngine recreates it
+    ToneEngine.getInstance().invalidateInstrument(currentInstrument.id);
 
+    // Build the update with new synth type and appropriate config
+    const updates: Partial<InstrumentConfig> = {
+      synthType,
+      // Clear all synth-specific configs
+      tb303: undefined,
+      drumMachine: undefined,
+      chipSynth: undefined,
+      pwmSynth: undefined,
+      wavetable: undefined,
+      granular: undefined,
+      superSaw: undefined,
+      polySynth: undefined,
+      organ: undefined,
+      stringMachine: undefined,
+      formantSynth: undefined,
+    };
+
+    // Initialize the appropriate synth-specific config
+    switch (synthType) {
+      case 'TB303':
+        updates.tb303 = { ...DEFAULT_TB303 };
+        break;
+      case 'DrumMachine':
+        updates.drumMachine = { ...DEFAULT_DRUM_MACHINE };
+        break;
+      case 'ChipSynth':
+        updates.chipSynth = { ...DEFAULT_CHIP_SYNTH };
+        break;
+      case 'PWMSynth':
+        updates.pwmSynth = { ...DEFAULT_PWM_SYNTH };
+        break;
+      case 'Wavetable':
+        updates.wavetable = { ...DEFAULT_WAVETABLE };
+        break;
+      case 'GranularSynth':
+        updates.granular = { ...DEFAULT_GRANULAR };
+        break;
+      case 'SuperSaw':
+        updates.superSaw = { ...DEFAULT_SUPERSAW };
+        break;
+      case 'PolySynth':
+        updates.polySynth = { ...DEFAULT_POLYSYNTH };
+        break;
+      case 'Organ':
+        updates.organ = { ...DEFAULT_ORGAN };
+        break;
+      case 'StringMachine':
+        updates.stringMachine = { ...DEFAULT_STRING_MACHINE };
+        break;
+      case 'FormantSynth':
+        updates.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
+        break;
+    }
+
+    updateInstrument(currentInstrument.id, updates);
     onSelect?.(synthType);
   };
 

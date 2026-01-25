@@ -238,7 +238,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       oscillator: { type: 'sawtooth' },
       filter: {
         cutoff: 1200,
-        resonance: 96, // Self-oscillation territory
+        resonance: 92, // High but not full self-oscillation
       },
       filterEnvelope: {
         envMod: 75,
@@ -246,6 +246,20 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 70 },
       slide: { time: 80, mode: 'exponential' },
+      devilFish: {
+        enabled: true,
+        normalDecay: 350,
+        accentDecay: 250,
+        vegDecay: 800,
+        vegSustain: 10,
+        softAttack: 0.3,
+        filterTracking: 120, // Filter follows notes for melodic self-oscillation
+        filterFM: 0,
+        sweepSpeed: 'normal',
+        accentSweepEnabled: true,
+        highResonance: true,
+        muffler: 'off',
+      },
     },
     effects: [],
     volume: -12, // Lower volume due to resonance
@@ -259,7 +273,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       oscillator: { type: 'sawtooth' },
       filter: {
         cutoff: 1800,
-        resonance: 98, // Maximum self-oscillation
+        resonance: 90, // High resonance for whistle but not overwhelming
       },
       filterEnvelope: {
         envMod: 90,
@@ -267,6 +281,20 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       },
       accent: { amount: 85 },
       slide: { time: 120, mode: 'exponential' }, // Long slides
+      devilFish: {
+        enabled: true,
+        normalDecay: 500,
+        accentDecay: 400,
+        vegDecay: 1200,
+        vegSustain: 20,
+        softAttack: 3,
+        filterTracking: 150, // Strong tracking for melodic whistle
+        filterFM: 10,
+        sweepSpeed: 'slow',
+        accentSweepEnabled: true,
+        highResonance: true,
+        muffler: 'off',
+      },
     },
     effects: [],
     volume: -14,
@@ -482,18 +510,18 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       oscillator: { type: 'sawtooth' },
       filter: {
         cutoff: 1400,
-        resonance: 85,
+        resonance: 80,
       },
       filterEnvelope: {
-        envMod: 80,
+        envMod: 75,
         decay: 350,
       },
-      accent: { amount: 100 },
+      accent: { amount: 95 },
       slide: { time: 30, mode: 'exponential' },
       overdrive: {
-        amount: 70,
+        amount: 55,
         modelIndex: 0,
-        drive: 70,
+        drive: 55,
         dryWet: 100,
       },
       devilFish: {
@@ -501,18 +529,18 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
         normalDecay: 200,
         accentDecay: 100,
         vegDecay: 500,
-        vegSustain: 20,
+        vegSustain: 15,
         softAttack: 0.5,
-        filterTracking: 80,
-        filterFM: 80, // High FM for chaos
+        filterTracking: 60,
+        filterFM: 50, // Moderate FM for chaos without glitching
         sweepSpeed: 'fast',
         accentSweepEnabled: true,
-        highResonance: true,
-        muffler: 'hard',
+        highResonance: false, // Disable to prevent overwhelming self-oscillation
+        muffler: 'soft', // Soft instead of hard for less harshness
       },
     },
     effects: [],
-    volume: -12,
+    volume: -10,
     pan: 0,
   },
   {

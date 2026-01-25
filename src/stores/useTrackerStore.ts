@@ -90,6 +90,13 @@ interface TrackerStore {
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
 
+  // Original module data for libopenmpt playback (sample-accurate effects)
+  originalModuleData: {
+    base64: string;
+    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
+    sourceFile?: string;
+  } | null;
+
   // Actions
   setCurrentPattern: (index: number) => void;
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right') => void;
@@ -199,6 +206,7 @@ interface TrackerStore {
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
   setPatternOrder: (order: number[]) => void;
+  setOriginalModuleData: (data: TrackerStore['originalModuleData']) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -265,6 +273,9 @@ export const useTrackerStore = create<TrackerStore>()(
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
+
+    // Original module data for libopenmpt playback
+    originalModuleData: null,
 
     // Actions
     setCurrentPattern: (index) =>
@@ -1548,6 +1559,11 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patternOrder = order;
           state.currentPositionIndex = 0;
         }
+      }),
+
+    setOriginalModuleData: (data) =>
+      set((state) => {
+        state.originalModuleData = data;
       }),
 
     importPattern: (pattern) => {

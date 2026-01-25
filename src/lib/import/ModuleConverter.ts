@@ -11,6 +11,23 @@ import { convertMODEffect } from './formats/MODParser';
 import { periodToXMNote, effectStringToXM } from '@/lib/xmConversions';
 
 /**
+ * Convert ArrayBuffer to base64 string
+ * Uses chunked processing to avoid stack overflow on large files
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB chunks to avoid call stack issues
+  const chunks: string[] = [];
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    chunks.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
+  }
+
+  return btoa(chunks.join(''));
+}
+
+/**
  * Convert a raw pattern cell to our TrackerCell format (libopenmpt legacy)
  */
 function convertCell(rawCell: RawPatternCell): TrackerCell {
@@ -249,6 +266,12 @@ export interface ConversionResult {
   sampleNames: string[];
   channelCount: number;
   metadata?: ImportMetadata;
+  // Original module data for libopenmpt playback (sample-accurate effects)
+  originalModuleData?: {
+    base64: string;             // Base64-encoded original file
+    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
+    sourceFile?: string;        // Original filename
+  };
 }
 
 /**
@@ -305,7 +328,8 @@ export function convertXMModule(
   patterns: XMNote[][][],
   channelCount: number,
   metadata: ImportMetadata,
-  instrumentNames: string[]
+  instrumentNames: string[],
+  originalBuffer?: ArrayBuffer
 ): ConversionResult {
   const convertedPatterns: Pattern[] = [];
 
@@ -378,6 +402,16 @@ export function convertXMModule(
   const order = metadata.modData?.patternOrderTable ||
     Array.from({ length: convertedPatterns.length }, (_, i) => i);
 
+  // Store original module data for libopenmpt playback if provided
+  let originalModuleData: ConversionResult['originalModuleData'];
+  if (originalBuffer) {
+    originalModuleData = {
+      base64: arrayBufferToBase64(originalBuffer),
+      format: 'XM',
+      sourceFile: metadata.sourceFile,
+    };
+  }
+
   return {
     patterns: convertedPatterns,
     order,
@@ -385,6 +419,7 @@ export function convertXMModule(
     sampleNames: instrumentNames,
     channelCount,
     metadata,
+    originalModuleData,
   };
 }
 
@@ -395,7 +430,8 @@ export function convertMODModule(
   patterns: MODNote[][][],
   channelCount: number,
   metadata: ImportMetadata,
-  instrumentNames: string[]
+  instrumentNames: string[],
+  originalBuffer?: ArrayBuffer
 ): ConversionResult {
   const convertedPatterns: Pattern[] = [];
 
@@ -474,6 +510,16 @@ export function convertMODModule(
     resultOrder: order,
   });
 
+  // Store original module data for libopenmpt playback if provided
+  let originalModuleData: ConversionResult['originalModuleData'];
+  if (originalBuffer) {
+    originalModuleData = {
+      base64: arrayBufferToBase64(originalBuffer),
+      format: 'MOD',
+      sourceFile: metadata.sourceFile,
+    };
+  }
+
   return {
     patterns: convertedPatterns,
     order,
@@ -481,5 +527,6 @@ export function convertMODModule(
     sampleNames: instrumentNames,
     channelCount,
     metadata,
+    originalModuleData,
   };
 }

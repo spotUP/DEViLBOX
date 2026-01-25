@@ -15,8 +15,9 @@
 
 import * as Tone from 'tone';
 import type { Pattern } from '@/types';
-import type { InstrumentConfig } from '@/types/instrument';
+import type { InstrumentConfig, ChiptuneModuleConfig } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
+import { ChiptuneInstrument } from './ChiptuneInstrument';
 
 // ============================================================================
 // CONSTANTS
@@ -157,6 +158,12 @@ export interface TrackerSong {
   numChannels: number;
   initialSpeed: number;
   initialBPM: number;
+  // Original module data for libopenmpt playback (sample-accurate effects)
+  originalModuleData?: {
+    base64: string;
+    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
+    sourceFile?: string;
+  };
 }
 
 // ============================================================================
@@ -190,6 +197,10 @@ export class TrackerReplayer {
 
   // Tick timer
   private tickLoop: Tone.Loop | null = null;
+
+  // Libopenmpt playback mode for sample-accurate module playback
+  private useLibopenmpt = false;
+  private chiptuneInstrument: ChiptuneInstrument | null = null;
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -310,20 +321,102 @@ export class TrackerReplayer {
     if (!this.song || this.playing) return;
 
     await Tone.start();
+
+    // Check if we should use libopenmpt for sample-accurate playback
+    if (this.useLibopenmpt && this.song.originalModuleData?.base64) {
+      console.log('[TrackerReplayer] Using libopenmpt for sample-accurate playback');
+      await this.playWithLibopenmpt();
+      return;
+    }
+
+    // Native Tone.js-based playback
     this.playing = true;
+
+    // CRITICAL: Reset transport to time 0 before starting
+    // This ensures scheduled events start correctly
+    const transport = Tone.getTransport();
+    transport.cancel(); // Clear any pending events
+    transport.position = 0; // Reset to time 0
 
     // Use Transport.scheduleRepeat for more reliable timing
     const tickInterval = 2.5 / this.bpm;
-    this.tickEventId = Tone.getTransport().scheduleRepeat((time) => {
+    this.tickEventId = transport.scheduleRepeat((time) => {
       this.processTick(time);
     }, tickInterval, 0);
 
-    Tone.getTransport().start();
+    console.log('[TrackerReplayer] Starting playback:', {
+      speed: this.speed,
+      bpm: this.bpm,
+      tickInterval,
+      songLength: this.song.songLength,
+      numPatterns: this.song.patterns.length,
+    });
 
+    transport.start();
+
+  }
+
+  /**
+   * Play using libopenmpt for sample-accurate module playback
+   */
+  private async playWithLibopenmpt(): Promise<void> {
+    if (!this.song?.originalModuleData) return;
+
+    const config: ChiptuneModuleConfig = {
+      moduleData: this.song.originalModuleData.base64,
+      format: this.song.originalModuleData.format,
+      sourceFile: this.song.originalModuleData.sourceFile,
+      useLibopenmpt: true,
+      repeatCount: 0,
+      stereoSeparation: 100,
+      interpolationFilter: 0,
+    };
+
+    // Dispose previous instance if exists (defensive)
+    if (this.chiptuneInstrument) {
+      this.chiptuneInstrument.dispose();
+      this.chiptuneInstrument = null;
+    }
+
+    // Create ChiptuneInstrument with callbacks for position tracking
+    this.chiptuneInstrument = new ChiptuneInstrument(config, {
+      onProgress: (data) => {
+        // Update position tracking
+        this.songPos = data.order;
+        this.pattPos = data.row;
+        if (this.onRowChange) {
+          this.onRowChange(data.row, data.pattern, data.order);
+        }
+      },
+      onEnded: () => {
+        this.playing = false;
+        if (this.onSongEnd) {
+          this.onSongEnd();
+        }
+      },
+      onError: (error) => {
+        console.error('[TrackerReplayer] libopenmpt error:', error);
+        this.playing = false;
+      },
+    });
+
+    // Connect to destination
+    this.chiptuneInstrument.toDestination();
+
+    // play() will wait for initialization internally
+    this.playing = true;
+    await this.chiptuneInstrument.play();
   }
 
   stop(): void {
     this.playing = false;
+
+    // Stop libopenmpt playback if active
+    if (this.chiptuneInstrument) {
+      this.chiptuneInstrument.stop();
+      this.chiptuneInstrument.dispose();
+      this.chiptuneInstrument = null;
+    }
 
     // Clear tick event
     if (this.tickEventId !== null) {
@@ -405,8 +498,22 @@ export class TrackerReplayer {
 
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
+    if (patternNum === undefined) {
+      console.error('[TrackerReplayer] Invalid songPos:', this.songPos, 'songPositions:', this.song.songPositions);
+      this.stop();
+      return;
+    }
     const pattern = this.song.patterns[patternNum];
-    if (!pattern) return;
+    if (!pattern) {
+      console.error('[TrackerReplayer] Pattern not found:', patternNum);
+      this.stop();
+      return;
+    }
+
+    // Log row changes (only on tick 0 to reduce spam)
+    if (this.currentTick === 0) {
+      console.log('[TrackerReplayer] Row:', this.pattPos, '/', pattern.length, 'Pattern:', patternNum, 'Pos:', this.songPos, '/', this.song.songLength);
+    }
 
     const engine = getToneEngine();
 
@@ -468,7 +575,8 @@ export class TrackerReplayer {
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
-        ch.volume = 64; // Reset volume on instrument change
+        // Use sample's default volume if available, otherwise full volume
+        ch.volume = instrument.metadata?.modPlayback?.defaultVolume ?? 64;
         ch.finetune = instrument.metadata?.modPlayback?.finetune ?? 0;
       }
     }
@@ -480,18 +588,34 @@ export class TrackerReplayer {
 
     // Handle note
     const noteValue = row.note;
+    // Use raw period from MOD data if available (more accurate than converting from note)
+    const rawPeriod = row.period;
+
+    // Debug: log row data on first few rows of first pattern
+    if (this.pattPos < 5 && chIndex === 0) {
+      console.log('[TrackerReplayer] Row data ch0:', { note: noteValue, period: rawPeriod, inst: row.instrument });
+    }
 
     if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
       // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
       if (effect === 3 || effect === 5) {
-        ch.portaTarget = this.noteToPeriod(noteValue, ch.finetune);
+        // Use raw period if available, otherwise convert from note
+        ch.portaTarget = rawPeriod > 0 ? rawPeriod : this.noteToPeriod(noteValue, ch.finetune);
         if (param !== 0 && effect === 3) {
           ch.tonePortaSpeed = param;
         }
       } else {
         // Normal note - trigger
-        ch.note = this.noteToPeriod(noteValue, ch.finetune);
-        ch.period = ch.note;
+        // IMPORTANT: Use raw period from MOD data if available for accurate playback
+        if (rawPeriod > 0) {
+          ch.note = rawPeriod;
+          ch.period = rawPeriod;
+          console.log('[TrackerReplayer] Using raw period:', rawPeriod, 'for note:', noteValue);
+        } else {
+          ch.note = this.noteToPeriod(noteValue, ch.finetune);
+          ch.period = ch.note;
+          console.log('[TrackerReplayer] Converted note to period:', ch.period, 'from note:', noteValue);
+        }
 
         // Handle sample offset (9xx)
         let offset = 0;
@@ -577,6 +701,7 @@ export class TrackerReplayer {
         break;
 
       case 0xB: // Position jump
+        console.log('[TrackerReplayer] Effect Bxx (position jump) at row', this.pattPos, '-> pos', param);
         this.posJumpPos = param;
         this.posJumpFlag = true;
         this.pBreakFlag = true;
@@ -588,6 +713,7 @@ export class TrackerReplayer {
         break;
 
       case 0xD: // Pattern break
+        console.log('[TrackerReplayer] Effect Dxx (pattern break) at row', this.pattPos, '-> row', x * 10 + y);
         this.pBreakPos = x * 10 + y; // BCD
         if (this.pBreakPos > 63) this.pBreakPos = 0;
         this.pBreakFlag = true;
@@ -848,6 +974,7 @@ export class TrackerReplayer {
 
   private triggerNote(ch: ChannelState, time: number, _offset: number): void {
     if (!ch.instrument) {
+      console.warn('[TrackerReplayer] triggerNote: No instrument for channel', ch.channelIndex);
       return;
     }
 
@@ -869,6 +996,7 @@ export class TrackerReplayer {
     // Use velocity based on channel volume (0-64 -> 0-1)
     const velocity = ch.volume / 64;
 
+
     // For TB-303 with slide, call triggerNoteAttack with slide flag
     // TB303Engine.triggerAttack handles sliding: it ramps frequency instead of retriggering
     if (config.synthType === 'TB303' && ch.slide) {
@@ -880,7 +1008,8 @@ export class TrackerReplayer {
         config,
         ch.period,
         ch.accent,
-        ch.slide // slide flag tells TB303Engine to do portamento
+        ch.slide, // slide flag tells TB303Engine to do portamento
+        ch.channelIndex
       );
       this.lastNotePerChannel.set(ch.channelIndex, noteStr);
       engine.triggerChannelMeter(ch.channelIndex, velocity);
@@ -916,6 +1045,7 @@ export class TrackerReplayer {
     } else {
       // Sustained synths (TB303, Synth, etc.): use triggerAttack
       // Notes sustain until next note or explicit release
+      // Pass channelIndex for slide/accent support on non-TB303 synths
       engine.triggerNoteAttack(
         config.id,
         noteStr,
@@ -924,7 +1054,8 @@ export class TrackerReplayer {
         config,
         ch.period,
         ch.accent,
-        ch.slide
+        ch.slide,
+        ch.channelIndex
       );
     }
 
@@ -1078,8 +1209,17 @@ export class TrackerReplayer {
   private advanceRow(): void {
     if (!this.song) return;
 
+    const prevPos = this.songPos;
+    const prevRow = this.pattPos;
+
     // Pattern break
     if (this.pBreakFlag) {
+      console.log('[TrackerReplayer] Pattern break:', {
+        from: { pos: prevPos, row: prevRow },
+        breakPos: this.pBreakPos,
+        posJumpFlag: this.posJumpFlag,
+        posJumpPos: this.posJumpPos,
+      });
       this.pattPos = this.pBreakPos;
       this.pBreakFlag = false;
       this.pBreakPos = 0;
@@ -1093,6 +1233,10 @@ export class TrackerReplayer {
 
     // Position jump
     if (this.posJumpFlag) {
+      console.log('[TrackerReplayer] Position jump:', {
+        from: prevPos,
+        to: this.posJumpPos,
+      });
       this.songPos = this.posJumpPos;
       this.posJumpFlag = false;
     }
@@ -1105,10 +1249,12 @@ export class TrackerReplayer {
     if (this.pattPos >= patternLength) {
       this.pattPos = 0;
       this.songPos++;
+      console.log('[TrackerReplayer] Pattern end, advancing to pos:', this.songPos);
     }
 
     // Song end
     if (this.songPos >= this.song.songLength) {
+      console.log('[TrackerReplayer] Song end, restarting at:', this.song.restartPosition);
       this.songPos = this.song.restartPosition < this.song.songLength
         ? this.song.restartPosition
         : 0;
@@ -1134,6 +1280,40 @@ export class TrackerReplayer {
   getCurrentTick(): number { return this.currentTick; }
 
   // ==========================================================================
+  // LIBOPENMPT PLAYBACK MODE
+  // ==========================================================================
+
+  /**
+   * Enable or disable libopenmpt playback mode
+   * When enabled, uses libopenmpt WASM for sample-accurate module playback
+   * This provides authentic vibrato, portamento, and effects that Tone.js can't handle
+   */
+  setUseLibopenmpt(enable: boolean): void {
+    this.useLibopenmpt = enable;
+  }
+
+  /**
+   * Check if libopenmpt mode is enabled
+   */
+  getUseLibopenmpt(): boolean {
+    return this.useLibopenmpt;
+  }
+
+  /**
+   * Check if current song has original module data for libopenmpt playback
+   */
+  hasOriginalModuleData(): boolean {
+    return !!this.song?.originalModuleData?.base64;
+  }
+
+  /**
+   * Get the current playback mode description
+   */
+  getPlaybackMode(): 'native' | 'libopenmpt' {
+    return this.useLibopenmpt && this.hasOriginalModuleData() ? 'libopenmpt' : 'native';
+  }
+
+  // ==========================================================================
   // CLEANUP
   // ==========================================================================
 
@@ -1142,6 +1322,10 @@ export class TrackerReplayer {
     this.channels = [];
     this.song = null;
     this.sampleBufferCache.clear();
+    if (this.chiptuneInstrument) {
+      this.chiptuneInstrument.dispose();
+      this.chiptuneInstrument = null;
+    }
   }
 }
 

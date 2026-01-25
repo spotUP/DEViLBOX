@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { X, Upload, Play, Square, Music, FileAudio, AlertCircle } from 'lucide-react';
+import { X, Upload, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
@@ -15,10 +15,14 @@ import {
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
 
+export interface ImportOptions {
+  useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
+}
+
 interface ImportModuleDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (info: ModuleInfo) => void;
+  onImport: (info: ModuleInfo, options: ImportOptions) => void;
 }
 
 export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
@@ -30,6 +34,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [useLibopenmpt, setUseLibopenmpt] = useState(true); // Default to libopenmpt for accuracy
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback(async (file: File) => {
@@ -87,9 +92,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       setIsPlaying(false);
     }
 
-    onImport(moduleInfo);
+    onImport(moduleInfo, { useLibopenmpt });
     onClose();
-  }, [moduleInfo, isPlaying, onImport, onClose]);
+  }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt]);
 
   const handleClose = useCallback(() => {
     if (moduleInfo && isPlaying) {
@@ -231,8 +236,33 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* Import note */}
+          {/* Playback options */}
           {moduleInfo && (
+            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="useLibopenmpt"
+                  checked={useLibopenmpt}
+                  onChange={(e) => setUseLibopenmpt(e.target.checked)}
+                  className="w-4 h-4 rounded border-dark-border bg-dark-bgSecondary accent-accent-primary"
+                />
+                <label htmlFor="useLibopenmpt" className="text-sm text-text-primary cursor-pointer">
+                  Use libopenmpt for sample-accurate playback
+                </label>
+              </div>
+              <div className="flex items-start gap-2 text-xs text-text-muted">
+                <Info size={12} className="mt-0.5 flex-shrink-0" />
+                <span>
+                  When enabled, uses libopenmpt WASM for authentic tracker effects (smooth vibrato, portamento).
+                  Editing will use Tone.js approximation.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Import note */}
+          {moduleInfo && !useLibopenmpt && (
             <p className="text-xs text-text-muted">
               Note: Importing will create patterns and sampler instruments from this module.
               Complex effects may not translate perfectly.

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useAudioStore } from '@stores';
+import { useAudioStore, useTransportStore } from '@stores';
 import { useThemeStore } from '@stores/useThemeStore';
 
 interface OscilloscopeProps {
@@ -49,6 +49,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
 
   const { currentThemeId } = useThemeStore();
   const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const isPlaying = useTransportStore((state) => state.isPlaying);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,17 +62,79 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
     canvas.width = actualWidth;
     canvas.height = height;
 
-    let isRunning = true;
+    // PERF: Don't run animation loop when not playing - just draw static background
+    if (!isPlaying) {
+      // Draw static empty state
+      const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
+      const gridColor = isCyanTheme ? 'rgba(0, 255, 255, 0.08)' : '#1a1a1d';
+      const centerLineColor = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(0, 212, 170, 0.2)';
 
-    // Theme-aware colors
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, actualWidth, height);
+
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < actualWidth; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, height);
+        ctx.stroke();
+      }
+      for (let i = 0; i < height; i += 30) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(actualWidth, i);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = centerLineColor;
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(actualWidth, height / 2);
+      ctx.stroke();
+      return; // No animation loop when not playing
+    }
+
+    let isRunning = true;
+    let lastFrameTime = 0;
+    const FRAME_INTERVAL = 1000 / 30; // PERF: Limit to 30fps - oscilloscope doesn't need 60fps
+
+    // Theme-aware colors (cached once, not recreated per frame)
     const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
     const gridColor = isCyanTheme ? 'rgba(0, 255, 255, 0.08)' : '#1a1a1d';
     const waveColor1 = isCyanTheme ? '#00ffff' : '#00d4aa';
     const waveColor2 = isCyanTheme ? '#00ffff' : '#7c3aed';
     const centerLineColor = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(0, 212, 170, 0.2)';
 
-    const draw = () => {
+    // PERF: Pre-create gradient once instead of every frame
+    const waveformGradient = ctx.createLinearGradient(0, 0, actualWidth, 0);
+    waveformGradient.addColorStop(0, waveColor1);
+    waveformGradient.addColorStop(0.5, waveColor1);
+    waveformGradient.addColorStop(1, waveColor2);
+
+    // PERF: Pre-compute spectrum colors to avoid string allocation per bar per frame
+    const spectrumColors: string[] = [];
+    if (mode === 'spectrum') {
+      for (let i = 0; i < 1024; i++) {
+        if (isCyanTheme) {
+          // Will be updated per-frame based on amplitude
+          spectrumColors.push('rgba(0, 255, 255, 0.75)');
+        } else {
+          const hue = 160 + (i / 1024) * 120;
+          spectrumColors.push(`hsla(${hue}, 80%, 50%, 0.8)`);
+        }
+      }
+    }
+
+    const draw = (timestamp: number) => {
       if (!isRunning || !canvas || !ctx) return;
+
+      // PERF: Limit to target FPS
+      const elapsed = timestamp - lastFrameTime;
+      if (elapsed < FRAME_INTERVAL) {
+        animationRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      lastFrameTime = timestamp - (elapsed % FRAME_INTERVAL);
 
       // Clear canvas with dark background
       ctx.fillStyle = bgColor;
@@ -101,13 +164,8 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         // Draw waveform
         const waveform = analyserNode.getValue() as Float32Array;
 
-        // Gradient stroke (monochrome cyan for cyan theme)
-        const gradient = ctx.createLinearGradient(0, 0, actualWidth, 0);
-        gradient.addColorStop(0, waveColor1);
-        gradient.addColorStop(0.5, waveColor1);
-        gradient.addColorStop(1, waveColor2);
-
-        ctx.strokeStyle = gradient;
+        // Use cached gradient
+        ctx.strokeStyle = waveformGradient;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
@@ -150,25 +208,26 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
           const normalized = (db + 100) / 100;
           const barHeight = normalized * height;
 
-          // Gradient based on frequency (monochrome cyan for cyan theme)
+          // Use pre-computed colors (cyan theme still needs per-bar alpha)
           if (isCyanTheme) {
-            const alpha = 0.5 + (normalized * 0.5);
-            ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+            // For cyan, vary alpha based on amplitude
+            ctx.globalAlpha = 0.5 + (normalized * 0.5);
+            ctx.fillStyle = 'rgb(0, 255, 255)';
           } else {
-            const hue = 160 + (i / spectrum.length) * 120; // Teal to purple
-            ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+            ctx.fillStyle = spectrumColors[i] || spectrumColors[spectrumColors.length - 1];
           }
 
           ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
 
           x += barWidth;
         }
+        ctx.globalAlpha = 1; // Reset alpha
       }
 
       animationRef.current = requestAnimationFrame(draw);
     };
 
-    draw();
+    animationRef.current = requestAnimationFrame(draw);
 
     return () => {
       isRunning = false;
@@ -176,7 +235,7 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [actualWidth, height, mode, analyserNode, fftNode, isCyanTheme]);
+  }, [actualWidth, height, mode, analyserNode, fftNode, isCyanTheme, isPlaying]);
 
   return (
     <div ref={containerRef} className={width === 'auto' ? 'w-full' : ''}>

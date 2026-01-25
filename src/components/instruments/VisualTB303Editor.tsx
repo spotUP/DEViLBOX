@@ -175,8 +175,8 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
             <div className="flex flex-col items-center">
               <Knob
                 value={config.filter.cutoff}
-                min={200}
-                max={20000}
+                min={50}
+                max={18000}
                 onChange={(v) => updateFilter('cutoff', v)}
                 label="Cutoff"
                 size="lg"
@@ -324,12 +324,12 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
                     <Knob
                       value={config.devilFish?.softAttack ?? 0.3}
                       min={0.3}
-                      max={3000}
+                      max={30}
                       onChange={(v) => updateDevilFish('softAttack', v)}
                       label="Soft Attack"
                       size="sm"
                       color={devilFishColor}
-                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                      formatValue={(v) => `${v.toFixed(1)}ms`}
                     />
                     <div className="mt-1 text-xs text-gray-600 text-center">(Normal Notes)</div>
                   </div>
@@ -395,27 +395,41 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
           )}
         </div>
 
-        {/* Slide & Accent Info */}
-        <div className="mt-4 bg-[#1a1a1a] rounded-lg p-3">
-          <div className="flex items-center justify-around text-xs">
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-white'}`}>
-                S
+        {/* Slide Control */}
+        <div className="mt-4 bg-[#1a1a1a] rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-white'}`}>
+                  S
+                </div>
+                <div className="text-gray-400 text-xs">
+                  <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-cyan-400'}`}>Slide</div>
+                  <div>Portamento</div>
+                </div>
               </div>
-              <div className="text-gray-400">
-                <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-cyan-400'}`}>Slide</div>
-                <div>Portamento glide</div>
+              <div className="w-px h-8 bg-gray-700" />
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-pink-400 to-pink-600 text-white'}`}>
+                  A
+                </div>
+                <div className="text-gray-400 text-xs">
+                  <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-pink-400'}`}>Accent</div>
+                  <div>Emphasize</div>
+                </div>
               </div>
             </div>
-            <div className="w-px h-8 bg-gray-700" />
             <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-pink-400 to-pink-600 text-white'}`}>
-                A
-              </div>
-              <div className="text-gray-400">
-                <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-pink-400'}`}>Accent</div>
-                <div>Emphasize note</div>
-              </div>
+              <Knob
+                value={config.slide?.time ?? 60}
+                min={10}
+                max={500}
+                onChange={(v) => onChange({ slide: { ...config.slide, time: v } })}
+                label="Slide Time"
+                size="sm"
+                color={knobColor}
+                formatValue={(v) => `${Math.round(v)}ms`}
+              />
             </div>
           </div>
         </div>

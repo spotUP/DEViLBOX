@@ -28,7 +28,6 @@ interface ChannelTrigger {
 }
 
 const ROW_HEIGHT = 28; // Height of each row in pixels
-const VISIBLE_ROWS_BUFFER = 10; // Extra rows to render above/below viewport
 
 interface PatternEditorProps {
   onAcidGenerator?: (channelIndex: number) => void;
@@ -83,12 +82,12 @@ const SteppedScroller: React.FC<{
 const StatusBar: React.FC<{
   patternLength: number;
   channelCount: number;
-  cursorChannel: number;
-}> = React.memo(({ patternLength, channelCount, cursorChannel }) => {
+}> = React.memo(({ patternLength, channelCount }) => {
   const { isPlaying, currentRow } = useTransportStore(
     useShallow((state) => ({ isPlaying: state.isPlaying, currentRow: state.currentRow }))
   );
   const cursorRow = useTrackerStore((state) => state.cursor.rowIndex);
+  const cursorChannel = useTrackerStore((state) => state.cursor.channelIndex);
   const insertMode = useTrackerStore((state) => state.insertMode);
   const displayRow = isPlaying ? currentRow : cursorRow;
 
@@ -117,14 +116,125 @@ const StatusBar: React.FC<{
 });
 StatusBar.displayName = 'StatusBar';
 
+// PERFORMANCE: Cursor caret overlay as separate component
+// Prevents entire PatternEditor from re-rendering on cursor moves
+const CursorCaret: React.FC<{
+  isMobile: boolean;
+  mobileChannelWidth: number;
+  isCyanTheme: boolean;
+  channelCount: number;
+}> = React.memo(({ isMobile, mobileChannelWidth, isCyanTheme, channelCount }) => {
+  const cursor = useTrackerStore((state) => state.cursor);
+  const isPlaying = useTransportStore((state) => state.isPlaying);
+
+  if (isPlaying || channelCount === 0) return null;
+
+  const ROW_NUM_WIDTH = 48;
+  const CHANNEL_WIDTH = isMobile ? mobileChannelWidth : 260;
+  const CELL_GAP = 4;
+  const NOTE_WIDTH = 42;
+  const INSTRUMENT_WIDTH = 28;
+  const VOLUME_WIDTH = 28;
+  const EFFECT_WIDTH = 42;
+  const ACCENT_WIDTH = 24;
+  const CHAR_WIDTH = 14;
+
+  const channelIndex = isMobile ? 0 : cursor.channelIndex;
+  let caretX = ROW_NUM_WIDTH + (channelIndex * CHANNEL_WIDTH) + 8;
+
+  switch (cursor.columnType) {
+    case 'note':
+      break;
+    case 'instrument':
+      caretX += NOTE_WIDTH + CELL_GAP;
+      break;
+    case 'volume':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP;
+      break;
+    case 'effTyp':
+    case 'effParam':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
+      break;
+    case 'effect2':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
+      break;
+    case 'accent':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
+      break;
+    case 'slide':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
+      break;
+  }
+
+  let caretWidth = NOTE_WIDTH;
+  if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
+    caretX += cursor.digitIndex * CHAR_WIDTH;
+    caretWidth = CHAR_WIDTH;
+  } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam' || cursor.columnType === 'effect2') {
+    caretX += cursor.digitIndex * CHAR_WIDTH;
+    caretWidth = CHAR_WIDTH;
+  } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
+    caretWidth = ACCENT_WIDTH;
+  }
+
+  return (
+    <div
+      className="absolute pointer-events-none z-50"
+      style={{
+        top: '50%',
+        transform: 'translateY(-50%)',
+        left: caretX,
+        width: caretWidth,
+        height: ROW_HEIGHT,
+        border: `2px solid ${isCyanTheme ? '#00ffff' : '#ef4444'}`,
+        borderRadius: '2px',
+        backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+        transition: 'left 0.08s ease-out, width 0.08s ease-out',
+      }}
+    />
+  );
+});
+CursorCaret.displayName = 'CursorCaret';
+
+// PERFORMANCE: Scroll position manager for stopped playback
+// Updates CSS transforms directly without re-rendering PatternEditor
+const CursorScrollManager: React.FC<{
+  contentRef: React.RefObject<HTMLDivElement | null>;
+  rowNumbersRef: React.RefObject<HTMLDivElement | null>;
+  containerHeight: number;
+  isReady: boolean;
+  patternLength: number;
+}> = React.memo(({ contentRef, rowNumbersRef, containerHeight, isReady, patternLength }) => {
+  const rowIndex = useTrackerStore((state) => state.cursor.rowIndex);
+  const isPlaying = useTransportStore((state) => state.isPlaying);
+
+  useEffect(() => {
+    if (isPlaying || !isReady || !contentRef.current || containerHeight <= 0) return;
+
+    const halfContainer = containerHeight / 2;
+    const offset = halfContainer - (rowIndex * ROW_HEIGHT) - (ROW_HEIGHT / 2);
+
+    contentRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
+    if (rowNumbersRef.current) {
+      rowNumbersRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
+    }
+  }, [rowIndex, containerHeight, isReady, isPlaying, contentRef, rowNumbersRef, patternLength]);
+
+  return null;
+});
+CursorScrollManager.displayName = 'CursorScrollManager';
+
 const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator }) => {
   const { isMobile } = useResponsiveSafe();
 
   // CRITICAL OPTIMIZATION: Use selectors to prevent re-renders on every pattern change
   // Only subscribe to specific data needed, not entire patterns array
+  // NOTE: cursor subscription REMOVED - now handled by CursorCaret and CursorScrollManager
   const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
-  const cursor = useTrackerStore((state) => state.cursor);
   const showGhostPatterns = useTrackerStore((state) => state.showGhostPatterns);
+
+  // Mobile: Only subscribe to channelIndex, not full cursor object
+  const mobileChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
 
   // Get adjacent patterns for ghost rendering (memoized to prevent flicker)
   const prevPattern = useTrackerStore((state) => {
@@ -175,7 +285,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const [containerHeight, setContainerHeight] = useState(600);
   const [isReady, setIsReady] = useState(false);
   const [channelTriggers, setChannelTriggers] = useState<ChannelTrigger[]>([]);
-  const lastTriggerRowRef = useRef<number>(-1);
   const isScrollSyncing = useRef(false);
 
   // Custom scrollbar state
@@ -194,8 +303,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const speedRef = useRef(speed); // Track speed without restarting animation
   const containerHeightRef = useRef(0); // Cache container height to avoid layout thrashing
 
-  // Mobile: Track which channel is currently visible (synced with cursor)
-  const mobileChannelIndex = cursor.channelIndex;
+  // Mobile channel index subscription moved to top of component for performance
 
   // Mobile: Swipe gesture handlers
   const handleSwipeLeft = useCallback(() => {
@@ -230,42 +338,39 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   //   });
   // }, [currentPatternIndex, pattern]);
 
-  // For non-playing state, use cursor position
+  // Scroll position now managed by CursorScrollManager component for stopped playback
   // During playback, the animation loop handles scroll directly via DOM
-  const scrollRow = cursor.rowIndex;
 
   // Track note triggers for VU meters - only when stopped (editing)
+  // DISABLED: VU meters are disabled for performance, no need to track triggers
   // When NOT playing: update triggers based on cursor row (pattern preview)
-  useEffect(() => {
-    if (!pattern || isPlaying) return;
-
-    const targetRow = cursor.rowIndex;
-    if (lastTriggerRowRef.current === targetRow) return;
-    lastTriggerRowRef.current = targetRow;
-
-    const newTriggers: ChannelTrigger[] = pattern.channels.map((channel) => {
-      const cell = channel.rows[targetRow];
-      // XM format: note 0 = empty, 97 = note off, 1-96 = valid notes
-      const hasNote = cell?.note && cell.note !== 0 && cell.note !== 97;
-      // Use volume if set, otherwise default to 0.8
-      // XM volume: 0x10-0x50 = volume 0-64, need to extract actual volume
-      let volume = 0.8;
-      if (cell?.volume != null && cell.volume > 0) {
-        if (cell.volume >= 0x10 && cell.volume <= 0x50) {
-          volume = (cell.volume - 0x10) / 64;
-        } else {
-          volume = cell.volume / 64;
-        }
-      }
-
-      return {
-        level: hasNote ? Math.min(1, volume * 1.2) : 0,
-        triggered: hasNote || false,
-      };
-    });
-
-    setChannelTriggers(newTriggers);
-  }, [cursor.rowIndex, pattern, isPlaying]);
+  // useEffect(() => {
+  //   if (!pattern || isPlaying) return;
+  //
+  //   const targetRow = cursor.rowIndex;
+  //   if (lastTriggerRowRef.current === targetRow) return;
+  //   lastTriggerRowRef.current = targetRow;
+  //
+  //   const newTriggers: ChannelTrigger[] = pattern.channels.map((channel) => {
+  //     const cell = channel.rows[targetRow];
+  //     const hasNote = cell?.note && cell.note !== 0 && cell.note !== 97;
+  //     let volume = 0.8;
+  //     if (cell?.volume != null && cell.volume > 0) {
+  //       if (cell.volume >= 0x10 && cell.volume <= 0x50) {
+  //         volume = (cell.volume - 0x10) / 64;
+  //       } else {
+  //         volume = cell.volume / 64;
+  //       }
+  //     }
+  //
+  //     return {
+  //       level: hasNote ? Math.min(1, volume * 1.2) : 0,
+  //       triggered: hasNote || false,
+  //     };
+  //   });
+  //
+  //   setChannelTriggers(newTriggers);
+  // }, [cursor.rowIndex, pattern, isPlaying]);
 
   // When PLAYING: poll ToneEngine for real-time trigger levels
   // DISABLED: ChannelVUMeter returns null, so polling causes unnecessary re-renders
@@ -409,16 +514,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     // Speed is tracked via ref so animation doesn't restart on Fxx commands
   }, [isPlaying, pattern, smoothScrolling]);
 
-  // Calculate the scroll offset for the pattern
-  // Active row is ALWAYS centered at the edit bar, pattern wraps seamlessly
-  const scrollOffset = useMemo(() => {
-    if (!isReady || !pattern || !containerHeight || containerHeight <= 0) return 0;
-
-    const halfContainer = containerHeight / 2;
-    // Center the scroll row under the edit bar
-    // Use scrollRow (continuous) for smooth looping, not activeRow
-    return halfContainer - (scrollRow * ROW_HEIGHT) - (ROW_HEIGHT / 2);
-  }, [scrollRow, containerHeight, isReady, pattern]);
+  // Scroll transforms are now managed by CursorScrollManager component
+  // No scrollOffset useMemo needed - transforms applied directly via DOM
 
   // Track container size using ResizeObserver for accurate sizing
   // This properly handles when other elements (like TB303KnobPanel) resize
@@ -534,11 +631,12 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   }, [pattern?.channels.length]);
 
   // Scroll horizontally to keep cursor channel visible (for Tab navigation, etc.)
+  // Uses mobileChannelIndex subscription (which is actually cursor.channelIndex for all views)
   useEffect(() => {
     if (isMobile || !headerScrollRef.current || !contentScrollRef.current) return;
 
     const CHANNEL_WIDTH = 260;
-    const channelLeft = cursor.channelIndex * CHANNEL_WIDTH;
+    const channelLeft = mobileChannelIndex * CHANNEL_WIDTH;
     const channelRight = channelLeft + CHANNEL_WIDTH;
 
     const scrollContainer = headerScrollRef.current;
@@ -571,7 +669,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
         setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
       }
     }
-  }, [cursor.channelIndex, isMobile]);
+  }, [mobileChannelIndex, isMobile]);
 
   // Validate containerHeight matches actual rendered height (development only)
   useEffect(() => {
@@ -628,21 +726,16 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       return rows;
     }
 
-    // When stopped, only render visible rows for performance (current pattern only)
-    const firstVirtualRow = Math.floor(-scrollOffset / ROW_HEIGHT) - VISIBLE_ROWS_BUFFER;
-    const lastVirtualRow = Math.ceil((containerHeight - scrollOffset) / ROW_HEIGHT) + VISIBLE_ROWS_BUFFER;
-
-    // Generate array of virtual rows with their actual pattern row index
+    // When stopped, render ALL pattern rows - transform handles scrolling
+    // This avoids expensive recalculation when cursor moves (scrollOffset changes)
+    // The DOM stays stable, only the CSS transform changes - much faster!
     const rows: Array<{ virtualIndex: number; actualIndex: number; patternType: 'prev' | 'current' | 'next' }> = [];
-    for (let v = firstVirtualRow; v <= lastVirtualRow; v++) {
-      // Always wrap around for seamless looping
-      let actual = v % patternLength;
-      if (actual < 0) actual += patternLength;
-      rows.push({ virtualIndex: v, actualIndex: actual, patternType: 'current' });
+    for (let i = 0; i < patternLength; i++) {
+      rows.push({ virtualIndex: i, actualIndex: i, patternType: 'current' });
     }
 
     return rows;
-  }, [scrollOffset, isPlaying, containerHeight, pattern?.length, prevPattern?.length, nextPattern?.length, showGhostPatterns]);
+  }, [isPlaying, pattern?.length, prevPattern?.length, nextPattern?.length, showGhostPatterns]);
 
   // Memoize channel colors - same for all rows, only changes when pattern changes
   const channelColors = useMemo(() => {
@@ -668,29 +761,12 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const prevRowCellsData = useMemo(() => extractRowCells(prevPattern), [prevPattern, extractRowCells]);
   const nextRowCellsData = useMemo(() => extractRowCells(nextPattern), [nextPattern, extractRowCells]);
 
-  // Calculate row opacity based on position in viewport (uses virtual row index for positioning)
-  // Rows near edges fade out slightly for visual depth
-  // During playback, return full opacity (the transform handles positioning)
-  const getRowOpacity = useCallback((virtualIndex: number) => {
-    if (!isReady) return 1;
-    // During playback, use full opacity - the CSS fade overlays handle edge fading
-    if (isPlaying) return 1;
-    // Guard against invalid containerHeight
-    if (!containerHeight || containerHeight <= 0) return 1;
-
-    // Calculate where this virtual row appears in the viewport
-    const rowTop = virtualIndex * ROW_HEIGHT + scrollOffset;
-    const viewportCenter = containerHeight / 2;
-    const distanceFromCenter = Math.abs(rowTop + ROW_HEIGHT / 2 - viewportCenter);
-    const maxDistance = containerHeight / 2;
-
-    // Guard against division by zero
-    if (maxDistance <= 0) return 1;
-
-    // Gentle fade at edges, full opacity in center
-    const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDistance) * 0.6);
-    return opacity;
-  }, [scrollOffset, isPlaying, containerHeight, isReady]);
+  // Row opacity - simplified since CSS fade overlays handle edge depth
+  // The gradient overlays at top/bottom provide the visual fade effect
+  const getRowOpacity = useCallback((_virtualIndex: number): number => {
+    // Full opacity for all rows - CSS overlays handle the fade effect
+    return 1;
+  }, []);
 
   // Channel context menu handlers
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -815,14 +891,25 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   }, [pattern, setCell]);
 
   // Handle manual scroll to allow user override
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!isPlaying) {
-      e.preventDefault();
-      const delta = Math.sign(e.deltaY) * 2; // Half sensitivity
-      const newRow = Math.max(0, Math.min((pattern?.length || 1) - 1, cursor.rowIndex + delta));
-      useTrackerStore.getState().moveCursorToRow(newRow);
-    }
-  }, [isPlaying, cursor.rowIndex, pattern?.length]);
+  // Must use native event listener with { passive: false } to allow preventDefault()
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!isPlaying) {
+        e.preventDefault();
+        const delta = Math.sign(e.deltaY) * 2; // Half sensitivity
+        const patternLength = pattern?.length || 1;
+        const currentRow = useTrackerStore.getState().cursor.rowIndex;
+        const newRow = Math.max(0, Math.min(patternLength - 1, currentRow + delta));
+        useTrackerStore.getState().moveCursorToRow(newRow);
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [isPlaying, pattern?.length]);
 
   // Sync horizontal scroll between header and content with debouncing
   const scrollSyncTimeoutRef = useRef<number | null>(null);
@@ -1252,7 +1339,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           minHeight: 0,
           overflowY: 'hidden'
         }}
-        onWheel={handleWheel}
       >
         {/* PERFORMANCE: Stepped scrolling handled by separate component to avoid full re-renders */}
         <SteppedScroller
@@ -1261,6 +1347,15 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           containerRef={containerRef}
           containerHeight={containerHeight}
           patternExists={!!pattern}
+        />
+
+        {/* PERFORMANCE: Cursor scroll position manager for stopped playback */}
+        <CursorScrollManager
+          contentRef={contentRef}
+          rowNumbersRef={rowNumbersRef}
+          containerHeight={containerHeight}
+          isReady={isReady}
+          patternLength={pattern.length}
         />
 
         {/* Fixed center edit bar - always vertically centered using CSS */}
@@ -1274,84 +1369,13 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           }}
         />
 
-        {/* Fixed caret overlay - never moves vertically, only horizontally */}
-        {/* FT2-style: Highlights individual characters within cells */}
-        {!isPlaying && pattern && (() => {
-          const ROW_NUM_WIDTH = 48; // Width of row number column
-          const CHANNEL_WIDTH = isMobile ? mobileChannelWidth : 260;
-          const CELL_GAP = 4; // gap-1 = 4px
-
-          // Calculate cell widths (approximate from TrackerRow)
-          const NOTE_WIDTH = 42; // 3ch ~ 42px for monospace
-          const INSTRUMENT_WIDTH = 28; // 2ch
-          const VOLUME_WIDTH = 28; // 2ch
-          const EFFECT_WIDTH = 42; // 3ch
-          const ACCENT_WIDTH = 24;
-          const CHAR_WIDTH = 14; // Approximate width of one monospace character
-
-          // Base position: row number + channel offset
-          const channelIndex = isMobile ? 0 : cursor.channelIndex; // Mobile always shows channel at index 0
-          let caretX = ROW_NUM_WIDTH + (channelIndex * CHANNEL_WIDTH) + 8; // +8 for channel padding
-
-          // Add offset based on column type
-          // Column order: note, instrument, volume, effect, effect2, accent, slide
-          switch (cursor.columnType) {
-            case 'note':
-              // caretX stays at start
-              break;
-            case 'instrument':
-              caretX += NOTE_WIDTH + CELL_GAP;
-              break;
-            case 'volume':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP;
-              break;
-            case 'effTyp':
-            case 'effParam':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
-              break;
-            case 'effect2':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
-              break;
-            case 'accent':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
-              break;
-            case 'slide':
-              caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
-              break;
-          }
-
-          // FT2: Add character-level offset for editable columns
-          let caretWidth = NOTE_WIDTH;
-          if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
-            // 2-digit columns: highlight one character at digitIndex
-            caretX += cursor.digitIndex * CHAR_WIDTH;
-            caretWidth = CHAR_WIDTH;
-          } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam' || cursor.columnType === 'effect2') {
-            // 3-character columns (effect): highlight one character at digitIndex
-            caretX += cursor.digitIndex * CHAR_WIDTH;
-            caretWidth = CHAR_WIDTH;
-          } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
-            caretWidth = ACCENT_WIDTH;
-          }
-          // Note column keeps full width highlighting
-
-          return (
-            <div
-              className="absolute pointer-events-none z-50"
-              style={{
-                top: '50%',
-                transform: 'translateY(-50%)',
-                left: caretX,
-                width: caretWidth,
-                height: ROW_HEIGHT,
-                border: `2px solid ${isCyanTheme ? '#00ffff' : '#ef4444'}`,
-                borderRadius: '2px',
-                backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                transition: 'left 0.08s ease-out, width 0.08s ease-out',
-              }}
-            />
-          );
-        })()}
+        {/* Cursor caret - isolated component to prevent full re-renders on cursor moves */}
+        <CursorCaret
+          isMobile={isMobile}
+          mobileChannelWidth={mobileChannelWidth}
+          isCyanTheme={isCyanTheme}
+          channelCount={pattern.channels.length}
+        />
 
         {/* VU Meters - Heart Tracker style, extend UP from edit bar */}
         <div
@@ -1395,7 +1419,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
               className="relative"
               style={{
                 height: containerHeight || 600,
-                transform: isPlaying ? undefined : `translate3d(0, ${scrollOffset}px, 0)`,
+                // Transform managed by CursorScrollManager/SteppedScroller components
                 transition: 'none',
                 willChange: 'transform',
               }}
@@ -1461,9 +1485,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
               minWidth: `${isMobile ? (ROW_NUM_WIDTH + mobileChannelWidth) : (ROW_NUM_WIDTH + channelsOnlyWidth)}px`,
               height: containerHeight || 600, // Fallback to 600px
               minHeight: containerHeight || 600,
-              // During playback, animation loop handles transform directly via DOM
-              // When stopped, use React-managed scrollOffset
-              transform: isPlaying ? undefined : `translate3d(0, ${scrollOffset}px, 0)`,
+              // Transform managed by CursorScrollManager/SteppedScroller components
               // No transition - instant response for crisp keyboard navigation
               transition: 'none',
               willChange: 'transform',
@@ -1507,9 +1529,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
               const rowChannelColors = isMobile
                 ? [channelColors[mobileChannelIndex]]
                 : channelColors;
-
-              // Never show cursor on rows - caret is rendered as a fixed overlay on the edit bar
-              const isCursorRow = false;
 
               // Base opacity from viewport position
               let opacity = getRowOpacity(virtualIndex);
@@ -1555,8 +1574,9 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
                     rowIndex={actualIndex}
                     cells={rowCells}
                     channelColors={rowChannelColors}
-                    cursor={cursor}
-                    isCursorRow={isCursorRow}
+                    cursorColumnType={null}  // Cursor caret is separate overlay
+                    cursorChannelIndex={-1}  // Cursor caret is separate overlay
+                    isCursorRow={false}
                     isCurrentPlaybackRow={false}
                     channelWidth={isMobile ? mobileChannelWidth : undefined}
                     baseChannelIndex={isMobile ? mobileChannelIndex : 0}
@@ -1572,7 +1592,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       <StatusBar
         patternLength={pattern.length}
         channelCount={pattern.channels.length}
-        cursorChannel={cursor.channelIndex}
       />
 
       {/* Cell context menu */}
