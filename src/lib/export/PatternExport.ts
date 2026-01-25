@@ -72,6 +72,7 @@ export function xpToPattern(xpData: XPFileFormat): Omit<Pattern, 'id'> {
       rows: rows.slice(0, xpData.rows), // Ensure correct length
       muted: false,
       solo: false,
+      collapsed: false,
       volume: 80,
       pan: 0,
       instrumentId: null,

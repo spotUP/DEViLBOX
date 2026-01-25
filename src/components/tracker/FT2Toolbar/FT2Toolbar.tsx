@@ -10,7 +10,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { FT2Button } from './FT2Button';
+import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
@@ -18,6 +18,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
@@ -187,15 +188,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
-  const { save: saveProject } = useProjectPersistence();
+  useProjectPersistence(); // Keep hook for auto-save functionality
   const { instruments, loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
-  const { compactToolbar, toggleCompactToolbar } = useUIStore();
+  const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
   const { curves } = useAutomationStore();
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -319,18 +321,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showModulesMenu]);
 
-  // Save handler with feedback (browser storage)
-  const handleSave = () => {
-    const success = saveProject();
-    if (success) {
-      notify.success('Project saved to browser storage', 2000);
-    } else {
-      notify.error('Failed to save project');
-    }
-  };
-
   // Save to file handler (download to computer)
-  const handleSaveFile = () => {
+  const handleSave = () => {
     try {
       const sequence = patterns.map((p) => p.id);
       // Convert automation curves to export format
@@ -651,6 +643,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
+      {/* Main toolbar content with oscilloscope on right */}
+      <div className="flex">
+        {/* Left: Toolbar controls - natural width */}
+        <div className="flex-shrink-0">
+
       {/* Row 1: Position/BPM/Pattern/Playback */}
       <div className="ft2-toolbar-row">
         {/* Position Section */}
@@ -668,12 +665,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             max={patternOrder.length - 1}
             format="hex"
           />
-          <FT2Button onClick={handleInsertPosition} small title="Insert position (duplicate current)">
+          <Button variant="default" size="sm" onClick={handleInsertPosition} title="Insert position (duplicate current)">
             Ins
-          </FT2Button>
-          <FT2Button onClick={handleDeletePosition} small title="Delete position" disabled={songLength <= 1}>
+          </Button>
+          <Button variant="default" size="sm" onClick={handleDeletePosition} title="Delete position" disabled={songLength <= 1}>
             Del
-          </FT2Button>
+          </Button>
         </div>
 
         {/* BPM Display - Read-only (controlled by F20+ effect commands) */}
@@ -705,30 +702,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
         {/* Playback Section */}
         <div className="ft2-section ft2-section-playback">
-          <FT2Button
+          <Button
+            variant={isPlayingSong ? 'danger' : 'primary'}
+            size="sm"
             onClick={handlePlaySong}
-            active={isPlayingSong}
-            colorAccent={isPlayingSong ? 'red' : 'green'}
-            title={isPlayingSong ? 'Stop playback (F8 / Esc)' : 'Play song from start (F5)'}
+            className="min-w-[72px]"
+            title={isPlayingSong ? 'Stop song playback (F8 / Esc)' : 'Play song from start (F5)'}
           >
-            {isPlayingSong ? 'Stop' : 'Play Song'}
-          </FT2Button>
-          <FT2Button
+            {isPlayingSong ? 'Stop Song' : 'Play Song'}
+          </Button>
+          <Button
+            variant={isPlayingPattern ? 'danger' : 'primary'}
+            size="sm"
             onClick={handlePlayPattern}
-            active={isPlayingPattern}
-            colorAccent={isPlayingPattern ? 'red' : 'green'}
-            title={isPlayingPattern ? 'Stop playback (F8 / Esc)' : 'Play/loop current pattern (F6)'}
+            className="min-w-[88px]"
+            title={isPlayingPattern ? 'Stop pattern playback (F8 / Esc)' : 'Play/loop current pattern (F6)'}
           >
-            {isPlayingPattern ? 'Stop' : 'Play Pattern'}
-          </FT2Button>
-          <FT2Button
+            {isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
+          </Button>
+          <Button
+            variant={recordMode ? 'danger' : 'default'}
+            size="sm"
+            className="min-w-[48px]"
             onClick={toggleRecordMode}
-            active={recordMode}
-            colorAccent={recordMode ? 'red' : undefined}
             title={recordMode ? 'Disable record mode (Enter)' : 'Enable record mode - enter notes at playback position (Enter)'}
           >
             {recordMode ? '● Rec' : 'Rec'}
-          </FT2Button>
+          </Button>
         </div>
       </div>
 
@@ -802,12 +802,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
           {/* Expand/Shrink */}
           <div className="ft2-section ft2-section-pattern">
-            <FT2Button onClick={handleExpand} small title="Expand pattern (double rows)">
+            <Button variant="default" size="sm" onClick={handleExpand} title="Expand pattern (double rows)">
               Expand
-            </FT2Button>
-            <FT2Button onClick={handleShrink} small title="Shrink pattern (halve rows)">
+            </Button>
+            <Button variant="default" size="sm" onClick={handleShrink} title="Shrink pattern (halve rows)">
               Shrink
-            </FT2Button>
+            </Button>
           </div>
 
           {/* Row indicator - separate component to avoid toolbar re-renders */}
@@ -826,33 +826,32 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             onChange={handleFileLoad}
             className="hidden"
           />
-          <FT2Button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowFileBrowser(true)}
-            small
             disabled={isLoading}
+            loading={isLoading}
             title="Load song or module (Ctrl+O)"
           >
-            {isLoading ? 'Loading...' : 'Load'}
-          </FT2Button>
+            Load
+          </Button>
 
-          <FT2Button onClick={handleSave} small title="Save to browser storage (Ctrl+S)">
+          <Button variant="ghost" size="sm" onClick={handleSave} title="Download song file (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
-          </FT2Button>
-          <FT2Button onClick={handleSaveFile} small title="Download song file to computer">
-            Download
-          </FT2Button>
+          </Button>
 
           {/* Bundled Modules Dropdown */}
           <div ref={modulesButtonRef}>
-            <FT2Button
+            <Button
+              variant={showModulesMenu ? 'primary' : 'ghost'}
+              size="sm"
               onClick={() => setShowModulesMenu(!showModulesMenu)}
-              small
-              active={showModulesMenu}
               disabled={isLoading}
               title="Load bundled example modules"
             >
               Modules
-            </FT2Button>
+            </Button>
           </div>
           {showModulesMenu && (
             <div
@@ -907,43 +906,60 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             </div>
           )}
 
-          <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list (Ctrl+Shift+P)">
+          <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns} title="Pattern list (Ctrl+Shift+P)">
             Patterns
-          </FT2Button>
-          <FT2Button onClick={onShowPatternOrder} small title="Pattern order editor">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order editor">
             Order
-          </FT2Button>
-          <FT2Button onClick={onShowInstruments} small title="Instrument editor (Ctrl+I)">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor (Ctrl+I)">
             Instr
-          </FT2Button>
-          <FT2Button onClick={onShowInstrumentFX} small active={showInstrumentFX} title="Instrument effects (Ctrl+Shift+F)">
+          </Button>
+          <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX} title="Instrument effects (Ctrl+Shift+F)">
             Instrument FX
-          </FT2Button>
-          <FT2Button onClick={onShowExport} small title="Export dialog (Ctrl+Shift+E)">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onShowExport} title="Export dialog (Ctrl+Shift+E)">
             Export
-          </FT2Button>
-          <FT2Button onClick={onShowMasterFX} small active={showMasterFX} title="Master effects (Ctrl+M)">
+          </Button>
+          <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects (Ctrl+M)">
             Master FX
-          </FT2Button>
-          <FT2Button onClick={onShowHelp} small title="Help & shortcuts (?)">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onShowHelp} title="Help & shortcuts (?)">
             Help
-          </FT2Button>
-          <FT2Button onClick={() => setShowSettings(true)} small title="Application settings">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Application settings">
             Settings
-          </FT2Button>
-          <FT2Button onClick={toggleMasterMute} small active={masterMuted} title="Toggle master mute (Ctrl+Shift+M)">
+          </Button>
+          <Button variant={masterMuted ? 'danger' : 'default'} size="sm" className="min-w-[52px]" onClick={toggleMasterMute} title="Toggle master mute (Ctrl+Shift+M)">
             {masterMuted ? 'Unmute' : 'Mute'}
-          </FT2Button>
-          <FT2Button
+          </Button>
+          <Button
+            variant={smoothScrolling ? 'primary' : 'default'}
+            size="sm"
+            className="min-w-[56px]"
             onClick={() => setSmoothScrolling(!smoothScrolling)}
-            small
-            active={smoothScrolling}
             title={smoothScrolling ? 'Classic stepped scrolling' : 'Smooth DAW-style scrolling'}
           >
             {smoothScrolling ? 'Smooth' : 'Stepped'}
-          </FT2Button>
+          </Button>
         </div>
       </div>
+
+        </div>
+        {/* End left toolbar controls */}
+
+        {/* Right: Oscilloscope - fills remaining space */}
+        <div
+          className="flex-1 min-w-[200px] flex items-center border-l border-dark-border px-2 cursor-pointer"
+          onClick={() => setVizMode(vizMode === 'waveform' ? 'spectrum' : 'waveform')}
+          title={`Click to switch to ${vizMode === 'waveform' ? 'spectrum' : 'waveform'} view`}
+        >
+          {oscilloscopeVisible && (
+            <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />
+          )}
+        </div>
+      </div>
+      {/* End main toolbar flex container */}
 
       {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

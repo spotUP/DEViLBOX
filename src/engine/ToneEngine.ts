@@ -138,9 +138,10 @@ export class ToneEngine {
     }
 
     // Configure Transport lookahead for reliable scheduling
-    // Increased from 0.1 to 0.2 for better resilience to main thread hiccups
+    // Use 0.05s (50ms) for balance between low latency keyboard preview and reliable playback
+    // Previously 0.2s which caused noticeable lag when pressing keys
     const transport = Tone.getTransport();
-    transport.context.lookAhead = 0.2;
+    transport.context.lookAhead = 0.05;
   }
 
   /**
@@ -1057,18 +1058,6 @@ export class ToneEngine {
             console.warn('[ToneEngine] Player buffer not loaded, skipping');
             return;
           }
-
-          // DEBUG: Log sample loop info
-          console.log('[ToneEngine] Playing MOD sample:', {
-            instrumentId,
-            loop: player.loop,
-            loopStart: player.loopStart,
-            loopEnd: player.loopEnd,
-            bufferDuration: player.buffer?.duration,
-            configLoop: config.sample?.loop,
-            configLoopStart: config.sample?.loopStart,
-            configLoopEnd: config.sample?.loopEnd,
-          });
 
           // Apply velocity as volume
           const velocityDb = velocity > 0 ? Tone.gainToDb(velocity) : -Infinity;

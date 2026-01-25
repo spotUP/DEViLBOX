@@ -124,6 +124,7 @@ const getInitialState = (): TabState => {
         })),
         muted: false,
         solo: false,
+        collapsed: false,
         volume: 80,
         pan: 0,
         instrumentId: null,

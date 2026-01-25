@@ -16,7 +16,7 @@ import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { useShallow } from 'zustand/react/shallow';
-import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsDownUp } from 'lucide-react';
+import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -123,9 +123,14 @@ const CursorCaret: React.FC<{
   mobileChannelWidth: number;
   isCyanTheme: boolean;
   channelCount: number;
-}> = React.memo(({ isMobile, mobileChannelWidth, isCyanTheme, channelCount }) => {
+  channelWidths: number[];
+}> = React.memo(({ isMobile, mobileChannelWidth, isCyanTheme, channelCount, channelWidths }) => {
   const cursor = useTrackerStore((state) => state.cursor);
   const isPlaying = useTransportStore((state) => state.isPlaying);
+  const currentChannelCollapsed = useTrackerStore((state) => {
+    const pattern = state.patterns[state.currentPatternIndex];
+    return pattern?.channels[state.cursor.channelIndex]?.collapsed ?? false;
+  });
 
   if (isPlaying || channelCount === 0) return null;
 
@@ -140,7 +145,17 @@ const CursorCaret: React.FC<{
   const CHAR_WIDTH = 14;
 
   const channelIndex = isMobile ? 0 : cursor.channelIndex;
-  let caretX = ROW_NUM_WIDTH + (channelIndex * CHANNEL_WIDTH) + 8;
+
+  // Calculate X position by summing widths of channels before current channel
+  let channelStartX = ROW_NUM_WIDTH;
+  if (!isMobile) {
+    for (let i = 0; i < channelIndex; i++) {
+      channelStartX += channelWidths[i] ?? CHANNEL_WIDTH;
+    }
+  } else {
+    channelStartX += channelIndex * CHANNEL_WIDTH;
+  }
+  let caretX = channelStartX + 8;
 
   switch (cursor.columnType) {
     case 'note':
@@ -166,11 +181,22 @@ const CursorCaret: React.FC<{
       break;
   }
 
+  // When channel is collapsed, cursor can only be on note column
   let caretWidth = NOTE_WIDTH;
-  if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
+  if (currentChannelCollapsed) {
+    // Collapsed channel - cursor stays on note, full width
+    caretWidth = NOTE_WIDTH;
+  } else if (cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
     caretX += cursor.digitIndex * CHAR_WIDTH;
     caretWidth = CHAR_WIDTH;
-  } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam' || cursor.columnType === 'effect2') {
+  } else if (cursor.columnType === 'effTyp') {
+    // Effect type is position 0 (1 digit)
+    caretWidth = CHAR_WIDTH;
+  } else if (cursor.columnType === 'effParam') {
+    // Effect param starts at position 1, has 2 digits (positions 1-2)
+    caretX += CHAR_WIDTH + (cursor.digitIndex * CHAR_WIDTH);
+    caretWidth = CHAR_WIDTH;
+  } else if (cursor.columnType === 'effect2') {
     caretX += cursor.digitIndex * CHAR_WIDTH;
     caretWidth = CHAR_WIDTH;
   } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
@@ -255,6 +281,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   const removeChannel = useTrackerStore((state) => state.removeChannel);
   const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
   const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
+  const toggleChannelCollapse = useTrackerStore((state) => state.toggleChannelCollapse);
   const setChannelColor = useTrackerStore((state) => state.setChannelColor);
   const setCell = useTrackerStore((state) => state.setCell);
   const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
@@ -290,6 +317,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
   // Custom scrollbar state
   const [customScrollThumbLeft, setCustomScrollThumbLeft] = useState(0);
   const [customScrollThumbWidth, setCustomScrollThumbWidth] = useState(100);
+  const [needsHorizontalScroll, setNeedsHorizontalScroll] = useState(false);
   const customScrollTrackRef = useRef<HTMLDivElement>(null);
   const isDraggingScrollbar = useRef(false);
 
@@ -595,17 +623,22 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
   // Sync custom scrollbar dimensions when header or channels change
   useEffect(() => {
-    if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+    if (!headerScrollRef.current) return;
 
     const updateScrollbarDimensions = () => {
-      if (!headerScrollRef.current || !customScrollTrackRef.current) return;
+      if (!headerScrollRef.current) return;
 
       const scrollWidth = headerScrollRef.current.scrollWidth;
       const clientWidth = headerScrollRef.current.clientWidth;
       const scrollLeft = headerScrollRef.current.scrollLeft;
-      const trackWidth = customScrollTrackRef.current.clientWidth;
 
-      if (scrollWidth > clientWidth) {
+      // First determine if scrolling is needed (independent of scrollbar ref)
+      const scrollingNeeded = scrollWidth > clientWidth;
+      setNeedsHorizontalScroll(scrollingNeeded);
+
+      // Only calculate thumb dimensions if scrollbar track exists
+      if (scrollingNeeded && customScrollTrackRef.current) {
+        const trackWidth = customScrollTrackRef.current.clientWidth;
         const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
         const maxScroll = scrollWidth - clientWidth;
         const maxThumbLeft = trackWidth - thumbWidth;
@@ -613,10 +646,6 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
         setCustomScrollThumbWidth(thumbWidth);
         setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
-      } else {
-        // No scrolling needed, hide thumb by making it full width
-        setCustomScrollThumbWidth(trackWidth);
-        setCustomScrollThumbLeft(0);
       }
     };
 
@@ -628,7 +657,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
     resizeObserver.observe(headerScrollRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [pattern?.channels.length]);
+  }, [pattern?.channels.length, needsHorizontalScroll]);
 
   // Scroll horizontally to keep cursor channel visible (for Tab navigation, etc.)
   // Uses mobileChannelIndex subscription (which is actually cursor.channelIndex for all views)
@@ -1029,14 +1058,26 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
   // Calculate total width needed for all channels (includes accent/slide columns)
   const CHANNEL_WIDTH = 260;
+  const COLLAPSED_CHANNEL_WIDTH = 60; // Narrow width showing just note column
   const ROW_NUM_WIDTH = 48;
 
   // Calculate explicit total content width for scrolling
   // Both header and content use channels-only width since row numbers are outside scroll area
   const channelsOnlyWidth = useMemo(() => {
     if (!pattern) return 0;
-    return pattern.channels.length * CHANNEL_WIDTH;
-  }, [pattern?.channels.length]);
+    return pattern.channels.reduce((sum, ch) => sum + (ch.collapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH), 0);
+  }, [pattern]);
+
+  // Memoized arrays for per-channel widths and collapsed state
+  const channelWidths = useMemo(() => {
+    if (!pattern) return [];
+    return pattern.channels.map(ch => ch.collapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH);
+  }, [pattern]);
+
+  const collapsedChannels = useMemo(() => {
+    if (!pattern) return [];
+    return pattern.channels.map(ch => ch.collapsed);
+  }, [pattern]);
 
   // Mobile: Use full width minus row numbers for single channel
   const [containerWidth, setContainerWidth] = useState(0);
@@ -1192,12 +1233,13 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
                   <div
                     key={channel.id}
                     className={`
-                      flex-shrink-0 w-[260px] flex items-center justify-between gap-2 px-3 py-1.5
-                      border-r border-dark-border transition-colors relative
+                      flex-shrink-0 flex items-center justify-between gap-2 px-3 py-1.5
+                      border-r border-dark-border transition-all relative
                       ${channel.muted ? 'opacity-50' : ''}
                       ${channel.solo ? 'bg-accent-primary/10' : ''}
                     `}
                     style={{
+                      width: channel.collapsed ? `${COLLAPSED_CHANNEL_WIDTH}px` : `${CHANNEL_WIDTH}px`,
                       backgroundColor: channel.color ? `${channel.color}15` : undefined,
                       boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
                     }}
@@ -1211,22 +1253,32 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
                         {(idx + 1).toString().padStart(2, '0')}
                       </span>
 
-                      {/* VU Meter - ProTracker style */}
-                      <ChannelVUMeter
-                        level={trigger.level}
-                        isActive={trigger.triggered}
-                      />
+                      {/* VU Meter - ProTracker style (hidden when collapsed) */}
+                      {!channel.collapsed && (
+                        <ChannelVUMeter
+                          level={trigger.level}
+                          isActive={trigger.triggered}
+                        />
+                      )}
                     </div>
 
                     {/* Channel controls */}
                     <div className="flex items-center gap-1">
-                      {/* Collapse channel button */}
+                      {/* Collapse channel button - always visible */}
                       <button
-                        className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
-                        title="Collapse/Expand Channel"
+                        onClick={() => toggleChannelCollapse(idx)}
+                        className={`p-1 rounded transition-colors ${
+                          channel.collapsed
+                            ? 'bg-accent-primary/20 text-accent-primary'
+                            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                        }`}
+                        title={channel.collapsed ? 'Expand Channel' : 'Collapse Channel'}
                       >
-                        <ChevronsDownUp size={12} />
+                        {channel.collapsed ? <ChevronsRight size={12} /> : <ChevronsLeft size={12} />}
                       </button>
+                      {/* Other controls - hidden when collapsed */}
+                      {!channel.collapsed && (
+                      <>
                       {/* Channel context menu dropdown */}
                       <ChannelContextMenu
                         channelIndex={idx}
@@ -1282,6 +1334,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
                           <Minus size={12} />
                         </button>
                       )}
+                      </>
+                      )}
                     </div>
                   </div>
                 );
@@ -1302,7 +1356,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           </div>
         </div>
 
-        {/* Custom always-visible scrollbar */}
+        {/* Custom scrollbar - only visible when horizontal scrolling is needed */}
+        {needsHorizontalScroll && (
         <div className="flex w-full">
           {/* Spacer for row number column */}
           <div className="flex-shrink-0 w-12" />
@@ -1327,6 +1382,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
             />
           </div>
         </div>
+        )}
       </div>
       )}
 
@@ -1375,6 +1431,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           mobileChannelWidth={mobileChannelWidth}
           isCyanTheme={isCyanTheme}
           channelCount={pattern.channels.length}
+          channelWidths={channelWidths}
         />
 
         {/* VU Meters - Heart Tracker style, extend UP from edit bar */}
@@ -1579,6 +1636,8 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
                     isCursorRow={false}
                     isCurrentPlaybackRow={false}
                     channelWidth={isMobile ? mobileChannelWidth : undefined}
+                    channelWidths={isMobile ? undefined : channelWidths}
+                    collapsedChannels={isMobile ? undefined : collapsedChannels}
                     baseChannelIndex={isMobile ? mobileChannelIndex : 0}
                   />
                 </div>

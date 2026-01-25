@@ -559,10 +559,14 @@ export class TrackerReplayer {
   private processRow(chIndex: number, ch: ChannelState, row: any, time: number): void {
     if (!this.song) return;
 
-    // Get effect info (XM format: effTyp/eff, or string format: effect2)
-    const effectStr = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
-    const effect = row.effTyp ?? (effectStr ? parseInt(effectStr[0], 16) : 0);
-    const param = row.eff ?? (effectStr ? parseInt(effectStr.substring(1), 16) : 0);
+    // Get first effect column (XM format: effTyp/eff)
+    const effect = row.effTyp ?? 0;
+    const param = row.eff ?? 0;
+
+    // Get second effect column (string format like "F1A")
+    const effect2Str = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
+    const effect2 = effect2Str ? parseInt(effect2Str[0], 16) : 0;
+    const param2 = effect2Str ? parseInt(effect2Str.substring(1), 16) : 0;
 
     // Handle TB-303 accent/slide columns
     ch.accent = row.accent ?? false;
@@ -644,8 +648,11 @@ export class TrackerReplayer {
       this.setChannelVolume(ch);
     }
 
-    // Process tick-0 effects
+    // Process tick-0 effects (both effect columns)
     this.processEffect0(chIndex, ch, effect, param, time);
+    if (effect2 !== 0 || param2 !== 0) {
+      this.processEffect0(chIndex, ch, effect2, param2, time);
+    }
   }
 
   // ==========================================================================
@@ -801,9 +808,21 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private processEffectTick(_chIndex: number, ch: ChannelState, row: any, time: number): void {
-    const effectStr = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
-    const effect = row.effTyp ?? (effectStr ? parseInt(effectStr[0], 16) : 0);
-    const param = row.eff ?? (effectStr ? parseInt(effectStr.substring(1), 16) : 0);
+    // Process first effect column
+    const effect = row.effTyp ?? 0;
+    const param = row.eff ?? 0;
+    this.doEffectTick(ch, effect, param, time);
+
+    // Process second effect column
+    const effect2Str = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
+    if (effect2Str) {
+      const effect2 = parseInt(effect2Str[0], 16);
+      const param2 = parseInt(effect2Str.substring(1), 16);
+      this.doEffectTick(ch, effect2, param2, time);
+    }
+  }
+
+  private doEffectTick(ch: ChannelState, effect: number, param: number, time: number): void {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 

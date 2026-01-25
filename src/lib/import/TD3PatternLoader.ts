@@ -154,18 +154,16 @@ function parseSeqFile(view: DataView, bytes: Uint8Array): TD3File {
 
   console.log(`[TD3Loader] Parsing ${deviceName} .seq file, version ${version}`);
 
-  // Detect format by checking if the data at offset 36 looks like TD-3 pitch encoding
-  // Per 303patterns.com: MSB is 0x00-0x02 (upper 4 bits), LSB is 0x00-0x0F (lower 4 bits)
-  // Combined value (MSB<<4)|LSB gives pitch, where 0x18 (24) = null/rest
+  // Detect format by checking if the data at offset 36 looks like MSB/LSB encoding
+  // MSB/LSB format: MSB is 0x00-0x03 (pitch upper + accent flag), LSB is 0x00-0x0F
   const NOTES_OFFSET = 36;
   let looksLikeSimpleFormat = true;
 
   for (let i = 0; i < 16 && looksLikeSimpleFormat; i++) {
     const msb = bytes[NOTES_OFFSET + i * 2];
     const lsb = bytes[NOTES_OFFSET + i * 2 + 1];
-    // Valid format: MSB is 0-2, LSB is 0-15
-    // This gives pitch values 0x00-0x2F (0-47), with 0x18 being null
-    if (msb > 0x02 || lsb > 0x0F) {
+    // Valid format: MSB is 0x00-0x03 (includes accent flag), LSB is 0x00-0x0F
+    if (msb > 0x03 || lsb > 0x0F) {
       looksLikeSimpleFormat = false;
     }
   }
@@ -178,32 +176,67 @@ function parseSeqFile(view: DataView, bytes: Uint8Array): TD3File {
 }
 
 /**
- * Parse .seq format based on TD-3 sysex specification from 303patterns.com
+ * Parse .seq format based on TD-3 sysex specification
  *
- * Note encoding: 2 bytes per step where value = (MSB << 4) | LSB
- * - MSB: 0x00-0x02 (upper 4 bits of pitch)
- * - LSB: 0x00-0x0F (lower 4 bits of pitch)
- * - Value 0x18 (24) = null/rest pitch
- * - Pitch is one octave lower than MIDI standard (add 12)
+ * Note encoding: 2 bytes per step where pitch = (MSB << 4) | LSB
+ * - MSB (byte 0): Upper 4 bits of pitch (encodes octave)
+ * - LSB (byte 1): Lower 4 bits of pitch (encodes note)
+ * - Combined pitch value 0x18 (24) = null/rest
+ * - Pitch maps to MIDI: midiNote = pitchValue + 12
  *
- * Accent/Slide: Separate 32-byte sections, 2 bytes per step (MSB=0, LSB=0/1)
+ * Separate sections for accents and slides at offsets 68 and 100
  */
 function parseSeqFileSimple(bytes: Uint8Array, deviceName: string, version: string): TD3File {
-  console.log(`[TD3Loader] Parsing ${deviceName} v${version} using 303patterns.com format`);
+  console.log(`[TD3Loader] Parsing ${deviceName} v${version} using MSB/LSB format`);
 
-  // Offsets in .seq file (after 36-byte header)
-  const NOTES_OFFSET = 36;     // 32 bytes (16 × 2)
-  const ACCENTS_OFFSET = 68;   // 32 bytes (16 × 2)
-  const SLIDES_OFFSET = 100;   // 32 bytes (16 × 2)
+  // Offsets in .seq file (based on TD-3 sysex format)
+  const NOTES_OFFSET = 36;       // 32 bytes (16 × 2): MSB + LSB pairs
+  const ACCENTS_OFFSET = 68;     // 32 bytes (16 × 2): accent flags (array format)
+  const SLIDES_OFFSET = 100;     // 32 bytes (16 × 2): slide flags (array format)
+  // const LENGTH_OFFSET = 134;     // 2 bytes: sequence length (unused for now)
+  const ACCENT_BITS_OFFSET = 138; // 4 bytes: accent bitfield (alternative format)
+  const SLIDE_BITS_OFFSET = 142;  // 4 bytes: slide bitfield (alternative format)
 
   const NULL_PITCH = 0x18; // 24 = inactive/rest pitch
+
+  // Read accent bitfield at offset 138 (4 bytes = 32 bits, use lower 16 for 16 steps)
+  // Format: each byte contains bits for 4 steps, LSB = lowest step number
+  let accentBitfield = 0;
+  if (bytes.length > ACCENT_BITS_OFFSET + 3) {
+    // Read as 4 separate bytes, each covering 4 steps
+    for (let i = 0; i < 4; i++) {
+      const byte = bytes[ACCENT_BITS_OFFSET + i];
+      // Each byte's bits map to 4 consecutive steps
+      for (let bit = 0; bit < 4; bit++) {
+        if ((byte >> bit) & 0x01) {
+          accentBitfield |= (1 << (i * 4 + bit));
+        }
+      }
+    }
+  }
+
+  // Read slide bitfield at offset 142
+  let slideBitfield = 0;
+  if (bytes.length > SLIDE_BITS_OFFSET + 3) {
+    for (let i = 0; i < 4; i++) {
+      const byte = bytes[SLIDE_BITS_OFFSET + i];
+      for (let bit = 0; bit < 4; bit++) {
+        if ((byte >> bit) & 0x01) {
+          slideBitfield |= (1 << (i * 4 + bit));
+        }
+      }
+    }
+  }
+
+  console.log(`[TD3Loader] Accent bitfield: 0x${accentBitfield.toString(16)} (binary: ${accentBitfield.toString(2).padStart(16, '0')})`);
+  console.log(`[TD3Loader] Slide bitfield: 0x${slideBitfield.toString(16)} (binary: ${slideBitfield.toString(2).padStart(16, '0')})`);
 
   const steps: TD3Step[] = [];
 
   for (let step = 0; step < 16; step++) {
     const noteOffset = NOTES_OFFSET + step * 2;
-    const msb = bytes[noteOffset];      // Upper 4 bits of pitch
-    const lsb = bytes[noteOffset + 1];  // Lower 4 bits of pitch
+    const msb = bytes[noteOffset];      // MSB: upper 4 bits of pitch
+    const lsb = bytes[noteOffset + 1];  // LSB: lower 4 bits of pitch
 
     // Combine to get pitch value: (MSB << 4) | LSB
     const pitchValue = (msb << 4) | lsb;
@@ -216,18 +249,23 @@ function parseSeqFileSimple(bytes: Uint8Array, deviceName: string, version: stri
 
     // Extract note (0-11) and octave from MIDI note
     const note = midiNote % 12;
-    const octave = Math.floor(midiNote / 12) - 2; // Relative to octave 2
+    // Adjust octave: -3 to match common acid bass notation (g2 = G2, not G3)
+    const octave = Math.floor(midiNote / 12) - 3;
 
-    // Read accent from separate section (2 bytes per step, LSB is boolean)
-    let hasAccent = false;
-    if (bytes.length > ACCENTS_OFFSET + step * 2 + 1) {
-      hasAccent = (bytes[ACCENTS_OFFSET + step * 2 + 1] & 0x01) !== 0;
+    // Check accent from bitfield first, then fall back to array format
+    let hasAccent = (accentBitfield >> step) & 0x01 ? true : false;
+    if (!hasAccent && bytes.length > ACCENTS_OFFSET + step * 2 + 1) {
+      // Fall back to array format
+      hasAccent = (bytes[ACCENTS_OFFSET + step * 2] & 0x01) !== 0 ||
+                  (bytes[ACCENTS_OFFSET + step * 2 + 1] & 0x01) !== 0;
     }
 
-    // Read slide from separate section
-    let hasSlide = false;
-    if (bytes.length > SLIDES_OFFSET + step * 2 + 1) {
-      hasSlide = (bytes[SLIDES_OFFSET + step * 2 + 1] & 0x01) !== 0;
+    // Check slide from bitfield first, then fall back to array format
+    let hasSlide = (slideBitfield >> step) & 0x01 ? true : false;
+    if (!hasSlide && bytes.length > SLIDES_OFFSET + step * 2 + 1) {
+      // Also check array format at offset 100
+      hasSlide = (bytes[SLIDES_OFFSET + step * 2] & 0x01) !== 0 ||
+                 (bytes[SLIDES_OFFSET + step * 2 + 1] & 0x01) !== 0;
     }
 
     steps.push({
@@ -245,6 +283,17 @@ function parseSeqFileSimple(bytes: Uint8Array, deviceName: string, version: stri
   const accentCount = steps.filter(s => s.accent).length;
   const slideCount = steps.filter(s => s.slide).length;
   console.log(`[TD3Loader] Parsed ${noteCount} notes, ${accentCount} accents, ${slideCount} slides`);
+
+  // Debug: show raw bytes from various offsets
+  const accentArrayBytes = Array.from(bytes.slice(ACCENTS_OFFSET, ACCENTS_OFFSET + 32))
+    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  const slideArrayBytes = Array.from(bytes.slice(SLIDES_OFFSET, SLIDES_OFFSET + 32))
+    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  const bitfieldBytes = Array.from(bytes.slice(ACCENT_BITS_OFFSET, ACCENT_BITS_OFFSET + 8))
+    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  console.log(`[TD3Loader] Accent array (offset ${ACCENTS_OFFSET}): ${accentArrayBytes}`);
+  console.log(`[TD3Loader] Slide array (offset ${SLIDES_OFFSET}): ${slideArrayBytes}`);
+  console.log(`[TD3Loader] Bitfield bytes (offset ${ACCENT_BITS_OFFSET}): ${bitfieldBytes}`);
 
   // Log the pattern for debugging
   const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -425,11 +474,19 @@ function parseSqsFile(view: DataView, bytes: Uint8Array, fileLength: number): TD
 }
 
 /**
+ * Options for TD-3 import
+ */
+export interface TD3ImportOptions {
+  autoAccent?: boolean;  // Add accent to all notes (default: true for acid patterns)
+  baseOctave?: number;   // Base octave (default: 2)
+}
+
+/**
  * Convert a TD3Pattern to DEViLBOX format
  */
 export function convertTD3PatternToDbox(
   td3Pattern: TD3Pattern,
-  baseOctave: number = 2
+  options: TD3ImportOptions = {}
 ): {
   rows: Array<{
     note: string | null;
@@ -440,6 +497,8 @@ export function convertTD3PatternToDbox(
     slide: boolean;
   }>;
 } {
+  const { autoAccent = true, baseOctave = 2 } = options;
+
   const rows = td3Pattern.steps.map((step) => {
     if (step.rest) {
       return {
@@ -462,7 +521,8 @@ export function convertTD3PatternToDbox(
       instrument: 1, // TB-303 instrument
       volume: null,
       effect: null,
-      accent: step.accent,
+      // Use file's accent if present, otherwise use autoAccent setting
+      accent: step.accent || autoAccent,
       slide: step.slide,
     };
   });
@@ -473,9 +533,13 @@ export function convertTD3PatternToDbox(
 /**
  * Convert entire TD3File to a DEViLBOX project
  */
-export function convertTD3FileToDbox(td3File: TD3File, filename: string): object {
+export function convertTD3FileToDbox(
+  td3File: TD3File,
+  filename: string,
+  options: TD3ImportOptions = {}
+): object {
   const patterns = td3File.patterns.map((td3Pattern, idx) => {
-    const converted = convertTD3PatternToDbox(td3Pattern);
+    const converted = convertTD3PatternToDbox(td3Pattern, options);
 
     return {
       id: `td3-pattern-${idx}`,

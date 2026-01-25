@@ -222,7 +222,11 @@ export const useTrackerInput = () => {
       // FT2: Get target channel for multi-channel recording
       const targetChannel = getTargetChannel();
 
-      // Track the held note with channel info
+      // PERFORMANCE: Trigger audio FIRST before any state updates
+      // State updates can cause React re-renders which delay audio
+      engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
+
+      // Track the held note with channel info (ref update, no re-render)
       heldNotesRef.current.set(key, {
         note: fullNote,
         xmNote,
@@ -230,11 +234,8 @@ export const useTrackerInput = () => {
         channelIndex: targetChannel,
       });
 
-      // FT2: Track key state for multi-channel allocation
+      // FT2: Track key state for multi-channel allocation (state update, may re-render)
       setKeyOn(targetChannel, xmNote);
-
-      // Trigger attack (note will sustain until keyup)
-      engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
     },
     [currentInstrumentId, instruments, getTargetChannel, setKeyOn]
   );
@@ -890,7 +891,9 @@ export const useTrackerInput = () => {
 
       // Check if this is a note key
       // IMPORTANT: Ignore key repeats to prevent retriggering while holding a key
-      if (NOTE_MAP[keyLower] && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat) {
+      // FT2: Only process note keys when cursor is on the NOTE column
+      // Otherwise, keys like 'c', 'v', 'b' etc. should go to effect/volume entry
+      if (NOTE_MAP[keyLower] && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat && cursor.columnType === 'note') {
         e.preventDefault();
         const { note, octaveOffset } = NOTE_MAP[keyLower];
         const octave = currentOctave + octaveOffset;
@@ -911,10 +914,10 @@ export const useTrackerInput = () => {
 
       // FT2: Key repeat behavior - only repeat note entry in edit mode
       // In edit mode (recordMode && !isPlaying), allow key repeat for notes
-      if (NOTE_MAP[keyLower] && e.repeat) {
+      if (NOTE_MAP[keyLower] && e.repeat && cursor.columnType === 'note') {
         e.preventDefault();
         // FT2 behavior: Allow key repeat only in edit mode
-        if (recordMode && !isPlaying && cursor.columnType === 'note') {
+        if (recordMode && !isPlaying) {
           const { note, octaveOffset } = NOTE_MAP[keyLower];
           const octave = currentOctave + octaveOffset;
           const heldNote = heldNotesRef.current.get(keyLower);

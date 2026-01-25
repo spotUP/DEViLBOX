@@ -42,9 +42,9 @@ export const NoteCell: React.FC<NoteCellProps> = React.memo(
           isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
         style={{
-          width: '3ch',
-          minWidth: '3ch',
-          maxWidth: '3ch',
+          width: '42px',
+          minWidth: '42px',
+          maxWidth: '42px',
           display: 'inline-block',
           textAlign: 'left',
           overflow: 'hidden',

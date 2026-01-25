@@ -24,7 +24,7 @@ import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { AutomationLanes } from './AutomationLanes';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsDownUp } from 'lucide-react';
+import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -129,9 +129,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   // Custom scrollbar state
   const [customScrollThumbLeft, setCustomScrollThumbLeft] = useState(0);
   const [customScrollThumbWidth, setCustomScrollThumbWidth] = useState(100);
+  const [needsHorizontalScroll, setNeedsHorizontalScroll] = useState(false);
   const customScrollTrackRef = useRef<HTMLDivElement>(null);
   const isDraggingScrollbar = useRef(false);
   const isScrollSyncing = useRef(false);
+
+  // Mobile state ref for render function access
+  const isMobileRef = useRef(isMobile);
+  isMobileRef.current = isMobile;
 
   // Get pattern and actions
   const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
@@ -139,6 +144,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const removeChannel = useTrackerStore((state) => state.removeChannel);
   const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
   const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
+  const toggleChannelCollapse = useTrackerStore((state) => state.toggleChannelCollapse);
   const setChannelColor = useTrackerStore((state) => state.setChannelColor);
   const setCell = useTrackerStore((state) => state.setCell);
   const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
@@ -583,7 +589,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     // Calculate visible lines with extra buffer for smooth scrolling
     const visibleLines = Math.ceil(height / ROW_HEIGHT) + 4;
     const topLines = Math.floor(visibleLines / 2);
-    const visibleStart = Math.floor(currentRowPosition) - topLines;
+    const centerRowIndex = Math.floor(currentRowPosition); // The row that should be at center
+    const visibleStart = centerRowIndex - topLines;
     const visibleEnd = visibleStart + visibleLines;
 
     // Center line position - offset by fractional part for smooth scrolling
@@ -594,38 +601,55 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     // Track widths - note(3) + inst(2) + vol(2) + eff1(3) + eff2(3) + accent(1) + slide(1) = 15 chars + gaps
     const noteWidth = CHAR_WIDTH * 3 + 4;
     const paramWidth = CHAR_WIDTH * 12 + 28; // inst + vol + eff1 + eff2 + accent + slide
-    const channelWidth = noteWidth + paramWidth + 20;
+    const fullChannelWidth = noteWidth + paramWidth + 20;
+    const collapsedWidth = 60; // Narrow width for collapsed channels
+
+    // Mobile: only render selected channel
+    const isMobileView = isMobileRef.current;
+    const mobileChannelIdx = cursor.channelIndex;
+
+    // Pre-calculate channel x positions based on collapsed state
+    const channelXPositions: number[] = [];
+    const channelWidths: number[] = [];
+    let xPos = 0;
+    for (let ch = 0; ch < numChannels; ch++) {
+      const isCollapsed = pattern.channels[ch]?.collapsed || false;
+      const chWidth = isCollapsed ? collapsedWidth : fullChannelWidth;
+      channelXPositions.push(xPos);
+      channelWidths.push(chWidth);
+      xPos += chWidth;
+    }
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw rows (including ghost patterns when playing with looping)
+    // Draw rows (including ghost patterns when enabled)
     for (let i = visibleStart; i < visibleEnd; i++) {
       let rowIndex: number;
       let patternType: 'prev' | 'current' | 'next' = 'current';
       let sourcePattern = pattern;
 
-      if (isPlaying) {
-        // During playback, handle ghost pattern rendering
-        if (i < 0 && showGhostPatterns && prevPattern) {
-          // Previous pattern (ghost)
-          rowIndex = ((prevPattern.length + (i % prevPattern.length)) % prevPattern.length);
-          patternType = 'prev';
-          sourcePattern = prevPattern;
-        } else if (i >= patternLength && showGhostPatterns && nextPattern) {
-          // Next pattern (ghost)
-          rowIndex = (i - patternLength) % nextPattern.length;
-          patternType = 'next';
-          sourcePattern = nextPattern;
-        } else {
-          // Current pattern with wrapping
-          rowIndex = ((i % patternLength) + patternLength) % patternLength;
-        }
-      } else {
-        // When stopped, don't wrap - just skip out-of-bounds rows
-        if (i < 0 || i >= patternLength) continue;
+      // Handle ghost pattern rendering (works during playback and when stopped)
+      if (i < 0 && showGhostPatterns && prevPattern) {
+        // Previous pattern (ghost)
+        rowIndex = ((prevPattern.length + (i % prevPattern.length)) % prevPattern.length);
+        patternType = 'prev';
+        sourcePattern = prevPattern;
+      } else if (i >= patternLength && showGhostPatterns && nextPattern) {
+        // Next pattern (ghost)
+        rowIndex = (i - patternLength) % nextPattern.length;
+        patternType = 'next';
+        sourcePattern = nextPattern;
+      } else if (i >= 0 && i < patternLength) {
+        // Current pattern
         rowIndex = i;
+      } else if (isPlaying) {
+        // During playback, wrap within current pattern
+        rowIndex = ((i % patternLength) + patternLength) % patternLength;
+      } else {
+        // When stopped without ghosts, skip out-of-bounds rows
+        continue;
       }
 
       const y = baseY + ((i - visibleStart) * ROW_HEIGHT);
@@ -634,6 +658,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       // Row background - dimmer for ghost rows
       const isHighlight = rowIndex % 4 === 0;
       const isGhostRow = patternType !== 'current';
+      // Center row is where the edit cursor is - compare loop index to center position
+      const isCenterRow = (i === centerRowIndex) && patternType === 'current';
+
       if (isGhostRow) {
         ctx.fillStyle = colors.rowGhost;
       } else {
@@ -641,54 +668,74 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       }
       ctx.fillRect(0, y, width, ROW_HEIGHT);
 
+      // Draw center line highlight (edit bar) BEFORE text so text appears on top
+      if (isCenterRow) {
+        ctx.fillStyle = colors.centerLine;
+        ctx.fillRect(0, y, width, ROW_HEIGHT);
+      }
+
       // Line number (dimmed for ghost rows)
       ctx.globalAlpha = isGhostRow ? (isLooping ? 0.4 : 0.6) : 1;
       const lineNumCanvas = getLineNumberCanvas(rowIndex, useHex);
       ctx.drawImage(lineNumCanvas, 4, y);
 
-      // Draw each channel
+      // Draw each channel (on mobile, only the selected channel)
       const channelCount = Math.min(numChannels, sourcePattern.channels.length);
-      for (let ch = 0; ch < channelCount; ch++) {
+      const channelsToRender = isMobileView
+        ? [mobileChannelIdx]  // Mobile: only selected channel
+        : Array.from({ length: channelCount }, (_, i) => i);  // Desktop: all channels
+
+      for (const ch of channelsToRender) {
+        if (ch >= channelCount) continue;
         const cell = sourcePattern.channels[ch]?.rows[rowIndex];
         if (!cell) continue;
 
-        const x = LINE_NUMBER_WIDTH + ch * channelWidth + 8 - scrollLeft;
+        const isCollapsed = pattern.channels[ch]?.collapsed || false;
+        const chWidth = channelWidths[ch] || fullChannelWidth;
+        // On mobile, position at x=0 (after line numbers), no scroll offset
+        const x = isMobileView
+          ? LINE_NUMBER_WIDTH + 8
+          : LINE_NUMBER_WIDTH + channelXPositions[ch] + 8 - scrollLeft;
 
-        // Skip if outside visible area
-        if (x + channelWidth < 0 || x > width) continue;
+        // Skip if outside visible area (desktop only)
+        if (!isMobileView && (x + chWidth < 0 || x > width)) continue;
 
         // Note
         const noteCanvas = getNoteCanvas(cell.note || 0);
         ctx.drawImage(noteCanvas, x, y);
 
-        // Parameters (including effect2, accent, slide)
-        const paramCanvas = getParamCanvas(
-          cell.instrument || 0,
-          cell.volume || 0,
-          cell.effTyp || 0,
-          cell.eff || 0,
-          cell.effect2,
-          cell.accent,
-          cell.slide
-        );
-        ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
+        // Parameters (only if not collapsed)
+        if (!isCollapsed) {
+          const paramCanvas = getParamCanvas(
+            cell.instrument || 0,
+            cell.volume || 0,
+            cell.effTyp || 0,
+            cell.eff || 0,
+            cell.effect2,
+            cell.accent,
+            cell.slide
+          );
+          ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
+        }
 
-        // Channel separator
-        ctx.fillStyle = colors.border;
-        ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
+        // Channel separator (only on desktop)
+        if (!isMobileView) {
+          ctx.fillStyle = colors.border;
+          const separatorX = LINE_NUMBER_WIDTH + channelXPositions[ch] + chWidth - scrollLeft;
+          ctx.fillRect(separatorX, y, 1, ROW_HEIGHT);
+        }
       }
 
       // Reset alpha for next row
       ctx.globalAlpha = 1;
     }
 
-    // Draw center line highlight
-    ctx.fillStyle = colors.centerLine;
-    ctx.fillRect(0, centerLineTop, width, ROW_HEIGHT);
-
     // Draw cursor (only when not playing)
     if (!isPlaying) {
-      const cursorX = LINE_NUMBER_WIDTH + cursor.channelIndex * channelWidth + 8 - scrollLeft;
+      // On mobile, cursor is always at x=0 since only one channel is shown
+      const cursorX = isMobileView
+        ? LINE_NUMBER_WIDTH + 8
+        : LINE_NUMBER_WIDTH + (channelXPositions[cursor.channelIndex] || 0) + 8 - scrollLeft;
       let cursorOffsetX = 0;
       let cursorW = noteWidth;
 
@@ -705,13 +752,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           cursorW = CHAR_WIDTH * 2;
           break;
         case 'effTyp':
-        case 'effParam':
+          // Effect type is position 0 (single character)
           cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8;
-          cursorW = CHAR_WIDTH * 3;
+          cursorW = CHAR_WIDTH;
+          break;
+        case 'effParam':
+          // Effect param starts at position 1, has 2 digits
+          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH;
+          cursorW = CHAR_WIDTH;
           break;
         case 'effect2':
+          // Effect 2 has 3 chars like effect 1
           cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 7 + 12;
-          cursorW = CHAR_WIDTH * 3;
+          cursorW = CHAR_WIDTH;
           break;
         case 'accent':
           cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 10 + 16;
@@ -752,7 +805,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     ctx.fillStyle = gradient2;
     ctx.fillRect(0, height - 60, width, 60);
 
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isMobile]);
 
   // Animation loop
   const animate = useCallback(() => {
@@ -836,6 +889,43 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
+
+  // Check if horizontal scrolling is needed
+  useEffect(() => {
+    if (!headerScrollRef.current) return;
+
+    const updateScrollbarDimensions = () => {
+      if (!headerScrollRef.current) return;
+
+      const scrollWidth = headerScrollRef.current.scrollWidth;
+      const clientWidth = headerScrollRef.current.clientWidth;
+
+      // Determine if scrolling is needed
+      const scrollingNeeded = scrollWidth > clientWidth;
+      setNeedsHorizontalScroll(scrollingNeeded);
+
+      // Calculate thumb dimensions if scrollbar track exists
+      if (scrollingNeeded && customScrollTrackRef.current) {
+        const scrollLeft = headerScrollRef.current.scrollLeft;
+        const trackWidth = customScrollTrackRef.current.clientWidth;
+        const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
+        const maxScroll = scrollWidth - clientWidth;
+        const maxThumbLeft = trackWidth - thumbWidth;
+        const scrollPercent = maxScroll > 0 ? scrollLeft / maxScroll : 0;
+
+        setCustomScrollThumbWidth(thumbWidth);
+        setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
+      }
+    };
+
+    updateScrollbarDimensions();
+
+    // Update when channels change
+    const resizeObserver = new ResizeObserver(updateScrollbarDimensions);
+    resizeObserver.observe(headerScrollRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, [pattern?.channels.length, needsHorizontalScroll]);
 
   // Handle header scroll sync with custom scrollbar
   const handleHeaderScroll = useCallback(() => {
@@ -943,7 +1033,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const noteWidth = CHAR_WIDTH * 3 + 4;
   const paramWidth = CHAR_WIDTH * 12 + 28; // inst + vol + eff1 + eff2 + accent + slide
   const channelHeaderWidth = noteWidth + paramWidth + 20;
-  const totalChannelsWidth = pattern ? pattern.channels.length * channelHeaderWidth : 0;
+  const collapsedChannelWidth = 60; // Narrow width for collapsed channels
+
+  // Calculate total width accounting for collapsed channels
+  const totalChannelsWidth = pattern
+    ? pattern.channels.reduce((sum, ch) => sum + (ch.collapsed ? collapsedChannelWidth : channelHeaderWidth), 0)
+    : 0;
+
+  // Get width for a specific channel
+  const getChannelWidth = (channel: typeof pattern.channels[0]) =>
+    channel.collapsed ? collapsedChannelWidth : channelHeaderWidth;
 
   if (!pattern) {
     return (
@@ -1048,7 +1147,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
                       style={{
-                        width: channelHeaderWidth,
+                        width: getChannelWidth(channel),
                         backgroundColor: channel.color ? `${channel.color}15` : undefined,
                         boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
                       }}
@@ -1060,66 +1159,78 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
                         >
                           {(idx + 1).toString().padStart(2, '0')}
                         </span>
-                        <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
+                        {!channel.collapsed && (
+                          <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {/* Collapse channel button (placeholder) */}
+                        {/* Collapse channel button - always visible */}
                         <button
-                          className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
-                          title="Collapse/Expand Channel"
-                        >
-                          <ChevronsDownUp size={12} />
-                        </button>
-                        <ChannelContextMenu
-                          channelIndex={idx}
-                          channel={channel}
-                          patternId={pattern.id}
-                          patternLength={pattern.length}
-                          onFillPattern={handleFillPattern}
-                          onClearChannel={handleClearChannel}
-                          onCopyChannel={handleCopyChannel}
-                          onCutChannel={handleCutChannel}
-                          onPasteChannel={handlePasteChannel}
-                          onTranspose={handleTranspose}
-                          onHumanize={handleHumanize}
-                          onInterpolate={handleInterpolate}
-                          onAcidGenerator={onAcidGenerator || (() => {})}
-                        />
-                        <ChannelColorPicker
-                          currentColor={channel.color}
-                          onColorSelect={(color) => setChannelColor(idx, color)}
-                        />
-                        <button
-                          onClick={() => toggleChannelMute(idx)}
+                          onClick={() => toggleChannelCollapse(idx)}
                           className={`p-1 rounded transition-colors ${
-                            channel.muted
-                              ? 'bg-accent-error/20 text-accent-error'
-                              : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
-                          }`}
-                          title={channel.muted ? 'Unmute' : 'Mute'}
-                        >
-                          {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
-                        </button>
-                        <button
-                          onClick={() => toggleChannelSolo(idx)}
-                          className={`p-1 rounded transition-colors ${
-                            channel.solo
+                            channel.collapsed
                               ? 'bg-accent-primary/20 text-accent-primary'
                               : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
                           }`}
-                          title={channel.solo ? 'Unsolo' : 'Solo'}
+                          title={channel.collapsed ? 'Expand Channel' : 'Collapse Channel'}
                         >
-                          <Headphones size={12} />
+                          {channel.collapsed ? <ChevronsRight size={12} /> : <ChevronsLeft size={12} />}
                         </button>
-                        {pattern.channels.length > 1 && (
-                          <button
-                            onClick={() => removeChannel(idx)}
-                            className="p-1 rounded text-text-muted hover:text-accent-error hover:bg-dark-bgHover transition-colors"
-                            title="Remove Channel"
-                          >
-                            <Minus size={12} />
-                          </button>
+                        {/* Other controls - hidden when collapsed */}
+                        {!channel.collapsed && (
+                          <>
+                            <ChannelContextMenu
+                              channelIndex={idx}
+                              channel={channel}
+                              patternId={pattern.id}
+                              patternLength={pattern.length}
+                              onFillPattern={handleFillPattern}
+                              onClearChannel={handleClearChannel}
+                              onCopyChannel={handleCopyChannel}
+                              onCutChannel={handleCutChannel}
+                              onPasteChannel={handlePasteChannel}
+                              onTranspose={handleTranspose}
+                              onHumanize={handleHumanize}
+                              onInterpolate={handleInterpolate}
+                              onAcidGenerator={onAcidGenerator || (() => {})}
+                            />
+                            <ChannelColorPicker
+                              currentColor={channel.color}
+                              onColorSelect={(color) => setChannelColor(idx, color)}
+                            />
+                            <button
+                              onClick={() => toggleChannelMute(idx)}
+                              className={`p-1 rounded transition-colors ${
+                                channel.muted
+                                  ? 'bg-accent-error/20 text-accent-error'
+                                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                              }`}
+                              title={channel.muted ? 'Unmute' : 'Mute'}
+                            >
+                              {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                            </button>
+                            <button
+                              onClick={() => toggleChannelSolo(idx)}
+                              className={`p-1 rounded transition-colors ${
+                                channel.solo
+                                  ? 'bg-accent-primary/20 text-accent-primary'
+                                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                              }`}
+                              title={channel.solo ? 'Unsolo' : 'Solo'}
+                            >
+                              <Headphones size={12} />
+                            </button>
+                            {pattern.channels.length > 1 && (
+                              <button
+                                onClick={() => removeChannel(idx)}
+                                className="p-1 rounded text-text-muted hover:text-accent-error hover:bg-dark-bgHover transition-colors"
+                                title="Remove Channel"
+                              >
+                                <Minus size={12} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1141,31 +1252,33 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
             </div>
           </div>
 
-          {/* Custom always-visible scrollbar */}
-          <div className="flex w-full">
-            {/* Spacer for row number column */}
-            <div className="flex-shrink-0" style={{ width: LINE_NUMBER_WIDTH }} />
+          {/* Custom scrollbar - only visible when horizontal scrolling is needed */}
+          {needsHorizontalScroll && (
+            <div className="flex w-full">
+              {/* Spacer for row number column */}
+              <div className="flex-shrink-0" style={{ width: LINE_NUMBER_WIDTH }} />
 
-            {/* Custom scrollbar track */}
-            <div
-              ref={customScrollTrackRef}
-              className="flex-1 bg-dark-bgSecondary border-t border-dark-border cursor-pointer"
-              style={{ height: '12px', minWidth: 0 }}
-              onMouseDown={handleCustomScrollbarMouseDown}
-            >
-              {/* Custom scrollbar thumb */}
+              {/* Custom scrollbar track */}
               <div
-                className="bg-accent-primary hover:bg-accent-primary/80 transition-colors"
-                style={{
-                  height: '100%',
-                  width: `${customScrollThumbWidth}px`,
-                  transform: `translateX(${customScrollThumbLeft}px)`,
-                  borderRadius: '2px',
-                  pointerEvents: 'none',
-                }}
-              />
+                ref={customScrollTrackRef}
+                className="flex-1 bg-dark-bgSecondary border-t border-dark-border cursor-pointer"
+                style={{ height: '12px', minWidth: 0 }}
+                onMouseDown={handleCustomScrollbarMouseDown}
+              >
+                {/* Custom scrollbar thumb */}
+                <div
+                  className="bg-accent-primary hover:bg-accent-primary/80 transition-colors"
+                  style={{
+                    height: '100%',
+                    width: `${customScrollThumbWidth}px`,
+                    transform: `translateX(${customScrollThumbLeft}px)`,
+                    borderRadius: '2px',
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

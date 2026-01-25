@@ -23,7 +23,6 @@ import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
-import { LiveModeToggle } from './LiveModeIndicator';
 import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Menu, Activity } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
@@ -537,7 +536,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       {/* Top Control Bar - Simple pattern info */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10">
         <div className="flex items-center gap-2">
-          <LiveModeToggle />
           <span className="text-accent-primary font-bold font-mono text-xs whitespace-nowrap">
             {pattern?.name || 'Untitled'}
           </span>

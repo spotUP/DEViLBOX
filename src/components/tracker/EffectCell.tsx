@@ -34,12 +34,23 @@ export const EffectCell: React.FC<EffectCellProps> = React.memo(
 
     const colorClass = isEmpty ? 'text-text-muted' : 'text-orange-400';
 
+    const cellStyle = {
+      width: '42px',
+      minWidth: '42px',
+      maxWidth: '42px',
+      display: 'inline-block' as const,
+      textAlign: 'left' as const,
+      overflow: 'hidden' as const,
+      whiteSpace: 'nowrap' as const,
+    };
+
     // FT2-style: Highlight only the character under the cursor
     if (isActive && displayValue !== '...') {
       const chars = displayValue.split('');
       return (
         <span
           className={`tracker-cell ${colorClass}`}
+          style={cellStyle}
           title={tooltip || undefined}
         >
           {chars.map((char, i) => (
@@ -67,6 +78,7 @@ export const EffectCell: React.FC<EffectCellProps> = React.memo(
           isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
         style={{
+          ...cellStyle,
           color: isActive ? '#ffffff' : undefined
         }}
         title={tooltip || undefined}

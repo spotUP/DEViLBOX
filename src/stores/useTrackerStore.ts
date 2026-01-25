@@ -196,7 +196,7 @@ interface TrackerStore {
   removeChannel: (channelIndex: number) => void;
   toggleChannelMute: (channelIndex: number) => void;
   toggleChannelSolo: (channelIndex: number) => void;
-  // toggleChannelCollapse: (channelIndex: number) => void;
+  toggleChannelCollapse: (channelIndex: number) => void;
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
@@ -225,6 +225,7 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
     rows: Array.from({ length }, () => ({ ...EMPTY_CELL })),
     muted: false,
     solo: false,
+    collapsed: false,
     volume: 80,
     pan: 0,
     instrumentId: null,
@@ -292,10 +293,13 @@ export const useTrackerStore = create<TrackerStore>()(
         const numRows = pattern.length;
 
         // Map column types to their digit count (0 means not editable on digit level or handles separately)
+        // effTyp = 1 digit (effect type: 0-9, A-Z)
+        // effParam = 2 digits (effect parameter: 00-FF)
         const DIGIT_COUNTS: Record<string, number> = {
           instrument: 2,
           volume: 2,
-          effect: 3,
+          effTyp: 1,
+          effParam: 2,
           effect2: 3,
           cutoff: 2,
           resonance: 2,
@@ -1417,6 +1421,7 @@ export const useTrackerStore = create<TrackerStore>()(
               rows: Array.from({ length: pattern.length }, () => ({ ...EMPTY_CELL })),
               muted: false,
               solo: false,
+              collapsed: false,
               volume: 80,
               pan: 0,
               instrumentId: null,
@@ -1478,14 +1483,14 @@ export const useTrackerStore = create<TrackerStore>()(
       }
     },
 
-    // toggleChannelCollapse: (channelIndex) =>
-    //   set((state) => {
-    //     state.patterns.forEach((pattern) => {
-    //       if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-    //         pattern.channels[channelIndex].collapsed = !pattern.channels[channelIndex].collapsed;
-    //       }
-    //     });
-    //   }),
+    toggleChannelCollapse: (channelIndex) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+            pattern.channels[channelIndex].collapsed = !pattern.channels[channelIndex].collapsed;
+          }
+        });
+      }),
 
     setChannelVolume: (channelIndex, volume) =>
       set((state) => {
