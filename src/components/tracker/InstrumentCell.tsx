@@ -27,11 +27,21 @@ export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
 
     const colorClass = isEmpty ? 'text-text-muted' : 'text-amber-400';
 
+    const cellStyle = {
+      width: '28px',
+      minWidth: '28px',
+      maxWidth: '28px',
+      display: 'inline-block' as const,
+      textAlign: 'left' as const,
+      overflow: 'hidden' as const,
+      whiteSpace: 'nowrap' as const,
+    };
+
     // FT2-style: Highlight only the character under the cursor
     if (isActive && displayValue !== '..') {
       const chars = displayValue.split('');
       return (
-        <span className={`tracker-cell ${colorClass}`}>
+        <span className={`tracker-cell ${colorClass}`} style={cellStyle}>
           {chars.map((char, i) => (
             <span
               key={i}
@@ -57,6 +67,7 @@ export const InstrumentCell: React.FC<InstrumentCellProps> = React.memo(
           isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
         style={{
+          ...cellStyle,
           color: isActive ? '#ffffff' : undefined
         }}
       >

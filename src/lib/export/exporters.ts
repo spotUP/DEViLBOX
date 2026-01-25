@@ -77,7 +77,7 @@ export function exportSong(
     : JSON.stringify(songData);
 
   const blob = new Blob([json], { type: 'application/json' });
-  const filename = `${sanitizeFilename(metadata.name)}.song.json`;
+  const filename = `${sanitizeFilename(metadata.name)}.dbox`;
 
   saveAs(blob, filename);
 }

@@ -38,16 +38,16 @@ export const Button: React.FC<ButtonProps> = ({
     default: 'btn',
     ghost: 'btn-ghost',
     icon: 'btn-icon',
-    danger: 'px-4 py-2 bg-red-600 text-white hover:bg-red-700 border border-red-700 rounded-md',
+    danger: 'btn-danger',
     ft2: '', // FT2 handled separately with color variants
   };
 
-  // Size classes for non-FT2 buttons
+  // Size modifier classes (applied to all button variants)
   const sizeClasses: Record<string, string> = {
-    sm: 'text-xs px-3 py-1.5',
-    md: 'text-sm px-4 py-2',
-    lg: 'text-base px-6 py-3',
-    icon: 'p-2',
+    sm: 'btn-sm',
+    md: 'btn-md',
+    lg: 'btn-lg',
+    icon: '',
   };
 
   // FT2 specific classes
@@ -77,13 +77,12 @@ export const Button: React.FC<ButtonProps> = ({
     buttonClasses += ` ${ft2BaseClasses} ${ft2SizeClasses[size]} ${ft2ColorClasses[color]}`;
   } else {
     const variantClass = variantClasses[variant] || variantClasses.default;
+    buttonClasses += ` ${variantClass}`;
 
-    // Only add size classes if not using CSS class-based variants
-    if (!['primary', 'default', 'ghost', 'icon'].includes(variant)) {
+    // Apply size modifier class
+    if (sizeClasses[size]) {
       buttonClasses += ` ${sizeClasses[size]}`;
     }
-
-    buttonClasses += ` ${variantClass}`;
   }
 
   if (fullWidth) {

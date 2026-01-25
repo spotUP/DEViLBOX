@@ -40,12 +40,23 @@ export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
       }
     }
 
+    const cellStyle = {
+      width: '28px',
+      minWidth: '28px',
+      maxWidth: '28px',
+      display: 'inline-block' as const,
+      textAlign: 'left' as const,
+      overflow: 'hidden' as const,
+      whiteSpace: 'nowrap' as const,
+    };
+
     // FT2-style: Highlight only the character under the cursor
     if (isActive && displayValue !== '..') {
       const chars = displayValue.split('');
       return (
         <span
           className={`tracker-cell ${colorClass}`}
+          style={cellStyle}
           title={tooltip || undefined}
         >
           {chars.map((char, i) => (
@@ -73,6 +84,7 @@ export const VolumeCell: React.FC<VolumeCellProps> = React.memo(
           isActive ? 'bg-accent-primary font-bold rounded-sm' : ''
         }`}
         style={{
+          ...cellStyle,
           color: isActive ? '#ffffff' : undefined
         }}
         title={tooltip || undefined}

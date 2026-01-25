@@ -291,16 +291,31 @@ export const ChannelVUMeters: React.FC = () => {
   const CHAR_WIDTH = 10;
   const noteWidth = CHAR_WIDTH * 3 + 4;  // 34
   const paramWidth = CHAR_WIDTH * 12 + 28; // 148 - inst(2) + vol(2) + eff1(3) + eff2(3) + accent(1) + slide(1) + gaps
-  const CHANNEL_WIDTH = noteWidth + paramWidth + 20; // 202
+  const FULL_CHANNEL_WIDTH = noteWidth + paramWidth + 20; // 202
+  const COLLAPSED_CHANNEL_WIDTH = 60; // Narrow width for collapsed channels
   const METER_WIDTH = 20; // Narrower to fit better
 
-  const getChannelCenterX = (index: number) => {
-    return ROW_NUM_WIDTH + index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
+  // Calculate x position accounting for collapsed channels
+  const getChannelCenterX = (index: number): number => {
+    let x = ROW_NUM_WIDTH;
+    for (let i = 0; i < index; i++) {
+      const isCollapsed = pattern?.channels[i]?.collapsed || false;
+      x += isCollapsed ? COLLAPSED_CHANNEL_WIDTH : FULL_CHANNEL_WIDTH;
+    }
+    const currentCollapsed = pattern?.channels[index]?.collapsed || false;
+    const currentWidth = currentCollapsed ? COLLAPSED_CHANNEL_WIDTH : FULL_CHANNEL_WIDTH;
+    return x + currentWidth / 2;
   };
 
   return (
     <div ref={containerRef} className="vu-meters-overlay">
       {Array(numChannels).fill(0).map((_, index) => {
+        // Skip VU meters for collapsed channels
+        const isCollapsed = pattern?.channels[index]?.collapsed || false;
+        if (isCollapsed) {
+          return null;
+        }
+
         const centerX = getChannelCenterX(index);
 
         return (

@@ -23,11 +23,13 @@ interface TrackerRowProps {
   isCursorRow: boolean;
   isCurrentPlaybackRow: boolean;
   channelWidth?: number; // Optional width per channel (mobile uses full width)
+  channelWidths?: number[]; // Per-channel widths (for collapsed channels)
+  collapsedChannels?: boolean[]; // Which channels are collapsed
   baseChannelIndex?: number; // Base channel index offset (for mobile single-channel view)
 }
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
-  ({ rowIndex, cells, channelColors, cursorColumnType, cursorChannelIndex, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
+  ({ rowIndex, cells, channelColors, cursorColumnType, cursorChannelIndex, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, channelWidths, collapsedChannels, baseChannelIndex = 0 }) => {
     const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const rowNumber = useHexNumbers
@@ -68,6 +70,10 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
           // XM format: note 97 = note off
           const isNoteOff = cell.note === 97;
           const channelColor = channelColors[localIndex];
+          // Check if this channel is collapsed
+          const isCollapsed = collapsedChannels?.[localIndex] ?? false;
+          // Use per-channel width if provided, otherwise fall back to default
+          const thisChannelWidth = channelWidths?.[localIndex] ?? effectiveChannelWidth;
 
           return (
             <div
@@ -79,12 +85,13 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                 ${isChannelActive ? 'bg-accent-primary/10' : ''}
               `}
               style={{
-                minWidth: effectiveChannelWidth,
+                minWidth: thisChannelWidth,
+                width: thisChannelWidth,
                 backgroundColor: channelColor && !isChannelActive ? `${channelColor}10` : undefined,
                 boxShadow: channelColor ? `inset 2px 0 0 ${channelColor}40` : undefined,
               }}
             >
-              {/* Note */}
+              {/* Note - always visible */}
               <NoteCell
                 value={cell.note}
                 isActive={isChannelActive && cursorColumnType === 'note'}
@@ -92,48 +99,53 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                 isNoteOff={isNoteOff}
               />
 
-              {/* Instrument */}
-              <InstrumentCell
-                value={cell.instrument}
-                isActive={isChannelActive && cursorColumnType === 'instrument'}
-                isEmpty={cell.instrument === 0}
-              />
+              {/* Other columns - hidden when collapsed */}
+              {!isCollapsed && (
+                <>
+                  {/* Instrument */}
+                  <InstrumentCell
+                    value={cell.instrument}
+                    isActive={isChannelActive && cursorColumnType === 'instrument'}
+                    isEmpty={cell.instrument === 0}
+                  />
 
-              {/* Volume */}
-              <VolumeCell
-                value={cell.volume}
-                isActive={isChannelActive && cursorColumnType === 'volume'}
-                isEmpty={cell.volume === 0 || cell.volume < 0x10}
-              />
+                  {/* Volume */}
+                  <VolumeCell
+                    value={cell.volume}
+                    isActive={isChannelActive && cursorColumnType === 'volume'}
+                    isEmpty={cell.volume === 0 || cell.volume < 0x10}
+                  />
 
-              {/* Effect 1 */}
-              <EffectCell
-                effTyp={cell.effTyp}
-                eff={cell.eff}
-                isActive={isChannelActive && (cursorColumnType === 'effTyp' || cursorColumnType === 'effParam')}
-                isEmpty={cell.effTyp === 0 && cell.eff === 0}
-              />
+                  {/* Effect 1 */}
+                  <EffectCell
+                    effTyp={cell.effTyp}
+                    eff={cell.eff}
+                    isActive={isChannelActive && (cursorColumnType === 'effTyp' || cursorColumnType === 'effParam')}
+                    isEmpty={cell.effTyp === 0 && cell.eff === 0}
+                  />
 
-              {/* Effect 2 */}
-              <EffectCell
-                value={cell.effect2}
-                isActive={isChannelActive && cursorColumnType === 'effect2'}
-                isEmpty={!cell.effect2}
-              />
+                  {/* Effect 2 */}
+                  <EffectCell
+                    value={cell.effect2}
+                    isActive={isChannelActive && cursorColumnType === 'effect2'}
+                    isEmpty={!cell.effect2}
+                  />
 
-              {/* Accent */}
-              <AccentCell
-                value={cell.accent}
-                isActive={isChannelActive && cursorColumnType === 'accent'}
-                onToggle={() => setCell(actualChannelIndex, rowIndex, { accent: !cell.accent })}
-              />
+                  {/* Accent */}
+                  <AccentCell
+                    value={cell.accent}
+                    isActive={isChannelActive && cursorColumnType === 'accent'}
+                    onToggle={() => setCell(actualChannelIndex, rowIndex, { accent: !cell.accent })}
+                  />
 
-              {/* Slide */}
-              <SlideCell
-                value={cell.slide}
-                isActive={isChannelActive && cursorColumnType === 'slide'}
-                onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
-              />
+                  {/* Slide */}
+                  <SlideCell
+                    value={cell.slide}
+                    isActive={isChannelActive && cursorColumnType === 'slide'}
+                    onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
+                  />
+                </>
+              )}
             </div>
           );
         })}

@@ -3,10 +3,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
+import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
 import { APP_VERSION, BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, ChevronUp, ChevronDown, Download } from 'lucide-react';
-import { Oscilloscope } from '@components/visualization/Oscilloscope';
+import { Plus, X, Palette, Download } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { Button } from '@components/ui/Button';
@@ -32,10 +31,6 @@ const NavBarComponent: React.FC = () => {
   const setTheme = useThemeStore((state) => state.setTheme);
   const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
 
-  const oscilloscopeVisible = useUIStore((state) => state.oscilloscopeVisible);
-  const toggleOscilloscopeVisible = useUIStore((state) => state.toggleOscilloscopeVisible);
-
-  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
 
@@ -214,28 +209,6 @@ const NavBarComponent: React.FC = () => {
         >
           <Plus size={16} />
         </button>
-      </div>
-
-      {/* Bottom Bar: Oscilloscope with consistent collapse toggle */}
-      <div className={`relative ${oscilloscopeVisible ? 'px-2 py-1' : 'h-6'}`}>
-        {/* Collapse toggle - consistent right-side position */}
-        <button
-          className="panel-collapse-toggle"
-          onClick={toggleOscilloscopeVisible}
-          title={oscilloscopeVisible ? 'Hide oscilloscope' : 'Show oscilloscope'}
-        >
-          {oscilloscopeVisible ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
-
-        {oscilloscopeVisible && (
-          <div
-            className="cursor-pointer"
-            onClick={() => setVizMode(vizMode === 'waveform' ? 'spectrum' : 'waveform')}
-            title={`Click to switch to ${vizMode === 'waveform' ? 'spectrum' : 'waveform'} view`}
-          >
-            <Oscilloscope width="auto" height={60} mode={vizMode} />
-          </div>
-        )}
       </div>
 
       {/* Download Modal */}

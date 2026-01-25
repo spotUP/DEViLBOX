@@ -176,6 +176,7 @@ function createPatternFromMIDI(
         color: null,
         muted: false,
         solo: false,
+        collapsed: false,
         volume: 80, // Default volume
         pan: 0, // Center pan
         rows,
@@ -256,6 +257,7 @@ function createPatternFromTrack(
         color: null,
         muted: false,
         solo: false,
+        collapsed: false,
         volume: 80, // Default volume
         pan: 0, // Center pan
         rows,

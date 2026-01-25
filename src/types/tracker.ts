@@ -101,6 +101,7 @@ export interface ChannelData {
   rows: TrackerCell[];
   muted: boolean;
   solo: boolean;
+  collapsed: boolean; // Collapse channel to narrow width
   volume: number; // 0-100
   pan: number; // -100 to 100
   instrumentId: number | null;
