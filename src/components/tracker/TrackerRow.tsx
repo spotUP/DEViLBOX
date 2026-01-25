@@ -18,7 +18,8 @@ interface TrackerRowProps {
   rowIndex: number;
   cells: TrackerCell[];
   channelColors: (string | null)[];
-  cursor: CursorPosition;
+  cursorColumnType: CursorPosition['columnType'] | null; // Only passed for cursor row
+  cursorChannelIndex: number; // -1 if not cursor row
   isCursorRow: boolean;
   isCurrentPlaybackRow: boolean;
   channelWidth?: number; // Optional width per channel (mobile uses full width)
@@ -26,7 +27,7 @@ interface TrackerRowProps {
 }
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
-  ({ rowIndex, cells, channelColors, cursor, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
+  ({ rowIndex, cells, channelColors, cursorColumnType, cursorChannelIndex, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, baseChannelIndex = 0 }) => {
     const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const rowNumber = useHexNumbers
@@ -62,7 +63,8 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
           // The actual channel index in the pattern (for cursor matching)
           const actualChannelIndex = baseChannelIndex + localIndex;
           // Cursor is now a fixed overlay - cells don't need active state
-          const isChannelActive = false;
+          // Only enable if this is the cursor row AND cursor channel
+          const isChannelActive = cursorChannelIndex === actualChannelIndex;
           // XM format: note 97 = note off
           const isNoteOff = cell.note === 97;
           const channelColor = channelColors[localIndex];
@@ -85,7 +87,7 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               {/* Note */}
               <NoteCell
                 value={cell.note}
-                isActive={isChannelActive && cursor.columnType === 'note'}
+                isActive={isChannelActive && cursorColumnType === 'note'}
                 isEmpty={cell.note === 0}
                 isNoteOff={isNoteOff}
               />
@@ -93,14 +95,14 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               {/* Instrument */}
               <InstrumentCell
                 value={cell.instrument}
-                isActive={isChannelActive && cursor.columnType === 'instrument'}
+                isActive={isChannelActive && cursorColumnType === 'instrument'}
                 isEmpty={cell.instrument === 0}
               />
 
               {/* Volume */}
               <VolumeCell
                 value={cell.volume}
-                isActive={isChannelActive && cursor.columnType === 'volume'}
+                isActive={isChannelActive && cursorColumnType === 'volume'}
                 isEmpty={cell.volume === 0 || cell.volume < 0x10}
               />
 
@@ -108,28 +110,28 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
               <EffectCell
                 effTyp={cell.effTyp}
                 eff={cell.eff}
-                isActive={isChannelActive && (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam')}
+                isActive={isChannelActive && (cursorColumnType === 'effTyp' || cursorColumnType === 'effParam')}
                 isEmpty={cell.effTyp === 0 && cell.eff === 0}
               />
 
               {/* Effect 2 */}
               <EffectCell
                 value={cell.effect2}
-                isActive={isChannelActive && cursor.columnType === 'effect2'}
+                isActive={isChannelActive && cursorColumnType === 'effect2'}
                 isEmpty={!cell.effect2}
               />
 
               {/* Accent */}
               <AccentCell
                 value={cell.accent}
-                isActive={isChannelActive && cursor.columnType === 'accent'}
+                isActive={isChannelActive && cursorColumnType === 'accent'}
                 onToggle={() => setCell(actualChannelIndex, rowIndex, { accent: !cell.accent })}
               />
 
               {/* Slide */}
               <SlideCell
                 value={cell.slide}
-                isActive={isChannelActive && cursor.columnType === 'slide'}
+                isActive={isChannelActive && cursorColumnType === 'slide'}
                 onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
               />
             </div>

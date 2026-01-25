@@ -18,8 +18,8 @@ import { useTrackerStore, useThemeStore, useUIStore, useTransportStore } from '@
 import { getToneEngine } from '@engine/ToneEngine';
 
 const DECAY_RATE = 0.88;
-const SWING_RANGE = 50;
-const SWING_SPEED = 0.8;
+const SWING_RANGE = 20; // Reduced to stay within channel bounds
+const SWING_SPEED = 2.0; // Faster swing
 const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
 
@@ -286,9 +286,13 @@ export const ChannelVUMeters: React.FC = () => {
     return null;
   }
 
-  const ROW_NUM_WIDTH = 48;
-  const CHANNEL_WIDTH = 260;
-  const METER_WIDTH = 28;
+  // Match PatternEditorCanvas dimensions
+  const ROW_NUM_WIDTH = 40; // LINE_NUMBER_WIDTH in canvas
+  const CHAR_WIDTH = 10;
+  const noteWidth = CHAR_WIDTH * 3 + 4;  // 34
+  const paramWidth = CHAR_WIDTH * 12 + 28; // 148 - inst(2) + vol(2) + eff1(3) + eff2(3) + accent(1) + slide(1) + gaps
+  const CHANNEL_WIDTH = noteWidth + paramWidth + 20; // 202
+  const METER_WIDTH = 20; // Narrower to fit better
 
   const getChannelCenterX = (index: number) => {
     return ROW_NUM_WIDTH + index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;

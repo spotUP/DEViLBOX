@@ -43,6 +43,18 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     };
   }, []);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Get filtered samples
   const getFilteredSamples = (): SampleInfo[] => {
     if (!selectedPack) return [];

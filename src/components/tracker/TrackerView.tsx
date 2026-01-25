@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PatternEditor } from './PatternEditor';
+import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
@@ -12,7 +12,7 @@ import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
-import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
+import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
@@ -166,6 +166,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Get actions (these don't cause re-renders)
   const loadPatterns = useTrackerStore((state) => state.loadPatterns);
   const setPatternOrder = useTrackerStore((state) => state.setPatternOrder);
+  const setOriginalModuleData = useTrackerStore((state) => state.setOriginalModuleData);
   const setShowGhostPatterns = useTrackerStore((state) => state.setShowGhostPatterns);
   const scaleVolume = useTrackerStore((state) => state.scaleVolume);
   const fadeVolume = useTrackerStore((state) => state.fadeVolume);
@@ -269,27 +270,33 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   usePatternPlayback();
 
   // Module import handler - used by both mobile and desktop views
-  const handleModuleImport = useCallback(async (info: ModuleInfo) => {
+  const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
+    const { useLibopenmpt } = options;
+
     // Check if native parser data is available (XM/MOD)
     if (info.nativeData) {
       const { format, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
 
       console.log(`[Import] Using native ${format} parser`);
       console.log(`[Import] ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
+      console.log(`[Import] libopenmpt playback mode: ${useLibopenmpt ? 'enabled' : 'disabled'}`);
 
       // Convert patterns using native converter
+      // Pass original buffer for libopenmpt playback if enabled
       const result = format === 'XM'
         ? convertXMModule(
             patterns,
             importMetadata.originalChannelCount,
             importMetadata,
-            parsedInstruments.map(i => i.name)
+            parsedInstruments.map(i => i.name),
+            useLibopenmpt ? info.arrayBuffer : undefined
           )
         : convertMODModule(
             patterns,
             importMetadata.originalChannelCount,
             importMetadata,
-            parsedInstruments.map(i => i.name)
+            parsedInstruments.map(i => i.name),
+            useLibopenmpt ? info.arrayBuffer : undefined
           );
 
       if (result.patterns.length === 0) {
@@ -319,6 +326,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         console.warn('[Import] No pattern order found in result!');
       }
 
+      // Store original module data for libopenmpt playback if available
+      if (result.originalModuleData) {
+        setOriginalModuleData(result.originalModuleData);
+        console.log('[Import] Original module data stored for libopenmpt playback');
+      } else {
+        setOriginalModuleData(null);
+      }
+
       // Update project metadata
       setMetadata({
         name: info.metadata.title,
@@ -345,13 +360,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         console.log('[Import] Samples ready for playback');
       }
 
+      const libopenmptNote = result.originalModuleData
+        ? `\n\n🎵 libopenmpt playback available - sample-accurate effects!`
+        : '';
+
       alert(`Module "${info.metadata.title}" imported!\n\n` +
         `Format: ${format}\n` +
         `Patterns: ${result.patterns.length}\n` +
         `Channels: ${importMetadata.originalChannelCount}\n` +
         `Instruments: ${instruments.length}\n` +
         `Samplers: ${samplerCount}\n\n` +
-        `✨ Native parser used - full sample extraction and FT2 effects preserved!`);
+        `✨ Native parser used - full sample extraction and FT2 effects preserved!${libopenmptNote}`);
 
       return;
     }
@@ -441,7 +460,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       `Channels: ${result.channelCount}\n` +
       `Instruments: ${instruments.length}\n` +
       `Samplers: ${samplerCount}`);
-  }, [loadInstruments, loadPatterns, setMetadata, setBPM]);
+  }, [loadInstruments, loadPatterns, setMetadata, setBPM, setPatternOrder, setOriginalModuleData]);
 
   // Acid generator handler
   const handleAcidGenerator = useCallback((channelIndex: number) => {
@@ -534,7 +553,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onShowInstrumentFX={onShowInstrumentFX}
           onShowInstruments={onShowInstruments}
           onShowPatternOrder={() => setShowPatternOrder(true)}
-          onImport={() => setShowImportModule(true)}
           showMasterFX={showMasterFX}
           showInstrumentFX={showInstrumentFX}
         />
@@ -667,7 +685,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            <PatternEditor onAcidGenerator={handleAcidGenerator} />
+            <PatternEditorCanvas onAcidGenerator={handleAcidGenerator} />
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
           ) : viewMode === 'pianoroll' ? (

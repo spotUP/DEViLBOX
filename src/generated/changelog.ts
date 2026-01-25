@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-23T13:43:55.486Z
+ * Generated: 2026-01-25T17:16:26.405Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,15 +20,63 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '58';
-export const BUILD_HASH = '6080166';
-export const BUILD_DATE = '2026-01-23';
+export const BUILD_NUMBER = '67';
+export const BUILD_HASH = 'ef2ad91';
+export const BUILD_DATE = '2026-01-25';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-24',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Fix FPS fluctuation and improve audio timing stability'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
+    date: '2026-01-23',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Major playback performance optimizations and sound cleanup'
+      },
+      {
+        type: 'fix',
+        description: 'Reuse preloaded instruments instead of creating new ones per channel'
+      },
+      {
+        type: 'improvement',
+        description: 'Avoid unnecessary React state updates during playback'
+      },
+      {
+        type: 'improvement',
+        description: 'Use O(1) instrument lookup map in TrackerReplayer'
+      },
+      {
+        type: 'improvement',
+        description: 'Only create ArpeggioEngine when arpeggio is enabled'
+      },
+      {
+        type: 'fix',
+        description: 'Remove console spam from UnifiedInstrumentEditor tab validation'
+      },
+      {
+        type: 'fix',
+        description: 'Replace require() with ES import for ArpeggioEngine'
+      },
+      {
+        type: 'feature',
+        description: 'Add advanced arpeggio editor for ChipSynth with 48 presets'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-2',
     date: '2026-01-22',
     changes: [
       {
@@ -94,7 +142,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-3',
     date: '2026-01-21',
     changes: [
       {
@@ -120,7 +168,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-2',
+    version: '1.0.1-4',
     date: '2026-01-20',
     changes: [
       {
@@ -154,7 +202,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-3',
+    version: '1.0.1-5',
     date: '2026-01-17',
     changes: [
       {
@@ -184,7 +232,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-4',
+    version: '1.0.1-6',
     date: '2026-01-16',
     changes: [
       {
@@ -218,42 +266,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Show all 22 synths with search field'
-      },
-      {
-        type: 'fix',
-        description: 'Fix cursor visibility during playback'
-      },
-      {
-        type: 'fix',
-        description: 'Fix duplicate Live button and cursor advancement after note entry'
-      },
-      {
-        type: 'fix',
-        description: 'Fix TestKeyboard responsiveness and keyboard event handling'
-      },
-      {
-        type: 'feature',
-        description: 'Add awesome sample editor with full waveform visualization'
-      },
-      {
-        type: 'fix',
-        description: 'UI improvements: Download button, start page update, live mode fix'
-      },
-      {
-        type: 'fix',
-        description: 'Fix slider track visibility'
-      },
-      {
-        type: 'feature',
-        description: 'Add 8 new synthesizer types'
-      },
-      {
-        type: 'feature',
-        description: 'Complete Live Mode features and add GranularSynth'
-      },
-      {
-        type: 'improvement',
-        description: 'Record while playing: enter notes at playback position'
       }
     ]
   }

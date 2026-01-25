@@ -51,6 +51,25 @@ export class ToneEngine {
   // Track active looping players per channel (to stop when new note triggers)
   private channelActivePlayer: Map<number, Tone.Player> = new Map();
 
+
+  // Per-channel last note state for slide/portamento effects (non-TB303 synths)
+  // Tracks the last triggered note frequency so slides can glide to the new note
+  private channelLastNote: Map<number, {
+    frequency: number;    // Last note frequency in Hz
+    time: number;         // When the note was triggered (for time-based decisions)
+    instrumentId: number; // Which instrument played it
+  }> = new Map();
+
+
+  // Per-channel last playback rate for Player/Sampler slide effects
+  // Used for sample-based instruments where pitch is controlled by playbackRate
+  private channelLastPlaybackRate: Map<number, number> = new Map();
+
+  // Slide time constant (RC circuit time constant, similar to TB-303's ~60ms)
+  private static readonly SLIDE_TIME_CONSTANT = 0.06; // 60ms slide time
+  // Accent velocity boost factor
+  private static readonly ACCENT_BOOST = 1.35; // 35% velocity increase for accents
+
   // Metronome synth and state
   private metronomeSynth: Tone.MembraneSynth | null = null;
   private metronomeVolume: Tone.Gain | null = null;
@@ -118,9 +137,10 @@ export class ToneEngine {
       }
     }
 
-    // Configure Transport lookahead for reliable scheduling at high BPMs
+    // Configure Transport lookahead for reliable scheduling
+    // Increased from 0.1 to 0.2 for better resilience to main thread hiccups
     const transport = Tone.getTransport();
-    transport.context.lookAhead = 0.1;
+    transport.context.lookAhead = 0.2;
   }
 
   /**
@@ -255,6 +275,17 @@ export class ToneEngine {
   public stop(): void {
     // Release all active notes before stopping to prevent hanging notes
     this.releaseAll();
+
+    // Kill master effects tails (delay, reverb) by temporarily muting output
+    // then restoring after the effect buffers have cleared
+    const currentVolume = this.masterChannel.volume.value;
+    this.masterChannel.volume.value = -Infinity;
+
+    // Restore volume after effects have flushed (delay/reverb tails)
+    setTimeout(() => {
+      this.masterChannel.volume.value = currentVolume;
+    }, 50);
+
     Tone.getTransport().stop();
   }
 
@@ -465,9 +496,7 @@ export class ToneEngine {
         break;
 
       case 'MetalSynth':
-        // PERFORMANCE FIX: MetalSynth has severe performance issues in Tone.js
-        // (1-5+ seconds per note, getting progressively worse - likely voice accumulation bug)
-        // Use NoiseSynth with bandpass filter as a fast alternative for hi-hats/cymbals
+        // Use NoiseSynth as fast alternative for hi-hats/cymbals
         instrument = new Tone.NoiseSynth({
           noise: { type: 'white' },
           envelope: {
@@ -576,25 +605,28 @@ export class ToneEngine {
         }
 
         if (sampleUrl) {
-          // CRITICAL: For looping samples (chiptunes, MOD), use Tone.Player with loop
-          // Tone.Sampler doesn't support proper looping for single-cycle waveforms
-          if (hasLoop) {
+          // CRITICAL: For MOD/XM samples or looping samples, use Tone.Player
+          // Tone.Player allows direct playbackRate control for accurate pitch
+          // Tone.Sampler rounds to nearest semitone, losing precision
+          const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
+
+          if (hasLoop || usePeriodPlayback) {
             instrument = new Tone.Player({
               url: sampleUrl,
-              loop: true,
-              loopStart: loopStart / (config.sample?.sampleRate || 8363), // Convert samples to seconds
-              loopEnd: loopEnd / (config.sample?.sampleRate || 8363),
-              volume: config.volume || -12,
+              loop: hasLoop,
+              loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
+              loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
+              volume: config.volume || 0, // Use unity gain - volume controlled via velocity
               onload: () => {
               },
               onerror: (err: Error) => {
-                console.error(`[ToneEngine] Looping Player ${instrumentId} failed to load sample:`, err);
+                console.error(`[ToneEngine] Player ${instrumentId} failed to load sample:`, err);
               },
             });
             // Store as 'Player' type for proper handling in other methods
             this.instrumentSynthTypes.set(key, 'Player');
           } else {
-            // Non-looping: Use Tone.Sampler for pitch shifting
+            // Non-MOD, non-looping: Use Tone.Sampler for note-based playback
             const urls: { [note: string]: string } = {};
             urls[baseNote] = sampleUrl;
 
@@ -703,7 +735,10 @@ export class ToneEngine {
     // Store instrument with composite key (per-channel)
     this.instruments.set(key, instrument);
     // Track the synth type for proper release handling
-    this.instrumentSynthTypes.set(key, config.synthType);
+    // Don't overwrite if already set (e.g., Sampler converted to Player)
+    if (!this.instrumentSynthTypes.has(key)) {
+      this.instrumentSynthTypes.set(key, config.synthType);
+    }
 
     // Create instrument effect chain and connect (fire-and-forget for initial creation)
     // For effect updates, use rebuildInstrumentEffects() which properly awaits
@@ -894,6 +929,84 @@ export class ToneEngine {
   /**
    * Trigger note attack
    */
+
+  /**
+   * Apply slide (portamento) and accent effects to a synth instrument
+   * This implements 303-style slide/accent for all oscillator-based synths
+   * 
+   * @param instrument The synth instrument
+   * @param targetFreq Target note frequency in Hz
+   * @param time Scheduled time for the note
+   * @param velocity Original velocity (0-1)
+   * @param accent If true, boost velocity
+   * @param slide If true, glide from previous frequency
+   * @param channelIndex Channel index for tracking last note
+   * @param instrumentId Instrument ID for tracking
+   * @returns Modified velocity (with accent boost applied)
+   */
+  private applySlideAndAccent(
+    instrument: any,
+    targetFreq: number,
+    time: number,
+    velocity: number,
+    accent?: boolean,
+    slide?: boolean,
+    channelIndex?: number,
+    instrumentId?: number
+  ): number {
+    // Apply accent: boost velocity
+    let finalVelocity = velocity;
+    if (accent) {
+      finalVelocity = Math.min(1, velocity * ToneEngine.ACCENT_BOOST);
+    }
+
+    // Apply slide: glide from previous note frequency
+    if (slide && channelIndex !== undefined) {
+      const lastNote = this.channelLastNote.get(channelIndex);
+      
+      // Only slide if there was a previous note on this channel
+      if (lastNote && lastNote.frequency > 0) {
+        // Get the oscillator frequency parameter
+        // Different synths have different structures
+        let freqParam: Tone.Param<'frequency'> | null = null;
+        
+        if (instrument.oscillator?.frequency) {
+          // Synth, MonoSynth, etc.
+          freqParam = instrument.oscillator.frequency;
+        } else if (instrument.voice0?.oscillator?.frequency) {
+          // DuoSynth has voice0 and voice1
+          freqParam = instrument.voice0.oscillator.frequency;
+        } else if (instrument.frequency) {
+          // Some synths expose frequency directly
+          freqParam = instrument.frequency;
+        }
+        
+        if (freqParam) {
+          try {
+            // Set to previous frequency first (no ramp)
+            freqParam.setValueAtTime(lastNote.frequency, time);
+            // Then exponentially approach target frequency (RC circuit style)
+            freqParam.setTargetAtTime(targetFreq, time, ToneEngine.SLIDE_TIME_CONSTANT);
+          } catch (e) {
+            // Silently ignore if frequency manipulation fails
+            // The note will still play at the target frequency
+          }
+        }
+      }
+    }
+
+    // Update last note tracking for this channel
+    if (channelIndex !== undefined && instrumentId !== undefined) {
+      this.channelLastNote.set(channelIndex, {
+        frequency: targetFreq,
+        time: time,
+        instrumentId: instrumentId
+      });
+    }
+
+    return finalVelocity;
+  }
+
   public triggerNoteAttack(
     instrumentId: number,
     note: string,
@@ -902,11 +1015,18 @@ export class ToneEngine {
     config: InstrumentConfig,
     period?: number,
     accent?: boolean,
-    slide?: boolean
+    slide?: boolean,
+    channelIndex?: number
   ): void {
     const instrument = this.getInstrument(instrumentId, config);
 
-    if (!instrument || !instrument.triggerAttack) {
+    if (!instrument) {
+      return;
+    }
+
+    // Check if instrument can play - allow triggerAttack (synths) or start (Players)
+    const canPlay = instrument.triggerAttack || instrument.start;
+    if (!canPlay) {
       return;
     }
 
@@ -924,13 +1044,76 @@ export class ToneEngine {
         // NoiseSynth.triggerAttack(time, velocity) - no note
         (instrument as Tone.NoiseSynth).triggerAttack(safeTime, velocity);
       } else if (config.synthType === 'Sampler') {
-        // Check if Sampler has any loaded samples before triggering
-        const sampler = instrument as Tone.Sampler;
-        if (!sampler.loaded) {
-          // Silently skip - no sample loaded yet
-          return;
+        // MOD/XM samples with period-based playback are created as Players
+        // Check the stored type to determine actual instrument class
+        const key = this.getInstrumentKey(instrumentId, undefined);
+        const actualType = this.instrumentSynthTypes.get(key);
+
+        if (actualType === 'Player') {
+          // This is actually a Player (MOD/XM sample), handle as Player
+          const player = instrument as Tone.Player;
+
+          if (!player.buffer || !player.buffer.loaded) {
+            console.warn('[ToneEngine] Player buffer not loaded, skipping');
+            return;
+          }
+
+          // DEBUG: Log sample loop info
+          console.log('[ToneEngine] Playing MOD sample:', {
+            instrumentId,
+            loop: player.loop,
+            loopStart: player.loopStart,
+            loopEnd: player.loopEnd,
+            bufferDuration: player.buffer?.duration,
+            configLoop: config.sample?.loop,
+            configLoopStart: config.sample?.loopStart,
+            configLoopEnd: config.sample?.loopEnd,
+          });
+
+          // Apply velocity as volume
+          const velocityDb = velocity > 0 ? Tone.gainToDb(velocity) : -Infinity;
+          player.volume.value = velocityDb;
+
+          // Check if this is a MOD/XM sample with period-based playback
+          if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
+            // Calculate playback rate from Amiga period (same formula as triggerNote)
+            const modPlayback = config.metadata.modPlayback;
+            let finetunedPeriod = period;
+
+            if (modPlayback.finetune !== 0) {
+              // Use ProTracker period table lookup for 100% accuracy
+              const noteIndex = periodToNoteIndex(period, 0);
+              if (noteIndex >= 0) {
+                // Look up finetuned period from table
+                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+              }
+            }
+
+            // Calculate target frequency from period
+            const frequency = modPlayback.periodMultiplier / finetunedPeriod;
+            // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
+            const sampleRate = config.sample?.sampleRate || 8363;
+            const playbackRate = frequency / sampleRate;
+            player.playbackRate = playbackRate;
+          } else {
+            // No period provided (keyboard playback) - calculate playback rate from note
+            // The sample's base note is the pitch at playbackRate 1.0
+            const baseNote = config.sample?.baseNote || 'C4';
+            const baseFreq = Tone.Frequency(baseNote).toFrequency();
+            const targetFreq = Tone.Frequency(note).toFrequency();
+            const playbackRate = targetFreq / baseFreq;
+            player.playbackRate = playbackRate;
+          }
+
+          player.start(safeTime);
+        } else {
+          // Regular Sampler
+          const sampler = instrument as Tone.Sampler;
+          if (!sampler.loaded) {
+            return;
+          }
+          sampler.triggerAttack(note, safeTime, velocity);
         }
-        sampler.triggerAttack(note, safeTime, velocity);
       } else if (config.synthType === 'Player' || config.synthType === 'GranularSynth') {
         // Player/GranularSynth need a buffer loaded
         const player = instrument as Tone.Player | Tone.GrainPlayer;
@@ -939,39 +1122,66 @@ export class ToneEngine {
           return;
         }
 
+        // Apply velocity as volume (Player doesn't have velocity parameter like Sampler)
+        // Convert velocity (0-1) to dB: velocity 1.0 = 0dB, 0.5 = -6dB, 0 = -Infinity
+        const velocityDb = velocity > 0 ? Tone.gainToDb(velocity) : -Infinity;
+        player.volume.value = velocityDb;
+
         // Check if this is a MOD/XM sample with period-based playback
         if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
-          // Calculate playback rate from Amiga period
-          // Formula: frequency = AMIGA_PALFREQUENCY_HALF / period
-          //          playbackRate = frequency / audioContext.sampleRate
+          // Calculate playback rate from Amiga period (same formula as triggerNote)
           const modPlayback = config.metadata.modPlayback;
-
-          // Apply finetune by adjusting period
-          // ProTracker finetune: -8 to +7 (each step is ~1/8 semitone)
-          // XM finetune: -128 to +127 (finer resolution)
           let finetunedPeriod = period;
+
           if (modPlayback.finetune !== 0) {
-            // Calculate finetune multiplier
-            // XM spec: 2^(finetune / 1536) where 1536 = 128 * 12 semitones
-            // We use 1536 for XM accuracy
-            // Note: finetune > 0 → higher pitch → lower period (divide)
-            const finetuneMultiplier = Math.pow(2, modPlayback.finetune / 1536);
-            finetunedPeriod = period / finetuneMultiplier; // DIVIDE to get correct direction
+            // Use ProTracker period table lookup for 100% accuracy
+            const noteIndex = periodToNoteIndex(period, 0);
+            if (noteIndex >= 0) {
+              // Look up finetuned period from table
+              finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+            }
           }
 
+          // Calculate target frequency from period
           const frequency = modPlayback.periodMultiplier / finetunedPeriod;
-          const playbackRate = frequency / Tone.getContext().sampleRate;
-
-          // Set playback rate before starting
+          // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
+          const sampleRate = config.sample?.sampleRate || 8363;
+          const playbackRate = frequency / sampleRate;
           player.playbackRate = playbackRate;
-        } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
-          // Warn if period-based playback is enabled but no period provided
-          console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
+        } else {
+          // No period provided (keyboard playback) - calculate playback rate from note
+          const baseNote = config.sample?.baseNote || 'C4';
+          const baseFreq = Tone.Frequency(baseNote).toFrequency();
+          const targetFreq = Tone.Frequency(note).toFrequency();
+          const playbackRate = targetFreq / baseFreq;
+          player.playbackRate = playbackRate;
         }
 
         player.start(safeTime);
+      } else if (config.synthType === 'NoiseSynth') {
+        // NoiseSynth doesn't use note frequencies - just trigger at time with velocity
+        const noiseSynth = instrument as Tone.NoiseSynth;
+        const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
+        noiseSynth.triggerAttack(safeTime, finalVelocity);
+      } else if (config.synthType === 'MetalSynth') {
+        // MetalSynth uses frequency but through its own API
+        const metalSynth = instrument as Tone.MetalSynth;
+        const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
+        // MetalSynth.triggerAttack(time, velocity) - no note parameter
+        metalSynth.triggerAttack(safeTime, finalVelocity);
+      } else if (config.synthType === 'MembraneSynth') {
+        // MembraneSynth takes note but has a different signature
+        const membraneSynth = instrument as Tone.MembraneSynth;
+        const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
+        membraneSynth.triggerAttack(note, safeTime, finalVelocity);
       } else {
-        instrument.triggerAttack(note, safeTime, velocity);
+        // Standard synths - apply slide/accent for 303-style effects
+        const targetFreq = Tone.Frequency(note).toFrequency();
+        const finalVelocity = this.applySlideAndAccent(
+          instrument, targetFreq, safeTime, velocity,
+          accent, slide, channelIndex, instrumentId
+        );
+        instrument.triggerAttack(note, safeTime, finalVelocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteAttack for ${config.synthType}:`, error);
@@ -1150,7 +1360,7 @@ export class ToneEngine {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
         (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
       } else if (config.synthType === 'MetalSynth') {
-        // MetalSynth replaced with NoiseSynth for performance - doesn't take note parameter
+        // MetalSynth replaced with NoiseSynth - doesn't take note parameter
         (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
       } else if (config.synthType === 'MembraneSynth') {
         // MembraneSynth replaced with regular Synth for performance
@@ -1159,6 +1369,10 @@ export class ToneEngine {
         // GrainPlayer uses start/stop instead of triggerAttackRelease
         const grainPlayer = instrument as Tone.GrainPlayer;
         if (grainPlayer.buffer && grainPlayer.buffer.loaded) {
+          // Apply velocity as volume
+          const velocityDb = velocity > 0 ? Tone.gainToDb(velocity) : -Infinity;
+          grainPlayer.volume.value = velocityDb;
+
           // Check if this is a MOD/XM sample with period-based playback
           if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
             // Calculate playback rate from Amiga period
@@ -1190,11 +1404,19 @@ export class ToneEngine {
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
         }
-      } else if (config.synthType === 'Player' || (config.synthType === 'Sampler' && config.sample?.loop)) {
+      } else if (config.synthType === 'Player' ||
+                 (config.synthType === 'Sampler' && config.sample?.loop) ||
+                 (config.synthType === 'Sampler' && config.metadata?.modPlayback?.usePeriodPlayback)) {
         // Player uses start instead of triggerAttackRelease
-        // Also handle looping Samplers which are converted to Players at creation time
+        // Also handle looping Samplers and MOD/XM samples which are converted to Players at creation time
         const player = instrument as Tone.Player;
         if (player.buffer && player.buffer.loaded) {
+          // Apply accent: boost velocity for louder/punchier sound
+          const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
+          // Apply velocity as volume (Player doesn't have velocity parameter like Sampler)
+          const velocityDb = finalVelocity > 0 ? Tone.gainToDb(finalVelocity) : -Infinity;
+          player.volume.value = velocityDb;
+
           // Check if this is a MOD/XM sample with period-based playback
           if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
             // Calculate playback rate from Amiga period
@@ -1334,17 +1556,31 @@ export class ToneEngine {
         config.synthType === 'FormantSynth'
       ) {
         // New synths with triggerAttackRelease interface
+        // Apply slide/accent for mono synths (PolySynth can't slide between notes)
         if (instrument.triggerAttackRelease) {
-          instrument.triggerAttackRelease(note, duration, safeTime, velocity);
+          const targetFreq = Tone.Frequency(note).toFrequency();
+          const finalVelocity = this.applySlideAndAccent(
+            instrument, targetFreq, safeTime, velocity,
+            accent, slide, channelIndex, instrumentId
+          );
+          instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
         }
       } else if (config.synthType === 'DrumMachine') {
         // DrumMachine - some drum types don't take note parameter
+        // Apply accent (velocity boost) but not slide (drums don't pitch slide)
         if (instrument.triggerAttackRelease) {
-          instrument.triggerAttackRelease(note, duration, safeTime, velocity);
+          const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
+          instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
         }
       } else if (instrument.triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)
-        instrument.triggerAttackRelease(note, duration, safeTime, velocity);
+        // Apply slide/accent for 303-style effects on all synths
+        const targetFreq = Tone.Frequency(note).toFrequency();
+        const finalVelocity = this.applySlideAndAccent(
+          instrument, targetFreq, safeTime, velocity,
+          accent, slide, channelIndex, instrumentId
+        );
+        instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error triggering note for ${config.synthType}:`, error);
@@ -1490,7 +1726,8 @@ export class ToneEngine {
     });
 
     if (synths.length === 0) {
-      console.warn('[ToneEngine] Cannot update TB303 parameters - no TB303 instances found for instrument', instrumentId);
+      // No instances yet - this is normal if no notes have been played
+      // The synth will be created with the correct config on the next note
       return;
     }
 
@@ -2351,6 +2588,8 @@ export class ToneEngine {
 
   // Channel trigger levels for VU meters (set when notes trigger)
   private channelTriggerLevels: Map<number, number> = new Map();
+  // PERF: Reusable array for getChannelTriggerLevels to avoid GC pressure
+  private triggerLevelsCache: number[] = [];
 
   /**
    * Trigger a channel's VU meter (called when a note plays on that channel)
@@ -2361,21 +2600,25 @@ export class ToneEngine {
 
   /**
    * Get channel trigger levels for VU meters (real-time note triggers)
+   * PERF: Reuses internal array to avoid allocations every frame
    */
   public getChannelTriggerLevels(numChannels: number): number[] {
-    const levels: number[] = [];
+    // Resize cache array if needed (only allocates when channel count changes)
+    if (this.triggerLevelsCache.length !== numChannels) {
+      this.triggerLevelsCache = new Array(numChannels).fill(0);
+    }
+
     for (let i = 0; i < numChannels; i++) {
-      levels.push(this.channelTriggerLevels.get(i) || 0);
-      // Decay the trigger level
       const current = this.channelTriggerLevels.get(i) || 0;
+      this.triggerLevelsCache[i] = current;
+
+      // Decay the trigger level
       if (current > 0) {
-        this.channelTriggerLevels.set(i, current * 0.85);
-        if (current < 0.01) {
-          this.channelTriggerLevels.set(i, 0);
-        }
+        const decayed = current * 0.85;
+        this.channelTriggerLevels.set(i, decayed < 0.01 ? 0 : decayed);
       }
     }
-    return levels;
+    return this.triggerLevelsCache;
   }
 
   /**

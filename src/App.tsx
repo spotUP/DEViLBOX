@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
-import { InstrumentModal } from '@components/instruments/InstrumentModal';
+import { EditInstrumentModal } from '@components/instruments/EditInstrumentModal';
 import { HelpModal } from '@components/help/HelpModal';
 import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
@@ -417,7 +417,7 @@ function App() {
       {/* Modals */}
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />
-      <InstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
+      <EditInstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
       <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />

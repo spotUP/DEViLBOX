@@ -3,8 +3,32 @@
  * Supports automation, bipolar mode, logarithmic scaling, touch input, and more
  */
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { useThemeStore } from '@stores';
+
+// Throttle function to limit how often a callback is called
+function throttle<T extends (...args: any[]) => void>(fn: T, limit: number): T {
+  let lastCall = 0;
+  let lastValue: any = undefined;
+  let rafId: number | null = null;
+
+  return ((...args: any[]) => {
+    const now = performance.now();
+    lastValue = args[0]; // Store latest value
+
+    if (now - lastCall >= limit) {
+      lastCall = now;
+      fn(...args);
+    } else if (!rafId) {
+      // Schedule a final call with the last value when dragging stops
+      rafId = requestAnimationFrame(() => {
+        fn(lastValue);
+        rafId = null;
+        lastCall = performance.now();
+      });
+    }
+  }) as T;
+}
 
 interface KnobProps {
   // Core (both versions)
@@ -67,6 +91,10 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef(0);
   const dragStartValue = useRef(0);
+
+  // Throttle onChange to ~60fps (16ms) to prevent audio glitches from too many rapid updates
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const throttledOnChange = useMemo(() => throttle(onChange, 16), [onChange]);
 
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -264,7 +292,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         newValue = Math.round(newValue * 10) / 10;
       }
 
-      onChange(newValue);
+      // Use throttled onChange during drag to prevent audio glitches
+      throttledOnChange(newValue);
     };
 
     const handleMouseUp = () => {
@@ -287,7 +316,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
     };
-  }, [isDragging, min, max, logarithmic, step, onChange]);
+  }, [isDragging, min, max, logarithmic, step, throttledOnChange]);
 
   // Indicator line position
   const indicatorEnd = polarToCartesian(rotation);

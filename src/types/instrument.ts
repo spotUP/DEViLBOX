@@ -25,7 +25,9 @@ export type SynthType =
   | 'ChipSynth'
   | 'PWMSynth'
   | 'StringMachine'
-  | 'FormantSynth';
+  | 'FormantSynth'
+  // Module playback (libopenmpt)
+  | 'ChiptuneModule';
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -91,8 +93,8 @@ export interface DevilFishConfig {
 }
 
 export interface TB303Config {
-  // Engine selection
-  engineType?: 'tonejs' | 'accurate'; // Default: 'tonejs'
+  // Engine selection - 'accurate' uses Open303 AudioWorklet for authentic TB-303 sound
+  engineType?: 'tonejs' | 'accurate'; // Default: 'accurate'
 
   // Tuning
   tuning?: number; // Master tuning in Hz (default: 440)
@@ -232,6 +234,30 @@ export const DEFAULT_GRANULAR: GranularConfig = {
     cutoff: 20000,
     resonance: 0,
   },
+};
+
+/**
+ * ChiptuneModule Configuration
+ * Uses libopenmpt WASM for sample-accurate MOD/XM/IT/S3M playback
+ * Provides audio-rate parameter modulation for authentic tracker effects
+ */
+export interface ChiptuneModuleConfig {
+  moduleData: string;             // Base64-encoded original module file
+  format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
+  sourceFile?: string;            // Original filename for reference
+  useLibopenmpt?: boolean;        // If true, use libopenmpt for playback (default: true)
+  repeatCount?: number;           // -1 = infinite, 0 = once, >0 = n times
+  stereoSeparation?: number;      // 0-200% stereo separation (100 = default)
+  interpolationFilter?: number;   // 0 = none, 1 = linear, 2 = cubic, 8 = sinc
+}
+
+export const DEFAULT_CHIPTUNE_MODULE: ChiptuneModuleConfig = {
+  moduleData: '',
+  format: 'UNKNOWN',
+  useLibopenmpt: true,
+  repeatCount: 0,
+  stereoSeparation: 100,
+  interpolationFilter: 0,
 };
 
 /**
@@ -855,6 +881,7 @@ export interface InstrumentMetadata {
     usePeriodPlayback: boolean; // If true, use period-based playback (Amiga)
     periodMultiplier: number; // AMIGA_PALFREQUENCY_HALF = 3546895
     finetune: number; // -8 to +7 (ProTracker) or -128 to +127 (XM)
+    defaultVolume?: number; // Sample's default volume (0-64) for channel init
   };
 }
 
@@ -899,6 +926,8 @@ export interface InstrumentConfig {
   pwmSynth?: PWMSynthConfig;
   stringMachine?: StringMachineConfig;
   formantSynth?: FormantSynthConfig;
+  // Module playback (libopenmpt)
+  chiptuneModule?: ChiptuneModuleConfig;
   // Sampler config
   sample?: SampleConfig;
   effects: EffectConfig[];

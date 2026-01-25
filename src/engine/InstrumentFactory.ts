@@ -601,8 +601,8 @@ export class InstrumentFactory {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
-    // Choose engine based on engineType (default: tonejs)
-    const engineType = config.tb303.engineType || 'tonejs';
+    // Choose engine based on engineType (default: accurate - uses Open303 AudioWorklet)
+    const engineType = config.tb303.engineType || 'accurate';
 
     if (engineType === 'accurate') {
       // Use Open303-based accurate engine

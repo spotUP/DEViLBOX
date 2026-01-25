@@ -112,6 +112,9 @@ export class TB303EngineAccurate {
     };
   }
 
+  // Track if worklet is loaded (shared across all instances)
+  private static workletLoaded = false;
+
   /**
    * Initialize the AudioWorklet
    */
@@ -121,9 +124,22 @@ export class TB303EngineAccurate {
     }
 
     try {
-      // Load the worklet module (use BASE_URL for proper path in dev/prod)
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      await this.audioContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+      // Load the worklet module only if not already loaded
+      // (AudioWorklet processors can only be registered once per context)
+      if (!TB303EngineAccurate.workletLoaded) {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        try {
+          await this.audioContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+          TB303EngineAccurate.workletLoaded = true;
+        } catch (error) {
+          // Check if error is due to already registered processor
+          if (error instanceof Error && error.message.includes('already registered')) {
+            TB303EngineAccurate.workletLoaded = true;
+          } else {
+            throw error;
+          }
+        }
+      }
 
       // Create worklet node
       this.workletNode = new AudioWorkletNode(this.audioContext, 'tb303-processor', {

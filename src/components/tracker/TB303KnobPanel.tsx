@@ -78,7 +78,7 @@ const DEFAULT_PARAMS: TB303Params = {
   accent: 70,
   overdrive: 0,
   tuning: 0, // Cents offset from A4=440Hz
-  engineType: 'tonejs',
+  engineType: 'accurate', // Uses Open303 AudioWorklet for authentic sound
   overdriveModel: 0, // Default to TS9
   useNeuralOverdrive: false, // Default to waveshaper
   tempoRelative: false, // Default to absolute time

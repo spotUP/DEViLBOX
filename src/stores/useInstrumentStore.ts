@@ -23,7 +23,7 @@ interface InstrumentStore {
   instruments: InstrumentConfig[];
   currentInstrumentId: number | null;
   currentInstrument: InstrumentConfig | null;
-  previewInstrument: InstrumentConfig | null; // For modal previews (CreateInstrumentModal)
+  previewInstrument: InstrumentConfig | null; // For modal previews (EditInstrumentModal)
   presets: InstrumentPreset[];
 
   // Actions

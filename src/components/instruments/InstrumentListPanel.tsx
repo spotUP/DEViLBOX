@@ -1,6 +1,6 @@
 /**
  * InstrumentListPanel - FT2-style instrument list with actions
- * Shows all instruments with Add, Load, Save, Create, Edit buttons
+ * Shows all instruments with Add, Preset, Sample, Edit buttons
  */
 
 import React, { useState } from 'react';
@@ -8,8 +8,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
-import { Plus, FolderOpen, Wand2, Pencil, Trash2, Copy, Package } from 'lucide-react';
-import { CreateInstrumentModal } from './CreateInstrumentModal';
+import { Plus, FolderOpen, Pencil, Trash2, Copy, Package } from 'lucide-react';
 import { LoadPresetModal } from './LoadPresetModal';
 import { SamplePackBrowser } from './SamplePackBrowser';
 import { BASS_PRESETS } from '@constants/factoryPresets';
@@ -37,7 +36,6 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
     createInstrument(startingPreset);
   };
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showSamplePackModal, setShowSamplePackModal] = useState(false);
 
@@ -56,7 +54,7 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
 
       {/* Action Buttons */}
       <div className="px-2 py-2 bg-ft2-header border-b border-ft2-border">
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           <button
             onClick={handleAddInstrument}
             className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
@@ -80,14 +78,6 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
           >
             <Package size={14} />
             <span className="text-[8px] font-bold">SAMPLE</span>
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-cursor text-ft2-cursor hover:bg-ft2-cursor hover:text-ft2-bg transition-colors"
-            title="Create new instrument from scratch"
-          >
-            <Wand2 size={14} />
-            <span className="text-[8px] font-bold">CREATE</span>
           </button>
           <button
             onClick={() => onEditInstrument?.(currentInstrumentId!)}
@@ -183,9 +173,6 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
       </div>
 
       {/* Modals */}
-      {showCreateModal && (
-        <CreateInstrumentModal onClose={() => setShowCreateModal(false)} />
-      )}
       {showLoadModal && (
         <LoadPresetModal onClose={() => setShowLoadModal(false)} />
       )}

@@ -39,7 +39,8 @@ const getSegmentColor = (index: number, total: number, isLit: boolean): string =
 
 export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
   ({ level, isActive }) => {
-    // TEMP: Disable to test performance
+    // DISABLED: Using ChannelVUMeters overlay instead (no React state updates needed)
+    // If re-enabling, also set DISABLE_VU_POLLING = false in PatternEditor.tsx
     return null;
 
     const [displayLevel, setDisplayLevel] = useState(0);

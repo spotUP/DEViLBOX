@@ -20,6 +20,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
+import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule } from '@lib/import/ModuleConverter';
@@ -135,7 +136,6 @@ interface FT2ToolbarProps {
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onShowPatternOrder?: () => void;
-  onImport?: () => void;
   showPatterns?: boolean;
   showMasterFX?: boolean;
   showInstrumentFX?: boolean;
@@ -149,7 +149,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowInstrumentFX,
   onShowInstruments,
   onShowPatternOrder,
-  onImport,
   showPatterns,
   showMasterFX,
   showInstrumentFX,
@@ -197,50 +196,50 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const demoMenuRef = useRef<HTMLDivElement>(null);
-  const demoButtonRef = useRef<HTMLDivElement>(null);
-  const [demoMenuPosition, setDemoMenuPosition] = useState({ top: 0, left: 0 });
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const modulesMenuRef = useRef<HTMLDivElement>(null);
+  const modulesButtonRef = useRef<HTMLDivElement>(null);
+  const [modulesMenuPosition, setModulesMenuPosition] = useState({ top: 0, left: 0 });
 
-  // Demo songs organized by category
-  const DEMO_SONGS = {
+  // Bundled modules organized by category
+  const BUNDLED_MODULES = {
     acid: [
-      { file: 'acid/classic-303-acid-demo.dbox', name: '🎛️ Classic 303 Acid Demo' },
-      { file: 'acid/phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' },
-      { file: 'acid/hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue' },
-      { file: 'acid/josh-wink-higher-state.dbox', name: 'Josh Wink - Higher State' },
-      { file: 'acid/dittytoy-303.dbox', name: 'Dittytoy 303' },
-      { file: 'acid/fatboy-slim-everyone-needs-303.dbox', name: 'Fatboy Slim - Everyone Needs a 303' },
-      { file: 'acid/fast-eddie-acid-thunder.dbox', name: 'Fast Eddie - Acid Thunder' },
-      { file: 'acid/dj-tim-misjah-access.dbox', name: 'DJ Tim & Misjah - Access' },
-      { file: 'acid/samplab-mathew-303.dbox', name: '🎹 Samplab Mathew 303' },
-      { file: 'acid/samplab-mathew-full.dbox', name: '🎹 Samplab Mathew (Full)' },
-      { file: 'acid/slow-creaky-acid-authentic.dbox', name: '🐌 Slow Creaky (Authentic)' },
-      { file: 'acid/slow-creaky-acid-tempo-relative.dbox', name: '🐌 Slow Creaky (Tempo-Relative)' },
+      { file: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' },
+      { file: 'hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue' },
+      { file: 'josh-wink-higher-state.dbox', name: 'Josh Wink - Higher State' },
+      { file: 'dittytoy-303.dbox', name: 'Dittytoy 303' },
+      { file: 'fatboy-slim-everyone-needs-303_.dbox', name: 'Fatboy Slim - Everyone Needs a 303' },
+      { file: 'fast-eddie-acid-thunder.dbox', name: 'Fast Eddie - Acid Thunder' },
+      { file: 'dj-tim-misjah-access.dbox', name: 'DJ Tim & Misjah - Access' },
+      { file: 'samplab-mathew-303.dbox', name: 'Samplab Mathew 303' },
+      { file: 'samplab-mathew-full.dbox', name: 'Samplab Mathew (Full)' },
+      { file: 'slow-creaky-acid-authentic.dbox', name: 'Slow Creaky (Authentic)' },
+      { file: 'slow-creaky-acid-tempo-relative.dbox', name: 'Slow Creaky (Tempo-Relative)' },
     ],
     tb303: [
-      { file: 'tb303/1-fatboy-slim-everybody-needs-a-303.dbox', name: 'Fatboy Slim - Everybody needs a 303' },
-      { file: 'tb303/2-josh-wink-high-state-of-consciousness.dbox', name: 'Josh Wink - High State of Consciousness' },
-      { file: 'tb303/3-christophe-just-i-m-a-disco-dancer-part-1-.dbox', name: 'Christophe Just - I\'m a Disco Dancer (Part 1)' },
-      { file: 'tb303/4-christophe-just-i-m-a-disco-dancer-part-2-.dbox', name: 'Christophe Just - I\'m a Disco Dancer (Part 2)' },
-      { file: 'tb303/5-claustrophobic-sting-the-prodigy.dbox', name: 'Claustrophobic Sting - The Prodigy' },
-      { file: 'tb303/6-josh-wink-are-you-there.dbox', name: 'Josh Wink - Are You There' },
-      { file: 'tb303/7-cut-paste-forget-it-part-1-.dbox', name: 'Cut Paste - Forget It (Part 1)' },
-      { file: 'tb303/8-cut-paste-forget-it-part-2-.dbox', name: 'Cut Paste - Forget It (Part 2)' },
-      { file: 'tb303/9-public-energy-three-o-three-part-1-.dbox', name: 'Public Energy - Three O Three (Part 1)' },
-      { file: 'tb303/10-public-energy-three-o-three-part-2-.dbox', name: 'Public Energy - Three O Three (Part 2)' },
+      { file: 'fatboy-slim-everybody-needs-a-303.dbox', name: 'Fatboy Slim - Everybody needs a 303' },
+      { file: 'josh-wink-high-state-of-consciousness.dbox', name: 'Josh Wink - High State of Consciousness' },
+      { file: 'christophe-just-i-m-a-disco-dancer-part-1-.dbox', name: 'Christophe Just - Disco Dancer (Part 1)' },
+      { file: 'christophe-just-i-m-a-disco-dancer-part-2-.dbox', name: 'Christophe Just - Disco Dancer (Part 2)' },
+      { file: 'claustrophobic-sting-the-prodigy.dbox', name: 'Claustrophobic Sting - The Prodigy' },
+      { file: 'josh-wink-are-you-there.dbox', name: 'Josh Wink - Are You There' },
+      { file: 'cut-paste-forget-it-part-1-.dbox', name: 'Cut Paste - Forget It (Part 1)' },
+      { file: 'paste-forget-it-part-2-.dbox', name: 'Cut Paste - Forget It (Part 2)' },
+      { file: 'public-energy-three-o-three-part-1-.dbox', name: 'Public Energy - Three O Three (Part 1)' },
+      { file: 'public-energy-three-o-three-part-2-.dbox', name: 'Public Energy - Three O Three (Part 2)' },
     ],
     general: [
-      { file: 'general/new-order-confusion.dbox', name: 'New Order - Confusion' },
-      { file: 'general/edge-of-motion-setup-707.dbox', name: 'Edge of Motion - 707 Setup' },
+      { file: 'new-order-confusion.dbox', name: 'New Order - Confusion' },
+      { file: 'edge-of-motion-setup-707.dbox', name: 'Edge of Motion - 707 Setup' },
     ],
   };
 
-  // Load demo song from server
-  const handleLoadDemo = async (filename: string) => {
-    setShowDemoMenu(false);
+  // Load bundled module from server
+  const handleLoadModule = async (filename: string) => {
+    setShowModulesMenu(false);
 
     // Stop playback before loading
     if (isPlaying) {
@@ -250,59 +249,37 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
     setIsLoading(true);
     try {
-      // Use import.meta.env.BASE_URL for correct path on GitHub Pages
       const basePath = import.meta.env.BASE_URL || '/';
-      const response = await fetch(`${basePath}demos/${filename}`);
+      const response = await fetch(`${basePath}modules/${filename}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
       const songData = await response.json();
 
-      // Validate song format (support both .dbox and .song.json formats)
+      // Validate song format
       if (songData.format !== 'devilbox-dbox' && songData.format !== 'devilbox-song') {
-        throw new Error(`Invalid format: expected "devilbox-dbox" or "devilbox-song", got "${songData.format}"`);
+        throw new Error(`Invalid format: expected "devilbox-dbox", got "${songData.format}"`);
       }
 
-      // Validate required fields
-      if (!songData.patterns || !Array.isArray(songData.patterns)) {
-        throw new Error('Missing or invalid "patterns" array');
-      }
-      if (!songData.instruments || !Array.isArray(songData.instruments)) {
-        throw new Error('Missing or invalid "instruments" array');
-      }
-      if (!songData.sequence || !Array.isArray(songData.sequence)) {
-        throw new Error('Missing or invalid "sequence" array');
-      }
-
-      // CRITICAL: Migrate old format demo songs to new XM format
-      // Demo songs use old format (string notes, null values, old effects)
-      // Must migrate before loading to avoid runtime errors
+      // Migrate old format if needed
       const { needsMigration, migrateProject } = await import('@/lib/migration');
       let patterns = songData.patterns;
       let instruments = songData.instruments;
 
       if (needsMigration(patterns, instruments)) {
-        console.log('[Demo] Old format detected, migrating to XM format...');
         const migrated = migrateProject(patterns, instruments);
         patterns = migrated.patterns;
         instruments = migrated.instruments;
-        console.log('[Demo] Migration complete!');
       }
 
       // Load song data
       if (patterns) {
         loadPatterns(patterns);
-
-        // Convert sequence (pattern IDs) to pattern order (indices)
         if (songData.sequence && Array.isArray(songData.sequence)) {
           const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
           const order = songData.sequence
             .map((patternId: string) => patternIdToIndex.get(patternId))
             .filter((index: number | undefined): index is number => index !== undefined);
-
-          if (order.length > 0) {
-            setPatternOrder(order);
-            console.log('[Demo] Loaded pattern order:', order);
-          }
+          if (order.length > 0) setPatternOrder(order);
         }
       }
       if (instruments) loadInstruments(instruments);
@@ -310,9 +287,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (songData.bpm) setBPM(songData.bpm);
 
       notify.success(`Loaded: ${songData.metadata?.name || filename}`, 2000);
-      console.log(`[Demo] Loaded: ${filename}`);
     } catch (error) {
-      console.error('Failed to load demo:', error);
+      console.error('Failed to load module:', error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       notify.error(`Failed to load ${filename}: ${errorMsg}`, 10000);
     } finally {
@@ -322,26 +298,26 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   // Calculate dropdown position when menu opens
   React.useEffect(() => {
-    if (showDemoMenu && demoButtonRef.current) {
-      const rect = demoButtonRef.current.getBoundingClientRect();
-      setDemoMenuPosition({
+    if (showModulesMenu && modulesButtonRef.current) {
+      const rect = modulesButtonRef.current.getBoundingClientRect();
+      setModulesMenuPosition({
         top: rect.bottom + 4,
         left: rect.left,
       });
     }
-  }, [showDemoMenu]);
+  }, [showModulesMenu]);
 
-  // Close demo menu when clicking outside
+  // Close modules menu when clicking outside
   React.useEffect(() => {
-    if (!showDemoMenu) return;
+    if (!showModulesMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (demoMenuRef.current && !demoMenuRef.current.contains(e.target as Node)) {
-        setShowDemoMenu(false);
+      if (modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
+        setShowModulesMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDemoMenu]);
+  }, [showModulesMenu]);
 
   // Save handler with feedback (browser storage)
   const handleSave = () => {
@@ -851,7 +827,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             className="hidden"
           />
           <FT2Button
-            onClick={() => setShowImportDialog(true)}
+            onClick={() => setShowFileBrowser(true)}
             small
             disabled={isLoading}
             title="Load song or module (Ctrl+O)"
@@ -859,80 +835,78 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             {isLoading ? 'Loading...' : 'Load'}
           </FT2Button>
 
-          {/* Demo Songs Dropdown */}
-          <div ref={demoButtonRef}>
-            <FT2Button
-              onClick={() => setShowDemoMenu(!showDemoMenu)}
-              small
-              active={showDemoMenu}
-              disabled={isLoading}
-              title="Load example songs"
-            >
-              Demos ▾
-            </FT2Button>
-          </div>
-          {showDemoMenu && (
-            <div
-              ref={demoMenuRef}
-              className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[220px] max-h-[300px] overflow-y-auto"
-              style={{
-                top: `${demoMenuPosition.top}px`,
-                left: `${demoMenuPosition.left}px`,
-              }}
-            >
-              {/* Acid Demos */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">
-                🎛️ Acid / 303
-              </div>
-              {DEMO_SONGS.acid.map((demo) => (
-                <button
-                  key={demo.file}
-                  onClick={() => handleLoadDemo(demo.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {demo.name}
-                </button>
-              ))}
-
-              {/* TB-303 Pattern Demos */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
-                🎹 TB-303 Patterns
-              </div>
-              {DEMO_SONGS.tb303.map((demo) => (
-                <button
-                  key={demo.file}
-                  onClick={() => handleLoadDemo(demo.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {demo.name}
-                </button>
-              ))}
-
-              {/* General Demos */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
-                🎵 General
-              </div>
-              {DEMO_SONGS.general.map((demo) => (
-                <button
-                  key={demo.file}
-                  onClick={() => handleLoadDemo(demo.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {demo.name}
-                </button>
-              ))}
-            </div>
-          )}
-
           <FT2Button onClick={handleSave} small title="Save to browser storage (Ctrl+S)">
             {isDirty ? 'Save*' : 'Save'}
           </FT2Button>
           <FT2Button onClick={handleSaveFile} small title="Download song file to computer">
             Download
           </FT2Button>
-          <FT2Button onClick={onImport} small title="Import module dialog">
-            Import
-          </FT2Button>
+
+          {/* Bundled Modules Dropdown */}
+          <div ref={modulesButtonRef}>
+            <FT2Button
+              onClick={() => setShowModulesMenu(!showModulesMenu)}
+              small
+              active={showModulesMenu}
+              disabled={isLoading}
+              title="Load bundled example modules"
+            >
+              Modules
+            </FT2Button>
+          </div>
+          {showModulesMenu && (
+            <div
+              ref={modulesMenuRef}
+              className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto"
+              style={{
+                top: `${modulesMenuPosition.top}px`,
+                left: `${modulesMenuPosition.left}px`,
+              }}
+            >
+              {/* Acid Modules */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">
+                Acid / 303
+              </div>
+              {BUNDLED_MODULES.acid.map((mod) => (
+                <button
+                  key={mod.file}
+                  onClick={() => handleLoadModule(mod.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {mod.name}
+                </button>
+              ))}
+
+              {/* TB-303 Pattern Modules */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
+                TB-303 Patterns
+              </div>
+              {BUNDLED_MODULES.tb303.map((mod) => (
+                <button
+                  key={mod.file}
+                  onClick={() => handleLoadModule(mod.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {mod.name}
+                </button>
+              ))}
+
+              {/* General Modules */}
+              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
+                General
+              </div>
+              {BUNDLED_MODULES.general.map((mod) => (
+                <button
+                  key={mod.file}
+                  onClick={() => handleLoadModule(mod.file)}
+                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
+                >
+                  {mod.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <FT2Button onClick={onShowPatterns} small active={showPatterns} title="Pattern list (Ctrl+Shift+P)">
             Patterns
           </FT2Button>
@@ -979,6 +953,73 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleModuleImport}
+      />
+
+      {/* File Browser */}
+      <FileBrowser
+        isOpen={showFileBrowser}
+        onClose={() => setShowFileBrowser(false)}
+        mode="load"
+        onLoad={async (data: any, filename: string) => {
+          // Stop playback before loading
+          if (isPlaying) {
+            stop();
+            engine.releaseAll();
+          }
+
+          try {
+            // Migrate old format if needed
+            const { needsMigration, migrateProject } = await import('@/lib/migration');
+            let patterns = data.patterns;
+            let instruments = data.instruments;
+
+            if (needsMigration(patterns, instruments)) {
+              const migrated = migrateProject(patterns, instruments);
+              patterns = migrated.patterns;
+              instruments = migrated.instruments;
+            }
+
+            // Load song data
+            if (patterns) {
+              loadPatterns(patterns);
+              if (data.sequence && Array.isArray(data.sequence)) {
+                const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
+                const order = data.sequence
+                  .map((patternId: string) => patternIdToIndex.get(patternId))
+                  .filter((index: number | undefined): index is number => index !== undefined);
+                if (order.length > 0) setPatternOrder(order);
+              }
+            }
+            if (instruments) loadInstruments(instruments);
+            if (data.metadata) setMetadata(data.metadata);
+            if (data.bpm) setBPM(data.bpm);
+
+            notify.success(`Loaded: ${data.metadata?.name || filename}`, 2000);
+          } catch (error) {
+            console.error('Failed to load file:', error);
+            notify.error(`Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }}
+        onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+          // Stop playback before loading
+          if (isPlaying) {
+            stop();
+            engine.releaseAll();
+          }
+
+          try {
+            // Import the module loader
+            const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+            const moduleInfo = await loadModuleFile(new File([buffer], filename));
+
+            if (moduleInfo) {
+              await handleModuleImport(moduleInfo);
+            }
+          } catch (error) {
+            console.error('Failed to load tracker module:', error);
+            notify.error(`Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }}
       />
     </div>
   );
