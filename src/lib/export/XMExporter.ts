@@ -204,13 +204,11 @@ function convertCellToXMNote(cell: TrackerCell, _warnings: string[]): XMNoteData
   // Convert instrument (0 = no instrument in XM format)
   const instrument = cell.instrument ?? 0;
 
-  // Convert volume (combine direct volume and effect2 volume column)
-  let volume = 0;
-  if (cell.volume !== null) {
-    // Direct volume set (0-64)
-    volume = 0x10 + Math.min(cell.volume, 0x40);
-  } else if (cell.effect2) {
-    // Convert effect2 back to volume column effect
+  // Use cell.volume directly as it is already the XM-compatible volume column (0x00-0xFF)
+  let volume = cell.volume || 0;
+  
+  // If volume column is empty, try to convert effect2 (legacy DEViLBOX format)
+  if (volume === 0 && cell.effect2) {
     volume = convertEffectToVolumeColumn(cell.effect2);
   }
 
@@ -254,37 +252,53 @@ function convertEffectToVolumeColumn(effect: string): number {
   const parsed = parseEffect(effect);
 
   // Map common effects back to volume column
+  // 0xA: Volume slide
   if (parsed.type === 0xA) {
-    // Volume slide
     const x = (parsed.param >> 4) & 0x0F;
     const y = parsed.param & 0x0F;
 
-    if (x > 0) return 0x70 + x; // Volume slide up
-    if (y > 0) return 0x60 + y; // Volume slide down
+    if (x > 0) return 0x70 + Math.min(x, 0x0F); // Volume slide up
+    if (y > 0) return 0x60 + Math.min(y, 0x0F); // Volume slide down
   }
 
+  // 0xE: Fine volume slide
   if (parsed.type === 0xE) {
     const x = (parsed.param >> 4) & 0x0F;
     const y = parsed.param & 0x0F;
 
-    if (x === 0xA) return 0x90 + y; // Fine volume up (EAx)
-    if (x === 0xB) return 0x80 + y; // Fine volume down (EBx)
+    if (x === 0xA) return 0x90 + Math.min(y, 0x0F); // Fine volume up (EAx)
+    if (x === 0xB) return 0x80 + Math.min(y, 0x0F); // Fine volume down (EBx)
   }
 
+  // 0x4: Vibrato
   if (parsed.type === 0x4) {
-    // Vibrato depth
     const y = parsed.param & 0x0F;
-    return 0xB0 + y;
+    return 0xB0 + Math.min(y, 0x0F); // Vibrato depth
   }
 
+  // 0x3: Tone portamento
   if (parsed.type === 0x3) {
-    // Tone portamento
     const speed = Math.floor(parsed.param / 16);
     return 0xF0 + Math.min(speed, 0x0F);
   }
 
+  // 0x8: Set panning
+  if (parsed.type === 0x8) {
+    const pan = Math.floor(parsed.param / 16);
+    return 0xC0 + Math.min(pan, 0x0F);
+  }
+
+  // 0x19 (P): Panning slide
+  if (parsed.type === 25) { // 'P' is index 25
+    const x = (parsed.param >> 4) & 0x0F;
+    const y = parsed.param & 0x0F;
+    if (x > 0) return 0xE0 + Math.min(x, 0x0F); // Pan slide right
+    if (y > 0) return 0xD0 + Math.min(y, 0x0F); // Pan slide left
+  }
+
   return 0;
 }
+
 
 /**
  * Convert Sampler instrument to XM instrument
@@ -293,7 +307,7 @@ async function convertSamplerToXMInstrument(
   inst: InstrumentConfig,
   importMetadata?: ImportMetadata
 ): Promise<XMInstrumentData> {
-  // Check if we have preserved original sample
+  // Check if we have preserved original sample (lossless re-export)
   const originalSample = importMetadata?.originalSamples?.[inst.id];
 
   if (originalSample) {
@@ -323,9 +337,55 @@ async function convertSamplerToXMInstrument(
     };
   }
 
-  // No preserved sample - would need to extract from current sample
-  // For now, create empty instrument
+  // Handle current DEViLBOX sample if present
+  if (inst.sample && inst.sample.audioBuffer) {
+    const s = inst.sample;
+    const audioBuffer = s.audioBuffer as ArrayBuffer; // Safe due to check above
+    const bitDepth = 16; // Internal buffers are usually Float32, we export as 16-bit
+    const relativeNote = 49 - noteNameToIndex(s.baseNote);
+    const finetune = Math.max(-128, Math.min(127, Math.round(s.detune * 128 / 100)));
+
+    const loopStart = s.loop ? s.loopStart * 2 : 0;
+    const loopLength = s.loop ? (s.loopEnd - s.loopStart) * 2 : 0;
+
+    return {
+      name: inst.name.substring(0, 22),
+      samples: [
+        {
+          name: inst.name.substring(0, 22),
+          pcmData: audioBuffer,
+          loopStart,
+          loopLength,
+          volume: Math.round((inst.volume + 60) * 64 / 60), // Map -60..0dB to 0..64
+          finetune,
+          type: buildTypeFlags(s.loop ? 'forward' : 'none', bitDepth),
+          panning: Math.round((inst.pan + 100) * 255 / 200), // Map -100..100 to 0..255
+          relativeNote,
+        },
+      ],
+      vibratoType: 0,
+      vibratoSweep: 0,
+      vibratoDepth: 0,
+      vibratoRate: 0,
+      volumeFadeout: 0,
+    };
+  }
+
+  // No preserved or current sample
   return createEmptyXMInstrument(inst.name);
+}
+
+/**
+ * Convert note name (e.g., "C-4") to XM note index (1-96)
+ */
+function noteNameToIndex(name: string): number {
+  if (!name || name.length < 3) return 49; // Default C-4
+  const notes = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+  const notePart = name.substring(0, 2).toUpperCase();
+  const octavePart = parseInt(name.substring(2));
+  const noteIndex = notes.indexOf(notePart);
+  if (noteIndex === -1 || isNaN(octavePart)) return 49;
+  return octavePart * 12 + noteIndex + 1;
 }
 
 /**
@@ -416,15 +476,15 @@ function writeXMHeader(config: any): Uint8Array {
     buffer[offset++] = idText.charCodeAt(i);
   }
 
-  // Module name (20 bytes)
-  writeString(buffer, offset, config.moduleName, 20);
+  // Module name (20 bytes, space-padded per FT2 convention)
+  writeString(buffer, offset, config.moduleName, 20, 32);
   offset += 20;
 
   // 0x1A byte
   buffer[offset++] = 0x1A;
 
-  // Tracker name (20 bytes)
-  writeString(buffer, offset, config.trackerName, 20);
+  // Tracker name (20 bytes, space-padded per FT2 convention)
+  writeString(buffer, offset, config.trackerName, 20, 32);
   offset += 20;
 
   // Version number (2 bytes, little-endian)
@@ -731,10 +791,22 @@ function deltaEncode(buffer: ArrayBuffer, is16Bit: boolean): ArrayBuffer {
 }
 
 /**
- * Write string to buffer (null-padded)
+ * Write string to buffer
+ * @param buffer Target buffer
+ * @param offset Start offset
+ * @param str String to write
+ * @param maxLength Maximum length
+ * @param padChar Optional padding character (default: 0)
  */
-function writeString(buffer: Uint8Array, offset: number, str: string, maxLength: number): void {
+function writeString(
+  buffer: Uint8Array,
+  offset: number,
+  str: string,
+  maxLength: number,
+  padChar: number = 0
+): void {
   for (let i = 0; i < maxLength; i++) {
-    buffer[offset + i] = i < str.length ? str.charCodeAt(i) : 0;
+    buffer[offset + i] = i < str.length ? str.charCodeAt(i) : padChar;
   }
 }
+
