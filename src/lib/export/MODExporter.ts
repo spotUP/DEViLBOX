@@ -163,25 +163,35 @@ interface MODNoteData {
 /**
  * Amiga period table for notes
  * Period = base period for C-2 / (2 ^ (note / 12))
+ * Standard range: C-1 to B-3 (periods 856-113)
+ * Extended range: C-0 to B-5 (periods 1712-28)
  */
 const AMIGA_PERIODS: { [key: string]: number } = {
+  // Octave 0
   'C-0': 1712, 'C#0': 1616, 'D-0': 1525, 'D#0': 1440, 'E-0': 1357, 'F-0': 1281,
   'F#0': 1209, 'G-0': 1141, 'G#0': 1077, 'A-0': 1017, 'A#0': 961, 'B-0': 907,
+  // Octave 1
   'C-1': 856, 'C#1': 808, 'D-1': 762, 'D#1': 720, 'E-1': 678, 'F-1': 640,
   'F#1': 604, 'G-1': 570, 'G#1': 538, 'A-1': 508, 'A#1': 480, 'B-1': 453,
+  // Octave 2
   'C-2': 428, 'C#2': 404, 'D-2': 381, 'D#2': 360, 'E-2': 339, 'F-2': 320,
   'F#2': 302, 'G-2': 285, 'G#2': 269, 'A-2': 254, 'A#2': 240, 'B-2': 226,
+  // Octave 3
   'C-3': 214, 'C#3': 202, 'D-3': 190, 'D#3': 180, 'E-3': 170, 'F-3': 160,
   'F#3': 151, 'G-3': 143, 'G#3': 135, 'A-3': 127, 'A#3': 120, 'B-3': 113,
+  // Octave 4 (Extended)
+  'C-4': 107, 'C#4': 101, 'D-4': 95, 'D#4': 90, 'E-4': 85, 'F-4': 80,
+  'F#4': 75, 'G-4': 71, 'G#4': 67, 'A-4': 63, 'A#4': 60, 'B-4': 56,
+  // Octave 5 (Extended)
+  'C-5': 53, 'C#5': 50, 'D-5': 47, 'D#5': 45, 'E-5': 42, 'F-5': 40,
+  'F#5': 37, 'G-5': 35, 'G#5': 33, 'A-5': 31, 'A#5': 30, 'B-5': 28,
 };
 
 /**
  * Convert note name to Amiga period
  */
 function noteToPeriod(noteName: string): number {
-  // Remove dash for lookup
-  const lookupName = noteName.replace('-', '-');
-  return AMIGA_PERIODS[lookupName] || 0;
+  return AMIGA_PERIODS[noteName] || 0;
 }
 
 /**
@@ -236,7 +246,7 @@ function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteDat
     period = noteToPeriod(noteStr);
     if (period === 0) {
       // Note out of range for Amiga period table
-      warnings.push(`Note ${noteStr} is out of range for MOD format (C-0 to B-3 supported).`);
+      warnings.push(`Note ${noteStr} is out of range for MOD format (C-0 to B-5 supported).`);
     }
   }
 
