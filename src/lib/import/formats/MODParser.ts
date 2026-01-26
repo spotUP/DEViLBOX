@@ -329,12 +329,24 @@ export function periodToNote(period: number): string | null {
   // Amiga period table converted to Tone.js format (no dashes)
   // Octaves shifted +2 (MOD C-1 = modern C3, MOD C-2 = modern C4, etc.)
   const PERIOD_TABLE: { [key: number]: string } = {
+    // Octave 0 (Extended) -> Tone.js Octave 2
+    1712: 'C2', 1616: 'C#2', 1525: 'D2', 1440: 'D#2', 1357: 'E2', 1281: 'F2',
+    1209: 'F#2', 1141: 'G2', 1077: 'G#2', 1017: 'A2', 961: 'A#2', 907: 'B2',
+    // Octave 1 -> Tone.js Octave 3
     856: 'C3', 808: 'C#3', 762: 'D3', 720: 'D#3', 678: 'E3', 640: 'F3',
     604: 'F#3', 570: 'G3', 538: 'G#3', 508: 'A3', 480: 'A#3', 453: 'B3',
+    // Octave 2 -> Tone.js Octave 4
     428: 'C4', 404: 'C#4', 381: 'D4', 360: 'D#4', 339: 'E4', 320: 'F4',
     302: 'F#4', 285: 'G4', 269: 'G#4', 254: 'A4', 240: 'A#4', 226: 'B4',
+    // Octave 3 -> Tone.js Octave 5
     214: 'C5', 202: 'C#5', 190: 'D5', 180: 'D#5', 170: 'E5', 160: 'F5',
     151: 'F#5', 143: 'G5', 135: 'G#5', 127: 'A5', 120: 'A#5', 113: 'B5',
+    // Octave 4 (Extended) -> Tone.js Octave 6
+    107: 'C6', 101: 'C#6', 95: 'D6', 90: 'D#6', 85: 'E6', 80: 'F6',
+    75: 'F#6', 71: 'G6', 67: 'G#6', 63: 'A6', 60: 'A#6', 56: 'B6',
+    // Octave 5 (Extended) -> Tone.js Octave 7
+    53: 'C7', 50: 'C#7', 47: 'D7', 45: 'D#7', 42: 'E7', 40: 'F7',
+    37: 'F#7', 35: 'G7', 33: 'G#7', 31: 'A7', 30: 'A#7', 28: 'B7',
   };
 
   // Find closest period
