@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-25T22:34:19.471Z
+ * Generated: 2026-01-26T07:06:20.685Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '68';
-export const BUILD_HASH = '23074f9';
-export const BUILD_DATE = '2026-01-25';
+export const BUILD_NUMBER = '69';
+export const BUILD_HASH = '9844ce1';
+export const BUILD_DATE = '2026-01-26';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-25',
     changes: [
+      {
+        type: 'feature',
+        description: 'Refactor FT2 toolbar to use design system buttons and fix UI issues'
+      },
       {
         type: 'feature',
         description: 'Add TD-3 pattern import, file browser, and fix Tone.js synth handling'
@@ -268,10 +272,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix unused imports'
-      },
-      {
-        type: 'improvement',
-        description: 'Redesign instrument panel for intuitive UX'
       }
     ]
   }
