@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
-import { APP_VERSION, BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
+import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
 import { Plus, X, Palette, Download } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -88,9 +88,9 @@ const NavBarComponent: React.FC = () => {
           </h1>
           <span
             className="text-xs font-medium text-text-inverse bg-accent-primary px-2 py-0.5 rounded cursor-help"
-            title={`Build #${BUILD_NUMBER} • ${BUILD_HASH} • ${BUILD_DATE}`}
+            title={`${BUILD_HASH} • ${BUILD_DATE}`}
           >
-            v{APP_VERSION}
+            1.0.{BUILD_NUMBER}
           </span>
         </div>
 

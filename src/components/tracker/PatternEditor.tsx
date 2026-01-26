@@ -583,6 +583,14 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
     // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver(() => {
+      // Skip state updates during playback to prevent jumping
+      if (isPlayingRef.current) {
+        // Only update the cached ref, not state
+        if (containerRef.current) {
+          containerHeightRef.current = containerRef.current.clientHeight;
+        }
+        return;
+      }
       debouncedUpdate();
       // Also update cached height for smooth scrolling animation
       if (containerRef.current) {

@@ -612,14 +612,14 @@
     text-align: center;
   }
 
-  /* TB303 Knob Panel */
+  /* TB303 Knob Panel - Compact layout */
   .tb303-knob-panel {
     position: relative;
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
-    gap: 16px;
-    padding: 12px 16px;
+    gap: 8px;
+    padding: 6px 12px;
     background-color: var(--color-bg-secondary);
     border-bottom: 1px solid var(--color-border);
     overflow-x: auto;
@@ -908,22 +908,22 @@
   .tb303-settings-row {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     width: 100%;
-    padding: 8px 0;
+    padding: 4px 0;
     border-bottom: 1px solid var(--color-border);
-    margin-bottom: 12px;
+    margin-bottom: 4px;
     flex-wrap: wrap;
   }
 
   .tb303-all-knobs-row {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: flex-start;
+    gap: 2px;
     width: 100%;
     overflow-x: auto;
     flex-wrap: wrap;
-    padding: 8px 0;
+    padding: 2px 0;
   }
 
   .tb303-visualizers-row {
