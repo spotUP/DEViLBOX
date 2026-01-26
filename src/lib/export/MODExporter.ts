@@ -169,28 +169,28 @@ interface MODNoteData {
 /**
  * Amiga period table for notes
  * Period = base period for C-2 / (2 ^ (note / 12))
- * Standard range: C-1 to B-3 (periods 856-113)
- * Extended range: C-0 to B-5 (periods 1712-28)
+ * Standard MOD range (periods 856-113) maps to DEViLBOX C-3 to B-5
+ * Extended range (periods 1712-28) maps to DEViLBOX C-2 to B-7
  */
 const AMIGA_PERIODS: { [key: string]: number } = {
-  // Octave 0
-  'C-0': 1712, 'C#0': 1616, 'D-0': 1525, 'D#0': 1440, 'E-0': 1357, 'F-0': 1281,
-  'F#0': 1209, 'G-0': 1141, 'G#0': 1077, 'A-0': 1017, 'A#0': 961, 'B-0': 907,
-  // Octave 1
-  'C-1': 856, 'C#1': 808, 'D-1': 762, 'D#1': 720, 'E-1': 678, 'F-1': 640,
-  'F#1': 604, 'G-1': 570, 'G#1': 538, 'A-1': 508, 'A#1': 480, 'B-1': 453,
-  // Octave 2
-  'C-2': 428, 'C#2': 404, 'D-2': 381, 'D#2': 360, 'E-2': 339, 'F-2': 320,
-  'F#2': 302, 'G-2': 285, 'G#2': 269, 'A-2': 254, 'A#2': 240, 'B-2': 226,
-  // Octave 3
-  'C-3': 214, 'C#3': 202, 'D-3': 190, 'D#3': 180, 'E-3': 170, 'F-3': 160,
-  'F#3': 151, 'G-3': 143, 'G#3': 135, 'A-3': 127, 'A#3': 120, 'B-3': 113,
-  // Octave 4 (Extended)
-  'C-4': 107, 'C#4': 101, 'D-4': 95, 'D#4': 90, 'E-4': 85, 'F-4': 80,
-  'F#4': 75, 'G-4': 71, 'G#4': 67, 'A-4': 63, 'A#4': 60, 'B-4': 56,
-  // Octave 5 (Extended)
-  'C-5': 53, 'C#5': 50, 'D-5': 47, 'D#5': 45, 'E-5': 42, 'F-5': 40,
-  'F#5': 37, 'G-5': 35, 'G#5': 33, 'A-5': 31, 'A#5': 30, 'B-5': 28,
+  // Octave 2 (Extended low)
+  'C-2': 1712, 'C#2': 1616, 'D-2': 1525, 'D#2': 1440, 'E-2': 1357, 'F-2': 1281,
+  'F#2': 1209, 'G-2': 1141, 'G#2': 1077, 'A-2': 1017, 'A#2': 961, 'B-2': 907,
+  // Octave 3 (Standard Start 856)
+  'C-3': 856, 'C#3': 808, 'D-3': 762, 'D#3': 720, 'E-3': 678, 'F-3': 640,
+  'F#3': 604, 'G-3': 570, 'G#3': 538, 'A-3': 508, 'A#3': 480, 'B-3': 453,
+  // Octave 4
+  'C-4': 428, 'C#4': 404, 'D-4': 381, 'D#4': 360, 'E-4': 339, 'F-4': 320,
+  'F#4': 302, 'G-4': 285, 'G#4': 269, 'A-4': 254, 'A#4': 240, 'B-4': 226,
+  // Octave 5
+  'C-5': 214, 'C#5': 202, 'D-5': 190, 'D#5': 180, 'E-5': 170, 'F-5': 160,
+  'F#5': 151, 'G-5': 143, 'G#5': 135, 'A-5': 127, 'A#5': 120, 'B-5': 113,
+  // Octave 6 (Extended high)
+  'C-6': 107, 'C#6': 101, 'D-6': 95, 'D#6': 90, 'E-6': 85, 'F-6': 80,
+  'F#6': 75, 'G-6': 71, 'G#6': 67, 'A-6': 63, 'A#6': 60, 'B-6': 56,
+  // Octave 7 (Extended high)
+  'C-7': 53, 'C#7': 50, 'D-7': 47, 'D#7': 45, 'E-7': 42, 'F-7': 40,
+  'F#7': 37, 'G-7': 35, 'G#7': 33, 'A-7': 31, 'A#7': 30, 'B-7': 28,
 };
 
 /**
@@ -252,7 +252,7 @@ function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteDat
     period = noteToPeriod(noteStr);
     if (period === 0) {
       // Note out of range for Amiga period table
-      warnings.push(`Note ${noteStr} is out of range for MOD format (C-0 to B-5 supported).`);
+      warnings.push(`Note ${noteStr} is out of range for MOD format (C-2 to B-7 supported).`);
     }
   }
 
