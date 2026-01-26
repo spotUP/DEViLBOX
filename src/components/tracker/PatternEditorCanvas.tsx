@@ -121,10 +121,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
 
-  // Smooth scrolling refs
-  const playbackStartTimeRef = useRef(0);
-  const playbackStartRowRef = useRef(0);
+  // Smooth scrolling anchor (synchronization point)
+  const scrollAnchorRef = useRef({ row: 0, time: 0 });
   const speedRef = useRef(6); // Default speed
+
+  // Update anchor when row changes (subscribe to store to avoid re-renders)
+  useEffect(() => {
+    const unsub = useTransportStore.subscribe((state, prevState) => {
+      // Update anchor on row change or play start
+      if (state.currentRow !== scrollAnchorRef.current.row || (state.isPlaying && !prevState.isPlaying)) {
+        scrollAnchorRef.current = {
+          row: state.currentRow,
+          time: performance.now()
+        };
+      }
+    });
+    return unsub;
+  }, []);
 
   // Custom scrollbar state
   const [customScrollThumbLeft, setCustomScrollThumbLeft] = useState(0);
@@ -233,18 +246,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const isPlayingRef = useRef(isPlaying);
   const smoothScrollingRef = useRef(smoothScrolling);
   useEffect(() => {
-    const wasPlaying = isPlayingRef.current;
-    const wasSmoothScrolling = smoothScrollingRef.current;
     isPlayingRef.current = isPlaying;
     smoothScrollingRef.current = smoothScrolling;
-
-    // Initialize refs when playback starts or when switching to smooth mode during playback
-    if (isPlaying && smoothScrolling && (!wasPlaying || !wasSmoothScrolling)) {
-      playbackStartTimeRef.current = performance.now();
-      // Read continuousRow directly from store to avoid dependency
-      playbackStartRowRef.current = useTransportStore.getState().continuousRow;
-    }
-  }, [isPlaying, smoothScrolling]); // Removed continuousRow - read directly when needed
+  }, [isPlaying, smoothScrolling]);
 
   // Mobile swipe handlers
   const handleSwipeLeft = useCallback(() => {
@@ -565,18 +569,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     // Calculate current row position (fractional for smooth scrolling)
     let currentRowPosition: number;
     if (isPlaying && smoothScrollingActive) {
-      // Smooth scrolling: calculate fractional row position based on time
+      // Smooth scrolling: calculate fractional row position based on anchor
       const transport = Tone.getTransport();
-      const currentBpm = transport.bpm.value;
+      const currentBpm = transport.bpm.value || 125;
       const tickInterval = 2.5 / currentBpm;
       const secondsPerRow = tickInterval * speedRef.current;
-      const elapsedMs = performance.now() - playbackStartTimeRef.current;
-      const elapsedSeconds = elapsedMs / 1000;
-      const rowsElapsed = elapsedSeconds / secondsPerRow;
-      const rawRowPosition = playbackStartRowRef.current + rowsElapsed;
-      currentRowPosition = rawRowPosition % pattern.length;
+      
+      const anchor = scrollAnchorRef.current;
+      const elapsedSeconds = (performance.now() - anchor.time) / 1000;
+      
+      // Predict current position: anchor row + progress into next row
+      // We limit prediction to +1.5 rows to prevent wild overshoots if lag occurs
+      const predictedOffset = Math.min(elapsedSeconds / secondsPerRow, 1.5);
+      
+      currentRowPosition = anchor.row + predictedOffset;
     } else if (isPlaying) {
-      // Stepped scrolling: use integer row
+      // Stepped scrolling: use integer row from store directly
       currentRowPosition = transportState.currentRow;
     } else {
       // Stopped: use cursor position
