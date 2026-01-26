@@ -265,10 +265,11 @@ export class MODHandler extends BaseFormatHandler {
         this.activeEffects.set(channel, { type: 'tremolo', param, x, y });
         break;
 
-      // 8xx - Set panning (extension)
+      // 8xx - Set panning (extension - DISABLED for strict PT compliance)
       case MOD_EFFECTS.SET_PANNING:
-        state.pan = param;
-        result.setPan = param;
+        // ProTracker does not support 8xx panning. 
+        // This is a common extension (e.g. FastTracker), but for 1:1 PT accuracy,
+        // channels are hard-panned LRRL. We ignore this command.
         break;
 
       // 9xx - Sample offset (PT2.3D accurate implementation)
@@ -429,10 +430,10 @@ export class MODHandler extends BaseFormatHandler {
         state.tremoloRetrigger = (y & 4) === 0;
         break;
 
-      // E8x - Set panning (coarse)
+      // E8x - Karplus Strong (Not implemented)
+      // Standard ProTracker uses E8x for Karplus Strong (destructive sample effect).
+      // Many modern trackers use it for panning, but for 1:1 PT accuracy, we skip it.
       case MOD_E_COMMANDS.PANNING:
-        state.pan = y * 17; // 0-15 -> 0-255
-        result.setPan = state.pan;
         break;
 
       // E9x - Retrigger note
