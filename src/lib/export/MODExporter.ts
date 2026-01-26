@@ -121,7 +121,13 @@ export async function exportAsMOD(
   });
 
   const blob = new Blob([modData], { type: 'application/octet-stream' });
-  const filename = `${moduleName.replace(/[^a-zA-Z0-9]/g, '_')}.mod`;
+  
+  // Prevent overwriting original file by appending _export
+  let safeName = moduleName.replace(/[^a-zA-Z0-9]/g, '_');
+  if (!safeName.toLowerCase().endsWith('_export')) {
+    safeName += '_export';
+  }
+  const filename = `${safeName}.mod`;
 
   return {
     data: blob,
