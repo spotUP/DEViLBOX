@@ -17,7 +17,10 @@ export const InstrumentEditorDemo: React.FC = () => {
   const [editingEffect, setEditingEffect] = useState<EffectConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'synth' | 'effects'>('synth');
 
-  const { currentInstrument, currentInstrumentId } = useInstrumentStore();
+  const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
+  const currentInstrument = useInstrumentStore((state) => 
+    state.instruments.find((i) => i.id === state.currentInstrumentId) || null
+  );
 
   if (!currentInstrument || currentInstrumentId === null) {
     return (

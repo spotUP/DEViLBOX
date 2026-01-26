@@ -36,9 +36,8 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   mode = 'modal',
   showInstrumentList = true,
   showKeyboard: initialShowKeyboard = true,
-  onClose: _onClose,
+  onClose,
 }) => {
-  void _onClose; // Prop available for future use
   const {
     currentInstrument,
     updateInstrument,
@@ -162,6 +161,17 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               <Save size={14} />
               Save
             </button>
+            
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-ft2-bg hover:bg-ft2-shadow text-ft2-textDim hover:text-ft2-text transition-colors text-sm border border-ft2-border"
+                title="Close (Esc)"
+              >
+                <LucideIcons.X size={14} />
+                Close
+              </button>
+            )}
           </div>
         </div>
 
@@ -207,6 +217,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="flex-1 overflow-y-auto scrollbar-ft2">
           {activeTab === 'quick' && (
             <QuickView
+              key={currentInstrument.id}
               onEditSound={handleGoToSound}
               onBrowseAll={handleGoToBrowse}
               onSavePreset={() => setShowSaveDialog(true)}
@@ -217,6 +228,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             <div className="overflow-y-auto">
               {currentInstrument.synthType === 'TB303' ? (
                 <VisualTB303Editor
+                  key={currentInstrument.id}
                   config={currentInstrument.tb303!}
                   onChange={(tb303Updates) => updateInstrument(currentInstrument.id, {
                     tb303: { ...currentInstrument.tb303!, ...tb303Updates }
@@ -224,6 +236,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                 />
               ) : (
                 <VisualSynthEditor
+                  key={currentInstrument.id}
                   instrument={currentInstrument}
                   onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
                 />
@@ -248,7 +261,11 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
           {activeTab === 'effects' && (
             <div className="p-4">
-              <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
+              <EffectChain 
+                key={currentInstrument.id}
+                instrumentId={currentInstrument.id} 
+                effects={currentInstrument.effects || []} 
+              />
             </div>
           )}
 

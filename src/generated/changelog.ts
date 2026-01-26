@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-26T07:06:20.685Z
+ * Generated: 2026-01-26T13:44:52.462Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '69';
-export const BUILD_HASH = '9844ce1';
+export const BUILD_NUMBER = '73';
+export const BUILD_HASH = '60b910c';
 export const BUILD_DATE = '2026-01-26';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -29,6 +29,28 @@ export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-26',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Update project documentation and change logs'
+      },
+      {
+        type: 'fix',
+        description: 'Optimize React rendering and add visualization components'
+      },
+      {
+        type: 'improvement',
+        description: 'Optimize audio engine and playback for M1/Apple Silicon'
+      },
+      {
+        type: 'improvement',
+        description: 'Restructure public assets into data directory'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-25',
     changes: [
       {
@@ -42,7 +64,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-24',
     changes: [
       {
@@ -52,7 +74,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-2',
+    version: '1.0.1-3',
     date: '2026-01-23',
     changes: [
       {
@@ -90,7 +112,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-3',
+    version: '1.0.1-4',
     date: '2026-01-22',
     changes: [
       {
@@ -156,7 +178,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-4',
+    version: '1.0.1-5',
     date: '2026-01-21',
     changes: [
       {
@@ -182,7 +204,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-5',
+    version: '1.0.1-6',
     date: '2026-01-20',
     changes: [
       {
@@ -216,7 +238,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-6',
+    version: '1.0.1-7',
     date: '2026-01-17',
     changes: [
       {
@@ -246,7 +268,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-7',
+    version: '1.0.1-8',
     date: '2026-01-16',
     changes: [
       {
@@ -256,22 +278,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix Tone.js cancelAndHoldAtTime null error'
-      },
-      {
-        type: 'feature',
-        description: 'Improve instrument creation and add reset button'
-      },
-      {
-        type: 'feature',
-        description: 'Add visual VST-style instrument editors'
-      },
-      {
-        type: 'feature',
-        description: 'Add FT2-style instrument list panel with create workflow'
-      },
-      {
-        type: 'fix',
-        description: 'Fix unused imports'
       }
     ]
   }

@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
-import { CHANGELOG, CURRENT_VERSION, type ChangelogEntry } from '@generated/changelog';
+import { CHANGELOG, CURRENT_VERSION, FULL_VERSION, type ChangelogEntry } from '@generated/changelog';
 
 const STORAGE_KEY = 'devilbox-seen-version';
 
@@ -48,7 +48,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ onClose }) => {
             </div>
             <div>
               <h2 className="text-lg font-bold text-text-primary">What's New</h2>
-              <p className="text-xs text-text-muted">DEViLBOX v{CURRENT_VERSION}</p>
+              <p className="text-xs text-text-muted">DEViLBOX v{FULL_VERSION}</p>
             </div>
           </div>
           <button

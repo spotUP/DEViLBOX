@@ -27,14 +27,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
   showActions = true,
   onInstrumentChange,
 }) => {
-  const {
-    instruments,
-    currentInstrumentId,
-    setCurrentInstrument,
-    createInstrument,
-    deleteInstrument,
-    cloneInstrument,
-  } = useInstrumentStore();
+  const instruments = useInstrumentStore((state) => state.instruments);
+  const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
+  const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
+  const createInstrument = useInstrumentStore((state) => state.createInstrument);
+  const deleteInstrument = useInstrumentStore((state) => state.deleteInstrument);
+  const cloneInstrument = useInstrumentStore((state) => state.cloneInstrument);
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);

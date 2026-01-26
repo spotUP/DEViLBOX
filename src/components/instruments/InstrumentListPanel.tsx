@@ -18,14 +18,12 @@ interface InstrumentListPanelProps {
 }
 
 export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEditInstrument }) => {
-  const {
-    instruments,
-    currentInstrumentId,
-    setCurrentInstrument,
-    createInstrument,
-    deleteInstrument,
-    cloneInstrument,
-  } = useInstrumentStore();
+  const instruments = useInstrumentStore((state) => state.instruments);
+  const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
+  const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
+  const createInstrument = useInstrumentStore((state) => state.createInstrument);
+  const deleteInstrument = useInstrumentStore((state) => state.deleteInstrument);
+  const cloneInstrument = useInstrumentStore((state) => state.cloneInstrument);
 
   const { useHexNumbers } = useUIStore();
 
