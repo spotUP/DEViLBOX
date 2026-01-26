@@ -559,41 +559,175 @@ function packPatternData(rows: XMNoteData[][], channelCount: number): Uint8Array
  * Write XM instrument
  */
 function writeXMInstrument(instrument: XMInstrumentData): Uint8Array {
-  // Write XM instrument header
-  // Note: Full instrument support with sample data requires proper delta encoding
-  // and sample header writing. Currently writes minimal header for compatibility.
-
-  const headerSize = instrument.samples.length > 0 ? 263 : 29;
-  const buffer = new Uint8Array(headerSize);
-  const view = new DataView(buffer.buffer);
-
-  // Instrument header size (4 bytes)
-  view.setUint32(0, headerSize, true);
-
-  // Instrument name (22 bytes)
-  writeString(buffer, 4, instrument.name, 22);
-
-  // Type (1 byte) - always 0
-  buffer[26] = 0;
-
-  // Sample count (2 bytes)
-  view.setUint16(27, instrument.samples.length, true);
-
-  // If no samples, we're done
+  // If no samples, write minimal header (29 bytes)
   if (instrument.samples.length === 0) {
+    const buffer = new Uint8Array(29);
+    const view = new DataView(buffer.buffer);
+    
+    view.setUint32(0, 29, true); // Instrument header size
+    writeString(buffer, 4, instrument.name, 22);
+    buffer[26] = 0; // Type
+    view.setUint16(27, 0, true); // Num samples
+    
     return buffer;
   }
 
-  // Note: Full instrument export requires implementing:
-  // - Sample header size (40 bytes each)
-  // - Sample note mapping (96 bytes) - which sample for each note
-  // - Volume/panning envelope points (12 points * 4 bytes each)
-  // - Envelope flags, loop points, sustain points
-  // - Vibrato settings
-  // - Delta-encoded 8/16-bit sample data
-  // Current implementation writes minimal header for basic XM compatibility
+  // Calculate total size
+  // Instrument Header (263) + (NumSamples * SampleHeaderSize (40)) + SampleDataSize
+  const instHeaderSize = 263;
+  const sampleHeaderSize = 40;
+  
+  let totalSampleDataSize = 0;
+  for (const sample of instrument.samples) {
+    totalSampleDataSize += sample.pcmData.byteLength;
+  }
+  
+  const totalSize = instHeaderSize + (instrument.samples.length * sampleHeaderSize) + totalSampleDataSize;
+  const buffer = new Uint8Array(totalSize);
+  const view = new DataView(buffer.buffer);
+  
+  // --- Instrument Header ---
+  
+  view.setUint32(0, instHeaderSize, true);
+  writeString(buffer, 4, instrument.name, 22);
+  buffer[26] = 0; // Type
+  view.setUint16(27, instrument.samples.length, true);
+  view.setUint32(29, sampleHeaderSize, true);
+  
+  // Note mapping (96 bytes)
+  // Map all notes to sample 0 (first sample) for now, or use relativeNote info if available
+  // In XM, sample numbers are 0-based in this array
+  for (let i = 0; i < 96; i++) {
+    buffer[33 + i] = 0; // Default to first sample
+  }
+  
+  // Volume Envelope (48 bytes: 12 points * 4 bytes)
+  if (instrument.volumeEnvelope && instrument.volumeEnvelope.points) {
+    for (let i = 0; i < Math.min(instrument.volumeEnvelope.points.length, 12); i++) {
+      const pt = instrument.volumeEnvelope.points[i];
+      view.setUint16(129 + (i * 4), pt.tick, true); // Tick
+      view.setUint16(129 + (i * 4) + 2, pt.value, true); // Value
+    }
+  }
+  
+  // Panning Envelope (48 bytes)
+  if (instrument.panningEnvelope && instrument.panningEnvelope.points) {
+    for (let i = 0; i < Math.min(instrument.panningEnvelope.points.length, 12); i++) {
+      const pt = instrument.panningEnvelope.points[i];
+      view.setUint16(177 + (i * 4), pt.tick, true);
+      view.setUint16(177 + (i * 4) + 2, pt.value, true);
+    }
+  }
+  
+  // Envelope counts
+  view.setUint8(225, instrument.volumeEnvelope?.points?.length || 0);
+  view.setUint8(226, instrument.panningEnvelope?.points?.length || 0);
+
+  // Volume Envelope Settings
+  view.setUint8(227, instrument.volumeEnvelope?.sustainPoint ?? 0);
+  view.setUint8(228, instrument.volumeEnvelope?.loopStartPoint ?? 0);
+  view.setUint8(229, instrument.volumeEnvelope?.loopEndPoint ?? 0);
+  
+  // Panning Envelope Settings
+  view.setUint8(230, instrument.panningEnvelope?.sustainPoint ?? 0);
+  view.setUint8(231, instrument.panningEnvelope?.loopStartPoint ?? 0);
+  view.setUint8(232, instrument.panningEnvelope?.loopEndPoint ?? 0);
+  
+  // Envelope flags
+  let volFlags = 0;
+  if (instrument.volumeEnvelope?.enabled) volFlags |= 1; // On
+  if (instrument.volumeEnvelope?.sustainPoint !== null && instrument.volumeEnvelope?.sustainPoint !== undefined) volFlags |= 2; // Sustain
+  if (instrument.volumeEnvelope?.loopStartPoint !== null && instrument.volumeEnvelope?.loopStartPoint !== undefined) volFlags |= 4; // Loop
+  buffer[233] = volFlags;
+  
+  let panFlags = 0;
+  if (instrument.panningEnvelope?.enabled) panFlags |= 1; // On
+  if (instrument.panningEnvelope?.sustainPoint !== null && instrument.panningEnvelope?.sustainPoint !== undefined) panFlags |= 2; // Sustain
+  if (instrument.panningEnvelope?.loopStartPoint !== null && instrument.panningEnvelope?.loopStartPoint !== undefined) panFlags |= 4; // Loop
+  buffer[234] = panFlags;
+  
+  // Vibrato
+  buffer[235] = instrument.vibratoType;
+  buffer[236] = instrument.vibratoSweep;
+  buffer[237] = instrument.vibratoDepth;
+  buffer[238] = instrument.vibratoRate;
+  
+  view.setUint16(239, instrument.volumeFadeout, true);
+  
+  // --- Sample Headers ---
+  
+  let headerOffset = 263;
+  let dataOffset = 263 + (instrument.samples.length * sampleHeaderSize);
+  
+  for (const sample of instrument.samples) {
+    // Sample Length
+    view.setUint32(headerOffset, sample.pcmData.byteLength, true);
+    
+    // Loop Start
+    view.setUint32(headerOffset + 4, sample.loopStart, true);
+    
+    // Loop Length
+    view.setUint32(headerOffset + 8, sample.loopLength, true);
+    
+    // Volume
+    buffer[headerOffset + 12] = sample.volume;
+    
+    // Finetune
+    buffer[headerOffset + 13] = sample.finetune;
+    
+    // Type (Loop type + Bit depth)
+    buffer[headerOffset + 14] = sample.type;
+    
+    // Panning
+    buffer[headerOffset + 15] = sample.panning;
+    
+    // Relative Note
+    buffer[headerOffset + 16] = sample.relativeNote;
+    
+    // Reserved (17)
+    buffer[headerOffset + 17] = 0;
+    
+    // Name (22 bytes)
+    writeString(buffer, headerOffset + 18, sample.name, 22);
+    
+    // Write Sample Data (Delta Encoded)
+    const is16Bit = (sample.type & 0x10) !== 0;
+    const encodedData = deltaEncode(sample.pcmData, is16Bit);
+    buffer.set(new Uint8Array(encodedData), dataOffset);
+    
+    // Advance offsets
+    headerOffset += sampleHeaderSize;
+    dataOffset += sample.pcmData.byteLength;
+  }
 
   return buffer;
+}
+
+/**
+ * Perform delta encoding on PCM data
+ */
+function deltaEncode(buffer: ArrayBuffer, is16Bit: boolean): ArrayBuffer {
+  if (is16Bit) {
+    const src = new Int16Array(buffer);
+    const dest = new Int16Array(src.length);
+    let prev = 0;
+    for (let i = 0; i < src.length; i++) {
+      const current = src[i];
+      dest[i] = current - prev;
+      prev = current;
+    }
+    return dest.buffer;
+  } else {
+    const src = new Int8Array(buffer);
+    const dest = new Int8Array(src.length);
+    let prev = 0;
+    for (let i = 0; i < src.length; i++) {
+      const current = src[i];
+      dest[i] = current - prev;
+      prev = current;
+    }
+    return dest.buffer;
+  }
 }
 
 /**
