@@ -81,8 +81,14 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
       try {
         // Try native parser for XM/MOD
         if (useNativeParser) {
+          console.log('[ModuleLoader] Trying native parser for', ext);
           try {
             const nativeData = await loadWithNativeParser(arrayBuffer, ext, file.name);
+            console.log('[ModuleLoader] Native parser result:', {
+              hasData: !!nativeData,
+              format: nativeData?.format,
+              patternsCount: nativeData?.patterns?.length,
+            });
             if (nativeData) {
               // Create metadata for compatibility
               const metadata: ModuleMetadata = {

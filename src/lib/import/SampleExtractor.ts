@@ -379,8 +379,9 @@ function extractS3M(data: Uint8Array): ExtractionResult {
       channels: 1,  // We only handle mono for now
       bitDepth: is16Bit ? 16 : 8,
       pcmData,
-      loopStart: isLooped ? loopStart : undefined,
-      loopEnd: isLooped ? loopEnd : undefined,
+      // S3M stores loop points in bytes, convert to samples for 16-bit
+      loopStart: isLooped ? (is16Bit ? loopStart / 2 : loopStart) : undefined,
+      loopEnd: isLooped ? (is16Bit ? loopEnd / 2 : loopEnd) : undefined,
       loopType: isLooped ? 'forward' : 'none',
       baseNote: 'C-4',
       volume,

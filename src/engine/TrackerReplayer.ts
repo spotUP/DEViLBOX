@@ -135,6 +135,8 @@ interface ChannelState {
   retrigCount: number;           // Retrigger counter
   patternLoopRow: number;        // Pattern loop start row
   patternLoopCount: number;      // Pattern loop counter
+  glissando: boolean;            // E3x: Glissando control (slide in semitones)
+  hasNoteInRow: boolean;         // For E9x retrigger - tracks if row has a note (pt2-clone: n_note > 0)
 
   // TB-303 specific
   accent: boolean;
@@ -187,7 +189,12 @@ export class TrackerReplayer {
   private pBreakFlag = false;
   private posJumpFlag = false;
   private posJumpPos = 0;
-  private patternDelay = 0;      // EEx pattern delay
+
+  // EEx pattern delay - two-stage system matching pt2-clone
+  // pattDelTime is set when E command is encountered
+  // pattDelTime2 is the active countdown (effects still process during delay)
+  private pattDelTime = 0;
+  private pattDelTime2 = 0;
 
   // Channels
   private channels: ChannelState[] = [];
@@ -251,7 +258,8 @@ export class TrackerReplayer {
     this.bpm = song.initialBPM;
     this.pBreakFlag = false;
     this.posJumpFlag = false;
-    this.patternDelay = 0;
+    this.pattDelTime = 0;
+    this.pattDelTime2 = 0;
 
     // Build instrument lookup map for O(1) access during playback
     this.instrumentMap.clear();
@@ -305,6 +313,8 @@ export class TrackerReplayer {
       retrigCount: 0,
       patternLoopRow: 0,
       patternLoopCount: 0,
+      glissando: false,
+      hasNoteInRow: false,
       accent: false,
       slide: false,
       instrument: null,
@@ -490,12 +500,6 @@ export class TrackerReplayer {
   private processTick(time: number): void {
     if (!this.song || !this.playing) return;
 
-    // Handle pattern delay
-    if (this.patternDelay > 0) {
-      this.patternDelay--;
-      return;
-    }
-
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
     if (patternNum === undefined) {
@@ -531,11 +535,27 @@ export class TrackerReplayer {
       }
 
       if (this.currentTick === 0) {
-        // Tick 0: Read new row data
-        this.processRow(ch, channel, row, time);
+        // Tick 0: Check pattern delay state
+        if (this.pattDelTime2 === 0) {
+          // No pattern delay active - read new row data normally
+          this.processRow(ch, channel, row, time);
+        } else {
+          // Pattern delay active on tick 0 - only process effects, don't read notes
+          // This matches pt2-clone behavior: effects continue during pattern delay
+          this.processEffectTick(ch, channel, row, time);
+        }
       } else {
-        // Ticks 1+: Process continuous effects
+        // Ticks 1+: Process continuous effects (always, including during pattern delay)
         this.processEffectTick(ch, channel, row, time);
+      }
+    }
+
+    // After processing all channels on tick 0, handle pattern delay state
+    if (this.currentTick === 0) {
+      // Copy pending delay to active delay (two-stage system from pt2-clone)
+      if (this.pattDelTime > 0) {
+        this.pattDelTime2 = this.pattDelTime;
+        this.pattDelTime = 0;
       }
     }
 
@@ -548,7 +568,7 @@ export class TrackerReplayer {
     this.currentTick++;
     if (this.currentTick >= this.speed) {
       this.currentTick = 0;
-      this.advanceRow();
+      this.advanceRowWithDelay();
     }
   }
 
@@ -562,6 +582,12 @@ export class TrackerReplayer {
     // Get first effect column (XM format: effTyp/eff)
     const effect = row.effTyp ?? 0;
     const param = row.eff ?? 0;
+
+    // Check if row has a note for E9x retrigger (pt2-clone: n_note & 0xFFF > 0)
+    const noteValue = row.note;
+    const rawPeriod = row.period;
+    ch.hasNoteInRow = (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') ||
+                      (rawPeriod && rawPeriod > 0);
 
     // Get second effect column (string format like "F1A")
     const effect2Str = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
@@ -589,11 +615,6 @@ export class TrackerReplayer {
     if (typeof row.note === 'number' && row.note > 0 && row.note < 97) {
       ch.xmNote = row.note;
     }
-
-    // Handle note
-    const noteValue = row.note;
-    // Use raw period from MOD data if available (more accurate than converting from note)
-    const rawPeriod = row.period;
 
     // Debug: log row data on first few rows of first pattern
     if (this.pattPos < 5 && chIndex === 0) {
@@ -628,8 +649,14 @@ export class TrackerReplayer {
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
         }
 
-        // Trigger the note
-        this.triggerNote(ch, time, offset);
+        // Check for note delay (EDx) - if present, don't trigger on tick 0
+        const hasNoteDelay = (effect === 0xE && ((param >> 4) & 0x0F) === 0xD && (param & 0x0F) > 0);
+
+        if (!hasNoteDelay) {
+          // Trigger the note immediately
+          this.triggerNote(ch, time, offset);
+        }
+        // Note: if hasNoteDelay, the note will be triggered in doEffectTick at the specified tick
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -732,10 +759,14 @@ export class TrackerReplayer {
 
       case 0xF: // Set speed/tempo
         if (param === 0) {
-          // F00 = stop in some trackers
+          // F00 = STOP song (ProTracker spec)
+          console.log('[TrackerReplayer] Effect F00 - stopping song');
+          this.stop();
         } else if (param < 0x20) {
+          // 01-1F = VBlank speed (ticks per row)
           this.speed = param;
         } else {
+          // 20-FF = BPM (CIA timing)
           this.bpm = param;
           this.updateTickInterval();
         }
@@ -744,7 +775,15 @@ export class TrackerReplayer {
   }
 
   private processExtendedEffect0(_chIndex: number, ch: ChannelState, x: number, y: number, _time: number): void {
+    const engine = getToneEngine();
+
     switch (x) {
+      case 0x0: // Filter on/off (E0x)
+        // E00 = filter ON (LED on, softer sound)
+        // E01 = filter OFF (LED off, brighter sound)
+        engine.setAmigaFilter(y === 0);
+        break;
+
       case 0x1: // Fine porta up
         ch.period = Math.max(113, ch.period - y);
         this.updatePeriod(ch);
@@ -753,6 +792,11 @@ export class TrackerReplayer {
       case 0x2: // Fine porta down
         ch.period = Math.min(856, ch.period + y);
         this.updatePeriod(ch);
+        break;
+
+      case 0x3: // Glissando control (E3x)
+        // When on, tone portamento slides in semitones instead of smooth
+        ch.glissando = y !== 0;
         break;
 
       case 0x4: // Vibrato waveform
@@ -775,6 +819,10 @@ export class TrackerReplayer {
           if (ch.patternLoopCount !== 0) {
             this.pBreakPos = ch.patternLoopRow;
             this.pBreakFlag = true;
+            // IMPORTANT: Set posJumpPos to current position to prevent songPos from incrementing
+            // Pattern loops should stay in the same pattern, just jump back to loop start row
+            this.posJumpPos = this.songPos;
+            this.posJumpFlag = true;
           }
         }
         break;
@@ -783,8 +831,8 @@ export class TrackerReplayer {
         ch.waveControl = (ch.waveControl & 0x0F) | ((y & 0x0F) << 4);
         break;
 
-      case 0x9: // Retrigger
-        ch.retrigCount = y;
+      case 0x9: // Retrigger - handled in doEffectTick using modulo-based triggering (pt2-clone)
+        // E9x doesn't need tick-0 processing; the modulo check happens on all ticks in doEffectTick
         break;
 
       case 0xA: // Fine volume up
@@ -797,8 +845,14 @@ export class TrackerReplayer {
         this.setChannelVolume(ch);
         break;
 
-      case 0xE: // Pattern delay
-        this.patternDelay = y * this.speed;
+      // Note: ECx (note cut) and EDx (note delay) are handled in doEffectTick
+      // They don't need tick-0 processing
+
+      case 0xE: // Pattern delay (EEx) - pt2-clone uses y+1 with two-stage system
+        // Only set if no delay is already active (pattDelTime2 === 0)
+        if (this.pattDelTime2 === 0) {
+          this.pattDelTime = y + 1;
+        }
         break;
     }
   }
@@ -869,16 +923,18 @@ export class TrackerReplayer {
 
       case 0xE: // Extended effects
         if (x === 0x9 && y > 0) {
-          // Retrigger
-          ch.retrigCount--;
-          if (ch.retrigCount <= 0) {
-            ch.retrigCount = y;
+          // Retrigger (E9x) - pt2-clone uses modulo-based triggering
+          // If tick 0 AND row has a note, skip (pt2-clone: n_note & 0xFFF > 0)
+          // Otherwise, if tick % y == 0, retrigger
+          if (this.currentTick === 0 && ch.hasNoteInRow) {
+            // Don't retrigger on tick 0 if row has a note (it was/will be triggered)
+          } else if (this.currentTick % y === 0) {
             this.triggerNote(ch, time, 0);
           }
         } else if (x === 0xC && y === this.currentTick) {
-          // Note cut
+          // Note cut - ProTracker spec: "the volume is just turned down" (not actually stopped)
           ch.volume = 0;
-          this.stopChannel(ch, time);
+          this.setChannelVolume(ch);
         } else if (x === 0xD && y === this.currentTick) {
           // Note delay
           this.triggerNote(ch, time, 0);
@@ -918,7 +974,36 @@ export class TrackerReplayer {
       if (ch.period < ch.portaTarget) ch.period = ch.portaTarget;
     }
 
-    this.updatePeriod(ch);
+    // E3x Glissando: slide in semitones instead of smooth
+    if (ch.glissando) {
+      // Quantize period to nearest note in period table
+      const quantizedPeriod = this.quantizePeriodToNote(ch.period, ch.finetune);
+      this.updatePeriodDirect(ch, quantizedPeriod);
+    } else {
+      this.updatePeriod(ch);
+    }
+  }
+
+  /**
+   * Quantize a period value to the nearest note in the period table
+   * Used for E3x glissando control
+   */
+  private quantizePeriodToNote(period: number, finetune: number): number {
+    const ftIndex = finetune >= 0 ? finetune : finetune + 16;
+    const offset = ftIndex * 36;
+
+    let closestIndex = 0;
+    let closestDiff = Math.abs(PERIOD_TABLE[offset] - period);
+
+    for (let i = 1; i < 36; i++) {
+      const diff = Math.abs(PERIOD_TABLE[offset + i] - period);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestIndex = i;
+      }
+    }
+
+    return PERIOD_TABLE[offset + closestIndex];
   }
 
   private doVibrato(ch: ChannelState): void {
@@ -1224,6 +1309,31 @@ export class TrackerReplayer {
   // ==========================================================================
   // ROW ADVANCEMENT
   // ==========================================================================
+
+  /**
+   * Advance row with pattern delay handling (pt2-clone two-stage system)
+   */
+  private advanceRowWithDelay(): void {
+    if (!this.song) return;
+
+    // Handle pattern delay countdown
+    if (this.pattDelTime2 > 0) {
+      this.pattDelTime2--;
+      if (this.pattDelTime2 > 0) {
+        // Delay still active - stay on current row
+        // Notify (for UI update)
+        if (this.onRowChange && this.song) {
+          const pattNum = this.song.songPositions[this.songPos];
+          this.onRowChange(this.pattPos, pattNum, this.songPos);
+        }
+        return;
+      }
+      // Delay just expired (pattDelTime2 === 0), fall through to advance
+    }
+
+    // Normal row advancement
+    this.advanceRow();
+  }
 
   private advanceRow(): void {
     if (!this.song) return;
