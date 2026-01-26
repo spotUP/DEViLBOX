@@ -17,6 +17,7 @@ import {
   noteStringToPeriod,
   getArpeggioPeriod,
   snapPeriodToSemitone,
+  VIBRATO_TABLE,
 } from './PeriodTables';
 
 // Effect constants
@@ -686,25 +687,69 @@ export class MODHandler extends BaseFormatHandler {
    * Note: In original ProTracker, tremolo uses vibratoPos (bug in ramp waveform)
    */
   private processTremolo(state: ChannelState, result: TickResult): void {
-    // Get waveform value
+    // ProTracker 1:1 implementation
     const pos = this.emulatePTBugs ? state.vibratoPos : state.tremoloPos;
-    const waveValue = this.getWaveformValue(state.tremoloWaveform, pos);
+    
+    // Map string waveform to number: 0=sine, 1=ramp, 2=square, 3=random
+    let type = 0;
+    switch (state.tremoloWaveform) {
+      case 'rampDown': type = 1; break;
+      case 'square': type = 2; break;
+      case 'random': type = 3; break;
+      default: type = 0;
+    }
+    
+    // Calculate table index (0-31)
+    const tableIndex = pos & 0x1F;
+    
+    let tremoloData = 0;
+    
+    switch (type) {
+      case 0: // Sine
+        tremoloData = VIBRATO_TABLE[tableIndex];
+        break;
+      case 1: // Ramp
+        // PT Bug: Ramp uses vibratoPos even if tremoloPos should be used
+        // Since we selected 'pos' based on emulatePTBugs above, we just check phase
+        // Ramp down: 255 -> 0
+        if (this.emulatePTBugs ? (state.vibratoPos & 0x20) === 0 : (state.tremoloPos & 0x20) === 0) {
+          tremoloData = tableIndex << 3; // 0-31 -> 0-248
+        } else {
+          tremoloData = 255 - (tableIndex << 3);
+        }
+        break;
+      case 2: // Square
+        tremoloData = 255;
+        break;
+      case 3: // Random (not in standard PT, but in extensions)
+        tremoloData = Math.floor(Math.random() * 255);
+        break;
+    }
 
-    // PT2.3D tremolo scaling: (waveValue * depth) >> 6
-    // Since waveValue is normalized (-1 to 1), we multiply by depth * 4
-    // to match PT2's (255 * depth / 64) ≈ depth * 4 formula
-    const delta = Math.floor(waveValue * state.tremoloDepth * 4);
+    // Apply scaling: (data * depth) / 64
+    const delta = (tremoloData * state.tremoloDepth) >> 6;
 
     // Apply to volume
-    const newVolume = this.clampVolume(state.volume + delta);
+    // Add if phase is 0-31, Subtract if 32-63
+    let newVolume = state.volume;
+    if ((pos & 0x20) === 0) {
+      newVolume += delta;
+      if (newVolume > 64) newVolume = 64;
+    } else {
+      newVolume -= delta;
+      if (newVolume < 0) newVolume = 0;
+    }
+    
     result.setVolume = newVolume;
 
-    // Advance tremolo position: PT2 uses (speed >> 2) & 0x3C
-    // With speed stored as nibble (0-15), this becomes speed * 4
+    // Advance tremolo position
+    // PT2: ch->n_tremolopos += (ch->n_tremolocmd >> 2) & 0x3C;
+    // DEViLBOX stores speed (x) separately. x * 4 is equivalent.
+    state.tremoloPos = (state.tremoloPos + state.tremoloSpeed * 4) & 0x3F;
+    
+    // PT bug: Tremolo updates vibrato position too if emulating bugs
     if (this.emulatePTBugs) {
-      state.vibratoPos = (state.vibratoPos + state.tremoloSpeed * 4) & 0x3F;
-    } else {
-      state.tremoloPos = (state.tremoloPos + state.tremoloSpeed * 4) & 0x3F;
+        state.vibratoPos = state.tremoloPos; 
     }
   }
 
