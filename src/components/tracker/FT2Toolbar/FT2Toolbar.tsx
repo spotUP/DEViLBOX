@@ -19,12 +19,17 @@ import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
+import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
+import { StereoField } from '@components/visualization/StereoField';
+import { LogoAnimation } from '@components/visualization/LogoAnimation';
+import { EnvelopeVisualizer } from '@components/ui/EnvelopeVisualizer';
+import { AccentChargeVisualizer } from '@components/ui/AccentChargeVisualizer';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
-import { convertModule } from '@lib/import/ModuleConverter';
+import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import type { InstrumentConfig } from '@typedefs/instrument';
@@ -197,7 +202,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum'>('waveform');
+  // Start with logo intro, then cycle through other visualizers
+  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'>('logo');
   const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -375,12 +381,39 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
     setIsLoading(true);
     try {
-      if (!moduleInfo.metadata.song) {
+      let result;
+
+      // Debug: Log what data we have
+      console.log('[Import] moduleInfo:', {
+        hasNativeData: !!moduleInfo.nativeData,
+        nativeFormat: moduleInfo.nativeData?.format,
+        hasNativePatterns: !!moduleInfo.nativeData?.patterns,
+        nativePatternsLength: moduleInfo.nativeData?.patterns?.length,
+        hasSong: !!moduleInfo.metadata.song,
+        title: moduleInfo.metadata.title,
+      });
+
+      // Check if we have native parser data (MOD/XM files)
+      if (moduleInfo.nativeData?.patterns) {
+        const { format, patterns: nativePatterns, importMetadata, instruments: nativeInstruments } = moduleInfo.nativeData;
+        const channelCount = importMetadata.originalChannelCount;
+        const instrumentNames = nativeInstruments?.map(i => i.name) || [];
+
+        if (format === 'XM') {
+          result = convertXMModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+        } else if (format === 'MOD') {
+          result = convertMODModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+        } else {
+          notify.error(`Unsupported native format: ${format}`, 5000);
+          return;
+        }
+      } else if (moduleInfo.metadata.song) {
+        // Fall back to libopenmpt data
+        result = convertModule(moduleInfo.metadata.song);
+      } else {
         notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`, 5000);
         return;
       }
-
-      const result = convertModule(moduleInfo.metadata.song);
 
       if (result.patterns.length === 0) {
         notify.error(`Module "${moduleInfo.metadata.title}" contains no patterns`, 5000);
@@ -948,14 +981,68 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         </div>
         {/* End left toolbar controls */}
 
-        {/* Right: Oscilloscope - fills remaining space */}
+        {/* Right: Visualizer - cycles through waveform/spectrum/channels/stereo/logo/envelope/accent */}
         <div
-          className="flex-1 min-w-[200px] flex items-center border-l border-dark-border px-2 cursor-pointer"
-          onClick={() => setVizMode(vizMode === 'waveform' ? 'spectrum' : 'waveform')}
-          title={`Click to switch to ${vizMode === 'waveform' ? 'spectrum' : 'waveform'} view`}
+          className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer"
+          onClick={() => {
+            // Logo is intro-only, not in the cycle
+            const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
+            const currentIndex = modes.indexOf(vizMode as typeof modes[number]);
+            setVizMode(modes[(currentIndex + 1) % modes.length]);
+          }}
+          title={`Click to cycle visualizer (${vizMode})`}
         >
           {oscilloscopeVisible && (
-            <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />
+            <>
+              {(vizMode === 'waveform' || vizMode === 'spectrum') && (
+                <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />
+              )}
+              {vizMode === 'channels' && (
+                <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />
+              )}
+              {vizMode === 'stereo' && (
+                <StereoField height={compactToolbar ? 70 : 100} />
+              )}
+              {vizMode === 'logo' && (
+                <LogoAnimation
+                  height={compactToolbar ? 70 : 100}
+                  onComplete={() => setVizMode('waveform')}
+                />
+              )}
+              {vizMode === 'envelope' && (
+                <EnvelopeVisualizer
+                  attack={3}
+                  decay={(() => {
+                    const tb303 = instruments.find(i => i.synthType === 'TB303');
+                    return tb303?.parameters?.decay ?? 200;
+                  })()}
+                  sustain={0}
+                  release={50}
+                  envMod={(() => {
+                    const tb303 = instruments.find(i => i.synthType === 'TB303');
+                    return tb303?.parameters?.envMod ?? 60;
+                  })()}
+                  height={compactToolbar ? 70 : 100}
+                  color="var(--color-synth-envelope)"
+                  label="Filter Envelope"
+                />
+              )}
+              {vizMode === 'accent' && (
+                <AccentChargeVisualizer
+                  charge={0}
+                  sweepSpeed={(() => {
+                    const tb303 = instruments.find(i => i.synthType === 'TB303');
+                    return tb303?.parameters?.devilFish?.sweepSpeed ?? 'normal';
+                  })()}
+                  enabled={(() => {
+                    const tb303 = instruments.find(i => i.synthType === 'TB303');
+                    return tb303?.parameters?.devilFish?.accentSweepEnabled ?? true;
+                  })()}
+                  height={compactToolbar ? 70 : 100}
+                  color="var(--color-synth-accent)"
+                />
+              )}
+            </>
           )}
         </div>
       </div>
@@ -975,7 +1062,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       <FileBrowser
         isOpen={showFileBrowser}
         onClose={() => setShowFileBrowser(false)}
-        mode="load"
         onLoad={async (data: any, filename: string) => {
           // Stop playback before loading
           if (isPlaying) {

@@ -167,10 +167,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   });
 
   // Transport state with smooth scrolling
-  const { isPlaying, continuousRow, smoothScrolling, speed } = useTransportStore(
+  // NOTE: continuousRow removed - read directly from store to avoid re-renders during playback
+  const { isPlaying, smoothScrolling, speed } = useTransportStore(
     useShallow((state) => ({
       isPlaying: state.isPlaying,
-      continuousRow: state.continuousRow,
       smoothScrolling: state.smoothScrolling,
       speed: state.speed,
     }))
@@ -241,9 +241,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     // Initialize refs when playback starts or when switching to smooth mode during playback
     if (isPlaying && smoothScrolling && (!wasPlaying || !wasSmoothScrolling)) {
       playbackStartTimeRef.current = performance.now();
-      playbackStartRowRef.current = continuousRow;
+      // Read continuousRow directly from store to avoid dependency
+      playbackStartRowRef.current = useTransportStore.getState().continuousRow;
     }
-  }, [isPlaying, smoothScrolling, continuousRow]);
+  }, [isPlaying, smoothScrolling]); // Removed continuousRow - read directly when needed
 
   // Mobile swipe handlers
   const handleSwipeLeft = useCallback(() => {
@@ -807,21 +808,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
   }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isMobile]);
 
-  // Animation loop
-  const animate = useCallback(() => {
-    render();
-    rafRef.current = requestAnimationFrame(animate);
+  // PERFORMANCE: Use ref for render function to prevent animation loop restarts
+  // When render's dependencies change, only the ref is updated, not the animation loop
+  const renderRef = useRef(render);
+  useEffect(() => {
+    renderRef.current = render;
   }, [render]);
 
-  // Start animation loop
+  // Animation loop - uses stable ref, never restarts
   useEffect(() => {
+    const animate = () => {
+      renderRef.current();
+      rafRef.current = requestAnimationFrame(animate);
+    };
     rafRef.current = requestAnimationFrame(animate);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [animate]);
+  }, []); // Empty deps - loop starts once and never restarts
 
   // Handle resize
   useEffect(() => {

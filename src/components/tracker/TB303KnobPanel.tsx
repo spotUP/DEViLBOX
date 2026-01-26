@@ -11,8 +11,7 @@ import { ChevronDown, ChevronUp, Radio } from 'lucide-react';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { Switch3Way } from '@components/controls/Switch3Way';
-import { EnvelopeVisualizer } from '@components/ui/EnvelopeVisualizer';
-import { AccentChargeVisualizer } from '@components/ui/AccentChargeVisualizer';
+// Visualizers moved to FT2Toolbar oscilloscope area
 import { useInstrumentStore, useTrackerStore, useTransportStore, useAutomationStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useMIDIStore } from '@stores/useMIDIStore';
@@ -23,7 +22,6 @@ import type { DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
 // import { DEFAULT_PEDALBOARD } from '@typedefs/pedalboard';
 import { TB303_PRESETS } from '@constants/tb303Presets';
-import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 
 // Throttle function - limits how often a function can be called
 const throttle = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
@@ -139,8 +137,6 @@ const TB303KnobPanelComponent: React.FC = () => {
   );
   // MIDI store for CC handlers and synth selection
   const { registerCCHandler, unregisterCCHandler, controlledInstrumentId, setControlledInstrument } = useMIDIStore();
-  // Responsive context to hide visualizers on narrow windows
-  const { width: windowWidth } = useResponsiveSafe();
 
   const [params, setParams] = useState<TB303Params>(DEFAULT_PARAMS);
   // Keep a ref to always have the latest params (avoids stale closure issues)
@@ -180,11 +176,6 @@ const TB303KnobPanelComponent: React.FC = () => {
   const initialSyncDoneRef = useRef(false);
   // Track the first TB303 instrument ID to detect when a new project is loaded
   const lastTB303IdRef = useRef<number | null>(null);
-
-  // Visualization state
-  const [envelopePosition, setEnvelopePosition] = useState<number>(0);
-  const [envelopeActive, setEnvelopeActive] = useState<boolean>(false);
-  const [accentCharge, setAccentCharge] = useState<number>(0);
 
   // Find all TB303 instruments
   const tb303Instruments = instruments.filter(i => i.synthType === 'TB303');
@@ -518,27 +509,6 @@ const TB303KnobPanelComponent: React.FC = () => {
       // Batch dispatch all updates in one action for better performance
       if (Object.keys(updates).length > 0) {
         dispatchLiveModulation({ type: 'SET_MULTIPLE', values: updates });
-      }
-
-      // Update visualization data (envelope and accent charge)
-      try {
-        const engine = getToneEngine();
-        const inst = tb303Instruments[0];
-        if (inst) {
-          const synth = engine.getInstrument(inst.id, inst, -1);
-          if (synth && synth instanceof TB303Synth) {
-            // Get envelope position and accent charge
-            const envPos = synth.getEnvelopePosition();
-            const envActive = synth.isEnvelopeActive();
-            const charge = synth.getAccentCharge();
-
-            setEnvelopePosition(envPos);
-            setEnvelopeActive(envActive);
-            setAccentCharge(charge);
-          }
-        }
-      } catch (error) {
-        // Silently ignore errors in visualization polling
       }
 
       animationRef.current = requestAnimationFrame(pollLiveValues);
@@ -1158,12 +1128,12 @@ const TB303KnobPanelComponent: React.FC = () => {
             </div>
           </div>
 
-          {/* All knobs in one horizontal row */}
+          {/* All knobs in one horizontal row - compact size for space efficiency */}
           <div className="tb303-all-knobs-row">
-            <Knob label="Tuning" value={params.tuning} min={-100} max={100} unit="¢" onChange={handleTuningChange} defaultValue={0} color="var(--color-synth-modulation)" bipolar />
-            <Knob label="Cutoff" value={params.cutoff} min={50} max={18000} unit="Hz" onChange={handleCutoffChange} logarithmic defaultValue={800} color="var(--color-synth-filter)" displayValue={liveCutoff} isActive={isPlaying && liveCutoff !== undefined} />
-            <Knob label="Reso" value={params.resonance} min={0} max={100} unit="%" onChange={handleResonanceChange} defaultValue={65} color="var(--color-synth-filter)" displayValue={liveResonance} isActive={isPlaying && liveResonance !== undefined} />
-            <Knob label="EnvMod" value={params.envMod} min={0} max={100} unit="%" onChange={handleEnvModChange} defaultValue={60} color="var(--color-synth-envelope)" displayValue={liveEnvMod} isActive={isPlaying && liveEnvMod !== undefined} />
+            <Knob label="Tuning" value={params.tuning} min={-100} max={100} unit="¢" onChange={handleTuningChange} defaultValue={0} color="var(--color-synth-modulation)" bipolar size="sm" />
+            <Knob label="Cutoff" value={params.cutoff} min={50} max={18000} unit="Hz" onChange={handleCutoffChange} logarithmic defaultValue={800} color="var(--color-synth-filter)" displayValue={liveCutoff} isActive={isPlaying && liveCutoff !== undefined} size="sm" />
+            <Knob label="Reso" value={params.resonance} min={0} max={100} unit="%" onChange={handleResonanceChange} defaultValue={65} color="var(--color-synth-filter)" displayValue={liveResonance} isActive={isPlaying && liveResonance !== undefined} size="sm" />
+            <Knob label="EnvMod" value={params.envMod} min={0} max={100} unit="%" onChange={handleEnvModChange} defaultValue={60} color="var(--color-synth-envelope)" displayValue={liveEnvMod} isActive={isPlaying && liveEnvMod !== undefined} size="sm" />
             <Knob
               label={devilFishConfig.enabled ? "VEG Decay" : "Decay"}
               title={devilFishConfig.enabled ? "Volume envelope decay (amplitude envelope)" : "Filter envelope decay (MEG)"}
@@ -1177,17 +1147,18 @@ const TB303KnobPanelComponent: React.FC = () => {
               color="var(--color-synth-envelope)"
               displayValue={devilFishConfig.enabled ? liveVegDecay : liveDecay}
               isActive={isPlaying && (devilFishConfig.enabled ? liveVegDecay !== undefined : liveDecay !== undefined)}
+              size="sm"
             />
-            <Knob label="Accent" value={params.accent} min={0} max={100} unit="%" onChange={handleAccentChange} defaultValue={70} color="var(--color-synth-accent)" displayValue={liveAccent} isActive={isPlaying && liveAccent !== undefined} />
-            <Knob label="Drive" value={params.overdrive} min={0} max={100} unit="%" onChange={handleOverdriveChange} defaultValue={0} color="var(--color-synth-drive)" displayValue={liveOverdrive} isActive={isPlaying && liveOverdrive !== undefined} />
+            <Knob label="Accent" value={params.accent} min={0} max={100} unit="%" onChange={handleAccentChange} defaultValue={70} color="var(--color-synth-accent)" displayValue={liveAccent} isActive={isPlaying && liveAccent !== undefined} size="sm" />
+            <Knob label="Drive" value={params.overdrive} min={0} max={100} unit="%" onChange={handleOverdriveChange} defaultValue={0} color="var(--color-synth-drive)" displayValue={liveOverdrive} isActive={isPlaying && liveOverdrive !== undefined} size="sm" />
 
             {/* Devil Fish knobs */}
-            <Knob label="Norm Dec" title="Filter envelope decay time for normal (non-accented) notes (MEG)" value={devilFishConfig.normalDecay} min={30} max={3000} unit="ms" onChange={handleNormalDecayChange} logarithmic defaultValue={200} color="var(--color-synth-envelope)" displayValue={liveNormalDecay} isActive={isPlaying && liveNormalDecay !== undefined} />
-            <Knob label="Acc Dec" title="Filter envelope decay time for accented notes (MEG)" value={devilFishConfig.accentDecay} min={30} max={3000} unit="ms" onChange={handleAccentDecayChange} logarithmic defaultValue={200} color="var(--color-synth-accent)" displayValue={liveAccentDecay} isActive={isPlaying && liveAccentDecay !== undefined} />
-            <Knob label="Soft Atk" title="Attack time for non-accented notes (makes notes less percussive)" value={devilFishConfig.softAttack} min={0.3} max={3000} unit="ms" onChange={handleSoftAttackChange} logarithmic defaultValue={0.3} color="var(--color-synth-envelope)" displayValue={liveSoftAttack} isActive={isPlaying && liveSoftAttack !== undefined} />
-            <Knob label="VEG Sus" title="Volume envelope sustain level (0%=decay to zero, 100%=infinite notes)" value={devilFishConfig.vegSustain} min={0} max={100} unit="%" onChange={handleVegSustainChange} defaultValue={0} color="var(--color-synth-filter)" displayValue={liveVegSustain} isActive={isPlaying && liveVegSustain !== undefined} />
-            <Knob label="Tracking" title="Filter cutoff follows note pitch (0%=off, 100%=1:1, 200%=over-tracking)" value={devilFishConfig.filterTracking} min={0} max={200} unit="%" onChange={handleFilterTrackingChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterTracking} isActive={isPlaying && liveFilterTracking !== undefined} />
-            <Knob label="FM" title="Audio-rate filter modulation (VCA output modulates filter frequency)" value={devilFishConfig.filterFM} min={0} max={100} unit="%" onChange={handleFilterFMChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterFM} isActive={isPlaying && liveFilterFM !== undefined} />
+            <Knob label="Norm Dec" title="Filter envelope decay time for normal (non-accented) notes (MEG)" value={devilFishConfig.normalDecay} min={30} max={3000} unit="ms" onChange={handleNormalDecayChange} logarithmic defaultValue={200} color="var(--color-synth-envelope)" displayValue={liveNormalDecay} isActive={isPlaying && liveNormalDecay !== undefined} size="sm" />
+            <Knob label="Acc Dec" title="Filter envelope decay time for accented notes (MEG)" value={devilFishConfig.accentDecay} min={30} max={3000} unit="ms" onChange={handleAccentDecayChange} logarithmic defaultValue={200} color="var(--color-synth-accent)" displayValue={liveAccentDecay} isActive={isPlaying && liveAccentDecay !== undefined} size="sm" />
+            <Knob label="Soft Atk" title="Attack time for non-accented notes (makes notes less percussive)" value={devilFishConfig.softAttack} min={0.3} max={3000} unit="ms" onChange={handleSoftAttackChange} logarithmic defaultValue={0.3} color="var(--color-synth-envelope)" displayValue={liveSoftAttack} isActive={isPlaying && liveSoftAttack !== undefined} size="sm" />
+            <Knob label="VEG Sus" title="Volume envelope sustain level (0%=decay to zero, 100%=infinite notes)" value={devilFishConfig.vegSustain} min={0} max={100} unit="%" onChange={handleVegSustainChange} defaultValue={0} color="var(--color-synth-filter)" displayValue={liveVegSustain} isActive={isPlaying && liveVegSustain !== undefined} size="sm" />
+            <Knob label="Tracking" title="Filter cutoff follows note pitch (0%=off, 100%=1:1, 200%=over-tracking)" value={devilFishConfig.filterTracking} min={0} max={200} unit="%" onChange={handleFilterTrackingChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterTracking} isActive={isPlaying && liveFilterTracking !== undefined} size="sm" />
+            <Knob label="FM" title="Audio-rate filter modulation (VCA output modulates filter frequency)" value={devilFishConfig.filterFM} min={0} max={100} unit="%" onChange={handleFilterFMChange} defaultValue={0} color="var(--color-synth-modulation)" displayValue={liveFilterFM} isActive={isPlaying && liveFilterFM !== undefined} size="sm" />
 
             <Switch3Way label="Sweep" title="Accent sweep speed (capacitor charge rate for consecutive accents)" value={devilFishConfig.sweepSpeed} options={['fast', 'normal', 'slow']} labels={['F', 'N', 'S']} onChange={handleSweepSpeedChange} color="var(--color-synth-accent)" />
             <Switch3Way label="Muffler" title="VCA soft clipping (adds buzz and square-wave character)" value={devilFishConfig.muffler} options={['off', 'soft', 'hard']} labels={['Off', 'Sft', 'Hrd']} onChange={handleMufflerChange} color="var(--color-synth-drive)" />
@@ -1195,34 +1166,7 @@ const TB303KnobPanelComponent: React.FC = () => {
             <Toggle label="Acc Swp" title="Enable accent sweep circuit (capacitor charge buildup)" value={devilFishConfig.accentSweepEnabled} onChange={handleAccentSweepChange} color="var(--color-synth-accent)" size="sm" />
           </div>
 
-          {/* Visualizers row - hide on narrow windows */}
-          {windowWidth >= 1200 && (
-            <div className="tb303-visualizers-row">
-              <div style={{ width: '200px', maxWidth: '200px' }}>
-                <EnvelopeVisualizer
-                  attack={3}
-                  decay={liveDecay ?? params.decay}
-                  sustain={0}
-                  release={50}
-                  envMod={liveEnvMod ?? params.envMod}
-                  currentPosition={envelopePosition}
-                  isActive={envelopeActive}
-                  height={50}
-                  color="var(--color-synth-envelope)"
-                  label="Filter Envelope"
-                />
-              </div>
-              <div style={{ width: '200px', maxWidth: '200px' }}>
-                <AccentChargeVisualizer
-                  charge={accentCharge}
-                  sweepSpeed={devilFishConfig.sweepSpeed}
-                  enabled={devilFishConfig.accentSweepEnabled}
-                  height={50}
-                  color="var(--color-synth-accent)"
-                />
-              </div>
-            </div>
-          )}
+          {/* Visualizers moved to FT2Toolbar - click oscilloscope to cycle through modes */}
         </>
       )}
 

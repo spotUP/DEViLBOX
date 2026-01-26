@@ -24,7 +24,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Menu, Activity } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity } from 'lucide-react';
 import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
@@ -533,17 +533,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Desktop view
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-dark-bg overflow-y-hidden">
-      {/* Top Control Bar - Simple pattern info */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border relative z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-accent-primary font-bold font-mono text-xs whitespace-nowrap">
-            {pattern?.name || 'Untitled'}
-          </span>
-        </div>
-      </div>
-
-      {/* FT2 Style Toolbar */}
-      <div className="flex-shrink-0">
+      {/* FT2 Style Toolbar (shrinkable when space is limited) */}
+      <div className="flex-shrink min-h-[80px]">
         <FT2Toolbar
           onShowExport={onShowExport}
           onShowHelp={onShowHelp}
@@ -556,29 +547,26 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         />
       </div>
 
-      {/* TB-303 Live Knobs (compact view when not in TB-303 editor mode) */}
+      {/* TB-303 Live Knobs - full height, panel has its own collapse toggle */}
       {viewMode !== 'tb303' && (
-        <div className="flex-shrink-0 max-h-[120px] overflow-y-auto">
+        <div className="flex-shrink-0">
           <TB303KnobPanel />
         </div>
       )}
 
-      {/* Editor Controls Toolbar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
-        <div className="flex items-center gap-3">
-          {/* Menu icon */}
-          <Menu size={16} className="text-text-muted" />
-
+      {/* Editor Controls Toolbar - Compact & Shrinkable */}
+      <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
+        <div className="flex items-center gap-2">
           {/* View Mode Dropdown */}
-          <div className="flex items-center gap-1.5">
-            {viewMode === 'tracker' && <List size={16} className="text-text-secondary" />}
-            {viewMode === 'grid' && <Grid3x3 size={16} className="text-text-secondary" />}
-            {viewMode === 'pianoroll' && <Piano size={16} className="text-text-secondary" />}
-            {viewMode === 'tb303' && <Radio size={16} className="text-text-secondary" />}
+          <div className="flex items-center gap-1">
+            {viewMode === 'tracker' && <List size={14} className="text-text-secondary" />}
+            {viewMode === 'grid' && <Grid3x3 size={14} className="text-text-secondary" />}
+            {viewMode === 'pianoroll' && <Piano size={14} className="text-text-secondary" />}
+            {viewMode === 'tb303' && <Radio size={14} className="text-text-secondary" />}
             <select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value as ViewMode)}
-              className="px-3 py-1.5 text-sm bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+              className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
               title="Select editor view"
             >
               <option value="tracker">Tracker</option>
@@ -591,11 +579,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {/* Channel Selector (grid and piano roll views) */}
           {(viewMode === 'grid' || viewMode === 'pianoroll') && pattern && (
             <>
-              <span className="text-text-secondary text-xs font-medium">CH:</span>
+              <span className="text-text-secondary text-[10px] font-medium">CH:</span>
               <select
                 value={gridChannelIndex}
                 onChange={(e) => setGridChannelIndex(Number(e.target.value))}
-                className="px-3 py-1.5 text-sm bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+                className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
               >
                 {pattern.channels.map((_, idx) => (
                   <option key={idx} value={idx}>
@@ -611,7 +599,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <button
               onClick={() => setShowGhostPatterns(!showGhostPatterns)}
               className={`
-                flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors
+                flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
                 ${showGhostPatterns
                   ? 'bg-accent-primary/20 text-accent-primary'
                   : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -619,7 +607,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               `}
               title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
             >
-              {showGhostPatterns ? <Eye size={16} /> : <EyeOff size={16} />}
+              {showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
               <span>Ghosts</span>
             </button>
           )}
@@ -629,7 +617,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <button
               onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
               className={`
-                flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors
+                flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
                 ${showAdvancedEdit
                   ? 'bg-accent-primary/20 text-accent-primary'
                   : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -637,8 +625,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               `}
               title="Toggle Advanced Edit Panel"
             >
-              <Zap size={16} />
-              <span>Adv Edit</span>
+              <Zap size={12} />
+              <span>Edit</span>
             </button>
           )}
 
@@ -646,19 +634,19 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' && (
             <button
               onClick={() => setShowAutomation(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
               title="Open Automation Editor"
             >
-              <Activity size={16} />
-              <span>Automation</span>
+              <Activity size={12} />
+              <span>Auto</span>
             </button>
           )}
         </div>
 
-        {/* FPS / Quality Indicator */}
+        {/* FPS / Quality Indicator - Compact */}
         <div
           className={`
-            flex items-center gap-1.5 px-3 py-1.5 text-sm rounded font-mono
+            flex items-center gap-1 px-2 py-0.5 text-xs rounded font-mono
             ${quality === 'low'
               ? 'bg-accent-error/20 text-accent-error'
               : quality === 'medium'
@@ -669,8 +657,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           title={`Performance: ${quality.toUpperCase()} | Avg FPS: ${averageFps} | Current: ${fps}`}
         >
           <span className="font-bold">{averageFps}</span>
-          <span className="text-xs opacity-70">FPS</span>
-          <div className={`w-2 h-2 rounded-full ${
+          <span className="text-[10px] opacity-70">FPS</span>
+          <div className={`w-1.5 h-1.5 rounded-full ${
             quality === 'low' ? 'bg-accent-error' :
             quality === 'medium' ? 'bg-orange-400' :
             'bg-green-400'
@@ -717,18 +705,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <InstrumentListPanel onEditInstrument={onShowInstruments} />
           </div>
         )}
-      </div>
-
-      {/* Keyboard Shortcuts Help - Collapsible on mobile */}
-      <div className="flex-shrink-0 hidden md:flex px-4 py-1.5 bg-dark-bgTertiary border-t border-dark-border text-[10px] text-text-muted font-mono items-center justify-center gap-4 flex-wrap">
-        <span><kbd className="text-text-secondary">↑↓←→</kbd> Navigate</span>
-        <span><kbd className="text-text-secondary">Tab</kbd> Next Ch</span>
-        <span><kbd className="text-text-secondary">A-Z</kbd> Notes</span>
-        <span><kbd className="text-text-secondary">Ctrl+↑↓</kbd> Transpose</span>
-        <span><kbd className="text-text-secondary">Ctrl+I</kbd> Interpolate</span>
-        <span><kbd className="text-text-secondary">Ctrl+F</kbd> Find</span>
-        <span><kbd className="text-text-secondary">Del</kbd> Clear</span>
-        <span><kbd className="text-text-secondary">Space</kbd> Edit Mode</span>
       </div>
 
       {/* Dialogs */}
