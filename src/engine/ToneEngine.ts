@@ -76,6 +76,11 @@ export class ToneEngine {
   private metronomeEnabled: boolean = false;
   private metronomePart: Tone.Part | null = null;
 
+  // Amiga audio filter (E0x command) - low-pass filter at ~3.3kHz
+  // E00 = filter ON (LED on), E01 = filter OFF (LED off/bypassed)
+  private amigaFilter: Tone.Filter;
+  private amigaFilterEnabled: boolean = true; // Default: filter ON (like real Amiga)
+
   // Per-instrument effect chains (keyed by composite string "instrumentId-channelIndex")
   private instrumentEffectChains: Map<string | number, {
     effects: Tone.ToneAudioNode[];
@@ -85,6 +90,14 @@ export class ToneEngine {
   private constructor() {
     // Master input (where all instruments connect)
     this.masterInput = new Tone.Gain(1);
+
+    // Amiga audio filter (E0x) - 1-pole low-pass at ~3.3kHz
+    // The original Amiga had a simple RC filter on the audio output
+    this.amigaFilter = new Tone.Filter({
+      frequency: 3300,
+      type: 'lowpass',
+      rolloff: -12, // Close to Amiga's 6dB/octave characteristic
+    });
 
     // Master output channel with volume/pan control
     this.masterChannel = new Tone.Channel({
@@ -100,8 +113,10 @@ export class ToneEngine {
     this.masterChannel.connect(this.analyser);
     this.masterChannel.connect(this.fft);
 
-    // Default routing: masterInput → masterChannel (no effects)
-    this.masterInput.connect(this.masterChannel);
+    // Default routing: masterInput → amigaFilter → masterChannel
+    // Filter starts enabled (like real Amiga with power LED on)
+    this.masterInput.connect(this.amigaFilter);
+    this.amigaFilter.connect(this.masterChannel);
 
     // Instrument map
     this.instruments = new Map();
@@ -236,6 +251,59 @@ export class ToneEngine {
    */
   public setMasterMute(muted: boolean): void {
     this.masterChannel.mute = muted;
+  }
+
+  /**
+   * Set Amiga audio filter state (E0x command)
+   * E00 = filter ON (LED on, softer sound)
+   * E01 = filter OFF (LED off, brighter sound)
+   *
+   * The Amiga had a hardware low-pass filter at ~3.3kHz that could be
+   * toggled via software. When ON, it softened the sound. When OFF,
+   * the full frequency range was preserved.
+   */
+  public setAmigaFilter(enabled: boolean): void {
+    if (this.amigaFilterEnabled === enabled) return;
+
+    this.amigaFilterEnabled = enabled;
+
+    // Determine what's currently at the end of the chain before masterChannel
+    const hasEffects = this.masterEffectsNodes.length > 0;
+    const lastNode = hasEffects
+      ? this.masterEffectsNodes[this.masterEffectsNodes.length - 1]
+      : this.masterInput;
+
+    // Disconnect and reconnect
+    if (hasEffects) {
+      // Effects chain: disconnect last effect and reconnect
+      lastNode.disconnect();
+      if (enabled) {
+        lastNode.connect(this.amigaFilter);
+        // Ensure amigaFilter connects to masterChannel
+        try { this.amigaFilter.disconnect(); } catch { /* ok */ }
+        this.amigaFilter.connect(this.masterChannel);
+      } else {
+        lastNode.connect(this.masterChannel);
+      }
+    } else {
+      // No effects: disconnect masterInput and reconnect
+      this.masterInput.disconnect();
+      if (enabled) {
+        this.masterInput.connect(this.amigaFilter);
+        // Ensure amigaFilter connects to masterChannel
+        try { this.amigaFilter.disconnect(); } catch { /* ok */ }
+        this.amigaFilter.connect(this.masterChannel);
+      } else {
+        this.masterInput.connect(this.masterChannel);
+      }
+    }
+  }
+
+  /**
+   * Get current Amiga filter state
+   */
+  public getAmigaFilterEnabled(): boolean {
+    return this.amigaFilterEnabled;
   }
 
   /**
@@ -2021,6 +2089,7 @@ export class ToneEngine {
     // Dispose master channel and analyzers
     this.analyser.dispose();
     this.fft.dispose();
+    this.amigaFilter.dispose();
     this.masterInput.dispose();
     this.masterChannel.dispose();
 
@@ -2159,9 +2228,16 @@ export class ToneEngine {
     // Filter to only enabled effects
     const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
+    // Helper to get final output (respecting Amiga filter state)
+    const getFinalOutput = () => this.amigaFilterEnabled ? this.amigaFilter : this.masterChannel;
+
     if (enabledEffects.length === 0) {
-      // No effects - direct connection
-      this.masterInput.connect(this.masterChannel);
+      // No effects - connect through Amiga filter if enabled
+      if (this.amigaFilterEnabled) {
+        this.masterInput.connect(this.amigaFilter);
+      } else {
+        this.masterInput.connect(this.masterChannel);
+      }
       return;
     }
 
@@ -2176,14 +2252,15 @@ export class ToneEngine {
       this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
     });
 
-    // Connect chain: masterInput → effects[0] → effects[n] → masterChannel
+    // Connect chain: masterInput → effects[0] → effects[n] → [amigaFilter] → masterChannel
     this.masterInput.connect(this.masterEffectsNodes[0]);
 
     for (let i = 0; i < this.masterEffectsNodes.length - 1; i++) {
       this.masterEffectsNodes[i].connect(this.masterEffectsNodes[i + 1]);
     }
 
-    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
+    // Final effect connects to Amiga filter (if enabled) or directly to master channel
+    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(getFinalOutput());
 
   }
 

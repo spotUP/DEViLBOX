@@ -103,13 +103,17 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     const sampleData = readMODSampleData(view, offset, sampleHeader);
     offset += sampleHeader.length * 2; // Length is in words
 
+    // MOD samples are 8-bit, so length in samples = length in bytes = words * 2
+    const lengthInSamples = sampleHeader.length * 2;
+
     const sample: ParsedSample = {
       id: i + 1, // MOD instruments are 1-31 (1-indexed)
       name: sampleHeader.name,
       pcmData: sampleData,
-      loopStart: sampleHeader.loopStart,
-      loopLength: sampleHeader.loopLength,
-      // ProTracker spec: loop enabled when length > 2 (not > 1)
+      // Loop points are in words, convert to samples (bytes for 8-bit)
+      loopStart: sampleHeader.loopStart * 2,
+      loopLength: sampleHeader.loopLength * 2,
+      // ProTracker spec: loop enabled when length > 2 words (not > 1)
       // This prevents short loop glitches
       loopType: sampleHeader.loopLength > 2 ? 'forward' : 'none',
       volume: sampleHeader.volume,
@@ -118,7 +122,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
       panning: 128, // Center (MOD doesn't have per-sample panning)
       bitDepth: 8,
       sampleRate: 8363, // Amiga C-2 sample rate (8363 Hz)
-      length: sampleHeader.length,
+      length: lengthInSamples,
     };
 
     instruments.push({
