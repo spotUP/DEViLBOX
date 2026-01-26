@@ -257,7 +257,7 @@ export function formatVolumeColumn(volume: number): string {
  * Convert Amiga period to XM note number
  * Used for accurate MOD import
  *
- * @param period Amiga period (113-856)
+ * @param period Amiga period (28-1712)
  * @param finetune Finetune value (-8 to +7)
  * @returns XM note number (1-96)
  */
@@ -267,12 +267,21 @@ export function periodToXMNote(period: number, _finetune: number = 0): number {
     return 0;
   }
 
-  // ProTracker period table for C-1 to B-3 (finetune 0)
+  // ProTracker period table (Extended range C-0 to B-5)
+  // C-0 = 1712, C-1 = 856, C-2 = 428, C-3 = 214, C-4 = 107, C-5 = 53
   const PT_PERIODS = [
-    1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,  // Octave 1
-    856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480, 453,   // Octave 2
-    428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240, 226,   // Octave 3
-    214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120, 113,   // Octave 4
+    // Octave 0
+    1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,
+    // Octave 1
+    856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480, 453,
+    // Octave 2
+    428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240, 226,
+    // Octave 3
+    214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120, 113,
+    // Octave 4 (Extended)
+    107,  101,  95,   90,   85,   80,   75,   71,   67,   63,   60,   56,
+    // Octave 5 (Extended)
+    53,   50,   47,   45,   42,   40,   37,   35,   33,   31,   30,   28
   ];
 
   // Find closest period
@@ -287,8 +296,9 @@ export function periodToXMNote(period: number, _finetune: number = 0): number {
     }
   }
 
-  // Convert to XM note (C-1 = note 13, B-3 = note 48)
-  const xmNote = closestNote + 12; // Offset by 1 octave (C-1 starts at index 12)
+  // Convert to XM note
+  // Index 1 (1712) = C-0 = XM Note 1
+  const xmNote = closestNote; 
 
   return Math.min(96, Math.max(1, xmNote));
 }
