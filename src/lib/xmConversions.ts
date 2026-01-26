@@ -268,9 +268,10 @@ export function periodToXMNote(period: number, _finetune: number = 0): number {
   }
 
   // ProTracker period table (Extended range C-0 to B-5)
-  // C-0 = 1712, C-1 = 856, C-2 = 428, C-3 = 214, C-4 = 107, C-5 = 53
+  // Maps to DEViLBOX C-2 to B-7 (2 octaves up) to align with standard trackers
+  // 1712 = C-2 (Note 25), 428 = C-4 (Note 49)
   const PT_PERIODS = [
-    // Octave 0
+    // Octave 0 (Extended)
     1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,
     // Octave 1
     856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480, 453,
@@ -292,13 +293,14 @@ export function periodToXMNote(period: number, _finetune: number = 0): number {
     const diff = Math.abs(PT_PERIODS[i] - period);
     if (diff < closestDiff) {
       closestDiff = diff;
-      closestNote = i + 1; // 1-indexed
+      closestNote = i + 1; // 1-indexed in this array
     }
   }
 
   // Convert to XM note
-  // Index 1 (1712) = C-0 = XM Note 1
-  const xmNote = closestNote; 
+  // Index 1 (1712) corresponds to XM Note 25 (C-2)
+  // Index 25 (428) corresponds to XM Note 49 (C-4)
+  const xmNote = closestNote + 24; 
 
   return Math.min(96, Math.max(1, xmNote));
 }
@@ -317,12 +319,22 @@ export function xmNoteToPeriod(xmNote: number, _finetune: number = 0): number {
   }
 
   // Calculate period using Amiga formula
-  // period = (428 * 8363 * 2^((4*12+1-note)/12)) / sampleRate
-  // Simplified for 8363 Hz (finetune 0):
-  const noteIndex = xmNote - 1; // 0-95
-  const period = 7680 - (noteIndex * 64);
+  // Aligned to: C-4 (Note 49) = 428
+  // Formula: period = 428 * 2 ^ ((49 - note) / 12)
+  // For integer math: 428 corresponds to Note 49
+  // Note 1 (C-0) -> Period 6848 (approx)
+  
+  // Note 49 (C-4) is 428
+  // Note 25 (C-2) is 1712
+  
+  // Period table base (C-2 = 1712)
+  // Note 25 = 1712
+  // We need to calculate how many semitones away from C-2 we are
+  
+  const semitonesFromC2 = xmNote - 25;
+  const period = 1712 * Math.pow(2, -semitonesFromC2 / 12);
 
-  return Math.max(113, Math.min(856, period));
+  return Math.max(28, Math.min(1712, Math.round(period)));
 }
 
 /**
