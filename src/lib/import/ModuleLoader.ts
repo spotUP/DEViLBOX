@@ -278,10 +278,14 @@ async function loadWithLibopenmpt(
 export function getSupportedExtensions(): string[] {
   return [
     '.mod', '.xm', '.it', '.s3m', '.mptm',
-    '.669', '.amf', '.ams', '.dbm', '.dmf',
-    '.dsm', '.far', '.gdm', '.imf', '.j2b',
-    '.mdl', '.med', '.mt2', '.mtm', '.okt',
-    '.psm', '.ptm', '.stm', '.ult', '.umx',
+    '.669', '.amf', '.ams', '.dbm', '.digi', '.dmf',
+    '.dsm', '.far', '.ftm', '.gdm', '.gmc', '.imf', 
+    '.j2b', '.m15', '.mdl', '.med', '.mms', '.mt2', 
+    '.mtm', '.okt', '.psm', '.pt36', '.ptm', '.puma', 
+    '.sfx', '.sfx2', '.stk', '.stm', '.stp', '.stx', 
+    '.symmod', '.ult', '.umx',
+    // Compressed/Packed formats
+    '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack'
   ];
 }
 

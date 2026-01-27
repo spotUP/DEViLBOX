@@ -6,6 +6,7 @@
 import type { Pattern, TrackerCell, ImportMetadata } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
 import { xmNoteToString } from '../xmConversions';
+import { SynthBaker } from '../audio/SynthBaker';
 
 export interface MODExportOptions {
   channelCount?: number; // 4, 6, 8 channels (default: 4)
@@ -77,13 +78,34 @@ export async function exportAsMOD(
     }
 
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" cannot be exported to MOD (synth rendering not supported).`);
-      // Note: Rendering synths to samples would require:
-      // 1. OfflineAudioContext to render synth audio
-      // 2. Converting rendered audio to 8-bit signed PCM
-      // 3. Properly handling loop points and sample length limits
-      // This is complex and platform-dependent, so synths export as empty samples
-      modSamples.push(createEmptySample());
+      try {
+        const bakedBuffer = await SynthBaker.bakeToSample(inst);
+        const arrayBuffer = bakedBuffer.getChannelData(0).buffer;
+        
+        // Create a Sampler-like config for the baked synth
+        const dummyConfig: InstrumentConfig = {
+          ...inst,
+          synthType: 'Sampler',
+          sample: {
+            audioBuffer: arrayBuffer,
+            url: '',
+            baseNote: 'C4',
+            detune: 0,
+            loop: false,
+            loopStart: 0,
+            loopEnd: 0,
+            reverse: false,
+            playbackRate: 1.0,
+          }
+        };
+        
+        const modSample = await convertSamplerToMODSample(dummyConfig, importMetadata);
+        modSamples.push(modSample);
+        warnings.push(`Synth instrument "${inst.name}" was baked to a sample for MOD export.`);
+      } catch (error) {
+        warnings.push(`Failed to bake synth instrument "${inst.name}": ${error}. Exporting as empty.`);
+        modSamples.push(createEmptySample());
+      }
     } else if (inst.synthType === 'Sampler') {
       const modSample = await convertSamplerToMODSample(inst, importMetadata);
       modSamples.push(modSample);
