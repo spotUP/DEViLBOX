@@ -87,9 +87,7 @@ export class S3MHandler extends BaseFormatHandler {
     y: number;
   }> = new Map();
 
-  // Pattern loop state
-  private patternLoopRow: Map<number, number> = new Map();
-  private patternLoopCount: Map<number, number> = new Map();
+  // Pattern delay state (pattern loop uses base class maps)
   public patternDelayCount: number = 0; // Used for SEx pattern delay effect
 
   // Sample offset high byte (SAx command)
@@ -101,8 +99,6 @@ export class S3MHandler extends BaseFormatHandler {
   init(config: FormatConfig): void {
     super.init(config);
     this.activeEffects.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.highOffset.clear();
     this.patternDelayCount = 0;
   }
@@ -113,8 +109,6 @@ export class S3MHandler extends BaseFormatHandler {
   resetAll(): void {
     super.resetAll();
     this.activeEffects.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.highOffset.clear();
     this.patternDelayCount = 0;
   }
@@ -448,13 +442,11 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case S3M_S_COMMANDS.VIBRATO_WAVEFORM:
-        state.vibratoWaveform = this.waveformFromNumber(y & 3);
-        state.vibratoRetrigger = (y & 4) === 0;
+        this.setVibratoWaveform(state, y);
         break;
 
       case S3M_S_COMMANDS.TREMOLO_WAVEFORM:
-        state.tremoloWaveform = this.waveformFromNumber(y & 3);
-        state.tremoloRetrigger = (y & 4) === 0;
+        this.setTremoloWaveform(state, y);
         break;
 
       case S3M_S_COMMANDS.PANBRELLO_WAVEFORM:
@@ -471,22 +463,7 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case S3M_S_COMMANDS.PATTERN_LOOP:
-        if (y === 0) {
-          this.patternLoopRow.set(channel, this.currentRow);
-        } else {
-          const count = this.patternLoopCount.get(channel) ?? 0;
-          if (count === 0) {
-            this.patternLoopCount.set(channel, y);
-          } else {
-            this.patternLoopCount.set(channel, count - 1);
-          }
-          if ((this.patternLoopCount.get(channel) ?? 0) > 0) {
-            result.patternLoop = {
-              startRow: this.patternLoopRow.get(channel) ?? 0,
-              count: this.patternLoopCount.get(channel) ?? 0,
-            };
-          }
-        }
+        this.processPatternLoop(channel, y, result);
         break;
 
       case S3M_S_COMMANDS.NOTE_CUT:
@@ -592,13 +569,7 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'globalVolSlide':
-        if (x > 0) {
-          this.globalVolume = Math.min(64, this.globalVolume + x);
-        }
-        else if (y > 0) {
-          this.globalVolume = Math.max(0, this.globalVolume - y);
-        }
-        result.setGlobalVolume = this.globalVolume;
+        this.processGlobalVolumeSlide(x, y, result);
         break;
 
       case 'retrig':
@@ -661,20 +632,6 @@ export class S3MHandler extends BaseFormatHandler {
       const baseFreq = this.periodToHz(state.period);
       const newFreq = baseFreq * Math.pow(2, offset / 12);
       result.setFrequency = newFreq;
-    }
-  }
-
-  /**
-   * Process tremor
-   */
-  private processTremor(state: ChannelState, result: TickResult): void {
-    const cycle = state.tremorOnTime + state.tremorOffTime;
-    state.tremorPos = (state.tremorPos + 1) % cycle;
-
-    if (state.tremorPos < state.tremorOnTime) {
-      result.setVolume = state.volume;
-    } else {
-      result.setVolume = 0;
     }
   }
 

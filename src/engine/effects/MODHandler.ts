@@ -81,9 +81,7 @@ export class MODHandler extends BaseFormatHandler {
     y: number;
   }> = new Map();
 
-  // Pattern loop state
-  private patternLoopRow: Map<number, number> = new Map();
-  private patternLoopCount: Map<number, number> = new Map();
+  // Pattern delay state (pattern loop uses base class maps)
   public patternDelayCount: number = 0;
 
   /**
@@ -101,8 +99,6 @@ export class MODHandler extends BaseFormatHandler {
     super.init(config);
     this.emulatePTBugs = config.emulatePTBugs ?? true;
     this.activeEffects.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
     this.ciaBPMDelay = null;
   }
@@ -113,8 +109,6 @@ export class MODHandler extends BaseFormatHandler {
   resetAll(): void {
     super.resetAll();
     this.activeEffects.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
     this.ciaBPMDelay = null;
   }
@@ -369,8 +363,7 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case MOD_E_COMMANDS.VIBRATO_WAVEFORM:
-        state.vibratoWaveform = this.waveformFromNumber(y & 3);
-        state.vibratoRetrigger = (y & 4) === 0;
+        this.setVibratoWaveform(state, y);
         break;
 
       case MOD_E_COMMANDS.FINETUNE:
@@ -378,27 +371,11 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case MOD_E_COMMANDS.PATTERN_LOOP:
-        if (y === 0) {
-          this.patternLoopRow.set(channel, this.currentRow);
-        } else {
-          const currentCount = this.patternLoopCount.get(channel) ?? 0;
-          if (currentCount === 0) {
-            this.patternLoopCount.set(channel, y);
-          } else {
-            this.patternLoopCount.set(channel, currentCount - 1);
-          }
-          if ((this.patternLoopCount.get(channel) ?? 0) > 0) {
-            result.patternLoop = {
-              startRow: this.patternLoopRow.get(channel) ?? 0,
-              count: this.patternLoopCount.get(channel) ?? 0,
-            };
-          }
-        }
+        this.processPatternLoop(channel, y, result);
         break;
 
       case MOD_E_COMMANDS.TREMOLO_WAVEFORM:
-        state.tremoloWaveform = this.waveformFromNumber(y & 3);
-        state.tremoloRetrigger = (y & 4) === 0;
+        this.setTremoloWaveform(state, y);
         break;
 
       case MOD_E_COMMANDS.RETRIG:
@@ -409,13 +386,11 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case MOD_E_COMMANDS.FINE_VOL_UP:
-        state.volume = this.clampVolume(state.volume + y);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, y, 0, result);
         break;
 
       case MOD_E_COMMANDS.FINE_VOL_DOWN:
-        state.volume = this.clampVolume(state.volume - y);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, 0, y, result);
         break;
 
       case MOD_E_COMMANDS.NOTE_CUT:
