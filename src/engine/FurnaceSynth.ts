@@ -39,13 +39,75 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.outputGain = new Tone.Gain(1);
     this.output = this.outputGain;
 
-    // Initialize engine if needed
-    this.chipEngine.init(Tone.getContext().rawContext as AudioContext);
-
-    // Connect to the global WASM chip engine output
-    this.chipEngine.getOutput().connect(this.outputGain as any);
+    // Initialize engine asynchronously - don't block constructor
+    this.initEngine();
 
     this.updateParameters();
+  }
+
+  private async initEngine(): Promise<void> {
+    try {
+      // Get the native AudioContext - try multiple approaches
+      const toneContext = Tone.getContext();
+      let rawContext: AudioContext | null = null;
+
+      // Method 1: Direct rawContext property
+      if (toneContext.rawContext && typeof (toneContext.rawContext as any).createGain === 'function') {
+        rawContext = toneContext.rawContext as AudioContext;
+      }
+
+      // Method 2: Get from the destination node's context (more reliable)
+      if (!rawContext) {
+        const destNode = Tone.getDestination();
+        const nativeNode = (destNode as any)._gainNode || (destNode as any).output?._gainNode;
+        if (nativeNode?.context) {
+          rawContext = nativeNode.context as AudioContext;
+        }
+      }
+
+      // Method 3: Create a temporary gain node to extract context
+      if (!rawContext) {
+        const tempGain = new Tone.Gain(1);
+        const nativeGain = (tempGain as any)._gainNode;
+        if (nativeGain?.context) {
+          rawContext = nativeGain.context as AudioContext;
+        }
+        tempGain.dispose();
+      }
+
+      if (!rawContext || !rawContext.audioWorklet) {
+        console.warn('[FurnaceSynth] Could not get valid AudioContext, skipping chip engine init');
+        return;
+      }
+
+      // Wait for context to be running
+      if (rawContext.state !== 'running') {
+        await new Promise<void>((resolve) => {
+          const checkState = () => {
+            if (rawContext!.state === 'running') {
+              resolve();
+            } else {
+              setTimeout(checkState, 100);
+            }
+          };
+          checkState();
+        });
+      }
+
+      // Initialize chip engine
+      await this.chipEngine.init(rawContext);
+
+      // Connect to the global WASM chip engine output if available
+      try {
+        const output = this.chipEngine.getOutput();
+        output.connect(this.outputGain as any);
+      } catch {
+        // Engine not initialized - that's ok, will work without WASM chips
+        console.warn('[FurnaceSynth] Chip engine not available, using fallback');
+      }
+    } catch (err) {
+      console.warn('[FurnaceSynth] Failed to initialize chip engine:', err);
+    }
   }
 
   /**
