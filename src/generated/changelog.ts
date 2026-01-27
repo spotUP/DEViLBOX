@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T17:50:29.825Z
+ * Generated: 2026-01-27T17:56:01.774Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '108';
-export const BUILD_HASH = 'c70e37c';
+export const BUILD_NUMBER = '109';
+export const BUILD_HASH = '7797cec';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix Cxx volume command to update active voice gains'
+      },
       {
         type: 'fix',
         description: 'Add ToneEngine volume debug logging'
@@ -250,10 +254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Replace require() with ES import for ArpeggioEngine'
-      },
-      {
-        type: 'feature',
-        description: 'Add advanced arpeggio editor for ChipSynth with 48 presets'
       }
     ]
   }
