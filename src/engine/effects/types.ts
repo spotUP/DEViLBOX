@@ -5,13 +5,19 @@
  */
 
 // Supported module formats
-export type ModuleFormat = 'MOD' | 'XM' | 'S3M' | 'IT' | 'NATIVE';
+export type ModuleFormat = 
+  | 'MOD' | 'XM' | 'S3M' | 'IT' 
+  | 'DBM' | 'DIGI' | 'MTM' | 'MED' 
+  | 'OKT' | '669' | 'FAR' | 'ULT' 
+  | 'STM' | 'STX' | 'PT36' | 'SFX' 
+  | 'NATIVE';
 
 // Format-specific configuration
 export interface FormatConfig {
   format: ModuleFormat;
   emulatePTBugs?: boolean;    // MOD: Emulate ProTracker quirks
   linearSlides?: boolean;     // XM: Use linear frequency slides (vs Amiga)
+  amigaLimits?: boolean;      // S3M/IT: Clamp periods to 113-856 range
   initialSpeed: number;       // Ticks per row (default 6)
   initialTempo: number;       // BPM (default 125)
   numChannels: number;        // Number of channels
@@ -71,6 +77,22 @@ export interface ChannelState {
   noteDelayTick: number;      // Tick to trigger note (-1 = disabled)
   keyOffTick: number;         // Tick to key-off (XM Kxx)
 
+  // Filter state
+  filterCutoff?: number;      // 0-127
+  filterResonance?: number;   // 0-127
+
+  // Envelope state (for compliance testing)
+  envelopeVolume?: number;    // 0-64
+  envelopePanning?: number;   // 0-64
+  envelopePitch?: number;     // For filter/pitch envelopes
+  fadeoutVolume?: number;     // 0-65536
+
+  // Auto-vibrato state
+  autoVibratoPos?: number;    // 0-255
+  autoVibratoSweep?: number;  // Current depth multiplier (0-255)
+  activeInstrument?: any;     // Metadata for current instrument (XM/IT auto-vibrato)
+  nnaMode?: number;           // 0=Cut, 1=Continue, 2=Off, 3=Fade
+  
   // Memory values (for effects that remember last parameter)
   lastPortaUp: number;
   lastPortaDown: number;
@@ -85,12 +107,20 @@ export interface ChannelState {
   lastArpeggio: number;
   lastRetrig: number;
   lastTremor: number;
+  lastS3MParam?: number;      // Unified memory for S3M effects
+  lastGlobalVolumeSlide?: number;
+  channelVolume?: number;     // IT separate channel volume
+  lastChannelVolumeSlide?: number;
 
   // Instrument state
   instrumentId: number | null;
   sampleId: number | null;
   noteOn: boolean;            // Is note currently playing?
+  funkRepeatPos?: number;     // For EFx Invert Loop
 }
+
+// Re-export tracker envelope types
+export type { EnvelopePoints, EnvelopePoint } from '../../types/tracker';
 
 // Result of processing an effect tick
 export interface TickResult {
@@ -103,6 +133,7 @@ export interface TickResult {
   // Volume changes
   setVolume?: number;         // Set volume 0-64
   volumeSlide?: number;       // Add to volume
+  setChannelVolume?: number;  // Set channel volume 0-64 (IT)
   setGlobalVolume?: number;   // Set global volume 0-64
   globalVolumeSlide?: number; // Add to global volume
 
@@ -123,6 +154,16 @@ export interface TickResult {
 
   // Sample control
   sampleOffset?: number;      // Start sample at offset
+  funkRepeat?: number;        // EFx Invert Loop position
+
+  // Amiga control
+  setAmigaFilter?: boolean;   // Enable/disable hardware LED filter
+
+  // Filter control (IT/S3M)
+  setFilterCutoff?: number;    // 0-127 (127=bypass)
+  setFilterResonance?: number; // 0-127
+  nnaAction?: number;         // 0=Cut, 1=Continue, 2=Off, 3=Fade
+  pastNoteAction?: number;    // 0=Cut, 2=Off, 3=Fade (IT S77-S79)
 
   // Transport control
   setBPM?: number;            // Set tempo in BPM
@@ -134,6 +175,7 @@ export interface TickResult {
     count: number;
   };
   patternDelay?: number;      // Delay pattern by N rows
+  stopSong?: boolean;         // Stop song playback (F00)
 }
 
 // Effect handler interface - implemented by format-specific handlers

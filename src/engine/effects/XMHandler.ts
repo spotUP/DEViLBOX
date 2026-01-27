@@ -14,8 +14,10 @@ import {
   periodToFrequency,
   noteStringToPeriod,
   xmLinearPeriodToFrequency,
-  XM_LINEAR_PERIOD_BASE,
+  noteStringToXMLinearPeriod,
 } from './PeriodTables';
+
+declare var require: any;
 
 // XM Effect constants (same as MOD, plus extensions)
 const XM_EFFECTS = {
@@ -89,12 +91,12 @@ export class XMHandler extends BaseFormatHandler {
   readonly format = 'XM' as const;
 
   // XM-specific settings
-  private linearSlides: boolean = true;
-  private minPeriod: number = 1;
-  private maxPeriod: number = 32000;
+  public linearSlides: boolean = true;
+  public minPeriod: number = 1;
+  public maxPeriod: number = 32000;
 
   // Active effects per channel
-  private activeEffects: Map<number, {
+  protected activeEffects: Map<number, {
     type: string;
     param: number;
     x: number;
@@ -108,6 +110,28 @@ export class XMHandler extends BaseFormatHandler {
   private patternLoopRow: Map<number, number> = new Map(); // Per-channel in XM
   private patternLoopCount: Map<number, number> = new Map();
   public patternDelayCount: number = 0; // Used for EEx pattern delay effect
+
+  /**
+   * XM-specific note to period conversion
+   */
+  public noteStringToPeriod(note: string, finetune: number = 0): number {
+    if (this.linearSlides) {
+      return noteStringToXMLinearPeriod(note, finetune);
+    }
+    return super.noteStringToPeriod(note, finetune);
+  }
+
+  /**
+   * S3M frequency calculation (standard Amiga PAL)
+   */
+  public periodToHz(period: number): number {
+    if (period <= 0) return 0;
+    if (this.linearSlides) {
+      return xmLinearPeriodToFrequency(period);
+    } else {
+      return periodToFrequency(period);
+    }
+  }
 
   /**
    * Initialize with format config
@@ -135,49 +159,6 @@ export class XMHandler extends BaseFormatHandler {
   }
 
   /**
-   * Convert note string to XM period
-   */
-  private noteToXMPeriod(note: string, finetune: number = 0): number {
-    if (!note || note === '...' || note === '---') return 0;
-    if (note === '===' || note === '^^^') return -1;
-
-    // Parse note
-    const match = note.match(/^([A-G][#-]?)[-]?(\d)$/i);
-    if (!match) return 0;
-
-    const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-    const noteName = match[1].toUpperCase().replace('#', '#').replace('-', '-');
-    const octave = parseInt(match[2], 10);
-
-    const noteIndex = noteNames.findIndex(n => n === noteName || n.replace('-', '') === noteName.replace('-', ''));
-    if (noteIndex === -1) return 0;
-
-    // XM note number: (octave * 12) + noteIndex + 1
-    const noteNum = (octave * 12) + noteIndex + 1;
-
-    if (this.linearSlides) {
-      // Linear period: 7680 - (noteNum * 64) - (finetune / 2)
-      return XM_LINEAR_PERIOD_BASE - (noteNum * 64) - Math.floor(finetune / 2);
-    } else {
-      // Amiga period (use period table)
-      return noteStringToPeriod(note, Math.floor(finetune / 16));
-    }
-  }
-
-  /**
-   * Get frequency from XM period
-   */
-  private periodToHz(period: number): number {
-    if (period <= 0) return 0;
-
-    if (this.linearSlides) {
-      return xmLinearPeriodToFrequency(period);
-    } else {
-      return periodToFrequency(period);
-    }
-  }
-
-  /**
    * Process effect at row start (tick 0)
    */
   processRowStart(
@@ -196,9 +177,35 @@ export class XMHandler extends BaseFormatHandler {
     // Handle instrument change
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
-      // In XM, instrument change resets volume if no volume column
-      if (volume === null) {
-        state.volume = 64;
+      
+      const defaultVol = (state as any).sampleDefaultVolume ?? 64;
+      const defaultFinetune = (state as any).sampleDefaultFinetune ?? 0;
+
+      // In XM, instrument change resets volume IF no volume column or effect Cxx override
+      const parsed = this.parseEffect(effect);
+      const isSetVol = (parsed && parsed.command === XM_EFFECTS.SET_VOLUME) || 
+                       (volume !== null && volume >= 0x10 && volume <= 0x50);
+      
+      if (!isSetVol) {
+        state.volume = defaultVol;
+        result.setVolume = state.volume;
+      }
+
+      // Update finetune even without a note
+      const oldFinetune = state.finetune;
+      state.finetune = defaultFinetune;
+
+      // If no note is present, re-calculate period if finetune changed
+      if (!note || note === '...' || note === '---') {
+        if (state.period > 0 && oldFinetune !== defaultFinetune) {
+          const { periodToNoteString } = require('./PeriodTables');
+          const noteStr = periodToNoteString(state.period, oldFinetune);
+          state.period = noteStringToPeriod(noteStr, defaultFinetune);
+          state.frequency = this.periodToHz(state.period);
+          result.setPeriod = state.period;
+          result.setFrequency = state.frequency;
+        }
+        result.triggerNote = false; // Ensure we don't restart the sample
       }
     }
 
@@ -218,7 +225,7 @@ export class XMHandler extends BaseFormatHandler {
         state.noteOn = false;
       } else {
         // Convert note to period
-        const period = this.noteToXMPeriod(note, state.finetune);
+        const period = this.noteStringToPeriod(note, state.finetune);
         if (period > 0) {
           // Check if this is a tone portamento target
           const parsed = this.parseEffect(effect);
@@ -250,6 +257,13 @@ export class XMHandler extends BaseFormatHandler {
     if (effect) {
       const effectResult = this.processEffectTick0(channel, effect, state, note);
       Object.assign(result, effectResult);
+      
+      // Hardware Compliance: Process continuous effects on Tick 0 too
+      // EXCEPT for Auto-Vibrato in XM (AutoVibratoSweepKeyOff.xm quirk)
+      if (this.format !== 'XM') {
+        const tick0Continuous = this.processTick(channel, 0, state);
+        Object.assign(result, tick0Continuous);
+      }
     }
 
     return result;
@@ -300,6 +314,7 @@ export class XMHandler extends BaseFormatHandler {
 
       case XM_VOL_EFFECTS.SET_PAN:
         // C0-CF: Set panning (0-F -> 0-240)
+        // Hardware Quirk: XM volume-column panning is multiplied by 16 (PF = 8F0, not 8FF)
         state.pan = param << 4;
         result.setPan = state.pan;
         break;
@@ -486,11 +501,11 @@ export class XMHandler extends BaseFormatHandler {
    * Process E-commands on tick 0
    */
   private processECommandTick0(
-    channel: number,
+    _channel: number,
     x: number,
     y: number,
     state: ChannelState,
-    note: string | null,
+    _note: string | null,
     result: TickResult
   ): void {
     switch (x) {
@@ -530,18 +545,18 @@ export class XMHandler extends BaseFormatHandler {
 
       case XM_E_COMMANDS.PATTERN_LOOP:
         if (y === 0) {
-          this.patternLoopRow.set(channel, this.currentRow);
+          this.patternLoopRow.set(_channel, this.currentRow);
         } else {
-          const count = this.patternLoopCount.get(channel) ?? 0;
+          const count = this.patternLoopCount.get(_channel) ?? 0;
           if (count === 0) {
-            this.patternLoopCount.set(channel, y);
+            this.patternLoopCount.set(_channel, y);
           } else {
-            this.patternLoopCount.set(channel, count - 1);
+            this.patternLoopCount.set(_channel, count - 1);
           }
-          if ((this.patternLoopCount.get(channel) ?? 0) > 0) {
+          if ((this.patternLoopCount.get(_channel) ?? 0) > 0) {
             result.patternLoop = {
-              startRow: this.patternLoopRow.get(channel) ?? 0,
-              count: this.patternLoopCount.get(channel) ?? 0,
+              startRow: this.patternLoopRow.get(_channel) ?? 0,
+              count: this.patternLoopCount.get(_channel) ?? 0,
             };
           }
         }
@@ -560,7 +575,7 @@ export class XMHandler extends BaseFormatHandler {
       case XM_E_COMMANDS.RETRIG:
         if (y > 0) {
           state.retrigTick = y;
-          this.activeEffects.set(channel, { type: 'retrig', param: y, x: 0, y });
+          this.activeEffects.set(_channel, { type: 'retrig', param: y, x: 0, y });
         }
         break;
 
@@ -576,13 +591,13 @@ export class XMHandler extends BaseFormatHandler {
 
       case XM_E_COMMANDS.NOTE_CUT:
         state.noteCutTick = y;
-        this.activeEffects.set(channel, { type: 'noteCut', param: y, x: 0, y });
+        this.activeEffects.set(_channel, { type: 'noteCut', param: y, x: 0, y });
         break;
 
       case XM_E_COMMANDS.NOTE_DELAY:
-        if (y > 0 && note) {
+        if (y > 0 && _note) {
           state.noteDelayTick = y;
-          this.activeEffects.set(channel, { type: 'noteDelay', param: y, x: 0, y });
+          this.activeEffects.set(_channel, { type: 'noteDelay', param: y, x: 0, y });
         }
         break;
 
@@ -605,6 +620,9 @@ export class XMHandler extends BaseFormatHandler {
   ): TickResult {
     const result: TickResult = {};
 
+    // 1. Process Auto-Vibrato (XM / IT)
+    this.processAutoVibrato(state, result, tick);
+
     // Process volume column effects (tick N)
     const volCol = this.volumeColumnData.get(channel) ?? 0;
     if (volCol > 0) {
@@ -618,15 +636,17 @@ export class XMHandler extends BaseFormatHandler {
 
       switch (type) {
         case 'arpeggio':
-          this.processArpeggio(tick, state, x, y, result);
+          if (tick > 0) {
+            this.processArpeggio(tick, state, x, y, result);
+          }
           break;
 
         case 'portaUp':
-          this.processPortaUp(state, param, result);
+          this.processPortaUp(state, param, result, this.minPeriod);
           break;
 
         case 'portaDown':
-          this.processPortaDown(state, param, result);
+          this.processPortaDown(state, param, result, this.maxPeriod);
           break;
 
         case 'tonePorta':
@@ -634,7 +654,7 @@ export class XMHandler extends BaseFormatHandler {
           break;
 
         case 'vibrato':
-          this.processVibrato(state, result);
+          this.processVibrato(state, result, 4);
           break;
 
         case 'tonePortaVolSlide':
@@ -643,7 +663,7 @@ export class XMHandler extends BaseFormatHandler {
           break;
 
         case 'vibratoVolSlide':
-          this.processVibrato(state, result);
+          this.processVibrato(state, result, 4);
           this.processVolumeSlide(state, x, y, result);
           break;
 
@@ -669,6 +689,9 @@ export class XMHandler extends BaseFormatHandler {
             state.pan = this.clampPan(state.pan + x);
           } else if (y > 0) {
             state.pan = this.clampPan(state.pan - y);
+          } else if (param === 0) {
+            // Hardware Quirk: Pan slide left 0 (P00) resets to 0 on all ticks > 0
+            state.pan = 0;
           }
           result.setPan = state.pan;
           break;
@@ -681,7 +704,7 @@ export class XMHandler extends BaseFormatHandler {
           break;
 
         case 'multiRetrig':
-          if (y > 0 && tick % y === 0) {
+          if (tick > 0 && y > 0 && tick % y === 0) {
             result.triggerNote = true;
             // Apply volume change using retrig table
             if (x > 0 && x < RETRIG_VOLUME_OPS.length) {
@@ -742,24 +765,27 @@ export class XMHandler extends BaseFormatHandler {
 
     switch (type) {
       case XM_VOL_EFFECTS.VOL_SLIDE_DOWN:
-        state.volume = this.clampVolume(state.volume - param);
-        result.setVolume = state.volume;
+        this.processVolumeSlide(state, 0, param, result);
         break;
 
       case XM_VOL_EFFECTS.VOL_SLIDE_UP:
-        state.volume = this.clampVolume(state.volume + param);
-        result.setVolume = state.volume;
+        this.processVolumeSlide(state, param, 0, result);
         break;
 
       case XM_VOL_EFFECTS.VIBRATO:
         if (param > 0) {
           state.vibratoDepth = param;
         }
-        this.processVibrato(state, result);
+        this.processVibrato(state, result, 4);
         break;
 
       case XM_VOL_EFFECTS.PAN_SLIDE_LEFT:
-        state.pan = this.clampPan(state.pan - param);
+        // Hardware Quirk: Pan slide left with param 0 resets to 0 on all ticks > 0
+        if (param === 0) {
+          state.pan = 0;
+        } else {
+          state.pan = this.clampPan(state.pan - param);
+        }
         result.setPan = state.pan;
         break;
 
@@ -778,8 +804,25 @@ export class XMHandler extends BaseFormatHandler {
   }
 
   /**
-   * Process arpeggio (0xy)
+   * Overridden Vibrato for XM: handles linear period scaling
    */
+  protected processVibrato(state: ChannelState, result: TickResult, depthMultiplier: number = 4): void {
+    if (state.period <= 0) return;
+
+    const waveValue = this.getWaveformValue(state.vibratoWaveform, state.vibratoPos);
+    
+    // XM Scaling: each depth unit is 4 units in linear mode, or 1 unit in Amiga mode
+    const finalDepthMultiplier = this.linearSlides ? depthMultiplier : 1;
+    const delta = Math.floor(waveValue * state.vibratoDepth * finalDepthMultiplier);
+
+    const finalPeriod = state.period + delta;
+    result.setPeriod = finalPeriod;
+    result.setFrequency = this.periodToHz(finalPeriod);
+
+    // Advance position for next tick
+    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
+  }
+
   private processArpeggio(
     tick: number,
     state: ChannelState,
@@ -789,8 +832,12 @@ export class XMHandler extends BaseFormatHandler {
   ): void {
     if (state.period <= 0) return;
 
+    // Hardware Quirk: FastTracker 2 Arpeggio LUT
+    // FT2 counts ticks DOWNWARDS for arpeggio lookup.
+    // At speed 6, ticks are processed 0, 1, 2, 3, 4, 5 but lookup uses 5, 4, 3, 2, 1, 0.
+    const arpTick = this.speed > 0 ? (this.speed - 1 - tick) : tick;
     const offsets = [0, x, y];
-    const offset = offsets[tick % 3];
+    const offset = offsets[arpTick % 3];
 
     if (this.linearSlides) {
       // In linear mode, each semitone = 64 period units
@@ -804,120 +851,5 @@ export class XMHandler extends BaseFormatHandler {
       const newFreq = baseFreq * Math.pow(2, offset / 12);
       result.setFrequency = newFreq;
     }
-  }
-
-  /**
-   * Process portamento up (1xx)
-   */
-  private processPortaUp(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    if (this.linearSlides) {
-      state.period -= speed * 4;
-    } else {
-      state.period -= speed;
-    }
-
-    if (state.period < this.minPeriod) {
-      state.period = this.minPeriod;
-    }
-
-    state.frequency = this.periodToHz(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process portamento down (2xx)
-   */
-  private processPortaDown(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    if (this.linearSlides) {
-      state.period += speed * 4;
-    } else {
-      state.period += speed;
-    }
-
-    if (state.period > this.maxPeriod) {
-      state.period = this.maxPeriod;
-    }
-
-    state.frequency = this.periodToHz(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process tone portamento (3xx)
-   */
-  private processTonePorta(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0 || state.portamentoTarget <= 0) return;
-
-    const slideSpeed = this.linearSlides ? speed * 4 : speed;
-
-    if (state.period < state.portamentoTarget) {
-      state.period += slideSpeed;
-      if (state.period > state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    } else if (state.period > state.portamentoTarget) {
-      state.period -= slideSpeed;
-      if (state.period < state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    }
-
-    state.frequency = this.periodToHz(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process vibrato (4xy)
-   */
-  private processVibrato(state: ChannelState, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    const waveValue = this.getWaveformValue(state.vibratoWaveform, state.vibratoPos);
-
-    // XM vibrato depth is in 1/16 semitones (linear) or period units (Amiga)
-    let delta: number;
-    if (this.linearSlides) {
-      // Each semitone = 64 period units, depth is 1/16 semitone
-      delta = Math.floor(waveValue * state.vibratoDepth * 4);
-    } else {
-      delta = Math.floor(waveValue * state.vibratoDepth);
-    }
-
-    const newPeriod = state.period + delta;
-    result.setPeriod = newPeriod;
-    result.setFrequency = this.periodToHz(newPeriod);
-
-    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
-  }
-
-  /**
-   * Process tremolo (7xy)
-   */
-  private processTremolo(state: ChannelState, result: TickResult): void {
-    const waveValue = this.getWaveformValue(state.tremoloWaveform, state.tremoloPos);
-    const delta = Math.floor(waveValue * state.tremoloDepth);
-    const newVolume = this.clampVolume(state.volume + delta);
-
-    result.setVolume = newVolume;
-    state.tremoloPos = (state.tremoloPos + state.tremoloSpeed) & 0x3F;
-  }
-
-  /**
-   * Process volume slide (Axy)
-   */
-  private processVolumeSlide(state: ChannelState, up: number, down: number, result: TickResult): void {
-    if (up > 0) {
-      state.volume = this.clampVolume(state.volume + up);
-    } else if (down > 0) {
-      state.volume = this.clampVolume(state.volume - down);
-    }
-    result.setVolume = state.volume;
   }
 }

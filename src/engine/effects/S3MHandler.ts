@@ -3,37 +3,9 @@
  *
  * Implements ScreamTracker 3 effect commands with S3M-specific command letters:
  * S3M uses different effect letters than MOD/XM (e.g., A=Speed, T=Tempo, D=VolSlide)
- *
- * Command mapping:
- * A = Set Speed (ticks per row)
- * B = Position Jump
- * C = Pattern Break
- * D = Volume Slide
- * E = Portamento Down
- * F = Portamento Up
- * G = Tone Portamento
- * H = Vibrato
- * I = Tremor
- * J = Arpeggio
- * K = Vibrato + Volume Slide
- * L = Tone Porta + Volume Slide
- * M = Set Channel Volume (not in original S3M)
- * N = Channel Volume Slide (not in original S3M)
- * O = Sample Offset
- * P = Panning Slide (not in original S3M)
- * Q = Retrigger + Volume Slide
- * R = Tremolo
- * S = Special Commands (Sxy)
- * T = Set Tempo (BPM)
- * U = Fine Vibrato
- * V = Set Global Volume
- * W = Global Volume Slide (not in original S3M)
- * X = Set Panning
- * Y = Panbrello (not in original S3M)
- * Z = MIDI Macros (not implemented)
  */
 
-import { type ChannelState, type TickResult, type FormatConfig } from './types';
+import { type ChannelState, type TickResult, type FormatConfig, type ModuleFormat } from './types';
 import { BaseFormatHandler } from './FormatHandler';
 import {
   periodToFrequency,
@@ -93,14 +65,22 @@ const S3M_S_COMMANDS = {
  * ScreamTracker 3 effect handler
  */
 export class S3MHandler extends BaseFormatHandler {
-  readonly format = 'S3M' as const;
+  readonly format: ModuleFormat = 'S3M';
 
-  // S3M-specific settings (reserved for future format-specific features)
+  // S3M-specific settings
   public stereo: boolean = true;
   public customPan: boolean = false;
 
+  /**
+   * S3M frequency calculation (standard Amiga PAL)
+   */
+  public periodToHz(period: number): number {
+    if (period <= 0) return 0;
+    return periodToFrequency(period);
+  }
+
   // Active effects per channel
-  private activeEffects: Map<number, {
+  protected activeEffects: Map<number, {
     type: string;
     param: number;
     x: number;
@@ -196,7 +176,8 @@ export class S3MHandler extends BaseFormatHandler {
     }
 
     // Handle volume column (S3M has separate volume column)
-    if (volume !== null && volume <= 64) {
+    // We use 255 as a sentinel for 'empty' from PatternScheduler.
+    if (volume !== null && volume !== 255 && volume <= 64) {
       state.volume = volume;
       result.setVolume = volume;
     }
@@ -216,7 +197,7 @@ export class S3MHandler extends BaseFormatHandler {
             state.portamentoTarget = period;
           } else {
             state.period = period;
-            state.frequency = periodToFrequency(period);
+            state.frequency = this.periodToHz(period);
             state.noteOn = true;
             result.triggerNote = true;
             result.setPeriod = period;
@@ -233,6 +214,10 @@ export class S3MHandler extends BaseFormatHandler {
     if (effect) {
       const effectResult = this.processEffectTick0(channel, effect, state, note);
       Object.assign(result, effectResult);
+      
+      // Hardware Compliance: Process continuous effects on Tick 0 too
+      const tick0Continuous = this.processTick(channel, 0, state);
+      Object.assign(result, tick0Continuous);
     }
 
     return result;
@@ -253,6 +238,16 @@ export class S3MHandler extends BaseFormatHandler {
 
     const { letter, x, y, param } = parsed;
 
+    // Hardware Quirk: S3M Effect Memory
+    // Most S3M effects share the last non-zero parameter as memory.
+    const sharedMemoryEffects = ['D', 'E', 'F', 'I', 'J', 'K', 'L', 'Q', 'R', 'S'];
+    if (param > 0 && sharedMemoryEffects.includes(letter)) {
+      state.lastS3MParam = param;
+    }
+    const currentParam = param > 0 ? param : (state.lastS3MParam ?? 0);
+    const curX = (currentParam >> 4) & 0x0F;
+    const curY = currentParam & 0x0F;
+
     switch (letter) {
       case 'A': // Set Speed
         if (param > 0) {
@@ -270,68 +265,65 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'D': // Volume Slide
-        if (param > 0) state.lastVolumeSlide = param;
-        // Check for fine slides (D0x = fine down, Dx0 = fine up, DxF/DFx = fine)
-        if (x === 0x0F && y > 0) {
-          // Fine slide down
-          state.volume = this.clampVolume(state.volume - y);
+        // Check for fine slides: DFy = Fine Up, DxF = Fine Down
+        if (curX === 0x0F && curY > 0) {
+          // Fine slide UP (DFy)
+          state.volume = this.clampVolume(state.volume + curY);
           result.setVolume = state.volume;
-        } else if (y === 0x0F && x > 0) {
-          // Fine slide up
-          state.volume = this.clampVolume(state.volume + x);
+        } else if (curY === 0x0F && curX > 0) {
+          // Fine slide DOWN (DxF)
+          state.volume = this.clampVolume(state.volume - curX);
           result.setVolume = state.volume;
         } else {
-          this.activeEffects.set(channel, { type: 'volumeSlide', param, x, y });
+          this.activeEffects.set(channel, { type: 'volumeSlide', param: currentParam, x: curX, y: curY });
         }
         break;
 
       case 'E': // Portamento Down
-        if (param > 0) state.lastPortaDown = param;
         // Check for fine/extra fine
-        if (x === 0x0F) {
+        if (curX === 0x0F) {
           // Fine porta down
           if (state.period > 0) {
-            state.period += y * 4;
-            state.frequency = periodToFrequency(state.period);
+            state.period += curY * 4;
+            state.frequency = this.periodToHz(state.period);
             result.setPeriod = state.period;
             result.setFrequency = state.frequency;
           }
-        } else if (x === 0x0E) {
+        } else if (curX === 0x0E) {
           // Extra fine porta down
           if (state.period > 0) {
-            state.period += y;
-            state.frequency = periodToFrequency(state.period);
+            state.period += curY;
+            state.frequency = this.periodToHz(state.period);
             result.setPeriod = state.period;
             result.setFrequency = state.frequency;
           }
         } else {
-          this.activeEffects.set(channel, { type: 'portaDown', param: state.lastPortaDown, x, y });
+          this.activeEffects.set(channel, { type: 'portaDown', param: currentParam, x: curX, y: curY });
         }
         break;
 
       case 'F': // Portamento Up
-        if (param > 0) state.lastPortaUp = param;
         // Check for fine/extra fine
-        if (x === 0x0F) {
+        if (curX === 0x0F) {
           // Fine porta up
           if (state.period > 0) {
-            state.period -= y * 4;
+            state.period -= curY * 4;
             if (state.period < 1) state.period = 1;
-            state.frequency = periodToFrequency(state.period);
+            state.frequency = this.periodToHz(state.period);
             result.setPeriod = state.period;
             result.setFrequency = state.frequency;
           }
-        } else if (x === 0x0E) {
+        } else if (curX === 0x0E) {
           // Extra fine porta up
           if (state.period > 0) {
-            state.period -= y;
+            state.period -= curY;
             if (state.period < 1) state.period = 1;
-            state.frequency = periodToFrequency(state.period);
+            state.frequency = this.periodToHz(state.period);
             result.setPeriod = state.period;
             result.setFrequency = state.frequency;
           }
         } else {
-          this.activeEffects.set(channel, { type: 'portaUp', param: state.lastPortaUp, x, y });
+          this.activeEffects.set(channel, { type: 'portaUp', param: currentParam, x: curX, y: curY });
         }
         break;
 
@@ -349,24 +341,24 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'I': // Tremor
-        if (x > 0) state.tremorOnTime = x;
-        if (y > 0) state.tremorOffTime = y;
-        this.activeEffects.set(channel, { type: 'tremor', param, x, y });
+        if (curX > 0) state.tremorOnTime = curX;
+        if (curY > 0) state.tremorOffTime = curY;
+        this.activeEffects.set(channel, { type: 'tremor', param: currentParam, x: curX, y: curY });
         break;
 
       case 'J': // Arpeggio
-        if (param !== 0) {
-          state.lastArpeggio = param;
-          this.activeEffects.set(channel, { type: 'arpeggio', param, x, y });
+        if (currentParam !== 0) {
+          state.lastArpeggio = currentParam;
+          this.activeEffects.set(channel, { type: 'arpeggio', param: currentParam, x: curX, y: curY });
         }
         break;
 
       case 'K': // Vibrato + Volume Slide
-        this.activeEffects.set(channel, { type: 'vibratoVolSlide', param, x, y });
+        this.activeEffects.set(channel, { type: 'vibratoVolSlide', param: currentParam, x: curX, y: curY });
         break;
 
       case 'L': // Tone Porta + Volume Slide
-        this.activeEffects.set(channel, { type: 'tonePortaVolSlide', param, x, y });
+        this.activeEffects.set(channel, { type: 'tonePortaVolSlide', param: currentParam, x: curX, y: curY });
         break;
 
       case 'O': { // Sample Offset
@@ -377,21 +369,21 @@ export class S3MHandler extends BaseFormatHandler {
       }
 
       case 'Q': // Retrig + Volume Slide
-        if (y > 0) state.retrigTick = y;
-        if (x >= 0) state.retrigVolChange = x;
-        this.activeEffects.set(channel, { type: 'retrig', param, x, y });
+        if (curY > 0) state.retrigTick = curY;
+        if (curX >= 0) state.retrigVolChange = x;
+        this.activeEffects.set(channel, { type: 'retrig', param: currentParam, x: curX, y: curY });
         break;
 
       case 'R': // Tremolo
-        if (x > 0) state.lastTremoloSpeed = x;
-        if (y > 0) state.lastTremoloDepth = y;
+        if (curX > 0) state.lastTremoloSpeed = curX;
+        if (curY > 0) state.lastTremoloDepth = curY;
         state.tremoloSpeed = state.lastTremoloSpeed;
         state.tremoloDepth = state.lastTremoloDepth;
-        this.activeEffects.set(channel, { type: 'tremolo', param, x, y });
+        this.activeEffects.set(channel, { type: 'tremolo', param: currentParam, x: curX, y: curY });
         break;
 
       case 'S': // Special Commands
-        this.processSCommand(channel, x, y, state, note, result);
+        this.processSCommand(channel, curX, curY, state, note, result);
         break;
 
       case 'T': // Set Tempo
@@ -406,7 +398,7 @@ export class S3MHandler extends BaseFormatHandler {
 
       case 'U': // Fine Vibrato
         if (x > 0) state.lastVibratoSpeed = x;
-        if (y > 0) state.lastVibratoDepth = y;
+        if (y > 0) state.lastVibratoDepth = y; // Shares depth with H
         state.vibratoSpeed = state.lastVibratoSpeed;
         state.vibratoDepth = state.lastVibratoDepth;
         this.activeEffects.set(channel, { type: 'fineVibrato', param, x, y });
@@ -418,7 +410,8 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'W': // Global Volume Slide
-        this.activeEffects.set(channel, { type: 'globalVolSlide', param, x, y });
+        if (param > 0) state.lastGlobalVolumeSlide = param;
+        this.activeEffects.set(channel, { type: 'globalVolSlide', param: state.lastGlobalVolumeSlide ?? 0, x: curX, y: curY });
         break;
 
       case 'X': // Set Panning
@@ -461,6 +454,10 @@ export class S3MHandler extends BaseFormatHandler {
       case S3M_S_COMMANDS.TREMOLO_WAVEFORM:
         state.tremoloWaveform = this.waveformFromNumber(y & 3);
         state.tremoloRetrigger = (y & 4) === 0;
+        break;
+
+      case S3M_S_COMMANDS.PANBRELLO_WAVEFORM:
+        // Not implemented
         break;
 
       case S3M_S_COMMANDS.PANNING:
@@ -521,6 +518,12 @@ export class S3MHandler extends BaseFormatHandler {
     state: ChannelState
   ): TickResult {
     const result: TickResult = {};
+
+    // 1. Process Auto-Vibrato (for IT which extends S3M)
+    if (this.format === 'IT') {
+      (this as any).processAutoVibrato(state, result, tick);
+    }
+
     const activeEffect = this.activeEffects.get(channel);
 
     if (!activeEffect) return result;
@@ -533,33 +536,45 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'portaUp':
-        this.processPortaUp(state, param, result);
+        if (tick === 0) break; // S3M quirk: no porta on tick 0
+        this.processPortaUp(state, param, result, 64); // S3M clamp to 64
         break;
 
       case 'portaDown':
-        this.processPortaDown(state, param, result);
+        if (tick === 0) break; // S3M quirk: no porta on tick 0
+        this.processPortaDown(state, param, result, 32767);
         break;
 
       case 'tonePorta':
+        if (tick === 0) break; // S3M quirk: no porta on tick 0
         this.processTonePorta(state, param, result);
+        // S3M Tone Porta also clamps to 64
+        if (state.period < 64) {
+          state.period = 64;
+          state.frequency = this.periodToHz(64);
+          result.setPeriod = 64;
+          result.setFrequency = state.frequency;
+        }
         break;
 
       case 'vibrato':
-        this.processVibrato(state, false, result);
+        this.processVibrato(state, result, 4);
         break;
 
       case 'fineVibrato':
-        this.processVibrato(state, true, result);
+        this.processVibrato(state, result, 1);
         break;
 
       case 'vibratoVolSlide':
-        this.processVibrato(state, false, result);
-        this.processVolumeSlide(state, x, y, result);
+        this.processVibrato(state, result, 4);
+        if (tick > 0) this.processVolumeSlide(state, x, y, result);
         break;
 
       case 'tonePortaVolSlide':
-        this.processTonePorta(state, state.lastTonePortaSpeed, result);
-        this.processVolumeSlide(state, x, y, result);
+        if (tick > 0) {
+          this.processTonePorta(state, state.lastTonePortaSpeed, result);
+          this.processVolumeSlide(state, x, y, result);
+        }
         break;
 
       case 'tremolo':
@@ -571,13 +586,15 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'volumeSlide':
+        if (tick === 0) break; // S3M quirk: no vol slide on tick 0
         this.processVolumeSlide(state, x, y, result);
         break;
 
       case 'globalVolSlide':
         if (x > 0) {
           this.globalVolume = Math.min(64, this.globalVolume + x);
-        } else if (y > 0) {
+        }
+        else if (y > 0) {
           this.globalVolume = Math.max(0, this.globalVolume - y);
         }
         result.setGlobalVolume = this.globalVolume;
@@ -623,6 +640,44 @@ export class S3MHandler extends BaseFormatHandler {
   }
 
   /**
+   * Process arpeggio
+   */
+  private processArpeggio(
+    tick: number,
+    state: ChannelState,
+    x: number,
+    y: number,
+    result: TickResult
+  ): void {
+    if (state.period <= 0) return;
+
+    const offsets = [0, x, y];
+    const offset = offsets[tick % 3];
+
+    if (offset === 0) {
+      result.setPeriod = state.period;
+    } else {
+      const baseFreq = this.periodToHz(state.period);
+      const newFreq = baseFreq * Math.pow(2, offset / 12);
+      result.setFrequency = newFreq;
+    }
+  }
+
+  /**
+   * Process tremor
+   */
+  private processTremor(state: ChannelState, result: TickResult): void {
+    const cycle = state.tremorOnTime + state.tremorOffTime;
+    state.tremorPos = (state.tremorPos + 1) % cycle;
+
+    if (state.tremorPos < state.tremorOnTime) {
+      result.setVolume = state.volume;
+    } else {
+      result.setVolume = 0;
+    }
+  }
+
+  /**
    * Apply S3M retrig volume modification
    */
   private applyRetrigVolume(volume: number, mode: number): number {
@@ -644,136 +699,5 @@ export class S3MHandler extends BaseFormatHandler {
       case 0xF: return volume * 2;
       default: return volume;
     }
-  }
-
-  /**
-   * Process arpeggio
-   */
-  private processArpeggio(
-    tick: number,
-    state: ChannelState,
-    x: number,
-    y: number,
-    result: TickResult
-  ): void {
-    if (state.period <= 0) return;
-
-    const offsets = [0, x, y];
-    const offset = offsets[tick % 3];
-
-    if (offset === 0) {
-      result.setPeriod = state.period;
-    } else {
-      const baseFreq = periodToFrequency(state.period);
-      const newFreq = baseFreq * Math.pow(2, offset / 12);
-      result.setFrequency = newFreq;
-    }
-  }
-
-  /**
-   * Process portamento up
-   */
-  private processPortaUp(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    state.period -= speed * 4;
-    if (state.period < 1) state.period = 1;
-
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process portamento down
-   */
-  private processPortaDown(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    state.period += speed * 4;
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process tone portamento
-   */
-  private processTonePorta(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0 || state.portamentoTarget <= 0) return;
-
-    const slideSpeed = speed * 4;
-
-    if (state.period < state.portamentoTarget) {
-      state.period += slideSpeed;
-      if (state.period > state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    } else if (state.period > state.portamentoTarget) {
-      state.period -= slideSpeed;
-      if (state.period < state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    }
-
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process vibrato
-   */
-  private processVibrato(state: ChannelState, fine: boolean, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    const waveValue = this.getWaveformValue(state.vibratoWaveform, state.vibratoPos);
-    const depth = fine ? state.vibratoDepth : state.vibratoDepth * 4;
-    const delta = Math.floor(waveValue * depth);
-
-    const newPeriod = state.period + delta;
-    result.setPeriod = newPeriod;
-    result.setFrequency = periodToFrequency(newPeriod);
-
-    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
-  }
-
-  /**
-   * Process tremolo
-   */
-  private processTremolo(state: ChannelState, result: TickResult): void {
-    const waveValue = this.getWaveformValue(state.tremoloWaveform, state.tremoloPos);
-    const delta = Math.floor(waveValue * state.tremoloDepth);
-    const newVolume = this.clampVolume(state.volume + delta);
-
-    result.setVolume = newVolume;
-    state.tremoloPos = (state.tremoloPos + state.tremoloSpeed) & 0x3F;
-  }
-
-  /**
-   * Process tremor
-   */
-  private processTremor(state: ChannelState, result: TickResult): void {
-    const cycle = state.tremorOnTime + state.tremorOffTime;
-    state.tremorPos = (state.tremorPos + 1) % cycle;
-
-    if (state.tremorPos < state.tremorOnTime) {
-      result.setVolume = state.volume;
-    } else {
-      result.setVolume = 0;
-    }
-  }
-
-  /**
-   * Process volume slide
-   */
-  private processVolumeSlide(state: ChannelState, up: number, down: number, result: TickResult): void {
-    // S3M volume slide: if both set, up takes priority
-    if (up > 0) {
-      state.volume = this.clampVolume(state.volume + up);
-    } else if (down > 0) {
-      state.volume = this.clampVolume(state.volume - down);
-    }
-    result.setVolume = state.volume;
   }
 }
