@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T17:56:01.774Z
+ * Generated: 2026-01-27T19:15:23.724Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '109';
-export const BUILD_HASH = '7797cec';
+export const BUILD_NUMBER = '112';
+export const BUILD_HASH = '255792d';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix .dbox module loading path'
+      },
+      {
+        type: 'fix',
+        description: 'Add Furnace and DefleMask module import support, fix AudioWorklet issues'
+      },
+      {
+        type: 'fix',
+        description: 'Add voice debug logging'
+      },
       {
         type: 'fix',
         description: 'Fix Cxx volume command to update active voice gains'
@@ -242,18 +254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Use O(1) instrument lookup map in TrackerReplayer'
-      },
-      {
-        type: 'improvement',
-        description: 'Only create ArpeggioEngine when arpeggio is enabled'
-      },
-      {
-        type: 'fix',
-        description: 'Remove console spam from UnifiedInstrumentEditor tab validation'
-      },
-      {
-        type: 'fix',
-        description: 'Replace require() with ES import for ArpeggioEngine'
       }
     ]
   }

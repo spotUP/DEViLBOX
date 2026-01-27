@@ -9,16 +9,16 @@ import type { CCMapping, TB303Parameter } from '../types';
 
 /**
  * TD-3 CC number assignments
- * Note: ENV_MOD is set to CC12 to avoid conflict with PAN (CC10)
+ * Based on Behringer TD-3/TD-3-MO MIDI Implementation Chart
  */
 export const TD3_CC_MAP = {
   CUTOFF: 74,      // Filter cutoff frequency
   RESONANCE: 71,   // Filter resonance
-  ENV_MOD: 12,     // Filter envelope modulation depth (was 10, changed to avoid PAN conflict)
+  ENV_MOD: 10,     // Filter envelope modulation depth (TD-3 sends on CC 10)
   DECAY: 75,       // Envelope decay time
-  ACCENT: 16,      // Accent amount (may vary by device)
+  ACCENT: 16,      // Accent amount
   VOLUME: 7,       // Channel volume
-  PAN: 10,         // Pan position
+  // Note: CC 10 is also standard MIDI Pan, but TD-3 uses it for Env Mod
 } as const;
 
 /**
