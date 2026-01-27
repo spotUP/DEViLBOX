@@ -118,9 +118,9 @@ export const itCases: ComplianceTestCase[] = [
 
                                                                 { tick: 0, frequency: 209715.2 },
 
-                                                                // Delta ~2621.4. 209715.2 + 2621.4 = 212336.6
+                                                                // Delta = 1 * (10/200) * (64/255) * 209715.2 = 2631.7
 
-                                                                { tick: 1, frequency: 212336.6 } 
+                                                                { tick: 1, frequency: 212346.9 }
 
                                                               ]
 

@@ -34,7 +34,7 @@ export const vibratoCases: ComplianceTestCase[] = [
   {
     name: 'IT Auto-Vibrato Square',
     format: 'IT',
-    initialState: { 
+    initialState: {
       frequency: 100000,
       activeInstrument: {
         autoVibrato: {
@@ -46,12 +46,15 @@ export const vibratoCases: ComplianceTestCase[] = [
       } as any
     },
     steps: [
-      { 
-        row: 0, 
-        note: 'C-3', 
+      {
+        row: 0,
+        note: 'C-3',
+        // C-3 base freq: 124457.1 Hz (period 214)
+        // Square wave at pos 0 = +1, depth=10 (5%), sweep=255 (100%)
+        // Delta = 1 * 0.05 * 1.0 * 124457.1 = 6222.9 Hz
         expected: [
-          { tick: 0, frequency: 125437.1 }, // Starts at modulated frequency due to instant sweep
-          { tick: 1, frequency: 125437.1 }
+          { tick: 0, frequency: 130680.0 },
+          { tick: 1, frequency: 130680.0 }
         ]
       }
     ]
@@ -110,7 +113,7 @@ export const vibratoCases: ComplianceTestCase[] = [
   {
     name: 'IT Auto-Vibrato RampUp',
     format: 'IT',
-    initialState: { 
+    initialState: {
       frequency: 100000,
       activeInstrument: {
         autoVibrato: {
@@ -122,12 +125,15 @@ export const vibratoCases: ComplianceTestCase[] = [
       } as any
     },
     steps: [
-      { 
-        row: 0, 
-        note: 'C-3', 
+      {
+        row: 0,
+        note: 'C-3',
+        // C-3 base freq: 124457.1 Hz (period 214)
+        // RampUp wave at pos 0 = -1, depth=10 (5%), sweep=255 (100%)
+        // Delta = -1 * 0.05 * 1.0 * 124457.1 = -6222.9 Hz
         expected: [
-          { tick: 0, frequency: 125437.1 },
-          { tick: 1, frequency: 125437.1 }
+          { tick: 0, frequency: 118234.3 },
+          { tick: 1, frequency: 118234.3 }
         ]
       }
     ]
