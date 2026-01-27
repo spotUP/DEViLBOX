@@ -17,6 +17,9 @@ import {
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getToneEngine } from '@engine/ToneEngine';
+import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
+import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
+import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
 interface InstrumentStore {
   // State
@@ -50,6 +53,9 @@ interface InstrumentStore {
 
   // Import
   loadInstruments: (instruments: InstrumentConfig[]) => void;
+  loadFurnaceInstrument: (buffer: ArrayBuffer) => void;
+  loadDefleMaskInstrument: (buffer: ArrayBuffer) => void;
+  loadDefleMaskWavetable: (buffer: ArrayBuffer) => void;
 
   // Transformation (MOD/XM import)
   transformInstrument: (
@@ -58,6 +64,11 @@ interface InstrumentStore {
     mappingStrategy: 'analyze' | 'default'
   ) => void;
   revertToSample: (instrumentId: number) => void;
+
+  // Destructive Editing
+  reverseSample: (instrumentId: number) => Promise<void>;
+  normalizeSample: (instrumentId: number) => Promise<void>;
+  invertLoopSample: (instrumentId: number) => Promise<void>;
 
   // Reset to initial state
   reset: () => void;
@@ -488,6 +499,76 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     },
 
+    loadFurnaceInstrument: (buffer) => {
+      try {
+        const { name, config } = FurnaceParser.parse(buffer);
+        const existingIds = get().instruments.map((i) => i.id);
+        const newId = findNextId(existingIds);
+
+        set((state) => {
+          const newInstrument: InstrumentConfig = {
+            id: newId,
+            name: name || 'Furnace Patch',
+            type: 'synth',
+            synthType: 'Furnace',
+            furnace: config,
+            effects: [],
+            volume: -6,
+            pan: 0,
+          };
+          state.instruments.push(newInstrument);
+          state.currentInstrumentId = newId;
+        });
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to load Furnace instrument:', error);
+      }
+    },
+
+    loadDefleMaskInstrument: (buffer) => {
+      try {
+        const { name, config } = DefleMaskParser.parse(buffer, 'dmp');
+        const existingIds = get().instruments.map((i) => i.id);
+        const newId = findNextId(existingIds);
+
+        set((state) => {
+          const newInstrument: InstrumentConfig = {
+            id: newId,
+            name: name || 'DefleMask Patch',
+            type: 'synth',
+            synthType: 'Furnace', // We use the Furnace engine for DMF playback
+            furnace: config,
+            effects: [],
+            volume: -6,
+            pan: 0,
+          };
+          state.instruments.push(newInstrument);
+          state.currentInstrumentId = newId;
+        });
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to load DefleMask instrument:', error);
+      }
+    },
+
+    loadDefleMaskWavetable: (buffer) => {
+      try {
+        const waveData = DefleMaskParser.parse(buffer, 'dmw');
+        const currentId = get().currentInstrumentId;
+        if (!currentId) return;
+
+        set((state) => {
+          const inst = state.instruments.find((i) => i.id === currentId);
+          if (inst?.synthType === 'Furnace' && inst.furnace) {
+            inst.furnace.wavetables.push({
+              id: inst.furnace.wavetables.length,
+              data: waveData,
+            });
+          }
+        });
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to load DefleMask wavetable:', error);
+      }
+    },
+
     // Transform sample instrument to synth (MOD/XM import feature)
     transformInstrument: (instrumentId, targetSynthType, mappingStrategy) => {
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
@@ -713,6 +794,68 @@ export const useInstrumentStore = create<InstrumentStore>()(
       } catch (error) {
         console.warn('[InstrumentStore] Could not invalidate instrument:', error);
       }
+    },
+
+    // Destructive Editing Actions
+    reverseSample: async (id) => {
+      const inst = get().instruments.find((i) => i.id === id);
+      if (!inst?.sample?.audioBuffer) return;
+
+      const rawBuffer = inst.sample.audioBuffer as any;
+      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
+      const newBuffer = WaveformProcessor.reverse(audioBuffer);
+      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
+
+      set((state) => {
+        const instrument = state.instruments.find((i) => i.id === id);
+        if (instrument?.sample) {
+          instrument.sample.audioBuffer = arrayBuffer;
+        }
+      });
+
+      getToneEngine().invalidateInstrument(id);
+    },
+
+    normalizeSample: async (id) => {
+      const inst = get().instruments.find((i) => i.id === id);
+      if (!inst?.sample?.audioBuffer) return;
+
+      const rawBuffer = inst.sample.audioBuffer as any;
+      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
+      const newBuffer = WaveformProcessor.normalize(audioBuffer);
+      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
+
+      set((state) => {
+        const instrument = state.instruments.find((i) => i.id === id);
+        if (instrument?.sample) {
+          instrument.sample.audioBuffer = arrayBuffer;
+        }
+      });
+
+      getToneEngine().invalidateInstrument(id);
+    },
+
+    invertLoopSample: async (id) => {
+      const inst = get().instruments.find((i) => i.id === id);
+      if (!inst?.sample?.audioBuffer || !inst.sample.loop) return;
+
+      const rawBuffer = inst.sample.audioBuffer as any;
+      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
+      const newBuffer = WaveformProcessor.invertLoop(
+        audioBuffer, 
+        inst.sample.loopStart, 
+        inst.sample.loopEnd
+      );
+      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
+
+      set((state) => {
+        const instrument = state.instruments.find((i) => i.id === id);
+        if (instrument?.sample) {
+          instrument.sample.audioBuffer = arrayBuffer;
+        }
+      });
+
+      getToneEngine().invalidateInstrument(id);
     },
 
     // Reset to initial state (for new project/tab)
