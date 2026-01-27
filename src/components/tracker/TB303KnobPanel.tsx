@@ -135,8 +135,8 @@ const TB303KnobPanelComponent: React.FC = () => {
   const { tb303Collapsed, toggleTB303Collapsed } = useUIStore(
     useShallow((state) => ({ tb303Collapsed: state.tb303Collapsed, toggleTB303Collapsed: state.toggleTB303Collapsed }))
   );
-  // MIDI store for CC handlers and synth selection
-  const { registerCCHandler, unregisterCCHandler, controlledInstrumentId, setControlledInstrument } = useMIDIStore();
+  // MIDI store for CC handlers, synth selection, and output to external hardware
+  const { registerCCHandler, unregisterCCHandler, controlledInstrumentId, setControlledInstrument, sendCC } = useMIDIStore();
 
   const [params, setParams] = useState<TB303Params>(DEFAULT_PARAMS);
   // Keep a ref to always have the latest params (avoids stale closure issues)
@@ -614,8 +614,15 @@ const TB303KnobPanelComponent: React.FC = () => {
       persistToStore({ cutoff: value });
       // Register override - automation won't apply for one pattern cycle
       overrideManager.setOverride('cutoff', value / 18000); // Normalize to 0-1
+
+      // Send CC 74 to external hardware (TD-3-MO)
+      // Convert Hz (50-18000) to MIDI CC (0-127) using logarithmic scale
+      const minHz = 50, maxHz = 18000;
+      const logMin = Math.log(minHz), logMax = Math.log(maxHz);
+      const normalized = (Math.log(Math.max(minHz, value)) - logMin) / (logMax - logMin);
+      sendCC(74, normalized * 127);
     }, 16),
-    [updateAllTB303, overrideManager, persistToStore]
+    [updateAllTB303, overrideManager, persistToStore, sendCC]
   );
 
   const handleResonanceChange = useCallback(

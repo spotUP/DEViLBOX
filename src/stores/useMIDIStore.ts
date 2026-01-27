@@ -67,6 +67,11 @@ interface MIDIStore {
 
   // Knob control target
   setControlledInstrument: (id: number | null) => void;
+
+  // MIDI Output - send CC to external hardware (e.g., TD-3-MO)
+  sendCC: (cc: number, value: number, channel?: number) => void;
+  midiOutputEnabled: boolean;
+  setMidiOutputEnabled: (enabled: boolean) => void;
 }
 
 // Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
@@ -101,6 +106,7 @@ export const useMIDIStore = create<MIDIStore>()(
       lastActivityTimestamp: 0,
       controlledInstrumentId: null,  // null = control all TB303 instruments
       showPatternDialog: false,
+      midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
       // Initialize MIDI
       init: async () => {
@@ -392,6 +398,24 @@ export const useMIDIStore = create<MIDIStore>()(
           state.controlledInstrumentId = id;
         });
       },
+
+      // Send CC to external hardware (TD-3-MO, etc.)
+      sendCC: (cc, value, channel = 0) => {
+        const { midiOutputEnabled } = get();
+        if (!midiOutputEnabled) return;
+
+        const manager = getMIDIManager();
+        // Clamp value to 0-127
+        const clampedValue = Math.max(0, Math.min(127, Math.round(value)));
+        manager.sendCC(channel, cc, clampedValue);
+      },
+
+      // Enable/disable MIDI output
+      setMidiOutputEnabled: (enabled) => {
+        set((state) => {
+          state.midiOutputEnabled = enabled;
+        });
+      },
     })),
     {
       name: 'midi-settings',
@@ -401,6 +425,7 @@ export const useMIDIStore = create<MIDIStore>()(
         selectedInputId: state.selectedInputId,
         selectedOutputId: state.selectedOutputId,
         controlledInstrumentId: state.controlledInstrumentId,
+        midiOutputEnabled: state.midiOutputEnabled,
       }),
     }
   )
