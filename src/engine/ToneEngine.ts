@@ -1,4 +1,3 @@
-// @ts-nocheck - Tone.js API type issues need resolution
 /**
  * ToneEngine - Tone.js Audio Engine Wrapper
  * Manages Tone.js lifecycle, instruments, master effects, and audio context
@@ -10,10 +9,32 @@ import { DEFAULT_TB303 } from '@typedefs/instrument';
 import { TB303Synth } from './TB303Engine';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriod } from './effects/PeriodTables';
+import { AmigaFilter } from './effects/AmigaFilter';
+import { TrackerEnvelope } from './TrackerEnvelope';
+
+interface VoiceState {
+  instrument: any;
+  note: string;
+  volumeEnv: TrackerEnvelope;
+  panningEnv: TrackerEnvelope;
+  pitchEnv: TrackerEnvelope;
+  fadeout: number;
+  fadeoutStep: number;
+  isKeyOff: boolean;
+  isFilterEnvelope: boolean;
+  lastCutoff: number;
+  lastResonance: number;
+  nodes: {
+    gain: Tone.Gain;
+    filter: any;
+    panner: Tone.Panner;
+  };
+}
 
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
   private static tb303WorkletLoaded: boolean = false; // Track if TB303 worklet is loaded
+  private static itFilterWorkletLoaded: boolean = false; // Track if ITFilter worklet is loaded
 
   // Master routing chain: instruments → masterInput → masterEffects → masterChannel → analyzers → destination
   public masterInput: Tone.Gain; // Where instruments connect
@@ -24,6 +45,9 @@ export class ToneEngine {
   public instruments: Map<string, Tone.PolySynth | Tone.Synth | any>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<string, string> = new Map();
+
+  // Active voices per channel (for IT NNA support)
+  private activeVoices: Map<number, VoiceState[]> = new Map();
 
   // Master effects chain
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
@@ -61,9 +85,7 @@ export class ToneEngine {
   }> = new Map();
 
 
-  // Per-channel last playback rate for Player/Sampler slide effects
-  // Used for sample-based instruments where pitch is controlled by playbackRate
-  private channelLastPlaybackRate: Map<number, number> = new Map();
+
 
   // Slide time constant (RC circuit time constant, similar to TB-303's ~60ms)
   private static readonly SLIDE_TIME_CONSTANT = 0.06; // 60ms slide time
@@ -76,9 +98,9 @@ export class ToneEngine {
   private metronomeEnabled: boolean = false;
   private metronomePart: Tone.Part | null = null;
 
-  // Amiga audio filter (E0x command) - low-pass filter at ~3.3kHz
+  // Amiga audio filter (E0x command) - 1:1 hardware emulation
   // E00 = filter ON (LED on), E01 = filter OFF (LED off/bypassed)
-  private amigaFilter: Tone.Filter;
+  private amigaFilter: AmigaFilter;
   private amigaFilterEnabled: boolean = true; // Default: filter ON (like real Amiga)
 
   // Per-instrument effect chains (keyed by composite string "instrumentId-channelIndex")
@@ -91,13 +113,8 @@ export class ToneEngine {
     // Master input (where all instruments connect)
     this.masterInput = new Tone.Gain(1);
 
-    // Amiga audio filter (E0x) - 1-pole low-pass at ~3.3kHz
-    // The original Amiga had a simple RC filter on the audio output
-    this.amigaFilter = new Tone.Filter({
-      frequency: 3300,
-      type: 'lowpass',
-      rolloff: -12, // Close to Amiga's 6dB/octave characteristic
-    });
+    // Amiga audio filter (E0x) - 1:1 hardware emulation
+    this.amigaFilter = new AmigaFilter();
 
     // Master output channel with volume/pan control
     this.masterChannel = new Tone.Channel({
@@ -113,8 +130,7 @@ export class ToneEngine {
     this.masterChannel.connect(this.analyser);
     this.masterChannel.connect(this.fft);
 
-    // Default routing: masterInput → amigaFilter → masterChannel
-    // Filter starts enabled (like real Amiga with power LED on)
+    // Default routing: masterInput → masterEffectsNode? → amigaFilter → masterChannel
     this.masterInput.connect(this.amigaFilter);
     this.amigaFilter.connect(this.masterChannel);
 
@@ -130,6 +146,22 @@ export class ToneEngine {
       ToneEngine.instance = new ToneEngine();
     }
     return ToneEngine.instance;
+  }
+
+  /**
+   * Helper to decode an ArrayBuffer to an AudioBuffer
+   */
+  public async decodeAudioData(buffer: ArrayBuffer): Promise<AudioBuffer> {
+    return await Tone.getContext().rawContext.decodeAudioData(buffer.slice(0));
+  }
+
+  /**
+   * Helper to convert an AudioBuffer back to an ArrayBuffer (Float32 PCM)
+   * Note: This returns the raw Float32 data of the first channel for now.
+   * Proper multi-channel interleaved encoding is a future enhancement.
+   */
+  public async encodeAudioData(buffer: AudioBuffer): Promise<ArrayBuffer> {
+    return buffer.getChannelData(0).buffer.slice(0);
   }
 
   /**
@@ -152,11 +184,18 @@ export class ToneEngine {
       }
     }
 
-    // Configure Transport lookahead for reliable scheduling
-    // Use 0.05s (50ms) for balance between low latency keyboard preview and reliable playback
-    // Previously 0.2s which caused noticeable lag when pressing keys
-    const transport = Tone.getTransport();
-    transport.context.lookAhead = 0.05;
+    // Pre-load ITFilter AudioWorklet
+    if (!ToneEngine.itFilterWorkletLoaded) {
+      try {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+        ToneEngine.itFilterWorkletLoaded = true;
+      } catch (error) {
+        console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
+      }
+    }
+
+    // Load AmigaFilter worklet handled by its class
   }
 
   /**
@@ -257,46 +296,10 @@ export class ToneEngine {
    * Set Amiga audio filter state (E0x command)
    * E00 = filter ON (LED on, softer sound)
    * E01 = filter OFF (LED off, brighter sound)
-   *
-   * The Amiga had a hardware low-pass filter at ~3.3kHz that could be
-   * toggled via software. When ON, it softened the sound. When OFF,
-   * the full frequency range was preserved.
    */
   public setAmigaFilter(enabled: boolean): void {
-    if (this.amigaFilterEnabled === enabled) return;
-
     this.amigaFilterEnabled = enabled;
-
-    // Determine what's currently at the end of the chain before masterChannel
-    const hasEffects = this.masterEffectsNodes.length > 0;
-    const lastNode = hasEffects
-      ? this.masterEffectsNodes[this.masterEffectsNodes.length - 1]
-      : this.masterInput;
-
-    // Disconnect and reconnect
-    if (hasEffects) {
-      // Effects chain: disconnect last effect and reconnect
-      lastNode.disconnect();
-      if (enabled) {
-        lastNode.connect(this.amigaFilter);
-        // Ensure amigaFilter connects to masterChannel
-        try { this.amigaFilter.disconnect(); } catch { /* ok */ }
-        this.amigaFilter.connect(this.masterChannel);
-      } else {
-        lastNode.connect(this.masterChannel);
-      }
-    } else {
-      // No effects: disconnect masterInput and reconnect
-      this.masterInput.disconnect();
-      if (enabled) {
-        this.masterInput.connect(this.amigaFilter);
-        // Ensure amigaFilter connects to masterChannel
-        try { this.amigaFilter.disconnect(); } catch { /* ok */ }
-        this.amigaFilter.connect(this.masterChannel);
-      } else {
-        this.masterInput.connect(this.masterChannel);
-      }
-    }
+    this.amigaFilter.ledFilterEnabled = enabled;
   }
 
   /**
@@ -304,6 +307,18 @@ export class ToneEngine {
    */
   public getAmigaFilterEnabled(): boolean {
     return this.amigaFilterEnabled;
+  }
+
+  /**
+   * Process a single tracker tick for all active instruments
+   * Supports macro modulation for Furnace and other tick-aware synths
+   */
+  public processInstrumentTicks(time: number = Tone.now()): void {
+    this.instruments.forEach((instrument) => {
+      if (instrument && typeof instrument.processTick === 'function') {
+        instrument.processTick(time);
+      }
+    });
   }
 
   /**
@@ -461,16 +476,19 @@ export class ToneEngine {
         // Adjust polyphony based on quality level for CPU savings
         const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                                this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new Tone.PolySynth(Tone.Synth, {
+        instrument = new Tone.PolySynth({
+          voice: Tone.Synth,
           maxPolyphony: synthPolyphony,
-          oscillator: {
-            type: config.oscillator?.type || 'sawtooth',
-          },
-          envelope: {
-            attack: (config.envelope?.attack ?? 10) / 1000,
-            decay: (config.envelope?.decay ?? 200) / 1000,
-            sustain: (config.envelope?.sustain ?? 50) / 100,
-            release: (config.envelope?.release ?? 1000) / 1000,
+          options: {
+            oscillator: {
+              type: config.oscillator?.type || 'sawtooth',
+            },
+            envelope: {
+              attack: (config.envelope?.attack ?? 10) / 1000,
+              decay: (config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.envelope?.sustain ?? 50) / 100,
+              release: (config.envelope?.release ?? 1000) / 1000,
+            },
           },
           volume: config.volume || -12,
         });
@@ -521,16 +539,19 @@ export class ToneEngine {
         // FMSynth is CPU-intensive, reduce polyphony on lower quality
         const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                             this.currentPerformanceQuality === 'medium' ? 6 : 3;
-        instrument = new Tone.PolySynth(Tone.FMSynth, {
+        instrument = new Tone.PolySynth({
+          voice: Tone.FMSynth,
           maxPolyphony: fmPolyphony,
-          oscillator: { type: config.oscillator?.type || 'sine' },
-          envelope: {
-            attack: (config.envelope?.attack ?? 10) / 1000,
-            decay: (config.envelope?.decay ?? 200) / 1000,
-            sustain: (config.envelope?.sustain ?? 50) / 100,
-            release: (config.envelope?.release ?? 1000) / 1000,
+          options: {
+            oscillator: { type: config.oscillator?.type || 'sine' },
+            envelope: {
+              attack: (config.envelope?.attack ?? 10) / 1000,
+              decay: (config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.envelope?.sustain ?? 50) / 100,
+              release: (config.envelope?.release ?? 1000) / 1000,
+            },
+            modulationIndex: 10,
           },
-          modulationIndex: 10,
           volume: config.volume || -12,
         });
         break;
@@ -539,14 +560,17 @@ export class ToneEngine {
         // AMSynth has dual oscillators, reduce polyphony on lower quality
         const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                             this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new Tone.PolySynth(Tone.AMSynth, {
+        instrument = new Tone.PolySynth({
+          voice: Tone.AMSynth,
           maxPolyphony: amPolyphony,
-          oscillator: { type: config.oscillator?.type || 'sine' },
-          envelope: {
-            attack: (config.envelope?.attack ?? 10) / 1000,
-            decay: (config.envelope?.decay ?? 200) / 1000,
-            sustain: (config.envelope?.sustain ?? 50) / 100,
-            release: (config.envelope?.release ?? 1000) / 1000,
+          options: {
+            oscillator: { type: config.oscillator?.type || 'sine' },
+            envelope: {
+              attack: (config.envelope?.attack ?? 10) / 1000,
+              decay: (config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.envelope?.sustain ?? 50) / 100,
+              release: (config.envelope?.release ?? 1000) / 1000,
+            },
           },
           volume: config.volume || -12,
         });
@@ -555,11 +579,14 @@ export class ToneEngine {
       case 'PluckSynth':
         const pluckPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                                this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new Tone.PolySynth(Tone.PluckSynth, {
+        instrument = new (Tone.PolySynth as any)({
+          voice: Tone.PluckSynth,
           maxPolyphony: pluckPolyphony,
-          attackNoise: 1,
-          dampening: config.filter?.frequency || 4000,
-          resonance: 0.7,
+          options: {
+            attackNoise: 1,
+            dampening: config.filter?.frequency || 4000,
+            resonance: 0.7,
+          },
           volume: config.volume || -12,
         });
         break;
@@ -781,14 +808,16 @@ export class ToneEngine {
       case 'ChipSynth':
       case 'PWMSynth':
       case 'StringMachine':
-      case 'FormantSynth': {
+      case 'FormantSynth':
+      case 'Furnace': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
 
       default:
         // Default to basic synth
-        instrument = new Tone.PolySynth(Tone.Synth, {
+        instrument = new Tone.PolySynth({
+          voice: Tone.Synth,
           maxPolyphony: 16, // Increased for high BPM playback
           volume: config.volume || -12,
         });
@@ -1151,7 +1180,7 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            player.playbackRate = playbackRate;
+            (player as any).playbackRate = playbackRate;
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
             // The sample's base note is the pitch at playbackRate 1.0
@@ -1159,7 +1188,7 @@ export class ToneEngine {
             const baseFreq = Tone.Frequency(baseNote).toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
-            player.playbackRate = playbackRate;
+            (player as any).playbackRate = playbackRate;
           }
 
           player.start(safeTime);
@@ -1215,7 +1244,7 @@ export class ToneEngine {
         }
 
         player.start(safeTime);
-      } else if (config.synthType === 'NoiseSynth') {
+      } else if ((config.synthType as string) === 'NoiseSynth') {
         // NoiseSynth doesn't use note frequencies - just trigger at time with velocity
         const noiseSynth = instrument as Tone.NoiseSynth;
         const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
@@ -1391,25 +1420,91 @@ export class ToneEngine {
     slide?: boolean,
     channelIndex?: number,
     period?: number,
-    sampleOffset?: number // 9xx effect: start sample at byte offset
+    sampleOffset?: number, // 9xx effect: start sample at byte offset
+    nnaAction: number = 0  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
   ): void {
-    const instrument = this.getInstrument(instrumentId, config, channelIndex);
-
-    if (!instrument) {
-      console.warn(`[ToneEngine] triggerNote: No instrument found for id=${instrumentId} type=${config.synthType}`);
-      return;
-    }
-
-    // Get safe time for the note
     const safeTime = this.getSafeTime(time);
-    if (safeTime === null) {
-      console.warn(`[ToneEngine] triggerNote: Audio context not ready`);
-      return; // Audio context not ready
-    }
+    if (safeTime === null) return;
 
+    const instrument = this.getInstrument(instrumentId, config, channelIndex);
+    if (!instrument) return;
+
+    if (channelIndex !== undefined) {
+      // 1. Handle Past Note Actions (NNA)
+      let voices = this.activeVoices.get(channelIndex) || [];
+      
+      if (nnaAction === 0) { // CUT (Standard MOD/XM/S3M behavior)
+        voices.forEach(v => {
+          this.stopVoice(v, safeTime);
+        });
+        voices = [];
+      } else {
+        // IT NNA: Continue, Note Off, or Fade
+        voices.forEach(v => {
+          if (nnaAction === 2) v.volumeEnv.keyOff(); // Note Off
+          if (nnaAction === 3) {
+            v.isKeyOff = true; // Start fadeout
+            // Use instrument's fadeout rate if available
+            if (v.fadeoutStep === 0) v.fadeoutStep = 1024; // Default approx 1/64
+          }
+        });
+      }
+
+      // 2. Create independent playback node for this voice
+      // This is essential for IT NNA so overlapping notes have separate envelopes/filters
+      let voiceNode: any;
+      if (config.synthType === 'Sampler' || config.synthType === 'Player') {
+        voiceNode = new Tone.Player(instrument.buffer);
+        // FIX: Copy looping settings from parent instrument
+        voiceNode.loop = instrument.loop;
+        voiceNode.loopStart = instrument.loopStart;
+        voiceNode.loopEnd = instrument.loopEnd;
+      } else if (config.synthType === 'Synth') {
+        voiceNode = new Tone.Synth(instrument.get());
+      } else {
+        voiceNode = instrument; // Fallback for specialized synths
+      }
+
+      // 3. Create new voice state and routing chain
+      const voice = this.createVoice(channelIndex, voiceNode, note, config);
+      voiceNode.connect(voice.nodes.gain);
+      
+      voices.push(voice);
+      this.activeVoices.set(channelIndex, voices);
+
+      // 4. Trigger the playback
+      try {
+        if (voiceNode instanceof Tone.Player) {
+          // Apply velocity as volume
+          const velocityDb = velocity > 0 ? Tone.gainToDb(velocity) : -Infinity;
+          voiceNode.volume.value = velocityDb;
+
+          if (config.metadata?.modPlayback?.usePeriodPlayback && period) {
+            const modPlayback = config.metadata.modPlayback;
+            const frequency = modPlayback.periodMultiplier / period;
+            const sampleRate = config.sample?.sampleRate || 8363;
+            (voiceNode as any).playbackRate = frequency / sampleRate;
+          } else {
+            // FIX: Handle non-period playback for voice nodes (matches triggerNoteAttack)
+            const baseNote = config.sample?.baseNote || 'C4';
+            const baseFreq = Tone.Frequency(baseNote).toFrequency();
+            const targetFreq = Tone.Frequency(note).toFrequency();
+            const playbackRate = targetFreq / baseFreq;
+            (voiceNode as any).playbackRate = playbackRate;
+          }
+          const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
+          voiceNode.start(safeTime, offset);
+        } else if (voiceNode.triggerAttack) {
+          voiceNode.triggerAttack(note, safeTime, velocity);
+        }
+      } catch (e) {
+        console.error(`[ToneEngine] Voice trigger error:`, e);
+      }
+      return; // Handled via voice system
+    }
 
     try {
-      // Handle different synth types with their specific APIs
+      // Fallback for non-channel triggers (like pre-listening)
       if (instrument instanceof TB303Synth) {
         // TB-303 has accent/slide support
         instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
@@ -1450,13 +1545,13 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            (grainPlayer as any).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
           } else {
             // Calculate pitch shift from note (C4 = base pitch)
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            grainPlayer.playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            (grainPlayer as any).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
           }
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
@@ -1494,7 +1589,7 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            player.playbackRate = playbackRate;
+            (player as any).playbackRate = playbackRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided
             console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
@@ -1503,7 +1598,7 @@ export class ToneEngine {
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            player.playbackRate = playbackRate;
+            (player as any).playbackRate = playbackRate;
           }
 
           // Apply sample offset (9xx command) if present
@@ -1534,20 +1629,6 @@ export class ToneEngine {
         // (Looping samples are handled as Players above)
         const sampler = instrument as Tone.Sampler;
 
-        // CRITICAL DEBUG: Check what's inside the sampler
-        const samplerDebug = {
-          instrumentId,
-          note,
-          loaded: sampler.loaded,
-          hasSample: !!config.sample,
-          sampleUrl: config.sample?.url?.substring(0, 50),
-          baseNote: config.sample?.baseNote,
-          sampleOffset,
-          // Check internal Tone.Sampler state
-          samplerHasBuffers: Object.keys((sampler as any)._buffers?._buffers || {}).length > 0,
-          samplerBufferKeys: Object.keys((sampler as any)._buffers?._buffers || {}),
-        };
-
         if (sampler.loaded) {
 
           if (sampleOffset && sampleOffset > 0) {
@@ -1577,7 +1658,7 @@ export class ToneEngine {
                 const targetFreq = Tone.Frequency(note).toFrequency();
                 const playbackRate = targetFreq / baseFreq;
 
-                offsetPlayer.playbackRate = playbackRate;
+                (offsetPlayer as any).playbackRate = playbackRate;
 
                 // Start at offset, stop after duration
                 offsetPlayer.start(safeTime, clampedOffset);
@@ -1855,17 +1936,17 @@ export class ToneEngine {
       return;
     }
 
-    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some(fx => fx.enabled && fx.type === 'neural');
+    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some((fx: any) => fx.enabled && fx.type === 'neural');
 
     // Update all instances
     for (const synth of synths) {
       if (hasNeuralEffect) {
         // Find first enabled neural effect
-        const neuralEffect = pedalboard.chain.find(fx => fx.enabled && fx.type === 'neural');
+        const neuralEffect = pedalboard.chain.find((fx: any) => fx.enabled && fx.type === 'neural');
         if (neuralEffect && neuralEffect.modelIndex !== undefined) {
           try {
             // Load GuitarML model and enable
-            await synth.setGuitarMLModel(neuralEffect.modelIndex);
+            await synth.loadGuitarMLModel(neuralEffect.modelIndex);
             await synth.setGuitarMLEnabled(true);
 
             // Set dry/wet mix if specified
@@ -2050,13 +2131,13 @@ export class ToneEngine {
       chain.effects.forEach((fx) => {
         try {
           fx.dispose();
-        } catch {
+        } catch (e) {
           console.warn(`[ToneEngine] Failed to dispose effect for instrument ${instrumentId}:`, e);
         }
       });
       try {
         chain.output.dispose();
-      } catch {
+      } catch (e) {
         console.warn(`[ToneEngine] Failed to dispose effect chain output for instrument ${instrumentId}:`, e);
       }
     });
@@ -2066,7 +2147,7 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       try {
         instrument.dispose();
-      } catch {
+      } catch (e) {
         console.warn(`[ToneEngine] Failed to dispose instrument ${key}:`, e);
       }
     });
@@ -2161,7 +2242,8 @@ export class ToneEngine {
    * Rebuild an instrument's effect chain (public method for store to call, now async)
    */
   public async rebuildInstrumentEffects(instrumentId: number, effects: EffectConfig[]): Promise<void> {
-    const instrument = this.instruments.get(instrumentId);
+    const key = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(key);
     if (!instrument) {
       console.warn('[ToneEngine] Cannot rebuild effects - instrument not found:', instrumentId);
       return;
@@ -2170,12 +2252,12 @@ export class ToneEngine {
     // Disconnect instrument from current chain
     try {
       instrument.disconnect();
-    } catch {
+    } catch (e) {
       // May not be connected
     }
 
     // Build new effect chain (await for neural effects)
-    await this.buildInstrumentEffectChain(instrumentId, effects, instrument);
+    await this.buildInstrumentEffectChain(key, effects, instrument);
   }
 
   /**
@@ -2304,8 +2386,8 @@ export class ToneEngine {
     switch (config.type) {
       case 'Distortion':
         if (node instanceof Tone.Distortion) {
-          node.distortion = params.drive ?? 0.4;
-          node.oversample = params.oversample ?? 'none';
+          node.distortion = params.drive as any ?? 0.4;
+          node.oversample = params.oversample as any ?? 'none';
         }
         break;
 
@@ -2316,100 +2398,100 @@ export class ToneEngine {
       case 'Delay':
       case 'FeedbackDelay':
         if (node instanceof Tone.FeedbackDelay) {
-          node.delayTime.value = params.time ?? 0.25;
-          node.feedback.value = params.feedback ?? 0.5;
+          node.delayTime.value = params.time as any ?? 0.25;
+          node.feedback.value = params.feedback as any ?? 0.5;
         }
         break;
 
       case 'Chorus':
         if (node instanceof Tone.Chorus) {
-          node.frequency.value = params.frequency ?? 1.5;
-          node.depth = params.depth ?? 0.7;
+          node.frequency.value = params.frequency as any ?? 1.5;
+          node.depth = params.depth as any ?? 0.7;
         }
         break;
 
       case 'Phaser':
         if (node instanceof Tone.Phaser) {
-          node.frequency.value = params.frequency ?? 0.5;
-          node.octaves = params.octaves ?? 3;
+          node.frequency.value = params.frequency as any ?? 0.5;
+          node.octaves = params.octaves as any ?? 3;
         }
         break;
 
       case 'Tremolo':
         if (node instanceof Tone.Tremolo) {
-          node.frequency.value = params.frequency ?? 10;
-          node.depth.value = params.depth ?? 0.5;
+          node.frequency.value = params.frequency as any ?? 10;
+          node.depth.value = params.depth as any ?? 0.5;
         }
         break;
 
       case 'Vibrato':
         if (node instanceof Tone.Vibrato) {
-          node.frequency.value = params.frequency ?? 5;
-          node.depth.value = params.depth ?? 0.1;
+          node.frequency.value = params.frequency as any ?? 5;
+          node.depth.value = params.depth as any ?? 0.1;
         }
         break;
 
       case 'BitCrusher':
         if (node instanceof Tone.BitCrusher) {
-          node.bits.value = params.bits ?? 4;
+          node.bits.value = params.bits as any ?? 4;
         }
         break;
 
       case 'PingPongDelay':
         if (node instanceof Tone.PingPongDelay) {
-          node.delayTime.value = params.time ?? 0.25;
-          node.feedback.value = params.feedback ?? 0.5;
+          node.delayTime.value = params.time as any ?? 0.25;
+          node.feedback.value = params.feedback as any ?? 0.5;
         }
         break;
 
       case 'PitchShift':
         if (node instanceof Tone.PitchShift) {
-          node.pitch = params.pitch ?? 0;
+          node.pitch = params.pitch as any ?? 0;
         }
         break;
 
       case 'Compressor':
         if (node instanceof Tone.Compressor) {
-          node.threshold.value = params.threshold ?? -24;
-          node.ratio.value = params.ratio ?? 12;
-          node.attack.value = params.attack ?? 0.003;
-          node.release.value = params.release ?? 0.25;
+          node.threshold.value = params.threshold as any ?? -24;
+          node.ratio.value = params.ratio as any ?? 12;
+          node.attack.value = params.attack as any ?? 0.003;
+          node.release.value = params.release as any ?? 0.25;
         }
         break;
 
       case 'EQ3':
         if (node instanceof Tone.EQ3) {
-          node.low.value = params.low ?? 0;
-          node.mid.value = params.mid ?? 0;
-          node.high.value = params.high ?? 0;
+          node.low.value = params.low as any ?? 0;
+          node.mid.value = params.mid as any ?? 0;
+          node.high.value = params.high as any ?? 0;
         }
         break;
 
       case 'Filter':
         if (node instanceof Tone.Filter) {
-          node.frequency.value = params.frequency ?? 350;
-          node.Q.value = params.Q ?? 1;
+          node.frequency.value = params.frequency as any ?? 350;
+          node.Q.value = params.Q as any ?? 1;
         }
         break;
 
       case 'AutoFilter':
         if (node instanceof Tone.AutoFilter) {
-          node.frequency.value = params.frequency ?? 1;
-          node.baseFrequency = params.baseFrequency ?? 200;
-          node.octaves = params.octaves ?? 2.6;
+          node.frequency.value = params.frequency as any ?? 1;
+          node.baseFrequency = params.baseFrequency as any ?? 200;
+          node.octaves = params.octaves as any ?? 2.6;
         }
         break;
 
       case 'AutoPanner':
         if (node instanceof Tone.AutoPanner) {
-          node.frequency.value = params.frequency ?? 1;
-          node.depth.value = params.depth ?? 1;
+          node.frequency.value = params.frequency as any ?? 1;
+          node.depth.value = params.depth as any ?? 1;
         }
         break;
 
       case 'StereoWidener':
         if (node instanceof Tone.StereoWidener) {
-          node.width.value = params.width ?? 0.5;
+          node.width.value = params.width as any ?? 0.5;
         }
         break;
     }
@@ -2421,7 +2503,7 @@ export class ToneEngine {
 
   /**
    * Get or create a channel's audio chain
-   * Route: channelInput → channel (volume/pan) → masterInput
+   * Route: [Voices] → channelInput → channel (volume/pan) → masterInput
    */
   public getChannelOutput(channelIndex: number): Tone.Gain {
     if (!this.channelOutputs.has(channelIndex)) {
@@ -2440,10 +2522,87 @@ export class ToneEngine {
         channel,
         meter,
       });
-
     }
 
     return this.channelOutputs.get(channelIndex)!.input;
+  }
+
+  /**
+   * Create a new voice chain for a note
+   */
+  private createVoice(channelIndex: number, instrument: any, note: string, config: InstrumentConfig): VoiceState {
+    const channelOutput = this.channelOutputs.get(channelIndex);
+    if (!channelOutput) throw new Error(`Channel ${channelIndex} not initialized`);
+
+    const gain = new Tone.Gain(1);
+    
+    // Hardware Quirk: Use IT-specific high-fidelity filter for IT modules
+    let filter: any;
+    const isIT = config.metadata?.importedFrom === 'IT';
+    
+    if (isIT && ToneEngine.itFilterWorkletLoaded) {
+      filter = new AudioWorkletNode(Tone.getContext().rawContext, 'it-filter-processor');
+    } else {
+      filter = new Tone.Filter({
+        type: 'lowpass',
+        frequency: 20000,
+        Q: 0,
+        rolloff: -12,
+      });
+    }
+    
+    const panner = new Tone.Panner(0);
+
+    // Connect: Voice → gain → filter → panner → channelInput
+    if (filter instanceof Tone.Filter) {
+      gain.connect(filter);
+      filter.connect(panner);
+    } else {
+      // Raw Web Audio node connection
+      gain.connect(filter);
+      Tone.connect(filter, panner);
+    }
+    
+    panner.connect(channelOutput.input);
+
+    const envs = config.metadata?.envelopes?.[config.id];
+    const volEnv = new TrackerEnvelope();
+    const panEnv = new TrackerEnvelope();
+    const pitchEnv = new TrackerEnvelope();
+
+    if (envs?.volumeEnvelope) volEnv.init(envs.volumeEnvelope);
+    if (envs?.panningEnvelope) panEnv.init(envs.panningEnvelope);
+    if (envs?.pitchEnvelope) pitchEnv.init(envs.pitchEnvelope);
+
+    return {
+      instrument,
+      note,
+      volumeEnv: volEnv,
+      panningEnv: panEnv,
+      pitchEnv: pitchEnv,
+      fadeout: 65536,
+      fadeoutStep: config.metadata?.modPlayback?.fadeout || 0,
+      isKeyOff: false,
+      isFilterEnvelope: envs?.pitchEnvelope?.type === 'filter',
+      lastCutoff: 127,
+      lastResonance: 0,
+      nodes: { gain, filter, panner }
+    };
+  }
+
+  /**
+   * Helper to stop a specific voice
+   */
+  private stopVoice(voice: VoiceState, time: number): void {
+    if (voice.instrument.stop) voice.instrument.stop(time);
+    else if (voice.instrument.triggerRelease) voice.instrument.triggerRelease(time);
+    
+    // Dispose nodes after a short delay to allow for audio tail/clipping prevention
+    setTimeout(() => {
+      voice.nodes.gain.dispose();
+      voice.nodes.filter.dispose();
+      voice.nodes.panner.dispose();
+    }, 100);
   }
 
   /**
@@ -2457,14 +2616,146 @@ export class ToneEngine {
   }
 
   /**
-   * Set channel pan
+   * Set channel filter cutoff (IT Zxx command)
+   * Target the "current" voice's filter
+   */
+  public setChannelFilterCutoff(channelIndex: number, cutoff: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length === 0) return;
+
+    // Apply to the most recent voice (the "current" one)
+    const voice = voices[voices.length - 1];
+    voice.lastCutoff = cutoff;
+    const resonance = voice.lastResonance;
+
+    const filter = voice.nodes.filter;
+    const now = Tone.now();
+
+    // Hardware Quirk: Filter is bypassed ONLY if Cutoff=127 AND Resonance=0
+    // Or if ITHandler explicitly requested bypass via value 255
+    if ((cutoff >= 127 && resonance === 0) || cutoff === 255) {
+      if (filter instanceof Tone.Filter) {
+        filter.frequency.setValueAtTime(24000, now);
+        filter.Q.setValueAtTime(0, now);
+      } else if (filter instanceof AudioWorkletNode) {
+        filter.parameters.get('cutoff')?.setValueAtTime(127, now);
+        filter.parameters.get('resonance')?.setValueAtTime(0, now);
+      }
+      return;
+    }
+
+    if (filter instanceof Tone.Filter) {
+      // High-Fidelity IT Mapping:
+      // Cutoff 0-127 -> ~100Hz to 10000Hz (Exponential)
+      const freq = 100 * Math.pow(100, cutoff / 127);
+      filter.frequency.setValueAtTime(freq, now);
+    } else if (filter instanceof AudioWorkletNode) {
+      // Worklet uses raw IT values
+      filter.parameters.get('cutoff')?.setValueAtTime(cutoff, now);
+    }
+  }
+
+  /**
+   * Set channel filter resonance (IT Z8x command)
+   * Target the "current" voice's filter
+   */
+  public setChannelFilterResonance(channelIndex: number, resonance: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length === 0) return;
+
+    // Apply to the most recent voice
+    const voice = voices[voices.length - 1];
+    voice.lastResonance = resonance;
+    const cutoff = voice.lastCutoff;
+
+    const filter = voice.nodes.filter;
+    const now = Tone.now();
+
+    if (filter instanceof Tone.Filter) {
+      // High-Fidelity IT Mapping:
+      // IT resonance was quite aggressive. 0-127 -> Q 0.0 to ~25.0
+      // We use an exponential mapping for that "biting" resonance character
+      const q = (resonance / 127) * (resonance / 127) * 25;
+      filter.Q.setValueAtTime(q, now);
+    } else if (filter instanceof AudioWorkletNode) {
+      filter.parameters.get('resonance')?.setValueAtTime(resonance, now);
+    }
+
+    // If resonance was set but cutoff is at max, re-evaluate bypass
+    if (resonance > 0 && cutoff >= 127) {
+      this.setChannelFilterCutoff(channelIndex, cutoff);
+    }
+  }
+
+  /**
+   * Set channel pan (-100 to 100)
    */
   public setChannelPan(channelIndex: number, pan: number | null | undefined): void {
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (channelOutput) {
-      // Convert -100 to 100 range to -1 to 1, default to 0 if null/undefined
-      const panValue = pan ?? 0;
-      channelOutput.channel.pan.value = panValue / 100;
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length === 0) return;
+
+    // Apply to current voice
+    const voice = voices[voices.length - 1];
+    const panValue = (pan ?? 0) / 100; // -1..1
+    voice.nodes.panner.pan.setValueAtTime(panValue, Tone.now());
+  }
+
+  /**
+   * Set channel Funk Repeat (EFx Invert Loop)
+   * Shifts the loop points of the current voice
+   */
+  public setChannelFunkRepeat(channelIndex: number, position: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length === 0) return;
+
+    const voice = voices[voices.length - 1];
+    const player = voice.instrument;
+
+    // Funk repeat only works on looping Players
+    if (player instanceof Tone.Player && player.loop) {
+      if (position === 0) {
+        // Reset to original loop points if needed (would need to store them)
+        return;
+      }
+
+      // ProTracker EFx shifts the loop start point within the loop
+      // position 0x00..0x80
+      const buffer = player.buffer;
+      if (buffer.loaded) {
+        const originalLoopStart = (player as any)._originalLoopStart ?? player.loopStart;
+        if ((player as any)._originalLoopStart === undefined) {
+          (player as any)._originalLoopStart = player.loopStart;
+        }
+
+        // Shift loopStart based on position (approximate behavior)
+        const shiftSeconds = (position / 128) * (player.loopEnd as number - originalLoopStart as number);
+        player.loopStart = (originalLoopStart as number) + shiftSeconds;
+      }
+    }
+  }
+
+  /**
+   * Handle IT Past Note Action (S77-S79)
+   * Targets all voices EXCEPT the most recent one
+   */
+  public handlePastNoteAction(channelIndex: number, action: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length <= 1) return;
+
+    // All voices except the last one are "past"
+    const pastVoices = voices.slice(0, voices.length - 1);
+    const currentVoice = voices[voices.length - 1];
+
+    if (action === 0) { // CUT
+      pastVoices.forEach(v => this.stopVoice(v, Tone.now()));
+      this.activeVoices.set(channelIndex, [currentVoice]);
+    } else if (action === 2) { // NOTE OFF
+      pastVoices.forEach(v => v.volumeEnv.keyOff());
+    } else if (action === 3) { // NOTE FADE
+      pastVoices.forEach(v => {
+        v.isKeyOff = true;
+        if (v.fadeoutStep === 0) v.fadeoutStep = 1024;
+      });
     }
   }
 
@@ -2475,46 +2766,44 @@ export class ToneEngine {
    */
   public setChannelPitch(channelIndex: number, pitchMultiplier: number): void {
     const pitchState = this.channelPitchState.get(channelIndex);
-    if (!pitchState) {
-      // Pitch state not initialized - normal for channels without active notes
-      return;
-    }
-
-    const instrument = this.instruments.get(pitchState.instrumentKey);
-    if (!instrument) {
-      console.warn(`[ToneEngine] setChannelPitch: No instrument found for key ${pitchState.instrumentKey}`);
-      return;
-    }
+    if (!pitchState) return;
 
     // Update current pitch multiplier
     pitchState.currentPitchMult = pitchMultiplier;
 
-    // Apply pitch based on instrument type
-    const synthType = this.instrumentSynthTypes.get(pitchState.instrumentKey);
+    // Apply to the most recent active voice on this channel
+    const voices = this.activeVoices.get(channelIndex);
+    if (!voices || voices.length === 0) {
+      // Fallback to shared instrument for non-NNA playback
+      const instrument = this.instruments.get(pitchState.instrumentKey);
+      if (!instrument) return;
+      this.applyPitchToNode(instrument, pitchMultiplier, pitchState.basePlaybackRate, pitchState.instrumentKey);
+      return;
+    }
+
+    const currentVoice = voices[voices.length - 1];
+    this.applyPitchToNode(currentVoice.instrument, pitchMultiplier, pitchState.basePlaybackRate, pitchState.instrumentKey);
+  }
+
+  /**
+   * Helper to apply pitch multiplier to a specific Tone node
+   */
+  private applyPitchToNode(node: any, pitchMultiplier: number, baseRate: number, instrumentKey: string): void {
+    const synthType = this.instrumentSynthTypes.get(instrumentKey);
     const cents = 1200 * Math.log2(pitchMultiplier);
 
-    if (synthType === 'Player' || synthType === 'GranularSynth') {
-      // For Players/GrainPlayers: multiply base playback rate
-      const newRate = pitchState.basePlaybackRate * pitchMultiplier;
-      if (instrument.playbackRate !== undefined) {
-        instrument.playbackRate = newRate;
-      }
+    if (node instanceof Tone.Player || node instanceof Tone.GrainPlayer) {
+      (node as any).playbackRate = baseRate * pitchMultiplier;
     } else if (synthType === 'Sampler') {
-      // For Sampler: use detune in cents
-      if (instrument.detune !== undefined) {
-        instrument.detune = cents;
-      }
+      if (node.detune !== undefined) node.detune.value = cents;
     } else {
-      // For synths: use detune property (most Tone.js synths have this)
-      let applied = false;
-      if (instrument.detune !== undefined) {
-        instrument.detune.value = cents;
-        applied = true;
-      } else if (instrument.oscillator?.detune !== undefined) {
-        instrument.oscillator.detune.value = cents;
-        applied = true;
-      }
-      if (applied) {
+      // For synths: use detune property
+      if (node.detune !== undefined && node.detune instanceof Tone.Signal) {
+        node.detune.value = cents;
+      } else if (node.oscillator?.detune !== undefined) {
+        node.oscillator.detune.value = cents;
+      } else if (node.detune !== undefined) {
+        node.detune = cents; // Primitive
       }
     }
   }
@@ -2614,17 +2903,17 @@ export class ToneEngine {
     this.channelOutputs.forEach((channelOutput, channelIndex) => {
       try {
         channelOutput.meter.dispose();
-      } catch {
+      } catch (e) {
         console.warn(`[ToneEngine] Failed to dispose meter for channel ${channelIndex}:`, e);
       }
       try {
         channelOutput.channel.dispose();
-      } catch {
+      } catch (e) {
         console.warn(`[ToneEngine] Failed to dispose channel ${channelIndex}:`, e);
       }
       try {
         channelOutput.input.dispose();
-      } catch {
+      } catch (e) {
         console.warn(`[ToneEngine] Failed to dispose input for channel ${channelIndex}:`, e);
       }
     });
@@ -2724,7 +3013,7 @@ export class ToneEngine {
 
     // Update all TB-303 synths (can reconfigure dynamically)
     let tb303Count = 0;
-    this.instruments.forEach((instrument, key) => {
+    this.instruments.forEach((instrument, _key) => {
       if (instrument instanceof TB303Synth) {
         instrument.setQuality(quality);
         tb303Count++;
@@ -2780,6 +3069,109 @@ export class ToneEngine {
     }
 
   }
+
+  // ============================================================================
+  // TRACKER ENVELOPE PROCESSING (XM/IT)
+  // ============================================================================
+
+  /**
+   * Process tracker envelopes for a channel (Sub-tick processing)
+   */
+  public updateChannelEnvelopes(channelIndex: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    const channelOutput = this.channelOutputs.get(channelIndex);
+    if (!voices || voices.length === 0 || !channelOutput) return;
+
+    const remainingVoices: VoiceState[] = [];
+
+    voices.forEach(voice => {
+      // 1. Advance volume envelope (0-64)
+      const envVol = voice.volumeEnv.tickNext();
+      
+      // Advance fadeout if key is off
+      if (voice.isKeyOff && voice.fadeout > 0) {
+        voice.fadeout = Math.max(0, voice.fadeout - voice.fadeoutStep);
+      }
+
+      // Calculate final volume multiplier (0.0 to 1.0)
+      const volMult = (envVol / 64) * (voice.fadeout / 65536);
+      voice.nodes.gain.gain.setValueAtTime(volMult, Tone.now());
+
+      // 2. Advance panning envelope (0-64)
+      const envPan = voice.panningEnv.tickNext();
+      if (envPan !== 32) {
+        // Base pan is in channel node (-1..1)
+        const basePan = channelOutput.channel.pan.value;
+        const envOffset = (envPan - 32) / 32;
+        const finalPan = Math.max(-1, Math.min(1, basePan + envOffset));
+        voice.nodes.panner.pan.setValueAtTime(finalPan, Tone.now());
+      }
+
+      // 3. Advance pitch/filter envelope
+      const envPitch = voice.pitchEnv.tickNext();
+      if (voice.pitchEnv.isEnabled()) {
+        if (voice.isFilterEnvelope) {
+          const baseCutoff = voice.lastCutoff;
+          const envOffset = (envPitch - 32);
+          const finalCutoff = Math.max(0, Math.min(127, baseCutoff + envOffset));
+          
+          // Apply to voice filter
+          if (voice.nodes.filter instanceof Tone.Filter) {
+            const freq = 100 * Math.pow(100, finalCutoff / 127);
+            voice.nodes.filter.frequency.setValueAtTime(freq, Tone.now());
+          } else if (voice.nodes.filter instanceof AudioWorkletNode) {
+            voice.nodes.filter.parameters.get('cutoff')?.setValueAtTime(finalCutoff, Tone.now());
+          }
+        } else {
+          // Pitch modulation (Additive semitones)
+          const semitoneOffset = (envPitch - 32) / 32 * 12; // +/- 12 semitones
+          // Note: Pitch modulation requires per-voice oscillator control
+          // Player/Sampler usually have detune/playbackRate
+          if ((voice.instrument as any).detune !== undefined) {
+            (voice.instrument as any).detune.value = semitoneOffset * 100;
+          }
+        }
+      }
+
+      // Cleanup: check if voice is finished
+      const isFinished = (voice.isKeyOff && voice.fadeout <= 0) || 
+                        (voice.volumeEnv.isFinished() && voice.isKeyOff);
+      
+      if (!isFinished) {
+        remainingVoices.push(voice);
+      } else {
+        // Dispose nodes
+        voice.nodes.gain.dispose();
+        voice.nodes.filter.dispose();
+        voice.nodes.panner.dispose();
+      }
+    });
+
+    if (remainingVoices.length > 0) {
+      this.activeVoices.set(channelIndex, remainingVoices);
+    } else {
+      this.activeVoices.delete(channelIndex);
+    }
+  }
+
+  /**
+   * Signal key-off for a channel
+   */
+  public setChannelKeyOff(channelIndex: number): void {
+    const voices = this.activeVoices.get(channelIndex);
+    if (voices) {
+      voices.forEach(voice => {
+        voice.isKeyOff = true;
+        voice.volumeEnv.keyOff();
+        voice.panningEnv.keyOff();
+        voice.pitchEnv.keyOff();
+      });
+    }
+  }
+
+  // ============================================
+  // END TRACKER ENVELOPE PROCESSING
+  // ============================================
 
   /**
    * Get current performance quality level

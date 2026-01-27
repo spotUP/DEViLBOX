@@ -604,12 +604,12 @@ export class ProTrackerReplayer {
         break;
 
       case 0x1: // Fine portamento up
-        ch.n_period = Math.max(113, ch.n_period - y);
+        ch.n_period = Math.max(1, ch.n_period - y);
         this.updatePeriod(ch, time);
         break;
 
       case 0x2: // Fine portamento down
-        ch.n_period = Math.min(856, ch.n_period + y);
+        ch.n_period = Math.min(32000, ch.n_period + y);
         this.updatePeriod(ch, time);
         break;
 
@@ -715,12 +715,12 @@ export class ProTrackerReplayer {
         break;
 
       case 0x1: // Portamento up
-        ch.n_period = Math.max(113, ch.n_period - param);
+        ch.n_period = Math.max(1, ch.n_period - param);
         this.updatePeriod(ch, time);
         break;
 
       case 0x2: // Portamento down
-        ch.n_period = Math.min(856, ch.n_period + param);
+        ch.n_period = Math.min(32000, ch.n_period + param);
         this.updatePeriod(ch, time);
         break;
 
@@ -1011,7 +1011,7 @@ export class ProTrackerReplayer {
     const sampleRate = ch.n_start?.sampleRate || 8363;
     const playbackRate = frequency / sampleRate;
 
-    ch.player.playbackRate = playbackRate;
+    (ch.player as any).playbackRate = playbackRate;
   }
 
   // ==========================================================================
