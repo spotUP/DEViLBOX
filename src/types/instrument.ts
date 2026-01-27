@@ -26,6 +26,7 @@ export type SynthType =
   | 'PWMSynth'
   | 'StringMachine'
   | 'FormantSynth'
+  | 'Furnace'
   // Module playback (libopenmpt)
   | 'ChiptuneModule';
 
@@ -119,6 +120,10 @@ export interface TB303Config {
   slide: {
     time: number; // 2-360ms (stock TB-303 was fixed at 60ms, Devil Fish makes it variable)
     mode: 'linear' | 'exponential';
+  };
+  pedalboard?: {
+    enabled: boolean;
+    chain: any[];
   };
   overdrive?: {
     amount: number; // 0-100%
@@ -816,6 +821,77 @@ export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   brightness: 70,
 };
 
+/**
+ * Furnace Tracker Instrument Configuration
+ */
+export interface FurnaceOperatorConfig {
+  enabled: boolean;
+  mult: number;      // 0-15
+  tl: number;        // Total Level (0-127)
+  ar: number;        // Attack Rate (0-31)
+  dr: number;        // Decay Rate (0-31)
+  sl: number;        // Sustain Level (0-15)
+  rr: number;        // Release Rate (0-15)
+  dt: number;        // Detune (-3 to +3)
+  rs: number;        // Rate Scaling (0-3)
+  am: boolean;       // Amplitude Modulation
+  ksr: boolean;      // Key Scale Rate
+  ssg: number;       // SSG-EG (0-15)
+}
+
+export interface FurnaceMacro {
+  type: number;
+  data: number[];
+  loop: number;
+  release: number;
+  mode: number;
+}
+
+export interface FurnaceOpMacros {
+  tl?: FurnaceMacro;
+  mult?: FurnaceMacro;
+  ar?: FurnaceMacro;
+  dr?: FurnaceMacro;
+  sl?: FurnaceMacro;
+  rr?: FurnaceMacro;
+}
+
+export interface FurnaceConfig {
+  chipType: number;
+  algorithm: number; // 0-7
+  feedback: number;  // 0-7
+  operators: FurnaceOperatorConfig[];
+  macros: FurnaceMacro[];
+  opMacros: FurnaceOpMacros[]; // Per operator macros
+  wavetables: Array<{
+    id: number;
+    data: number[];
+  }>;
+}
+
+export const DEFAULT_FURNACE: FurnaceConfig = {
+  chipType: 1, // FM
+  algorithm: 0,
+  feedback: 0,
+  operators: Array.from({ length: 4 }, () => ({
+    enabled: true,
+    mult: 1,
+    tl: 0,
+    ar: 31,
+    dr: 0,
+    sl: 0,
+    rr: 15,
+    dt: 0,
+    rs: 0,
+    am: false,
+    ksr: false,
+    ssg: 0,
+  })),
+  macros: [],
+  opMacros: Array.from({ length: 4 }, () => ({})),
+  wavetables: [],
+};
+
 export type AudioEffectType =
   | 'Distortion'
   | 'Reverb'
@@ -882,7 +958,14 @@ export interface InstrumentMetadata {
     periodMultiplier: number; // AMIGA_PALFREQUENCY_HALF = 3546895
     finetune: number; // -8 to +7 (ProTracker) or -128 to +127 (XM)
     defaultVolume?: number; // Sample's default volume (0-64) for channel init
+    fadeout?: number; // Fadeout rate
   };
+  envelopes?: Record<number, {
+    volumeEnvelope?: any;
+    panningEnvelope?: any;
+    pitchEnvelope?: any;
+    fadeout?: number;
+  }>;
 }
 
 export interface SampleConfig {
@@ -926,6 +1009,7 @@ export interface InstrumentConfig {
   pwmSynth?: PWMSynthConfig;
   stringMachine?: StringMachineConfig;
   formantSynth?: FormantSynthConfig;
+  furnace?: FurnaceConfig;
   // Module playback (libopenmpt)
   chiptuneModule?: ChiptuneModuleConfig;
   // Sampler config

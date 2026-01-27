@@ -14,3 +14,4 @@ export { useHistoryStore } from './useHistoryStore';
 export { useTabsStore, type ProjectTab } from './useTabsStore';
 export { useThemeStore, themes, type Theme, type ThemeColors } from './useThemeStore';
 export { useNotificationStore, notify, type Notification, type NotificationType } from './useNotificationStore';
+export { useSettingsStore } from './useSettingsStore';
