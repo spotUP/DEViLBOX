@@ -23,6 +23,7 @@ import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { SampleEditor } from './SampleEditor';
 import { ArpeggioEditor } from './ArpeggioEditor';
+import { FurnaceEditor } from './FurnaceEditor';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
 
@@ -117,6 +118,16 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
       {isSampleBased && (
         <div className="p-4">
           <SampleEditor instrument={instrument} onChange={onChange} />
+        </div>
+      )}
+
+      {/* Furnace Instrument Editor */}
+      {instrument.synthType === 'Furnace' && instrument.furnace && (
+        <div className="p-4 border-b border-gray-800">
+          <FurnaceEditor
+            config={instrument.furnace}
+            onChange={(furnace) => onChange({ furnace: { ...instrument.furnace!, ...furnace } })}
+          />
         </div>
       )}
 

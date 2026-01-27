@@ -21,6 +21,7 @@ import {
   Search,
   ChevronRight,
   RotateCcw,
+  FileUp,
 } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
@@ -38,6 +39,9 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
     cloneInstrument,
     setCurrentInstrument,
     resetInstrument,
+    loadFurnaceInstrument,
+    loadDefleMaskInstrument,
+    loadDefleMaskWavetable,
   } = useInstrumentStore();
 
   // Create a new instrument with a good starting preset
@@ -46,6 +50,7 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
     createInstrument(startingPreset);
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showInstrumentList, setShowInstrumentList] = useState(false);
   const [showPresetBrowser, setShowPresetBrowser] = useState(false);
   const [showSynthSelector, setShowSynthSelector] = useState(false);
@@ -141,8 +146,41 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
 
   const categories = Object.keys(PRESET_CATEGORIES) as PresetCategory[];
 
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const buffer = event.target?.result as ArrayBuffer;
+      if (buffer) {
+        if (extension === 'fui' || extension === 'fur') {
+          loadFurnaceInstrument(buffer);
+        } else if (extension === 'dmp') {
+          loadDefleMaskInstrument(buffer);
+        } else if (extension === 'dmw') {
+          loadDefleMaskWavetable(buffer);
+        }
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    
+    // Clear input
+    e.target.value = '';
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-dark-bg">
+      {/* Hidden file input for instrument import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".fui,.fur,.dmp,.dmw"
+        onChange={handleImportFile}
+        className="hidden"
+      />
       {/* Header - Instrument Selector */}
       <div className="bg-dark-bgSecondary border-b border-dark-border px-4 py-3">
         <div className="flex items-center justify-between">
@@ -370,6 +408,16 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
                 </div>
               )}
             </div>
+
+            {/* Import Instrument Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 bg-dark-bgTertiary text-text-primary border-dark-border hover:border-accent-primary transition-all group"
+              title="Import Furnace (.fui) or DefleMask (.dmp, .dmw)"
+            >
+              <FileUp size={18} className="text-text-muted group-hover:text-accent-primary transition-colors" />
+              <span className="font-medium">Import</span>
+            </button>
           </div>
         </div>
 

@@ -45,7 +45,7 @@ function App() {
     }))
   );
   const [initError, setInitError] = useState<string | null>(null);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showPatterns, setShowPatterns] = useState(false);
@@ -252,6 +252,33 @@ function App() {
       effect: { ...editingEffect.effect, wet }
     });
   };
+
+  useEffect(() => {
+    // Add a one-time global click listener to start audio if it hasn't been started
+    const handleFirstInteraction = async () => {
+      if (contextState !== 'running') {
+        try {
+          const engine = getToneEngine();
+          await engine.init();
+          setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
+          console.log('Audio engine resumed via first interaction');
+        } catch (error) {
+          console.error('Failed to resume audio engine:', error);
+        }
+      }
+      // Remove listener after first interaction
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    window.addEventListener('click', handleFirstInteraction);
+    window.addEventListener('keydown', handleFirstInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, [contextState, setContextState]);
 
   // Handler to start audio context on user interaction
   const handleStartAudio = async () => {

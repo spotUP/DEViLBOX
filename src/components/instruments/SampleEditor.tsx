@@ -6,12 +6,14 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
-  ZoomIn, ZoomOut, Repeat, Sparkles
+  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw, Maximize2, FlipVertical
 } from 'lucide-react';
-import { useInstrumentStore } from '../../stores';
+import { useInstrumentStore, notify } from '../../stores';
 import type { InstrumentConfig } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
+import { SampleEnhancerPanel } from './SampleEnhancerPanel';
+import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 
 interface SampleEditorProps {
   instrument: InstrumentConfig;
@@ -31,7 +33,12 @@ const NOTE_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#'
 const OCTAVE_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
 export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
-  const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
+  const { 
+    updateInstrument: storeUpdateInstrument,
+    reverseSample,
+    normalizeSample,
+    invertLoopSample
+  } = useInstrumentStore();
 
   // Use onChange prop if provided (for temp instruments), otherwise use store
   const updateInstrument = useCallback((id: number, updates: Partial<InstrumentConfig>) => {
@@ -54,6 +61,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [showEnhancer, setShowEnhancer] = useState(false);
 
   // Get sample data from instrument
   const sampleUrl: string | null = instrument.parameters?.sampleUrl || instrument.granular?.sampleUrl || null;
@@ -505,12 +513,55 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           {isGranular ? <Sparkles size={16} className="text-violet-400" /> : <Music size={16} className="text-accent-primary" />}
           {isGranular ? 'GRANULAR SAMPLE' : 'SAMPLE'}
         </h3>
-        {sampleInfo && (
-          <span className="text-xs text-text-muted font-mono truncate max-w-[180px]">
-            {sampleInfo.name}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {audioBuffer && (
+            <button
+              onClick={() => setShowEnhancer(!showEnhancer)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${
+                showEnhancer 
+                  ? 'bg-accent-primary text-text-inverse' 
+                  : 'bg-accent-primary/10 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20'
+              }`}
+            >
+              <Wand2 size={12} />
+              {showEnhancer ? 'Hide Enhancer' : 'Enhance'}
+            </button>
+          )}
+          {sampleInfo && (
+            <span className="text-xs text-text-muted font-mono truncate max-w-[180px]">
+              {sampleInfo.name}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Enhancement Panel */}
+      {showEnhancer && audioBuffer && (
+        <SampleEnhancerPanel
+          audioBuffer={audioBuffer}
+          isLoading={isLoading}
+          onBufferProcessed={async (result: ProcessedResult) => {
+            const { buffer: newBuffer, dataUrl } = result;
+            
+            // Set the local buffer state immediately for visualization
+            setAudioBuffer(newBuffer);
+
+            updateInstrument(instrument.id, {
+              parameters: {
+                ...instrument.parameters,
+                sampleUrl: dataUrl,
+                sampleInfo: {
+                  name: sampleInfo?.name ? (sampleInfo.name.startsWith('Enhanced_') ? sampleInfo.name : `Enhanced_${sampleInfo.name}`) : 'Enhanced Sample',
+                  duration: newBuffer.duration,
+                  size: Math.round((dataUrl.split(',')[1].length * 3) / 4), // Accurate base64 size
+                  sampleRate: newBuffer.sampleRate,
+                  channels: newBuffer.numberOfChannels,
+                }
+              }
+            });
+          }}
+        />
+      )}
 
       {/* Error */}
       {error && (
@@ -604,6 +655,62 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             </button>
 
             <div className="flex-1" />
+
+            {/* Destructive Tools */}
+            <div className="flex items-center gap-1 bg-dark-bgSecondary p-1 rounded-lg border border-dark-border">
+              <button
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    await reverseSample(instrument.id);
+                    notify.success('Sample reversed destructively');
+                  } catch (e) {
+                    notify.error('Failed to reverse sample');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary"
+                title="Reverse Buffer (Destructive)"
+              >
+                <RefreshCcw size={14} className="-scale-x-100" />
+              </button>
+              <button
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    await normalizeSample(instrument.id);
+                    notify.success('Sample normalized');
+                  } catch (e) {
+                    notify.error('Failed to normalize sample');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary"
+                title="Normalize Buffer (Destructive)"
+              >
+                <Maximize2 size={14} />
+              </button>
+              <button
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    await invertLoopSample(instrument.id);
+                    notify.success('Loop area inverted (Funk Repeat)');
+                  } catch (e) {
+                    notify.error('Failed to invert loop');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={!loopEnabled}
+                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary disabled:opacity-30"
+                title="Invert Loop Phase (Destructive EFx)"
+              >
+                <FlipVertical size={14} />
+              </button>
+            </div>
 
             {/* Zoom */}
             <button

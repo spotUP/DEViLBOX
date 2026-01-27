@@ -4,13 +4,14 @@
  * No more separate tabs - all 60 effects available for any instrument
  */
 
-import React, { useState } from 'react';
-import { X, Settings, Sliders, Cpu, AlertTriangle } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, Settings, Sliders, Cpu, AlertTriangle, ChevronDown } from 'lucide-react';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
-import { useInstrumentStore } from '@stores';
+import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 
 interface InstrumentEffectsModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface InstrumentEffectsModalProps {
 
 export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ isOpen, onClose }) => {
   const [editingEffect, setEditingEffect] = useState<EffectConfig | null>(null);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
 
   const {
     instruments,
@@ -26,10 +28,25 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
     addEffectConfig,
     removeEffect,
     updateEffect,
+    updateInstrument,
   } = useInstrumentStore();
 
   // Get current instrument
   const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId);
+
+  // Load a factory preset
+  const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
+    if (currentInstrumentId === null) return;
+    
+    const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
+      ...fx,
+      id: `instrument-fx-${Date.now()}-${index}`,
+    }));
+    
+    updateInstrument(currentInstrumentId, { effects: effects as any });
+    setShowPresetMenu(false);
+    notify.success(`Applied ${preset.name} to ${currentInstrument?.name}`);
+  }, [currentInstrumentId, updateInstrument, currentInstrument?.name]);
 
   if (!currentInstrument) {
     return null;
@@ -130,6 +147,44 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
             <span className="text-[10px] text-accent-info px-2 py-1 bg-accent-info/10 rounded">
               {AVAILABLE_EFFECTS.length} effects available
             </span>
+
+            {/* Presets Dropdown */}
+            <div className="relative ml-2">
+              <button
+                onClick={() => setShowPresetMenu(!showPresetMenu)}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-dark-bgTertiary text-text-primary
+                         hover:bg-dark-bgHover transition-colors flex items-center gap-2 border border-dark-border"
+              >
+                Presets <ChevronDown size={14} />
+              </button>
+
+              {showPresetMenu && (
+                <div className="absolute left-0 top-full mt-2 w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[60vh] overflow-y-auto scrollbar-modern">
+                  {/* Factory Presets by Category */}
+                  {Object.entries(MASTER_FX_PRESETS.reduce((acc, preset) => {
+                    if (!acc[preset.category]) acc[preset.category] = [];
+                    acc[preset.category].push(preset);
+                    return acc;
+                  }, {} as Record<string, MasterFxPreset[]>)).map(([category, presets]) => (
+                    <div key={category}>
+                      <div className="px-4 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary sticky top-0">
+                        {category}
+                      </div>
+                      {presets.map((preset) => (
+                        <div
+                          key={preset.name}
+                          onClick={() => handleLoadPreset(preset)}
+                          className="px-4 py-3 hover:bg-dark-bgHover cursor-pointer"
+                        >
+                          <div className="text-sm text-text-primary">{preset.name}</div>
+                          <div className="text-xs text-text-muted">{preset.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Performance Warning Indicator */}

@@ -6,6 +6,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { Toggle } from '@components/controls/Toggle';
 
 interface SettingsModalProps {
@@ -25,6 +26,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   } = useUIStore();
 
   const { currentThemeId, setTheme } = useThemeStore();
+  const {
+    amigaLimits,
+    setAmigaLimits,
+    linearInterpolation,
+    setLinearInterpolation
+  } = useSettingsStore();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -111,6 +118,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   label=""
                   value={compactToolbar}
                   onChange={setCompactToolbar}
+                  size="sm"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Engine Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">ENGINE</h3>
+            <div className="space-y-3">
+              {/* Amiga Limits */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Amiga Limits:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Clamp periods to 113-856</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={amigaLimits}
+                  onChange={setAmigaLimits}
+                  size="sm"
+                />
+              </div>
+
+              {/* Linear Interpolation */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Sample Interpolation:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Linear (clean) vs None (crunchy)</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={linearInterpolation}
+                  onChange={setLinearInterpolation}
                   size="sm"
                 />
               </div>
