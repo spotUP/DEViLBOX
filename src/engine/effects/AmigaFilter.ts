@@ -88,14 +88,35 @@ export class AmigaFilter extends Tone.ToneAudioNode {
     this._initializing = true;
 
     try {
-      // Get the native AudioContext from Tone.js
-      // In Tone.js, the rawContext is the native Web Audio API context
+      // Get the native AudioContext - try multiple approaches
       const toneContext = Tone.getContext();
-      const rawContext = toneContext.rawContext;
+      let rawContext: AudioContext | null = null;
+
+      // Method 1: Direct rawContext property
+      if (toneContext.rawContext && typeof (toneContext.rawContext as any).createGain === 'function') {
+        rawContext = toneContext.rawContext as AudioContext;
+      }
+
+      // Method 2: Get from the destination node's context (more reliable)
+      if (!rawContext) {
+        const destNode = Tone.getDestination();
+        const nativeNode = (destNode as any)._gainNode || (destNode as any).output?._gainNode;
+        if (nativeNode?.context) {
+          rawContext = nativeNode.context as AudioContext;
+        }
+      }
+
+      // Method 3: Get from this effect's own native nodes
+      if (!rawContext) {
+        const nativeInput = (this.input as any)._gainNode || (this.input as any)._node;
+        if (nativeInput?.context) {
+          rawContext = nativeInput.context as AudioContext;
+        }
+      }
 
       // Verify it's actually an AudioContext by checking for audioWorklet
       if (!rawContext || !rawContext.audioWorklet) {
-        console.warn('[AmigaFilter] AudioWorklet not supported');
+        console.warn('[AmigaFilter] AudioWorklet not supported or no valid context');
         this._initializing = false;
         return;
       }
@@ -110,10 +131,8 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       const baseUrl = import.meta.env.BASE_URL || '/';
       await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
 
-      // Construct the node - pass the rawContext directly
-      // The key insight: rawContext IS the native context, but instanceof checks
-      // can fail across realms. The audioWorklet.addModule success proves it's valid.
-      this._worklet = new AudioWorkletNode(rawContext as AudioContext, 'amiga-filter-processor');
+      // Construct the node
+      this._worklet = new AudioWorkletNode(rawContext, 'amiga-filter-processor');
       
       // Initialize worklet with coefficients
       this._worklet.port.postMessage({

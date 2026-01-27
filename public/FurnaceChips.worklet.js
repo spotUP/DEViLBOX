@@ -8,14 +8,13 @@ try {
 } catch (e) {}
 
 class FurnaceChipsProcessor extends AudioWorkletProcessor {
-  private furnaceModule = null;
-  private isInitialized = false;
-  private leftBufferPtr = 0;
-  private rightBufferPtr = 0;
-  private activeChips = new Set();
-
   constructor() {
     super();
+    this.furnaceModule = null;
+    this.isInitialized = false;
+    this.leftBufferPtr = 0;
+    this.rightBufferPtr = 0;
+    this.activeChips = new Set();
     this.port.onmessage = this.handleMessage.bind(this);
   }
 

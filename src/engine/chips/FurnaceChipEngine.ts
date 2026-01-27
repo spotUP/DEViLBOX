@@ -71,6 +71,25 @@ export class FurnaceChipEngine {
     if (this.isLoaded) return;
 
     try {
+      // Validate audioContext is actually an AudioContext
+      if (!audioContext || !audioContext.audioWorklet) {
+        console.warn('[FurnaceChipEngine] Invalid AudioContext - audioWorklet not available');
+        return;
+      }
+
+      // Check constructor name to handle cross-realm issues
+      const contextType = audioContext.constructor?.name;
+      if (contextType !== 'AudioContext' && contextType !== 'webkitAudioContext') {
+        console.warn('[FurnaceChipEngine] audioContext is not a valid AudioContext:', contextType);
+        return;
+      }
+
+      // Ensure context is running
+      if (audioContext.state !== 'running') {
+        console.warn('[FurnaceChipEngine] AudioContext not running, deferring init');
+        return;
+      }
+
       const baseUrl = import.meta.env.BASE_URL || '/';
       await audioContext.audioWorklet.addModule(`${baseUrl}FurnaceChips.worklet.js`);
 
@@ -94,7 +113,7 @@ export class FurnaceChipEngine {
       console.log('[FurnaceChipEngine] WASM chips initialized with binary injection');
     } catch (err) {
       console.error('[FurnaceChipEngine] Initialization failed:', err);
-      throw err;
+      // Don't throw - allow graceful degradation
     }
   }
 

@@ -7,6 +7,8 @@
 import { ChiptunePlayer } from './ChiptunePlayer';
 import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
+import { parseFurnaceSong, convertFurnaceToDevilbox } from './formats/FurnaceSongParser';
+import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
 import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
 
 // Raw pattern cell data from libopenmpt
@@ -48,7 +50,7 @@ export interface ModuleMetadata {
 export interface ModuleInfo {
   metadata: ModuleMetadata;
   arrayBuffer: ArrayBuffer;
-  player: ChiptunePlayer;
+  player?: ChiptunePlayer;  // Optional for formats not supported by libopenmpt (e.g., .fur)
   file: File;  // Original file for sample extraction
   // Native parser data (if available)
   nativeData?: {
@@ -76,7 +78,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 
       // Determine file type
       const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-      const useNativeParser = ext === '.xm' || ext === '.mod';
+      const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf';
 
       try {
         // Try native parser for XM/MOD
@@ -93,7 +95,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               // Create metadata for compatibility
               const metadata: ModuleMetadata = {
                 title: nativeData.importMetadata.sourceFile,
-                type: nativeData.format,
+                type: ext === '.fur' ? 'Furnace' : ext === '.dmf' ? 'DefleMask' : nativeData.format,
                 channels: nativeData.importMetadata.originalChannelCount,
                 patterns: nativeData.importMetadata.originalPatternCount,
                 orders: nativeData.importMetadata.modData?.songLength || 1,
@@ -103,8 +105,11 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
                 message: nativeData.importMetadata.modData?.songMessage,
               };
 
-              // Also load with libopenmpt for playback
-              const player = await loadWithLibopenmpt(arrayBuffer, file);
+              // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
+              let player: ChiptunePlayer | undefined;
+              if (ext !== '.fur' && ext !== '.dmf') {
+                player = await loadWithLibopenmpt(arrayBuffer, file);
+              }
 
               resolve({
                 metadata,
@@ -185,14 +190,18 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
  * Preview a loaded module (play audio)
  */
 export async function previewModule(info: ModuleInfo): Promise<void> {
-  await info.player.play(info.arrayBuffer);
+  if (info.player) {
+    await info.player.play(info.arrayBuffer);
+  }
 }
 
 /**
  * Stop module preview
  */
 export function stopPreview(info: ModuleInfo): void {
-  info.player.stop();
+  if (info.player) {
+    info.player.stop();
+  }
 }
 
 /**
@@ -216,6 +225,36 @@ async function loadWithNativeParser(
       const result = await parseMOD(buffer);
       return {
         format: 'MOD',
+        importMetadata: result.metadata,
+        instruments: result.instruments,
+        patterns: result.patterns as any,
+      };
+    } else if (ext === '.fur') {
+      console.log('[ModuleLoader] Parsing Furnace file...');
+      const module = await parseFurnaceSong(buffer);
+      const result = convertFurnaceToDevilbox(module);
+      console.log('[ModuleLoader] Furnace parse complete:', {
+        instruments: result.instruments.length,
+        patterns: result.patterns.length,
+        channels: result.metadata.originalChannelCount,
+      });
+      return {
+        format: 'XM', // Use XM format for effect handling compatibility
+        importMetadata: result.metadata,
+        instruments: result.instruments,
+        patterns: result.patterns as any,
+      };
+    } else if (ext === '.dmf') {
+      console.log('[ModuleLoader] Parsing DefleMask file...');
+      const dmfModule = DefleMaskParser.parse(buffer, 'dmf') as DMFModule;
+      const result = convertDefleMaskToDevilbox(dmfModule);
+      console.log('[ModuleLoader] DefleMask parse complete:', {
+        instruments: result.instruments.length,
+        patterns: result.patterns.length,
+        channels: result.metadata.originalChannelCount,
+      });
+      return {
+        format: 'XM', // Use XM format for effect handling compatibility
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as any,
@@ -279,11 +318,13 @@ export function getSupportedExtensions(): string[] {
   return [
     '.mod', '.xm', '.it', '.s3m', '.mptm',
     '.669', '.amf', '.ams', '.dbm', '.digi', '.dmf',
-    '.dsm', '.far', '.ftm', '.gdm', '.gmc', '.imf', 
-    '.j2b', '.m15', '.mdl', '.med', '.mms', '.mt2', 
-    '.mtm', '.okt', '.psm', '.pt36', '.ptm', '.puma', 
-    '.sfx', '.sfx2', '.stk', '.stm', '.stp', '.stx', 
+    '.dsm', '.far', '.ftm', '.gdm', '.gmc', '.imf',
+    '.j2b', '.m15', '.mdl', '.med', '.mms', '.mt2',
+    '.mtm', '.okt', '.psm', '.pt36', '.ptm', '.puma',
+    '.sfx', '.sfx2', '.stk', '.stm', '.stp', '.stx',
     '.symmod', '.ult', '.umx',
+    // Furnace tracker format
+    '.fur',
     // Compressed/Packed formats
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack'
   ];
@@ -295,4 +336,172 @@ export function getSupportedExtensions(): string[] {
 export function isSupportedModule(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
   return getSupportedExtensions().includes(ext);
+}
+
+/**
+ * Convert DefleMask module to DEViLBOX format
+ */
+function convertDefleMaskToDevilbox(dmf: DMFModule): {
+  instruments: ParsedInstrument[];
+  patterns: any[][][]; // [pattern][row][channel]
+  metadata: ImportMetadata;
+} {
+  // Convert instruments
+  const instruments: ParsedInstrument[] = dmf.instruments.map((inst, idx) => ({
+    id: idx + 1,
+    name: inst.name || `Instrument ${idx + 1}`,
+    samples: [], // DefleMask uses FM/PSG synthesis, not samples
+    fadeout: 0,
+    volumeType: 'none' as const,
+    panningType: 'none' as const,
+  }));
+
+  // Convert patterns using the pattern matrix
+  // DefleMask stores patterns per-channel, we need to combine them
+  // Pattern storage: patterns[ch * matrixRows + matrixPos]
+  // Each pattern has rows[row][ch] with the note data
+  const patterns: any[][][] = [];
+
+  for (let matrixPos = 0; matrixPos < dmf.matrixRows; matrixPos++) {
+    const patternRows: any[][] = [];
+
+    for (let row = 0; row < dmf.patternRows; row++) {
+      const rowCells: any[] = [];
+
+      for (let ch = 0; ch < dmf.channelCount; ch++) {
+        // Get the pattern index used at this matrix position for this channel
+        const patIdx = dmf.patternMatrix[ch]?.[matrixPos] || 0;
+
+        // Calculate flat pattern array index
+        // Patterns are stored: all patterns for ch0, then all for ch1, etc.
+        const patternOffset = ch * dmf.matrixRows + patIdx;
+        const pattern = dmf.patterns[patternOffset];
+
+        // Get the note at this row for this channel
+        const dmfNote = pattern?.rows?.[row]?.[ch];
+        if (dmfNote) {
+          rowCells.push(convertDMFCell(dmfNote));
+        } else {
+          rowCells.push({
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effectType: 0,
+            effectParam: 0,
+          });
+        }
+      }
+
+      patternRows.push(rowCells);
+    }
+
+    patterns.push(patternRows);
+  }
+
+  // Calculate BPM from DefleMask timing
+  // DefleMask: BPM = (Hz * 2.5) / (timeBase + 1) / ticksPerRow[0]
+  const hz = 60; // Default to NTSC
+  const bpm = Math.round((hz * 2.5) / (dmf.timeBase + 1) / dmf.ticksPerRow[0] * 4);
+
+  const metadata: ImportMetadata = {
+    sourceFormat: 'XM', // Use XM for effect handling compatibility
+    sourceFile: dmf.name || 'DefleMask Module',
+    importedAt: new Date().toISOString(),
+    originalChannelCount: dmf.channelCount,
+    originalPatternCount: patterns.length,
+    originalInstrumentCount: dmf.instruments.length,
+    modData: {
+      moduleType: 'DMF',
+      initialSpeed: dmf.ticksPerRow[0],
+      initialBPM: bpm > 0 ? bpm : 125,
+      amigaPeriods: false,
+      channelNames: Array.from({ length: dmf.channelCount }, (_, i) => `Ch ${i + 1}`),
+      songLength: dmf.matrixRows,
+      restartPosition: 0,
+      patternOrderTable: Array.from({ length: dmf.matrixRows }, (_, i) => i),
+      songMessage: `${dmf.name} by ${dmf.author}`,
+    },
+  };
+
+  return { instruments, patterns, metadata };
+}
+
+/**
+ * Convert a single DefleMask note to XM-compatible format
+ */
+function convertDMFCell(dmfNote: {
+  note: number;
+  octave: number;
+  volume: number;
+  instrument: number;
+  effects: Array<{ code: number; value: number }>;
+}): any {
+  let note = 0;
+
+  if (dmfNote.note === 100) {
+    // Note off
+    note = 97;
+  } else if (dmfNote.note >= 0 && dmfNote.note <= 11) {
+    // Convert note (0-11) + octave to XM format (1-96)
+    const octave = Math.max(0, Math.min(7, dmfNote.octave));
+    note = (octave * 12) + dmfNote.note + 1;
+    if (note > 96) note = 96;
+    if (note < 1) note = 0;
+  }
+
+  // Convert volume (DefleMask uses 0-15, XM uses 0x10-0x50 for 0-64)
+  let volume = 0;
+  if (dmfNote.volume >= 0) {
+    volume = 0x10 + Math.floor(dmfNote.volume * 4); // Scale 0-15 to 0-64
+  }
+
+  // Convert first effect
+  let effectType = 0;
+  let effectParam = 0;
+  if (dmfNote.effects.length > 0) {
+    const fx = dmfNote.effects[0];
+    effectType = mapDMFEffect(fx.code);
+    effectParam = fx.value & 0xFF;
+  }
+
+  return {
+    note,
+    instrument: dmfNote.instrument >= 0 ? dmfNote.instrument + 1 : 0,
+    volume,
+    effectType,
+    effectParam,
+  };
+}
+
+/**
+ * Map DefleMask effect codes to XM effect codes
+ */
+function mapDMFEffect(dmfEffect: number): number {
+  // DefleMask effect mapping to XM
+  // Many effects are similar but some need translation
+  const effectMap: Record<number, number> = {
+    0x00: 0x00, // Arpeggio
+    0x01: 0x01, // Portamento up
+    0x02: 0x02, // Portamento down
+    0x03: 0x03, // Tone portamento
+    0x04: 0x04, // Vibrato
+    0x07: 0x07, // Tremolo
+    0x08: 0x08, // Panning
+    0x09: 0x09, // Sample offset
+    0x0A: 0x0A, // Volume slide
+    0x0B: 0x0B, // Position jump
+    0x0C: 0x0C, // Set volume
+    0x0D: 0x0D, // Pattern break
+    0x0F: 0x0F, // Set speed/tempo
+    0x10: 0x10, // Set global volume (XM Gxx)
+    0xE1: 0xE1, // Fine portamento up
+    0xE2: 0xE2, // Fine portamento down
+    0xE9: 0xE9, // Retrigger
+    0xEA: 0xEA, // Fine volume slide up
+    0xEB: 0xEB, // Fine volume slide down
+    0xEC: 0xEC, // Note cut
+    0xED: 0xED, // Note delay
+  };
+
+  return effectMap[dmfEffect] ?? 0;
 }
