@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-26T07:06:20.685Z
+ * Generated: 2026-01-27T14:55:49.322Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,15 +20,77 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '69';
-export const BUILD_HASH = '9844ce1';
-export const BUILD_DATE = '2026-01-26';
+export const BUILD_NUMBER = '83';
+export const BUILD_HASH = 'b2cdfca';
+export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-26',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Audit and strict ProTracker effect alignment'
+      },
+      {
+        type: 'fix',
+        description: 'Fix Tremolo (7xy) effect accuracy'
+      },
+      {
+        type: 'fix',
+        description: 'Fix smooth scrolling jumpiness'
+      },
+      {
+        type: 'fix',
+        description: 'Fix MOD pitch shift logic'
+      },
+      {
+        type: 'fix',
+        description: 'Fix MOD octave pitch mapping'
+      },
+      {
+        type: 'improvement',
+        description: 'Prevent MOD export from overwriting source files'
+      },
+      {
+        type: 'improvement',
+        description: 'MOD Import: Extend supported note range to C-0 to B-5'
+      },
+      {
+        type: 'fix',
+        description: 'Fix MOD import pitch shifting and range'
+      },
+      {
+        type: 'fix',
+        description: 'Fix MOD and XM export limitations'
+      },
+      {
+        type: 'fix',
+        description: 'Fix XM export binary compatibility: implement full instrument and sample header writing with delta encoding'
+      },
+      {
+        type: 'improvement',
+        description: 'Update project documentation and change logs'
+      },
+      {
+        type: 'fix',
+        description: 'Optimize React rendering and add visualization components'
+      },
+      {
+        type: 'improvement',
+        description: 'Optimize audio engine and playback for M1/Apple Silicon'
+      },
+      {
+        type: 'improvement',
+        description: 'Restructure public assets into data directory'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-25',
     changes: [
       {
@@ -42,7 +104,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-24',
     changes: [
       {
@@ -52,7 +114,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-2',
+    version: '1.0.1-3',
     date: '2026-01-23',
     changes: [
       {
@@ -90,7 +152,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-3',
+    version: '1.0.1-4',
     date: '2026-01-22',
     changes: [
       {
@@ -156,7 +218,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-4',
+    version: '1.0.1-5',
     date: '2026-01-21',
     changes: [
       {
@@ -182,7 +244,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-5',
+    version: '1.0.1-6',
     date: '2026-01-20',
     changes: [
       {
@@ -204,74 +266,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add dynamic version handling for export/import system (#10)'
-      },
-      {
-        type: 'feature',
-        description: 'Implement virtualized tracker view with @tanstack/react-virtual (#9)'
-      },
-      {
-        type: 'feature',
-        description: 'Add Electron desktop application support (#8)'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-6',
-    date: '2026-01-17',
-    changes: [
-      {
-        type: 'fix',
-        description: 'Fix cursor positioning for dual effect columns in pattern editor'
-      },
-      {
-        type: 'feature',
-        description: 'Add dual effect columns support (2x3 character effect commands per note)'
-      },
-      {
-        type: 'feature',
-        description: 'Implement ProTracker-style BPM control via pattern commands'
-      },
-      {
-        type: 'fix',
-        description: 'Fix TypeScript build errors for deployment'
-      },
-      {
-        type: 'fix',
-        description: 'Fix FT2 toolbar arrow buttons and add speed commands to demo songs'
-      },
-      {
-        type: 'improvement',
-        description: 'Refactor components for consistency and reusability'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-7',
-    date: '2026-01-16',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Redesign CreateInstrumentModal for better space efficiency'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Tone.js cancelAndHoldAtTime null error'
-      },
-      {
-        type: 'feature',
-        description: 'Improve instrument creation and add reset button'
-      },
-      {
-        type: 'feature',
-        description: 'Add visual VST-style instrument editors'
-      },
-      {
-        type: 'feature',
-        description: 'Add FT2-style instrument list panel with create workflow'
-      },
-      {
-        type: 'fix',
-        description: 'Fix unused imports'
       }
     ]
   }
