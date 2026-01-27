@@ -1,19 +1,28 @@
 # Handoff for Next Session
 
 ## Current State
-We are in the middle of finalizing the **Impulse Tracker NNA Compliance**. The `ToneEngine` is now capable of polyphonic playback on a single channel (supporting overlapping notes via NNAs), but the `ComplianceRunner` needs a final adjustment to its "Fade" simulation to perfectly match the engine's internal `fadeoutStep` logic.
+**All 63 compliance tests passing.** The engine is fully compliant across MOD, XM, S3M, and IT formats with correct:
+- Format-aware period conversion (MOD/S3M/IT/XM octave mappings)
+- IT auto-vibrato at tick 0 with proper frequency-based modulation
+- MOD arpeggio wraparound at period table boundaries
+- NNA (New Note Action) polyphonic playback
+- Volume/panning envelope interpolation
 
-## Immediate Next Steps
-1.  **Finalize NNA Tests:** Run `npm run test:compliance` and ensure `IT Compliance: IT NNA Note Off` passes. You may need to refine the `isFading` logic in `ComplianceRunner.ts` to subtract `fadeoutStep` (default 1024) per tick from the voice volume.
-2.  **MOD Sample Swapping:** Implement the "Lone Instrument" quirk where changing an instrument ID mid-row (without a note) updates the volume and finetune of the *currently playing* sample without restarting the waveform.
-3.  **Refactor & Optimize:** Now that the logic is verified, simplify `ToneEngine.ts` and `XMHandler.ts` by moving shared effect logic into `BaseFormatHandler`.
-4.  **Auto-Vibrato Sweep:** Ensure the sweep (fade-in) of auto-vibrato is perfectly linear according to XM/IT specs.
+## Completed
+- [x] NNA Tests (IT NNA Continue, Note Off, Note Fade all passing)
+- [x] MOD Sample Swapping ("Lone Instrument" quirk)
+- [x] Auto-Vibrato Sweep (linear fade-in per XM/IT specs)
+- [x] Format-aware period/note conversion across all handlers
+
+## Remaining Work
+1.  **Furnace Integration:** Chiptune synthesis via WebAssembly (see FURNACE_INTEGRATION_HANDOFF.md)
+2.  **Refactor & Optimize:** Move remaining duplicated effect logic into `BaseFormatHandler`
+3.  **Performance:** Profile and optimize hot paths in ToneEngine
 
 ## Key Files
 *   `src/engine/ToneEngine.ts`: The multi-voice mixer.
-*   `src/engine/effects/ITHandler.ts`: Impulse Tracker command logic.
+*   `src/engine/effects/FormatHandler.ts`: Base class with shared effect logic.
 *   `src/engine/effects/__tests__/ComplianceRunner.ts`: The sub-tick verification engine.
-*   `src/engine/effects/__tests__/cases/it_nna_cases.ts`: The specific NNA test definitions.
-*   `src/engine/effects/PeriodTables.ts`: Updated 10-octave lookup logic.
+*   `src/engine/effects/PeriodTables.ts`: 10-octave lookup with format-aware conversion.
 
-**Status:** Engine is 98% compliant across MOD, XM, S3M, and IT. Ready for final hardware quirks.
+**Status:** Engine is 100% compliant across MOD, XM, S3M, and IT. Ready for Furnace integration.

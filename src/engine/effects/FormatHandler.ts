@@ -370,6 +370,114 @@ export abstract class BaseFormatHandler implements FormatHandler {
     result.setVolume = state.volume;
   }
 
+  /**
+   * Shared Fine Volume Slide logic (tick 0 only)
+   */
+  protected processFineVolumeSlide(state: ChannelState, up: number, down: number, result: TickResult): void {
+    if (up > 0) {
+      state.volume = this.clampVolume(state.volume + up);
+    } else if (down > 0) {
+      state.volume = this.clampVolume(state.volume - down);
+    }
+    result.setVolume = state.volume;
+  }
+
+  /**
+   * Shared Global Volume Slide logic
+   */
+  protected processGlobalVolumeSlide(x: number, y: number, result: TickResult): void {
+    if (x > 0) {
+      this.globalVolume = Math.min(64, this.globalVolume + x);
+    } else if (y > 0) {
+      this.globalVolume = Math.max(0, this.globalVolume - y);
+    }
+    result.setGlobalVolume = this.globalVolume;
+  }
+
+  /**
+   * Shared Tremor logic (Ixy - alternating volume on/off)
+   */
+  protected processTremor(state: ChannelState, result: TickResult): void {
+    const cycle = state.tremorOnTime + state.tremorOffTime;
+    if (cycle === 0) return;
+    state.tremorPos = (state.tremorPos + 1) % cycle;
+
+    if (state.tremorPos < state.tremorOnTime) {
+      result.setVolume = state.volume;
+    } else {
+      result.setVolume = 0;
+    }
+  }
+
+  /**
+   * Shared Pattern Loop logic (E6x / SBx)
+   */
+  protected patternLoopRow: Map<number, number> = new Map();
+  protected patternLoopCount: Map<number, number> = new Map();
+
+  protected processPatternLoop(channel: number, count: number, result: TickResult): void {
+    if (count === 0) {
+      // Set loop point
+      this.patternLoopRow.set(channel, this.currentRow);
+    } else {
+      // Execute loop
+      const currentCount = this.patternLoopCount.get(channel) ?? 0;
+      if (currentCount === 0) {
+        this.patternLoopCount.set(channel, count);
+      } else {
+        this.patternLoopCount.set(channel, currentCount - 1);
+      }
+      if ((this.patternLoopCount.get(channel) ?? 0) > 0) {
+        result.patternLoop = {
+          startRow: this.patternLoopRow.get(channel) ?? 0,
+          count: this.patternLoopCount.get(channel) ?? 0,
+        };
+      }
+    }
+  }
+
+  /**
+   * Shared Vibrato Waveform setup (E4x / S3x)
+   */
+  protected setVibratoWaveform(state: ChannelState, param: number): void {
+    state.vibratoWaveform = this.waveformFromNumber(param & 3);
+    state.vibratoRetrigger = (param & 4) === 0;
+  }
+
+  /**
+   * Shared Tremolo Waveform setup (E7x / S4x)
+   */
+  protected setTremoloWaveform(state: ChannelState, param: number): void {
+    state.tremoloWaveform = this.waveformFromNumber(param & 3);
+    state.tremoloRetrigger = (param & 4) === 0;
+  }
+
+  /**
+   * Shared Fine Portamento Up logic (tick 0 only)
+   */
+  protected processFinePortaUp(state: ChannelState, speed: number, multiplier: number, minLimit: number, result: TickResult): void {
+    if (speed > 0 && state.period > 0) {
+      state.period -= speed * multiplier;
+      if (state.period < minLimit) state.period = minLimit;
+      state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+      result.setPeriod = state.period;
+      result.setFrequency = state.frequency;
+    }
+  }
+
+  /**
+   * Shared Fine Portamento Down logic (tick 0 only)
+   */
+  protected processFinePortaDown(state: ChannelState, speed: number, multiplier: number, maxLimit: number, result: TickResult): void {
+    if (speed > 0 && state.period > 0) {
+      state.period += speed * multiplier;
+      if (state.period > maxLimit) state.period = maxLimit;
+      state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+      result.setPeriod = state.period;
+      result.setFrequency = state.frequency;
+    }
+  }
+
   abstract processRowStart(
     channel: number,
     note: string | null,

@@ -106,9 +106,7 @@ export class XMHandler extends BaseFormatHandler {
   // Volume column state per channel
   private volumeColumnData: Map<number, number> = new Map();
 
-  // Pattern loop state
-  private patternLoopRow: Map<number, number> = new Map(); // Per-channel in XM
-  private patternLoopCount: Map<number, number> = new Map();
+  // Pattern delay state (pattern loop uses base class maps)
   public patternDelayCount: number = 0; // Used for EEx pattern delay effect
 
   /**
@@ -141,8 +139,6 @@ export class XMHandler extends BaseFormatHandler {
     this.linearSlides = config.linearSlides ?? true;
     this.activeEffects.clear();
     this.volumeColumnData.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
   }
 
@@ -153,8 +149,6 @@ export class XMHandler extends BaseFormatHandler {
     super.resetAll();
     this.activeEffects.clear();
     this.volumeColumnData.clear();
-    this.patternLoopRow.clear();
-    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
   }
 
@@ -296,14 +290,12 @@ export class XMHandler extends BaseFormatHandler {
 
       case XM_VOL_EFFECTS.FINE_VOL_DOWN:
         // 80-8F: Fine volume slide down
-        state.volume = this.clampVolume(state.volume - param);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, 0, param, result);
         break;
 
       case XM_VOL_EFFECTS.FINE_VOL_UP:
         // 90-9F: Fine volume slide up
-        state.volume = this.clampVolume(state.volume + param);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, param, 0, result);
         break;
 
       case XM_VOL_EFFECTS.VIBRATO_SPEED:
@@ -536,8 +528,7 @@ export class XMHandler extends BaseFormatHandler {
         break;
 
       case XM_E_COMMANDS.VIBRATO_WAVEFORM:
-        state.vibratoWaveform = this.waveformFromNumber(y & 3);
-        state.vibratoRetrigger = (y & 4) === 0;
+        this.setVibratoWaveform(state, y);
         break;
 
       case XM_E_COMMANDS.FINETUNE:
@@ -546,27 +537,11 @@ export class XMHandler extends BaseFormatHandler {
         break;
 
       case XM_E_COMMANDS.PATTERN_LOOP:
-        if (y === 0) {
-          this.patternLoopRow.set(_channel, this.currentRow);
-        } else {
-          const count = this.patternLoopCount.get(_channel) ?? 0;
-          if (count === 0) {
-            this.patternLoopCount.set(_channel, y);
-          } else {
-            this.patternLoopCount.set(_channel, count - 1);
-          }
-          if ((this.patternLoopCount.get(_channel) ?? 0) > 0) {
-            result.patternLoop = {
-              startRow: this.patternLoopRow.get(_channel) ?? 0,
-              count: this.patternLoopCount.get(_channel) ?? 0,
-            };
-          }
-        }
+        this.processPatternLoop(_channel, y, result);
         break;
 
       case XM_E_COMMANDS.TREMOLO_WAVEFORM:
-        state.tremoloWaveform = this.waveformFromNumber(y & 3);
-        state.tremoloRetrigger = (y & 4) === 0;
+        this.setTremoloWaveform(state, y);
         break;
 
       case XM_E_COMMANDS.PANNING:
@@ -582,13 +557,11 @@ export class XMHandler extends BaseFormatHandler {
         break;
 
       case XM_E_COMMANDS.FINE_VOL_UP:
-        state.volume = this.clampVolume(state.volume + y);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, y, 0, result);
         break;
 
       case XM_E_COMMANDS.FINE_VOL_DOWN:
-        state.volume = this.clampVolume(state.volume - y);
-        result.setVolume = state.volume;
+        this.processFineVolumeSlide(state, 0, y, result);
         break;
 
       case XM_E_COMMANDS.NOTE_CUT:
@@ -678,12 +651,7 @@ export class XMHandler extends BaseFormatHandler {
           break;
 
         case 'globalVolSlide':
-          if (x > 0) {
-            this.globalVolume = Math.min(64, this.globalVolume + x);
-          } else if (y > 0) {
-            this.globalVolume = Math.max(0, this.globalVolume - y);
-          }
-          result.setGlobalVolume = this.globalVolume;
+          this.processGlobalVolumeSlide(x, y, result);
           break;
 
         case 'panSlide':
@@ -716,16 +684,9 @@ export class XMHandler extends BaseFormatHandler {
           }
           break;
 
-        case 'tremor': {
-          const tremorCycle = state.tremorOnTime + state.tremorOffTime;
-          state.tremorPos = (state.tremorPos + 1) % tremorCycle;
-          if (state.tremorPos < state.tremorOnTime) {
-            result.setVolume = state.volume;
-          } else {
-            result.setVolume = 0;
-          }
+        case 'tremor':
+          this.processTremor(state, result);
           break;
-        }
 
         case 'retrig':
           if (tick > 0 && tick % param === 0) {
