@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T17:41:31.065Z
+ * Generated: 2026-01-27T17:46:22.997Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '106';
-export const BUILD_HASH = 'b8b2d12';
+export const BUILD_NUMBER = '107';
+export const BUILD_HASH = '9bc3823';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'fix',
+        description: 'Add debug logging for effect parsing in TrackerReplayer'
+      },
       {
         type: 'fix',
         description: 'Fix MOD instrument ID mapping during import'
@@ -256,10 +260,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Prevent Desktop App button text from wrapping'
-      },
-      {
-        type: 'improvement',
-        description: 'Chore: Release v1.0.1'
       }
     ]
   }

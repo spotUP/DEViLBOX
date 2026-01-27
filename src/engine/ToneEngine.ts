@@ -2631,7 +2631,10 @@ export class ToneEngine {
   public setChannelVolume(channelIndex: number, volumeDb: number): void {
     const channelOutput = this.channelOutputs.get(channelIndex);
     if (channelOutput) {
+      console.log(`[ToneEngine] setChannelVolume ch${channelIndex} = ${volumeDb}dB`);
       channelOutput.channel.volume.value = volumeDb;
+    } else {
+      console.warn(`[ToneEngine] setChannelVolume: no channel output for ch${channelIndex}`);
     }
   }
 
