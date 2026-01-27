@@ -69,11 +69,11 @@ interface MIDIStore {
   setControlledInstrument: (id: number | null) => void;
 }
 
-// Default TD-3 CC mappings
+// Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
 const DEFAULT_CC_MAPPINGS: CCMapping[] = [
   { ccNumber: 74, parameter: 'cutoff', min: 200, max: 20000, curve: 'logarithmic' },
   { ccNumber: 71, parameter: 'resonance', min: 0, max: 100, curve: 'linear' },
-  { ccNumber: 12, parameter: 'envMod', min: 0, max: 100, curve: 'linear' }, // Changed from 10 to avoid conflict with Pan
+  { ccNumber: 10, parameter: 'envMod', min: 0, max: 100, curve: 'linear' }, // TD-3 sends Env Mod on CC 10
   { ccNumber: 75, parameter: 'decay', min: 30, max: 3000, curve: 'logarithmic' },
   { ccNumber: 16, parameter: 'accent', min: 0, max: 100, curve: 'linear' },
 ];
@@ -170,6 +170,9 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle CC messages
               if (message.type === 'cc' && message.cc !== undefined && message.value !== undefined) {
+                // Debug: Log all CC messages to help diagnose TD-3 issues
+                console.log(`[MIDI CC] CC ${message.cc} = ${message.value} (ch ${message.channel})`);
+
                 // Check if we're learning
                 if (store.isLearning && store.learningParameter) {
                   store.handleLearnedCC(message.cc);
@@ -178,6 +181,7 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Find mapping for this CC
                 const mapping = store.ccMappings.find((m) => m.ccNumber === message.cc);
+                console.log(`[MIDI CC] Mapping for CC ${message.cc}:`, mapping ? mapping.parameter : 'NONE');
 
                 if (mapping) {
                   // Convert CC value (0-127) to parameter range
@@ -200,7 +204,10 @@ export const useMIDIStore = create<MIDIStore>()(
                   // Call registered handler for this parameter (using external Map)
                   const handler = ccHandlersMap.get(mapping.parameter);
                   if (handler) {
+                    console.log(`[MIDI CC] Calling handler for ${mapping.parameter} with value ${paramValue.toFixed(2)}`);
                     handler(paramValue);
+                  } else {
+                    console.warn(`[MIDI CC] No handler registered for ${mapping.parameter}`);
                   }
                 }
               }
