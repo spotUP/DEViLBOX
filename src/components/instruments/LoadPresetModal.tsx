@@ -82,6 +82,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       'TR-707': 'text-rose-400',
       'TR-505': 'text-amber-400',
       Chip: 'text-cyan-400',
+      Furnace: 'text-teal-400',
       FX: 'text-green-400',
       Drumnibus: 'text-emerald-400',
     };

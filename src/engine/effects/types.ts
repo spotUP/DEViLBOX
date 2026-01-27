@@ -24,7 +24,7 @@ export interface FormatConfig {
 }
 
 // Vibrato/Tremolo waveform types
-export type WaveformType = 'sine' | 'rampDown' | 'square' | 'random';
+export type WaveformType = 'sine' | 'rampDown' | 'rampUp' | 'square' | 'random';
 
 // Per-channel state for effect processing
 export interface ChannelState {

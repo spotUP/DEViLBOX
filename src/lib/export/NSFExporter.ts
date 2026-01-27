@@ -23,30 +23,6 @@ import type { RegisterWrite } from './VGMExporter';
 const NSF_HEADER_SIZE = 128;
 const NSF_MAGIC = [0x4E, 0x45, 0x53, 0x4D, 0x1A]; // "NESM\x1A"
 
-// APU register addresses
-const APU_REGS = {
-  PULSE1_VOL: 0x4000,
-  PULSE1_SWEEP: 0x4001,
-  PULSE1_LO: 0x4002,
-  PULSE1_HI: 0x4003,
-  PULSE2_VOL: 0x4004,
-  PULSE2_SWEEP: 0x4005,
-  PULSE2_LO: 0x4006,
-  PULSE2_HI: 0x4007,
-  TRI_LINEAR: 0x4008,
-  TRI_LO: 0x400A,
-  TRI_HI: 0x400B,
-  NOISE_VOL: 0x400C,
-  NOISE_LO: 0x400E,
-  NOISE_HI: 0x400F,
-  DMC_FREQ: 0x4010,
-  DMC_RAW: 0x4011,
-  DMC_START: 0x4012,
-  DMC_LEN: 0x4013,
-  STATUS: 0x4015,
-  FRAME_CTR: 0x4017,
-} as const;
-
 // Frame rate
 const FRAME_RATE = 60;
 const SAMPLES_PER_FRAME = 44100 / FRAME_RATE;
@@ -212,7 +188,6 @@ function encodeRegisterData(writes: RegisterWrite[]): number[] {
   const sortedWrites = [...filteredWrites].sort((a, b) => a.timestamp - b.timestamp);
 
   let currentFrame = 0;
-  let lastTimestamp = 0;
 
   for (const write of sortedWrites) {
     // Calculate which frame this write belongs to
@@ -232,8 +207,6 @@ function encodeRegisterData(writes: RegisterWrite[]): number[] {
 
     // Emit register write: offset, value
     data.push(regOffset, write.data);
-
-    lastTimestamp = write.timestamp;
   }
 
   // Final frame marker
@@ -252,7 +225,7 @@ function createNSFHeader(
   loadAddress: number,
   initAddress: number,
   playAddress: number,
-  dataLength: number
+  _dataLength: number
 ): Uint8Array {
   const header = new Uint8Array(NSF_HEADER_SIZE);
   const view = new DataView(header.buffer);

@@ -86,9 +86,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [availableChipFormats, setAvailableChipFormats] = useState<ChipExportFormat[]>([]);
   const [chipTitle, setChipTitle] = useState('');
   const [chipAuthor, setChipAuthor] = useState('');
+  const [chipLoopPoint, setChipLoopPoint] = useState(0); // Loop row for chip export
+
+  // Get loop point from transport store
+  const { loopStartRow, currentRow, setLoopStartRow } = useTransportStore();
+
+  // Sync chipLoopPoint with global loopStartRow on mount
+  useEffect(() => {
+    if (loopStartRow > 0) {
+      setChipLoopPoint(loopStartRow);
+    }
+  }, [loopStartRow]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const chipRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const chipRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle Escape key
   useEffect(() => {
@@ -371,10 +382,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             return;
           }
 
+          // Calculate loop point in samples from row number
+          // Formula: samples = row * (60 / BPM) * (speed / 6) * sampleRate
+          // Simplified: samples = row * secondsPerRow * 44100
+          const rowsPerBeat = 4; // Assuming 4 rows per beat (tracker standard)
+          const beatsPerSecond = bpm / 60;
+          const secondsPerRow = 1 / (beatsPerSecond * rowsPerBeat);
+          const loopPointSamples = chipLoopPoint > 0
+            ? Math.floor(chipLoopPoint * secondsPerRow * 44100)
+            : undefined;
+
           const chipResult = await exportChipMusic(chipLogData, {
             format: chipFormat,
             title: chipTitle || metadata.name || 'Untitled',
             author: chipAuthor || metadata.author || 'Unknown',
+            loopPoint: loopPointSamples,
           });
 
           // Download the file
@@ -1109,7 +1131,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               {exportMode === 'chip' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    Chip Music Export (VGM/ZSM/SAP/TIunA)
+                    Chip Music Export
                   </h3>
                   <div className="space-y-4">
                     {/* Recording controls */}
@@ -1178,7 +1200,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         EXPORT FORMAT
                       </label>
                       <div className="grid grid-cols-2 gap-2">
-                        {(['vgm', 'zsm', 'sap', 'tiuna'] as ChipExportFormat[]).map((fmt) => {
+                        {(['vgm', 'gym', 'nsf', 'gbs', 'spc', 'zsm', 'sap', 'tiuna'] as ChipExportFormat[]).map((fmt) => {
                           const info = FORMAT_INFO[fmt];
                           const isAvailable = availableChipFormats.includes(fmt) || chipWrites.length === 0;
                           return (
@@ -1230,6 +1252,38 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                           className="input w-full"
                         />
                       </div>
+                    </div>
+
+                    {/* Loop Point */}
+                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                      <label className="block text-xs font-mono text-text-muted mb-2">
+                        LOOP POINT (Row)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={chipLoopPoint}
+                          onChange={(e) => setChipLoopPoint(Math.max(0, Number(e.target.value)))}
+                          min={0}
+                          className="input flex-1 font-mono"
+                          placeholder="0"
+                        />
+                        <button
+                          onClick={() => {
+                            setChipLoopPoint(currentRow);
+                            setLoopStartRow(currentRow);
+                          }}
+                          className="px-3 py-2 rounded-lg bg-dark-bgHover text-text-primary font-mono text-xs hover:bg-dark-border transition-colors"
+                          title="Set loop point to current row"
+                        >
+                          From Cursor
+                        </button>
+                      </div>
+                      <p className="text-xs font-mono text-text-muted mt-2">
+                        {chipLoopPoint > 0
+                          ? `Music will loop back to row ${chipLoopPoint}`
+                          : 'Set to 0 for no loop (one-shot playback)'}
+                      </p>
                     </div>
 
                     {/* Format description */}

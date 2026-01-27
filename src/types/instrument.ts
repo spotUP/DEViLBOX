@@ -32,6 +32,9 @@ export type SynthType =
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
+// Extended waveform types for vibrato/tremolo effects (tracker formats)
+export type VibratoWaveformType = 'sine' | 'rampDown' | 'rampUp' | 'square' | 'random';
+
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch';
 
 export interface OscillatorConfig {
@@ -830,12 +833,18 @@ export interface FurnaceOperatorConfig {
   tl: number;        // Total Level (0-127)
   ar: number;        // Attack Rate (0-31)
   dr: number;        // Decay Rate (0-31)
+  d2r: number;       // Decay 2 Rate / Sustain Rate (0-31)
   sl: number;        // Sustain Level (0-15)
   rr: number;        // Release Rate (0-15)
   dt: number;        // Detune (-3 to +3)
+  dt2: number;       // Detune 2 / Coarse tune (0-3, OPM only)
   rs: number;        // Rate Scaling (0-3)
   am: boolean;       // Amplitude Modulation
   ksr: boolean;      // Key Scale Rate
+  ksl: number;       // Key Scale Level (0-3, OPL)
+  sus: boolean;      // Sustain flag (OPL)
+  vib: boolean;      // Vibrato flag (OPL)
+  ws: number;        // Waveform Select (0-7, OPL)
   ssg: number;       // SSG-EG (0-15)
 }
 
@@ -879,12 +888,18 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
     tl: 0,
     ar: 31,
     dr: 0,
+    d2r: 0,
     sl: 0,
     rr: 15,
     dt: 0,
+    dt2: 0,
     rs: 0,
     am: false,
     ksr: false,
+    ksl: 0,
+    sus: false,
+    vib: false,
+    ws: 0,
     ssg: 0,
   })),
   macros: [],

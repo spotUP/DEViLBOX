@@ -8,6 +8,7 @@ import type {
   InstrumentConfig,
   InstrumentPreset,
   EffectConfig,
+  FurnaceConfig,
 } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
@@ -526,7 +527,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     loadDefleMaskInstrument: (buffer) => {
       try {
-        const { name, config } = DefleMaskParser.parse(buffer, 'dmp');
+        const result = DefleMaskParser.parse(buffer, 'dmp') as { name: string; config: FurnaceConfig };
+        const { name, config } = result;
         const existingIds = get().instruments.map((i) => i.id);
         const newId = findNextId(existingIds);
 
@@ -551,7 +553,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     loadDefleMaskWavetable: (buffer) => {
       try {
-        const waveData = DefleMaskParser.parse(buffer, 'dmw');
+        const waveData = DefleMaskParser.parse(buffer, 'dmw') as number[];
         const currentId = get().currentInstrumentId;
         if (!currentId) return;
 

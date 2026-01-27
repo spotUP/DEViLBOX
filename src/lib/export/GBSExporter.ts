@@ -23,41 +23,6 @@ import type { RegisterWrite } from './VGMExporter';
 const GBS_HEADER_SIZE = 112;
 const GBS_MAGIC = [0x47, 0x42, 0x53]; // "GBS"
 
-// Game Boy audio register addresses (memory-mapped I/O)
-const GB_AUDIO_REGS = {
-  // Channel 1 (Pulse with sweep)
-  NR10: 0xFF10, // Sweep
-  NR11: 0xFF11, // Length/duty
-  NR12: 0xFF12, // Volume envelope
-  NR13: 0xFF13, // Frequency low
-  NR14: 0xFF14, // Frequency high + trigger
-
-  // Channel 2 (Pulse)
-  NR21: 0xFF16, // Length/duty
-  NR22: 0xFF17, // Volume envelope
-  NR23: 0xFF18, // Frequency low
-  NR24: 0xFF19, // Frequency high + trigger
-
-  // Channel 3 (Wave)
-  NR30: 0xFF1A, // DAC power
-  NR31: 0xFF1B, // Length
-  NR32: 0xFF1C, // Volume
-  NR33: 0xFF1D, // Frequency low
-  NR34: 0xFF1E, // Frequency high + trigger
-  // Wave RAM: 0xFF30-0xFF3F
-
-  // Channel 4 (Noise)
-  NR41: 0xFF20, // Length
-  NR42: 0xFF21, // Volume envelope
-  NR43: 0xFF22, // Polynomial counter
-  NR44: 0xFF23, // Trigger
-
-  // Master control
-  NR50: 0xFF24, // Master volume / VIN panning
-  NR51: 0xFF25, // Sound panning
-  NR52: 0xFF26, // Sound on/off
-} as const;
-
 // Frame rate (Game Boy runs at ~59.7Hz)
 const FRAME_RATE = 60;
 const SAMPLES_PER_FRAME = 44100 / FRAME_RATE;
@@ -102,11 +67,7 @@ function createZ80Driver(): {
   baseAddress: number;
 } {
   const baseAddress = 0x4000;
-
-  // HRAM variables (FF80-FFFE)
-  const HRAM_DATA_PTR_LO = 0xFF80;
-  const HRAM_DATA_PTR_HI = 0xFF81;
-  const HRAM_PLAYING = 0xFF82;
+  // HRAM layout: FF80=data ptr lo, FF81=data ptr hi, FF82=playing flag
 
   // INIT routine: Initialize data pointer and enable audio
   const initCode = [

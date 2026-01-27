@@ -12,7 +12,6 @@ import { type ChannelState, type TickResult, type FormatConfig, RETRIG_VOLUME_OP
 import { BaseFormatHandler } from './FormatHandler';
 import {
   periodToFrequency,
-  noteStringToPeriod,
   xmLinearPeriodToFrequency,
   noteStringToXMLinearPeriod,
 } from './PeriodTables';
