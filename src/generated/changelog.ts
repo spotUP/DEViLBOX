@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T19:32:44.753Z
+ * Generated: 2026-01-27T19:35:50.198Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '113';
-export const BUILD_HASH = '1d65e0b';
+export const BUILD_NUMBER = '114';
+export const BUILD_HASH = 'a57cf46';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add MIDI CC output to TD-3-MO'
+      },
       {
         type: 'fix',
         description: 'Fix TD-3 MIDI CC mappings and add debug logging'
@@ -250,10 +254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Reuse preloaded instruments instead of creating new ones per channel'
-      },
-      {
-        type: 'improvement',
-        description: 'Avoid unnecessary React state updates during playback'
       }
     ]
   }
