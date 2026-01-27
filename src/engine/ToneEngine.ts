@@ -703,6 +703,14 @@ export class ToneEngine {
         const loopStart = config.sample?.loopStart || 0;
         const loopEnd = config.sample?.loopEnd || 0;
 
+        // CRITICAL: Detect and reject stale blob URLs
+        // Blob URLs don't survive page refreshes - they're session-specific
+        // Data URLs (base64) and regular URLs survive, so those are fine
+        if (sampleUrl && sampleUrl.startsWith('blob:')) {
+          console.warn(`[ToneEngine] Sampler ${instrumentId} has stale blob URL (won't survive page refresh). Re-import the module to fix.`);
+          sampleUrl = undefined; // Clear invalid URL
+        }
+
         // Prepend BASE_URL for relative paths (handles /DEViLBOX/ prefix in production)
         if (sampleUrl && sampleUrl.startsWith('/') && !sampleUrl.startsWith('//')) {
           const baseUrl = import.meta.env.BASE_URL || '/';

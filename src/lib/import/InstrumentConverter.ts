@@ -137,8 +137,13 @@ function convertSampleToInstrument(
 }
 
 /**
- * Convert PCM data to AudioBuffer and blob URL
+ * Convert PCM data to AudioBuffer and data URL
  * XM/MOD samples are signed 8/16-bit, AudioBuffer uses Float32
+ *
+ * IMPORTANT: We use base64 data URLs instead of blob URLs because:
+ * - Blob URLs don't survive page refreshes (they're session-specific)
+ * - Data URLs embed the audio data directly, surviving serialization
+ * - This allows samples to persist across browser sessions
  */
 function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuffer; blobUrl: string } {
   const sampleRate = sample.sampleRate || 8363; // Default to Amiga C-2 rate
@@ -178,20 +183,37 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
     start: sample.loopStart,
     end: sample.loopStart + sample.loopLength,
   } : undefined;
-  const wavBlob = audioBufferToWav(audioBuffer, loopInfo);
-  const blobUrl = URL.createObjectURL(wavBlob);
+
+  // Get WAV as ArrayBuffer (not Blob) so we can convert to base64 synchronously
+  const wavArrayBuffer = audioBufferToWavArrayBuffer(audioBuffer, loopInfo);
+
+  // Convert to base64 data URL (survives page refresh unlike blob URLs)
+  const base64 = arrayBufferToBase64(wavArrayBuffer);
+  const dataUrl = `data:audio/wav;base64,${base64}`;
 
   return {
     audioBuffer: channelData.buffer,
-    blobUrl,
+    blobUrl: dataUrl,
   };
 }
 
 /**
- * Convert AudioBuffer to WAV blob for Tone.js
+ * Convert ArrayBuffer to base64 string
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Convert AudioBuffer to WAV ArrayBuffer
  * Optionally includes SMPL chunk for loop points (ProTracker/MOD support)
  */
-function audioBufferToWav(audioBuffer: AudioBuffer, loopInfo?: { start: number; end: number }): Blob {
+function audioBufferToWavArrayBuffer(audioBuffer: AudioBuffer, loopInfo?: { start: number; end: number }): ArrayBuffer {
   const numberOfChannels = audioBuffer.numberOfChannels;
   const dataLength = audioBuffer.length * numberOfChannels * 2;
   const sampleRate = audioBuffer.sampleRate;
@@ -256,7 +278,7 @@ function audioBufferToWav(audioBuffer: AudioBuffer, loopInfo?: { start: number; 
     view.setUint32(offset + 64, 0, true); // Play count (0 = infinite)
   }
 
-  return new Blob([buffer], { type: 'audio/wav' });
+  return buffer;
 }
 
 /**
