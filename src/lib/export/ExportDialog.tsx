@@ -21,9 +21,20 @@ import { exportPatternAsWav, exportSongAsWav } from './audioExport';
 import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
 import { exportAsXM, type XMExportOptions } from './XMExporter';
 import { exportAsMOD, type MODExportOptions } from './MODExporter';
+import {
+  ChipRecordingSession,
+  exportChipMusic,
+  getAvailableFormats,
+  getLogStatistics,
+  parseRegisterLog,
+  FORMAT_INFO,
+  type ChipExportFormat,
+  type RegisterWrite,
+} from './ChipExporter';
 import type { AutomationCurve } from '@typedefs/automation';
+import { Cpu } from 'lucide-react';
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip';
 type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
@@ -65,7 +76,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [bakeSynthsToSamples, setBakeSynthsToSamples] = useState(true);
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
+  // Chip export options
+  const [chipFormat, setChipFormat] = useState<ChipExportFormat>('vgm');
+  const [chipRecordingSession] = useState(() => new ChipRecordingSession());
+  const [isChipRecording, setIsChipRecording] = useState(false);
+  const [chipRecordingTime, setChipRecordingTime] = useState(0);
+  const [chipLogData, setChipLogData] = useState<Uint8Array | null>(null);
+  const [chipWrites, setChipWrites] = useState<RegisterWrite[]>([]);
+  const [availableChipFormats, setAvailableChipFormats] = useState<ChipExportFormat[]>([]);
+  const [chipTitle, setChipTitle] = useState('');
+  const [chipAuthor, setChipAuthor] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chipRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle Escape key
   useEffect(() => {
@@ -87,7 +110,60 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
     setExportWarnings([]);
   }, [exportMode]);
 
+  // Cleanup chip recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (chipRecordingTimerRef.current) {
+        clearInterval(chipRecordingTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!isOpen) return null;
+
+  // Chip recording controls
+  const startChipRecording = () => {
+    chipRecordingSession.startRecording();
+    setIsChipRecording(true);
+    setChipRecordingTime(0);
+    setChipLogData(null);
+    setChipWrites([]);
+    setAvailableChipFormats([]);
+
+    // Start timer
+    chipRecordingTimerRef.current = setInterval(() => {
+      setChipRecordingTime((t) => t + 100);
+    }, 100);
+  };
+
+  const stopChipRecording = async () => {
+    if (chipRecordingTimerRef.current) {
+      clearInterval(chipRecordingTimerRef.current);
+      chipRecordingTimerRef.current = null;
+    }
+
+    const logData = await chipRecordingSession.stopRecording();
+    setIsChipRecording(false);
+    setChipLogData(logData);
+
+    if (logData.length > 0) {
+      const writes = parseRegisterLog(logData);
+      setChipWrites(writes);
+      const formats = getAvailableFormats(writes);
+      setAvailableChipFormats(formats);
+      if (formats.length > 0 && !formats.includes(chipFormat)) {
+        setChipFormat(formats[0]);
+      }
+    }
+  };
+
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const tenths = Math.floor((ms % 1000) / 100);
+    return `${minutes}:${secs.toString().padStart(2, '0')}.${tenths}`;
+  };
 
   const handleExport = async () => {
     try {
@@ -286,6 +362,33 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             notify.success(`MOD file "${result.filename}" exported successfully!`);
             onClose();
           }
+          break;
+        }
+
+        case 'chip': {
+          if (!chipLogData || chipLogData.length === 0) {
+            notify.warning('No chip data recorded. Press Record first, then play your song.');
+            return;
+          }
+
+          const chipResult = await exportChipMusic(chipLogData, {
+            format: chipFormat,
+            title: chipTitle || metadata.name || 'Untitled',
+            author: chipAuthor || metadata.author || 'Unknown',
+          });
+
+          // Download the file
+          const url = URL.createObjectURL(chipResult.data);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = chipResult.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          notify.success(`${FORMAT_INFO[chipFormat].name} file exported successfully!`);
+          onClose();
           break;
         }
       }
@@ -551,6 +654,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold">MOD</div>
+                  </button>
+                  <button
+                    onClick={() => setExportMode('chip')}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all text-center
+                      ${exportMode === 'chip'
+                        ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                        : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                      }
+                    `}
+                  >
+                    <Cpu size={24} className="mx-auto mb-2" />
+                    <div className="font-mono text-sm font-semibold">Chip</div>
                   </button>
                 </div>
               </div>
@@ -990,6 +1106,140 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {exportMode === 'chip' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Chip Music Export (VGM/ZSM/SAP/TIunA)
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Recording controls */}
+                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-mono text-text-muted">RECORDING</span>
+                        <span className="text-lg font-mono text-accent-primary font-bold">
+                          {formatTime(chipRecordingTime)}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {!isChipRecording ? (
+                          <button
+                            onClick={startChipRecording}
+                            className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-white font-mono text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <span className="w-3 h-3 rounded-full bg-white" />
+                            Record
+                          </button>
+                        ) : (
+                          <button
+                            onClick={stopChipRecording}
+                            className="flex-1 px-4 py-2 rounded-lg bg-dark-bgHover text-text-primary font-mono text-sm hover:bg-dark-border transition-colors flex items-center justify-center gap-2"
+                          >
+                            <span className="w-3 h-3 bg-white" />
+                            Stop
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs font-mono text-text-muted mt-2">
+                        {isChipRecording
+                          ? 'Recording... Play your song now!'
+                          : chipWrites.length > 0
+                          ? `Captured ${chipWrites.length.toLocaleString()} register writes`
+                          : 'Press Record, then play your song to capture chip output'}
+                      </p>
+                    </div>
+
+                    {/* Chip statistics */}
+                    {chipWrites.length > 0 && (
+                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                        <h4 className="text-xs font-mono text-text-muted mb-2">CAPTURED DATA</h4>
+                        {(() => {
+                          const stats = getLogStatistics(chipWrites);
+                          return (
+                            <div className="space-y-1 text-sm font-mono">
+                              <div>Duration: <span className="text-accent-primary">{stats.duration.toFixed(1)}s</span></div>
+                              <div>Writes: <span className="text-accent-primary">{stats.totalWrites.toLocaleString()}</span></div>
+                              <div className="pt-1 border-t border-dark-border mt-2">
+                                <span className="text-text-muted">Chips used:</span>
+                                {stats.usedChips.map((chip) => (
+                                  <div key={chip.type} className="ml-2 text-xs">
+                                    {chip.name}: <span className="text-accent-secondary">{chip.writes.toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Format selection */}
+                    <div>
+                      <label className="block text-xs font-mono text-text-muted mb-2">
+                        EXPORT FORMAT
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['vgm', 'zsm', 'sap', 'tiuna'] as ChipExportFormat[]).map((fmt) => {
+                          const info = FORMAT_INFO[fmt];
+                          const isAvailable = availableChipFormats.includes(fmt) || chipWrites.length === 0;
+                          return (
+                            <button
+                              key={fmt}
+                              onClick={() => isAvailable && setChipFormat(fmt)}
+                              disabled={!isAvailable && chipWrites.length > 0}
+                              className={`
+                                p-3 rounded-lg text-left transition-all
+                                ${chipFormat === fmt
+                                  ? 'bg-accent-primary text-text-inverse'
+                                  : isAvailable || chipWrites.length === 0
+                                  ? 'bg-dark-bg border border-dark-border hover:border-dark-borderLight'
+                                  : 'bg-dark-bg border border-dark-border opacity-40 cursor-not-allowed'
+                                }
+                              `}
+                            >
+                              <div className="font-mono text-sm font-semibold">{info.name}</div>
+                              <div className="text-xs opacity-70">.{info.extension}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-mono text-text-muted mb-1">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={chipTitle}
+                          onChange={(e) => setChipTitle(e.target.value)}
+                          placeholder={metadata.name || 'Untitled'}
+                          className="input w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-mono text-text-muted mb-1">
+                          Author
+                        </label>
+                        <input
+                          type="text"
+                          value={chipAuthor}
+                          onChange={(e) => setChipAuthor(e.target.value)}
+                          placeholder={metadata.author || 'Unknown'}
+                          className="input w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Format description */}
+                    <div className="text-xs font-mono text-text-muted bg-dark-bg border border-dark-border rounded-lg p-3">
+                      {FORMAT_INFO[chipFormat].description}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Export Options */}
               <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4">
                 <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -1088,6 +1338,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : exportMode === 'midi' ? '.mid'
                   : exportMode === 'xm' ? '.xm'
                   : exportMode === 'mod' ? '.mod'
+                  : exportMode === 'chip' ? `.${FORMAT_INFO[chipFormat].extension}`
                   : `.${exportMode}.json`
                 }`
               : 'Select a file to import'}

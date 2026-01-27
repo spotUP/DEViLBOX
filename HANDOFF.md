@@ -15,9 +15,11 @@
 - [x] Format-aware period/note conversion across all handlers
 
 ## Remaining Work
-1.  **Furnace Integration:** Chiptune synthesis via WebAssembly (see FURNACE_INTEGRATION_HANDOFF.md)
-2.  **Refactor & Optimize:** Move remaining duplicated effect logic into `BaseFormatHandler`
-3.  **Performance:** Profile and optimize hot paths in ToneEngine
+1.  ~~**Furnace Integration:** Chiptune synthesis via WebAssembly~~ ✅ Complete (see FURNACE_INTEGRATION_HANDOFF.md)
+    - 8 chip export formats (VGM, ZSM, SAP, TIunA, GYM, NSF, GBS, SPC)
+    - Full macro system (volume, arp, duty, pitch, pan, operator macros)
+2.  ~~**Refactor & Optimize:** Move remaining duplicated effect logic into `BaseFormatHandler`~~ ✅ Complete
+3.  **Performance:** Profile and optimize hot paths in ToneEngine (optional)
 
 ## Key Files
 *   `src/engine/ToneEngine.ts`: The multi-voice mixer.

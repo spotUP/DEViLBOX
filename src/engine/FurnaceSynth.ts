@@ -25,6 +25,8 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   private opMacroPositions: Array<Record<string, number>> = Array.from({ length: 4 }, () => ({}));
   private activeNoteFreq: number = 440;
   private isNoteOn: boolean = false;
+  private currentDuty: number = 2; // Default 50% duty (for PSG/NES/GB)
+  private currentPan: number = 0;  // -127 to 127 (0 = center)
 
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
     super();
@@ -46,15 +48,19 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
   /**
    * Process a single tracker tick for macro modulation
+   * Furnace macro types:
+   *   0 = Volume, 1 = Arpeggio, 2 = Duty/Noise, 3 = Wave, 4 = Pitch, 5 = Panning
+   *   6 = Phase Reset, 7 = Extra 1, 8 = Extra 2, etc.
    */
   public processTick(time: number = Tone.now()): void {
     if (!this.isNoteOn) return;
 
-    let needsRegisterUpdate = false;
-
-    // 1. Global Macros (Volume, Arp, Pitch)
+    // 1. Global Macros (Volume, Arp, Duty, Pitch, Panning)
     this.config.macros.forEach(macro => {
+      if (!macro.data || macro.data.length === 0) return;
+
       let pos = this.macroPositions.get(macro.type) || 0;
+      if (pos >= macro.data.length) pos = macro.data.length - 1;
       const val = macro.data[pos];
 
       switch (macro.type) {
@@ -62,14 +68,39 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
           const volGain = Math.max(0, val / 127);
           this.outputGain.gain.setValueAtTime(volGain, time);
           break;
+
         case 1: // Arpeggio (relative semitones)
           this.updateFrequency(this.activeNoteFreq * Math.pow(2, val / 12));
           break;
-        case 4: // Pitch (relative cents)
-          this.updateFrequency(this.activeNoteFreq * Math.pow(2, val / 1200));
+
+        case 2: // Duty cycle / Noise mode
+          this.currentDuty = val;
+          this.writeDutyRegister(val);
+          break;
+
+        case 3: // Wavetable select
+          this.writeWavetableSelect(val);
+          break;
+
+        case 4: // Pitch (relative cents, signed)
+          // Furnace pitch macro uses signed values (-128 to 127 typical range)
+          const signedPitch = val > 127 ? val - 256 : val;
+          this.updateFrequency(this.activeNoteFreq * Math.pow(2, signedPitch / 1200));
+          break;
+
+        case 5: // Panning (-127 to 127)
+          this.currentPan = val > 127 ? val - 256 : val;
+          this.writePanRegister(this.currentPan);
+          break;
+
+        case 6: // Phase Reset (trigger on non-zero)
+          if (val !== 0) {
+            this.writePhaseReset();
+          }
           break;
       }
 
+      // Advance position with loop handling
       pos++;
       if (pos >= macro.data.length) {
         pos = macro.loop >= 0 ? macro.loop : macro.data.length - 1;
@@ -77,28 +108,298 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       this.macroPositions.set(macro.type, pos);
     });
 
-    // 2. Operator Macros (TL)
-    this.config.opMacros.forEach((opMacros, i) => {
-      if (opMacros.tl) {
-        const macro = opMacros.tl;
-        let pos = this.opMacroPositions[i].tl || 0;
-        const val = macro.data[pos];
+    // 2. Operator Macros (TL, MULT, AR, DR, SL, RR)
+    this.config.opMacros.forEach((opMacros, opIndex) => {
+      if (!opMacros) return;
 
-        // Update Total Level via register
-        this.config.operators[i].tl = val;
-        needsRegisterUpdate = true;
+      // Total Level (amplitude)
+      if (opMacros.tl && opMacros.tl.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.tl, opIndex, 'tl');
+        this.config.operators[opIndex].tl = val;
+        this.writeOperatorTL(opIndex, val);
+      }
 
-        pos++;
-        if (pos >= macro.data.length) {
-          pos = macro.loop >= 0 ? macro.loop : macro.data.length - 1;
-        }
-        this.opMacroPositions[i].tl = pos;
+      // Multiplier (frequency ratio)
+      if (opMacros.mult && opMacros.mult.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.mult, opIndex, 'mult');
+        this.config.operators[opIndex].mult = val;
+        this.writeOperatorMult(opIndex, val);
+      }
+
+      // Attack Rate
+      if (opMacros.ar && opMacros.ar.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.ar, opIndex, 'ar');
+        this.config.operators[opIndex].ar = val;
+        this.writeOperatorAR(opIndex, val);
+      }
+
+      // Decay Rate
+      if (opMacros.dr && opMacros.dr.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.dr, opIndex, 'dr');
+        this.config.operators[opIndex].dr = val;
+        this.writeOperatorDR(opIndex, val);
+      }
+
+      // Sustain Level
+      if (opMacros.sl && opMacros.sl.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.sl, opIndex, 'sl');
+        this.config.operators[opIndex].sl = val;
+        this.writeOperatorSL(opIndex, val);
+      }
+
+      // Release Rate
+      if (opMacros.rr && opMacros.rr.data.length > 0) {
+        const val = this.advanceOpMacro(opMacros.rr, opIndex, 'rr');
+        this.config.operators[opIndex].rr = val;
+        this.writeOperatorRR(opIndex, val);
       }
     });
+  }
 
-    if (needsRegisterUpdate) {
-      this.updateParameters();
+  /**
+   * Advance an operator macro position and return current value
+   */
+  private advanceOpMacro(macro: { data: number[]; loop: number }, opIndex: number, param: string): number {
+    let pos = this.opMacroPositions[opIndex][param] || 0;
+    if (pos >= macro.data.length) pos = macro.data.length - 1;
+    const val = macro.data[pos];
+
+    pos++;
+    if (pos >= macro.data.length) {
+      pos = macro.loop >= 0 ? macro.loop : macro.data.length - 1;
     }
+    this.opMacroPositions[opIndex][param] = pos;
+
+    return val;
+  }
+
+  // ============== Per-Parameter Register Writers ==============
+
+  /**
+   * Write duty cycle to PSG/NES/GB chips
+   */
+  private writeDutyRegister(duty: number): void {
+    const chan = this.channelIndex;
+
+    if (this.config.chipType === 34) { // NES
+      if (chan < 2) { // Pulse channels only
+        const base = 0x4000 + (chan * 4);
+        // Duty is bits 6-7 of $4000/$4004
+        const currentVol = this.config.operators[0]?.tl || 15;
+        const volReg = 0x30 | (currentVol & 0x0F); // Constant volume mode
+        this.chipEngine.write(FurnaceChipType.NES, base, ((duty & 3) << 6) | volReg);
+      }
+    } else if (this.config.chipType === 2) { // Game Boy
+      if (chan < 2) { // Pulse channels
+        const base = chan === 0 ? 0x11 : 0x16;
+        // Duty is bits 6-7 of NR11/NR21
+        this.chipEngine.write(FurnaceChipType.GB, base, (duty & 3) << 6);
+      }
+    } else if (this.config.chipType === 8) { // PSG (SN76489)
+      // SN76489 doesn't have duty control, but some variants do
+      // For now, just ignore
+    }
+  }
+
+  /**
+   * Write wavetable index select
+   */
+  private writeWavetableSelect(index: number): void {
+    if (this.config.wavetables && this.config.wavetables[index]) {
+      const waveData = this.config.wavetables[index].data;
+      FurnaceRegisterMapper.uploadWavetable(this.chipEngine, this.config.chipType, waveData);
+    }
+  }
+
+  /**
+   * Write panning register
+   */
+  private writePanRegister(pan: number): void {
+    // pan: -127 (full left) to 127 (full right), 0 = center
+    const chan = this.channelIndex;
+
+    if (this.config.chipType === 1) { // OPN2
+      // OPN2 has L/R bits in register 0xB4-0xB6 (bits 6-7)
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+
+      let lr = 0xC0; // Both L+R by default
+      if (pan < -32) lr = 0x80;      // Left only
+      else if (pan > 32) lr = 0x40;  // Right only
+
+      // Combine with AMS/FMS (preserve existing values)
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xB4 + chanOffset), lr);
+    } else if (this.config.chipType === 33) { // OPM
+      // OPM has L/R bits in register 0x20 (bits 6-7)
+      let lr = 0xC0;
+      if (pan < -32) lr = 0x80;
+      else if (pan > 32) lr = 0x40;
+
+      const current = ((this.config.feedback & 7) << 3) | (this.config.algorithm & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0x20 + (chan & 7), lr | current);
+    } else if (this.config.chipType === 2) { // Game Boy
+      // GB has per-channel L/R in NR51 (0x25)
+      // This is a global register, so we'd need to track all channels
+      // For now, simplified implementation
+      let lr = 0;
+      if (pan <= 0) lr |= (1 << chan);       // Left
+      if (pan >= 0) lr |= (1 << (chan + 4)); // Right
+      this.chipEngine.write(FurnaceChipType.GB, 0x25, 0xFF); // All channels both
+    }
+  }
+
+  /**
+   * Write phase reset (retrigger oscillator)
+   */
+  private writePhaseReset(): void {
+    // Most chips reset phase on key-on, but some have explicit control
+    // For OPN2/OPM, we can briefly key-off then key-on
+    if (this.config.chipType === 1) { // OPN2
+      const chanOffset = this.channelIndex % 3;
+      const part = this.channelIndex < 3 ? 0 : 1;
+      // Quick key-off/on cycle
+      this.chipEngine.write(FurnaceChipType.OPN2, 0x28, (part << 2) | chanOffset);
+      this.chipEngine.write(FurnaceChipType.OPN2, 0x28, 0xF0 | (part << 2) | chanOffset);
+    }
+  }
+
+  /**
+   * Write operator Total Level (0-127)
+   */
+  private writeOperatorTL(opIndex: number, tl: number): void {
+    const chan = this.channelIndex;
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x40 + opOff), tl & 0x7F);
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0x60 + opOff, tl & 0x7F);
+    }
+  }
+
+  /**
+   * Write operator Multiplier (0-15)
+   */
+  private writeOperatorMult(opIndex: number, mult: number): void {
+    const chan = this.channelIndex;
+    const op = this.config.operators[opIndex];
+    const dtNative = this.furnaceDtToOPN2(op.dt);
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x30 + opOff), ((dtNative & 7) << 4) | (mult & 0x0F));
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0x40 + opOff, ((dtNative & 7) << 4) | (mult & 0x0F));
+    }
+  }
+
+  /**
+   * Write operator Attack Rate (0-31)
+   */
+  private writeOperatorAR(opIndex: number, ar: number): void {
+    const chan = this.channelIndex;
+    const op = this.config.operators[opIndex];
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      // 0x50: RS (bits 6-7), AR (bits 0-4)
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x50 + opOff), ((op.rs & 3) << 6) | (ar & 0x1F));
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0x80 + opOff, ((op.rs & 3) << 6) | (ar & 0x1F));
+    }
+  }
+
+  /**
+   * Write operator Decay Rate (0-31)
+   */
+  private writeOperatorDR(opIndex: number, dr: number): void {
+    const chan = this.channelIndex;
+    const op = this.config.operators[opIndex];
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      // 0x60: AM (bit 7), DR (bits 0-4)
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x60 + opOff), (op.am ? 0x80 : 0) | (dr & 0x1F));
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0xA0 + opOff, (op.am ? 0x80 : 0) | (dr & 0x1F));
+    }
+  }
+
+  /**
+   * Write operator Sustain Level (0-15)
+   */
+  private writeOperatorSL(opIndex: number, sl: number): void {
+    const chan = this.channelIndex;
+    const op = this.config.operators[opIndex];
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      // 0x80: SL (bits 4-7), RR (bits 0-3)
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x80 + opOff), ((sl & 0x0F) << 4) | (op.rr & 0x0F));
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0xE0 + opOff, ((sl & 0x0F) << 4) | (op.rr & 0x0F));
+    }
+  }
+
+  /**
+   * Write operator Release Rate (0-15)
+   */
+  private writeOperatorRR(opIndex: number, rr: number): void {
+    const chan = this.channelIndex;
+    const op = this.config.operators[opIndex];
+
+    if (this.config.chipType === 1) { // OPN2
+      const part = chan < 3 ? 0 : 1;
+      const chanOffset = chan % 3;
+      const regBase = part === 0 ? 0x000 : 0x100;
+      const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+      const opOff = opOffsets[opIndex] + chanOffset;
+      // 0x80: SL (bits 4-7), RR (bits 0-3)
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x80 + opOff), ((op.sl & 0x0F) << 4) | (rr & 0x0F));
+    } else if (this.config.chipType === 33) { // OPM
+      const opOffsets = [0x00, 0x10, 0x08, 0x18];
+      const opOff = opOffsets[opIndex] + (chan & 7);
+      this.chipEngine.write(FurnaceChipType.OPM, 0xE0 + opOff, ((op.sl & 0x0F) << 4) | (rr & 0x0F));
+    }
+  }
+
+  /**
+   * Convert Furnace DT to OPN2 native format
+   */
+  private furnaceDtToOPN2(dt: number): number {
+    if (dt >= 0) return dt & 3;
+    return (4 + Math.abs(dt)) & 7;
   }
 
   private updateFrequency(freq: number): void {
@@ -188,44 +489,144 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     }
   }
 
-  public triggerAttack(note: string, time?: number, _velocity?: number): this {
+  public triggerAttack(note: string, time?: number, velocity?: number): this {
     const freq = Tone.Frequency(note).toFrequency();
     this.activeNoteFreq = freq;
     this.isNoteOn = true;
-    
+
+    // Reset all macro state for new note
     this.macroPositions.clear();
     this.opMacroPositions = Array.from({ length: 4 }, () => ({}));
+    this.currentDuty = 2;  // Reset to 50% duty
+    this.currentPan = 0;   // Reset to center
+
+    const scheduledTime = time || Tone.now();
 
     // 1. Setup registers
-    const scheduledTime = time || Tone.now();
-    
     this.updateParameters();
     this.updateFrequency(freq);
-    
-    // 2. Write Key ON
-    const chanOffset = (this.channelIndex % 3);
-    const part = this.channelIndex < 3 ? 0 : 1;
-    const keyOnVal = 0xF0 | (part << 2) | chanOffset; // All 4 operators ON
-    
-    // Key ON must be precise
-    this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOnVal);
 
-    // Initial macro process (velocity could affect starting volume)
+    // 2. Write Key ON (chip-specific)
+    this.writeKeyOn(velocity);
+
+    // 3. Process first macro tick (velocity could affect starting volume)
     this.processTick(scheduledTime);
 
     return this;
   }
 
+  /**
+   * Write chip-specific key-on command
+   */
+  private writeKeyOn(velocity?: number): void {
+    const chan = this.channelIndex;
+    const vol = velocity !== undefined ? Math.floor(velocity * 15) : 15;
+
+    switch (this.config.chipType) {
+      case 1: // OPN2
+        const chanOffset = chan % 3;
+        const part = chan < 3 ? 0 : 1;
+        const keyOnVal = 0xF0 | (part << 2) | chanOffset; // All 4 operators ON
+        this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOnVal);
+        break;
+
+      case 33: // OPM
+        // OPM key-on is register 0x08, bits 0-2 = channel, bits 3-6 = operators
+        this.chipEngine.write(FurnaceChipType.OPM, 0x08, 0x78 | (chan & 7));
+        break;
+
+      case 34: // NES
+        if (chan < 2) { // Pulse
+          const base = 0x4000 + (chan * 4);
+          this.chipEngine.write(FurnaceChipType.NES, base, ((this.currentDuty & 3) << 6) | 0x30 | vol);
+          this.chipEngine.write(FurnaceChipType.NES, base + 3, 0x08); // Length counter load
+        } else if (chan === 2) { // Triangle
+          this.chipEngine.write(FurnaceChipType.NES, 0x4008, 0xFF); // Linear counter
+          this.chipEngine.write(FurnaceChipType.NES, 0x400B, 0x08);
+        } else if (chan === 3) { // Noise
+          this.chipEngine.write(FurnaceChipType.NES, 0x400C, 0x30 | vol);
+          this.chipEngine.write(FurnaceChipType.NES, 0x400F, 0x08);
+        }
+        this.chipEngine.write(FurnaceChipType.NES, 0x4015, 0x0F); // Enable all channels
+        break;
+
+      case 2: // Game Boy
+        if (chan < 2) { // Pulse
+          const base = chan === 0 ? 0x10 : 0x15;
+          this.chipEngine.write(FurnaceChipType.GB, base + 1, ((this.currentDuty & 3) << 6));
+          this.chipEngine.write(FurnaceChipType.GB, base + 2, (vol << 4) | 0x08); // Volume envelope
+          this.chipEngine.write(FurnaceChipType.GB, base + 4, 0x80); // Trigger
+        } else if (chan === 2) { // Wave
+          this.chipEngine.write(FurnaceChipType.GB, 0x1A, 0x80); // Enable wave
+          this.chipEngine.write(FurnaceChipType.GB, 0x1C, 0x20); // Volume
+          this.chipEngine.write(FurnaceChipType.GB, 0x1E, 0x80); // Trigger
+        } else if (chan === 3) { // Noise
+          this.chipEngine.write(FurnaceChipType.GB, 0x21, (vol << 4) | 0x08);
+          this.chipEngine.write(FurnaceChipType.GB, 0x23, 0x80); // Trigger
+        }
+        this.chipEngine.write(FurnaceChipType.GB, 0x26, 0x80); // Master enable
+        break;
+
+      case 8: // PSG (SN76489)
+        const atten = 15 - Math.min(15, vol);
+        this.chipEngine.write(FurnaceChipType.PSG, 0, 0x90 | ((chan & 3) << 5) | atten);
+        break;
+    }
+  }
+
   public triggerRelease(_time?: number): this {
     this.isNoteOn = false;
-    
-    // Write Key OFF
-    const chanOffset = (this.channelIndex % 3);
-    const part = this.channelIndex < 3 ? 0 : 1;
-    const keyOffVal = (part << 2) | chanOffset; // All 4 operators OFF
-    this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOffVal);
-    
+    this.writeKeyOff();
     return this;
+  }
+
+  /**
+   * Write chip-specific key-off command
+   */
+  private writeKeyOff(): void {
+    const chan = this.channelIndex;
+
+    switch (this.config.chipType) {
+      case 1: // OPN2
+        const chanOffset = chan % 3;
+        const part = chan < 3 ? 0 : 1;
+        const keyOffVal = (part << 2) | chanOffset; // All 4 operators OFF
+        this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOffVal);
+        break;
+
+      case 33: // OPM
+        // OPM key-off: write 0 to operator bits
+        this.chipEngine.write(FurnaceChipType.OPM, 0x08, chan & 7);
+        break;
+
+      case 34: // NES
+        // NES doesn't have true key-off, silence the channel
+        if (chan < 2) {
+          const base = 0x4000 + (chan * 4);
+          this.chipEngine.write(FurnaceChipType.NES, base, 0x30); // Vol = 0
+        } else if (chan === 2) {
+          this.chipEngine.write(FurnaceChipType.NES, 0x4008, 0x00); // Disable triangle
+        } else if (chan === 3) {
+          this.chipEngine.write(FurnaceChipType.NES, 0x400C, 0x30); // Vol = 0
+        }
+        break;
+
+      case 2: // Game Boy
+        if (chan < 2) {
+          const base = chan === 0 ? 0x10 : 0x15;
+          this.chipEngine.write(FurnaceChipType.GB, base + 2, 0x00); // Volume = 0
+        } else if (chan === 2) {
+          this.chipEngine.write(FurnaceChipType.GB, 0x1A, 0x00); // Disable wave
+        } else if (chan === 3) {
+          this.chipEngine.write(FurnaceChipType.GB, 0x21, 0x00); // Volume = 0
+        }
+        break;
+
+      case 8: // PSG (SN76489)
+        // Set attenuation to max (silence)
+        this.chipEngine.write(FurnaceChipType.PSG, 0, 0x9F | ((chan & 3) << 5));
+        break;
+    }
   }
 
   dispose(): this {
