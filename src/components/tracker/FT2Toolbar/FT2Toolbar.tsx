@@ -264,7 +264,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setIsLoading(true);
     try {
       const basePath = import.meta.env.BASE_URL || '/';
-      const response = await fetch(`${basePath}modules/${filename}`);
+      const response = await fetch(`${basePath}data/songs/${filename}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const songData = await response.json();
       const { needsMigration, migrateProject } = await import('@/lib/migration');
