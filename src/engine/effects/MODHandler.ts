@@ -8,16 +8,19 @@
  * - Optional bug emulation (arpeggio overflow, portamento limits, etc.)
  */
 
-import { type ChannelState, type TickResult, type FormatConfig } from './types';
+import { type ChannelState, type TickResult, type FormatConfig, type WaveformType } from './types';
 import { BaseFormatHandler } from './FormatHandler';
 import {
   PT_MIN_PERIOD,
   PT_MAX_PERIOD,
   periodToFrequency,
-  noteStringToPeriod,
   getArpeggioPeriod,
   snapPeriodToSemitone,
+  periodToNoteIndex,
+  finetuneToIndex,
+  PERIOD_TABLE,
   VIBRATO_TABLE,
+  periodToNoteString,
 } from './PeriodTables';
 
 // Effect constants
@@ -30,7 +33,7 @@ const MOD_EFFECTS = {
   TONE_PORTA_VOL_SLIDE: 0x5,
   VIBRATO_VOL_SLIDE: 0x6,
   TREMOLO: 0x7,
-  SET_PANNING: 0x8,      // Not in original PT, but common extension
+  SET_PANNING: 0x8,
   SAMPLE_OFFSET: 0x9,
   VOLUME_SLIDE: 0xA,
   POSITION_JUMP: 0xB,
@@ -42,22 +45,22 @@ const MOD_EFFECTS = {
 
 // E-command sub-effects
 const MOD_E_COMMANDS = {
-  FILTER: 0x0,           // E0x - Amiga LED filter (not implemented)
-  FINE_PORTA_UP: 0x1,    // E1x - Fine portamento up
-  FINE_PORTA_DOWN: 0x2,  // E2x - Fine portamento down
-  GLISSANDO: 0x3,        // E3x - Glissando control
-  VIBRATO_WAVEFORM: 0x4, // E4x - Set vibrato waveform
-  FINETUNE: 0x5,         // E5x - Set finetune
-  PATTERN_LOOP: 0x6,     // E6x - Pattern loop
-  TREMOLO_WAVEFORM: 0x7, // E7x - Set tremolo waveform
-  PANNING: 0x8,          // E8x - Set panning (coarse)
-  RETRIG: 0x9,           // E9x - Retrigger note
-  FINE_VOL_UP: 0xA,      // EAx - Fine volume slide up
-  FINE_VOL_DOWN: 0xB,    // EBx - Fine volume slide down
-  NOTE_CUT: 0xC,         // ECx - Note cut
-  NOTE_DELAY: 0xD,       // EDx - Note delay
-  PATTERN_DELAY: 0xE,    // EEx - Pattern delay
-  INVERT_LOOP: 0xF,      // EFx - Invert loop / Funk repeat
+  FILTER: 0x0,
+  FINE_PORTA_UP: 0x1,
+  FINE_PORTA_DOWN: 0x2,
+  GLISSANDO: 0x3,
+  VIBRATO_WAVEFORM: 0x4,
+  FINETUNE: 0x5,
+  PATTERN_LOOP: 0x6,
+  TREMOLO_WAVEFORM: 0x7,
+  PANNING: 0x8,
+  RETRIG: 0x9,
+  FINE_VOL_UP: 0xA,
+  FINE_VOL_DOWN: 0xB,
+  NOTE_CUT: 0xC,
+  NOTE_DELAY: 0xD,
+  PATTERN_DELAY: 0xE,
+  INVERT_LOOP: 0xF,
 };
 
 /**
@@ -68,10 +71,10 @@ export class MODHandler extends BaseFormatHandler {
 
   // ProTracker-specific settings
   private emulatePTBugs: boolean = true;
-  private ciaBPMDelay: number | null = null; // For CIA timing bug
+  private ciaBPMDelay: number | null = null;
 
-  // Active effects per channel (for tick processing)
-  private activeEffects: Map<number, {
+  // Active effects per channel
+  protected activeEffects: Map<number, {
     type: string;
     param: number;
     x: number;
@@ -79,9 +82,17 @@ export class MODHandler extends BaseFormatHandler {
   }> = new Map();
 
   // Pattern loop state
-  private patternLoopRow: number = 0;
-  private patternLoopCount: number = 0;
-  public patternDelayCount: number = 0; // Used for EEx pattern delay effect
+  private patternLoopRow: Map<number, number> = new Map();
+  private patternLoopCount: Map<number, number> = new Map();
+  public patternDelayCount: number = 0;
+
+  /**
+   * MOD frequency calculation (standard Amiga PAL)
+   */
+  public periodToHz(period: number): number {
+    if (period <= 0) return 0;
+    return periodToFrequency(period);
+  }
 
   /**
    * Initialize with format config
@@ -90,8 +101,8 @@ export class MODHandler extends BaseFormatHandler {
     super.init(config);
     this.emulatePTBugs = config.emulatePTBugs ?? true;
     this.activeEffects.clear();
-    this.patternLoopRow = 0;
-    this.patternLoopCount = 0;
+    this.patternLoopRow.clear();
+    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
     this.ciaBPMDelay = null;
   }
@@ -102,8 +113,8 @@ export class MODHandler extends BaseFormatHandler {
   resetAll(): void {
     super.resetAll();
     this.activeEffects.clear();
-    this.patternLoopRow = 0;
-    this.patternLoopCount = 0;
+    this.patternLoopRow.clear();
+    this.patternLoopCount.clear();
     this.patternDelayCount = 0;
     this.ciaBPMDelay = null;
   }
@@ -115,62 +126,89 @@ export class MODHandler extends BaseFormatHandler {
     channel: number,
     note: string | null,
     instrument: number | null,
-    volume: number | null,
+    _volume: number | null,
     effect: string | null,
     state: ChannelState
   ): TickResult {
     const result: TickResult = {};
 
-    // Clear active effect for this channel
     this.activeEffects.delete(channel);
 
-    // Handle delayed BPM change (CIA timing bug)
     if (this.emulatePTBugs && this.ciaBPMDelay !== null) {
       result.setBPM = this.ciaBPMDelay;
       this.ciaBPMDelay = null;
     }
 
-    // Handle instrument change
+    // Handle instrument change (Swap quirk)
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
-      // In ProTracker, instrument change resets volume
-      // UNLESS it's a tone portamento (3xx) which preserves volume
-      const parsed = this.parseEffect(effect);
-      const isTonePorta = parsed && (
-        parsed.command === MOD_EFFECTS.TONE_PORTA ||
-        parsed.command === MOD_EFFECTS.TONE_PORTA_VOL_SLIDE
-      );
-      if (!isTonePorta) {
-        state.volume = 64;
-        result.setVolume = state.volume;
+      
+      const defaultVol = (state as any).activeInstrument?.defaultVolume ?? 64;
+      const defaultFinetune = (state as any).activeInstrument?.finetune ?? 0;
+
+      state.volume = defaultVol;
+      result.setVolume = state.volume;
+
+      const oldFinetune = state.finetune;
+      state.finetune = defaultFinetune;
+
+      if (!note || note === '...' || note === '---') {
+        if (state.period > 0 && oldFinetune !== defaultFinetune) {
+          const noteStr = periodToNoteString(state.period, oldFinetune);
+          state.period = this.noteStringToPeriod(noteStr, defaultFinetune);
+          state.frequency = this.periodToHz(state.period);
+          result.setPeriod = state.period;
+          result.setFrequency = state.frequency;
+        }
+        result.triggerNote = false;
       }
     }
 
-    // Handle note
-    if (note && note !== '...' && note !== '---') {
+    if (_volume !== null && _volume !== 255 && _volume <= 64) {
+      state.volume = _volume;
+      result.setVolume = state.volume;
+    }
+
+    if (effect) {
+      const effectResult = this.processEffectTick0(channel, effect, state, note, instrument);
+      Object.assign(result, effectResult);
+      
+      const tick0Continuous = this.processTick(channel, 0, state);
+      if (this.format === 'MOD') {
+        delete tick0Continuous.setPeriod;
+        if (tick0Continuous.setVolume === state.volume) delete tick0Continuous.setVolume;
+      }
+      Object.assign(result, tick0Continuous);
+    }
+
+    if (note && note !== '...' && note !== '---' && !result.preventNoteTrigger) {
       if (note === '===' || note === '^^^') {
-        // Note off
         result.cutNote = true;
         state.noteOn = false;
       } else {
-        // Convert note to period
-        const period = noteStringToPeriod(note, state.finetune);
+        const period = this.noteStringToPeriod(note, state.finetune);
         if (period > 0) {
-          // Check if this is a tone portamento target
           const parsed = this.parseEffect(effect);
-          if (parsed && (parsed.command === MOD_EFFECTS.TONE_PORTA ||
-                        parsed.command === MOD_EFFECTS.TONE_PORTA_VOL_SLIDE)) {
-            // Don't trigger note, just set portamento target
-            state.portamentoTarget = period;
+          const isTonePorta = parsed && (parsed.command === MOD_EFFECTS.TONE_PORTA ||
+                                       parsed.command === MOD_EFFECTS.TONE_PORTA_VOL_SLIDE);
+          
+          if (isTonePorta) {
+            let targetPeriod = period;
+            if (this.emulatePTBugs) {
+              const baseIndex = periodToNoteIndex(period, state.finetune);
+              const ftIndex = finetuneToIndex(state.finetune);
+              if (ftIndex >= 8 && baseIndex > 0) {
+                targetPeriod = PERIOD_TABLE[ftIndex][baseIndex - 1];
+              }
+            }
+            state.portamentoTarget = targetPeriod;
           } else {
-            // Trigger note
             state.period = period;
-            state.frequency = periodToFrequency(period);
+            state.frequency = this.periodToHz(period);
             state.noteOn = true;
             result.triggerNote = true;
             result.setPeriod = period;
 
-            // Reset vibrato/tremolo position on new note (unless waveform bit 4 set)
             if (state.vibratoRetrigger) state.vibratoPos = 0;
             if (state.tremoloRetrigger) state.tremoloPos = 0;
           }
@@ -178,30 +216,15 @@ export class MODHandler extends BaseFormatHandler {
       }
     }
 
-    // Handle volume column (not in original PT, but common extension)
-    if (volume !== null && volume >= 0 && volume <= 64) {
-      state.volume = volume;
-      result.setVolume = volume;
-    }
-
-    // Process effect command
-    if (effect) {
-      const effectResult = this.processEffectTick0(channel, effect, state, note, instrument);
-      Object.assign(result, effectResult);
-    }
-
     return result;
   }
 
-  /**
-   * Process effect on tick 0
-   */
   private processEffectTick0(
     channel: number,
     effect: string,
     state: ChannelState,
     note: string | null,
-    _instrument: number | null // Kept for signature consistency, unused after 9xx simplification
+    _instrument: number | null
   ): TickResult {
     const result: TickResult = {};
     const parsed = this.parseEffect(effect);
@@ -210,7 +233,6 @@ export class MODHandler extends BaseFormatHandler {
     const { command, x, y, param } = parsed;
 
     switch (command) {
-      // 0xy - Arpeggio
       case MOD_EFFECTS.ARPEGGIO:
         if (param !== 0) {
           state.lastArpeggio = param;
@@ -218,26 +240,21 @@ export class MODHandler extends BaseFormatHandler {
         }
         break;
 
-      // 1xx - Portamento up
       case MOD_EFFECTS.PORTA_UP:
         if (param > 0) state.lastPortaUp = param;
         this.activeEffects.set(channel, { type: 'portaUp', param: state.lastPortaUp, x, y });
         break;
 
-      // 2xx - Portamento down
       case MOD_EFFECTS.PORTA_DOWN:
         if (param > 0) state.lastPortaDown = param;
         this.activeEffects.set(channel, { type: 'portaDown', param: state.lastPortaDown, x, y });
         break;
 
-      // 3xx - Tone portamento
       case MOD_EFFECTS.TONE_PORTA:
         if (param > 0) state.lastTonePortaSpeed = param;
-        // Note: Volume reset for instrument change with 3xx is handled in processRowStart()
         this.activeEffects.set(channel, { type: 'tonePorta', param: state.lastTonePortaSpeed, x, y });
         break;
 
-      // 4xy - Vibrato
       case MOD_EFFECTS.VIBRATO:
         if (x > 0) state.lastVibratoSpeed = x;
         if (y > 0) state.lastVibratoDepth = y;
@@ -246,17 +263,14 @@ export class MODHandler extends BaseFormatHandler {
         this.activeEffects.set(channel, { type: 'vibrato', param, x, y });
         break;
 
-      // 5xy - Tone portamento + volume slide
       case MOD_EFFECTS.TONE_PORTA_VOL_SLIDE:
         this.activeEffects.set(channel, { type: 'tonePortaVolSlide', param, x, y });
         break;
 
-      // 6xy - Vibrato + volume slide
       case MOD_EFFECTS.VIBRATO_VOL_SLIDE:
         this.activeEffects.set(channel, { type: 'vibratoVolSlide', param, x, y });
         break;
 
-      // 7xy - Tremolo
       case MOD_EFFECTS.TREMOLO:
         if (x > 0) state.lastTremoloSpeed = x;
         if (y > 0) state.lastTremoloDepth = y;
@@ -265,47 +279,25 @@ export class MODHandler extends BaseFormatHandler {
         this.activeEffects.set(channel, { type: 'tremolo', param, x, y });
         break;
 
-      // 8xx - Set panning (extension - DISABLED for strict PT compliance)
-      case MOD_EFFECTS.SET_PANNING:
-        // ProTracker does not support 8xx panning. 
-        // This is a common extension (e.g. FastTracker), but for 1:1 PT accuracy,
-        // channels are hard-panned LRRL. We ignore this command.
-        break;
-
-      // 9xx - Sample offset (PT2.3D accurate implementation)
       case MOD_EFFECTS.SAMPLE_OFFSET: {
-        /* PT2.3D behavior (from pt2-clone source):
-         * - If param > 0, store it for future use
-         * - If param = 0, use previously stored value
-         * - Offset = stored_param * 256 bytes (128 words * 2 bytes/word)
-         * - No doubling bugs, no PT1/2 quirks
-         */
-
-        // Store param if > 0, otherwise use cached value
-        if (param > 0) {
-          state.lastSampleOffset = param;
+        if (param > 0) state.lastSampleOffset = param;
+        let offsetValue = state.lastSampleOffset << 8;
+        if (this.emulatePTBugs && _instrument !== null && _instrument > 0) {
+          offsetValue += (state.lastSampleOffset << 8);
         }
-
-        // Calculate offset: param * 256 bytes
-        // PT2 does: (param << 7) for words, then << 1 for bytes = 256
-        const offsetValue = state.lastSampleOffset << 8;
-
         result.sampleOffset = offsetValue;
         break;
       }
 
-      // Axy - Volume slide
       case MOD_EFFECTS.VOLUME_SLIDE:
         if (param > 0) state.lastVolumeSlide = param;
         this.activeEffects.set(channel, { type: 'volumeSlide', param: state.lastVolumeSlide, x, y });
         break;
 
-      // Bxx - Position jump
       case MOD_EFFECTS.POSITION_JUMP:
         result.positionJump = param;
         break;
 
-      // Cxx - Set volume
       case MOD_EFFECTS.SET_VOLUME: {
         const vol = Math.min(param, 64);
         state.volume = vol;
@@ -313,31 +305,24 @@ export class MODHandler extends BaseFormatHandler {
         break;
       }
 
-      // Dxx - Pattern break
       case MOD_EFFECTS.PATTERN_BREAK: {
-        // In ProTracker, Dxx parameter is BCD (D32 = row 32, not 50)
         const breakRow = x * 10 + y;
-        result.patternBreak = Math.min(breakRow, 63);
+        result.patternBreak = breakRow > 63 ? 0 : breakRow;
         break;
       }
 
-      // Exx - Extended commands
       case MOD_EFFECTS.E_COMMANDS:
         this.processECommandTick0(channel, x, y, state, note, result);
         break;
 
-      // Fxx - Set speed/tempo
       case MOD_EFFECTS.SET_SPEED:
         if (param === 0) {
-          // F00 = stop (not implemented - would require transport control)
+          result.stopSong = true;
         } else if (param < 0x20) {
-          // 01-1F: Set speed (ticks per row)
           this.speed = param;
           result.setSpeed = param;
         } else {
-          // 20-FF: Set BPM
           if (this.emulatePTBugs) {
-            // CIA timing bug: BPM change delayed by 1 tick
             this.ciaBPMDelay = param;
           } else {
             this.tempo = param;
@@ -350,9 +335,6 @@ export class MODHandler extends BaseFormatHandler {
     return result;
   }
 
-  /**
-   * Process E-commands on tick 0
-   */
   private processECommandTick0(
     channel: number,
     x: number,
@@ -362,81 +344,63 @@ export class MODHandler extends BaseFormatHandler {
     result: TickResult
   ): void {
     switch (x) {
-      // E0x - Amiga filter (not implemented)
       case MOD_E_COMMANDS.FILTER:
+        result.setAmigaFilter = (y === 0);
         break;
 
-      // E1x - Fine portamento up
       case MOD_E_COMMANDS.FINE_PORTA_UP:
         if (y > 0 && state.period > 0) {
           state.period = Math.max(PT_MIN_PERIOD, state.period - y);
-          state.frequency = periodToFrequency(state.period);
+          state.frequency = this.periodToHz(state.period);
           result.setPeriod = state.period;
         }
         break;
 
-      // E2x - Fine portamento down
       case MOD_E_COMMANDS.FINE_PORTA_DOWN:
         if (y > 0 && state.period > 0) {
           state.period = Math.min(PT_MAX_PERIOD, state.period + y);
-          state.frequency = periodToFrequency(state.period);
+          state.frequency = this.periodToHz(state.period);
           result.setPeriod = state.period;
         }
         break;
 
-      // E3x - Glissando control
       case MOD_E_COMMANDS.GLISSANDO:
-        // y=0: Off (smooth portamento)
-        // y=1: On (round tone portamento to nearest semitone)
         state.glissando = (y !== 0);
         break;
 
-      // E4x - Vibrato waveform
       case MOD_E_COMMANDS.VIBRATO_WAVEFORM:
         state.vibratoWaveform = this.waveformFromNumber(y & 3);
         state.vibratoRetrigger = (y & 4) === 0;
         break;
 
-      // E5x - Set finetune
       case MOD_E_COMMANDS.FINETUNE:
-        // Convert unsigned 0-15 to signed -8 to +7
         state.finetune = y > 7 ? y - 16 : y;
         break;
 
-      // E6x - Pattern loop
       case MOD_E_COMMANDS.PATTERN_LOOP:
         if (y === 0) {
-          // Set loop start point
-          this.patternLoopRow = this.currentRow;
+          this.patternLoopRow.set(channel, this.currentRow);
         } else {
-          // Loop y times
-          if (this.patternLoopCount === 0) {
-            this.patternLoopCount = y;
+          const currentCount = this.patternLoopCount.get(channel) ?? 0;
+          if (currentCount === 0) {
+            this.patternLoopCount.set(channel, y);
           } else {
-            this.patternLoopCount--;
+            this.patternLoopCount.set(channel, currentCount - 1);
           }
-          if (this.patternLoopCount > 0) {
+          if ((this.patternLoopCount.get(channel) ?? 0) > 0) {
             result.patternLoop = {
-              startRow: this.patternLoopRow,
-              count: this.patternLoopCount,
+              startRow: this.patternLoopRow.get(channel) ?? 0,
+              count: this.patternLoopCount.get(channel) ?? 0,
             };
           }
         }
         break;
 
-      // E7x - Tremolo waveform
       case MOD_E_COMMANDS.TREMOLO_WAVEFORM:
         state.tremoloWaveform = this.waveformFromNumber(y & 3);
         state.tremoloRetrigger = (y & 4) === 0;
         break;
 
-      // E8x - Karplus Strong (Not implemented)
-      // Standard ProTracker uses E8x for Karplus Strong (destructive sample effect).
-      // Many modern trackers use it for panning, but for 1:1 PT accuracy, we skip it.
-      case MOD_E_COMMANDS.PANNING:
-        break;
-
-      // E9x - Retrigger note
       case MOD_E_COMMANDS.RETRIG:
         if (y > 0) {
           state.retrigTick = y;
@@ -444,35 +408,29 @@ export class MODHandler extends BaseFormatHandler {
         }
         break;
 
-      // EAx - Fine volume slide up
       case MOD_E_COMMANDS.FINE_VOL_UP:
         state.volume = this.clampVolume(state.volume + y);
         result.setVolume = state.volume;
         break;
 
-      // EBx - Fine volume slide down
       case MOD_E_COMMANDS.FINE_VOL_DOWN:
         state.volume = this.clampVolume(state.volume - y);
         result.setVolume = state.volume;
         break;
 
-      // ECx - Note cut
       case MOD_E_COMMANDS.NOTE_CUT:
         state.noteCutTick = y;
         this.activeEffects.set(channel, { type: 'noteCut', param: y, x: 0, y });
         break;
 
-      // EDx - Note delay
       case MOD_E_COMMANDS.NOTE_DELAY:
         if (y > 0 && note) {
           state.noteDelayTick = y;
           this.activeEffects.set(channel, { type: 'noteDelay', param: y, x: 0, y });
-          // Note will be triggered later, so prevent immediate trigger
           result.preventNoteTrigger = true;
         }
         break;
 
-      // EEx - Pattern delay
       case MOD_E_COMMANDS.PATTERN_DELAY:
         if (y > 0) {
           this.patternDelayCount = y;
@@ -480,25 +438,30 @@ export class MODHandler extends BaseFormatHandler {
         }
         break;
 
-      // EFx - Invert loop / Funk repeat
       case MOD_E_COMMANDS.INVERT_LOOP:
-        // This is a destructive effect that modifies sample data
-        // Not implemented as it requires direct sample access
+        if (y === 0) {
+          state.funkRepeatPos = 0;
+        } else {
+          if (state.funkRepeatPos === undefined) state.funkRepeatPos = 0;
+          this.activeEffects.set(channel, { type: 'invertLoop', param: y, x: 0, y });
+        }
         break;
     }
   }
 
-  /**
-   * Process effect on ticks 1+ (not tick 0)
-   */
   processTick(
     channel: number,
     tick: number,
     state: ChannelState
   ): TickResult {
     const result: TickResult = {};
-    const activeEffect = this.activeEffects.get(channel);
 
+    if (this.emulatePTBugs && tick === 1 && this.ciaBPMDelay !== null) {
+      result.setBPM = this.ciaBPMDelay;
+      this.ciaBPMDelay = null;
+    }
+
+    const activeEffect = this.activeEffects.get(channel);
     if (!activeEffect) return result;
 
     const { type, param, x, y } = activeEffect;
@@ -509,15 +472,19 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case 'portaUp':
-        this.processPortaUp(state, param, result);
+        this.processPortaUp(state, param, result, PT_MIN_PERIOD);
         break;
 
       case 'portaDown':
-        this.processPortaDown(state, param, result);
+        this.processPortaDown(state, param, result, PT_MAX_PERIOD);
         break;
 
       case 'tonePorta':
         this.processTonePorta(state, param, result);
+        if (state.glissando && result.setPeriod !== undefined) {
+          result.setPeriod = snapPeriodToSemitone(result.setPeriod, state.finetune);
+          result.setFrequency = this.periodToHz(result.setPeriod);
+        }
         break;
 
       case 'vibrato':
@@ -526,12 +493,12 @@ export class MODHandler extends BaseFormatHandler {
 
       case 'tonePortaVolSlide':
         this.processTonePorta(state, state.lastTonePortaSpeed, result);
-        this.processVolumeSlide(state, x, y, result, tick);
+        this.processVolumeSlide(state, x, y, result);
         break;
 
       case 'vibratoVolSlide':
         this.processVibrato(state, result);
-        this.processVolumeSlide(state, x, y, result, tick);
+        this.processVolumeSlide(state, x, y, result);
         break;
 
       case 'tremolo':
@@ -539,12 +506,15 @@ export class MODHandler extends BaseFormatHandler {
         break;
 
       case 'volumeSlide':
-        this.processVolumeSlide(state, x, y, result, tick);
+        this.processVolumeSlide(state, x, y, result);
         break;
 
       case 'retrig':
         if (tick > 0 && tick % param === 0) {
           result.triggerNote = true;
+          if (this.emulatePTBugs && state.lastSampleOffset > 0) {
+            result.sampleOffset = state.lastSampleOffset << 8;
+          }
         }
         break;
 
@@ -561,14 +531,52 @@ export class MODHandler extends BaseFormatHandler {
           result.triggerNote = true;
         }
         break;
+
+      case 'invertLoop':
+        if (state.funkRepeatPos !== undefined) {
+          state.funkRepeatPos += param;
+          if (state.funkRepeatPos > 0x80) state.funkRepeatPos = 0;
+          result.funkRepeat = state.funkRepeatPos;
+        }
+        break;
     }
 
     return result;
   }
 
-  /**
-   * Process arpeggio effect (0xy)
-   */
+  protected getWaveformValueInt(waveform: WaveformType, pos: number): number {
+    const p = pos & 0x3F;
+    switch (waveform) {
+      case 'sine':
+        const val = VIBRATO_TABLE[p & 0x1F];
+        return p < 32 ? val : -val;
+      case 'rampDown':
+        return 255 - (p * 4);
+      case 'square':
+        return p < 32 ? 255 : -255;
+      default:
+        return 0;
+    }
+  }
+
+  protected processVibrato(state: ChannelState, result: TickResult): void {
+    if (state.period <= 0) return;
+    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
+    const waveValue = this.getWaveformValueInt(state.vibratoWaveform, state.vibratoPos);
+    const delta = (waveValue * state.vibratoDepth) >> 7;
+    const finalPeriod = state.period + delta;
+    result.setPeriod = finalPeriod;
+    result.setFrequency = this.periodToHz(finalPeriod);
+  }
+
+  protected processTremolo(state: ChannelState, result: TickResult): void {
+    state.tremoloPos = (state.tremoloPos + state.tremoloSpeed) & 0x3F;
+    const waveValue = this.getWaveformValueInt(state.tremoloWaveform, state.tremoloPos);
+    const delta = (waveValue * state.tremoloDepth) >> 6;
+    const newVolume = this.clampVolume(state.volume + delta);
+    result.setVolume = newVolume;
+  }
+
   private processArpeggio(
     tick: number,
     state: ChannelState,
@@ -577,202 +585,35 @@ export class MODHandler extends BaseFormatHandler {
     result: TickResult
   ): void {
     if (state.period <= 0) return;
-
-    // Cycle through base, +x, +y semitones
     const offsets = [0, x, y];
     const offset = offsets[tick % 3];
-
     if (offset === 0) {
       result.setPeriod = state.period;
     } else {
-      const newPeriod = getArpeggioPeriod(
-        state.period,
-        offset,
-        state.finetune,
-        this.emulatePTBugs
-      );
-      result.setPeriod = newPeriod;
-    }
-
-    result.setFrequency = periodToFrequency(result.setPeriod!);
-  }
-
-  /**
-   * Process portamento up (1xx)
-   */
-  private processPortaUp(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    state.period -= speed;
-    if (state.period < PT_MIN_PERIOD) {
-      state.period = PT_MIN_PERIOD;
-    }
-
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process portamento down (2xx)
-   */
-  private processPortaDown(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    state.period += speed;
-    if (state.period > PT_MAX_PERIOD) {
-      state.period = PT_MAX_PERIOD;
-    }
-
-    state.frequency = periodToFrequency(state.period);
-    result.setPeriod = state.period;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process tone portamento (3xx)
-   */
-  private processTonePorta(state: ChannelState, speed: number, result: TickResult): void {
-    if (state.period <= 0 || state.portamentoTarget <= 0) return;
-
-    // Slide period towards target
-    if (state.period < state.portamentoTarget) {
-      state.period += speed;
-      if (state.period > state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    } else if (state.period > state.portamentoTarget) {
-      state.period -= speed;
-      if (state.period < state.portamentoTarget) {
-        state.period = state.portamentoTarget;
-      }
-    }
-
-    // Apply glissando (E3x) - snap to nearest semitone
-    let finalPeriod = state.period;
-    if (state.glissando) {
-      finalPeriod = snapPeriodToSemitone(state.period, state.finetune);
-    }
-
-    state.frequency = periodToFrequency(finalPeriod);
-    result.setPeriod = finalPeriod;
-    result.setFrequency = state.frequency;
-  }
-
-  /**
-   * Process vibrato (4xy)
-   */
-  private processVibrato(state: ChannelState, result: TickResult): void {
-    if (state.period <= 0) return;
-
-    // Get waveform value (-1 to 1)
-    const waveValue = this.getWaveformValue(state.vibratoWaveform, state.vibratoPos);
-
-    // PT2.3D vibrato scaling: (waveValue * depth) >> 7
-    // Since waveValue is normalized (-1 to 1), we multiply by depth * 2
-    // to match PT2's (255 * depth / 128) ≈ depth * 2 formula
-    const delta = Math.floor(waveValue * state.vibratoDepth * 2);
-
-    // Apply to period (don't modify base period, just output)
-    const newPeriod = state.period + delta;
-    result.setPeriod = newPeriod;
-    result.setFrequency = periodToFrequency(newPeriod);
-
-    // Advance vibrato position: PT2 uses (speed >> 2) & 0x3C
-    // With speed stored as nibble (0-15), this becomes speed * 4
-    state.vibratoPos = (state.vibratoPos + state.vibratoSpeed * 4) & 0x3F;
-  }
-
-  /**
-   * Process tremolo (7xy)
-   * Note: In original ProTracker, tremolo uses vibratoPos (bug in ramp waveform)
-   */
-  private processTremolo(state: ChannelState, result: TickResult): void {
-    // ProTracker 1:1 implementation
-    const pos = this.emulatePTBugs ? state.vibratoPos : state.tremoloPos;
-    
-    // Map string waveform to number: 0=sine, 1=ramp, 2=square, 3=random
-    let type = 0;
-    switch (state.tremoloWaveform) {
-      case 'rampDown': type = 1; break;
-      case 'square': type = 2; break;
-      case 'random': type = 3; break;
-      default: type = 0;
-    }
-    
-    // Calculate table index (0-31)
-    const tableIndex = pos & 0x1F;
-    
-    let tremoloData = 0;
-    
-    switch (type) {
-      case 0: // Sine
-        tremoloData = VIBRATO_TABLE[tableIndex];
-        break;
-      case 1: // Ramp
-        // PT Bug: Ramp uses vibratoPos even if tremoloPos should be used
-        // Since we selected 'pos' based on emulatePTBugs above, we just check phase
-        // Ramp down: 255 -> 0
-        if (this.emulatePTBugs ? (state.vibratoPos & 0x20) === 0 : (state.tremoloPos & 0x20) === 0) {
-          tremoloData = tableIndex << 3; // 0-31 -> 0-248
-        } else {
-          tremoloData = 255 - (tableIndex << 3);
+      const ftIndex = finetuneToIndex(state.finetune);
+      const baseIndex = periodToNoteIndex(state.period, state.finetune);
+      let newPeriod: number;
+      if (baseIndex !== -1) {
+        let targetIndex = baseIndex + offset;
+        if (this.emulatePTBugs) {
+          if (targetIndex === 36) {
+            result.setPeriod = 0;
+            result.setFrequency = 0;
+            return;
+          } else if (targetIndex >= 37) {
+            targetIndex -= 37;
+          }
         }
-        break;
-      case 2: // Square
-        tremoloData = 255;
-        break;
-      case 3: // Random (not in standard PT, but in extensions)
-        tremoloData = Math.floor(Math.random() * 255);
-        break;
+        if (targetIndex < 36 && targetIndex >= 0) {
+          newPeriod = PERIOD_TABLE[ftIndex][targetIndex];
+        } else {
+          newPeriod = getArpeggioPeriod(state.period, offset, state.finetune, this.emulatePTBugs);
+        }
+      } else {
+        newPeriod = getArpeggioPeriod(state.period, offset, state.finetune, this.emulatePTBugs);
+      }
+      result.setPeriod = newPeriod;
+      result.setFrequency = result.setPeriod! > 0 ? this.periodToHz(result.setPeriod!) : 0;
     }
-
-    // Apply scaling: (data * depth) / 64
-    const delta = (tremoloData * state.tremoloDepth) >> 6;
-
-    // Apply to volume
-    // Add if phase is 0-31, Subtract if 32-63
-    let newVolume = state.volume;
-    if ((pos & 0x20) === 0) {
-      newVolume += delta;
-      if (newVolume > 64) newVolume = 64;
-    } else {
-      newVolume -= delta;
-      if (newVolume < 0) newVolume = 0;
-    }
-    
-    result.setVolume = newVolume;
-
-    // Advance tremolo position
-    // PT2: ch->n_tremolopos += (ch->n_tremolocmd >> 2) & 0x3C;
-    // DEViLBOX stores speed (x) separately. x * 4 is equivalent.
-    state.tremoloPos = (state.tremoloPos + state.tremoloSpeed * 4) & 0x3F;
-    
-    // PT bug: Tremolo updates vibrato position too if emulating bugs
-    if (this.emulatePTBugs) {
-        state.vibratoPos = state.tremoloPos; 
-    }
-  }
-
-  /**
-   * Process volume slide (Axy, 5xy, 6xy)
-   * Note: Volume slides should NOT happen on tick 0
-   */
-  private processVolumeSlide(
-    state: ChannelState,
-    up: number,
-    down: number,
-    result: TickResult,
-    tick?: number
-  ): void {
-    // Volume slides don't happen on tick 0 in ProTracker
-    if (tick === 0) return;
-
-    if (up > 0) {
-      state.volume = this.clampVolume(state.volume + up);
-    } else if (down > 0) {
-      state.volume = this.clampVolume(state.volume - down);
-    }
-    result.setVolume = state.volume;
   }
 }
