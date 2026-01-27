@@ -44,8 +44,20 @@ export class AmigaFilter extends Tone.ToneAudioNode {
 
   private async initWorklet() {
     const context = Tone.getContext();
-    // In Tone.js v14+, getContext().rawContext is the native BaseAudioContext (AudioContext or OfflineAudioContext)
-    const rawContext = context.rawContext;
+
+    // Get the actual native AudioContext - Tone.js wraps it
+    // We need the real BaseAudioContext for AudioWorkletNode
+    let rawContext: BaseAudioContext | null = null;
+
+    // Try different ways to get the native context
+    if (context.rawContext instanceof AudioContext || context.rawContext instanceof OfflineAudioContext) {
+      rawContext = context.rawContext;
+    } else if ((context as any)._context instanceof AudioContext) {
+      rawContext = (context as any)._context;
+    } else if (typeof (context.rawContext as any).baseLatency === 'number') {
+      // Duck-type check for native AudioContext
+      rawContext = context.rawContext as BaseAudioContext;
+    }
 
     if (!rawContext || !rawContext.audioWorklet) {
       console.warn('[AmigaFilter] AudioWorklet not supported or context not ready');
@@ -57,18 +69,10 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       // Diagnostic log to verify context type
       const contextType = rawContext.constructor.name;
       console.log('[AmigaFilter] Initializing on context type:', contextType);
-      
-      // If we are in a non-standard environment where rawContext might be a wrapper, 
-      // we try to reach deeper or fail gracefully
-      if (contextType !== 'AudioContext' && contextType !== 'OfflineAudioContext' && contextType !== 'webkitAudioContext') {
-        console.warn('[AmigaFilter] Context is not a native BaseAudioContext, falling back to bypass');
-        this.input.connect(this.output);
-        return;
-      }
 
       const baseUrl = import.meta.env.BASE_URL || '/';
       await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
-      
+
       // Construct the node using the native context
       this._worklet = new AudioWorkletNode(rawContext, 'amiga-filter-processor');
       
