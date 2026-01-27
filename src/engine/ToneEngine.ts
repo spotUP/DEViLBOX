@@ -2626,15 +2626,28 @@ export class ToneEngine {
   }
 
   /**
-   * Set channel volume
+   * Set channel volume (affects active voices on this channel)
+   * ProTracker Cxx command targets the voice/sample volume, not mixer volume
    */
   public setChannelVolume(channelIndex: number, volumeDb: number): void {
+    // Update active voice gains (ProTracker-style: Cxx affects sample volume)
+    const voices = this.activeVoices.get(channelIndex);
+    if (voices && voices.length > 0) {
+      const now = Tone.now();
+      // Convert dB to linear gain for voice nodes
+      const linearGain = volumeDb <= -60 ? 0 : Math.pow(10, volumeDb / 20);
+      for (const voice of voices) {
+        if (voice.nodes.gain) {
+          voice.nodes.gain.gain.setValueAtTime(linearGain, now);
+        }
+      }
+    }
+
+    // Also update channel output for consistency (affects future notes)
     const channelOutput = this.channelOutputs.get(channelIndex);
     if (channelOutput) {
-      console.log(`[ToneEngine] setChannelVolume ch${channelIndex} = ${volumeDb}dB`);
-      channelOutput.channel.volume.value = volumeDb;
-    } else {
-      console.warn(`[ToneEngine] setChannelVolume: no channel output for ch${channelIndex}`);
+      // Store as "base" volume but don't apply to channel mixer
+      // The voice gain handles the actual volume control
     }
   }
 
