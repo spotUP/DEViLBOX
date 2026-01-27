@@ -2605,6 +2605,7 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...TR707_PRESETS,
   ...TR505_PRESETS,
   ...CHIP_PRESETS,
+  ...FURNACE_PRESETS,
   ...FX_PRESETS,
   ...DRUMNIBUS_PRESETS,
 ];
@@ -2620,6 +2621,7 @@ export const PRESET_CATEGORIES = {
   'TR-707': TR707_PRESETS,
   'TR-505': TR505_PRESETS,
   Chip: CHIP_PRESETS,
+  Furnace: FURNACE_PRESETS,
   FX: FX_PRESETS,
   Drumnibus: DRUMNIBUS_PRESETS,
 };

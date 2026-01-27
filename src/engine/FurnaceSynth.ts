@@ -27,6 +27,8 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   private isNoteOn: boolean = false;
   private currentDuty: number = 2; // Default 50% duty (for PSG/NES/GB)
   private currentPan: number = 0;  // -127 to 127 (0 = center)
+  private velocity: number = 1.0;  // 0.0 to 1.0 for velocity modulation
+  private baseTLValues: number[] = []; // Store original TL values for velocity scaling
 
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
     super();
@@ -64,8 +66,8 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       const val = macro.data[pos];
 
       switch (macro.type) {
-        case 0: // Volume (0-127)
-          const volGain = Math.max(0, val / 127);
+        case 0: // Volume (0-127) with velocity scaling
+          const volGain = Math.max(0, (val / 127) * this.velocity);
           this.outputGain.gain.setValueAtTime(volGain, time);
           break;
 
@@ -494,25 +496,72 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.activeNoteFreq = freq;
     this.isNoteOn = true;
 
+    // Store velocity for macro modulation (0.0 to 1.0)
+    this.velocity = velocity !== undefined ? velocity : 1.0;
+
     // Reset all macro state for new note
     this.macroPositions.clear();
     this.opMacroPositions = Array.from({ length: 4 }, () => ({}));
     this.currentDuty = 2;  // Reset to 50% duty
     this.currentPan = 0;   // Reset to center
 
+    // Store base TL values before velocity scaling
+    this.baseTLValues = this.config.operators.map(op => op.tl);
+
+    // Apply velocity scaling to carrier operators for FM chips
+    this.applyVelocityToCarriers();
+
     const scheduledTime = time || Tone.now();
 
-    // 1. Setup registers
+    // 1. Setup registers (with velocity-scaled TL)
     this.updateParameters();
     this.updateFrequency(freq);
 
     // 2. Write Key ON (chip-specific)
     this.writeKeyOn(velocity);
 
-    // 3. Process first macro tick (velocity could affect starting volume)
+    // 3. Process first macro tick
     this.processTick(scheduledTime);
 
     return this;
+  }
+
+  /**
+   * Apply velocity scaling to carrier operators based on algorithm
+   * FM algorithms have different carrier/modulator configurations
+   * Only carriers (output operators) should be velocity-sensitive
+   */
+  private applyVelocityToCarriers(): void {
+    if (this.config.chipType !== 1 && this.config.chipType !== 33) {
+      return; // Only apply to FM chips (OPN2, OPM)
+    }
+
+    // Carrier operators by algorithm (0-7)
+    // Carrier = operator that outputs directly to DAC
+    const carriersByAlgorithm: number[][] = [
+      [3],           // Alg 0: Op4 is carrier
+      [3],           // Alg 1: Op4 is carrier
+      [3],           // Alg 2: Op4 is carrier
+      [3],           // Alg 3: Op4 is carrier
+      [1, 3],        // Alg 4: Op2, Op4 are carriers
+      [1, 2, 3],     // Alg 5: Op2, Op3, Op4 are carriers
+      [1, 2, 3],     // Alg 6: Op2, Op3, Op4 are carriers
+      [0, 1, 2, 3],  // Alg 7: All operators are carriers
+    ];
+
+    const carriers = carriersByAlgorithm[this.config.algorithm & 7] || [3];
+
+    // Velocity affects TL (total level) - lower TL = louder
+    // Scale: velocity 1.0 = original TL, velocity 0.0 = TL + 32 (quieter)
+    const tlOffset = Math.floor((1.0 - this.velocity) * 32);
+
+    for (const opIndex of carriers) {
+      if (this.config.operators[opIndex]) {
+        const baseTL = this.baseTLValues[opIndex];
+        // Clamp TL to 0-127 range
+        this.config.operators[opIndex].tl = Math.min(127, baseTL + tlOffset);
+      }
+    }
   }
 
   /**

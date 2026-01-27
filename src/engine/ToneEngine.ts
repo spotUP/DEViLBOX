@@ -92,6 +92,18 @@ export class ToneEngine {
   // Accent velocity boost factor
   private static readonly ACCENT_BOOST = 1.35; // 35% velocity increase for accents
 
+  // ===== PERFORMANCE OPTIMIZATION: Pre-computed lookup tables =====
+
+  // Filter cutoff frequency LUT (128 entries, exponential curve 100Hz to 10kHz)
+  private static readonly FILTER_CUTOFF_LUT: Float64Array = (() => {
+    const lut = new Float64Array(128);
+    for (let i = 0; i < 128; i++) {
+      // Exponential curve: 100 * 100^(i/127) gives range ~100Hz to ~10kHz
+      lut[i] = 100 * Math.pow(100, i / 127);
+    }
+    return lut;
+  })();
+
   // Metronome synth and state
   private metronomeSynth: Tone.MembraneSynth | null = null;
   private metronomeVolume: Tone.Gain | null = null;
@@ -3082,12 +3094,20 @@ export class ToneEngine {
     const channelOutput = this.channelOutputs.get(channelIndex);
     if (!voices || voices.length === 0 || !channelOutput) return;
 
-    const remainingVoices: VoiceState[] = [];
+    // Cache current time once for all voices (hot path optimization)
+    const now = Tone.now();
+    const basePan = channelOutput.channel.pan.value;
 
-    voices.forEach(voice => {
+    // In-place filtering: track write index
+    let writeIdx = 0;
+    const len = voices.length;
+
+    for (let i = 0; i < len; i++) {
+      const voice = voices[i];
+
       // 1. Advance volume envelope (0-64)
       const envVol = voice.volumeEnv.tickNext();
-      
+
       // Advance fadeout if key is off
       if (voice.isKeyOff && voice.fadeout > 0) {
         voice.fadeout = Math.max(0, voice.fadeout - voice.fadeoutStep);
@@ -3095,16 +3115,14 @@ export class ToneEngine {
 
       // Calculate final volume multiplier (0.0 to 1.0)
       const volMult = (envVol / 64) * (voice.fadeout / 65536);
-      voice.nodes.gain.gain.setValueAtTime(volMult, Tone.now());
+      voice.nodes.gain.gain.setValueAtTime(volMult, now);
 
       // 2. Advance panning envelope (0-64)
       const envPan = voice.panningEnv.tickNext();
       if (envPan !== 32) {
-        // Base pan is in channel node (-1..1)
-        const basePan = channelOutput.channel.pan.value;
         const envOffset = (envPan - 32) / 32;
         const finalPan = Math.max(-1, Math.min(1, basePan + envOffset));
-        voice.nodes.panner.pan.setValueAtTime(finalPan, Tone.now());
+        voice.nodes.panner.pan.setValueAtTime(finalPan, now);
       }
 
       // 3. Advance pitch/filter envelope
@@ -3114,19 +3132,17 @@ export class ToneEngine {
           const baseCutoff = voice.lastCutoff;
           const envOffset = (envPitch - 32);
           const finalCutoff = Math.max(0, Math.min(127, baseCutoff + envOffset));
-          
-          // Apply to voice filter
+
+          // Apply to voice filter using LUT
           if (voice.nodes.filter instanceof Tone.Filter) {
-            const freq = 100 * Math.pow(100, finalCutoff / 127);
-            voice.nodes.filter.frequency.setValueAtTime(freq, Tone.now());
+            const freq = ToneEngine.FILTER_CUTOFF_LUT[finalCutoff];
+            voice.nodes.filter.frequency.setValueAtTime(freq, now);
           } else if (voice.nodes.filter instanceof AudioWorkletNode) {
-            voice.nodes.filter.parameters.get('cutoff')?.setValueAtTime(finalCutoff, Tone.now());
+            voice.nodes.filter.parameters.get('cutoff')?.setValueAtTime(finalCutoff, now);
           }
         } else {
           // Pitch modulation (Additive semitones)
           const semitoneOffset = (envPitch - 32) / 32 * 12; // +/- 12 semitones
-          // Note: Pitch modulation requires per-voice oscillator control
-          // Player/Sampler usually have detune/playbackRate
           if ((voice.instrument as any).detune !== undefined) {
             (voice.instrument as any).detune.value = semitoneOffset * 100;
           }
@@ -3134,21 +3150,23 @@ export class ToneEngine {
       }
 
       // Cleanup: check if voice is finished
-      const isFinished = (voice.isKeyOff && voice.fadeout <= 0) || 
+      const isFinished = (voice.isKeyOff && voice.fadeout <= 0) ||
                         (voice.volumeEnv.isFinished() && voice.isKeyOff);
-      
+
       if (!isFinished) {
-        remainingVoices.push(voice);
+        // Keep voice - write to current position
+        voices[writeIdx++] = voice;
       } else {
         // Dispose nodes
         voice.nodes.gain.dispose();
         voice.nodes.filter.dispose();
         voice.nodes.panner.dispose();
       }
-    });
+    }
 
-    if (remainingVoices.length > 0) {
-      this.activeVoices.set(channelIndex, remainingVoices);
+    // Truncate array in-place
+    if (writeIdx > 0) {
+      voices.length = writeIdx;
     } else {
       this.activeVoices.delete(channelIndex);
     }

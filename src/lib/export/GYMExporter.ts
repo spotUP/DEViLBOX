@@ -42,7 +42,7 @@ export interface GYMExportOptions {
  * GYM only supports YM2612 and SN76489 (PSG)
  */
 export function canExportGYM(writes: RegisterWrite[]): boolean {
-  const supportedChips = [FurnaceChipType.OPN2, FurnaceChipType.PSG];
+  const supportedChips: number[] = [FurnaceChipType.OPN2, FurnaceChipType.PSG];
   return writes.some(w => supportedChips.includes(w.chipType));
 }
 

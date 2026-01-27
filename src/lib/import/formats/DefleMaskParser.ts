@@ -313,13 +313,19 @@ export class DefleMaskParser {
       am: reader.readUint8() !== 0,
       ar: reader.readUint8(),
       dr: reader.readUint8(),
+      d2r: 0,
       mult: reader.readUint8(),
       rr: reader.readUint8(),
       sl: reader.readUint8(),
       tl: reader.readUint8(),
       dt: 0,
+      dt2: 0,
       rs: 0,
       ksr: false,
+      ksl: 0,
+      sus: false,
+      vib: false,
+      ws: 0,
       ssg: 0
     };
 
@@ -373,12 +379,18 @@ export class DefleMaskParser {
           tl: reader.readUint8(),
           ar: reader.readUint8(),
           dr: reader.readUint8(),
+          d2r: 0,
           sl: reader.readUint8(),
           rr: reader.readUint8(),
           dt: reader.readInt8(),
+          dt2: 0,
           rs: reader.readUint8(),
           am: false,
           ksr: false,
+          ksl: 0,
+          sus: false,
+          vib: false,
+          ws: 0,
           ssg: 0
         };
         config.operators.push(op);

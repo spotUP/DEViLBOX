@@ -85,8 +85,7 @@ export class FurnaceParser {
 
   private static parseOldFormat(reader: BinaryReader): { name: string; config: FurnaceConfig } {
     reader.seek(16);
-    const version = reader.readUint16();
-    reader.skip(2);
+    reader.skip(4); // Skip version (2 bytes) + reserved (2 bytes)
     const dataPtr = reader.readUint32();
     const waveCount = reader.readUint16();
     const sampleCount = reader.readUint16();
@@ -167,11 +166,14 @@ export class FurnaceParser {
         enabled: ((opEnabled >> i) & 1) !== 0,
         mult: reader.readUint8() & 0x0F,
         dt: (reader.readUint8() >> 4) & 0x07,
+        dt2: 0,
         tl: reader.readUint8(),
         ar: reader.readUint8() & 0x1F,
         dr: reader.readUint8() & 0x1F,
+        d2r: 0,
         sl: (reader.readUint8() >> 4) & 0x0F,
         rr: reader.readUint8() & 0x0F,
+        rs: 0,
         ssg: reader.readUint8() & 0x0F,
         am: false, ksl: 0, ksr: false, sus: false, vib: false, ws: 0
       };

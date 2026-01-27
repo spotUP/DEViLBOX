@@ -56,6 +56,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   const isPlaying = useTransportStore((state) => state.isPlaying);
   const smoothScrolling = useTransportStore((state) => state.smoothScrolling);
   const bpm = useTransportStore((state) => state.bpm);
+  const loopStartRow = useTransportStore((state) => state.loopStartRow);
 
   // Instrument store selector
   const instruments = useInstrumentStore((state) => state.instruments);
@@ -67,6 +68,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   const [showHumanize, setShowHumanize] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const scrollIntervalRef = useRef<number | null>(null);
   const mouseMoveHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
@@ -151,7 +153,10 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
     };
   }, [isDragging, endSelection]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => setScrollLeft(e.currentTarget.scrollLeft);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(e.currentTarget.scrollLeft);
+    setScrollTop(e.currentTarget.scrollTop);
+  };
 
   const handleCellMouseDown = useCallback((channelIndex: number, rowIndex: number) => {
     moveCursorToChannel(channelIndex);
@@ -274,6 +279,34 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
         <div className="sticky top-0 left-0 w-full h-0 z-30 pointer-events-none overflow-visible">
           {/* Edit Bar - Modern Cyan Highlight */}
           <div className="absolute z-10" style={{ top: (dimensions.height / 2) - (ROW_HEIGHT / 2) - (HEADER_HEIGHT / 2), width: columnVirtualizer.getTotalSize(), height: ROW_HEIGHT, backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderTop: '1px solid var(--color-accent)', borderBottom: '1px solid var(--color-accent)', boxShadow: '0 0 15px var(--color-accent-glow)', transform: `translateX(${-scrollLeft}px)` }} />
+
+          {/* Loop Point Marker - Amber indicator */}
+          {loopStartRow > 0 && pattern && (
+            <div
+              className="absolute z-9 pointer-events-none"
+              style={{
+                top: (loopStartRow * ROW_HEIGHT) - scrollTop + HEADER_HEIGHT,
+                width: columnVirtualizer.getTotalSize(),
+                height: ROW_HEIGHT,
+                backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                borderTop: '2px solid #f59e0b',
+                transform: `translateX(${-scrollLeft}px)`,
+              }}
+            >
+              {/* Loop flag indicator */}
+              <div
+                className="absolute -left-0 -top-0 px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wider"
+                style={{
+                  backgroundColor: '#f59e0b',
+                  color: '#1a1a1a',
+                  borderRadius: '0 0 4px 0',
+                  transform: `translateX(${scrollLeft}px)`,
+                }}
+              >
+                LOOP
+              </div>
+            </div>
+          )}
         </div>
 
         {/* HUD */}

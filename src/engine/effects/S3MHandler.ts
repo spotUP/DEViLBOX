@@ -9,7 +9,6 @@ import { type ChannelState, type TickResult, type FormatConfig, type ModuleForma
 import { BaseFormatHandler } from './FormatHandler';
 import {
   periodToFrequency,
-  noteStringToPeriod,
 } from './PeriodTables';
 
 // S3M command letter to number mapping

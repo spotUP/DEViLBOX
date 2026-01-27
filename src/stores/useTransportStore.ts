@@ -22,6 +22,8 @@ interface TransportStore extends TransportState {
   metronomeVolume: number; // 0-100
   // Tracker timing (for visual sync)
   speed: number; // Ticks per row (1-31, default 6)
+  // Loop point for chip export (row where music loops back to)
+  loopStartRow: number; // 0 = no loop, >0 = loop back to this row
 
   // Actions
   setBPM: (bpm: number) => void;
@@ -41,6 +43,7 @@ interface TransportStore extends TransportState {
   setMetronomeVolume: (volume: number) => void;
   toggleMetronome: () => void;
   setSpeed: (speed: number) => void;
+  setLoopStartRow: (row: number) => void;
   reset: () => void;
 }
 
@@ -68,6 +71,7 @@ export const useTransportStore = create<TransportStore>()(
     metronomeEnabled: false,
     metronomeVolume: 75, // Default to 75%
     speed: 6, // Default speed (ticks per row) - ProTracker default
+    loopStartRow: 0, // 0 = no loop point set
 
     // Actions
     setBPM: (bpm) =>
@@ -226,6 +230,12 @@ export const useTransportStore = create<TransportStore>()(
         state.speed = Math.max(1, Math.min(31, speed));
       }),
 
+    setLoopStartRow: (row) =>
+      set((state) => {
+        // 0 = no loop, otherwise must be valid row number
+        state.loopStartRow = Math.max(0, row);
+      }),
+
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
@@ -240,6 +250,7 @@ export const useTransportStore = create<TransportStore>()(
         state.currentPatternIndex = 0;
         state.continuousRow = 0;
         state.speed = 6;
+        state.loopStartRow = 0;
       }),
   }))
 );
