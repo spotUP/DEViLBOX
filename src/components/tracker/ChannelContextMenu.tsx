@@ -25,15 +25,19 @@ import {
   Waves,
   Eye,
   EyeOff,
+  Sparkles,
 } from 'lucide-react';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { AutomationParameter } from '@typedefs/automation';
 import type { ChannelData } from '@typedefs/tracker';
 import { CHANNEL_COLORS } from '@typedefs/tracker';
+import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
+import { notify } from '@stores/useNotificationStore';
 
 interface ChannelContextMenuProps {
   channelIndex: number;
@@ -69,6 +73,20 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
   const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, patterns } = useTrackerStore();
   const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore();
+  const { updateInstrument } = useInstrumentStore();
+
+  const handleApplyChannelFxPreset = (presetName: string) => {
+    const preset = MASTER_FX_PRESETS.find(p => p.name === presetName);
+    if (!preset || !channel.instrumentId) return;
+
+    const effects = preset.effects.map((fx, index) => ({
+      ...fx,
+      id: `channel-fx-${Date.now()}-${index}`,
+    }));
+
+    updateInstrument(channel.instrumentId, { effects: effects as any });
+    notify.success(`Applied ${preset.name} to CH ${(channelIndex + 1).toString().padStart(2, '0')}`);
+  };
 
   const showLane = getShowLane(channelIndex);
   const curves = getCurvesForPattern(patternId, channelIndex);
@@ -340,6 +358,26 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         onClick: () => onPasteChannel(channelIndex),
       },
       { type: 'divider' },
+      // FX Presets Submenu
+      {
+        id: 'fx-presets',
+        label: 'FX Presets',
+        icon: <Sparkles size={14} />,
+        submenu: Object.entries(MASTER_FX_PRESETS.reduce((acc, preset) => {
+          if (!acc[preset.category]) acc[preset.category] = [];
+          acc[preset.category].push(preset);
+          return acc;
+        }, {} as Record<string, typeof MASTER_FX_PRESETS>)).map(([category, presets]) => ({
+          id: `fx-cat-${category}`,
+          label: category,
+          submenu: presets.map(preset => ({
+            id: `fx-preset-${preset.name}`,
+            label: preset.name,
+            onClick: () => handleApplyChannelFxPreset(preset.name),
+          }))
+        })),
+      },
+      { type: 'divider' },
       // Transpose submenu
       {
         id: 'transpose',
@@ -477,6 +515,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     setActiveParameter,
     setShowLane,
     removeCurve,
+    handleApplyChannelFxPreset,
   ]);
 
   return (

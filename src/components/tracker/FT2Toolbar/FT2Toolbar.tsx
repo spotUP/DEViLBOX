@@ -35,6 +35,8 @@ import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/imp
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
+import { MASTER_PRESETS, type MasterPreset } from '@constants/masterPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
@@ -179,12 +181,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setEditStep,
   } = useTrackerStore();
 
-  // PERFORMANCE: currentRow removed - now handled by RowDisplay component
   const {
     isPlaying,
     isLooping,
     bpm,
-    setBPM, // Used for loading songs, not for user input
+    setBPM,
     setIsLooping,
     play,
     stop,
@@ -193,7 +194,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
-  useProjectPersistence(); // Keep hook for auto-save functionality
+  useProjectPersistence();
   const { instruments, loadInstruments } = useInstrumentStore();
   const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
@@ -202,17 +203,26 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  // Start with logo intro, then cycle through other visualizers
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'>('logo');
+  
   const [showModulesMenu, setShowModulesMenu] = useState(false);
+  const [showPresetsMenu, setShowPresetsMenu] = useState(false);
+  const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
+  
   const modulesMenuRef = useRef<HTMLDivElement>(null);
   const modulesButtonRef = useRef<HTMLDivElement>(null);
+  const presetsMenuRef = useRef<HTMLDivElement>(null);
+  const presetsButtonRef = useRef<HTMLDivElement>(null);
+  const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
+  const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
+  
   const [modulesMenuPosition, setModulesMenuPosition] = useState({ top: 0, left: 0 });
+  const [presetsMenuPosition, setPresetsMenuPosition] = useState({ top: 0, left: 0 });
+  const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
 
-  // Bundled modules organized by category
   const BUNDLED_MODULES = {
     acid: [
       { file: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' },
@@ -245,41 +255,26 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     ],
   };
 
-  // Load bundled module from server
   const handleLoadModule = async (filename: string) => {
     setShowModulesMenu(false);
-
-    // Stop playback before loading
     if (isPlaying) {
       stop();
       engine.releaseAll();
     }
-
     setIsLoading(true);
     try {
       const basePath = import.meta.env.BASE_URL || '/';
       const response = await fetch(`${basePath}modules/${filename}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
       const songData = await response.json();
-
-      // Validate song format
-      if (songData.format !== 'devilbox-dbox' && songData.format !== 'devilbox-song') {
-        throw new Error(`Invalid format: expected "devilbox-dbox", got "${songData.format}"`);
-      }
-
-      // Migrate old format if needed
       const { needsMigration, migrateProject } = await import('@/lib/migration');
       let patterns = songData.patterns;
       let instruments = songData.instruments;
-
       if (needsMigration(patterns, instruments)) {
         const migrated = migrateProject(patterns, instruments);
         patterns = migrated.patterns;
         instruments = migrated.instruments;
       }
-
-      // Load song data
       if (patterns) {
         loadPatterns(patterns);
         if (songData.sequence && Array.isArray(songData.sequence)) {
@@ -293,45 +288,83 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (instruments) loadInstruments(instruments);
       if (songData.metadata) setMetadata(songData.metadata);
       if (songData.bpm) setBPM(songData.bpm);
-
       notify.success(`Loaded: ${songData.metadata?.name || filename}`, 2000);
     } catch (error) {
       console.error('Failed to load module:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      notify.error(`Failed to load ${filename}: ${errorMsg}`, 10000);
+      notify.error(`Failed to load ${filename}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Calculate dropdown position when menu opens
+  const handleLoadMasterPreset = async (preset: MasterPreset) => {
+    setShowPresetsMenu(false);
+    if (isPlaying) {
+      stop();
+      engine.releaseAll();
+    }
+    try {
+      loadInstruments(preset.instruments);
+      if (preset.bpm) setBPM(preset.bpm);
+      if (preset.patterns) loadPatterns(preset.patterns);
+      await engine.preloadInstruments(preset.instruments);
+      notify.success(`Loaded Preset: ${preset.name}`);
+    } catch (error) {
+      notify.error('Failed to load preset');
+    }
+  };
+
+  const handleLoadMasterFxPreset = (preset: MasterFxPreset) => {
+    setShowFxPresetsMenu(false);
+    const effects = preset.effects.map((fx, index) => ({
+      ...fx,
+      id: `master-fx-${Date.now()}-${index}`,
+    }));
+    useAudioStore.getState().setMasterEffects(effects as any);
+    notify.success(`Applied FX: ${preset.name}`);
+  };
+
   React.useEffect(() => {
     if (showModulesMenu && modulesButtonRef.current) {
       const rect = modulesButtonRef.current.getBoundingClientRect();
-      setModulesMenuPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
+      setModulesMenuPosition({ top: rect.bottom + 4, left: rect.left });
     }
   }, [showModulesMenu]);
 
-  // Close modules menu when clicking outside
   React.useEffect(() => {
-    if (!showModulesMenu) return;
+    if (showPresetsMenu && presetsButtonRef.current) {
+      const rect = presetsButtonRef.current.getBoundingClientRect();
+      setPresetsMenuPosition({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [showPresetsMenu]);
+
+  React.useEffect(() => {
+    if (showFxPresetsMenu && fxPresetsButtonRef.current) {
+      const rect = fxPresetsButtonRef.current.getBoundingClientRect();
+      setFxPresetsMenuPosition({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [showFxPresetsMenu]);
+
+  React.useEffect(() => {
+    if (!showModulesMenu && !showPresetsMenu && !showFxPresetsMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
+      if (showModulesMenu && modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
         setShowModulesMenu(false);
+      }
+      if (showPresetsMenu && presetsMenuRef.current && !presetsMenuRef.current.contains(e.target as Node)) {
+        setShowPresetsMenu(false);
+      }
+      if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
+        setShowFxPresetsMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showModulesMenu]);
+  }, [showModulesMenu, showPresetsMenu, showFxPresetsMenu]);
 
-  // Save to file handler (download to computer)
   const handleSave = () => {
     try {
       const sequence = patterns.map((p) => p.id);
-      // Convert automation curves to export format
       const automationData: Record<string, any> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_channel, channelIndex) => {
@@ -352,7 +385,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           }
         });
       });
-
       exportSong(
         metadata,
         bpm,
@@ -371,59 +403,34 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     }
   };
 
-  // Handle module import from dialog
   const handleModuleImport = async (moduleInfo: ModuleInfo) => {
-    // CRITICAL: Stop playback before loading new song to prevent audio glitches
     if (isPlaying) {
       stop();
-      engine.releaseAll(); // Release any held notes
+      engine.releaseAll();
     }
-
     setIsLoading(true);
     try {
       let result;
-
-      // Debug: Log what data we have
-      console.log('[Import] moduleInfo:', {
-        hasNativeData: !!moduleInfo.nativeData,
-        nativeFormat: moduleInfo.nativeData?.format,
-        hasNativePatterns: !!moduleInfo.nativeData?.patterns,
-        nativePatternsLength: moduleInfo.nativeData?.patterns?.length,
-        hasSong: !!moduleInfo.metadata.song,
-        title: moduleInfo.metadata.title,
-      });
-
-      // Check if we have native parser data (MOD/XM files)
       if (moduleInfo.nativeData?.patterns) {
         const { format, patterns: nativePatterns, importMetadata, instruments: nativeInstruments } = moduleInfo.nativeData;
         const channelCount = importMetadata.originalChannelCount;
         const instrumentNames = nativeInstruments?.map(i => i.name) || [];
-
         if (format === 'XM') {
           result = convertXMModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
         } else if (format === 'MOD') {
           result = convertMODModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
         } else {
-          notify.error(`Unsupported native format: ${format}`, 5000);
+          notify.error(`Unsupported native format: ${format}`);
           return;
         }
       } else if (moduleInfo.metadata.song) {
-        // Fall back to libopenmpt data
         result = convertModule(moduleInfo.metadata.song);
       } else {
-        notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`, 5000);
+        notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`);
         return;
       }
-
-      if (result.patterns.length === 0) {
-        notify.error(`Module "${moduleInfo.metadata.title}" contains no patterns`, 5000);
-        return;
-      }
-
-      // Use the parsed instruments from the native parser, or create from pattern data
       let instruments: InstrumentConfig[];
       if (moduleInfo.nativeData?.instruments) {
-        // Convert ParsedInstruments to InstrumentConfig
         const parsedInstruments = moduleInfo.nativeData.instruments;
         const format = moduleInfo.nativeData.format;
         instruments = parsedInstruments.flatMap((parsed, index) =>
@@ -432,192 +439,104 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       } else {
         instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, undefined);
       }
-
-      console.log('[Import]', instruments.length, 'instruments,', result.patterns.length, 'patterns');
-
       loadInstruments(instruments);
       loadPatterns(result.patterns);
-
-      // Set pattern order from module
       if (result.order && result.order.length > 0) {
         setPatternOrder(result.order);
-        console.log('[Import] Pattern order set:', result.order.length, 'positions');
-
-        // CRITICAL: Set current pattern to the first pattern in the order (position 0)
-        // This ensures playback starts from the beginning of the song
-        const firstPatternIndex = result.order[0];
-        setCurrentPattern(firstPatternIndex);
-        console.log(`[Import] Set current pattern to position 0: pattern ${firstPatternIndex}`);
+        setCurrentPattern(result.order[0]);
       }
-
       setMetadata({ name: moduleInfo.metadata.title, author: '', description: `Imported from ${moduleInfo.metadata.type}` });
-
-      // Apply initial BPM from module metadata (if available)
       const initialBPM = moduleInfo.nativeData?.importMetadata.modData?.initialBPM;
-      if (initialBPM) {
-        setBPM(initialBPM);
-      }
-
+      if (initialBPM) setBPM(initialBPM);
       notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
-
-      // Preload samples
-      console.log('[Import] Preloading samples...');
       await engine.preloadInstruments(instruments);
-      console.log('[Import] Samples ready for playback');
-
     } catch (err) {
-      notify.error(`Failed to import module: ${err instanceof Error ? err.message : String(err)}`, 8000);
+      notify.error(`Failed to import module`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // File load handler (like NavBar)
   const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Reset the file input so the same file can be selected again
     e.target.value = '';
-
-    // For MOD/XM files, open the import dialog instead
     if (isSupportedModule(file.name)) {
       setShowImportDialog(true);
-      // The dialog will handle the file selection
       return;
     }
-
-    // CRITICAL: Stop playback before loading new song to prevent audio glitches
     if (isPlaying) {
       stop();
-      engine.releaseAll(); // Release any held notes
+      engine.releaseAll();
     }
-
     setIsLoading(true);
     try {
       if (isMIDIFile(file.name)) {
-        // MIDI file import
         const midiResult = await importMIDIFile(file, {
-          quantize: 1,
-          mergeChannels: false,
-          velocityToVolume: true,
-          defaultPatternLength: 64,
+          quantize: 1, mergeChannels: false, velocityToVolume: true, defaultPatternLength: 64,
         });
-
-        // Create instruments for MIDI (simple oscillators)
         const instruments = createInstrumentsForModule(midiResult.patterns, [], undefined);
-
-        // Load patterns and instruments
         loadPatterns(midiResult.patterns);
         loadInstruments(instruments);
         setMetadata({
           name: midiResult.metadata.name,
           author: '',
-          description: `Imported from ${file.name} (${midiResult.metadata.tracks} MIDI tracks)`,
+          description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
         });
         setBPM(midiResult.bpm);
-
-        notify.success(`Loaded MIDI: ${midiResult.metadata.name} (${midiResult.patterns.length} patterns)`, 3000);
+        notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
       } else {
-        // JSON song file
         const songData = await importSong(file);
         if (!songData) {
-          notify.error('Failed to import song: Invalid or corrupted file', 8000);
+          notify.error('Failed to import song');
           return;
         }
-
-        // Validate song data
-        if (!songData.patterns || !Array.isArray(songData.patterns)) {
-          notify.error('Invalid song: Missing patterns array', 8000);
-          return;
-        }
-        if (!songData.instruments || !Array.isArray(songData.instruments)) {
-          notify.error('Invalid song: Missing instruments array', 8000);
-          return;
-        }
-
-        // CRITICAL: Migrate old format song files to new XM format
-        // User-saved songs may use old format (string notes, null values, old effects)
-        // Must migrate before loading to avoid runtime errors
         const { needsMigration, migrateProject } = await import('@/lib/migration');
         let patterns = songData.patterns;
         let instruments = songData.instruments;
-
         if (needsMigration(patterns, instruments)) {
-          console.log('[Import] Old format detected, migrating to XM format...');
           const migrated = migrateProject(patterns, instruments);
           patterns = migrated.patterns;
           instruments = migrated.instruments;
-          console.log('[Import] Migration complete!');
         }
-
-        // Load song data
         loadPatterns(patterns);
-
-        // Convert sequence (pattern IDs) to pattern order (indices)
         if (songData.sequence && Array.isArray(songData.sequence)) {
           const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
           const order = songData.sequence
             .map((patternId: string) => patternIdToIndex.get(patternId))
             .filter((index: number | undefined): index is number => index !== undefined);
-
-          if (order.length > 0) {
-            setPatternOrder(order);
-            console.log('[Import] Loaded pattern order:', order);
-          }
+          if (order.length > 0) setPatternOrder(order);
         }
-
         if (instruments) loadInstruments(instruments);
         if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
         setBPM(songData.bpm);
         setMetadata(songData.metadata);
-        notify.success(`Loaded: ${songData.metadata?.name || file.name}`, 2000);
+        notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
       }
     } catch (error) {
       console.error('Failed to load file:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      notify.error(`Failed to load ${file.name}: ${errorMsg}`, 10000);
+      notify.error(`Failed to load ${file.name}`);
     } finally {
       setIsLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
   const pattern = patterns[currentPatternIndex];
   const patternLength = pattern?.length || 64;
   const songLength = patterns.length;
 
-  // Position controls
   const handlePositionChange = (newPos: number) => {
-    if (newPos >= 0 && newPos < songLength) {
-      setCurrentPattern(newPos);
-    }
+    if (newPos >= 0 && newPos < songLength) setCurrentPattern(newPos);
   };
 
-  const handleInsertPosition = () => {
-    duplicatePattern(currentPatternIndex);
-  };
+  const handleInsertPosition = () => duplicatePattern(currentPatternIndex);
+  const handleDeletePosition = () => { if (songLength > 1) deletePattern(currentPatternIndex); };
+  const handlePatternChange = (newPat: number) => handlePositionChange(newPat);
 
-  const handleDeletePosition = () => {
-    if (songLength > 1) {
-      deletePattern(currentPatternIndex);
-    }
-  };
-
-  // Pattern controls
-  const handlePatternChange = (newPat: number) => {
-    // In a full implementation, this would select from unique patterns
-    // For now, it's the same as position
-    handlePositionChange(newPat);
-  };
-
-  // Playback controls - dual state buttons
   const handlePlaySong = async () => {
-    if (isPlaying && !isLooping) {
-      // Currently playing song - stop
-      stop();
-    } else {
-      // Start song playback (non-looping)
-      if (isPlaying) stop(); // Stop pattern playback first
+    if (isPlaying && !isLooping) stop();
+    else {
+      if (isPlaying) stop();
       setIsLooping(false);
       await engine.init();
       play();
@@ -625,504 +544,203 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handlePlayPattern = async () => {
-    if (isPlaying && isLooping) {
-      // Currently playing pattern - stop
-      stop();
-    } else {
-      // Start pattern playback (looping)
-      if (isPlaying) stop(); // Stop song playback first
+    if (isPlaying && isLooping) stop();
+    else {
+      if (isPlaying) stop();
       setIsLooping(true);
       await engine.init();
       play();
     }
   };
 
-  // Derived state for button labels
   const isPlayingSong = isPlaying && !isLooping;
   const isPlayingPattern = isPlaying && isLooping;
 
-  // Pattern edit controls
-  const handleExpand = () => {
-    expandPattern?.(currentPatternIndex);
-  };
-
-  const handleShrink = () => {
-    shrinkPattern?.(currentPatternIndex);
-  };
-
-  // Pattern length change handler
+  const handleExpand = () => expandPattern?.(currentPatternIndex);
+  const handleShrink = () => shrinkPattern?.(currentPatternIndex);
   const handleLengthChange = (newLength: number) => {
-    if (newLength >= 1 && newLength <= 256) {
-      resizePattern(currentPatternIndex, newLength);
-    }
+    if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);
   };
 
   return (
-    <div
-      className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}
-      style={compactToolbar ? {
-        maxHeight: '80px',
-        minHeight: '80px',
-        height: '80px',
-        overflow: 'hidden'
-      } : undefined}
-    >
-      {/* Toolbar Compact Toggle - consistent right-side position */}
-      <button
-        className="panel-collapse-toggle"
-        onClick={toggleCompactToolbar}
-        title={compactToolbar ? 'Expand toolbar' : 'Collapse toolbar'}
-      >
+    <div className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}>
+      <button className="panel-collapse-toggle" onClick={toggleCompactToolbar}>
         {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
-      {/* Main toolbar content with oscilloscope on right */}
       <div className="flex">
-        {/* Left: Toolbar controls - natural width */}
         <div className="flex-shrink-0">
-
-      {/* Row 1: Position/BPM/Pattern/Playback */}
-      <div className="ft2-toolbar-row">
-        {/* Position Section */}
-        <div className="ft2-section ft2-section-pos">
-          <FT2NumericInput
-            label="Position"
-            value={currentPositionIndex}
-            onChange={(pos) => {
-              // When position changes, update both position and pattern
-              setCurrentPosition(pos);
-              const patternIdx = patternOrder[pos] ?? pos;
-              setCurrentPattern(patternIdx);
-            }}
-            min={0}
-            max={patternOrder.length - 1}
-            format="hex"
-          />
-          <Button variant="default" size="sm" onClick={handleInsertPosition} title="Insert position (duplicate current)">
-            Ins
-          </Button>
-          <Button variant="default" size="sm" onClick={handleDeletePosition} title="Delete position" disabled={songLength <= 1}>
-            Del
-          </Button>
-        </div>
-
-        {/* BPM Display - Read-only (controlled by F20+ effect commands) */}
-        <div className="ft2-section ft2-section-tempo">
-          <div className="ft2-numeric-group">
-            <span className="ft2-numeric-label">BPM:</span>
-            <span className="ft2-numeric-value" title="BPM is controlled via F20-FF effect commands in patterns">
-              {bpm.toString().padStart(3, '0')}
-            </span>
-          </div>
-        </div>
-
-        {/* Pattern Section */}
-        <div className="ft2-section ft2-section-pattern">
-          <FT2NumericInput
-            label="Pattern"
-            value={patternOrder[currentPositionIndex] ?? currentPatternIndex}
-            onChange={handlePatternChange}
-            min={0}
-            max={patterns.length - 1}
-            format="hex"
-          />
-        </div>
-
-        {/* Instrument Selector (FT2-style) */}
-        <div className="ft2-section">
-          <InstrumentSelector />
-        </div>
-
-        {/* Playback Section */}
-        <div className="ft2-section ft2-section-playback">
-          <Button
-            variant={isPlayingSong ? 'danger' : 'primary'}
-            size="sm"
-            onClick={handlePlaySong}
-            className="min-w-[72px]"
-            title={isPlayingSong ? 'Stop song playback (F8 / Esc)' : 'Play song from start (F5)'}
-          >
-            {isPlayingSong ? 'Stop Song' : 'Play Song'}
-          </Button>
-          <Button
-            variant={isPlayingPattern ? 'danger' : 'primary'}
-            size="sm"
-            onClick={handlePlayPattern}
-            className="min-w-[88px]"
-            title={isPlayingPattern ? 'Stop pattern playback (F8 / Esc)' : 'Play/loop current pattern (F6)'}
-          >
-            {isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}
-          </Button>
-          <Button
-            variant={recordMode ? 'danger' : 'default'}
-            size="sm"
-            className="min-w-[48px]"
-            onClick={toggleRecordMode}
-            title={recordMode ? 'Disable record mode (Enter)' : 'Enable record mode - enter notes at playback position (Enter)'}
-          >
-            {recordMode ? '● Rec' : 'Rec'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Row 2: Pattern/Speed/Length/Stop-Record (hidden in compact mode) */}
-      {!compactToolbar && (
-        <div className="ft2-toolbar-row">
-          {/* Pattern display */}
-          <div className="ft2-section ft2-section-pos">
-            <FT2NumericInput
-              label="Pattern"
-              value={currentPatternIndex}
-              onChange={handlePatternChange}
-              min={0}
-              max={songLength - 1}
-              format="hex"
-            />
-          </div>
-
-          {/* Speed Section - Read-only display (controlled by Fxx effect commands) */}
-          <div className="ft2-section ft2-section-tempo">
-            <FT2NumericInput
-              label="Speed"
-              value={6}
-              onChange={() => {}} // Read-only: Speed is controlled via F01-F1F effect commands in patterns
-              min={1}
-              max={31}
-              format="hex"
-            />
-          </div>
-
-          {/* Length Section */}
-          <div className="ft2-section ft2-section-pattern">
-            <FT2NumericInput
-              label="Length"
-              value={patternLength}
-              onChange={handleLengthChange}
-              min={1}
-              max={256}
-              format="hex"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Row 3: Song Length/Add/Expand-Shrink (hidden in compact mode) */}
-      {!compactToolbar && (
-        <div className="ft2-toolbar-row">
-          {/* Song Length - Read-only display (add/delete patterns to change) */}
-          <div className="ft2-section ft2-section-pos">
-            <FT2NumericInput
-              label="Song Len"
-              value={songLength}
-              onChange={() => {}} // Read-only: Use Ins/Del buttons to add/remove patterns
-              min={1}
-              max={256}
-              format="hex"
-            />
-          </div>
-
-          {/* Edit Step (rows to advance after note entry in record mode) */}
-          <div className="ft2-section ft2-section-tempo">
-            <FT2NumericInput
-              label="Edit Step"
-              value={editStep}
-              onChange={setEditStep}
-              min={0}
-              max={16}
-              format="hex"
-            />
-          </div>
-
-          {/* Expand/Shrink */}
-          <div className="ft2-section ft2-section-pattern">
-            <Button variant="default" size="sm" onClick={handleExpand} title="Expand pattern (double rows)">
-              Expand
-            </Button>
-            <Button variant="default" size="sm" onClick={handleShrink} title="Shrink pattern (halve rows)">
-              Shrink
-            </Button>
-          </div>
-
-          {/* Row indicator - separate component to avoid toolbar re-renders */}
-          <RowDisplay />
-        </div>
-      )}
-
-      {/* Row 4: File/Menu buttons */}
-      <div className="ft2-toolbar-row ft2-toolbar-row-menu">
-        <div className="ft2-section">
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_FORMATS}
-            onChange={handleFileLoad}
-            className="hidden"
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowFileBrowser(true)}
-            disabled={isLoading}
-            loading={isLoading}
-            title="Load song or module (Ctrl+O)"
-          >
-            Load
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={handleSave} title="Download song file (Ctrl+S)">
-            {isDirty ? 'Save*' : 'Save'}
-          </Button>
-
-          {/* Bundled Modules Dropdown */}
-          <div ref={modulesButtonRef}>
-            <Button
-              variant={showModulesMenu ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setShowModulesMenu(!showModulesMenu)}
-              disabled={isLoading}
-              title="Load bundled example modules"
-            >
-              Modules
-            </Button>
-          </div>
-          {showModulesMenu && (
-            <div
-              ref={modulesMenuRef}
-              className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto"
-              style={{
-                top: `${modulesMenuPosition.top}px`,
-                left: `${modulesMenuPosition.left}px`,
-              }}
-            >
-              {/* Acid Modules */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">
-                Acid / 303
+          <div className="ft2-toolbar-row">
+            <div className="ft2-section ft2-section-pos">
+              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={(pos) => {
+                setCurrentPosition(pos);
+                setCurrentPattern(patternOrder[pos] ?? pos);
+              }} min={0} max={patternOrder.length - 1} format="hex" />
+              <Button variant="default" size="sm" onClick={handleInsertPosition}>Ins</Button>
+              <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={songLength <= 1}>Del</Button>
+            </div>
+            <div className="ft2-section ft2-section-tempo">
+              <div className="ft2-numeric-group">
+                <span className="ft2-numeric-label">BPM:</span>
+                <span className="ft2-numeric-value">{bpm.toString().padStart(3, '0')}</span>
               </div>
-              {BUNDLED_MODULES.acid.map((mod) => (
-                <button
-                  key={mod.file}
-                  onClick={() => handleLoadModule(mod.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {mod.name}
-                </button>
-              ))}
+            </div>
+            <div className="ft2-section ft2-section-pattern">
+              <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
+            </div>
+            <div className="ft2-section"><InstrumentSelector /></div>
+            <div className="ft2-section ft2-section-playback">
+              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+              <Button variant={recordMode ? 'danger' : 'default'} size="sm" className="min-w-[48px]" onClick={toggleRecordMode}>{recordMode ? '● Rec' : 'Rec'}</Button>
+            </div>
+          </div>
 
-              {/* TB-303 Pattern Modules */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
-                TB-303 Patterns
+          {!compactToolbar && (
+            <div className="ft2-toolbar-row">
+              <div className="ft2-section ft2-section-pos">
+                <FT2NumericInput label="Pattern" value={currentPatternIndex} onChange={handlePatternChange} min={0} max={songLength - 1} format="hex" />
               </div>
-              {BUNDLED_MODULES.tb303.map((mod) => (
-                <button
-                  key={mod.file}
-                  onClick={() => handleLoadModule(mod.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {mod.name}
-                </button>
-              ))}
-
-              {/* General Modules */}
-              <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">
-                General
+              <div className="ft2-section ft2-section-tempo">
+                <FT2NumericInput label="Speed" value={6} onChange={() => {}} min={1} max={31} format="hex" />
               </div>
-              {BUNDLED_MODULES.general.map((mod) => (
-                <button
-                  key={mod.file}
-                  onClick={() => handleLoadModule(mod.file)}
-                  className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors"
-                >
-                  {mod.name}
-                </button>
-              ))}
+              <div className="ft2-section ft2-section-pattern">
+                <FT2NumericInput label="Length" value={patternLength} onChange={handleLengthChange} min={1} max={256} format="hex" />
+              </div>
             </div>
           )}
 
-          <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns} title="Pattern list (Ctrl+Shift+P)">
-            Patterns
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order editor">
-            Order
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor (Ctrl+I)">
-            Instr
-          </Button>
-          <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX} title="Instrument effects (Ctrl+Shift+F)">
-            Instrument FX
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onShowExport} title="Export dialog (Ctrl+Shift+E)">
-            Export
-          </Button>
-          <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects (Ctrl+M)">
-            Master FX
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onShowHelp} title="Help & shortcuts (?)">
-            Help
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Application settings">
-            Settings
-          </Button>
-          <Button variant={masterMuted ? 'danger' : 'default'} size="sm" className="min-w-[52px]" onClick={toggleMasterMute} title="Toggle master mute (Ctrl+Shift+M)">
-            {masterMuted ? 'Unmute' : 'Mute'}
-          </Button>
-          <Button
-            variant={smoothScrolling ? 'primary' : 'default'}
-            size="sm"
-            className="min-w-[56px]"
-            onClick={() => setSmoothScrolling(!smoothScrolling)}
-            title={smoothScrolling ? 'Classic stepped scrolling' : 'Smooth DAW-style scrolling'}
-          >
-            {smoothScrolling ? 'Smooth' : 'Stepped'}
-          </Button>
-        </div>
-      </div>
+          {!compactToolbar && (
+            <div className="ft2-toolbar-row">
+              <div className="ft2-section ft2-section-pos">
+                <FT2NumericInput label="Song Len" value={songLength} onChange={() => {}} min={1} max={256} format="hex" />
+              </div>
+              <div className="ft2-section ft2-section-tempo">
+                <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
+              </div>
+              <div className="ft2-section ft2-section-pattern">
+                <Button variant="default" size="sm" onClick={handleExpand}>Expand</Button>
+                <Button variant="default" size="sm" onClick={handleShrink}>Shrink</Button>
+              </div>
+              <RowDisplay />
+            </div>
+          )}
 
-        </div>
-        {/* End left toolbar controls */}
+          <div className="ft2-toolbar-row ft2-toolbar-row-menu">
+            <div className="ft2-section">
+              <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
+              <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
+              <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
+              
+              <div ref={presetsButtonRef}>
+                <Button variant={showPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowPresetsMenu(!showPresetsMenu)} disabled={isLoading}>Presets</Button>
+              </div>
+              {showPresetsMenu && (
+                <div ref={presetsMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${presetsMenuPosition.top}px`, left: `${presetsMenuPosition.left}px` }}>
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Master Presets</div>
+                  {MASTER_PRESETS.map((preset) => (
+                    <button key={preset.id} onClick={() => handleLoadMasterPreset(preset)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex flex-col">
+                      <span className="font-bold">{preset.name}</span>
+                      <span className="text-[10px] opacity-60">{preset.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-        {/* Right: Visualizer - cycles through waveform/spectrum/channels/stereo/logo/envelope/accent */}
-        <div
-          className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer"
-          onClick={() => {
-            // Logo is intro-only, not in the cycle
-            const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
-            const currentIndex = modes.indexOf(vizMode as typeof modes[number]);
-            setVizMode(modes[(currentIndex + 1) % modes.length]);
-          }}
-          title={`Click to cycle visualizer (${vizMode})`}
-        >
+              <div ref={modulesButtonRef}>
+                <Button variant={showModulesMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowModulesMenu(!showModulesMenu)} disabled={isLoading}>Modules</Button>
+              </div>
+              {showModulesMenu && (
+                <div ref={modulesMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${modulesMenuPosition.top}px`, left: `${modulesMenuPosition.left}px` }}>
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Acid / 303</div>
+                  {BUNDLED_MODULES.acid.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">TB-303 Patterns</div>
+                  {BUNDLED_MODULES.tb303.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">General</div>
+                  {BUNDLED_MODULES.general.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                </div>
+              )}
+
+              <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns}>Patterns</Button>
+              <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
+              <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instr</Button>
+              <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX}>Instrument FX</Button>
+                        <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
+                        
+                        <div ref={fxPresetsButtonRef}>
+                          <Button variant={showFxPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowFxPresetsMenu(!showFxPresetsMenu)}>FX Presets</Button>
+                        </div>
+                        {showFxPresetsMenu && (
+                          <div ref={fxPresetsMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${fxPresetsMenuPosition.top}px`, left: `${fxPresetsMenuPosition.left}px` }}>
+                            <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Master FX Presets</div>
+                            {MASTER_FX_PRESETS.map((preset) => (
+                              <button key={preset.name} onClick={() => handleLoadMasterFxPreset(preset)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex flex-col">
+                                <span className="font-bold">{preset.name}</span>
+                                <span className="text-[10px] opacity-60">{preset.description}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+              
+                        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
+              
+              <Button variant="ghost" size="sm" onClick={onShowHelp}>Help</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
+              <Button variant={masterMuted ? 'danger' : 'default'} size="sm" className="min-w-[52px]" onClick={toggleMasterMute}>{masterMuted ? 'Unmute' : 'Mute'}</Button>
+              <Button variant={smoothScrolling ? 'primary' : 'default'} size="sm" className="min-w-[56px]" onClick={() => setSmoothScrolling(!smoothScrolling)}>{smoothScrolling ? 'Smooth' : 'Stepped'}</Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer" onClick={() => {
+          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
+          setVizMode(modes[(modes.indexOf(vizMode as any) + 1) % modes.length]);
+        }}>
           {oscilloscopeVisible && (
             <>
-              {(vizMode === 'waveform' || vizMode === 'spectrum') && (
-                <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />
-              )}
-              {vizMode === 'channels' && (
-                <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />
-              )}
-              {vizMode === 'stereo' && (
-                <StereoField height={compactToolbar ? 70 : 100} />
-              )}
-              {vizMode === 'logo' && (
-                <LogoAnimation
-                  height={compactToolbar ? 70 : 100}
-                  onComplete={() => setVizMode('waveform')}
-                />
-              )}
-              {vizMode === 'envelope' && (
-                <EnvelopeVisualizer
-                  attack={3}
-                  decay={(() => {
-                    const tb303 = instruments.find(i => i.synthType === 'TB303');
-                    return tb303?.parameters?.decay ?? 200;
-                  })()}
-                  sustain={0}
-                  release={50}
-                  envMod={(() => {
-                    const tb303 = instruments.find(i => i.synthType === 'TB303');
-                    return tb303?.parameters?.envMod ?? 60;
-                  })()}
-                  height={compactToolbar ? 70 : 100}
-                  color="var(--color-synth-envelope)"
-                  label="Filter Envelope"
-                />
-              )}
-              {vizMode === 'accent' && (
-                <AccentChargeVisualizer
-                  charge={0}
-                  sweepSpeed={(() => {
-                    const tb303 = instruments.find(i => i.synthType === 'TB303');
-                    return tb303?.parameters?.devilFish?.sweepSpeed ?? 'normal';
-                  })()}
-                  enabled={(() => {
-                    const tb303 = instruments.find(i => i.synthType === 'TB303');
-                    return tb303?.parameters?.devilFish?.accentSweepEnabled ?? true;
-                  })()}
-                  height={compactToolbar ? 70 : 100}
-                  color="var(--color-synth-accent)"
-                />
-              )}
+              {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />}
+              {vizMode === 'channels' && <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'stereo' && <StereoField height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'logo' && <LogoAnimation height={compactToolbar ? 70 : 100} onComplete={() => setVizMode('waveform')} />}
+              {vizMode === 'envelope' && <EnvelopeVisualizer attack={3} decay={instruments.find(i => i.synthType === 'TB303')?.parameters?.decay ?? 200} sustain={0} release={50} envMod={instruments.find(i => i.synthType === 'TB303')?.parameters?.envMod ?? 60} height={compactToolbar ? 70 : 100} color="var(--color-synth-envelope)" label="Filter Envelope" />}
+              {vizMode === 'accent' && <AccentChargeVisualizer charge={0} sweepSpeed={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.sweepSpeed ?? 'normal'} enabled={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.accentSweepEnabled ?? true} height={compactToolbar ? 70 : 100} color="var(--color-synth-accent)" />}
             </>
           )}
         </div>
       </div>
-      {/* End main toolbar flex container */}
 
-      {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-
-      {/* Import Module Dialog */}
-      <ImportModuleDialog
-        isOpen={showImportDialog}
-        onClose={() => setShowImportDialog(false)}
-        onImport={handleModuleImport}
-      />
-
-      {/* File Browser */}
-      <FileBrowser
-        isOpen={showFileBrowser}
-        onClose={() => setShowFileBrowser(false)}
-        onLoad={async (data: any, filename: string) => {
-          // Stop playback before loading
-          if (isPlaying) {
-            stop();
-            engine.releaseAll();
+      <ImportModuleDialog isOpen={showImportDialog} onClose={() => setShowImportDialog(false)} onImport={handleModuleImport} />
+      <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} onLoad={async (data: any, filename: string) => {
+        if (isPlaying) { stop(); engine.releaseAll(); }
+        try {
+          const { needsMigration, migrateProject } = await import('@/lib/migration');
+          let patterns = data.patterns, instruments = data.instruments;
+          if (needsMigration(patterns, instruments)) {
+            const migrated = migrateProject(patterns, instruments);
+            patterns = migrated.patterns; instruments = migrated.instruments;
           }
-
-          try {
-            // Migrate old format if needed
-            const { needsMigration, migrateProject } = await import('@/lib/migration');
-            let patterns = data.patterns;
-            let instruments = data.instruments;
-
-            if (needsMigration(patterns, instruments)) {
-              const migrated = migrateProject(patterns, instruments);
-              patterns = migrated.patterns;
-              instruments = migrated.instruments;
+          if (patterns) {
+            loadPatterns(patterns);
+            if (data.sequence && Array.isArray(data.sequence)) {
+              const patternIdToIndex = new Map(patterns.map((p: any, i: any) => [p.id, i]));
+              const order = data.sequence.map((id: any) => patternIdToIndex.get(id)).filter((idx: any) => idx !== undefined);
+              if (order.length > 0) setPatternOrder(order);
             }
-
-            // Load song data
-            if (patterns) {
-              loadPatterns(patterns);
-              if (data.sequence && Array.isArray(data.sequence)) {
-                const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
-                const order = data.sequence
-                  .map((patternId: string) => patternIdToIndex.get(patternId))
-                  .filter((index: number | undefined): index is number => index !== undefined);
-                if (order.length > 0) setPatternOrder(order);
-              }
-            }
-            if (instruments) loadInstruments(instruments);
-            if (data.metadata) setMetadata(data.metadata);
-            if (data.bpm) setBPM(data.bpm);
-
-            notify.success(`Loaded: ${data.metadata?.name || filename}`, 2000);
-          } catch (error) {
-            console.error('Failed to load file:', error);
-            notify.error(`Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
-        }}
-        onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
-          // Stop playback before loading
-          if (isPlaying) {
-            stop();
-            engine.releaseAll();
-          }
-
-          try {
-            // Import the module loader
-            const { loadModuleFile } = await import('@lib/import/ModuleLoader');
-            const moduleInfo = await loadModuleFile(new File([buffer], filename));
-
-            if (moduleInfo) {
-              await handleModuleImport(moduleInfo);
-            }
-          } catch (error) {
-            console.error('Failed to load tracker module:', error);
-            notify.error(`Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }}
-      />
+          if (instruments) loadInstruments(instruments);
+          if (data.metadata) setMetadata(data.metadata);
+          if (data.bpm) setBPM(data.bpm);
+          notify.success(`Loaded: ${data.metadata?.name || filename}`);
+        } catch (error) { notify.error('Failed to load file'); }
+      }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+        if (isPlaying) { stop(); engine.releaseAll(); }
+        try {
+          const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+          const moduleInfo = await loadModuleFile(new File([buffer], filename));
+          if (moduleInfo) await handleModuleImport(moduleInfo);
+        } catch (error) { notify.error('Failed to load module'); }
+      }} />
     </div>
   );
 };

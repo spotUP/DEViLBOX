@@ -8,7 +8,9 @@ import { VolumeCell } from './VolumeCell';
 import { EffectCell } from './EffectCell';
 import { AccentCell } from './AccentCell';
 import { SlideCell } from './SlideCell';
+import { AutomationColumns, AutomationColumnHeaders } from './AutomationColumns';
 import { AutomationLanes } from './AutomationLanes';
+import { MacroLanes } from './MacroLanes';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { CellContextMenu } from './CellContextMenu';
 import { VolumeX, Headphones, Circle } from 'lucide-react';
@@ -249,6 +251,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
                 <div className="flex items-center gap-1 min-w-0">
                   <span className={`text-[10px] font-bold ${isCurCh ? 'text-accent-primary' : 'text-text-primary'}`}>{`CH${chIdx + 1}`}</span>
                   {inst && <span className="text-[8px] opacity-60 truncate font-mono uppercase tracking-tighter">{inst.name}</span>}
+                  <AutomationColumnHeaders columnVisibility={columnVisibility} />
                 </div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={(e) => { e.stopPropagation(); toggleChannelMute(chIdx); }} className={`p-0.5 rounded ${ch.muted ? 'text-accent-error' : 'text-text-muted'}`}><VolumeX size={12} /></button>
@@ -292,6 +295,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
         {/* Automation Overlay */}
         <div style={{ position: 'absolute', top: showGhostPatterns ? GHOST_ROWS * ROW_HEIGHT : 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 15 }}>
           <AutomationLanes patternId={pattern.id} patternLength={pattern.length} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} scrollOffset={0} prevPatternId={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].id : undefined} nextPatternId={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].id : undefined} prevPatternLength={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].length : undefined} nextPatternLength={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].length : undefined} />
+          <MacroLanes pattern={pattern} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} />
         </div>
 
         {/* Rows */}
@@ -357,6 +361,13 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
                       {columnVisibility.effect2 && <EffectCell value={cell?.effect2} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect2'} isEmpty={!cell || !cell.effect2} />}
                       {columnVisibility.accent && <AccentCell value={cell?.accent} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'accent'} onToggle={() => !isG && setCell(chIdx, dRIdx, { accent: !cell.accent })} />}
                       {columnVisibility.slide && <SlideCell value={cell?.slide} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'slide'} onToggle={() => !isG && setCell(chIdx, dRIdx, { slide: !cell.slide })} />}
+                      <AutomationColumns
+                        cell={cell}
+                        cursor={cursor}
+                        channelIndex={chIdx}
+                        rowIndex={rIdx}
+                        columnVisibility={columnVisibility}
+                      />
                     </div>
                     {!isG && isCurRow && isCurCh && <div className="absolute inset-0 border-2 border-accent-primary z-10 pointer-events-none shadow-[0_0_8px_var(--color-accent)]" />}
                   </div>
