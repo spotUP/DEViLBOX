@@ -222,6 +222,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Mic',
     color: 'text-fuchsia-400',
   },
+  Furnace: {
+    type: 'Furnace',
+    name: 'Furnace FM',
+    shortName: 'FUI',
+    description: 'FM engine compatible with Furnace Tracker (.fui) instruments',
+    bestFor: ['Genesis bass', 'FM bells', 'Retro arcade', '4-op FM'],
+    icon: 'Cpu',
+    color: 'text-amber-500',
+  },
   ChiptuneModule: {
     type: 'ChiptuneModule',
     name: 'Chiptune Module',
@@ -255,6 +264,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.ChipSynth,
       SYNTH_INFO.PWMSynth,
       SYNTH_INFO.FormantSynth,
+      SYNTH_INFO.Furnace,
     ],
   },
   {
@@ -273,7 +283,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'keys',
     name: 'Keys',
     description: 'Keyboard instruments',
-    synths: [SYNTH_INFO.FMSynth, SYNTH_INFO.Organ],
+    synths: [SYNTH_INFO.FMSynth, SYNTH_INFO.Organ, SYNTH_INFO.Furnace],
   },
   {
     id: 'samples',

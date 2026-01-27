@@ -6,10 +6,10 @@
 
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { TB303_PRESETS } from './tb303Presets';
+import { FURNACE_PRESETS } from './furnacePresets';
 
-// ============================================================================
 // BASS PRESETS (12)
-// ============================================================================
+
 
 export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // TB-303 Acid Bass (8 presets)
