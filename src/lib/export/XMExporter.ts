@@ -5,6 +5,7 @@
 
 import type { Pattern, TrackerCell, ImportMetadata, EnvelopePoints } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
+import { SynthBaker } from '../audio/SynthBaker';
 
 export interface XMExportOptions {
   channelLimit?: number; // Default 32 (XM max)
@@ -62,13 +63,34 @@ export async function exportAsXM(
   const xmInstruments: XMInstrumentData[] = [];
   for (const inst of instruments) {
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" cannot be exported to XM (synth rendering not supported).`);
-      // Note: Rendering synths to samples would require:
-      // 1. OfflineAudioContext to render synth audio for each note
-      // 2. Converting rendered audio to 8-bit/16-bit delta-encoded PCM
-      // 3. Creating proper sample keymap (note-to-sample mapping)
-      // This is complex and platform-dependent, so synths export as empty instruments
-      xmInstruments.push(createEmptyXMInstrument(inst.name));
+      try {
+        const bakedBuffer = await SynthBaker.bakeToSample(inst);
+        const arrayBuffer = bakedBuffer.getChannelData(0).buffer;
+        
+        // Create a Sampler-like config for the baked synth
+        const dummyConfig: InstrumentConfig = {
+          ...inst,
+          synthType: 'Sampler',
+          sample: {
+            audioBuffer: arrayBuffer,
+            url: '',
+            baseNote: 'C4',
+            detune: 0,
+            loop: false,
+            loopStart: 0,
+            loopEnd: 0,
+            reverse: false,
+            playbackRate: 1.0,
+          }
+        };
+        
+        const xmInst = await convertSamplerToXMInstrument(dummyConfig, importMetadata);
+        xmInstruments.push(xmInst);
+        warnings.push(`Synth instrument "${inst.name}" was baked to a sample for XM export.`);
+      } catch (error) {
+        warnings.push(`Failed to bake synth instrument "${inst.name}": ${error}. Exporting as empty.`);
+        xmInstruments.push(createEmptyXMInstrument(inst.name));
+      }
     } else if (inst.synthType === 'Sampler') {
       // Convert sampler to XM instrument
       const xmInst = await convertSamplerToXMInstrument(inst, importMetadata);
