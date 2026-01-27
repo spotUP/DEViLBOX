@@ -32,49 +32,88 @@ export class AmigaFilter extends Tone.ToneAudioNode {
   output: Tone.Gain;
   private _worklet: AudioWorkletNode | null = null;
 
+  private _initialized = false;
+  private _initializing = false;
+
   constructor() {
     super();
     this.input = new Tone.Gain();
     this.output = new Tone.Gain();
     this._sampleRate = Tone.getContext().sampleRate;
-    
+
     this.setupCoefficients();
-    this.initWorklet();
+
+    // Connect bypass initially - worklet will be initialized lazily
+    this.input.connect(this.output);
+
+    // Try to initialize worklet when context is ready
+    this.tryInitWorklet();
   }
 
-  private async initWorklet() {
+  /**
+   * Try to initialize the worklet, retrying if context isn't ready
+   */
+  private async tryInitWorklet() {
+    if (this._initialized || this._initializing) return;
+
     const context = Tone.getContext();
 
-    // Get the actual native AudioContext - Tone.js wraps it
-    // We need the real BaseAudioContext for AudioWorkletNode
-    let rawContext: BaseAudioContext | null = null;
+    // Wait for context to be running (user interaction needed)
+    if (context.state !== 'running') {
+      // Listen for context state change
+      const checkState = () => {
+        if (context.state === 'running') {
+          this.initWorklet();
+        }
+      };
 
-    // Try different ways to get the native context
-    if (context.rawContext instanceof AudioContext || context.rawContext instanceof OfflineAudioContext) {
-      rawContext = context.rawContext;
-    } else if ((context as any)._context instanceof AudioContext) {
-      rawContext = (context as any)._context;
-    } else if (typeof (context.rawContext as any).baseLatency === 'number') {
-      // Duck-type check for native AudioContext
-      rawContext = context.rawContext as BaseAudioContext;
-    }
+      // Check periodically and on state change
+      context.on('statechange', checkState);
 
-    if (!rawContext || !rawContext.audioWorklet) {
-      console.warn('[AmigaFilter] AudioWorklet not supported or context not ready');
-      this.input.connect(this.output);
+      // Also try after a short delay (context might already be running)
+      setTimeout(() => {
+        if (context.state === 'running' && !this._initialized) {
+          this.initWorklet();
+        }
+      }, 100);
+
       return;
     }
 
+    await this.initWorklet();
+  }
+
+  private async initWorklet() {
+    if (this._initialized || this._initializing) return;
+    this._initializing = true;
+
     try {
-      // Diagnostic log to verify context type
-      const contextType = rawContext.constructor.name;
-      console.log('[AmigaFilter] Initializing on context type:', contextType);
+      // Get the native AudioContext from Tone.js
+      // In Tone.js, the rawContext is the native Web Audio API context
+      const toneContext = Tone.getContext();
+      const rawContext = toneContext.rawContext;
+
+      // Verify it's actually an AudioContext by checking for audioWorklet
+      if (!rawContext || !rawContext.audioWorklet) {
+        console.warn('[AmigaFilter] AudioWorklet not supported');
+        this._initializing = false;
+        return;
+      }
+
+      // Additional check: verify the context is in running state
+      if (rawContext.state !== 'running') {
+        console.warn('[AmigaFilter] Context not running, deferring init');
+        this._initializing = false;
+        return;
+      }
 
       const baseUrl = import.meta.env.BASE_URL || '/';
       await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
 
-      // Construct the node using the native context
-      this._worklet = new AudioWorkletNode(rawContext, 'amiga-filter-processor');
+      // Construct the node - pass the rawContext directly
+      // The key insight: rawContext IS the native context, but instanceof checks
+      // can fail across realms. The audioWorklet.addModule success proves it's valid.
+      this._worklet = new AudioWorkletNode(rawContext as AudioContext, 'amiga-filter-processor');
       
       // Initialize worklet with coefficients
       this._worklet.port.postMessage({
@@ -93,17 +132,20 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       const nativeOutput = (this.output as any)._gainNode || (this.output as any)._node || this.output.input;
 
       if (nativeInput && nativeInput.connect && this._worklet) {
+        // Disconnect bypass before connecting through worklet
+        try { this.input.disconnect(this.output); } catch {}
+
         nativeInput.connect(this._worklet);
         this._worklet.connect(nativeOutput);
+        this._initialized = true;
         console.log('[AmigaFilter] 1:1 hardware filter initialized successfully');
       } else {
         throw new Error('Could not find native nodes for connection');
       }
     } catch (e) {
       console.error('[AmigaFilter] Failed to load worklet:', e);
-      // Ensure we don't break the audio chain on failure
-      try { this.input.disconnect(); } catch {}
-      this.input.connect(this.output);
+      // Keep bypass connection (already connected in constructor)
+      this._initializing = false;
     }
   }
 
