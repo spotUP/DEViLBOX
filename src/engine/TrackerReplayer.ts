@@ -618,7 +618,15 @@ export class TrackerReplayer {
 
     // Debug: log row data on first few rows of first pattern
     if (this.pattPos < 5 && chIndex === 0) {
-      console.log('[TrackerReplayer] Row data ch0:', { note: noteValue, period: rawPeriod, inst: row.instrument });
+      console.log('[TrackerReplayer] Row data ch0:', {
+        note: noteValue,
+        period: rawPeriod,
+        inst: row.instrument,
+        effTyp: row.effTyp,
+        eff: row.eff,
+        effect: effect,
+        param: param
+      });
     }
 
     if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
@@ -742,6 +750,7 @@ export class TrackerReplayer {
         break;
 
       case 0xC: // Set volume
+        console.log('[TrackerReplayer] Effect Cxx (set volume) ch', ch.channelIndex, 'vol', param);
         ch.volume = Math.min(64, param);
         this.setChannelVolume(ch);
         break;

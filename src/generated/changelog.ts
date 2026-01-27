@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T17:26:27.536Z
+ * Generated: 2026-01-27T17:41:31.065Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '104';
-export const BUILD_HASH = 'fd6c2d4';
+export const BUILD_NUMBER = '106';
+export const BUILD_HASH = 'b8b2d12';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix MOD instrument ID mapping during import'
+      },
+      {
+        type: 'improvement',
+        description: 'Update generated changelog'
+      },
       {
         type: 'fix',
         description: 'Fix AmigaFilter by deferring worklet init until context running'
@@ -252,14 +260,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Chore: Release v1.0.1'
-      },
-      {
-        type: 'fix',
-        description: 'Implement pattern sequence/order playback for proper song arrangement'
-      },
-      {
-        type: 'feature',
-        description: 'Add automated release script with version bumping'
       }
     ]
   }
