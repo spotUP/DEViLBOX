@@ -31,12 +31,14 @@ export interface EffectMemory {
     vibratoDepth?: number;
     vibratoWaveform?: WaveformType;
     vibratoNoRetrig?: boolean;
+    vibratoPhase?: number; // Persistent phase 0-63
 
     // Tremolo
     tremoloSpeed?: number;
     tremoloDepth?: number;
     tremoloWaveform?: WaveformType;
     tremoloNoRetrig?: boolean;
+    tremoloPhase?: number; // Persistent phase 0-63
 
     // Volume
     volumeSlideUp?: number;
@@ -99,14 +101,12 @@ export interface EffectState {
   vibrato?: {
     speed: number;
     depth: number;
-    phase: number;
     waveform: WaveformType;
   };
 
   tremolo?: {
     speed: number;
     depth: number;
-    phase: number;
     waveform: WaveformType;
   };
 
@@ -169,7 +169,16 @@ export interface EffectResult {
 
   // Sample
   sampleOffset?: number;
+
+  // Amiga Filter
+  setAmigaFilter?: boolean;
 }
+
+// ProTracker vibrato/tremolo sine table
+const VIBRATO_TABLE = [
+  0, 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
+  255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24
+];
 
 export class EffectProcessor {
   private memory: EffectMemory = {};
@@ -225,19 +234,21 @@ export class EffectProcessor {
    * Get waveform value for vibrato/tremolo
    */
   private getWaveformValue(waveform: WaveformType, phase: number): number {
-    const normalizedPhase = (phase % 64) / 64; // 0-1
+    const p = phase & 63;
 
     switch (waveform) {
       case 'sine':
-        return Math.sin(normalizedPhase * Math.PI * 2);
+        // Use authentic ProTracker sine table
+        const tableValue = VIBRATO_TABLE[p & 31];
+        return p < 32 ? tableValue / 255 : -(tableValue / 255);
       case 'rampDown':
-        return 1 - (normalizedPhase * 2);
+        return 1 - ((p % 32) / 16);
       case 'square':
-        return normalizedPhase < 0.5 ? 1 : -1;
+        return p < 32 ? 1 : -1;
       case 'random':
         return Math.random() * 2 - 1;
       default:
-        return Math.sin(normalizedPhase * Math.PI * 2);
+        return Math.sin((p / 64) * Math.PI * 2);
     }
   }
 
@@ -339,7 +350,6 @@ export class EffectProcessor {
         state.vibrato = {
           speed: mem.vibratoSpeed || 4,
           depth: mem.vibratoDepth || 4,
-          phase: mem.vibratoNoRetrig ? (state.vibrato?.phase || 0) : 0,
           waveform: mem.vibratoWaveform || 'sine',
         };
         break;
@@ -367,7 +377,6 @@ export class EffectProcessor {
         state.vibrato = {
           speed: mem.vibratoSpeed || 4,
           depth: mem.vibratoDepth || 4,
-          phase: state.vibrato?.phase || 0,
           waveform: mem.vibratoWaveform || 'sine',
         };
         // Volume slide
@@ -385,7 +394,6 @@ export class EffectProcessor {
         state.tremolo = {
           speed: mem.tremoloSpeed || 4,
           depth: mem.tremoloDepth || 4,
-          phase: mem.tremoloNoRetrig ? (state.tremolo?.phase || 0) : 0,
           waveform: mem.tremoloWaveform || 'sine',
         };
         break;
@@ -415,7 +423,6 @@ export class EffectProcessor {
           up: mem.volumeSlideUp || 0,
           down: mem.volumeSlideDown || 0,
         };
-        console.log(`[EffectCommands] Axy setup ch${channelIndex}: volumeSlide up=${state.volumeSlide.up}, down=${state.volumeSlide.down}, currentVol=${mem.volume}`);
         break;
 
       // ========== Bxx - Jump to Song Position ==========
@@ -446,15 +453,12 @@ export class EffectProcessor {
       case 0xF:
         if (param === 0) {
           // F00 = stop song (not implemented)
-          console.log('[EffectCommands] F00: Stop song (not implemented)');
         } else if (param < 0x20) {
           // 01-1F: Set speed (ticks per row)
-          console.log(`[EffectCommands] F${param.toString(16).padStart(2,'0').toUpperCase()}: Set speed to ${param} ticks/row`);
           this.ticksPerRow = param;
           result.setSpeed = param;
         } else {
           // 20-FF: Set BPM
-          console.log(`[EffectCommands] F${param.toString(16).padStart(2,'0').toUpperCase()}: Set BPM to ${param}`);
           result.setBPM = param;
         }
         break;
@@ -549,8 +553,9 @@ export class EffectProcessor {
     const mem = this.memory[channelIndex];
 
     switch (x) {
-      // E0x - Filter (not implemented - Amiga only)
+      // E0x - Filter (Amiga LED filter)
       case 0x0:
+        result.setAmigaFilter = (y === 0);
         break;
 
       // E1x - Fine Portamento Up
@@ -628,14 +633,12 @@ export class EffectProcessor {
 
       // EAx - Fine Volume Slide Up
       case 0xA:
-        // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
         mem.volume = Math.min(64, (mem.volume ?? 64) + y);
         result.setVolume = mem.volume;
         break;
 
       // EBx - Fine Volume Slide Down
       case 0xB:
-        // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
         mem.volume = Math.max(0, (mem.volume ?? 64) - y);
         result.setVolume = mem.volume;
         break;
@@ -729,26 +732,30 @@ export class EffectProcessor {
 
     // Vibrato
     if (state.vibrato) {
-      const { speed, depth, phase, waveform } = state.vibrato;
+      const { speed, depth, waveform } = state.vibrato;
+      const phase = mem.vibratoPhase ?? 0;
       const waveValue = this.getWaveformValue(waveform, phase);
-      // Depth is in 1/16 semitones
+      // PT2.3D Scaling for period slides is approx (waveValue * depth) / (16 * 12) semitones
       result.frequencyMult = Math.pow(2, (waveValue * depth) / (16 * 12));
-      state.vibrato.phase += speed;
+      mem.vibratoPhase = (phase + speed) & 63;
     }
 
     // Tremolo
     if (state.tremolo) {
-      const { speed, depth, phase, waveform } = state.tremolo;
+      const { speed, depth, waveform } = state.tremolo;
+      const phase = mem.tremoloPhase ?? 0;
       const waveValue = this.getWaveformValue(waveform, phase);
-      // Depth is in volume units
-      result.volumeAdd = waveValue * depth;
-      state.tremolo.phase += speed;
+      
+      // PT2.3D scaling: delta = (waveValue_0_255 * depth) >> 6
+      // Since our waveValue is -1 to 1, we convert:
+      // (waveValue * 255 * depth) / 64 ≈ waveValue * depth * 4
+      result.volumeAdd = waveValue * depth * 4;
+      mem.tremoloPhase = (phase + speed) & 63;
     }
 
     // Volume Slide
     if (state.volumeSlide) {
       const { up, down } = state.volumeSlide;
-      // CRITICAL: Use ?? instead of || because 0 is a valid volume (0 || 64 = 64, but 0 ?? 64 = 0)
       const currentVol = mem.volume ?? 64;
       mem.volume = Math.max(0, Math.min(64, currentVol + up - down));
       result.volumeSet = mem.volume;
@@ -757,7 +764,6 @@ export class EffectProcessor {
     // Panning Slide
     if (state.panSlide) {
       const { right, left } = state.panSlide;
-      // CRITICAL: Use ?? instead of || because 0 is a valid pan value (full left)
       mem.pan = Math.max(0, Math.min(255, (mem.pan ?? 128) + right - left));
       result.panSet = mem.pan;
     }
@@ -776,10 +782,8 @@ export class EffectProcessor {
           const volMults: number[] = [1, 1, 1, 1, 1, 1, 2/3, 0.5, 1, 1, 1, 1, 1, 1, 1.5, 2];
 
           if (vc <= 5 || (vc >= 9 && vc <= 13)) {
-            // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
             mem.volume = Math.max(0, Math.min(64, (mem.volume ?? 64) + volChanges[vc]));
           } else if (vc === 6 || vc === 7 || vc === 14 || vc === 15) {
-            // CRITICAL: Use ?? instead of || because 0 is a valid volume (C00 sets volume to 0)
             mem.volume = Math.max(0, Math.min(64, Math.floor((mem.volume ?? 64) * volMults[vc])));
           }
           result.volumeSet = mem.volume;

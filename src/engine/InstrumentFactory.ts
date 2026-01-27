@@ -25,6 +25,7 @@ import { SidechainCompressor } from './effects/SidechainCompressor';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { ArpeggioEngine } from './ArpeggioEngine';
+import { FurnaceSynth } from './FurnaceSynth';
 
 export class InstrumentFactory {
   /**
@@ -72,6 +73,10 @@ export class InstrumentFactory {
 
       case 'TB303':
         instrument = this.createTB303(config);
+        break;
+
+      case 'Furnace':
+        instrument = this.createFurnace(config);
         break;
 
       case 'Sampler':
@@ -1960,6 +1965,13 @@ export class InstrumentFactory {
     };
 
     return chipSynthWrapper as any;
+  }
+
+  private static createFurnace(config: InstrumentConfig): FurnaceSynth {
+    if (!config.furnace) {
+      throw new Error('Furnace config required for Furnace synth type');
+    }
+    return new FurnaceSynth(config.furnace);
   }
 
   /**
