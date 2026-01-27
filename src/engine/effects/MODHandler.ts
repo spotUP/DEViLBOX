@@ -591,21 +591,25 @@ export class MODHandler extends BaseFormatHandler {
       result.setPeriod = state.period;
     } else {
       const ftIndex = finetuneToIndex(state.finetune);
+      // periodToNoteIndex returns internal indices: 36-71 for Amiga period table range
       const baseIndex = periodToNoteIndex(state.period, state.finetune);
       let newPeriod: number;
       if (baseIndex !== -1) {
         let targetIndex = baseIndex + offset;
         if (this.emulatePTBugs) {
-          if (targetIndex === 36) {
+          // ProTracker boundary: internal index 72 (one past B-3) returns 0
+          if (targetIndex === 72) {
             result.setPeriod = 0;
             result.setFrequency = 0;
             return;
-          } else if (targetIndex >= 37) {
+          } else if (targetIndex >= 73) {
+            // Wrap to beginning of table (index 73 -> 36, 74 -> 37, etc.)
             targetIndex -= 37;
           }
         }
-        if (targetIndex < 36 && targetIndex >= 0) {
-          newPeriod = PERIOD_TABLE[ftIndex][targetIndex];
+        // PERIOD_TABLE uses indices 0-35, internal indices are 36-71
+        if (targetIndex >= 36 && targetIndex < 72) {
+          newPeriod = PERIOD_TABLE[ftIndex][targetIndex - 36];
         } else {
           newPeriod = getArpeggioPeriod(state.period, offset, state.finetune, this.emulatePTBugs);
         }
