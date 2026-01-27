@@ -121,6 +121,9 @@ export class ITHandler extends S3MHandler {
 
     const result = super.processRowStart(channel, note, instrument, volume, effect, state);
 
+    // IT processes auto-vibrato at tick 0 (unlike XM which only does ticks 1+)
+    this.processAutoVibrato(state, result, 0);
+
     if (effect && effect.startsWith('Z')) {
       this.processITEffectTick0(channel, effect, state, result);
     }

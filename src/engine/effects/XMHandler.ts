@@ -199,8 +199,10 @@ export class XMHandler extends BaseFormatHandler {
       if (!note || note === '...' || note === '---') {
         if (state.period > 0 && oldFinetune !== defaultFinetune) {
           const { periodToNoteString } = require('./PeriodTables');
-          const noteStr = periodToNoteString(state.period, oldFinetune);
-          state.period = noteStringToPeriod(noteStr, defaultFinetune);
+          // Use format-aware conversion to maintain correct octave mapping
+          const noteStr = periodToNoteString(state.period, oldFinetune, this.format);
+          // Use instance method to respect format-specific period calculation
+          state.period = this.noteStringToPeriod(noteStr, defaultFinetune);
           state.frequency = this.periodToHz(state.period);
           result.setPeriod = state.period;
           result.setFrequency = state.frequency;

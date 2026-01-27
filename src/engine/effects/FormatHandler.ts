@@ -156,6 +156,10 @@ export abstract class BaseFormatHandler implements FormatHandler {
         // Sawtooth wave: 1 at 0, -1 at 63
         return 1 - (pos / 32);
 
+      case 'rampUp':
+        // Inverse sawtooth: -1 at 0, 1 at 63
+        return (pos / 32) - 1;
+
       case 'square':
         // Square wave: 1 for first half, -1 for second half
         return pos < 32 ? 1 : -1;
@@ -236,10 +240,13 @@ export abstract class BaseFormatHandler implements FormatHandler {
       result.setFrequency = (this as any).periodToHz(result.setPeriod);
     } else if (this.format === 'IT') {
       // IT pitch-based auto-vibrato scaling
-      // Test suite expects high-precision frequency updates.
-      // Scaling derived from compliance tests: (noteFreq * depth * sweep) / 1048576
-      const baseFreq = (this as any).periodToHz ? (this as any).periodToHz(1) : 26633830;
-      const autoDeltaHz = (waveValue * av.depth * state.autoVibratoSweep * baseFreq) / 1048576;
+      // Uses current note frequency as base for percentage-based modulation
+      // depth/200 gives max percentage, sweep/255 gives current fade-in factor
+      // At depth=10, sweep=64: (10/200) * (64/255) = 0.0125 = 1.25% modulation
+      const noteFreq = state.frequency || 0;
+      const depthFactor = av.depth / 200;
+      const sweepFactor = state.autoVibratoSweep / 255;
+      const autoDeltaHz = waveValue * depthFactor * sweepFactor * noteFreq;
       
       if (result.setFrequency) {
         result.setFrequency += autoDeltaHz;

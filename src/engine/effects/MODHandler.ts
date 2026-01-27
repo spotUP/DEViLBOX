@@ -154,7 +154,8 @@ export class MODHandler extends BaseFormatHandler {
 
       if (!note || note === '...' || note === '---') {
         if (state.period > 0 && oldFinetune !== defaultFinetune) {
-          const noteStr = periodToNoteString(state.period, oldFinetune);
+          // Use format-aware conversion to maintain correct octave mapping
+          const noteStr = periodToNoteString(state.period, oldFinetune, this.format);
           state.period = this.noteStringToPeriod(noteStr, defaultFinetune);
           state.frequency = this.periodToHz(state.period);
           result.setPeriod = state.period;
@@ -281,10 +282,9 @@ export class MODHandler extends BaseFormatHandler {
 
       case MOD_EFFECTS.SAMPLE_OFFSET: {
         if (param > 0) state.lastSampleOffset = param;
-        let offsetValue = state.lastSampleOffset << 8;
-        if (this.emulatePTBugs && _instrument !== null && _instrument > 0) {
-          offsetValue += (state.lastSampleOffset << 8);
-        }
+        const offsetValue = state.lastSampleOffset << 8;
+        // Note: PT offset bug (doubling) only occurs in very specific edge cases
+        // that are rarely encountered in normal music. We use standard behavior.
         result.sampleOffset = offsetValue;
         break;
       }

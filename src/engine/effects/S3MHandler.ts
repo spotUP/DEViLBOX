@@ -145,13 +145,14 @@ export class S3MHandler extends BaseFormatHandler {
 
   /**
    * Convert note string to S3M period
+   * Uses the public noteStringToPeriod method to respect format in subclasses
    */
   private noteToS3MPeriod(note: string, finetune: number = 0): number {
     if (!note || note === '...' || note === '---') return 0;
     if (note === '===' || note === '^^^') return -1;
 
-    // S3M uses standard Amiga periods but with different octave range
-    return noteStringToPeriod(note, finetune);
+    // Use instance method to respect format (IT/S3M have different octave mappings)
+    return this.noteStringToPeriod(note, finetune);
   }
 
   /**
@@ -265,14 +266,14 @@ export class S3MHandler extends BaseFormatHandler {
         break;
 
       case 'D': // Volume Slide
-        // Check for fine slides: DFy = Fine Up, DxF = Fine Down
-        if (curX === 0x0F && curY > 0) {
-          // Fine slide UP (DFy)
-          state.volume = this.clampVolume(state.volume + curY);
+        // Check for fine slides: DxF = Fine Up by x, DFy = Fine Down by y
+        if (curY === 0x0F && curX > 0) {
+          // Fine slide UP (DxF) - y=F means fine, x is amount
+          state.volume = this.clampVolume(state.volume + curX);
           result.setVolume = state.volume;
-        } else if (curY === 0x0F && curX > 0) {
-          // Fine slide DOWN (DxF)
-          state.volume = this.clampVolume(state.volume - curX);
+        } else if (curX === 0x0F && curY > 0) {
+          // Fine slide DOWN (DFy) - x=F means fine, y is amount
+          state.volume = this.clampVolume(state.volume - curY);
           result.setVolume = state.volume;
         } else {
           this.activeEffects.set(channel, { type: 'volumeSlide', param: currentParam, x: curX, y: curY });

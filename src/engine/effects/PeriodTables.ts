@@ -153,9 +153,12 @@ export function noteStringToPeriod(note: string, finetune: number = 0, format?: 
   if (semitone === -1) return 0;
 
   // Format-specific base octaves.
-  let baseOctave = 4; // Default XM
-  if (format === 'MOD') baseOctave = 0; // MOD replayer: C-1 maps to Note 36 (856).
-  if (format === 'IT' || format === 'S3M') baseOctave = 2; // IT replayer: C-3 maps to Note 60 (214).
+  // These map display octave numbers to internal note indices:
+  // - internalIndex = (displayOctave - baseOctave) * 12 + semitone + 48
+  // - Table covers indices 36-71 (periods 856-113)
+  let baseOctave = 4; // XM: C-5 = index 48 (middle C at period 428)
+  if (format === 'MOD') baseOctave = 1; // MOD: C-1 = index 48 (period 428), B-3 = index 83 (extrapolated)
+  if (format === 'IT' || format === 'S3M') baseOctave = 2; // IT/S3M: C-3 = index 60 (period 214)
 
   const internalIndex = (octave - baseOctave) * 12 + semitone + 48;
   return getPeriodExtended(internalIndex, finetune);
