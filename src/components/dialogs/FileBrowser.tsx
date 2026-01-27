@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Music, Upload } from 'lucide-react';
 
 // Supported file extensions
-const TRACKER_EXTENSIONS = ['.mod', '.xm', '.it', '.s3m'];
+const TRACKER_EXTENSIONS = ['.mod', '.xm', '.it', '.s3m', '.fur', '.dmf'];
 
 // Check if file is a tracker module (needs conversion)
 const isTrackerModule = (filename: string): boolean => {
@@ -198,7 +198,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             <div className="flex flex-col items-center justify-center h-full text-accent-primary">
               <Upload size={48} className="mb-4" />
               <p className="text-lg font-medium">Drop file to load</p>
-              <p className="text-sm text-text-muted">.dbox, .json, .mod, .xm, .it, .s3m</p>
+              <p className="text-sm text-text-muted">.dbox, .json, .mod, .xm, .it, .s3m, .fur, .dmf</p>
             </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center h-full text-text-muted">
@@ -239,7 +239,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".dbox,.json,.mod,.xm,.it,.s3m"
+          accept=".dbox,.json,.mod,.xm,.it,.s3m,.fur,.dmf"
           onChange={handleLocalFileChange}
           className="hidden"
         />
