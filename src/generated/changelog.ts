@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T14:55:49.322Z
+ * Generated: 2026-01-27T17:26:27.536Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '83';
-export const BUILD_HASH = 'b2cdfca';
+export const BUILD_NUMBER = '104';
+export const BUILD_HASH = 'fd6c2d4';
 export const BUILD_DATE = '2026-01-27';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -29,6 +29,96 @@ export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-27',
+    changes: [
+      {
+        type: 'fix',
+        description: 'Fix AmigaFilter by deferring worklet init until context running'
+      },
+      {
+        type: 'fix',
+        description: 'Fix sample URLs not surviving page refresh'
+      },
+      {
+        type: 'fix',
+        description: 'Fix AmigaFilter AudioWorkletNode context detection'
+      },
+      {
+        type: 'feature',
+        description: 'Add velocity modulation, loop points, and performance optimizations'
+      },
+      {
+        type: 'improvement',
+        description: 'Furnace integration phases 3-5: chip export + macro system'
+      },
+      {
+        type: 'improvement',
+        description: 'Refactor duplicated effect logic into BaseFormatHandler'
+      },
+      {
+        type: 'fix',
+        description: 'Fix MOD arpeggio wraparound at period table boundaries'
+      },
+      {
+        type: 'fix',
+        description: 'Fix format-aware period conversion and IT auto-vibrato'
+      },
+      {
+        type: 'feature',
+        description: 'Update changelog and add Serena config'
+      },
+      {
+        type: 'improvement',
+        description: 'Update documentation and handoff files'
+      },
+      {
+        type: 'improvement',
+        description: 'Update dependencies'
+      },
+      {
+        type: 'feature',
+        description: 'Update presets and add master presets'
+      },
+      {
+        type: 'feature',
+        description: 'Add audio processing utilities and update exporters'
+      },
+      {
+        type: 'improvement',
+        description: 'Update UI components for Furnace and effects'
+      },
+      {
+        type: 'improvement',
+        description: 'Extend types and stores for Furnace integration'
+      },
+      {
+        type: 'feature',
+        description: 'Add Furnace format support and FM presets'
+      },
+      {
+        type: 'feature',
+        description: 'Add Furnace chip engine (WASM-based emulation)'
+      },
+      {
+        type: 'improvement',
+        description: 'Update core engine with multi-format support'
+      },
+      {
+        type: 'feature',
+        description: 'Add effect compliance test suite'
+      },
+      {
+        type: 'improvement',
+        description: 'Refactor effect system with format-specific handlers'
+      },
+      {
+        type: 'feature',
+        description: 'Add chip music exporters (VGM, ZSM, SAP, TIunA) and DefleMask parser'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-26',
     changes: [
       {
@@ -90,7 +180,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-25',
     changes: [
       {
@@ -104,7 +194,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-2',
+    version: '1.0.1-3',
     date: '2026-01-24',
     changes: [
       {
@@ -114,7 +204,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-3',
+    version: '1.0.1-4',
     date: '2026-01-23',
     changes: [
       {
@@ -152,7 +242,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-4',
+    version: '1.0.1-5',
     date: '2026-01-22',
     changes: [
       {
@@ -170,102 +260,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add automated release script with version bumping'
-      },
-      {
-        type: 'feature',
-        description: 'Expand FT2 toolbar by default for better UX'
-      },
-      {
-        type: 'feature',
-        description: 'Add automated Electron app release workflow'
-      },
-      {
-        type: 'fix',
-        description: 'Use design system Button component for Desktop App button'
-      },
-      {
-        type: 'feature',
-        description: 'Wire up Desktop App button to show download modal with Electron binaries'
-      },
-      {
-        type: 'feature',
-        description: 'Make startup.sh non-interactive with CLI arguments'
-      },
-      {
-        type: 'fix',
-        description: 'Add missing source files and fix all demo files for CI/CD deployment'
-      },
-      {
-        type: 'feature',
-        description: 'Add automatic version check and update notifications'
-      },
-      {
-        type: 'improvement',
-        description: 'Chore: Update build number to 46'
-      },
-      {
-        type: 'improvement',
-        description: 'Chore: Update changelog for build 45'
-      },
-      {
-        type: 'improvement',
-        description: 'Chore: Configure GitHub Pages deployment'
-      },
-      {
-        type: 'fix',
-        description: 'Pattern editor layout with custom scrollbar and mobile fixes'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-5',
-    date: '2026-01-21',
-    changes: [
-      {
-        type: 'feature',
-        description: 'Song format documentation, error handling, and volume normalization'
-      },
-      {
-        type: 'feature',
-        description: 'Add TB-303 preset dropdown and vegDecay migration'
-      },
-      {
-        type: 'fix',
-        description: 'Separate filter and VCA envelope decay controls'
-      },
-      {
-        type: 'fix',
-        description: 'Correct Devil Fish default vegDecay to prevent clicks'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve EnvelopeVisualizer size and theme integration'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-6',
-    date: '2026-01-20',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Update summary with Acid Sequencer information'
-      },
-      {
-        type: 'feature',
-        description: 'Add Acid Sequencer for TB-303 Pattern Sequencing'
-      },
-      {
-        type: 'feature',
-        description: 'Add GuitarML Neural Network Overdrive to TB-303 Engine'
-      },
-      {
-        type: 'feature',
-        description: 'Implement 1:1 accurate TB-303 emulation with Open303 DSP engine'
-      },
-      {
-        type: 'feature',
-        description: 'Add dynamic version handling for export/import system (#10)'
       }
     ]
   }
