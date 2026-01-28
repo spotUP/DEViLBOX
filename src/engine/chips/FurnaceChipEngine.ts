@@ -98,26 +98,10 @@ export class FurnaceChipEngine {
       // Cast to any for duck typing checks
       const ctx = audioContext as any;
 
-      // Validate audioContext using duck typing (constructor name is unreliable across realms)
+      // Validate audioContext using duck typing
       if (!ctx || !ctx.audioWorklet || typeof ctx.createGain !== 'function') {
         console.warn('[FurnaceChipEngine] Invalid audio context - no audioWorklet');
-        this.initFailedPermanently = true;
-        return;
-      }
-
-      // Check if this is a real native AudioContext, not a Tone.js wrapper
-      // The browser's AudioWorkletNode constructor requires a BaseAudioContext instance
-      const isNativeContext = (
-        audioContext instanceof AudioContext ||
-        audioContext instanceof OfflineAudioContext ||
-        // Check constructor name as fallback for cross-realm scenarios
-        ctx.constructor?.name === 'AudioContext' ||
-        ctx.constructor?.name === 'OfflineAudioContext'
-      );
-
-      if (!isNativeContext) {
-        console.warn('[FurnaceChipEngine] Not a native AudioContext:', ctx.constructor?.name);
-        this.initFailedPermanently = true;
+        this.initPromise = null; // Allow retry
         return;
       }
 
@@ -128,14 +112,14 @@ export class FurnaceChipEngine {
         return;
       }
 
-      // Now we know it's a real AudioContext
-      const nativeContext = audioContext as AudioContext;
+      console.log('[FurnaceChipEngine] AudioContext ready, state:', ctx.state);
+
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       // Try to add the worklet module
       const workletUrl = `${baseUrl}FurnaceChips.worklet.js`;
       try {
-        await nativeContext.audioWorklet.addModule(workletUrl);
+        await ctx.audioWorklet.addModule(workletUrl);
         console.log('[FurnaceChipEngine] Worklet module loaded');
       } catch (err: any) {
         // Check if it's "already registered" vs actual error
@@ -162,7 +146,7 @@ export class FurnaceChipEngine {
 
       // Try to create the AudioWorkletNode
       try {
-        this.workletNode = new AudioWorkletNode(nativeContext, 'furnace-chips-processor', {
+        this.workletNode = new AudioWorkletNode(ctx, 'furnace-chips-processor', {
           numberOfInputs: 0,
           numberOfOutputs: 1,
           outputChannelCount: [2],
