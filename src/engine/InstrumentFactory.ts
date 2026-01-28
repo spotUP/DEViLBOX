@@ -5,7 +5,7 @@
  */
 
 import * as Tone from 'tone';
-import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, EffectConfig, PitchEnvelopeConfig } from '@typedefs/instrument';
 import {
   DEFAULT_WAVETABLE,
   DEFAULT_SUPERSAW,
@@ -16,6 +16,8 @@ import {
   DEFAULT_PWM_SYNTH,
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
+  DEFAULT_WOBBLE_BASS,
+  DEFAULT_DRUMKIT,
   VOWEL_FORMANTS,
 } from '../types/instrument';
 import { TB303Synth } from './TB303Engine';
@@ -26,6 +28,7 @@ import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
+import { DrumKitSynth } from './DrumKitSynth';
 
 export class InstrumentFactory {
   /**
@@ -77,6 +80,149 @@ export class InstrumentFactory {
 
       case 'Furnace':
         instrument = this.createFurnace(config);
+        break;
+
+      // Furnace Chip Types - all use FurnaceSynth with different chip IDs
+      case 'FurnaceOPN':
+        instrument = this.createFurnaceWithChip(config, 1); // OPN2
+        break;
+      case 'FurnaceOPM':
+        instrument = this.createFurnaceWithChip(config, 33); // OPM
+        break;
+      case 'FurnaceOPL':
+        instrument = this.createFurnaceWithChip(config, 14); // OPL3
+        break;
+      case 'FurnaceOPLL':
+        instrument = this.createFurnaceWithChip(config, 9); // OPLL
+        break;
+      case 'FurnaceESFM':
+        instrument = this.createFurnaceWithChip(config, 48); // ESFM
+        break;
+      case 'FurnaceOPZ':
+        instrument = this.createFurnaceWithChip(config, 40); // OPZ
+        break;
+      case 'FurnaceOPNA':
+        instrument = this.createFurnaceWithChip(config, 6); // OPNA
+        break;
+      case 'FurnaceOPNB':
+        instrument = this.createFurnaceWithChip(config, 7); // OPNB
+        break;
+      case 'FurnaceOPL4':
+        instrument = this.createFurnaceWithChip(config, 46); // OPL4
+        break;
+      case 'FurnaceY8950':
+        instrument = this.createFurnaceWithChip(config, 15); // Y8950
+        break;
+      case 'FurnaceVRC7':
+        instrument = this.createFurnaceWithChip(config, 35); // VRC7
+        break;
+      case 'FurnaceNES':
+        instrument = this.createFurnaceWithChip(config, 34); // NES
+        break;
+      case 'FurnaceGB':
+        instrument = this.createFurnaceWithChip(config, 2); // GB
+        break;
+      case 'FurnaceSNES':
+        instrument = this.createFurnaceWithChip(config, 41); // SNES
+        break;
+      case 'FurnacePCE':
+        instrument = this.createFurnaceWithChip(config, 4); // PCE
+        break;
+      case 'FurnacePSG':
+        instrument = this.createFurnaceWithChip(config, 8); // PSG (SN76489)
+        break;
+      case 'FurnaceVB':
+        instrument = this.createFurnaceWithChip(config, 36); // Virtual Boy
+        break;
+      case 'FurnaceLynx':
+        instrument = this.createFurnaceWithChip(config, 39); // Lynx
+        break;
+      case 'FurnaceSWAN':
+        instrument = this.createFurnaceWithChip(config, 37); // WonderSwan
+        break;
+      case 'FurnaceVRC6':
+        instrument = this.createFurnaceWithChip(config, 21); // VRC6
+        break;
+      case 'FurnaceN163':
+        instrument = this.createFurnaceWithChip(config, 22); // N163
+        break;
+      case 'FurnaceFDS':
+        instrument = this.createFurnaceWithChip(config, 23); // FDS
+        break;
+      case 'FurnaceMMC5':
+        instrument = this.createFurnaceWithChip(config, 24); // MMC5
+        break;
+      case 'FurnaceC64':
+        instrument = this.createFurnaceWithChip(config, 3); // SID
+        break;
+      case 'FurnaceAY':
+        instrument = this.createFurnaceWithChip(config, 5); // AY
+        break;
+      case 'FurnaceVIC':
+        instrument = this.createFurnaceWithChip(config, 32); // VIC
+        break;
+      case 'FurnaceSAA':
+        instrument = this.createFurnaceWithChip(config, 31); // SAA
+        break;
+      case 'FurnaceTED':
+        instrument = this.createFurnaceWithChip(config, 43); // TED
+        break;
+      case 'FurnaceVERA':
+        instrument = this.createFurnaceWithChip(config, 42); // VERA
+        break;
+      case 'FurnaceSCC':
+        instrument = this.createFurnaceWithChip(config, 10); // SCC
+        break;
+      case 'FurnaceTIA':
+        instrument = this.createFurnaceWithChip(config, 38); // TIA
+        break;
+      case 'FurnaceSEGAPCM':
+        instrument = this.createFurnaceWithChip(config, 16); // SEGAPCM
+        break;
+      case 'FurnaceQSOUND':
+        instrument = this.createFurnaceWithChip(config, 19); // QSound
+        break;
+      case 'FurnaceES5506':
+        instrument = this.createFurnaceWithChip(config, 18); // ES5506
+        break;
+      case 'FurnaceRF5C68':
+        instrument = this.createFurnaceWithChip(config, 17); // RF5C68
+        break;
+      case 'FurnaceC140':
+        instrument = this.createFurnaceWithChip(config, 25); // C140
+        break;
+      case 'FurnaceK007232':
+        instrument = this.createFurnaceWithChip(config, 26); // K007232
+        break;
+      case 'FurnaceK053260':
+        instrument = this.createFurnaceWithChip(config, 27); // K053260
+        break;
+      case 'FurnaceGA20':
+        instrument = this.createFurnaceWithChip(config, 28); // GA20
+        break;
+      case 'FurnaceOKI':
+        instrument = this.createFurnaceWithChip(config, 20); // OKI
+        break;
+      case 'FurnaceYMZ280B':
+        instrument = this.createFurnaceWithChip(config, 29); // YMZ280B
+        break;
+      case 'FurnaceX1_010':
+        instrument = this.createFurnaceWithChip(config, 30); // X1-010
+        break;
+      case 'FurnaceBUBBLE':
+        instrument = this.createFurnaceWithChip(config, 47); // Bubble System
+        break;
+      case 'FurnaceSM8521':
+        instrument = this.createFurnaceWithChip(config, 44); // SM8521
+        break;
+      case 'FurnaceT6W28':
+        instrument = this.createFurnaceWithChip(config, 45); // T6W28
+        break;
+      case 'FurnaceSUPERVISION':
+        instrument = this.createFurnaceWithChip(config, 49); // Supervision
+        break;
+      case 'FurnaceUPD1771':
+        instrument = this.createFurnaceWithChip(config, 50); // UPD1771
         break;
 
       case 'Sampler':
@@ -140,6 +286,14 @@ export class InstrumentFactory {
 
       case 'FormantSynth':
         instrument = this.createFormantSynth(config);
+        break;
+
+      case 'WobbleBass':
+        instrument = this.createWobbleBass(config);
+        break;
+
+      case 'DrumKit':
+        instrument = this.createDrumKit(config);
         break;
 
       default:
@@ -438,8 +592,8 @@ export class InstrumentFactory {
   // PRIVATE SYNTH CREATORS
   // ============================================================================
 
-  private static createSynth(config: InstrumentConfig): Tone.PolySynth {
-    return new Tone.PolySynth(Tone.Synth, {
+  private static createSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: {
         type: config.oscillator?.type || 'sawtooth',
         detune: config.oscillator?.detune || 0,
@@ -452,6 +606,42 @@ export class InstrumentFactory {
       },
       volume: config.volume || -12,
     });
+
+    // Setup pitch envelope if enabled
+    const pitchEnv = config.pitchEnvelope;
+    const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
+
+    // If no pitch envelope, return synth directly
+    if (!hasPitchEnv) {
+      return synth;
+    }
+
+    // Wrap synth to add pitch envelope support
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
+        synth.triggerAttackRelease(note, duration, t, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
+        synth.triggerAttack(note, t, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        const t = time ?? Tone.now();
+        this.triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
+        synth.triggerRelease(note, t);
+      },
+      releaseAll: () => {
+        synth.set({ detune: 0 });
+        synth.releaseAll();
+      },
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as any;
   }
 
   private static createMonoSynth(config: InstrumentConfig): Tone.MonoSynth {
@@ -767,18 +957,37 @@ export class InstrumentFactory {
     synth.connect(filter);
     filter.connect(chorus);
 
+    // Setup pitch envelope if enabled
+    const pitchEnv = config.pitchEnvelope;
+    const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
+
     // Return a wrapper object
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-        synth.triggerAttackRelease(note, duration, time, velocity);
+        const t = time ?? Tone.now();
+        if (hasPitchEnv) {
+          this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
+        }
+        synth.triggerAttackRelease(note, duration, t, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
-        synth.triggerAttack(note, time, velocity);
+        const t = time ?? Tone.now();
+        if (hasPitchEnv) {
+          this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
+        }
+        synth.triggerAttack(note, t, velocity);
       },
       triggerRelease: (note: string, time?: number) => {
-        synth.triggerRelease(note, time);
+        const t = time ?? Tone.now();
+        if (hasPitchEnv) {
+          this.triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
+        }
+        synth.triggerRelease(note, t);
       },
-      releaseAll: () => synth.releaseAll(),
+      releaseAll: () => {
+        synth.set({ detune: 0 }); // Reset pitch on release all
+        synth.releaseAll();
+      },
       connect: (dest: Tone.InputNode) => chorus.connect(dest),
       disconnect: () => chorus.disconnect(),
       dispose: () => {
@@ -793,7 +1002,7 @@ export class InstrumentFactory {
   /**
    * PolySynth - True polyphonic synth with voice management
    */
-  private static createPolySynth(config: InstrumentConfig): Tone.PolySynth {
+  private static createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const psConfig = config.polySynth || DEFAULT_POLYSYNTH;
 
     // Select voice type
@@ -801,7 +1010,7 @@ export class InstrumentFactory {
     if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
     else if (psConfig.voiceType === 'AMSynth') VoiceClass = Tone.AMSynth;
 
-    return new Tone.PolySynth(VoiceClass, {
+    const synth = new Tone.PolySynth(VoiceClass, {
       maxPolyphony: psConfig.voiceCount,
       oscillator: {
         type: psConfig.oscillator.type || 'sawtooth',
@@ -814,6 +1023,42 @@ export class InstrumentFactory {
       },
       volume: config.volume || -12,
     });
+
+    // Setup pitch envelope if enabled
+    const pitchEnv = config.pitchEnvelope;
+    const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
+
+    // If no pitch envelope, return synth directly
+    if (!hasPitchEnv) {
+      return synth;
+    }
+
+    // Wrap synth to add pitch envelope support
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
+        synth.triggerAttackRelease(note, duration, t, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
+        synth.triggerAttack(note, t, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => {
+        const t = time ?? Tone.now();
+        this.triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
+        synth.triggerRelease(note, t);
+      },
+      releaseAll: () => {
+        synth.set({ detune: 0 });
+        synth.releaseAll();
+      },
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as any;
   }
 
   /**
@@ -1888,16 +2133,16 @@ export class InstrumentFactory {
     if (arpeggioConfig?.enabled) {
       arpeggioEngine = new ArpeggioEngine({
         config: arpeggioConfig,
-        onNoteOn: (note: string, velocity: number, duration: number) => {
-          // Release last arpeggio note before playing new one
+        onNoteOn: (note: string, velocity: number, duration: number, scheduledTime: number) => {
+          // Release last arpeggio note before playing new one - use scheduled time for tight timing
           if (lastArpNote) {
-            synth.triggerRelease(lastArpNote, Tone.now());
+            synth.triggerRelease(lastArpNote, scheduledTime);
           }
-          synth.triggerAttackRelease(note, duration, Tone.now(), velocity);
+          synth.triggerAttackRelease(note, duration, scheduledTime, velocity);
           lastArpNote = note;
         },
-        onNoteOff: (note: string) => {
-          synth.triggerRelease(note, Tone.now());
+        onNoteOff: (note: string, scheduledTime: number) => {
+          synth.triggerRelease(note, scheduledTime);
           if (lastArpNote === note) {
             lastArpNote = null;
           }
@@ -1972,6 +2217,30 @@ export class InstrumentFactory {
       throw new Error('Furnace config required for Furnace synth type');
     }
     return new FurnaceSynth(config.furnace);
+  }
+
+  /**
+   * Create Furnace synth with specific chip type
+   * Used for the individual chip type synths (FurnaceOPN, FurnaceNES, etc.)
+   */
+  private static createFurnaceWithChip(config: InstrumentConfig, chipType: number): FurnaceSynth {
+    const furnaceConfig = config.furnace || {
+      chipType,
+      algorithm: 0,
+      feedback: 0,
+      operators: [
+        { tl: 0, ar: 31, dr: 0, sr: 0, rr: 15, sl: 0, mul: 1, dt: 0 },
+        { tl: 40, ar: 31, dr: 10, sr: 5, rr: 8, sl: 8, mul: 2, dt: 0 },
+        { tl: 40, ar: 31, dr: 10, sr: 5, rr: 8, sl: 8, mul: 1, dt: 0 },
+        { tl: 20, ar: 31, dr: 15, sr: 0, rr: 10, sl: 4, mul: 1, dt: 0 },
+      ],
+      macros: [],
+      opMacros: [],
+      wavetables: [],
+    };
+    // Override chip type
+    furnaceConfig.chipType = chipType;
+    return new FurnaceSynth(furnaceConfig);
   }
 
   /**
@@ -2176,6 +2445,405 @@ export class InstrumentFactory {
   }
 
   /**
+   * WobbleBass - Dedicated bass synth for dubstep, DnB, jungle
+   * Features: dual oscillators, FM, Reese detuning, wobble LFO, distortion, formant growl
+   */
+  private static createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
+    const wbConfig = config.wobbleBass || DEFAULT_WOBBLE_BASS;
+    console.log('[WobbleBass] Creating with config:', {
+      hasWobbleBass: !!config.wobbleBass,
+      envelope: wbConfig.envelope,
+      osc1: wbConfig.osc1,
+      filter: wbConfig.filter,
+      configVolume: config.volume,
+    });
+
+    // === OSCILLATOR SECTION ===
+    // Create dual oscillators with unison
+    const voiceCount = Math.max(1, wbConfig.unison.voices);
+    const detuneSpread = wbConfig.unison.detune;
+
+    // Main oscillator 1 (with unison)
+    const osc1 = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: wbConfig.osc1.type,
+      },
+      envelope: {
+        attack: wbConfig.envelope.attack / 1000,
+        decay: wbConfig.envelope.decay / 1000,
+        sustain: wbConfig.envelope.sustain / 100,
+        release: wbConfig.envelope.release / 1000,
+      },
+      volume: -6 + (wbConfig.osc1.level / 100) * 6 - 6,
+    });
+
+    // Main oscillator 2 (slightly detuned for Reese)
+    const osc2 = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      oscillator: {
+        type: wbConfig.osc2.type,
+      },
+      envelope: {
+        attack: wbConfig.envelope.attack / 1000,
+        decay: wbConfig.envelope.decay / 1000,
+        sustain: wbConfig.envelope.sustain / 100,
+        release: wbConfig.envelope.release / 1000,
+      },
+      volume: -6 + (wbConfig.osc2.level / 100) * 6 - 6,
+    });
+
+    // Set octave offsets via detune (1200 cents = 1 octave)
+    osc1.set({ detune: wbConfig.osc1.octave * 1200 + wbConfig.osc1.detune });
+    osc2.set({ detune: wbConfig.osc2.octave * 1200 + wbConfig.osc2.detune });
+
+    // Sub oscillator (clean sine for solid low end)
+    let subOsc: Tone.PolySynth | null = null;
+    if (wbConfig.sub.enabled) {
+      subOsc = new Tone.PolySynth(Tone.Synth, {
+        maxPolyphony: 8,
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: wbConfig.envelope.attack / 1000,
+          decay: wbConfig.envelope.decay / 1000,
+          sustain: wbConfig.envelope.sustain / 100,
+          release: wbConfig.envelope.release / 1000,
+        },
+        volume: -12 + (wbConfig.sub.level / 100) * 12 - 6,
+      });
+      subOsc.set({ detune: wbConfig.sub.octave * 1200 });
+    }
+
+    // === UNISON SPREAD ===
+    // Create additional detuned voices for thickness
+    const unisonVoices: Tone.PolySynth[] = [];
+    const unisonPanners: Tone.Panner[] = [];
+    if (voiceCount > 1) {
+      for (let i = 1; i < Math.min(voiceCount, 8); i++) {
+        const detuneAmount = ((i / voiceCount) - 0.5) * detuneSpread * 2;
+        const panAmount = ((i / voiceCount) - 0.5) * (wbConfig.unison.stereoSpread / 50);
+
+        const voice = new Tone.PolySynth(Tone.Synth, {
+          maxPolyphony: 4,
+          oscillator: { type: wbConfig.osc1.type },
+          envelope: {
+            attack: wbConfig.envelope.attack / 1000,
+            decay: wbConfig.envelope.decay / 1000,
+            sustain: wbConfig.envelope.sustain / 100,
+            release: wbConfig.envelope.release / 1000,
+          },
+          volume: -12 - (voiceCount * 1.5),
+        });
+        voice.set({ detune: wbConfig.osc1.octave * 1200 + detuneAmount });
+
+        const panner = new Tone.Panner(panAmount);
+        voice.connect(panner);
+        unisonVoices.push(voice);
+        unisonPanners.push(panner);
+      }
+    }
+
+    // === FM SECTION ===
+    // Optional FM modulation between oscillators
+    let fmSynth: Tone.PolySynth | null = null;
+    if (wbConfig.fm.enabled && wbConfig.fm.amount > 0) {
+      fmSynth = new Tone.PolySynth(Tone.FMSynth, {
+        maxPolyphony: 8,
+        modulationIndex: wbConfig.fm.amount / 10,
+        harmonicity: wbConfig.fm.ratio,
+        envelope: {
+          attack: wbConfig.envelope.attack / 1000,
+          decay: wbConfig.envelope.decay / 1000,
+          sustain: wbConfig.envelope.sustain / 100,
+          release: wbConfig.envelope.release / 1000,
+        },
+        volume: -6,
+      });
+      fmSynth.set({ detune: wbConfig.osc1.octave * 1200 });
+    }
+
+    // === MIXER ===
+    const oscMixer = new Tone.Gain(1);
+
+    // === FILTER SECTION ===
+    const filter = new Tone.Filter({
+      type: wbConfig.filter.type,
+      frequency: wbConfig.filter.cutoff,
+      Q: wbConfig.filter.resonance / 10,
+      rolloff: wbConfig.filter.rolloff,
+    });
+
+    // Filter drive/saturation
+    let filterDrive: Tone.Distortion | null = null;
+    if (wbConfig.filter.drive > 0) {
+      filterDrive = new Tone.Distortion({
+        distortion: wbConfig.filter.drive / 100,
+        oversample: '2x',
+      });
+    }
+
+    // === FILTER ENVELOPE ===
+    const filterEnvAmount = wbConfig.filterEnvelope.amount / 100;
+    const filterBaseFreq = wbConfig.filter.cutoff;
+    const filterEnvOctaves = Math.abs(filterEnvAmount) * 4; // Max 4 octaves sweep
+
+    // Use FrequencyEnvelope for filter envelope modulation
+    const filterEnv = new Tone.FrequencyEnvelope({
+      baseFrequency: filterBaseFreq,
+      octaves: filterEnvOctaves,
+      attack: wbConfig.filterEnvelope.attack / 1000,
+      decay: wbConfig.filterEnvelope.decay / 1000,
+      sustain: wbConfig.filterEnvelope.sustain / 100,
+      release: wbConfig.filterEnvelope.release / 1000,
+    });
+
+    // Connect filter envelope to filter frequency (only if LFO not taking over)
+    if (!wbConfig.wobbleLFO.enabled || wbConfig.filterEnvelope.amount > 0) {
+      filterEnv.connect(filter.frequency);
+    }
+
+    // === WOBBLE LFO ===
+    let wobbleLFO: Tone.LFO | null = null;
+
+    if (wbConfig.wobbleLFO.enabled) {
+      // Calculate LFO rate from sync value
+      let lfoRate = wbConfig.wobbleLFO.rate;
+      if (wbConfig.wobbleLFO.sync !== 'free') {
+        // Convert sync division to rate based on current BPM
+        const bpm = Tone.getTransport().bpm.value || 120;
+        const syncMap: Record<string, number> = {
+          '1/1': 1,
+          '1/2': 2,
+          '1/2T': 3,
+          '1/2D': 1.5,
+          '1/4': 4,
+          '1/4T': 6,
+          '1/4D': 3,
+          '1/8': 8,
+          '1/8T': 12,
+          '1/8D': 6,
+          '1/16': 16,
+          '1/16T': 24,
+          '1/16D': 12,
+          '1/32': 32,
+          '1/32T': 48,
+        };
+        const divisor = syncMap[wbConfig.wobbleLFO.sync] || 4;
+        lfoRate = (bpm / 60) * (divisor / 4);
+      }
+
+      // Map shape to Tone.js type
+      const shapeMap: Record<string, Tone.ToneOscillatorType> = {
+        'sine': 'sine',
+        'triangle': 'triangle',
+        'saw': 'sawtooth',
+        'square': 'square',
+        'sample_hold': 'square', // Closest approximation
+      };
+
+      // Calculate filter modulation range based on amount
+      const filterModRange = filterBaseFreq * 4; // 4 octaves max range
+      const minFreq = Math.max(20, filterBaseFreq * 0.1);
+      const maxFreq = Math.min(20000, filterBaseFreq + (filterModRange * (wbConfig.wobbleLFO.amount / 100)));
+
+      wobbleLFO = new Tone.LFO({
+        frequency: lfoRate,
+        type: shapeMap[wbConfig.wobbleLFO.shape] || 'sine',
+        min: minFreq,
+        max: maxFreq,
+        phase: wbConfig.wobbleLFO.phase,
+      });
+
+      wobbleLFO.connect(filter.frequency);
+      wobbleLFO.start();
+    }
+
+    // === DISTORTION SECTION ===
+    let distortion: Tone.ToneAudioNode | null = null;
+    if (wbConfig.distortion.enabled) {
+      switch (wbConfig.distortion.type) {
+        case 'soft':
+          distortion = new Tone.Distortion({
+            distortion: wbConfig.distortion.drive / 100,
+            oversample: '2x',
+          });
+          break;
+        case 'hard':
+          distortion = new Tone.Chebyshev({
+            order: Math.floor(1 + (wbConfig.distortion.drive / 100) * 50),
+          });
+          break;
+        case 'fuzz':
+          distortion = new Tone.Distortion({
+            distortion: 0.5 + (wbConfig.distortion.drive / 200),
+            oversample: '4x',
+          });
+          break;
+        case 'bitcrush':
+          distortion = new Tone.BitCrusher({
+            bits: Math.max(2, 12 - Math.floor(wbConfig.distortion.drive / 10)),
+          });
+          break;
+      }
+    }
+
+    // Post-distortion tone control
+    const toneFilter = new Tone.Filter({
+      type: 'lowpass',
+      frequency: 500 + (wbConfig.distortion.tone / 100) * 15000,
+      Q: 0.5,
+    });
+
+    // === FORMANT SECTION (for growl) ===
+    let formantFilters: Tone.Filter[] = [];
+    let formantMixer: Tone.Gain | null = null;
+    if (wbConfig.formant.enabled) {
+      const formants = VOWEL_FORMANTS[wbConfig.formant.vowel];
+      formantFilters = [
+        new Tone.Filter({ type: 'bandpass', frequency: formants.f1, Q: 5 }),
+        new Tone.Filter({ type: 'bandpass', frequency: formants.f2, Q: 5 }),
+        new Tone.Filter({ type: 'bandpass', frequency: formants.f3, Q: 5 }),
+      ];
+      formantMixer = new Tone.Gain(0.5);
+    }
+
+    // === OUTPUT ===
+    const output = new Tone.Gain(1);
+    output.gain.value = Math.pow(10, (config.volume ?? -6) / 20);
+
+    // === SIGNAL CHAIN ===
+    // Route oscillators through mixer
+    osc1.connect(oscMixer);
+    osc2.connect(oscMixer);
+    if (subOsc) subOsc.connect(oscMixer);
+    if (fmSynth) fmSynth.connect(oscMixer);
+    // Connect unison panners (voices already connected to their panners)
+    unisonPanners.forEach(p => p.connect(oscMixer));
+
+    // Route through filter chain
+    if (filterDrive) {
+      oscMixer.connect(filterDrive);
+      filterDrive.connect(filter);
+    } else {
+      oscMixer.connect(filter);
+    }
+
+    // Route through effects
+    let currentNode: Tone.ToneAudioNode = filter;
+
+    if (distortion) {
+      currentNode.connect(distortion);
+      currentNode = distortion;
+    }
+
+    currentNode.connect(toneFilter);
+    currentNode = toneFilter;
+
+    // Add formant parallel path if enabled
+    if (formantMixer && formantFilters.length > 0) {
+      formantFilters.forEach(f => {
+        currentNode.connect(f);
+        f.connect(formantMixer!);
+      });
+      formantMixer.connect(output);
+      currentNode.connect(output); // Mix dry + formant
+    } else {
+      currentNode.connect(output);
+    }
+
+    // Store active notes for release
+    const activeNotes = new Set<string>();
+
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        const v = velocity ?? 0.8;
+
+        // Reset LFO phase on retrigger
+        if (wbConfig.wobbleLFO.retrigger && wobbleLFO) {
+          wobbleLFO.phase = wbConfig.wobbleLFO.phase;
+        }
+
+        // Trigger filter envelope
+        filterEnv.triggerAttack(t);
+
+        // Trigger all oscillators
+        osc1.triggerAttackRelease(note, duration, t, v);
+        osc2.triggerAttackRelease(note, duration, t, v);
+        if (subOsc) subOsc.triggerAttackRelease(note, duration, t, v);
+        if (fmSynth) fmSynth.triggerAttackRelease(note, duration, t, v);
+        unisonVoices.forEach(voice => voice.triggerAttackRelease(note, duration, t, v * 0.6));
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        const t = time ?? Tone.now();
+        const v = velocity ?? 0.8;
+        activeNotes.add(note);
+
+        console.log(`[WobbleBass] triggerAttack note=${note} time=${t} velocity=${v} osc1Vol=${osc1.volume.value}dB outputGain=${output.gain.value}`);
+
+        // Reset LFO phase on retrigger
+        if (wbConfig.wobbleLFO.retrigger && wobbleLFO) {
+          wobbleLFO.phase = wbConfig.wobbleLFO.phase;
+        }
+
+        // Trigger filter envelope
+        filterEnv.triggerAttack(t);
+
+        osc1.triggerAttack(note, t, v);
+        osc2.triggerAttack(note, t, v);
+        if (subOsc) subOsc.triggerAttack(note, t, v);
+        if (fmSynth) fmSynth.triggerAttack(note, t, v);
+        unisonVoices.forEach(voice => voice.triggerAttack(note, t, v * 0.6));
+      },
+      triggerRelease: (note: string, time?: number) => {
+        const t = time ?? Tone.now();
+        activeNotes.delete(note);
+
+        filterEnv.triggerRelease(t);
+
+        osc1.triggerRelease(note, t);
+        osc2.triggerRelease(note, t);
+        if (subOsc) subOsc.triggerRelease(note, t);
+        if (fmSynth) fmSynth.triggerRelease(note, t);
+        unisonVoices.forEach(voice => voice.triggerRelease(note, t));
+      },
+      releaseAll: () => {
+        osc1.releaseAll();
+        osc2.releaseAll();
+        if (subOsc) subOsc.releaseAll();
+        if (fmSynth) fmSynth.releaseAll();
+        unisonVoices.forEach(voice => voice.releaseAll());
+        activeNotes.clear();
+      },
+      connect: (dest: Tone.InputNode) => output.connect(dest),
+      disconnect: () => output.disconnect(),
+      dispose: () => {
+        osc1.dispose();
+        osc2.dispose();
+        if (subOsc) subOsc.dispose();
+        if (fmSynth) fmSynth.dispose();
+        unisonVoices.forEach(v => v.dispose());
+        unisonPanners.forEach(p => p.dispose());
+        oscMixer.dispose();
+        filter.dispose();
+        if (filterDrive) filterDrive.dispose();
+        filterEnv.dispose();
+        if (wobbleLFO) wobbleLFO.dispose();
+        if (distortion) distortion.dispose();
+        toneFilter.dispose();
+        formantFilters.forEach(f => f.dispose());
+        if (formantMixer) formantMixer.dispose();
+        output.dispose();
+      },
+      volume: osc1.volume,
+
+      // Expose LFO for external control
+      wobbleLFO,
+      filter,
+    } as any;
+  }
+
+  /**
    * Reverse an AudioBuffer by copying samples in reverse order
    */
   private static reverseAudioBuffer(buffer: AudioBuffer): AudioBuffer {
@@ -2194,5 +2862,105 @@ export class InstrumentFactory {
       }
     }
     return reversed;
+  }
+
+  /**
+   * Create a DrumKit multi-sample instrument
+   */
+  private static createDrumKit(config: InstrumentConfig): DrumKitSynth {
+    const dkConfig = config.drumKit || DEFAULT_DRUMKIT;
+    return new DrumKitSynth(dkConfig);
+  }
+
+  // ============================================================================
+  // PITCH ENVELOPE UTILITIES
+  // ============================================================================
+
+  /**
+   * Apply pitch envelope for triggerAttackRelease (full envelope cycle)
+   * Modulates synth detune from initial offset back to 0, with decay/sustain/release
+   */
+  private static applyPitchEnvelope(
+    synth: Tone.PolySynth | { set: (options: { detune: number }) => void },
+    pitchEnv: PitchEnvelopeConfig,
+    time: number,
+    duration: number
+  ): void {
+    const startCents = pitchEnv.amount * 100; // Convert semitones to cents
+    const sustainCents = (pitchEnv.sustain / 100) * startCents;
+    const attackTime = pitchEnv.attack / 1000;
+    const decayTime = pitchEnv.decay / 1000;
+    const releaseTime = pitchEnv.release / 1000;
+
+    // Cast to access detune param
+    const s = synth as any;
+    if (!s.set) return;
+
+    // Start at initial offset
+    s.set({ detune: startCents });
+
+    // Attack phase: stay at start pitch (or ramp if attack > 0)
+    if (attackTime > 0) {
+      // For pitch envelope, attack means staying at the offset
+      // The actual envelope starts after attack
+    }
+
+    // Decay to sustain level
+    const decayStart = time + attackTime;
+    setTimeout(() => {
+      if (s.set) s.set({ detune: sustainCents });
+    }, (decayStart - Tone.now()) * 1000);
+
+    // Release back to 0 after note duration
+    const releaseStart = time + duration;
+    setTimeout(() => {
+      if (s.set) s.set({ detune: 0 });
+    }, (releaseStart - Tone.now()) * 1000 + releaseTime * 1000);
+  }
+
+  /**
+   * Trigger pitch envelope attack phase
+   * Sets initial pitch offset and schedules decay to sustain
+   */
+  private static triggerPitchEnvelopeAttack(
+    synth: Tone.PolySynth | { set: (options: { detune: number }) => void },
+    pitchEnv: PitchEnvelopeConfig,
+    time: number
+  ): void {
+    const startCents = pitchEnv.amount * 100; // Convert semitones to cents
+    const sustainCents = (pitchEnv.sustain / 100) * startCents;
+    const attackTime = pitchEnv.attack / 1000;
+    const decayTime = pitchEnv.decay / 1000;
+
+    const s = synth as any;
+    if (!s.set) return;
+
+    // Start at initial pitch offset
+    s.set({ detune: startCents });
+
+    // Schedule decay to sustain level
+    const totalADTime = (attackTime + decayTime) * 1000;
+    setTimeout(() => {
+      if (s.set) s.set({ detune: sustainCents });
+    }, totalADTime);
+  }
+
+  /**
+   * Trigger pitch envelope release phase
+   * Ramps from sustain level back to 0
+   */
+  private static triggerPitchEnvelopeRelease(
+    synth: Tone.PolySynth | { set: (options: { detune: number }) => void },
+    pitchEnv: PitchEnvelopeConfig,
+    time: number
+  ): void {
+    const releaseTime = pitchEnv.release / 1000;
+    const s = synth as any;
+    if (!s.set) return;
+
+    // Ramp back to 0 over release time
+    setTimeout(() => {
+      if (s.set) s.set({ detune: 0 });
+    }, releaseTime * 1000);
   }
 }

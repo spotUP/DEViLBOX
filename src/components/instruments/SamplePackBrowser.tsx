@@ -17,8 +17,15 @@ import {
   Disc3,
   Music,
   Sparkles,
+  Plus,
+  Upload,
+  FolderOpen,
+  FileArchive,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import * as Tone from 'tone';
+import { loadSamplePackFromDirectory, loadSamplePackFromZip } from '@/lib/audio/SamplePackLoader';
 
 interface SamplePackBrowserProps {
   onClose: () => void;
@@ -26,12 +33,71 @@ interface SamplePackBrowserProps {
 
 export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose }) => {
   const { currentInstrumentId, updateInstrument } = useInstrumentStore();
+  const [userPacks, setUserPacks] = useState<SamplePack[]>([]);
   const [selectedPack, setSelectedPack] = useState<SamplePack | null>(SAMPLE_PACKS[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSample, setSelectedSample] = useState<SampleInfo | null>(null);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const playerRef = useRef<Tone.Player | null>(null);
+  const dirInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Combine built-in and user packs
+  const allPacks = [...SAMPLE_PACKS, ...userPacks];
+
+  // Handle directory upload
+  const handleDirectoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const pack = await loadSamplePackFromDirectory(files);
+      setUserPacks(prev => [...prev, pack]);
+      setSelectedPack(pack);
+      if (pack.categories.length > 0) {
+        setActiveCategory(pack.categories[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load sample pack:', err);
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Handle ZIP upload
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const pack = await loadSamplePackFromZip(file);
+      setUserPacks(prev => [...prev, pack]);
+      setSelectedPack(pack);
+      if (pack.categories.length > 0) {
+        setActiveCategory(pack.categories[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load sample pack:', err);
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Remove user-uploaded pack
+  const handleRemovePack = (packId: string) => {
+    setUserPacks(prev => prev.filter(p => p.id !== packId));
+    if (selectedPack?.id === packId) {
+      setSelectedPack(SAMPLE_PACKS[0] || null);
+    }
+  };
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -48,12 +114,29 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        if (showAddMenu) {
+          setShowAddMenu(false);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, showAddMenu]);
+
+  // Close add menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    if (showAddMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAddMenu]);
 
   // Get filtered samples
   const getFilteredSamples = (): SampleInfo[] => {
@@ -193,10 +276,69 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           {/* Left Sidebar - Pack List */}
           <div className="w-64 bg-ft2-header border-r border-ft2-border flex flex-col">
             <div className="p-3 border-b border-ft2-border">
-              <h3 className="text-ft2-text font-bold text-xs mb-2">AVAILABLE PACKS</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-ft2-text font-bold text-xs">AVAILABLE PACKS</h3>
+                {/* Add samplepack dropdown */}
+                <div className="relative" ref={addMenuRef}>
+                  <button
+                    onClick={() => setShowAddMenu(!showAddMenu)}
+                    disabled={isUploading}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors disabled:opacity-50"
+                  >
+                    <Plus size={12} />
+                    Add
+                    <ChevronDown size={12} className={`transition-transform ${showAddMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showAddMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-40 bg-ft2-header border border-ft2-border rounded shadow-lg z-10">
+                      <button
+                        onClick={() => {
+                          dirInputRef.current?.click();
+                          setShowAddMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-ft2-text hover:bg-ft2-bg transition-colors"
+                      >
+                        <FolderOpen size={14} />
+                        From Folder
+                      </button>
+                      <button
+                        onClick={() => {
+                          zipInputRef.current?.click();
+                          setShowAddMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-ft2-text hover:bg-ft2-bg transition-colors"
+                      >
+                        <FileArchive size={14} />
+                        From ZIP
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Hidden file inputs */}
+              <input
+                ref={dirInputRef}
+                type="file"
+                {...{ webkitdirectory: '', directory: '' } as any}
+                multiple
+                onChange={handleDirectoryUpload}
+                className="hidden"
+              />
+              <input
+                ref={zipInputRef}
+                type="file"
+                accept=".zip"
+                onChange={handleZipUpload}
+                className="hidden"
+              />
             </div>
             <div className="flex-1 overflow-y-auto p-2 scrollbar-ft2">
-              {SAMPLE_PACKS.map((pack) => (
+              {isUploading && (
+                <div className="p-3 mb-2 bg-ft2-bg border border-ft2-highlight rounded text-ft2-text text-sm text-center">
+                  Loading pack...
+                </div>
+              )}
+              {allPacks.map((pack) => (
                 <button
                   key={pack.id}
                   onClick={() => {
@@ -206,12 +348,25 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                       setActiveCategory(pack.categories[0]);
                     }
                   }}
-                  className={`w-full p-3 rounded mb-2 text-left transition-all ${
+                  className={`w-full p-3 rounded mb-2 text-left transition-all relative group ${
                     selectedPack?.id === pack.id
                       ? 'bg-ft2-cursor text-ft2-bg'
                       : 'bg-ft2-bg border border-ft2-border hover:border-ft2-highlight'
                   }`}
                 >
+                  {/* Delete button for user-uploaded packs */}
+                  {pack.isUserUploaded && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemovePack(pack.id);
+                      }}
+                      className="absolute top-1 right-1 p-1 opacity-0 group-hover:opacity-100 bg-red-500/80 hover:bg-red-500 text-white rounded transition-all"
+                      title="Remove pack"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                   <div className="flex items-start gap-3">
                     {pack.coverImage ? (
                       <img
@@ -221,7 +376,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                       />
                     ) : (
                       <div className="w-12 h-12 rounded bg-ft2-border flex items-center justify-center">
-                        <Package size={20} />
+                        {pack.isUserUploaded ? <Upload size={20} /> : <Package size={20} />}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -333,7 +488,10 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                             key={sample.url}
                             role="button"
                             tabIndex={0}
-                            onClick={() => setSelectedSample(sample)}
+                            onClick={() => {
+                              setSelectedSample(sample);
+                              previewSample(sample);
+                            }}
                             onDoubleClick={() => handleLoadSample(sample)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleLoadSample(sample);

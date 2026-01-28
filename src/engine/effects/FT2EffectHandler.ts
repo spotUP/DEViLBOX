@@ -52,6 +52,14 @@ interface ChannelMemory {
   // Note delay/retrigger
   retriggerTick: number; // E9x counter
 
+  // Note fade (EFx)
+  noteFadeTick: number; // Tick at which fade starts (0 = disabled)
+  noteFadeSpeed: number; // Volume decrease per tick
+
+  // Envelope control (S7x - Impulse Tracker style)
+  volumeEnvelopeEnabled: boolean; // S77/S78
+  pitchEnvelopeEnabled: boolean; // S79/S7A
+
   // Current state
   currentVolume: number; // 0-64
   currentPanning: number; // 0-255 (128=center)
@@ -124,6 +132,10 @@ export class FT2EffectHandler {
         loopCount: 0,
         loopRow: 0,
         retriggerTick: 0,
+        noteFadeTick: 0,
+        noteFadeSpeed: 0,
+        volumeEnvelopeEnabled: true,
+        pitchEnvelopeEnabled: true,
         currentVolume: 64,
         currentPanning: 128,
         currentPitch: 440,
@@ -281,6 +293,59 @@ export class FT2EffectHandler {
           mem.volumeSlide = param;
         }
         break;
+
+      case 'S': // Special commands (Impulse Tracker style)
+        this.processSpecialCommand(effect, mem);
+        break;
+    }
+  }
+
+  /**
+   * Process special (Sxy) commands - Impulse Tracker style
+   * S7x - Envelope control
+   */
+  private processSpecialCommand(effect: string, mem: ChannelMemory): void {
+    const x = parseInt(effect.charAt(1), 16);
+    const y = parseInt(effect.charAt(2), 16);
+
+    switch (x) {
+      case 0x7: // S7x - Envelope control
+        switch (y) {
+          case 0x7: // S77 - Volume envelope off
+            mem.volumeEnvelopeEnabled = false;
+            break;
+          case 0x8: // S78 - Volume envelope on
+            mem.volumeEnvelopeEnabled = true;
+            break;
+          case 0x9: // S79 - Pitch envelope off
+            mem.pitchEnvelopeEnabled = false;
+            break;
+          case 0xA: // S7A - Pitch envelope on
+            mem.pitchEnvelopeEnabled = true;
+            break;
+          case 0xB: // S7B - Pan envelope off
+            // Could add pan envelope control later
+            break;
+          case 0xC: // S7C - Pan envelope on
+            // Could add pan envelope control later
+            break;
+        }
+        break;
+
+      // Other S commands can be added here
+      // S0x - Set filter (Amiga)
+      // S1x - Set glissando control
+      // S2x - Set finetune
+      // S3x - Set vibrato waveform
+      // S4x - Set tremolo waveform
+      // S8x - Set panning (coarse)
+      // S9x - Sound control (note cut, note off, note fade)
+      // SAx - Set high offset
+      // SBx - Pattern loop
+      // SCx - Note cut
+      // SDx - Note delay
+      // SEx - Pattern delay
+      // SFx - Set active macro
     }
   }
 
@@ -349,8 +414,23 @@ export class FT2EffectHandler {
         }
         break;
 
+      case 0xD: // EDx - Note delay (handled elsewhere)
+        break;
+
       case 0xE: // EEx - Pattern delay
         this.flowControl.patternDelay = y;
+        break;
+
+      case 0xF: // EFx - Note fade
+        // y = fade speed (1-F). Higher = faster fade
+        // Start fading immediately on tick 0, continue on subsequent ticks
+        if (y > 0) {
+          mem.noteFadeTick = 1; // Start fading from tick 1
+          mem.noteFadeSpeed = y; // Volume decrease per tick (1-15)
+        } else {
+          mem.noteFadeTick = 0; // Disable fade
+          mem.noteFadeSpeed = 0;
+        }
         break;
     }
   }
@@ -370,6 +450,7 @@ export class FT2EffectHandler {
     this.processTremolo(mem);
     this.processVolumeSlide(mem);
     this.processNoteCut(mem, currentTick);
+    this.processNoteFade(mem, currentTick);
     this.processNoteRetrigger(mem, currentTick);
   }
 
@@ -466,6 +547,16 @@ export class FT2EffectHandler {
    */
   private processNoteCut(_mem: ChannelMemory, _tick: number): void {
     // Would be triggered by stored cut tick from tick 0 processing
+  }
+
+  /**
+   * EFx - Note fade (gradual volume decrease)
+   */
+  private processNoteFade(mem: ChannelMemory, tick: number): void {
+    if (mem.noteFadeTick > 0 && tick >= mem.noteFadeTick) {
+      // Decrease volume by fade speed each tick
+      mem.currentVolume = Math.max(0, mem.currentVolume - mem.noteFadeSpeed);
+    }
   }
 
   /**

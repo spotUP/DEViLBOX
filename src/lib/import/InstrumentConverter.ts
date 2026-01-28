@@ -59,6 +59,10 @@ function convertSampleToInstrument(
   // Convert sample PCM data to AudioBuffer and blob URL
   const { audioBuffer, blobUrl } = convertPCMToAudioBuffer(sample);
 
+  // Debug logging for sample conversion
+  const logRate = sample.sampleRate || 8363;
+  console.log(`[InstrumentConverter] Inst ${instrumentId}: rate=${logRate} len=${sample.length} bits=${sample.bitDepth} loop=${sample.loopType} fine=${sample.finetune} vol=${sample.volume} name="${sample.name || parentInstrument.name}"`);
+
   // Calculate base note from relative note and finetune
   const baseNote = calculateBaseNote(sample.relativeNote, sample.finetune);
 
@@ -149,13 +153,13 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
   const sampleRate = sample.sampleRate || 8363; // Default to Amiga C-2 rate
   const length = sample.length;
 
-  // Use offline AudioContext to avoid browser limits
-  // Creating multiple AudioContexts causes "AudioContext encountered an error"
-  const audioContext = new OfflineAudioContext(1, length, sampleRate);
-  const audioBuffer = audioContext.createBuffer(1, length, sampleRate);
-  const channelData = audioBuffer.getChannelData(0);
+  // CRITICAL FIX: Don't use OfflineAudioContext - browsers clamp sample rate to 44100 Hz minimum
+  // Instead, create WAV file directly with correct sample rate header
+  // The browser will properly decode and resample when loading the WAV
 
-  // Convert PCM to Float32
+  // Convert PCM to 16-bit signed samples for WAV file
+  const samples16bit = new Int16Array(length);
+
   if (sample.bitDepth === 8) {
     // Check if already normalized (Float32Array from MOD parser)
     const pcmData = sample.pcmData instanceof Float32Array
@@ -163,38 +167,109 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
       : new Int8Array(sample.pcmData);
 
     for (let i = 0; i < length; i++) {
-      // If already Float32, copy directly; otherwise normalize
-      // 8-bit signed: -128 to +127 → divide by 128 for symmetric -1.0 to ~+1.0
-      channelData[i] = pcmData instanceof Float32Array
-        ? pcmData[i]
-        : pcmData[i] / 128.0;
+      // Convert to 16-bit range
+      if (pcmData instanceof Float32Array) {
+        // Already normalized -1 to 1
+        samples16bit[i] = Math.round(pcmData[i] * 32767);
+      } else {
+        // 8-bit signed: -128 to +127 → scale to 16-bit
+        samples16bit[i] = pcmData[i] * 256;
+      }
     }
   } else if (sample.bitDepth === 16) {
-    // 16-bit signed PCM: -32768 to +32767
+    // 16-bit signed PCM: copy directly
     const pcmData = new Int16Array(sample.pcmData);
     for (let i = 0; i < length; i++) {
-      channelData[i] = pcmData[i] / 32768.0;
+      samples16bit[i] = pcmData[i];
     }
   }
 
-  // Create WAV file from AudioBuffer for Tone.js Sampler
-  // Include loop points if sample has a loop
+  // Create WAV file directly with proper sample rate header
   const loopInfo = sample.loopType !== 'none' ? {
     start: sample.loopStart,
     end: sample.loopStart + sample.loopLength,
   } : undefined;
 
-  // Get WAV as ArrayBuffer (not Blob) so we can convert to base64 synchronously
-  const wavArrayBuffer = audioBufferToWavArrayBuffer(audioBuffer, loopInfo);
+  const wavArrayBuffer = createWavFile(samples16bit, sampleRate, loopInfo);
 
   // Convert to base64 data URL (survives page refresh unlike blob URLs)
   const base64 = arrayBufferToBase64(wavArrayBuffer);
   const dataUrl = `data:audio/wav;base64,${base64}`;
 
   return {
-    audioBuffer: channelData.buffer,
+    audioBuffer: samples16bit.buffer,
     blobUrl: dataUrl,
   };
+}
+
+/**
+ * Create a WAV file directly from 16-bit samples
+ * This bypasses OfflineAudioContext which has sample rate limitations
+ */
+function createWavFile(samples: Int16Array, sampleRate: number, loopInfo?: { start: number; end: number }): ArrayBuffer {
+  const numberOfChannels = 1;
+  const dataLength = samples.length * 2; // 16-bit = 2 bytes per sample
+
+  // Calculate total size (header + data + optional SMPL chunk)
+  const smplChunkSize = loopInfo ? 68 : 0;
+  const totalSize = 44 + dataLength + smplChunkSize;
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  // Write RIFF header
+  writeString(0, 'RIFF');
+  view.setUint32(4, totalSize - 8, true);
+  writeString(8, 'WAVE');
+
+  // Write fmt chunk
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true); // CRITICAL: Use the original sample rate (8363 Hz for MOD)
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true); // byte rate
+  view.setUint16(32, numberOfChannels * 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+
+  // Write data chunk
+  writeString(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  // Write PCM samples
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    view.setInt16(offset, samples[i], true);
+    offset += 2;
+  }
+
+  // Write SMPL chunk if loop points provided
+  if (loopInfo) {
+    writeString(offset, 'smpl');
+    view.setUint32(offset + 4, 60, true);
+    view.setUint32(offset + 8, 0, true); // Manufacturer
+    view.setUint32(offset + 12, 0, true); // Product
+    view.setUint32(offset + 16, Math.floor(1000000000 / sampleRate), true); // Sample period
+    view.setUint32(offset + 20, 60, true); // MIDI unity note
+    view.setUint32(offset + 24, 0, true); // MIDI pitch fraction
+    view.setUint32(offset + 28, 0, true); // SMPTE format
+    view.setUint32(offset + 32, 0, true); // SMPTE offset
+    view.setUint32(offset + 36, 1, true); // Number of loops
+    view.setUint32(offset + 40, 0, true); // Sampler data
+    view.setUint32(offset + 44, 0, true); // Cue point ID
+    view.setUint32(offset + 48, 0, true); // Loop type (forward)
+    view.setUint32(offset + 52, loopInfo.start, true); // Loop start
+    view.setUint32(offset + 56, loopInfo.end - 1, true); // Loop end
+    view.setUint32(offset + 60, 0, true); // Fraction
+    view.setUint32(offset + 64, 0, true); // Play count
+  }
+
+  return buffer;
 }
 
 /**
@@ -207,78 +282,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
-}
-
-/**
- * Convert AudioBuffer to WAV ArrayBuffer
- * Optionally includes SMPL chunk for loop points (ProTracker/MOD support)
- */
-function audioBufferToWavArrayBuffer(audioBuffer: AudioBuffer, loopInfo?: { start: number; end: number }): ArrayBuffer {
-  const numberOfChannels = audioBuffer.numberOfChannels;
-  const dataLength = audioBuffer.length * numberOfChannels * 2;
-  const sampleRate = audioBuffer.sampleRate;
-
-  // Calculate total size (header + data + optional SMPL chunk)
-  // SMPL chunk: 4 (ID) + 4 (size) + 36 (sampler data) + 24 (loop data) = 68 bytes
-  const smplChunkSize = loopInfo ? 68 : 0;
-  const totalSize = 44 + dataLength + smplChunkSize;
-  const buffer = new ArrayBuffer(totalSize);
-  const view = new DataView(buffer);
-
-  // Write WAV header
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, totalSize - 8, true); // File size - 8
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // fmt chunk size
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, numberOfChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numberOfChannels * 2, true); // byte rate
-  view.setUint16(32, numberOfChannels * 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
-  writeString(36, 'data');
-  view.setUint32(40, dataLength, true);
-
-  // Write PCM data
-  const channelData = audioBuffer.getChannelData(0);
-  let offset = 44;
-  for (let i = 0; i < audioBuffer.length; i++) {
-    const sample = Math.max(-1, Math.min(1, channelData[i]));
-    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-    offset += 2;
-  }
-
-  // Write SMPL chunk if loop points provided (ProTracker/MOD loop support)
-  if (loopInfo) {
-    writeString(offset, 'smpl');
-    view.setUint32(offset + 4, 60, true); // SMPL chunk size: 36 (sampler data) + 24 (loop data)
-    view.setUint32(offset + 8, 0, true); // Manufacturer
-    view.setUint32(offset + 12, 0, true); // Product
-    view.setUint32(offset + 16, Math.floor(1000000000 / sampleRate), true); // Sample period (nanoseconds)
-    view.setUint32(offset + 20, 60, true); // MIDI unity note (middle C)
-    view.setUint32(offset + 24, 0, true); // MIDI pitch fraction
-    view.setUint32(offset + 28, 0, true); // SMPTE format
-    view.setUint32(offset + 32, 0, true); // SMPTE offset
-    view.setUint32(offset + 36, 1, true); // Number of sample loops (1)
-    view.setUint32(offset + 40, 0, true); // Sampler data
-
-    // Loop data (24 bytes)
-    view.setUint32(offset + 44, 0, true); // Cue point ID
-    view.setUint32(offset + 48, 0, true); // Loop type (0 = forward loop)
-    view.setUint32(offset + 52, loopInfo.start, true); // Loop start (sample frames)
-    view.setUint32(offset + 56, loopInfo.end - 1, true); // Loop end (sample frames, inclusive)
-    view.setUint32(offset + 60, 0, true); // Fraction
-    view.setUint32(offset + 64, 0, true); // Play count (0 = infinite)
-  }
-
-  return buffer;
 }
 
 /**

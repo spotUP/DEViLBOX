@@ -124,7 +124,13 @@ export const QuickView: React.FC<QuickViewProps> = ({
   onBrowseAll,
   onSavePreset,
 }) => {
-  const { currentInstrument, updateInstrument } = useInstrumentStore();
+  // Use selectors for proper reactivity - don't use the getter!
+  const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
+  const instruments = useInstrumentStore(state => state.instruments);
+  const updateInstrument = useInstrumentStore(state => state.updateInstrument);
+
+  // Derive currentInstrument from state for proper re-renders
+  const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
   const { userPresets, addToRecent } = usePresetStore();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [carouselOffset, setCarouselOffset] = useState(0);

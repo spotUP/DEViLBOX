@@ -8,9 +8,10 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import { TB303Synth } from './TB303Engine';
 import { InstrumentFactory } from './InstrumentFactory';
-import { periodToNoteIndex, getPeriod } from './effects/PeriodTables';
+import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
+import { InstrumentAnalyser } from './InstrumentAnalyser';
 
 interface VoiceState {
   instrument: any;
@@ -120,6 +121,10 @@ export class ToneEngine {
     effects: Tone.ToneAudioNode[];
     output: Tone.Gain;
   }> = new Map();
+
+  // Per-instrument analysers for visualization (keyed by instrumentId)
+  // Lazy-created: only exists when visualization requests it
+  private instrumentAnalysers: Map<number, InstrumentAnalyser> = new Map();
 
   private constructor() {
     // Master input (where all instruments connect)
@@ -703,6 +708,9 @@ export class ToneEngine {
         const loopStart = config.sample?.loopStart || 0;
         const loopEnd = config.sample?.loopEnd || 0;
 
+        // Check if we have an edited buffer stored (takes priority over URL)
+        const storedBuffer = config.sample?.audioBuffer;
+
         // CRITICAL: Detect and reject stale blob URLs
         // Blob URLs don't survive page refreshes - they're session-specific
         // Data URLs (base64) and regular URLs survive, so those are fine
@@ -720,7 +728,49 @@ export class ToneEngine {
             : baseUrl + sampleUrl;
         }
 
-        if (sampleUrl) {
+        // If we have a stored edited buffer, use that instead of URL
+        if (storedBuffer) {
+          const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
+
+          if (hasLoop || usePeriodPlayback) {
+            instrument = new Tone.Player({
+              loop: hasLoop,
+              loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
+              loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
+              volume: config.volume || 0,
+            });
+            // Store as 'Player' type for proper handling in other methods
+            this.instrumentSynthTypes.set(key, 'Player');
+
+            // Load the stored buffer asynchronously
+            (async () => {
+              try {
+                const audioBuffer = await this.decodeAudioData(storedBuffer);
+                (instrument as Tone.Player).buffer = new Tone.ToneAudioBuffer(audioBuffer);
+                console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
+              } catch (err) {
+                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+              }
+            })();
+          } else {
+            // Non-looping: Use Tone.Sampler
+            instrument = new Tone.Sampler({
+              volume: config.volume || -12,
+            });
+
+            // Load the stored buffer asynchronously
+            (async () => {
+              try {
+                const audioBuffer = await this.decodeAudioData(storedBuffer);
+                const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+                (instrument as Tone.Sampler).add(baseNote as Tone.Unit.Note, toneBuffer);
+                console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
+              } catch (err) {
+                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+              }
+            })();
+          }
+        } else if (sampleUrl) {
           // CRITICAL: For MOD/XM samples or looping samples, use Tone.Player
           // Tone.Player allows direct playbackRate control for accurate pitch
           // Tone.Sampler rounds to nearest semitone, losing precision
@@ -829,6 +879,8 @@ export class ToneEngine {
       case 'PWMSynth':
       case 'StringMachine':
       case 'FormantSynth':
+      case 'Wavetable':
+      case 'WobbleBass':
       case 'Furnace': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
@@ -865,6 +917,131 @@ export class ToneEngine {
     });
 
     return instrument;
+  }
+
+  // ============================================================================
+  // INSTRUMENT ANALYSER FOR VISUALIZATION
+  // ============================================================================
+
+  /**
+   * Get or create an analyser for an instrument
+   * Lazy-creates the analyser only when visualization requests it
+   * Returns null if instrument doesn't exist or isn't connected
+   */
+  public getInstrumentAnalyser(instrumentId: number): InstrumentAnalyser | null {
+    // Check if analyser already exists
+    let analyser = this.instrumentAnalysers.get(instrumentId);
+    if (analyser) {
+      return analyser;
+    }
+
+    // Find the instrument - try shared key first (Samplers/Players)
+    const sharedKey = this.getInstrumentKey(instrumentId, -1);
+    let instrument = this.instruments.get(sharedKey);
+
+    // If not found, try to find any instance of this instrument
+    if (!instrument) {
+      for (const [key, inst] of this.instruments) {
+        if (key.startsWith(`${instrumentId}-`)) {
+          instrument = inst;
+          break;
+        }
+      }
+    }
+
+    if (!instrument) {
+      return null;
+    }
+
+    // Create new analyser
+    analyser = new InstrumentAnalyser();
+
+    // Get the effect chain output for this instrument
+    const effectChain = this.instrumentEffectChains.get(sharedKey);
+
+    if (effectChain) {
+      // Disconnect instrument from current destination
+      try {
+        instrument.disconnect();
+      } catch {
+        // May not be connected
+      }
+
+      // Re-route: instrument → analyser.input → analyser.output → effect chain
+      instrument.connect(analyser.input);
+
+      // Reconnect effects
+      if (effectChain.effects.length > 0) {
+        analyser.output.connect(effectChain.effects[0]);
+      } else {
+        analyser.output.connect(effectChain.output);
+      }
+    } else {
+      // No effect chain - connect directly through analyser
+      try {
+        instrument.disconnect();
+      } catch {
+        // May not be connected
+      }
+      instrument.connect(analyser.input);
+      analyser.output.connect(this.masterInput);
+    }
+
+    this.instrumentAnalysers.set(instrumentId, analyser);
+    return analyser;
+  }
+
+  /**
+   * Dispose an instrument analyser when no longer needed
+   */
+  public disposeInstrumentAnalyser(instrumentId: number): void {
+    const analyser = this.instrumentAnalysers.get(instrumentId);
+    if (!analyser) return;
+
+    // Find the instrument
+    const sharedKey = this.getInstrumentKey(instrumentId, -1);
+    let instrument = this.instruments.get(sharedKey);
+
+    if (!instrument) {
+      for (const [key, inst] of this.instruments) {
+        if (key.startsWith(`${instrumentId}-`)) {
+          instrument = inst;
+          break;
+        }
+      }
+    }
+
+    // Re-route instrument directly (bypass analyser)
+    if (instrument) {
+      try {
+        instrument.disconnect();
+      } catch {
+        // May not be connected
+      }
+
+      const effectChain = this.instrumentEffectChains.get(sharedKey);
+      if (effectChain) {
+        if (effectChain.effects.length > 0) {
+          instrument.connect(effectChain.effects[0]);
+        } else {
+          instrument.connect(effectChain.output);
+        }
+      } else {
+        instrument.connect(this.masterInput);
+      }
+    }
+
+    analyser.dispose();
+    this.instrumentAnalysers.delete(instrumentId);
+  }
+
+  /**
+   * Dispose all instrument analysers
+   */
+  private disposeAllInstrumentAnalysers(): void {
+    this.instrumentAnalysers.forEach((_analyser, id) => {
+      this.disposeInstrumentAnalyser(id);
+    });
   }
 
   /**
@@ -1191,7 +1368,7 @@ export class ToneEngine {
               const noteIndex = periodToNoteIndex(period, 0);
               if (noteIndex >= 0) {
                 // Look up finetuned period from table
-                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+                finetunedPeriod = getPeriodExtended(noteIndex, modPlayback.finetune);
               }
             }
 
@@ -1200,6 +1377,10 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
+
+            // Debug logging for sample playback
+            console.log(`[ToneEngine] Play inst=${config.id} period=${period} fineP=${finetunedPeriod} freq=${frequency.toFixed(1)}Hz sampleRate=${sampleRate} bufRate=${player.buffer?.sampleRate} rate=${playbackRate.toFixed(4)}`);
+
             (player as any).playbackRate = playbackRate;
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
@@ -1208,6 +1389,10 @@ export class ToneEngine {
             const baseFreq = Tone.Frequency(baseNote).toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
+
+            // Debug logging for sample playback (non-period)
+            console.log(`[ToneEngine] Play inst=${config.id} note=${note} base=${baseNote} baseF=${baseFreq.toFixed(1)} targetF=${targetFreq.toFixed(1)} bufRate=${player.buffer?.sampleRate} rate=${playbackRate.toFixed(4)}`);
+
             (player as any).playbackRate = playbackRate;
           }
 
@@ -1244,7 +1429,7 @@ export class ToneEngine {
             const noteIndex = periodToNoteIndex(period, 0);
             if (noteIndex >= 0) {
               // Look up finetuned period from table
-              finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+              finetunedPeriod = getPeriodExtended(noteIndex, modPlayback.finetune);
             }
           }
 
@@ -1557,7 +1742,7 @@ export class ToneEngine {
               const noteIndex = periodToNoteIndex(period, 0);
               if (noteIndex >= 0) {
                 // Look up finetuned period from table
-                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+                finetunedPeriod = getPeriodExtended(noteIndex, modPlayback.finetune);
               }
             }
 
@@ -1601,7 +1786,7 @@ export class ToneEngine {
               const noteIndex = periodToNoteIndex(period, 0);
               if (noteIndex >= 0) {
                 // Look up finetuned period from table
-                finetunedPeriod = getPeriod(noteIndex, modPlayback.finetune);
+                finetunedPeriod = getPeriodExtended(noteIndex, modPlayback.finetune);
               }
             }
 
@@ -1868,6 +2053,88 @@ export class ToneEngine {
     this.disposeInstrument(instrumentId);
     // Create new instrument with updated config
     this.getInstrument(instrumentId, config);
+  }
+
+  /**
+   * Preview a slice of an audio sample
+   * Creates a one-shot player for the specified frame range and plays it
+   */
+  public async previewSlice(
+    instrumentId: number,
+    startFrame: number,
+    endFrame: number
+  ): Promise<void> {
+    // Ensure audio context is started
+    await Tone.start();
+
+    // Get the instrument config
+    const instrumentStore = await import('../stores/useInstrumentStore').then(m => m.useInstrumentStore.getState());
+    const instrument = instrumentStore.instruments.find(i => i.id === instrumentId);
+
+    // Check for stored edited buffer first, then URL
+    const storedBuffer = instrument?.sample?.audioBuffer;
+    const sampleUrl = instrument?.sample?.url;
+
+    if (!storedBuffer && !sampleUrl) {
+      console.warn('[ToneEngine] Cannot preview slice: no sample buffer or URL');
+      return;
+    }
+
+    try {
+      let audioBuffer: AudioBuffer;
+
+      if (storedBuffer) {
+        // Use stored edited buffer
+        audioBuffer = await this.decodeAudioData(storedBuffer);
+      } else {
+        // Fetch and decode from URL
+        const response = await fetch(sampleUrl!);
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffer = await this.decodeAudioData(arrayBuffer);
+      }
+
+      const sampleRate = audioBuffer.sampleRate;
+      const sliceLength = endFrame - startFrame;
+
+      if (sliceLength <= 0) {
+        console.warn('[ToneEngine] Invalid slice range');
+        return;
+      }
+
+      // Create a buffer for just the slice
+      const sliceBuffer = Tone.context.createBuffer(
+        audioBuffer.numberOfChannels,
+        sliceLength,
+        sampleRate
+      );
+
+      // Copy the slice data
+      for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+        const sourceData = audioBuffer.getChannelData(ch);
+        const destData = sliceBuffer.getChannelData(ch);
+        for (let i = 0; i < sliceLength; i++) {
+          destData[i] = sourceData[startFrame + i];
+        }
+      }
+
+      // Create a one-shot player
+      const player = new Tone.Player(sliceBuffer).toDestination();
+      player.start();
+
+      // Auto-dispose after playback
+      const durationMs = (sliceLength / sampleRate) * 1000 + 100;
+      setTimeout(() => {
+        try {
+          player.stop();
+          player.dispose();
+        } catch {
+          // May already be disposed
+        }
+      }, durationMs);
+
+    } catch (error) {
+      console.error('[ToneEngine] Failed to preview slice:', error);
+    }
   }
 
   /**
@@ -2145,6 +2412,9 @@ export class ToneEngine {
 
     // Dispose metronome
     this.disposeMetronome();
+
+    // Dispose all instrument analysers
+    this.disposeAllInstrumentAnalysers();
 
     // Dispose all instrument effect chains
     this.instrumentEffectChains.forEach((chain, instrumentId) => {

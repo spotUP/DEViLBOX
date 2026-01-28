@@ -16,8 +16,10 @@ import type { ArpeggioConfig, ArpeggioStep } from '@typedefs/instrument';
 export interface ArpeggioEngineOptions {
   config: ArpeggioConfig;
   onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  onNoteOn?: (note: string, velocity: number, duration: number) => void;
-  onNoteOff?: (note: string) => void;
+  /** Called when a note should start. Use scheduledTime for sample-accurate timing. */
+  onNoteOn?: (note: string, velocity: number, duration: number, scheduledTime: number) => void;
+  /** Called when a note should release. Use scheduledTime for sample-accurate timing. */
+  onNoteOff?: (note: string, scheduledTime: number) => void;
 }
 
 export class ArpeggioEngine {
@@ -32,8 +34,8 @@ export class ArpeggioEngine {
 
   // Callbacks
   private onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  private onNoteOn?: (note: string, velocity: number, duration: number) => void;
-  private onNoteOff?: (note: string) => void;
+  private onNoteOn?: (note: string, velocity: number, duration: number, scheduledTime: number) => void;
+  private onNoteOff?: (note: string, scheduledTime: number) => void;
 
   // Track which note is currently playing for proper release
   private currentPlayingNote: string | null = null;
@@ -217,14 +219,14 @@ export class ArpeggioEngine {
       : Tone.Time(rawInterval).toSeconds();
     const duration = interval * gate * 0.95; // 95% to avoid overlap
 
-    // Release previous note if still playing
+    // Release previous note if still playing (slightly before new note for clean transition)
     if (this.currentPlayingNote && this.onNoteOff) {
-      this.onNoteOff(this.currentPlayingNote);
+      this.onNoteOff(this.currentPlayingNote, _time);
     }
 
-    // Trigger the note
+    // Trigger the note at the precisely scheduled time
     if (this.onNoteOn) {
-      this.onNoteOn(targetNote, velocity, duration);
+      this.onNoteOn(targetNote, velocity, duration, _time);
     }
     this.currentPlayingNote = targetNote;
 
@@ -256,6 +258,12 @@ export class ArpeggioEngine {
     this.isPlaying = true;
     this.heldNotes.add(note);
 
+    // Ensure Transport is started (required for Tone.Loop to work)
+    const transport = Tone.getTransport();
+    if (transport.state !== 'started') {
+      transport.start();
+    }
+
     // Create and start the loop
     const interval = this.getInterval();
 
@@ -283,9 +291,9 @@ export class ArpeggioEngine {
       this.heldNotes.clear();
     }
 
-    // Release current note
+    // Release current note immediately
     if (this.currentPlayingNote && this.onNoteOff) {
-      this.onNoteOff(this.currentPlayingNote);
+      this.onNoteOff(this.currentPlayingNote, Tone.now());
       this.currentPlayingNote = null;
     }
 

@@ -48,13 +48,16 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   onClose,
   createMode = false,
 }) => {
-  const {
-    currentInstrument,
-    createInstrument,
-    updateInstrument,
-    setPreviewInstrument,
-    setCurrentInstrument,
-  } = useInstrumentStore();
+  // Use selectors for proper reactivity - don't use the getter!
+  const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
+  const instruments = useInstrumentStore(state => state.instruments);
+  const createInstrument = useInstrumentStore(state => state.createInstrument);
+  const updateInstrument = useInstrumentStore(state => state.updateInstrument);
+  const setPreviewInstrument = useInstrumentStore(state => state.setPreviewInstrument);
+  const setCurrentInstrument = useInstrumentStore(state => state.setCurrentInstrument);
+
+  // Derive currentInstrument from state for proper re-renders
+  const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
 
   // Create mode state
   const [isCreating, setIsCreating] = useState(createMode);
@@ -355,7 +358,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
           {/* Left Sidebar: Instrument List */}
-          <div className="w-52 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
+          <div className="w-fit min-w-48 max-w-80 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
             <InstrumentList
               maxHeight="100%"
               showActions={true}

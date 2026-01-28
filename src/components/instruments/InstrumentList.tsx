@@ -6,7 +6,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 
@@ -140,7 +140,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
               {/* Instrument name */}
               <span
                 className={`
-                  flex-1 text-sm truncate
+                  text-sm whitespace-nowrap
                   ${isSelected ? 'text-text-primary' : 'text-text-secondary'}
                 `}
               >
@@ -151,6 +151,20 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
               {!compact && (
                 <span className="text-[10px] text-text-muted font-mono">
                   {synthInfo.shortName}
+                </span>
+              )}
+
+              {/* Sample loop indicator */}
+              {instrument.sample?.loop && (
+                <span
+                  className="text-text-muted ml-auto"
+                  title={instrument.sample.loopType === 'pingpong' ? 'Ping-pong loop' : 'Forward loop'}
+                >
+                  {instrument.sample.loopType === 'pingpong' ? (
+                    <Repeat size={10} className="text-blue-400" />
+                  ) : (
+                    <Repeat1 size={10} className="text-green-400" />
+                  )}
                 </span>
               )}
 

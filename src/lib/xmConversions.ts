@@ -87,6 +87,45 @@ export function xmNoteToString(xmNote: number): string {
 }
 
 /**
+ * Convert string note to MIDI note number
+ *
+ * @param note String note ("C-4", "D#5", etc.) or XM note number
+ * @returns MIDI note number (0-127)
+ *
+ * MIDI: C-4 = 60, C-0 = 12
+ */
+export function noteToMidi(note: string | number): number {
+  if (typeof note === 'number') {
+    // XM format: 1 = C-0, add 11 to get MIDI (C-0 = 12)
+    return note + 11;
+  }
+
+  if (note === null || note === '' || note === '...' || note === '===') {
+    return 60; // Default to C-4
+  }
+
+  // Parse note string like "C-4" or "C#5"
+  const match = note.match(/^([A-G])([#-])(\d)$/);
+  if (!match) {
+    return 60; // Default
+  }
+
+  const [, noteLetter, sharp, octaveStr] = match;
+  const octave = parseInt(octaveStr, 10);
+
+  // Find semitone (0-11)
+  const noteStr = noteLetter + sharp;
+  const semitone = NOTE_NAMES.indexOf(noteStr);
+
+  if (semitone === -1) {
+    return 60;
+  }
+
+  // MIDI: C-0 = 12, so (octave + 1) * 12 + semitone
+  return (octave + 1) * 12 + semitone;
+}
+
+/**
  * XM Effect type mapping
  * Maps effect character to effect type number
  */

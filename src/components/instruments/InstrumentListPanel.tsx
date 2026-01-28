@@ -3,7 +3,7 @@
  * Shows all instruments with Add, Preset, Sample, Edit buttons
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
@@ -12,6 +12,9 @@ import { Plus, FolderOpen, Pencil, Trash2, Copy, Package } from 'lucide-react';
 import { LoadPresetModal } from './LoadPresetModal';
 import { SamplePackBrowser } from './SamplePackBrowser';
 import { BASS_PRESETS } from '@constants/factoryPresets';
+import { getToneEngine } from '@engine/ToneEngine';
+import * as Tone from 'tone';
+import type { InstrumentConfig } from '@typedefs/instrument';
 
 interface InstrumentListPanelProps {
   onEditInstrument?: (id: number) => void;
@@ -28,6 +31,36 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
   } = useInstrumentStore();
 
   const { useHexNumbers } = useUIStore();
+  const previewTimeoutRef = useRef<number | null>(null);
+
+  // Preview an instrument by playing a short note
+  const previewInstrument = useCallback(async (inst: InstrumentConfig) => {
+    try {
+      // Start audio context if needed
+      await Tone.start();
+
+      // Clear any existing preview timeout
+      if (previewTimeoutRef.current) {
+        window.clearTimeout(previewTimeoutRef.current);
+      }
+
+      const engine = getToneEngine();
+
+      // Use C4 as default preview note, or C3 for bass instruments
+      const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
+      const previewNote = isBass ? 'C3' : 'C4';
+
+      const now = Tone.now();
+      engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
+
+      // Release after 300ms
+      previewTimeoutRef.current = window.setTimeout(() => {
+        engine.triggerNoteRelease(inst.id, previewNote, Tone.now(), inst);
+      }, 300);
+    } catch (error) {
+      console.warn('[InstrumentListPanel] Preview failed:', error);
+    }
+  }, []);
 
   // Create a new instrument with a good starting preset
   const handleAddInstrument = () => {
@@ -103,7 +136,10 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
             return (
               <div
                 key={inst.id}
-                onClick={() => setCurrentInstrument(inst.id)}
+                onClick={() => {
+                  setCurrentInstrument(inst.id);
+                  previewInstrument(inst);
+                }}
                 className={`
                   instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer border-b border-ft2-border
@@ -126,7 +162,7 @@ export const InstrumentListPanel: React.FC<InstrumentListPanelProps> = ({ onEdit
                 <IconComponent size={12} className={isSelected ? 'text-ft2-bg' : synthInfo.color} />
 
                 {/* Name */}
-                <span className="flex-1 text-xs font-mono truncate">
+                <span className="text-xs font-mono whitespace-nowrap">
                   {inst.name}
                 </span>
 

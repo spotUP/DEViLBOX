@@ -27,6 +27,65 @@ export type SynthType =
   | 'StringMachine'
   | 'FormantSynth'
   | 'Furnace'
+  // Furnace Chip Types (WASM-emulated)
+  // FM Synthesis Chips
+  | 'FurnaceOPN'      // Sega Genesis / Mega Drive (YM2612)
+  | 'FurnaceOPM'      // Yamaha OPM (X68000, arcade)
+  | 'FurnaceOPL'      // OPL3 (AdLib, Sound Blaster)
+  | 'FurnaceOPLL'     // Yamaha OPLL (MSX, SMS FM)
+  | 'FurnaceESFM'     // Enhanced OPL3 FM
+  | 'FurnaceOPZ'      // Yamaha OPZ (TX81Z)
+  | 'FurnaceOPNA'     // YM2608 (PC-98, arcade)
+  | 'FurnaceOPNB'     // YM2610 (Neo Geo)
+  | 'FurnaceOPL4'     // Yamaha OPL4 (FM + wavetable)
+  | 'FurnaceY8950'    // Y8950 (MSX-Audio)
+  // Console PSG Chips
+  | 'FurnaceNES'      // Nintendo Entertainment System (2A03)
+  | 'FurnaceGB'       // Game Boy
+  | 'FurnacePSG'      // TI SN76489 (Master System)
+  | 'FurnacePCE'      // PC Engine / TurboGrafx-16
+  | 'FurnaceSNES'     // Super Nintendo (SPC700)
+  | 'FurnaceVB'       // Virtual Boy
+  | 'FurnaceLynx'     // Atari Lynx
+  | 'FurnaceSWAN'     // WonderSwan
+  // NES Expansion Audio
+  | 'FurnaceVRC6'     // Konami VRC6 (Castlevania 3)
+  | 'FurnaceVRC7'     // Konami VRC7 (Lagrange Point)
+  | 'FurnaceN163'     // Namco 163 (wavetable)
+  | 'FurnaceFDS'      // Famicom Disk System
+  | 'FurnaceMMC5'     // MMC5 (Castlevania 3 US)
+  // Computer Chips
+  | 'FurnaceC64'      // Commodore 64 (SID)
+  | 'FurnaceAY'       // AY-3-8910 (ZX Spectrum, MSX)
+  | 'FurnaceVIC'      // VIC-20
+  | 'FurnaceSAA'      // Philips SAA1099
+  | 'FurnaceTED'      // Commodore Plus/4
+  | 'FurnaceVERA'     // Commander X16
+  // Arcade PCM Chips
+  | 'FurnaceSEGAPCM'  // Sega System 16/18
+  | 'FurnaceQSOUND'   // Capcom CPS1/CPS2
+  | 'FurnaceES5506'   // Ensoniq ES5506
+  | 'FurnaceRF5C68'   // Sega CD
+  | 'FurnaceC140'     // Namco System 2
+  | 'FurnaceK007232'  // Konami arcade
+  | 'FurnaceK053260'  // Konami arcade
+  | 'FurnaceGA20'     // Irem arcade
+  | 'FurnaceOKI'      // OKI MSM6295
+  | 'FurnaceYMZ280B'  // Capcom/Konami arcade
+  // Wavetable Chips
+  | 'FurnaceSCC'      // Konami SCC (MSX)
+  | 'FurnaceX1_010'   // Seta X1-010
+  | 'FurnaceBUBBLE'   // Bubble System
+  // Other
+  | 'FurnaceTIA'      // Atari 2600
+  | 'FurnaceSM8521'   // Sharp SM8521
+  | 'FurnaceT6W28'    // NEC PC-6001
+  | 'FurnaceSUPERVISION' // Watara Supervision
+  | 'FurnaceUPD1771'  // NEC μPD1771
+  // Bass synths
+  | 'WobbleBass'
+  // Multi-sample instruments
+  | 'DrumKit'
   // Module playback (libopenmpt)
   | 'ChiptuneModule';
 
@@ -65,6 +124,28 @@ export interface FilterEnvelopeConfig {
   sustain: number;
   release: number;
 }
+
+/**
+ * Pitch Envelope Configuration
+ * Modulates oscillator pitch over time (for kick drums, synth basses, FX)
+ */
+export interface PitchEnvelopeConfig {
+  enabled: boolean;
+  amount: number;       // -48 to +48 semitones (starting offset from base pitch)
+  attack: number;       // 0-2000ms - time to reach peak offset
+  decay: number;        // 0-2000ms - time to decay to sustain
+  sustain: number;      // -100 to +100% of amount - sustain offset (0 = back to base pitch)
+  release: number;      // 0-5000ms - time to return to base pitch on release
+}
+
+export const DEFAULT_PITCH_ENVELOPE: PitchEnvelopeConfig = {
+  enabled: false,
+  amount: 12,           // Start 1 octave up
+  attack: 0,            // Instant attack
+  decay: 50,            // Quick decay to base pitch
+  sustain: 0,           // Return to base pitch
+  release: 100,         // Quick release
+};
 
 /**
  * Devil Fish Mod Configuration
@@ -800,6 +881,198 @@ export const VOWEL_FORMANTS: Record<VowelType, { f1: number; f2: number; f3: num
   U: { f1: 350, f2: 600, f3: 2400 },
 };
 
+/**
+ * WobbleBass Configuration
+ * Dedicated bass synth for dubstep, DnB, jungle wobble and growl basses
+ * Features dual oscillators, FM, Reese-style detuning, aggressive filter, and tempo-synced LFO
+ */
+export type WobbleLFOSync =
+  | '1/1' | '1/2' | '1/2T' | '1/2D'
+  | '1/4' | '1/4T' | '1/4D'
+  | '1/8' | '1/8T' | '1/8D'
+  | '1/16' | '1/16T' | '1/16D'
+  | '1/32' | '1/32T'
+  | 'free';
+
+export type WobbleMode = 'classic' | 'reese' | 'fm' | 'growl' | 'hybrid';
+
+export interface WobbleBassConfig {
+  mode: WobbleMode;
+
+  // Dual Oscillator Section
+  osc1: {
+    type: WaveformType;
+    octave: number;           // -2 to +2
+    detune: number;           // -100 to +100 cents
+    level: number;            // 0-100%
+  };
+  osc2: {
+    type: WaveformType;
+    octave: number;           // -2 to +2
+    detune: number;           // -100 to +100 cents (for Reese effect)
+    level: number;            // 0-100%
+  };
+
+  // Sub Oscillator (clean sine)
+  sub: {
+    enabled: boolean;
+    octave: number;           // -2 to 0
+    level: number;            // 0-100%
+  };
+
+  // FM Section
+  fm: {
+    enabled: boolean;
+    amount: number;           // 0-100 (modulation index)
+    ratio: number;            // 0.5-8 (carrier:modulator ratio)
+    envelope: number;         // 0-100% (FM amount envelope depth)
+  };
+
+  // Unison/Reese Section
+  unison: {
+    voices: number;           // 1-16
+    detune: number;           // 0-100 cents spread
+    stereoSpread: number;     // 0-100%
+  };
+
+  // Filter Section (aggressive lowpass)
+  filter: {
+    type: 'lowpass' | 'bandpass' | 'highpass';
+    cutoff: number;           // 20-20000 Hz
+    resonance: number;        // 0-100% (high values for screaming)
+    rolloff: -12 | -24 | -48;
+    drive: number;            // 0-100% (filter drive/saturation)
+    keyTracking: number;      // 0-100%
+  };
+
+  // Filter Envelope
+  filterEnvelope: {
+    amount: number;           // -100 to +100% (bipolar)
+    attack: number;           // 0-2000ms
+    decay: number;            // 0-2000ms
+    sustain: number;          // 0-100%
+    release: number;          // 0-2000ms
+  };
+
+  // Wobble LFO (tempo-synced)
+  wobbleLFO: {
+    enabled: boolean;
+    sync: WobbleLFOSync;      // Tempo sync division
+    rate: number;             // 0.1-20 Hz (when sync='free')
+    shape: 'sine' | 'triangle' | 'saw' | 'square' | 'sample_hold';
+    amount: number;           // 0-100% filter modulation
+    pitchAmount: number;      // 0-100 cents
+    fmAmount: number;         // 0-100% FM modulation
+    phase: number;            // 0-360 degrees
+    retrigger: boolean;
+  };
+
+  // Amp Envelope
+  envelope: EnvelopeConfig;
+
+  // Built-in Effects
+  distortion: {
+    enabled: boolean;
+    type: 'soft' | 'hard' | 'fuzz' | 'bitcrush';
+    drive: number;            // 0-100%
+    tone: number;             // 0-100% (post-dist filter)
+  };
+
+  // Formant (for growl)
+  formant: {
+    enabled: boolean;
+    vowel: VowelType;
+    morph: number;            // 0-100% position between vowels
+    lfoAmount: number;        // 0-100% LFO modulation of vowel
+  };
+}
+
+export const DEFAULT_WOBBLE_BASS: WobbleBassConfig = {
+  mode: 'classic',
+
+  osc1: {
+    type: 'sawtooth',
+    octave: -1,
+    detune: 0,
+    level: 100,
+  },
+  osc2: {
+    type: 'sawtooth',
+    octave: -1,
+    detune: 7,              // Slight detune for thickness
+    level: 80,
+  },
+
+  sub: {
+    enabled: true,
+    octave: -2,
+    level: 60,
+  },
+
+  fm: {
+    enabled: false,
+    amount: 30,
+    ratio: 2,
+    envelope: 50,
+  },
+
+  unison: {
+    voices: 4,
+    detune: 15,
+    stereoSpread: 50,
+  },
+
+  filter: {
+    type: 'lowpass',
+    cutoff: 800,
+    resonance: 60,
+    rolloff: -24,
+    drive: 30,
+    keyTracking: 0,
+  },
+
+  filterEnvelope: {
+    amount: 70,
+    attack: 5,
+    decay: 300,
+    sustain: 20,
+    release: 200,
+  },
+
+  wobbleLFO: {
+    enabled: true,
+    sync: '1/4',
+    rate: 4,
+    shape: 'sine',
+    amount: 80,
+    pitchAmount: 0,
+    fmAmount: 0,
+    phase: 0,
+    retrigger: true,
+  },
+
+  envelope: {
+    attack: 5,
+    decay: 200,
+    sustain: 80,
+    release: 300,
+  },
+
+  distortion: {
+    enabled: true,
+    type: 'soft',
+    drive: 40,
+    tone: 70,
+  },
+
+  formant: {
+    enabled: false,
+    vowel: 'A',
+    morph: 0,
+    lfoAmount: 0,
+  },
+};
+
 export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   vowel: 'A',
   vowelMorph: {
@@ -983,18 +1256,150 @@ export interface InstrumentMetadata {
   }>;
 }
 
+// Import beat slicer types
+import type { BeatSlice, BeatSliceConfig } from './beatSlicer';
+
 export interface SampleConfig {
   audioBuffer?: ArrayBuffer;
   url: string;
   baseNote: string; // "C-4"
   detune: number; // -100 to +100 cents
   loop: boolean;
+  loopType?: 'off' | 'forward' | 'pingpong'; // Loop mode
   loopStart: number; // Sample frame index
   loopEnd: number; // Sample frame index
   sampleRate?: number; // For converting loop points to seconds (default 8363 Hz for MOD)
   reverse: boolean;
   playbackRate: number; // 0.25-4x
+  // Beat slicer data
+  slices?: BeatSlice[];
+  sliceConfig?: BeatSliceConfig;
 }
+
+/**
+ * Drumkit Key Mapping - Maps a note range to a sample
+ * Impulse Tracker style keymapping for multi-sample instruments
+ */
+export interface DrumKitKeyMapping {
+  /** Unique ID for this mapping */
+  id: string;
+  /** Note range start (MIDI note number, 0-127, or XM note 1-96) */
+  noteStart: number;
+  /** Note range end (MIDI note number) - same as start for single-key mapping */
+  noteEnd: number;
+  /** Reference to the source sample/instrument ID */
+  sampleId: string;
+  /** Sample URL if different from the referenced instrument */
+  sampleUrl?: string;
+  /** Sample name for display */
+  sampleName?: string;
+  /** Pitch offset in semitones (-48 to +48) */
+  pitchOffset: number;
+  /** Fine tuning in cents (-100 to +100) */
+  fineTune: number;
+  /** Volume offset in dB (-12 to +12) */
+  volumeOffset: number;
+  /** Panning offset (-100 to +100, 0 = center) */
+  panOffset: number;
+  /** Optional: override base note for sample playback */
+  baseNote?: string;
+}
+
+/**
+ * DrumKit Configuration - Multi-sample instrument
+ * Like Impulse Tracker's instrument keymapping
+ */
+export interface DrumKitConfig {
+  /** List of key mappings */
+  keymap: DrumKitKeyMapping[];
+  /** Default sample to use for unmapped notes */
+  defaultSampleId?: string;
+  /** Polyphony mode: 'poly' allows overlapping, 'mono' cuts previous note */
+  polyphony: 'poly' | 'mono';
+  /** Max simultaneous voices (1-16) */
+  maxVoices: number;
+  /** Whether to cut notes when same key is re-triggered */
+  noteCut: boolean;
+}
+
+export const DEFAULT_DRUMKIT: DrumKitConfig = {
+  keymap: [],
+  polyphony: 'poly',
+  maxVoices: 8,
+  noteCut: false,
+};
+
+/**
+ * LFO (Low Frequency Oscillator) Configuration
+ * Provides audio-rate modulation for filter, pitch, and amplitude
+ */
+export type LFOWaveform = 'sine' | 'triangle' | 'sawtooth' | 'square';
+export type LFOTarget = 'filter' | 'pitch' | 'volume';
+
+// Tempo-synced LFO divisions (T=triplet, D=dotted)
+export type LFOSyncDivision =
+  | '1/1' | '1/2' | '1/2T' | '1/2D'
+  | '1/4' | '1/4T' | '1/4D'
+  | '1/8' | '1/8T' | '1/8D'
+  | '1/16' | '1/16T' | '1/16D'
+  | '1/32' | '1/32T'
+  | 'free';
+
+// Mapping from sync division to rate multiplier (at 120 BPM)
+export const LFO_SYNC_RATES: Record<LFOSyncDivision, number> = {
+  '1/1': 0.5,     // Whole note = 0.5 Hz at 120 BPM
+  '1/2': 1,       // Half note
+  '1/2T': 1.5,    // Half note triplet
+  '1/2D': 0.75,   // Dotted half note
+  '1/4': 2,       // Quarter note
+  '1/4T': 3,      // Quarter triplet
+  '1/4D': 1.5,    // Dotted quarter
+  '1/8': 4,       // Eighth note
+  '1/8T': 6,      // Eighth triplet
+  '1/8D': 3,      // Dotted eighth
+  '1/16': 8,      // Sixteenth
+  '1/16T': 12,    // Sixteenth triplet
+  '1/16D': 6,     // Dotted sixteenth
+  '1/32': 16,     // 32nd note
+  '1/32T': 24,    // 32nd triplet
+  'free': 1,      // Not synced, use raw rate
+};
+
+export interface LFOConfig {
+  enabled: boolean;
+  waveform: LFOWaveform;
+  rate: number;           // 0.1 - 20 Hz (when sync='free')
+  sync?: boolean;         // Sync to tempo
+  syncDivision?: LFOSyncDivision;  // Tempo division when synced
+
+  // Filter LFO
+  filterAmount: number;   // 0-100% (bipolar: -100 to +100 cents from current)
+  filterTarget: 'cutoff' | 'resonance' | 'both';
+
+  // Pitch LFO (vibrato)
+  pitchAmount: number;    // 0-100 cents
+
+  // Volume LFO (tremolo)
+  volumeAmount: number;   // 0-100%
+
+  // Phase
+  phase: number;          // 0-360 degrees starting phase
+  retrigger: boolean;     // Reset phase on note attack
+}
+
+export const DEFAULT_LFO: LFOConfig = {
+  enabled: false,
+  waveform: 'sine',
+  rate: 5,
+  sync: false,
+  syncDivision: '1/4',
+  filterAmount: 0,
+  filterTarget: 'cutoff',
+  pitchAmount: 0,
+  volumeAmount: 0,
+  phase: 0,
+  retrigger: true,
+};
 
 /**
  * Instrument type discriminator for XM compatibility
@@ -1012,6 +1417,7 @@ export interface InstrumentConfig {
   envelope?: EnvelopeConfig;
   filter?: FilterConfig;
   filterEnvelope?: FilterEnvelopeConfig;
+  pitchEnvelope?: PitchEnvelopeConfig;  // Pitch modulation envelope (for synth basses, kicks, FX)
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
   granular?: GranularConfig;
@@ -1025,6 +1431,10 @@ export interface InstrumentConfig {
   stringMachine?: StringMachineConfig;
   formantSynth?: FormantSynthConfig;
   furnace?: FurnaceConfig;
+  // Bass synths
+  wobbleBass?: WobbleBassConfig;
+  // Drumkit/Keymap (multi-sample)
+  drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
   chiptuneModule?: ChiptuneModuleConfig;
   // Sampler config
@@ -1032,6 +1442,7 @@ export interface InstrumentConfig {
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100
+  lfo?: LFOConfig; // Global LFO for filter/pitch/volume modulation
   parameters?: Record<string, any>; // Additional synth-specific parameters (e.g., sample URLs)
   metadata?: InstrumentMetadata; // Import metadata and transformation history
 }

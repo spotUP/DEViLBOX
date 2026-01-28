@@ -21,6 +21,7 @@ interface SavedProject {
   instruments: ReturnType<typeof useInstrumentStore.getState>['instruments'];
   automation?: AutomationCurve[];
   masterEffects?: EffectConfig[];
+  grooveTemplateId?: string; // Groove/swing template ID
 }
 
 /**
@@ -45,6 +46,8 @@ export function saveProjectToStorage(): boolean {
       instruments: instrumentState.instruments,
       automation: automationState.curves,
       masterEffects: audioState.masterEffects,
+      // Only save groove template if not the default
+      ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
     };
 
     // CRITICAL FIX: Filter out MOD/XM imported instruments with samples
@@ -140,6 +143,11 @@ export function loadProjectFromStorage(): boolean {
       audioStore.setMasterEffects(project.masterEffects);
     }
 
+    // Load groove template
+    if (project.grooveTemplateId) {
+      transportStore.setGrooveTemplate(project.grooveTemplateId);
+    }
+
     projectStore.markAsSaved();
     return true;
   } catch (error) {
@@ -216,10 +224,10 @@ export function useProjectPersistence() {
     return unsubscribe;
   }, [markAsModified]);
 
-  // Subscribe to transport store changes (BPM)
+  // Subscribe to transport store changes (BPM, groove template)
   useEffect(() => {
     const unsubscribe = useTransportStore.subscribe((state, prevState) => {
-      if (state.bpm !== prevState.bpm) {
+      if (state.bpm !== prevState.bpm || state.grooveTemplateId !== prevState.grooveTemplateId) {
         markAsModified();
       }
     });

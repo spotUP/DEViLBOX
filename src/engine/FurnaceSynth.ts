@@ -30,6 +30,10 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   private velocity: number = 1.0;  // 0.0 to 1.0 for velocity modulation
   private baseTLValues: number[] = []; // Store original TL values for velocity scaling
 
+  // Fallback synth when WASM engine isn't available
+  private fallbackSynth: Tone.PolySynth | null = null;
+  private useWasmEngine: boolean = false;
+
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
     super();
     this.config = config;
@@ -39,10 +43,47 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.outputGain = new Tone.Gain(1);
     this.output = this.outputGain;
 
-    // Initialize engine asynchronously - don't block constructor
+    // Create fallback synth immediately (always available)
+    this.createFallbackSynth();
+
+    // Initialize WASM engine asynchronously - don't block constructor
     this.initEngine();
 
     this.updateParameters();
+  }
+
+  /**
+   * Create a Tone.js-based FM synth as fallback when WASM isn't available
+   */
+  private createFallbackSynth(): void {
+    // Create an FM synth that approximates FM chip sound
+    this.fallbackSynth = new Tone.PolySynth({
+      maxPolyphony: 8,
+      voice: Tone.FMSynth,
+      options: {
+        harmonicity: 3.5,
+        modulationIndex: this.config.algorithm <= 2 ? 10 : 5,
+        envelope: {
+          attack: 0.01,
+          decay: 0.2,
+          sustain: 0.5,
+          release: 0.3,
+        },
+        modulation: {
+          type: 'sine',
+        },
+        modulationEnvelope: {
+          attack: 0.01,
+          decay: 0.2,
+          sustain: 0.4,
+          release: 0.3,
+        },
+      },
+    });
+
+    // Connect to output
+    this.fallbackSynth.connect(this.outputGain);
+    this.fallbackSynth.volume.value = -6;
   }
 
   private async initEngine(): Promise<void> {
@@ -52,31 +93,21 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       let rawContext: AudioContext | null = null;
 
       // Method 1: Direct rawContext property
-      if (toneContext.rawContext && typeof (toneContext.rawContext as any).createGain === 'function') {
-        rawContext = toneContext.rawContext as AudioContext;
+      const rawCtx = toneContext.rawContext;
+      if (rawCtx && rawCtx instanceof AudioContext) {
+        rawContext = rawCtx;
       }
 
-      // Method 2: Get from the destination node's context (more reliable)
+      // Method 2: Get from internal property
       if (!rawContext) {
-        const destNode = Tone.getDestination();
-        const nativeNode = (destNode as any)._gainNode || (destNode as any).output?._gainNode;
-        if (nativeNode?.context) {
-          rawContext = nativeNode.context as AudioContext;
+        const internalContext = (toneContext as any)._context;
+        if (internalContext instanceof AudioContext) {
+          rawContext = internalContext;
         }
-      }
-
-      // Method 3: Create a temporary gain node to extract context
-      if (!rawContext) {
-        const tempGain = new Tone.Gain(1);
-        const nativeGain = (tempGain as any)._gainNode;
-        if (nativeGain?.context) {
-          rawContext = nativeGain.context as AudioContext;
-        }
-        tempGain.dispose();
       }
 
       if (!rawContext || !rawContext.audioWorklet) {
-        console.warn('[FurnaceSynth] Could not get valid AudioContext, skipping chip engine init');
+        console.warn('[FurnaceSynth] Using fallback FM synth (no WASM available)');
         return;
       }
 
@@ -97,16 +128,27 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       // Initialize chip engine
       await this.chipEngine.init(rawContext);
 
-      // Connect to the global WASM chip engine output if available
-      try {
-        const output = this.chipEngine.getOutput();
-        output.connect(this.outputGain as any);
-      } catch {
-        // Engine not initialized - that's ok, will work without WASM chips
-        console.warn('[FurnaceSynth] Chip engine not available, using fallback');
+      // Check if WASM engine is actually available
+      if (this.chipEngine.isInitialized()) {
+        // Connect to the global WASM chip engine output
+        try {
+          const output = this.chipEngine.getOutput();
+          output.connect(this.outputGain as any);
+          this.useWasmEngine = true;
+
+          // Disconnect fallback synth when WASM is available
+          if (this.fallbackSynth) {
+            this.fallbackSynth.disconnect();
+          }
+          console.log('[FurnaceSynth] WASM chip engine connected');
+        } catch {
+          console.warn('[FurnaceSynth] Using fallback FM synth');
+        }
+      } else {
+        console.warn('[FurnaceSynth] Using fallback FM synth (WASM not loaded)');
       }
-    } catch (err) {
-      console.warn('[FurnaceSynth] Failed to initialize chip engine:', err);
+    } catch {
+      console.warn('[FurnaceSynth] Using fallback FM synth (init failed)');
     }
   }
 
@@ -561,6 +603,14 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     // Store velocity for macro modulation (0.0 to 1.0)
     this.velocity = velocity !== undefined ? velocity : 1.0;
 
+    const scheduledTime = time || Tone.now();
+
+    // Use fallback synth if WASM engine isn't available
+    if (!this.useWasmEngine && this.fallbackSynth) {
+      this.fallbackSynth.triggerAttack(note, scheduledTime, this.velocity);
+      return this;
+    }
+
     // Reset all macro state for new note
     this.macroPositions.clear();
     this.opMacroPositions = Array.from({ length: 4 }, () => ({}));
@@ -572,8 +622,6 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
     // Apply velocity scaling to carrier operators for FM chips
     this.applyVelocityToCarriers();
-
-    const scheduledTime = time || Tone.now();
 
     // 1. Setup registers (with velocity-scaled TL)
     this.updateParameters();
@@ -685,8 +733,15 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     }
   }
 
-  public triggerRelease(_time?: number): this {
+  public triggerRelease(time?: number): this {
     this.isNoteOn = false;
+
+    // Use fallback synth if WASM engine isn't available
+    if (!this.useWasmEngine && this.fallbackSynth) {
+      this.fallbackSynth.releaseAll(time);
+      return this;
+    }
+
     this.writeKeyOff();
     return this;
   }
@@ -741,8 +796,12 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   }
 
   dispose(): this {
-    super.dispose();
+    if (this.fallbackSynth) {
+      this.fallbackSynth.dispose();
+      this.fallbackSynth = null;
+    }
     this.outputGain.dispose();
+    super.dispose();
     return this;
   }
 }

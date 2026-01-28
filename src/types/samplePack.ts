@@ -32,6 +32,8 @@ export interface SamplePack {
   samples: Record<SampleCategory, SampleInfo[]>;
   /** Total sample count */
   sampleCount: number;
+  /** Whether this pack was uploaded by the user */
+  isUserUploaded?: boolean;
 }
 
 export type SampleCategory =

@@ -88,33 +88,43 @@ export class AmigaFilter extends Tone.ToneAudioNode {
     this._initializing = true;
 
     try {
-      // Get the native AudioContext - try multiple approaches
+      // Get the native AudioContext - use Tone.js's internal context access
       const toneContext = Tone.getContext();
       let rawContext: AudioContext | null = null;
 
-      // Method 1: Direct rawContext property
-      if (toneContext.rawContext && typeof (toneContext.rawContext as any).createGain === 'function') {
-        rawContext = toneContext.rawContext as AudioContext;
+      // Method 1: Tone.js exposes rawContext which should be the native AudioContext
+      const rawCtx = toneContext.rawContext;
+      if (rawCtx && rawCtx instanceof AudioContext) {
+        rawContext = rawCtx;
+      } else if (rawCtx && rawCtx instanceof OfflineAudioContext) {
+        rawContext = rawCtx as unknown as AudioContext;
       }
 
-      // Method 2: Get from the destination node's context (more reliable)
+      // Method 2: If rawContext isn't a proper instance, try extracting from internal property
       if (!rawContext) {
-        const destNode = Tone.getDestination();
-        const nativeNode = (destNode as any)._gainNode || (destNode as any).output?._gainNode;
-        if (nativeNode?.context) {
-          rawContext = nativeNode.context as AudioContext;
+        // Tone.Context wraps BaseAudioContext - try to get _context
+        const internalContext = (toneContext as any)._context;
+        if (internalContext instanceof AudioContext) {
+          rawContext = internalContext;
         }
       }
 
-      // Method 3: Get from this effect's own native nodes
+      // Method 3: Get from a native node's context property
       if (!rawContext) {
-        const nativeInput = (this.input as any)._gainNode || (this.input as any)._node;
-        if (nativeInput?.context) {
-          rawContext = nativeInput.context as AudioContext;
+        // Create a temporary native oscillator to get the context
+        try {
+          const tempOsc = new Tone.Oscillator();
+          const nativeOsc = (tempOsc as any)._oscillator;
+          if (nativeOsc?.context instanceof AudioContext) {
+            rawContext = nativeOsc.context;
+          }
+          tempOsc.dispose();
+        } catch {
+          // Ignore
         }
       }
 
-      // Verify it's actually an AudioContext by checking for audioWorklet
+      // Verify we have a valid AudioContext with audioWorklet support
       if (!rawContext || !rawContext.audioWorklet) {
         console.warn('[AmigaFilter] AudioWorklet not supported or no valid context');
         this._initializing = false;
@@ -129,7 +139,16 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       }
 
       const baseUrl = import.meta.env.BASE_URL || '/';
-      await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
+
+      // Try to add the worklet module - might fail if already registered
+      try {
+        await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
+      } catch (e) {
+        // Module might already be registered - this is fine
+        if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
+          throw e;
+        }
+      }
 
       // Construct the node
       this._worklet = new AudioWorkletNode(rawContext, 'amiga-filter-processor');
@@ -145,12 +164,22 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       });
 
       // Connect Tone.Gain -> native AudioWorkletNode -> Tone.Gain
-      // We use the internal native gain nodes for the connection to the native worklet
-      // This is the most reliable way to bridge Tone.js and native nodes
-      const nativeInput = (this.input as any)._gainNode || (this.input as any)._node || this.input.input;
-      const nativeOutput = (this.output as any)._gainNode || (this.output as any)._node || this.output.input;
+      // Use the internal Tone.js properties to get native GainNodes
+      const getNativeNode = (toneNode: Tone.Gain): GainNode | null => {
+        // Tone.Gain stores native node in different properties depending on version
+        const node = (toneNode as any)._gainNode ||
+                     (toneNode as any).input ||
+                     (toneNode as any)._node;
+        if (node instanceof GainNode) return node;
+        // Try to access through context
+        if (node?.context instanceof AudioContext) return node;
+        return null;
+      };
 
-      if (nativeInput && nativeInput.connect && this._worklet) {
+      const nativeInput = getNativeNode(this.input);
+      const nativeOutput = getNativeNode(this.output);
+
+      if (nativeInput && nativeOutput && this._worklet) {
         // Disconnect bypass before connecting through worklet
         try { this.input.disconnect(this.output); } catch {}
 
@@ -159,7 +188,8 @@ export class AmigaFilter extends Tone.ToneAudioNode {
         this._initialized = true;
         console.log('[AmigaFilter] 1:1 hardware filter initialized successfully');
       } else {
-        throw new Error('Could not find native nodes for connection');
+        console.warn('[AmigaFilter] Could not find native nodes, using bypass');
+        this._initializing = false;
       }
     } catch (e) {
       console.error('[AmigaFilter] Failed to load worklet:', e);

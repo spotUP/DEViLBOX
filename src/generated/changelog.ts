@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-27T19:35:50.198Z
+ * Generated: 2026-01-28T01:57:35.803Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '114';
-export const BUILD_HASH = 'a57cf46';
-export const BUILD_DATE = '2026-01-27';
+export const BUILD_NUMBER = '115';
+export const BUILD_HASH = '6aebbd3';
+export const BUILD_DATE = '2026-01-28';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-27',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add .fur and .dmf to file browser accept filter'
+      },
       {
         type: 'feature',
         description: 'Add MIDI CC output to TD-3-MO'
@@ -250,10 +254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Major playback performance optimizations and sound cleanup'
-      },
-      {
-        type: 'fix',
-        description: 'Reuse preloaded instruments instead of creating new ones per channel'
       }
     ]
   }

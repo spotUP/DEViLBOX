@@ -55,6 +55,8 @@ export type FurnaceChipType = typeof FurnaceChipType[keyof typeof FurnaceChipTyp
 export class FurnaceChipEngine {
   private static instance: FurnaceChipEngine | null = null;
   private isLoaded: boolean = false;
+  private initPromise: Promise<void> | null = null;
+  private initFailed: boolean = false;
   private workletNode: AudioWorkletNode | null = null;
 
   public static getInstance(): FurnaceChipEngine {
@@ -66,42 +68,92 @@ export class FurnaceChipEngine {
 
   /**
    * Initialize the engine and load WASM
+   * @param audioContext - Must be a native AudioContext (not a Tone.js wrapper)
    */
-  public async init(audioContext: AudioContext): Promise<void> {
+  public async init(audioContext: unknown): Promise<void> {
+    // Already initialized successfully
     if (this.isLoaded) return;
 
+    // Previous init attempt failed - don't retry
+    if (this.initFailed) return;
+
+    // Init already in progress - wait for it
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    // Start initialization
+    this.initPromise = this.doInit(audioContext);
+    return this.initPromise;
+  }
+
+  private async doInit(audioContext: unknown): Promise<void> {
     try {
-      // Validate audioContext is actually an AudioContext
-      if (!audioContext || !audioContext.audioWorklet) {
-        console.warn('[FurnaceChipEngine] Invalid AudioContext - audioWorklet not available');
+      // Cast to any for duck typing checks
+      const ctx = audioContext as any;
+
+      // Validate audioContext using duck typing (constructor name is unreliable across realms)
+      if (!ctx || !ctx.audioWorklet || typeof ctx.createGain !== 'function') {
+        // Not a valid audio context - mark as failed
+        this.initFailed = true;
         return;
       }
 
-      // Check constructor name to handle cross-realm issues
-      const contextType = audioContext.constructor?.name;
-      if (contextType !== 'AudioContext' && contextType !== 'webkitAudioContext') {
-        console.warn('[FurnaceChipEngine] audioContext is not a valid AudioContext:', contextType);
+      // Check if this is a real native AudioContext, not a Tone.js wrapper
+      // The browser's AudioWorkletNode constructor requires a BaseAudioContext instance
+      const isNativeContext = (
+        audioContext instanceof AudioContext ||
+        audioContext instanceof OfflineAudioContext ||
+        // Check constructor name as fallback for cross-realm scenarios
+        ctx.constructor?.name === 'AudioContext' ||
+        ctx.constructor?.name === 'OfflineAudioContext'
+      );
+
+      if (!isNativeContext) {
+        // This is likely a Tone.js wrapped context - mark as failed
+        this.initFailed = true;
         return;
       }
 
       // Ensure context is running
-      if (audioContext.state !== 'running') {
-        console.warn('[FurnaceChipEngine] AudioContext not running, deferring init');
+      if (ctx.state !== 'running') {
+        // AudioContext not running - don't mark failed, could retry later
+        this.initPromise = null;
         return;
       }
 
+      // Now we know it's a real AudioContext
+      const nativeContext = audioContext as AudioContext;
       const baseUrl = import.meta.env.BASE_URL || '/';
-      await audioContext.audioWorklet.addModule(`${baseUrl}FurnaceChips.worklet.js`);
 
-      // Fetch WASM binary to pass to worklet (more reliable than letting it fetch itself)
+      // Try to add the worklet module (may already be registered)
+      try {
+        await nativeContext.audioWorklet.addModule(`${baseUrl}FurnaceChips.worklet.js`);
+      } catch {
+        // Module may already be registered, or doesn't exist - continue anyway
+      }
+
+      // Fetch WASM binary to pass to worklet
       const response = await fetch(`${baseUrl}FurnaceChips.wasm`);
+      if (!response.ok) {
+        // WASM file not available - mark as failed
+        this.initFailed = true;
+        return;
+      }
       const wasmBinary = await response.arrayBuffer();
 
-      this.workletNode = new AudioWorkletNode(audioContext, 'furnace-chips-processor', {
-        numberOfInputs: 0,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-      });
+      // Try to create the AudioWorkletNode
+      try {
+        this.workletNode = new AudioWorkletNode(nativeContext, 'furnace-chips-processor', {
+          numberOfInputs: 0,
+          numberOfOutputs: 1,
+          outputChannelCount: [2],
+        });
+      } catch {
+        // AudioWorkletNode creation failed - mark as failed
+        this.initFailed = true;
+        return;
+      }
 
       // Send binary and init command
       this.workletNode.port.postMessage({
@@ -110,10 +162,10 @@ export class FurnaceChipEngine {
       });
 
       this.isLoaded = true;
-      console.log('[FurnaceChipEngine] WASM chips initialized with binary injection');
-    } catch (err) {
-      console.error('[FurnaceChipEngine] Initialization failed:', err);
-      // Don't throw - allow graceful degradation
+      console.log('[FurnaceChipEngine] WASM chips initialized');
+    } catch {
+      // Silently fail - Furnace chip engine is optional
+      this.initFailed = true;
     }
   }
 
@@ -174,5 +226,12 @@ export class FurnaceChipEngine {
   public getOutput(): AudioNode {
     if (!this.workletNode) throw new Error('Engine not initialized');
     return this.workletNode;
+  }
+
+  /**
+   * Check if the engine is initialized and working
+   */
+  public isInitialized(): boolean {
+    return this.isLoaded && this.workletNode !== null;
   }
 }
