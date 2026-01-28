@@ -464,6 +464,24 @@
     border-color: var(--color-bg);
   }
 
+  .bg-ft2-shadow {
+    background-color: var(--ft2-shadow);
+  }
+
+  /* FT2 Sample Editor Display */
+  .ft2-display {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--color-bg);
+    color: var(--color-accent);
+    border: 1px solid var(--ft2-border);
+    padding: 2px 6px;
+    font-size: 10px;
+    text-align: center;
+    box-shadow:
+      inset 1px 1px 0 var(--ft2-shadow),
+      inset -1px -1px 0 var(--ft2-bg);
+  }
+
   /* Slider/range input styling */
   input[type="range"] {
     -webkit-appearance: none;
@@ -1540,6 +1558,45 @@
   margin-left: 4px;
 }
 
+/* Groove/Swing Template Selector */
+.ft2-groove-select {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  min-width: 100px;
+  max-width: 130px;
+  background: #1e1e24;
+  color: #e0e0e8;
+  border: 1px solid #3a3a42;
+  border-radius: 3px;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ft2-groove-select:hover {
+  background: #2a2a32;
+  border-color: #4a4a54;
+}
+
+.ft2-groove-select:focus {
+  outline: none;
+  border-color: var(--color-accent-primary, #22c55e);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2);
+}
+
+.ft2-groove-select option {
+  background: #1e1e24;
+  color: #e0e0e8;
+  padding: 4px 8px;
+}
+
+.ft2-groove-select optgroup {
+  background: #141418;
+  color: #888;
+  font-weight: bold;
+  font-style: normal;
+}
+
 .ft2-separator {
   display: none;
 }
@@ -2204,4 +2261,153 @@ html[data-theme="cyan-lineart"] #root > * {
   height: 38px !important;
   overflow: hidden !important;
   flex-wrap: nowrap !important;
+}
+
+/* ============================================
+   SYNTH EDITOR - No-Scroll Layout System
+   Tabbed interface to fit all controls on screen
+   ============================================ */
+
+.synth-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.synth-editor-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.synth-editor-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.synth-editor-tab {
+  padding: 6px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+}
+
+.synth-editor-tab:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+}
+
+.synth-editor-tab.active {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border-color: var(--color-accent);
+}
+
+.synth-editor-tab.devil-fish-active {
+  color: #ef4444;
+}
+
+.synth-editor-tab.devil-fish-active.active {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: white;
+  border-color: #ef4444;
+}
+
+.synth-editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.synth-editor-viz-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Section within tab content - no scroll */
+.synth-tab-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Grid layout for controls within a section */
+.synth-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 8px;
+}
+
+/* Compact knob row */
+.synth-knob-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+/* TB-303 specific styles for tabbed layout */
+.tb303-tab-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.tb303-section-compact {
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.tb303-section-compact .knob-container {
+  transform: scale(0.9);
+  transform-origin: center center;
+}
+
+/* Cyan lineart theme overrides for synth tabs */
+[data-theme="cyan-lineart"] .synth-editor-tab {
+  color: #008888;
+}
+
+[data-theme="cyan-lineart"] .synth-editor-tab:hover {
+  color: #00cccc;
+  background: rgba(0, 255, 255, 0.1);
+}
+
+[data-theme="cyan-lineart"] .synth-editor-tab.active {
+  background: rgba(0, 255, 255, 0.2);
+  color: #00ffff;
+  border-color: #00ffff;
+}
+
+[data-theme="cyan-lineart"] .synth-editor-tabs {
+  background: #041010;
+  border-color: rgba(0, 255, 255, 0.2);
 }
