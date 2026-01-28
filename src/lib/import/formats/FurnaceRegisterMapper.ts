@@ -155,18 +155,25 @@ export class FurnaceRegisterMapper {
     config.operators.slice(0, 2).forEach((op, i) => {
       const slotOff = part | slots[i];
 
-      // 0x20: AM (7), VIB (6), SUSTAIN (5), KSR (4), MULT (0-3)
-      const v20 = (op.am ? 0x80 : 0) | (op.mult & 0x0F); // Simplified
+      // 0x20: AM (7), VIB (6), EG-TYP/Sustain (5), KSR (4), MULT (0-3)
+      const v20 = (op.am ? 0x80 : 0) |
+                  (op.vib ? 0x40 : 0) |
+                  (op.sus ? 0x20 : 0) |
+                  (op.ksr ? 0x10 : 0) |
+                  (op.mult & 0x0F);
       engine.write(chip, 0x20 + slotOff, v20);
 
       // 0x40: KSL (6-7), TL (0-5)
-      engine.write(chip, 0x40 + slotOff, op.tl & 0x3F);
+      engine.write(chip, 0x40 + slotOff, ((op.ksl & 3) << 6) | (op.tl & 0x3F));
 
       // 0x60: AR (4-7), DR (0-3)
       engine.write(chip, 0x60 + slotOff, ((op.ar >> 1) << 4) | (op.dr >> 1));
 
       // 0x80: SL (4-7), RR (0-3)
       engine.write(chip, 0x80 + slotOff, ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
+
+      // 0xE0: Waveform Select (0-7)
+      engine.write(chip, 0xE0 + slotOff, op.ws & 0x07);
     });
   }
 

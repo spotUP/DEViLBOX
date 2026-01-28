@@ -1088,8 +1088,15 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
   config.algorithm = algFb & 0x07;
   config.feedback = (algFb >> 3) & 0x07;
 
-  reader.readUint8(); // fms/ams
-  reader.readUint8(); // llPatch/am2
+  const fmsAms = reader.readUint8();
+  config.fms = fmsAms & 0x07;
+  config.ams = (fmsAms >> 3) & 0x03;
+  config.fms2 = (fmsAms >> 5) & 0x07;
+
+  const llPatchAm2 = reader.readUint8();
+  config.opllPreset = llPatchAm2 & 0x1F;
+  config.ams2 = (llPatchAm2 >> 5) & 0x03;
+  config.ops = opCount;
 
   // Read operators
   for (let i = 0; i < opCount; i++) {
@@ -1120,10 +1127,11 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
       sl: (slRr >> 4) & 0x0F,
       rr: slRr & 0x0F,
       ssg: dvbSsg & 0x0F,
-      // dvb: (dvbSsg >> 4) & 0x0F,
+      dvb: (dvbSsg >> 4) & 0x0F,
       ws: damDt2Ws & 0x07,
       dt2: (damDt2Ws >> 3) & 0x03,
-      // dam: (damDt2Ws >> 5) & 0x07,
+      dam: (damDt2Ws >> 5) & 0x07,
+      egt: ((egtD2r >> 5) & 1) !== 0,
     };
 
     config.operators.push(op);
@@ -1146,10 +1154,14 @@ function parseFMDataOld(reader: BinaryReader, _version: number): FurnaceConfig {
 
   config.algorithm = reader.readUint8() & 0x07;
   config.feedback = reader.readUint8() & 0x07;
-  reader.skip(2); // fms, ams
+  config.fms = reader.readUint8() & 0x07;
+  config.ams = reader.readUint8() & 0x03;
 
   const opCount = reader.readUint8();
-  reader.skip(3); // opll, reserved
+  config.ops = opCount;
+  const opllPreset = reader.readUint8();
+  config.opllPreset = opllPreset;
+  reader.skip(2); // reserved
 
   for (let i = 0; i < 4; i++) {
     const op: FurnaceOperatorConfig = {
