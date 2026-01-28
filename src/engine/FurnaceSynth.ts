@@ -634,27 +634,50 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     }
 
     // Use the mapper to write all registers based on chip type
-    if (this.config.chipType === 1) { // OPN2/Genesis
-      FurnaceRegisterMapper.mapOPN2(this.chipEngine, this.channelIndex, this.config);
-    } else if (this.config.chipType === 33) { // OPM/Arcade
-      FurnaceRegisterMapper.mapOPM(this.chipEngine, this.channelIndex, this.config);
-    } else if (this.config.chipType === 14) { // OPL3
-      FurnaceRegisterMapper.mapOPL3(this.chipEngine, this.channelIndex, this.config);
-    } else if (this.config.chipType === 8 || this.config.chipType === 34) { // PSG / NES
-      FurnaceRegisterMapper.mapPSG(this.chipEngine, this.channelIndex, this.config);
-    } else if (this.config.chipType === 2) { // Game Boy
-      // Upload wavetable if available
-      if (this.config.wavetables.length > 0) {
-        FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 2, this.config.wavetables[0].data);
-      }
-    } else if (this.config.chipType === 7) { // SCC
-      if (this.config.wavetables.length > 0) {
-        FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 7, this.config.wavetables[0].data);
-      }
-    } else if (this.config.chipType === 17) { // N163
-      if (this.config.wavetables.length > 0) {
-        FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 17, this.config.wavetables[0].data);
-      }
+    switch (this.config.chipType) {
+      case 1: // OPN2/Genesis
+        FurnaceRegisterMapper.mapOPN2(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 33: // OPM/Arcade
+        FurnaceRegisterMapper.mapOPM(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 14: // OPL3
+        FurnaceRegisterMapper.mapOPL3(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 8: // PSG (SN76489)
+        FurnaceRegisterMapper.mapPSG(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 34: // NES APU
+        FurnaceRegisterMapper.mapNES(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 2: // Game Boy
+        FurnaceRegisterMapper.mapGB(this.chipEngine, this.channelIndex, this.config);
+        // Upload wavetable if available (for wave channel)
+        if (this.config.wavetables.length > 0) {
+          FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 2, this.config.wavetables[0].data);
+        }
+        break;
+
+      case 3: // C64 SID
+        FurnaceRegisterMapper.mapC64(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 7: // SCC
+        if (this.config.wavetables.length > 0) {
+          FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 7, this.config.wavetables[0].data);
+        }
+        break;
+
+      case 17: // N163
+        if (this.config.wavetables.length > 0) {
+          FurnaceRegisterMapper.uploadWavetable(this.chipEngine, 17, this.config.wavetables[0].data);
+        }
+        break;
     }
   }
 
