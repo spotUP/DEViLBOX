@@ -54,36 +54,64 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
   /**
    * Create a Tone.js-based FM synth as fallback when WASM isn't available
+   * Maps Furnace FM parameters to Tone.js FMSynth parameters
    */
   private createFallbackSynth(): void {
-    // Create an FM synth that approximates FM chip sound
+    // Get carrier operator (last one that outputs based on algorithm)
+    // Simplified: for most algorithms, op3 (index 3) is carrier
+    const carrierOp = this.config.operators[3] || this.config.operators[0];
+    const modulatorOp = this.config.operators[1] || this.config.operators[0];
+
+    // Convert FM operator rates to Tone.js envelope times
+    // AR: 0-31 (31 = instant, 0 = very slow) -> attack time in seconds
+    // DR: 0-31 -> decay time
+    // RR: 0-15 -> release time
+    // SL: 0-15 -> sustain level (15 = no sustain, 0 = full sustain)
+    const arToTime = (ar: number) => ar >= 31 ? 0.001 : Math.max(0.001, (31 - ar) / 31 * 2);
+    const drToTime = (dr: number) => dr >= 31 ? 0.01 : Math.max(0.01, (31 - dr) / 31 * 1.5);
+    const rrToTime = (rr: number) => rr >= 15 ? 0.05 : Math.max(0.05, (15 - rr) / 15 * 2);
+    const slToLevel = (sl: number) => Math.max(0, 1 - (sl / 15));
+
+    // Harmonicity from modulator mult ratio
+    const carrierMult = carrierOp.mult || 1;
+    const modMult = modulatorOp.mult || 1;
+    const harmonicity = modMult / Math.max(1, carrierMult);
+
+    // Modulation index from feedback and modulator TL
+    // Higher TL = quieter modulator = less modulation
+    const modIndex = Math.max(1, (127 - (modulatorOp.tl || 0)) / 10) * (1 + (this.config.feedback || 0) / 7);
+
+    // Create the fallback FM synth with mapped parameters
     this.fallbackSynth = new Tone.PolySynth({
       maxPolyphony: 8,
       voice: Tone.FMSynth,
       options: {
-        harmonicity: 3.5,
-        modulationIndex: this.config.algorithm <= 2 ? 10 : 5,
+        harmonicity: Math.max(0.5, Math.min(10, harmonicity)),
+        modulationIndex: Math.max(1, Math.min(20, modIndex)),
         envelope: {
-          attack: 0.01,
-          decay: 0.2,
-          sustain: 0.5,
-          release: 0.3,
+          attack: arToTime(carrierOp.ar ?? 31),
+          decay: drToTime(carrierOp.dr ?? 10),
+          sustain: slToLevel(carrierOp.sl ?? 0),
+          release: rrToTime(carrierOp.rr ?? 8),
         },
         modulation: {
           type: 'sine',
         },
         modulationEnvelope: {
-          attack: 0.01,
-          decay: 0.2,
-          sustain: 0.4,
-          release: 0.3,
+          attack: arToTime(modulatorOp.ar ?? 31),
+          decay: drToTime(modulatorOp.dr ?? 10),
+          sustain: slToLevel(modulatorOp.sl ?? 0) * 0.8,
+          release: rrToTime(modulatorOp.rr ?? 8),
         },
       },
     });
 
+    // Apply carrier TL as volume
+    const volume = -6 - (carrierOp.tl || 0) / 4; // TL affects volume, -6 to -38 dB range
+    this.fallbackSynth.volume.value = Math.max(-40, volume);
+
     // Connect to output
     this.fallbackSynth.connect(this.outputGain);
-    this.fallbackSynth.volume.value = -6;
   }
 
   private async initEngine(): Promise<void> {
@@ -570,6 +598,13 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   }
 
   public updateParameters(): void {
+    // If using fallback synth, recreate it with updated parameters
+    if (!this.useWasmEngine && this.fallbackSynth) {
+      this.fallbackSynth.disconnect();
+      this.fallbackSynth.dispose();
+      this.createFallbackSynth();
+    }
+
     // Use the mapper to write all registers based on chip type
     if (this.config.chipType === 1) { // OPN2/Genesis
       FurnaceRegisterMapper.mapOPN2(this.chipEngine, this.channelIndex, this.config);
