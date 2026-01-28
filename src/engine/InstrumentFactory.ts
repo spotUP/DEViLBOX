@@ -1765,7 +1765,7 @@ export class InstrumentFactory {
             filter.dispose();
             output.dispose();
           },
-          volume: new Tone.Param({ value: config.volume ?? -10, units: 'decibels' }),
+          volume: output.gain,
         } as any;
       }
 
@@ -1860,7 +1860,7 @@ export class InstrumentFactory {
             distortion.dispose();
             output.dispose();
           },
-          volume: new Tone.Param({ value: config.volume ?? -10, units: 'decibels' }),
+          volume: output.gain,
         } as any;
       }
 
@@ -2024,7 +2024,7 @@ export class InstrumentFactory {
             highVCA.dispose();
             output.dispose();
           },
-          volume: new Tone.Param({ value: config.volume ?? -12, units: 'decibels' }),
+          volume: output.gain,
         } as any;
       }
 
