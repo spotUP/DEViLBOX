@@ -39,11 +39,15 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   onClose: _onClose,
 }) => {
   void _onClose; // Prop available for future use
-  const {
-    currentInstrument,
-    updateInstrument,
-    createInstrument,
-  } = useInstrumentStore();
+
+  // Use selectors for proper reactivity - don't use the getter!
+  const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
+  const instruments = useInstrumentStore(state => state.instruments);
+  const updateInstrument = useInstrumentStore(state => state.updateInstrument);
+  const createInstrument = useInstrumentStore(state => state.createInstrument);
+
+  // Derive currentInstrument from state for proper re-renders
+  const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
 
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
   const [showKeyboard, setShowKeyboard] = useState(initialShowKeyboard);
@@ -124,7 +128,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     <div className={`flex h-full bg-ft2-bg ${mode === 'modal' ? '' : 'rounded-lg overflow-hidden'}`}>
       {/* Left Sidebar: Instrument List */}
       {showInstrumentList && (
-        <div className="w-52 border-r border-ft2-border flex-shrink-0 bg-ft2-header">
+        <div className="w-fit min-w-48 max-w-80 border-r border-ft2-border flex-shrink-0 bg-ft2-header">
           <InstrumentList
             maxHeight="100%"
             showActions={true}
@@ -203,18 +207,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             })}
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-ft2">
+        {/* Tab Content - No scrolling for synth editors (they handle their own layout) */}
+        <div className="flex-1 min-h-0 overflow-hidden">
           {activeTab === 'quick' && (
-            <QuickView
-              onEditSound={handleGoToSound}
-              onBrowseAll={handleGoToBrowse}
-              onSavePreset={() => setShowSaveDialog(true)}
-            />
+            <div className="h-full overflow-y-auto scrollbar-ft2">
+              <QuickView
+                onEditSound={handleGoToSound}
+                onBrowseAll={handleGoToBrowse}
+                onSavePreset={() => setShowSaveDialog(true)}
+              />
+            </div>
           )}
 
           {activeTab === 'sound' && (
-            <div className="overflow-y-auto">
+            <div className="h-full overflow-hidden">
               {currentInstrument.synthType === 'TB303' ? (
                 <VisualTB303Editor
                   config={currentInstrument.tb303!}
@@ -232,7 +238,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           )}
 
           {activeTab === 'sample' && (
-            <div className="p-4">
+            <div className="h-full overflow-y-auto scrollbar-ft2 p-4">
               <div className="bg-dark-bgSecondary rounded-lg p-8 text-center border border-dark-border">
                 <FileAudio size={48} className="mx-auto mb-4 text-text-muted" />
                 <h3 className="text-lg font-semibold text-text-primary mb-2">Enhanced Sample Editor</h3>
@@ -247,13 +253,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           )}
 
           {activeTab === 'effects' && (
-            <div className="p-4">
+            <div className="h-full overflow-y-auto scrollbar-ft2 p-4">
               <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
             </div>
           )}
 
           {activeTab === 'browse' && (
-            <div className="p-4">
+            <div className="h-full overflow-y-auto scrollbar-ft2 p-4">
               <CategorizedSynthSelector onSelect={handleSynthTypeChange} />
             </div>
           )}

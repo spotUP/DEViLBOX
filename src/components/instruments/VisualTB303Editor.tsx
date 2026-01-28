@@ -1,15 +1,17 @@
 /**
  * VisualTB303Editor - VST-style TB-303 acid synthesizer editor
  * Classic silver panel design with authentic knob layout
+ *
+ * REFACTORED: Now uses tab-based layout to fit all controls on screen without scrolling
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { TB303Config } from '@typedefs/instrument';
-// import { DEFAULT_PEDALBOARD } from '@typedefs/pedalboard';
 import { Knob } from '@components/controls/Knob';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
+import { TB303Tabs, type TB303Tab } from './SynthEditorTabs';
 
 interface VisualTB303EditorProps {
   config: TB303Config;
@@ -20,6 +22,8 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
   config,
   onChange,
 }) => {
+  const [activeTab, setActiveTab] = useState<TB303Tab>('main');
+
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
@@ -41,8 +45,6 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
   const headerBg = isCyanTheme
     ? 'bg-[#041010] border-b-2 border-cyan-500'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';
-  const dividerColor = isCyanTheme ? 'bg-cyan-700' : 'bg-gray-700';
-  const labelColor = isCyanTheme ? 'text-cyan-400' : 'text-gray-400';
 
   // Update helpers
   const updateFilter = (key: string, value: number) => {
@@ -70,7 +72,7 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
       accentDecay: 200,
       vegDecay: 3000,
       vegSustain: 0,
-      softAttack: 0.3,  // Devil Fish minimum (instant attack), not stock TB-303 fixed 4ms
+      softAttack: 0.3,
       filterTracking: 0,
       filterFM: 0,
       sweepSpeed: 'normal' as const,
@@ -90,349 +92,326 @@ export const VisualTB303Editor: React.FC<VisualTB303EditorProps> = ({
     });
   };
 
-  return (
-    <div className={`${mainBg} min-h-full`}>
-      {/* Header - Classic 303 branding */}
-      <div className={`px-6 py-4 ${headerBg}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ background: isCyanTheme ? 'linear-gradient(135deg, #00ffff, #008888)' : 'linear-gradient(135deg, #ffcc00, #ff9900)' }}>
-              <Zap size={24} className={isCyanTheme ? 'text-black' : 'text-black'} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black tracking-tight" style={{ color: accentColor }}>TB-303</h2>
-              <p className={`text-xs uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Bass Line Synthesizer</p>
-            </div>
+  // Render main tab content
+  const renderMainTab = () => (
+    <div className="tb303-tab-content">
+      {/* Waveform Selection */}
+      <div className="flex justify-center gap-3">
+        <button
+          onClick={() => onChange({ oscillator: { ...config.oscillator, type: 'sawtooth' } })}
+          className={`
+            w-20 h-14 rounded-lg border-4 transition-all shadow-lg
+            ${config.oscillator.type === 'sawtooth'
+              ? `bg-[#1a1a1a] shadow-lg`
+              : 'bg-[#2a2a2a] border-gray-600 hover:border-gray-400'
+            }
+          `}
+          style={config.oscillator.type === 'sawtooth' ? { borderColor: accentColor, boxShadow: `0 4px 15px ${accentColor}30` } : undefined}
+        >
+          <svg viewBox="0 0 40 24" className="w-full h-full p-2">
+            <path
+              d="M 4 12 L 4 4 L 20 20 L 20 4 L 36 20"
+              fill="none"
+              stroke={config.oscillator.type === 'sawtooth' ? accentColor : '#666'}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="text-xs font-bold" style={{ color: config.oscillator.type === 'sawtooth' ? accentColor : '#6b7280' }}>
+            SAW
           </div>
+        </button>
+        <button
+          onClick={() => onChange({ oscillator: { ...config.oscillator, type: 'square' } })}
+          className={`
+            w-20 h-14 rounded-lg border-4 transition-all shadow-lg
+            ${config.oscillator.type === 'square'
+              ? `bg-[#1a1a1a] shadow-lg`
+              : 'bg-[#2a2a2a] border-gray-600 hover:border-gray-400'
+            }
+          `}
+          style={config.oscillator.type === 'square' ? { borderColor: accentColor, boxShadow: `0 4px 15px ${accentColor}30` } : undefined}
+        >
+          <svg viewBox="0 0 40 24" className="w-full h-full p-2">
+            <path
+              d="M 4 20 L 4 4 L 20 4 L 20 20 L 36 20 L 36 4"
+              fill="none"
+              stroke={config.oscillator.type === 'square' ? accentColor : '#666'}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="text-xs font-bold" style={{ color: config.oscillator.type === 'square' ? accentColor : '#6b7280' }}>
+            SQR
+          </div>
+        </button>
+      </div>
 
+      {/* Main Knobs Row */}
+      <div className={`rounded-xl p-4 shadow-inner border ${panelBg}`}>
+        <div className="flex justify-around items-end">
+          <Knob
+            value={config.filter.cutoff}
+            min={50}
+            max={18000}
+            onChange={(v) => updateFilter('cutoff', v)}
+            label="Cutoff"
+            color={knobColor}
+            formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`}
+          />
+          <Knob
+            value={config.filter.resonance}
+            min={0}
+            max={100}
+            onChange={(v) => updateFilter('resonance', v)}
+            label="Reso"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={config.filterEnvelope.envMod}
+            min={0}
+            max={100}
+            onChange={(v) => updateFilterEnvelope('envMod', v)}
+            label="Env Mod"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={
+              config.devilFish?.enabled
+                ? (config.devilFish?.vegDecay ?? 3000)
+                : config.filterEnvelope.decay
+            }
+            min={30}
+            max={3000}
+            onChange={(v) => {
+              if (config.devilFish?.enabled) {
+                updateDevilFish('vegDecay', v);
+              } else {
+                updateFilterEnvelope('decay', v);
+              }
+            }}
+            label={config.devilFish?.enabled ? 'VEG Dec' : 'MEG Dec'}
+            color={knobColor}
+            formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+          />
+          <Knob
+            value={config.accent.amount}
+            min={0}
+            max={100}
+            onChange={(v) => updateAccent('amount', v)}
+            label="Accent"
+            color={accentKnobColor}
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
         </div>
       </div>
 
-      {/* Main Panel - Silver background */}
-      <div className="p-6">
-        {/* Waveform Selection */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`h-px flex-1 ${dividerColor}`} />
-            <span className={`text-xs font-bold uppercase tracking-wide ${labelColor}`}>Waveform</span>
-            <div className={`h-px flex-1 ${dividerColor}`} />
-          </div>
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={() => onChange({ oscillator: { ...config.oscillator, type: 'sawtooth' } })}
-              className={`
-                w-24 h-16 rounded-lg border-4 transition-all shadow-lg
-                ${config.oscillator.type === 'sawtooth'
-                  ? `bg-[#1a1a1a] shadow-lg`
-                  : 'bg-[#2a2a2a] border-gray-600 hover:border-gray-400'
-                }
-              `}
-              style={config.oscillator.type === 'sawtooth' ? { borderColor: accentColor, boxShadow: `0 4px 15px ${accentColor}30` } : undefined}
-            >
-              <svg viewBox="0 0 40 24" className="w-full h-full p-2">
-                <path
-                  d="M 4 12 L 4 4 L 20 20 L 20 4 L 36 20"
-                  fill="none"
-                  stroke={config.oscillator.type === 'sawtooth' ? accentColor : '#666'}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="text-xs font-bold" style={{ color: config.oscillator.type === 'sawtooth' ? accentColor : '#6b7280' }}>
-                SAW
+      {/* Slide Control */}
+      <div className="bg-[#1a1a1a] rounded-lg p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded flex items-center justify-center font-black text-sm ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-white'}`}>
+                S
               </div>
-            </button>
-            <button
-              onClick={() => onChange({ oscillator: { ...config.oscillator, type: 'square' } })}
-              className={`
-                w-24 h-16 rounded-lg border-4 transition-all shadow-lg
-                ${config.oscillator.type === 'square'
-                  ? `bg-[#1a1a1a] shadow-lg`
-                  : 'bg-[#2a2a2a] border-gray-600 hover:border-gray-400'
-                }
-              `}
-              style={config.oscillator.type === 'square' ? { borderColor: accentColor, boxShadow: `0 4px 15px ${accentColor}30` } : undefined}
-            >
-              <svg viewBox="0 0 40 24" className="w-full h-full p-2">
-                <path
-                  d="M 4 20 L 4 4 L 20 4 L 20 20 L 36 20 L 36 4"
-                  fill="none"
-                  stroke={config.oscillator.type === 'square' ? accentColor : '#666'}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="text-xs font-bold" style={{ color: config.oscillator.type === 'square' ? accentColor : '#6b7280' }}>
-                SQR
+              <div className={`text-xs font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-cyan-400'}`}>Slide</div>
+            </div>
+            <div className="w-px h-6 bg-gray-700" />
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded flex items-center justify-center font-black text-sm ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-pink-400 to-pink-600 text-white'}`}>
+                A
               </div>
-            </button>
+              <div className={`text-xs font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-pink-400'}`}>Accent</div>
+            </div>
           </div>
+          <Knob
+            value={config.slide?.time ?? 60}
+            min={10}
+            max={500}
+            onChange={(v) => onChange({ slide: { ...config.slide, time: v } })}
+            label="Slide Time"
+            size="sm"
+            color={knobColor}
+            formatValue={(v) => `${Math.round(v)}ms`}
+          />
         </div>
+      </div>
+    </div>
+  );
 
-        {/* Main Knobs Row */}
-        <div className={`rounded-2xl p-6 shadow-inner border mb-6 ${panelBg}`}>
-          <div className="flex justify-around items-end">
-            <div className="flex flex-col items-center">
-              <Knob
-                value={config.filter.cutoff}
-                min={50}
-                max={18000}
-                onChange={(v) => updateFilter('cutoff', v)}
-                label="Cutoff"
-                size="lg"
-                color={knobColor}
-                formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`}
-              />
-            </div>
-            <div className="flex flex-col items-center">
-              <Knob
-                value={config.filter.resonance}
-                min={0}
-                max={100}
-                onChange={(v) => updateFilter('resonance', v)}
-                label="Resonance"
-                size="lg"
-                color={knobColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
-            <div className="flex flex-col items-center">
-              <Knob
-                value={config.filterEnvelope.envMod}
-                min={0}
-                max={100}
-                onChange={(v) => updateFilterEnvelope('envMod', v)}
-                label="Env Mod"
-                size="lg"
-                color={knobColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
-            <div className="flex flex-col items-center">
-              <Knob
-                value={
-                  config.devilFish?.enabled
-                    ? (config.devilFish?.vegDecay ?? 3000)
-                    : config.filterEnvelope.decay
-                }
-                min={30}
-                max={3000}
-                onChange={(v) => {
-                  if (config.devilFish?.enabled) {
-                    // When DF enabled, decay knob controls VEG (amplitude envelope)
-                    updateDevilFish('vegDecay', v);
-                  } else {
-                    // When DF disabled, decay knob controls MEG (filter envelope)
-                    updateFilterEnvelope('decay', v);
-                  }
-                }}
-                label={config.devilFish?.enabled ? 'VEG Decay' : 'MEG Decay'}
-                size="lg"
-                color={knobColor}
-                formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
-              />
-              <div className="mt-1 text-xs text-gray-500 text-center">
-                {config.devilFish?.enabled ? '(Amplitude)' : '(Filter)'}
-              </div>
-            </div>
-            <div className="flex flex-col items-center">
-              <Knob
-                value={config.accent.amount}
-                min={0}
-                max={100}
-                onChange={(v) => updateAccent('amount', v)}
-                label="Accent"
-                size="lg"
-                color={accentKnobColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
+  // Render Devil Fish tab content
+  const renderDevilFishTab = () => (
+    <div className="tb303-tab-content">
+      {/* Devil Fish Enable Toggle */}
+      <div className={`rounded-xl p-3 border ${isCyanTheme ? 'bg-gradient-to-b from-cyan-900/20 to-cyan-900/10 border-cyan-900/30' : 'bg-gradient-to-b from-red-900/20 to-red-900/10 border-red-900/30'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${config.devilFish?.enabled ? 'animate-pulse' : ''} ${isCyanTheme ? 'bg-cyan-500' : 'bg-red-500'}`} />
+            <span className={`text-sm font-bold uppercase tracking-wide ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>Devil Fish Mods</span>
           </div>
-        </div>
-
-        {/* Filter Visualization */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`h-px flex-1 ${dividerColor}`} />
-            <span className={`text-xs font-bold uppercase tracking-wide ${labelColor}`}>Filter Response</span>
-            <div className={`h-px flex-1 ${dividerColor}`} />
-          </div>
-          <div className="bg-[#1a1a1a] rounded-xl p-2">
-            <FilterCurve
-              cutoff={config.filter.cutoff}
-              resonance={config.filter.resonance / 3.3} // Convert 0-100 to 0-30 Q
-              type="lowpass"
-              onCutoffChange={(v) => updateFilter('cutoff', v)}
-              onResonanceChange={(v) => updateFilter('resonance', v * 3.3)}
-              height={120}
-              color={filterColor}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-gray-500">Enable</span>
+            <input
+              type="checkbox"
+              checked={config.devilFish?.enabled || false}
+              onChange={(e) => updateDevilFish('enabled', e.target.checked)}
+              className={`w-5 h-5 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
             />
-          </div>
+          </label>
         </div>
+      </div>
 
-        {/* Devil Fish Mods */}
-        <div className={`rounded-xl p-4 border ${isCyanTheme ? 'bg-gradient-to-b from-cyan-900/20 to-cyan-900/10 border-cyan-900/30' : 'bg-gradient-to-b from-red-900/20 to-red-900/10 border-red-900/30'}`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${isCyanTheme ? 'bg-cyan-500' : 'bg-red-500'}`} />
-              <span className={`text-sm font-bold uppercase tracking-wide ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>Devil Fish Mods</span>
+      {config.devilFish?.enabled ? (
+        <>
+          {/* Envelope Generators Section */}
+          <div className={`rounded-xl p-3 border ${panelBg}`}>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Envelope Generators</div>
+            <div className="flex justify-around items-end">
+              <div className="flex flex-col items-center">
+                <Knob
+                  value={config.devilFish?.normalDecay ?? 200}
+                  min={30}
+                  max={3000}
+                  onChange={(v) => updateDevilFish('normalDecay', v)}
+                  label="Normal Dec"
+                  size="sm"
+                  color={devilFishColor}
+                  formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                />
+                <div className="text-[9px] text-gray-600">(MEG)</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <Knob
+                  value={config.devilFish?.accentDecay ?? 200}
+                  min={30}
+                  max={3000}
+                  onChange={(v) => updateDevilFish('accentDecay', v)}
+                  label="Accent Dec"
+                  size="sm"
+                  color={devilFishColor}
+                  formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
+                />
+                <div className="text-[9px] text-gray-600">(MEG)</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <Knob
+                  value={config.devilFish?.softAttack ?? 0.3}
+                  min={0.3}
+                  max={30}
+                  onChange={(v) => updateDevilFish('softAttack', v)}
+                  label="Soft Atk"
+                  size="sm"
+                  color={devilFishColor}
+                  formatValue={(v) => `${v.toFixed(1)}ms`}
+                />
+                <div className="text-[9px] text-gray-600">(Normal)</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <Knob
+                  value={config.devilFish?.vegSustain ?? 0}
+                  min={0}
+                  max={100}
+                  onChange={(v) => updateDevilFish('vegSustain', v)}
+                  label="VEG Sus"
+                  size="sm"
+                  color={devilFishColor}
+                  formatValue={(v) => `${Math.round(v)}%`}
+                />
+                <div className="text-[9px] text-gray-600">(Amp)</div>
+              </div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs text-gray-500">Enable</span>
-              <input
-                type="checkbox"
-                checked={config.devilFish?.enabled || false}
-                onChange={(e) => updateDevilFish('enabled', e.target.checked)}
-                className={`w-5 h-5 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
-              />
-            </label>
           </div>
 
-          {config.devilFish?.enabled && (
-            <div className="space-y-4">
-              {/* Envelope Generators Section */}
-              <div>
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Envelope Generators</div>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.normalDecay ?? 200}
-                      min={30}
-                      max={3000}
-                      onChange={(v) => updateDevilFish('normalDecay', v)}
-                      label="Normal Decay"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
-                    />
-                    <div className="mt-1 text-xs text-gray-600 text-center">(MEG Normal)</div>
-                  </div>
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.accentDecay ?? 200}
-                      min={30}
-                      max={3000}
-                      onChange={(v) => updateDevilFish('accentDecay', v)}
-                      label="Accent Decay"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`}
-                    />
-                    <div className="mt-1 text-xs text-gray-600 text-center">(MEG Accent)</div>
-                  </div>
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.softAttack ?? 0.3}
-                      min={0.3}
-                      max={30}
-                      onChange={(v) => updateDevilFish('softAttack', v)}
-                      label="Soft Attack"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => `${v.toFixed(1)}ms`}
-                    />
-                    <div className="mt-1 text-xs text-gray-600 text-center">(Normal Notes)</div>
-                  </div>
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.vegSustain ?? 0}
-                      min={0}
-                      max={100}
-                      onChange={(v) => updateDevilFish('vegSustain', v)}
-                      label="VEG Sustain"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => `${Math.round(v)}%`}
-                    />
-                    <div className="mt-1 text-xs text-gray-600 text-center">(Amplitude)</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Filter Modulation Section */}
-              <div>
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Filter Modulation</div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.overdrive?.amount || 0}
-                      min={0}
-                      max={100}
-                      onChange={(v) => updateOverdrive(v)}
-                      label="Overdrive"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => `${Math.round(v)}%`}
-                    />
-                  </div>
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.filterFM || 0}
-                      min={0}
-                      max={100}
-                      onChange={(v) => updateDevilFish('filterFM', v)}
-                      label="Filter FM"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => `${Math.round(v)}%`}
-                    />
-                  </div>
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex flex-col items-center">
-                    <Knob
-                      value={config.devilFish?.filterTracking || 0}
-                      min={0}
-                      max={200}
-                      onChange={(v) => updateDevilFish('filterTracking', v)}
-                      label="Key Track"
-                      size="sm"
-                      color={devilFishColor}
-                      formatValue={(v) => `${Math.round(v)}%`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Slide Control */}
-        <div className="mt-4 bg-[#1a1a1a] rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-white'}`}>
-                  S
-                </div>
-                <div className="text-gray-400 text-xs">
-                  <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-cyan-400'}`}>Slide</div>
-                  <div>Portamento</div>
-                </div>
-              </div>
-              <div className="w-px h-8 bg-gray-700" />
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded flex items-center justify-center font-black ${isCyanTheme ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-gradient-to-b from-pink-400 to-pink-600 text-white'}`}>
-                  A
-                </div>
-                <div className="text-gray-400 text-xs">
-                  <div className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-pink-400'}`}>Accent</div>
-                  <div>Emphasize</div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+          {/* Filter Modulation Section */}
+          <div className={`rounded-xl p-3 border ${panelBg}`}>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Filter Modulation</div>
+            <div className="flex justify-around items-end">
               <Knob
-                value={config.slide?.time ?? 60}
-                min={10}
-                max={500}
-                onChange={(v) => onChange({ slide: { ...config.slide, time: v } })}
-                label="Slide Time"
+                value={config.overdrive?.amount || 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateOverdrive(v)}
+                label="Overdrive"
                 size="sm"
-                color={knobColor}
-                formatValue={(v) => `${Math.round(v)}ms`}
+                color={devilFishColor}
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+              <Knob
+                value={config.devilFish?.filterFM || 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateDevilFish('filterFM', v)}
+                label="Filter FM"
+                size="sm"
+                color={devilFishColor}
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+              <Knob
+                value={config.devilFish?.filterTracking || 0}
+                min={0}
+                max={200}
+                onChange={(v) => updateDevilFish('filterTracking', v)}
+                label="Key Track"
+                size="sm"
+                color={devilFishColor}
+                formatValue={(v) => `${Math.round(v)}%`}
               />
             </div>
           </div>
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-gray-500">
+            <p className="text-sm">Enable Devil Fish mods to access</p>
+            <p className="text-xs">extended envelope and filter controls</p>
+          </div>
         </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={`synth-editor-container ${mainBg}`}>
+      {/* Header - Classic 303 branding - FIXED */}
+      <div className={`synth-editor-header px-4 py-2 ${headerBg}`}>
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg" style={{ background: isCyanTheme ? 'linear-gradient(135deg, #00ffff, #008888)' : 'linear-gradient(135deg, #ffcc00, #ff9900)' }}>
+            <Zap size={18} className="text-black" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black tracking-tight" style={{ color: accentColor }}>TB-303</h2>
+            <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Bass Line</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Visualization - FIXED */}
+      <div className="synth-editor-viz-header">
+        <div className="flex-1 bg-[#1a1a1a] rounded-lg overflow-hidden">
+          <FilterCurve
+            cutoff={config.filter.cutoff}
+            resonance={config.filter.resonance / 3.3}
+            type="lowpass"
+            onCutoffChange={(v) => updateFilter('cutoff', v)}
+            onResonanceChange={(v) => updateFilter('resonance', v * 3.3)}
+            height={70}
+            color={filterColor}
+          />
+        </div>
+      </div>
+
+      {/* Tab Bar - FIXED */}
+      <TB303Tabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        devilFishEnabled={config.devilFish?.enabled || false}
+      />
+
+      {/* Tab Content - FILLS REMAINING SPACE */}
+      <div className="synth-editor-content">
+        {activeTab === 'main' ? renderMainTab() : renderDevilFishTab()}
       </div>
     </div>
   );
