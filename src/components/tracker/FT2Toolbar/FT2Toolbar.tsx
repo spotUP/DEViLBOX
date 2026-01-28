@@ -189,14 +189,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setIsLooping,
     play,
     stop,
-    smoothScrolling,
-    setSmoothScrolling,
+    grooveTemplateId,
+    setGrooveTemplate,
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
   useProjectPersistence();
   const { instruments, loadInstruments } = useInstrumentStore();
-  const { masterMuted, toggleMasterMute, masterEffects } = useAudioStore();
+  const { masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
   const { curves } = useAutomationStore();
 
@@ -288,6 +288,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (instruments) loadInstruments(instruments);
       if (songData.metadata) setMetadata(songData.metadata);
       if (songData.bpm) setBPM(songData.bpm);
+      if (songData.grooveTemplateId) setGrooveTemplate(songData.grooveTemplateId);
       notify.success(`Loaded: ${songData.metadata?.name || filename}`, 2000);
     } catch (error) {
       console.error('Failed to load module:', error);
@@ -394,7 +395,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         Object.keys(automationData).length > 0 ? automationData : undefined,
         masterEffects.length > 0 ? masterEffects : undefined,
         curves.length > 0 ? curves : undefined,
-        { prettify: true }
+        { prettify: true },
+        grooveTemplateId
       );
       notify.success('Song downloaded!', 2000);
     } catch (error) {
@@ -513,6 +515,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
         setBPM(songData.bpm);
         setMetadata(songData.metadata);
+        if (songData.grooveTemplateId) setGrooveTemplate(songData.grooveTemplateId);
         notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
       }
     } catch (error) {
@@ -607,7 +610,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 <FT2NumericInput label="Speed" value={6} onChange={() => {}} min={1} max={31} format="hex" />
               </div>
               <div className="ft2-section ft2-section-pattern">
-                <FT2NumericInput label="Length" value={patternLength} onChange={handleLengthChange} min={1} max={256} format="hex" />
+                <FT2NumericInput
+                  label="Length"
+                  value={patternLength}
+                  onChange={handleLengthChange}
+                  min={1}
+                  max={256}
+                  format="hex"
+                  presets={[
+                    { label: '16 rows', value: 16 },
+                    { label: '32 rows', value: 32 },
+                    { label: '48 rows', value: 48 },
+                    { label: '64 rows (default)', value: 64 },
+                    { label: '96 rows', value: 96 },
+                    { label: '128 rows', value: 128 },
+                    { label: '192 rows', value: 192 },
+                    { label: '256 rows (max)', value: 256 },
+                  ]}
+                />
               </div>
             </div>
           )}
@@ -688,8 +708,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               
               <Button variant="ghost" size="sm" onClick={onShowHelp}>Help</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
-              <Button variant={masterMuted ? 'danger' : 'default'} size="sm" className="min-w-[52px]" onClick={toggleMasterMute}>{masterMuted ? 'Unmute' : 'Mute'}</Button>
-              <Button variant={smoothScrolling ? 'primary' : 'default'} size="sm" className="min-w-[56px]" onClick={() => setSmoothScrolling(!smoothScrolling)}>{smoothScrolling ? 'Smooth' : 'Stepped'}</Button>
             </div>
           </div>
         </div>
@@ -733,6 +751,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           if (instruments) loadInstruments(instruments);
           if (data.metadata) setMetadata(data.metadata);
           if (data.bpm) setBPM(data.bpm);
+          if (data.grooveTemplateId) setGrooveTemplate(data.grooveTemplateId);
           notify.success(`Loaded: ${data.metadata?.name || filename}`);
         } catch (error) { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {

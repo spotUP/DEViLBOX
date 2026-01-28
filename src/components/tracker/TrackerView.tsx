@@ -5,7 +5,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore } from '@stores';
+import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
@@ -174,6 +175,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const loadInstruments = useInstrumentStore((state) => state.loadInstruments);
   const setMetadata = useProjectStore((state) => state.setMetadata);
   const setBPM = useTransportStore((state) => state.setBPM);
+  const smoothScrolling = useTransportStore((state) => state.smoothScrolling);
+  const setSmoothScrolling = useTransportStore((state) => state.setSmoothScrolling);
+  const grooveTemplateId = useTransportStore((state) => state.grooveTemplateId);
+  const setGrooveTemplate = useTransportStore((state) => state.setGrooveTemplate);
+  const masterMuted = useAudioStore((state) => state.masterMuted);
+  const toggleMasterMute = useAudioStore((state) => state.toggleMasterMute);
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -641,6 +648,81 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <span>Auto</span>
             </button>
           )}
+
+          {/* Separator */}
+          <div className="w-px h-4 bg-dark-border mx-1" />
+
+          {/* Mute Button */}
+          <button
+            onClick={toggleMasterMute}
+            className={`
+              px-2 py-1 text-xs rounded font-medium transition-colors
+              ${masterMuted
+                ? 'bg-accent-error/20 text-accent-error'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+              }
+            `}
+            title={masterMuted ? 'Unmute master output' : 'Mute master output'}
+          >
+            {masterMuted ? 'Unmute' : 'Mute'}
+          </button>
+
+          {/* Stepped/Smooth Scrolling Toggle */}
+          <button
+            onClick={() => setSmoothScrolling(!smoothScrolling)}
+            className={`
+              px-2 py-1 text-xs rounded font-medium transition-colors
+              ${smoothScrolling
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+              }
+            `}
+            title={smoothScrolling ? 'Switch to stepped scrolling' : 'Switch to smooth scrolling'}
+          >
+            {smoothScrolling ? 'Smooth' : 'Stepped'}
+          </button>
+
+          {/* Groove Selector */}
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-text-muted font-mono">Groove:</span>
+            <select
+              value={grooveTemplateId}
+              onChange={(e) => setGrooveTemplate(e.target.value)}
+              className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1.5 py-0.5 text-xs font-mono cursor-pointer hover:bg-dark-bgHover focus:outline-none focus:border-accent-primary"
+              title="Groove/Swing Template - Applies timing offsets to notes for shuffle/swing feel"
+            >
+              <optgroup label="Straight">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'straight').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Shuffle">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'shuffle').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Swing">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'swing').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Funk">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'funk').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Hip-Hop">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'hip-hop').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Custom">
+                {GROOVE_TEMPLATES.filter(t => t.category === 'custom').map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
         </div>
 
         {/* FPS / Quality Indicator - Compact */}
@@ -701,7 +783,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         {/* Instrument List Panel - Flex item 3 - Hide on narrow windows */}
         {windowWidth >= 900 && showInstrumentPanel && (
-          <div className="flex-shrink-0 w-64 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
+          <div className="flex-shrink-0 w-fit min-w-48 max-w-80 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
             <InstrumentListPanel onEditInstrument={onShowInstruments} />
           </div>
         )}
