@@ -3,9 +3,14 @@
  * Central processor for all WASM chip emulators.
  */
 
+let scriptsLoaded = false;
 try {
   importScripts('FurnaceChips.js');
-} catch (e) {}
+  scriptsLoaded = typeof FurnaceChips === 'function';
+  console.log('[FurnaceWorklet] Scripts loaded:', scriptsLoaded);
+} catch (e) {
+  console.error('[FurnaceWorklet] Failed to load FurnaceChips.js:', e);
+}
 
 class FurnaceChipsProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -20,17 +25,27 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
 
   async initWasm(wasmBinary) {
     try {
+      if (!scriptsLoaded || typeof FurnaceChips !== 'function') {
+        console.error('[FurnaceWorklet] FurnaceChips not loaded');
+        return;
+      }
+
+      console.log('[FurnaceWorklet] Initializing WASM, binary size:', wasmBinary?.byteLength);
       const config = { locateFile: (path) => path };
       if (wasmBinary) config.wasmBinary = wasmBinary;
 
       this.furnaceModule = await FurnaceChips(config);
+      console.log('[FurnaceWorklet] WASM module loaded');
+
       this.furnaceModule._furnace_init_chips(sampleRate);
-      
+      console.log('[FurnaceWorklet] Chips initialized at', sampleRate, 'Hz');
+
       this.leftBufferPtr = this.furnaceModule._malloc(128 * 4);
       this.rightBufferPtr = this.furnaceModule._malloc(128 * 4);
-      
+
       this.isInitialized = true;
       this.port.postMessage({ type: 'initialized' });
+      console.log('[FurnaceWorklet] ✓ Ready');
     } catch (err) {
       console.error('[FurnaceWorklet] WASM Init Failed:', err);
     }
