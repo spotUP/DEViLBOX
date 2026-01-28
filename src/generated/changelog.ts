@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-28T02:22:22.396Z
+ * Generated: 2026-01-28T03:46:43.738Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '126';
-export const BUILD_HASH = 'cd2e4a1';
+export const BUILD_NUMBER = '127';
+export const BUILD_HASH = '622c48c';
 export const BUILD_DATE = '2026-01-28';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-28',
     changes: [
+      {
+        type: 'improvement',
+        description: 'Simplify Furnace WASM AudioContext detection'
+      },
       {
         type: 'fix',
         description: 'Add debug logging for Furnace WASM initialization'
@@ -238,10 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Prevent MOD export from overwriting source files'
-      },
-      {
-        type: 'improvement',
-        description: 'MOD Import: Extend supported note range to C-0 to B-5'
       }
     ]
   }

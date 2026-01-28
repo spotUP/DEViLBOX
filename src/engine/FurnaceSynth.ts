@@ -668,6 +668,11 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
     const scheduledTime = time || Tone.now();
 
+    // Try to init WASM if not yet available (user interaction should have started AudioContext)
+    if (!this.useWasmEngine && !this.initInProgress) {
+      this.initEngine(); // Fire and forget - will use WASM on next note if successful
+    }
+
     // Use fallback synth if WASM engine isn't available
     if (!this.useWasmEngine && this.fallbackSynth) {
       this.fallbackSynth.triggerAttack(note, scheduledTime, this.velocity);
