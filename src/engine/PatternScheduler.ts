@@ -20,6 +20,7 @@ import { xmNoteToToneJS, xmEffectToString } from '@/lib/xmConversions';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
+import { getGrooveOffset } from '@typedefs/audio';
 
 interface AutomationData {
   [patternId: string]: {
@@ -168,14 +169,24 @@ export class PatternScheduler {
   }
 
   /**
-   * Calculate swing offset for a given row
-   * Swing delays off-beat rows by a percentage of the row duration
+   * Calculate timing offset for a given row using groove template or swing
+   * Groove templates provide per-row timing offsets for complex rhythmic feels
    * @param row The row number
-   * @param swingAmount Swing amount (0-100, where 50 = no swing, 100 = full triplet feel)
    * @param rowDuration Duration of this row in seconds (for accurate per-row timing)
    * @returns Time offset in seconds
    */
-  private getSwingOffset(row: number, swingAmount: number, rowDuration: number): number {
+  private getGrooveOrSwingOffset(row: number, rowDuration: number): number {
+    const transportState = useTransportStore.getState();
+
+    // First check for groove template (takes priority over swing)
+    const grooveTemplate = transportState.getGrooveTemplate();
+    if (grooveTemplate && grooveTemplate.id !== 'straight') {
+      return getGrooveOffset(grooveTemplate, row, rowDuration);
+    }
+
+    // Fall back to legacy swing behavior
+    const swingAmount = transportState.swing;
+
     // No swing at 0 or 50 (neutral)
     if (swingAmount === 0 || swingAmount === 50) return 0;
 
@@ -327,17 +338,15 @@ export class PatternScheduler {
     const currentBPM = Tone.getTransport().bpm.value;
     const rowTimings = this.computeRowTimings(pattern, currentSpeed, currentBPM);
 
-    // Get swing amount from transport store
-    const swingAmount = useTransportStore.getState().swing;
-
     for (let row = 0; row < pattern.length; row++) {
       const rowTiming = rowTimings[row];
       const rowSecondsPerTick = 2.5 / rowTiming.bpm;
       const rowDuration = rowSecondsPerTick * rowTiming.speed;
-      
+
       // Hardware Quirk: Each row repetition (delay+1) restarts the tick counter
       for (let rep = 0; rep <= rowTiming.delay; rep++) {
-        const repStartTime = startOffset + rowTiming.time + rep * rowDuration + this.getSwingOffset(row, swingAmount, rowDuration);
+        // Apply groove template or swing timing offset
+        const repStartTime = startOffset + rowTiming.time + rep * rowDuration + this.getGrooveOrSwingOffset(row, rowDuration);
 
         events.push({
           time: repStartTime,

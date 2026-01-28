@@ -90,6 +90,15 @@ export const InstrumentPanel: React.FC<InstrumentPanelProps> = ({ onOpenModal })
     );
   }
 
+  // Debug: log current instrument synthType
+  console.log('[InstrumentPanel] currentInstrument:', {
+    id: currentInstrument.id,
+    name: currentInstrument.name,
+    synthType: currentInstrument.synthType,
+    hasTb303: !!currentInstrument.tb303,
+    hasSample: !!currentInstrument.sample,
+  });
+
   const synthInfo = getSynthInfo(currentInstrument.synthType);
 
   // Get icon component dynamically

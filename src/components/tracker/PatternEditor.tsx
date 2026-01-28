@@ -576,7 +576,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
       if (frameId) cancelAnimationFrame(frameId);
 
       // Wait for layout to settle before measuring (one frame ~16ms)
-      debounceTimer = setTimeout(() => {
+      debounceTimer = window.setTimeout(() => {
         frameId = requestAnimationFrame(updateHeight);
       }, 16); // One frame delay to let flex layout complete
     };

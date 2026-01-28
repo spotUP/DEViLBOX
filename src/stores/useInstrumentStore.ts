@@ -10,6 +10,7 @@ import type {
   EffectConfig,
   FurnaceConfig,
 } from '@typedefs/instrument';
+import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import {
   DEFAULT_OSCILLATOR,
   DEFAULT_ENVELOPE,
@@ -70,6 +71,13 @@ interface InstrumentStore {
   reverseSample: (instrumentId: number) => Promise<void>;
   normalizeSample: (instrumentId: number) => Promise<void>;
   invertLoopSample: (instrumentId: number) => Promise<void>;
+  updateSampleBuffer: (instrumentId: number, audioBuffer: AudioBuffer) => Promise<void>;
+
+  // Beat Slicer
+  updateSlices: (instrumentId: number, slices: BeatSlice[]) => void;
+  updateSliceConfig: (instrumentId: number, config: BeatSliceConfig) => void;
+  removeSlice: (instrumentId: number, sliceId: string) => void;
+  createSlicedInstruments: (sourceId: number, slices: BeatSlice[], namePrefix?: string) => Promise<number[]>;
 
   // Reset to initial state
   reset: () => void;
@@ -858,6 +866,167 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
       getToneEngine().invalidateInstrument(id);
+    },
+
+    updateSampleBuffer: async (id, audioBuffer) => {
+      const inst = get().instruments.find((i) => i.id === id);
+      if (!inst?.sample) return;
+
+      // Encode the AudioBuffer to ArrayBuffer for storage
+      const arrayBuffer = await getToneEngine().encodeAudioData(audioBuffer);
+
+      set((state) => {
+        const instrument = state.instruments.find((i) => i.id === id);
+        if (instrument?.sample) {
+          instrument.sample.audioBuffer = arrayBuffer;
+        }
+      });
+
+      // Force ToneEngine to reload the instrument with the new buffer
+      getToneEngine().invalidateInstrument(id);
+    },
+
+    // Beat Slicer Actions
+    updateSlices: (instrumentId, slices) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+        if (instrument?.sample) {
+          instrument.sample.slices = slices;
+        }
+      });
+    },
+
+    updateSliceConfig: (instrumentId, config) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+        if (instrument?.sample) {
+          instrument.sample.sliceConfig = config;
+        }
+      });
+    },
+
+    removeSlice: (instrumentId, sliceId) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+        if (instrument?.sample?.slices) {
+          const slices = instrument.sample.slices;
+          const idx = slices.findIndex((s) => s.id === sliceId);
+          if (idx !== -1 && slices.length > 1) {
+            const removedSlice = slices[idx];
+
+            // Merge with previous slice if exists, otherwise extend next slice
+            if (idx > 0) {
+              slices[idx - 1].endFrame = removedSlice.endFrame;
+              slices[idx - 1].endTime = removedSlice.endTime;
+            } else if (idx < slices.length - 1) {
+              slices[idx + 1].startFrame = removedSlice.startFrame;
+              slices[idx + 1].startTime = removedSlice.startTime;
+            }
+
+            slices.splice(idx, 1);
+          }
+        }
+      });
+    },
+
+    createSlicedInstruments: async (sourceId, slices, namePrefix = 'Slice') => {
+      const sourceInstrument = get().instruments.find((inst) => inst.id === sourceId);
+      if (!sourceInstrument?.sample?.url) {
+        console.error('[InstrumentStore] Source instrument has no sample');
+        return [];
+      }
+
+      const newInstrumentIds: number[] = [];
+      const engine = getToneEngine();
+
+      try {
+        // Fetch and decode the source audio
+        const response = await fetch(sourceInstrument.sample.url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await engine.decodeAudioData(arrayBuffer);
+
+        const existingIds = get().instruments.map((i) => i.id);
+
+        for (let i = 0; i < slices.length; i++) {
+          const slice = slices[i];
+          const newId = findNextId([...existingIds, ...newInstrumentIds]);
+          newInstrumentIds.push(newId);
+
+          // Extract slice audio data
+          const sliceLength = slice.endFrame - slice.startFrame;
+          const numChannels = audioBuffer.numberOfChannels;
+          const sampleRate = audioBuffer.sampleRate;
+
+          // Create offline context to render the slice
+          const offlineCtx = new OfflineAudioContext(numChannels, sliceLength, sampleRate);
+          const sliceBuffer = offlineCtx.createBuffer(numChannels, sliceLength, sampleRate);
+
+          // Copy audio data for each channel
+          for (let ch = 0; ch < numChannels; ch++) {
+            const sourceData = audioBuffer.getChannelData(ch);
+            const destData = sliceBuffer.getChannelData(ch);
+            for (let j = 0; j < sliceLength; j++) {
+              destData[j] = sourceData[slice.startFrame + j];
+            }
+          }
+
+          // Encode slice to ArrayBuffer (WAV)
+          const sliceArrayBuffer = await engine.encodeAudioData(sliceBuffer);
+
+          // Create data URL from the array buffer
+          const blob = new Blob([sliceArrayBuffer], { type: 'audio/wav' });
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+
+          // Create the new instrument
+          const sliceName = slice.label || `${namePrefix} ${i + 1}`;
+          const instrumentName = sourceInstrument.name
+            ? `${sourceInstrument.name} - ${sliceName}`
+            : sliceName;
+
+          set((state) => {
+            const newInstrument: InstrumentConfig = {
+              id: newId,
+              name: instrumentName.slice(0, 22), // XM 22-char limit
+              type: 'sample',
+              synthType: 'Sampler',
+              sample: {
+                url: dataUrl,
+                audioBuffer: sliceArrayBuffer,
+                baseNote: sourceInstrument.sample?.baseNote || 'C-4',
+                detune: sourceInstrument.sample?.detune || 0,
+                loop: false,
+                loopStart: 0,
+                loopEnd: sliceLength,
+                sampleRate: sampleRate,
+                reverse: false,
+                playbackRate: 1,
+              },
+              envelope: sourceInstrument.envelope || { ...DEFAULT_ENVELOPE },
+              effects: [],
+              volume: sourceInstrument.volume || -6,
+              pan: sourceInstrument.pan || 0,
+            };
+            state.instruments.push(newInstrument);
+          });
+        }
+
+        // Set the first new instrument as current
+        if (newInstrumentIds.length > 0) {
+          set((state) => {
+            state.currentInstrumentId = newInstrumentIds[0];
+          });
+        }
+
+        console.log(`[InstrumentStore] Created ${newInstrumentIds.length} sliced instruments`);
+        return newInstrumentIds;
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to create sliced instruments:', error);
+        return [];
+      }
     },
 
     // Reset to initial state (for new project/tab)

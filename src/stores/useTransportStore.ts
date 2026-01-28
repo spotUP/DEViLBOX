@@ -4,7 +4,8 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { TransportState } from '@typedefs/audio';
+import type { TransportState, GrooveTemplate } from '@typedefs/audio';
+import { GROOVE_TEMPLATES } from '@typedefs/audio';
 
 interface TransportStore extends TransportState {
   // State
@@ -24,6 +25,8 @@ interface TransportStore extends TransportState {
   speed: number; // Ticks per row (1-31, default 6)
   // Loop point for chip export (row where music loops back to)
   loopStartRow: number; // 0 = no loop, >0 = loop back to this row
+  // Groove template for timing variations
+  grooveTemplateId: string;
 
   // Actions
   setBPM: (bpm: number) => void;
@@ -44,6 +47,8 @@ interface TransportStore extends TransportState {
   toggleMetronome: () => void;
   setSpeed: (speed: number) => void;
   setLoopStartRow: (row: number) => void;
+  setGrooveTemplate: (templateId: string) => void;
+  getGrooveTemplate: () => GrooveTemplate;
   reset: () => void;
 }
 
@@ -72,6 +77,7 @@ export const useTransportStore = create<TransportStore>()(
     metronomeVolume: 75, // Default to 75%
     speed: 6, // Default speed (ticks per row) - ProTracker default
     loopStartRow: 0, // 0 = no loop point set
+    grooveTemplateId: 'straight', // Default to straight timing (no groove)
 
     // Actions
     setBPM: (bpm) =>
@@ -236,6 +242,22 @@ export const useTransportStore = create<TransportStore>()(
         state.loopStartRow = Math.max(0, row);
       }),
 
+    setGrooveTemplate: (templateId) =>
+      set((state) => {
+        // Verify template exists
+        const template = GROOVE_TEMPLATES.find(t => t.id === templateId);
+        if (template) {
+          state.grooveTemplateId = templateId;
+          // Also update swing to 0 when using groove template (they're alternatives)
+          state.swing = 0;
+        }
+      }),
+
+    getGrooveTemplate: () => {
+      const state = _get();
+      return GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId) || GROOVE_TEMPLATES[0];
+    },
+
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
@@ -251,6 +273,7 @@ export const useTransportStore = create<TransportStore>()(
         state.continuousRow = 0;
         state.speed = 6;
         state.loopStartRow = 0;
+        state.grooveTemplateId = 'straight';
       }),
   }))
 );

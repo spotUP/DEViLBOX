@@ -3,7 +3,7 @@
  * Replaces the flat grid with organized categories
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
@@ -19,9 +19,13 @@ import {
   DEFAULT_ORGAN,
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
+  DEFAULT_FURNACE,
+  DEFAULT_CHIPTUNE_MODULE,
+  DEFAULT_WOBBLE_BASS,
+  DEFAULT_DRUMKIT,
 } from '@typedefs/instrument';
 import * as LucideIcons from 'lucide-react';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight, Search, X } from 'lucide-react';
 import { ToneEngine } from '@engine/ToneEngine';
 
 interface CategorizedSynthSelectorProps {
@@ -35,15 +39,53 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   onSelect,
   compact = false,
 }) => {
-  const { currentInstrument, updateInstrument } = useInstrumentStore();
+  // Use selectors for proper reactivity - don't use the getter!
+  const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
+  const instruments = useInstrumentStore(state => state.instruments);
+  const updateInstrument = useInstrumentStore(state => state.updateInstrument);
+
+  // Derive currentInstrument from state for proper re-renders
+  const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [hoveredSynth, setHoveredSynth] = useState<SynthType | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Filter categories and synths based on search and category selection
+  const filteredCategories = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+
+    return SYNTH_CATEGORIES
+      .filter(cat => !selectedCategory || cat.id === selectedCategory)
+      .map(cat => ({
+        ...cat,
+        synths: cat.synths.filter(synth => {
+          if (!synth || !synth.icon) return false;
+          if (!query) return true;
+          // Search in name, shortName, description, and bestFor tags
+          return (
+            synth.name.toLowerCase().includes(query) ||
+            synth.shortName.toLowerCase().includes(query) ||
+            synth.description.toLowerCase().includes(query) ||
+            synth.bestFor.some(tag => tag.toLowerCase().includes(query))
+          );
+        })
+      }))
+      .filter(cat => cat.synths.length > 0);
+  }, [searchQuery, selectedCategory]);
+
+  // Count total visible synths
+  const totalVisibleSynths = useMemo(() =>
+    filteredCategories.reduce((sum, cat) => sum + cat.synths.length, 0),
+    [filteredCategories]
+  );
 
   // Get icon component dynamically (with full error handling)
-  const getIcon = (iconName: string | undefined) => {
+  const getIcon = (iconName: string | undefined): typeof LucideIcons.Music2 => {
     if (!iconName) return LucideIcons.Music2;
     try {
-      const Icon = (LucideIcons as any)[iconName];
+      const icons = LucideIcons as unknown as Record<string, typeof LucideIcons.Music2>;
+      const Icon = icons[iconName];
       return Icon || LucideIcons.Music2;
     } catch (error) {
       console.warn('[CategorizedSynthSelector] Failed to load icon:', iconName, error);
@@ -73,6 +115,10 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
       organ: undefined,
       stringMachine: undefined,
       formantSynth: undefined,
+      furnace: undefined,
+      chiptuneModule: undefined,
+      wobbleBass: undefined,
+      drumKit: undefined,
     };
 
     // Initialize the appropriate synth-specific config
@@ -109,6 +155,18 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
         break;
       case 'FormantSynth':
         updates.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
+        break;
+      case 'Furnace':
+        updates.furnace = { ...DEFAULT_FURNACE };
+        break;
+      case 'ChiptuneModule':
+        updates.chiptuneModule = { ...DEFAULT_CHIPTUNE_MODULE };
+        break;
+      case 'WobbleBass':
+        updates.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
+        break;
+      case 'DrumKit':
+        updates.drumKit = { ...DEFAULT_DRUMKIT };
         break;
     }
 
@@ -178,42 +236,135 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
   // Compact grid view
   if (compact) {
-    const allSynths = SYNTH_CATEGORIES.flatMap(cat => cat.synths).filter(s => s && s.icon);
+    const allSynths = filteredCategories.flatMap(cat => cat.synths);
     const uniqueSynths = Array.from(new Map(allSynths.map(s => [s.type, s])).values());
 
     return (
-      <div className="grid grid-cols-3 gap-2">
-        {uniqueSynths.filter(synth => synth && synth.icon).map((synth) => {
-          const isSelected = currentInstrument?.synthType === synth.type;
-          const IconComponent = getIcon(synth.icon);
-
-          return (
+      <div className="space-y-3">
+        {/* Search bar for compact view */}
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Search synths..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-8 py-1.5 text-sm bg-dark-bgSecondary border border-dark-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary"
+          />
+          {searchQuery && (
             <button
-              key={synth.type}
-              onClick={() => handleSelectSynth(synth.type)}
-              className={`
-                flex items-center gap-2 p-2 rounded-lg border text-left transition-all
-                ${isSelected
-                  ? 'bg-accent-primary/15 border-accent-primary'
-                  : 'bg-dark-bgSecondary border-dark-border hover:border-text-muted'
-                }
-              `}
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
             >
-              <IconComponent size={14} className={synth.color} />
-              <span className={`text-sm ${isSelected ? 'text-accent-primary' : 'text-text-secondary'}`}>
-                {synth.shortName}
-              </span>
+              <X size={14} />
             </button>
-          );
-        })}
+          )}
+        </div>
+
+        {/* Synth grid */}
+        <div className="grid grid-cols-3 gap-2">
+          {uniqueSynths.map((synth) => {
+            const isSelected = currentInstrument?.synthType === synth.type;
+            const IconComponent = getIcon(synth.icon);
+
+            return (
+              <button
+                key={synth.type}
+                onClick={() => handleSelectSynth(synth.type)}
+                className={`
+                  flex items-center gap-2 p-2 rounded-lg border text-left transition-all
+                  ${isSelected
+                    ? 'bg-accent-primary/15 border-accent-primary'
+                    : 'bg-dark-bgSecondary border-dark-border hover:border-text-muted'
+                  }
+                `}
+              >
+                <IconComponent size={14} className={synth.color} />
+                <span className={`text-sm truncate ${isSelected ? 'text-accent-primary' : 'text-text-secondary'}`}>
+                  {synth.shortName}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* No results */}
+        {uniqueSynths.length === 0 && (
+          <div className="text-center py-4 text-text-muted text-sm">
+            No synths found for "{searchQuery}"
+          </div>
+        )}
       </div>
     );
   }
 
   // Full categorized view
   return (
-    <div className="space-y-6">
-      {SYNTH_CATEGORIES.map((category) => (
+    <div className="space-y-4">
+      {/* Search and Filter Header */}
+      <div className="space-y-3 sticky top-0 bg-dark-bg pb-3 z-10">
+        {/* Search bar */}
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Search synths by name, description, or use case..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 text-sm bg-dark-bgSecondary border border-dark-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Category filter tabs */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={`px-3 py-1 text-xs rounded-full border transition-all ${
+              selectedCategory === null
+                ? 'bg-accent-primary text-dark-bg border-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary border-dark-border hover:border-text-muted'
+            }`}
+          >
+            All ({SYNTH_CATEGORIES.reduce((sum, cat) => sum + cat.synths.filter(s => s?.icon).length, 0)})
+          </button>
+          {SYNTH_CATEGORIES.map(cat => {
+            const count = cat.synths.filter(s => s?.icon).length;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                  selectedCategory === cat.id
+                    ? 'bg-accent-primary text-dark-bg border-accent-primary'
+                    : 'bg-dark-bgSecondary text-text-secondary border-dark-border hover:border-text-muted'
+                }`}
+              >
+                {cat.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Results count */}
+        {(searchQuery || selectedCategory) && (
+          <div className="text-xs text-text-muted">
+            Showing {totalVisibleSynths} synth{totalVisibleSynths !== 1 ? 's' : ''}
+            {searchQuery && ` matching "${searchQuery}"`}
+            {selectedCategory && ` in ${SYNTH_CATEGORIES.find(c => c.id === selectedCategory)?.name}`}
+          </div>
+        )}
+      </div>
+
+      {/* Categories and Synths */}
+      {filteredCategories.map((category) => (
         <div key={category.id}>
           {/* Category Header */}
           <button
@@ -226,19 +377,22 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
               <h3 className="text-sm font-semibold text-text-primary">{category.name}</h3>
               <p className="text-xs text-text-muted">{category.description}</p>
             </div>
-            <ChevronRight
-              size={16}
-              className={`
-                text-text-muted transition-transform
-                ${expandedCategory === category.id ? 'rotate-90' : ''}
-              `}
-            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted">{category.synths.length}</span>
+              <ChevronRight
+                size={16}
+                className={`
+                  text-text-muted transition-transform
+                  ${expandedCategory === category.id ? 'rotate-90' : ''}
+                `}
+              />
+            </div>
           </button>
 
           {/* Category Synths */}
           {(expandedCategory === category.id || expandedCategory === null) && (
             <div className="grid grid-cols-2 gap-3">
-              {category.synths.filter(synth => synth && synth.icon).map((synth) => {
+              {category.synths.map((synth) => {
                 const isSelected = currentInstrument?.synthType === synth.type;
                 return renderSynthCard(synth, isSelected);
               })}
@@ -246,6 +400,20 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
           )}
         </div>
       ))}
+
+      {/* No results */}
+      {filteredCategories.length === 0 && (
+        <div className="text-center py-8 text-text-muted">
+          <p className="text-sm">No synths found</p>
+          <p className="text-xs mt-1">Try a different search term or category</p>
+          <button
+            onClick={() => { setSearchQuery(''); setSelectedCategory(null); }}
+            className="mt-3 px-4 py-1.5 text-xs bg-dark-bgSecondary border border-dark-border rounded-lg hover:border-text-muted"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
 
       {/* Synth Info Panel (when hovering) */}
       {hoveredSynth && (

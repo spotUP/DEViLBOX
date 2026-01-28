@@ -21,6 +21,7 @@ export interface SongExport {
   automation?: Record<string, any>; // Legacy nested format or array of curves
   automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
+  grooveTemplateId?: string; // Groove/swing template ID
 }
 
 export interface SFXExport {
@@ -56,7 +57,8 @@ export function exportSong(
   automation: Record<string, any> | undefined,
   masterEffects: EffectConfig[] | undefined,
   automationCurves: AutomationCurve[] | undefined,
-  options: ExportOptions = {}
+  options: ExportOptions = {},
+  grooveTemplateId?: string
 ): void {
   const songData: SongExport = {
     format: 'devilbox-song',
@@ -70,6 +72,8 @@ export function exportSong(
     ...(automation && Object.keys(automation).length > 0 ? { automation } : {}),
     ...(automationCurves && automationCurves.length > 0 ? { automationCurves } : {}),
     ...(masterEffects && masterEffects.length > 0 ? { masterEffects } : {}),
+    // Include groove template if not the default
+    ...(grooveTemplateId && grooveTemplateId !== 'straight' ? { grooveTemplateId } : {}),
   };
 
   const json = options.prettify

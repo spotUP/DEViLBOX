@@ -1470,7 +1470,15 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         state.patterns.forEach((pattern) => {
           if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-            pattern.channels[channelIndex].solo = !pattern.channels[channelIndex].solo;
+            const wasAlreadySolo = pattern.channels[channelIndex].solo;
+            // Clear all solos first (exclusive solo behavior)
+            pattern.channels.forEach((ch) => {
+              ch.solo = false;
+            });
+            // Toggle the clicked channel (if it was solo, it's now off; if it wasn't, it's now on)
+            if (!wasAlreadySolo) {
+              pattern.channels[channelIndex].solo = true;
+            }
           }
         });
       });
