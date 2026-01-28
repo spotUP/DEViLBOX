@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-28T01:57:35.803Z
+ * Generated: 2026-01-28T02:17:29.622Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '115';
-export const BUILD_HASH = '6aebbd3';
+export const BUILD_NUMBER = '125';
+export const BUILD_HASH = '1f91d8a';
 export const BUILD_DATE = '2026-01-28';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -29,6 +29,52 @@ export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-28',
+    changes: [
+      {
+        type: 'fix',
+        description: 'Fix DrumMachine Tone.Param error breaking 909 drums'
+      },
+      {
+        type: 'fix',
+        description: 'Fix Furnace synth fallback to use actual instrument parameters'
+      },
+      {
+        type: 'feature',
+        description: 'Add Behringer TD-3 pattern presets'
+      },
+      {
+        type: 'improvement',
+        description: 'Update instrument system and engine improvements'
+      },
+      {
+        type: 'improvement',
+        description: 'Move Mute/Smooth/Groove controls to tracker header'
+      },
+      {
+        type: 'feature',
+        description: 'Implement tab-based synth editors for no-scroll UI'
+      },
+      {
+        type: 'feature',
+        description: 'Add synth editing enhancements and new engine components'
+      },
+      {
+        type: 'feature',
+        description: 'Add real-time visualization components for instruments'
+      },
+      {
+        type: 'feature',
+        description: 'Add Furnace chip instrument presets'
+      },
+      {
+        type: 'improvement',
+        description: 'Move documentation files to docs/ directory'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-27',
     changes: [
       {
@@ -162,7 +208,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-26',
     changes: [
       {
@@ -196,64 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix MOD import pitch shifting and range'
-      },
-      {
-        type: 'fix',
-        description: 'Fix MOD and XM export limitations'
-      },
-      {
-        type: 'fix',
-        description: 'Fix XM export binary compatibility: implement full instrument and sample header writing with delta encoding'
-      },
-      {
-        type: 'improvement',
-        description: 'Update project documentation and change logs'
-      },
-      {
-        type: 'fix',
-        description: 'Optimize React rendering and add visualization components'
-      },
-      {
-        type: 'improvement',
-        description: 'Optimize audio engine and playback for M1/Apple Silicon'
-      },
-      {
-        type: 'improvement',
-        description: 'Restructure public assets into data directory'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-2',
-    date: '2026-01-25',
-    changes: [
-      {
-        type: 'feature',
-        description: 'Refactor FT2 toolbar to use design system buttons and fix UI issues'
-      },
-      {
-        type: 'feature',
-        description: 'Add TD-3 pattern import, file browser, and fix Tone.js synth handling'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-3',
-    date: '2026-01-24',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Fix FPS fluctuation and improve audio timing stability'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-4',
-    date: '2026-01-23',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Major playback performance optimizations and sound cleanup'
       }
     ]
   }

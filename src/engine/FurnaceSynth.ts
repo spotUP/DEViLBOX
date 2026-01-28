@@ -33,6 +33,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   // Fallback synth when WASM engine isn't available
   private fallbackSynth: Tone.PolySynth | null = null;
   private useWasmEngine: boolean = false;
+  private initInProgress: boolean = false;
 
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
     super();
@@ -50,6 +51,15 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.initEngine();
 
     this.updateParameters();
+  }
+
+  /**
+   * Ensure WASM engine is initialized - call before playing notes
+   */
+  public async ensureInitialized(): Promise<void> {
+    if (this.useWasmEngine) return; // Already using WASM
+    if (this.initInProgress) return; // Init in progress
+    await this.initEngine();
   }
 
   /**
@@ -115,6 +125,12 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   }
 
   private async initEngine(): Promise<void> {
+    // Prevent concurrent init attempts
+    if (this.initInProgress) return;
+    if (this.useWasmEngine) return;
+
+    this.initInProgress = true;
+
     try {
       // Get the native AudioContext - try multiple approaches
       const toneContext = Tone.getContext();
@@ -135,22 +151,32 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       }
 
       if (!rawContext || !rawContext.audioWorklet) {
-        console.warn('[FurnaceSynth] Using fallback FM synth (no WASM available)');
+        console.warn('[FurnaceSynth] No AudioContext available, using fallback');
+        this.initInProgress = false;
         return;
       }
 
-      // Wait for context to be running
+      // Wait for context to be running (with timeout)
       if (rawContext.state !== 'running') {
-        await new Promise<void>((resolve) => {
-          const checkState = () => {
-            if (rawContext!.state === 'running') {
-              resolve();
-            } else {
-              setTimeout(checkState, 100);
-            }
-          };
-          checkState();
-        });
+        const started = await Promise.race([
+          new Promise<boolean>((resolve) => {
+            const checkState = () => {
+              if (rawContext!.state === 'running') {
+                resolve(true);
+              } else {
+                setTimeout(checkState, 100);
+              }
+            };
+            checkState();
+          }),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
+        ]);
+
+        if (!started) {
+          console.warn('[FurnaceSynth] AudioContext not running after 5s, using fallback');
+          this.initInProgress = false;
+          return;
+        }
       }
 
       // Initialize chip engine
@@ -168,15 +194,17 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
           if (this.fallbackSynth) {
             this.fallbackSynth.disconnect();
           }
-          console.log('[FurnaceSynth] WASM chip engine connected');
-        } catch {
-          console.warn('[FurnaceSynth] Using fallback FM synth');
+          console.log('[FurnaceSynth] ✓ WASM chip engine connected');
+        } catch (err) {
+          console.warn('[FurnaceSynth] Failed to connect WASM output:', err);
         }
       } else {
-        console.warn('[FurnaceSynth] Using fallback FM synth (WASM not loaded)');
+        console.warn('[FurnaceSynth] WASM engine not initialized, using fallback');
       }
-    } catch {
-      console.warn('[FurnaceSynth] Using fallback FM synth (init failed)');
+    } catch (err) {
+      console.warn('[FurnaceSynth] Init error:', err);
+    } finally {
+      this.initInProgress = false;
     }
   }
 
