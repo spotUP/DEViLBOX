@@ -234,8 +234,8 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // Furnace Chip Types
   FurnaceOPN: {
     type: 'FurnaceOPN',
-    name: 'Genesis / OPN2',
-    shortName: 'OPN2',
+    name: 'Sega Genesis (YM2612)',
+    shortName: 'Genesis',
     description: 'Sega Genesis / Mega Drive YM2612 - 6 channels of 4-op FM',
     bestFor: ['Genesis bass', 'FM leads', 'Slap bass', '16-bit game music'],
     icon: 'Gamepad2',
@@ -243,7 +243,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPM: {
     type: 'FurnaceOPM',
-    name: 'OPM / X68000',
+    name: 'Arcade / X68000 (YM2151)',
     shortName: 'OPM',
     description: 'Yamaha YM2151 - Sharp X68000, arcade machines',
     bestFor: ['Arcade FM', 'Bright leads', 'Brass', 'Game music'],
@@ -252,7 +252,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPL: {
     type: 'FurnaceOPL',
-    name: 'OPL3 / AdLib',
+    name: 'AdLib / Sound Blaster (OPL3)',
     shortName: 'OPL3',
     description: 'Yamaha YMF262 - AdLib, Sound Blaster, DOS games',
     bestFor: ['DOS game music', 'MIDI synth', 'Organs', 'PC gaming'],
@@ -261,7 +261,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPLL: {
     type: 'FurnaceOPLL',
-    name: 'OPLL / MSX',
+    name: 'MSX / Sega (OPLL)',
     shortName: 'OPLL',
     description: 'Yamaha YM2413 - MSX, SMS FM unit, budget FM',
     bestFor: ['MSX music', 'SMS FM', 'Lo-fi FM', 'Simple FM'],
@@ -279,7 +279,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPZ: {
     type: 'FurnaceOPZ',
-    name: 'OPZ / TX81Z',
+    name: 'Yamaha TX81Z (OPZ)',
     shortName: 'OPZ',
     description: 'Yamaha YM2414 - TX81Z, DX11, advanced FM',
     bestFor: ['Lately bass', 'DX bells', 'Complex FM', 'E-piano'],
@@ -288,7 +288,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceNES: {
     type: 'FurnaceNES',
-    name: 'NES / 2A03',
+    name: 'Nintendo NES (2A03)',
     shortName: 'NES',
     description: 'Nintendo Entertainment System - 2 pulse, triangle, noise, DPCM',
     bestFor: ['NES chiptune', '8-bit melodies', 'Retro drums', 'Famicom'],
@@ -297,7 +297,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceGB: {
     type: 'FurnaceGB',
-    name: 'Game Boy',
+    name: 'Nintendo Game Boy',
     shortName: 'GB',
     description: 'Nintendo Game Boy - 2 pulse, wave, noise channels',
     bestFor: ['Game Boy music', 'Lo-fi chiptune', 'Portable gaming'],
@@ -306,7 +306,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceC64: {
     type: 'FurnaceC64',
-    name: 'C64 / SID',
+    name: 'Commodore 64 (SID)',
     shortName: 'SID',
     description: 'Commodore 64 SID chip - 3 voices with filters',
     bestFor: ['SID leads', 'Arpeggios', 'Filter sweeps', 'Demoscene'],
@@ -315,7 +315,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceAY: {
     type: 'FurnaceAY',
-    name: 'AY-3-8910',
+    name: 'ZX Spectrum / Amstrad (AY)',
     shortName: 'AY',
     description: 'General Instrument AY - ZX Spectrum, MSX, Atari ST',
     bestFor: ['ZX Spectrum', 'MSX', 'Amstrad CPC', 'Envelope tricks'],
@@ -333,7 +333,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceVERA: {
     type: 'FurnaceVERA',
-    name: 'VERA',
+    name: 'Commander X16 (VERA)',
     shortName: 'VERA',
     description: 'Commander X16 - modern retro 16 channels PSG + PCM',
     bestFor: ['Modern retro', 'X16 music', 'Rich PSG'],
@@ -342,7 +342,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceSAA: {
     type: 'FurnaceSAA',
-    name: 'SAA1099',
+    name: 'SAM Coupé (SAA1099)',
     shortName: 'SAA',
     description: 'Philips SAA1099 - Sam Coupé, some PC sound cards',
     bestFor: ['Sam Coupé', 'Stereo chips', 'European home computers'],
@@ -351,7 +351,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnacePSG: {
     type: 'FurnacePSG',
-    name: 'SN76489 / PSG',
+    name: 'Sega Master System (PSG)',
     shortName: 'PSG',
     description: 'TI SN76489 - Master System, Game Gear, BBC Micro',
     bestFor: ['Master System', 'Colecovision', 'Square wave PSG'],
@@ -360,7 +360,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceVIC: {
     type: 'FurnaceVIC',
-    name: 'VIC-20',
+    name: 'Commodore VIC-20',
     shortName: 'VIC',
     description: 'Commodore VIC-20 - 3 square + noise',
     bestFor: ['VIC-20 music', 'Early 80s', 'Simple tones'],
@@ -398,7 +398,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // Additional FM chips
   FurnaceOPNA: {
     type: 'FurnaceOPNA',
-    name: 'OPNA / PC-98',
+    name: 'NEC PC-98 (OPNA)',
     shortName: 'OPNA',
     description: 'YM2608 - NEC PC-98, arcade machines',
     bestFor: ['PC-98 music', 'Touhou-style', 'Japanese arcade'],
@@ -407,7 +407,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPNB: {
     type: 'FurnaceOPNB',
-    name: 'OPNB / Neo Geo',
+    name: 'SNK Neo Geo (OPNB)',
     shortName: 'OPNB',
     description: 'YM2610 - SNK Neo Geo',
     bestFor: ['Neo Geo music', 'Fighting games', 'SNK'],
@@ -416,7 +416,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceOPL4: {
     type: 'FurnaceOPL4',
-    name: 'OPL4',
+    name: 'Yamaha OPL4',
     shortName: 'OPL4',
     description: 'Yamaha YMF278 - FM + wavetable hybrid',
     bestFor: ['Advanced OPL', 'FM + samples', 'Late DOS'],
@@ -425,7 +425,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceY8950: {
     type: 'FurnaceY8950',
-    name: 'Y8950 / MSX-Audio',
+    name: 'MSX-Audio (Y8950)',
     shortName: 'Y8950',
     description: 'Yamaha Y8950 - MSX-Audio, OPL + ADPCM',
     bestFor: ['MSX-Audio', 'OPL with drums', 'Japanese PC'],
@@ -435,7 +435,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // Console chips
   FurnacePCE: {
     type: 'FurnacePCE',
-    name: 'PC Engine',
+    name: 'PC Engine / TurboGrafx',
     shortName: 'PCE',
     description: 'PC Engine / TurboGrafx-16 - 6 channel wavetable',
     bestFor: ['PC Engine', 'TurboGrafx', 'HuCard games'],
@@ -444,7 +444,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceSNES: {
     type: 'FurnaceSNES',
-    name: 'SNES / SPC700',
+    name: 'Super Nintendo (SPC700)',
     shortName: 'SNES',
     description: 'Super Nintendo - Sony SPC700 8-channel BRR',
     bestFor: ['SNES music', '16-bit classics', 'BRR samples'],
@@ -453,7 +453,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceVB: {
     type: 'FurnaceVB',
-    name: 'Virtual Boy',
+    name: 'Nintendo Virtual Boy',
     shortName: 'VB',
     description: 'Nintendo Virtual Boy - 6 channel wavetable',
     bestFor: ['Virtual Boy', 'Stereo 3D audio', 'Nintendo VB'],
@@ -462,7 +462,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceSWAN: {
     type: 'FurnaceSWAN',
-    name: 'WonderSwan',
+    name: 'Bandai WonderSwan',
     shortName: 'SWAN',
     description: 'Bandai WonderSwan - 4 channel wavetable + PCM',
     bestFor: ['WonderSwan', 'Portable gaming', 'Bandai'],
@@ -472,7 +472,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // NES Expansion
   FurnaceVRC6: {
     type: 'FurnaceVRC6',
-    name: 'VRC6',
+    name: 'Famicom (VRC6)',
     shortName: 'VRC6',
     description: 'Konami VRC6 - 2 pulse + saw (Castlevania 3 JP)',
     bestFor: ['Castlevania 3', 'Konami NES', 'Extra channels'],
@@ -481,7 +481,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceVRC7: {
     type: 'FurnaceVRC7',
-    name: 'VRC7',
+    name: 'Famicom (VRC7)',
     shortName: 'VRC7',
     description: 'Konami VRC7 - OPLL clone (Lagrange Point)',
     bestFor: ['Lagrange Point', 'FM on NES', 'Konami FM'],
@@ -490,7 +490,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceN163: {
     type: 'FurnaceN163',
-    name: 'Namco 163',
+    name: 'Namco Arcade (N163)',
     shortName: 'N163',
     description: 'Namco 163 - 8 channel wavetable',
     bestFor: ['Namco NES', 'Wavetable', 'Complex tones'],
@@ -499,7 +499,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceFDS: {
     type: 'FurnaceFDS',
-    name: 'FDS',
+    name: 'Famicom Disk System',
     shortName: 'FDS',
     description: 'Famicom Disk System - wavetable + modulation',
     bestFor: ['FDS games', 'Wavy bass', 'Zelda FDS'],
@@ -508,7 +508,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceMMC5: {
     type: 'FurnaceMMC5',
-    name: 'MMC5',
+    name: 'Famicom (MMC5)',
     shortName: 'MMC5',
     description: 'MMC5 - 2 extra pulse channels',
     bestFor: ['Castlevania 3 US', 'Extra NES pulse', 'CV3'],
@@ -518,7 +518,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // Computer chips
   FurnaceTED: {
     type: 'FurnaceTED',
-    name: 'TED',
+    name: 'Commodore Plus/4 (TED)',
     shortName: 'TED',
     description: 'Commodore Plus/4 TED - 2 square + noise',
     bestFor: ['Plus/4 music', 'Commodore 16', 'Budget C64'],
@@ -528,7 +528,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   // Arcade PCM chips
   FurnaceSEGAPCM: {
     type: 'FurnaceSEGAPCM',
-    name: 'Sega PCM',
+    name: 'Sega Arcade (SegaPCM)',
     shortName: 'SEGAPCM',
     description: 'Sega System 16/18 - 16 channel PCM',
     bestFor: ['OutRun', 'After Burner', 'Sega arcade'],
@@ -537,7 +537,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   },
   FurnaceQSOUND: {
     type: 'FurnaceQSOUND',
-    name: 'QSound',
+    name: 'Capcom Arcade (QSound)',
     shortName: 'QSound',
     description: 'Capcom QSound - CPS1/CPS2 with 3D audio',
     bestFor: ['Street Fighter', 'CPS games', '3D positioning'],
