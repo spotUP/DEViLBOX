@@ -206,13 +206,13 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       });
     }
 
-    // Log every 1000 process calls to show we're still running
-    if (this._processCount % 1000 === 0) {
+    // Log every 1000 process calls to show we're still running (only if chips active)
+    if (this._processCount % 1000 === 0 && this.activeChips && this.activeChips.size > 0) {
       this.port.postMessage({
         type: 'debug',
         message: 'heartbeat',
         processCount: this._processCount,
-        activeChipsSize: this.activeChips ? this.activeChips.size : -1,
+        activeChipsSize: this.activeChips.size,
         isInitialized: this.isInitialized
       });
     }

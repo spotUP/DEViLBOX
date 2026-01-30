@@ -3233,13 +3233,11 @@ export class ToneEngine {
   public setChannelVolume(channelIndex: number, volumeDb: number): void {
     // Update active voice gains (ProTracker-style: Cxx affects sample volume)
     const voices = this.activeVoices.get(channelIndex);
-    console.log(`[ToneEngine] setChannelVolume ch${channelIndex} = ${volumeDb}dB, voices:`, voices?.length ?? 0);
 
     if (voices && voices.length > 0) {
       const now = Tone.now();
       // Convert dB to linear gain for voice nodes
       const linearGain = volumeDb <= -60 ? 0 : Math.pow(10, volumeDb / 20);
-      console.log(`[ToneEngine] Setting ${voices.length} voice gains to ${linearGain}`);
       for (const voice of voices) {
         if (voice.nodes.gain) {
           voice.nodes.gain.gain.setValueAtTime(linearGain, now);
