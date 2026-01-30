@@ -12,7 +12,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FurnaceMacroType, type FurnaceMacro } from '@typedefs/instrument';
-import { Play, Pause, RotateCcw, Plus, Minus, Repeat, Flag } from 'lucide-react';
+import { RotateCcw, Plus, Minus, Repeat, Flag } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -409,7 +409,7 @@ interface MacroListEditorProps {
 export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   macros,
   onChange,
-  chipType = 0,
+  chipType: _chipType = 0,  // Reserved for future chip-specific macro ranges
 }) => {
   const [expandedMacro, setExpandedMacro] = useState<number | null>(null);
 

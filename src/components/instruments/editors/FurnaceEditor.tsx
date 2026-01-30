@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import type { FurnaceConfig, FurnaceOperatorConfig } from '@typedefs/instrument';
+import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, Plus, Library, ChevronDown, ChevronRight } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
@@ -17,6 +17,8 @@ import {
   getFurnaceWavetablesByCategory,
   type FurnaceWavetablePreset
 } from '@constants/furnaceWavetablePresets';
+import { MacroListEditor } from './MacroEditor';
+import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 
 // ============================================================================
 // CHIP-SPECIFIC PARAMETER RANGES (from Furnace insEdit.cpp)
@@ -598,31 +600,14 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-violet-400" />
             <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Macro Editor</h3>
+            <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
           </div>
 
-          {config.macros.length === 0 ? (
-            <div className="text-center py-8 text-text-muted text-sm">
-              <p className="mb-2">No macros defined</p>
-              <p className="text-xs opacity-60">Macros allow automated parameter changes over time</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {config.macros.map((macro, i) => (
-                <div key={i} className="bg-dark-bg p-2 rounded border border-dark-border flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-violet-400 w-12">
-                    {getMacroTypeName(macro.type)}
-                  </span>
-                  <div className="flex-1 h-6 bg-dark-bgTertiary rounded relative overflow-hidden">
-                    {/* Mini macro visualization */}
-                    <MacroMiniView values={macro.data} loop={macro.loop} release={macro.release} />
-                  </div>
-                  <span className="text-[9px] text-text-muted font-mono">
-                    {macro.data.length} steps
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <MacroListEditor
+            macros={config.macros}
+            onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+            chipType={config.chipType}
+          />
         </div>
       )}
 
@@ -675,7 +660,39 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* WAVETABLE PANEL */}
       {(category === "Wavetable" || config.wavetables.length > 0) && (
-        <WavetablePanel config={config} onChange={onChange} />
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 mb-4">
+            <Waves size={16} className="text-cyan-400" />
+            <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
+              Wavetable Editor ({config.wavetables.length} waves)
+            </h3>
+            <span className="text-[9px] text-text-muted">Draw to edit waveforms</span>
+          </div>
+
+          <WavetableListEditor
+            wavetables={config.wavetables as WavetableData[]}
+            onChange={(wavetables) => onChange({ wavetables })}
+          />
+        </div>
+      )}
+
+      {/* MACROS PANEL (for non-FM categories) */}
+      {category !== "FM" && (
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity size={16} className="text-violet-400" />
+            <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
+              Macros ({config.macros.length})
+            </h3>
+            <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
+          </div>
+
+          <MacroListEditor
+            macros={config.macros}
+            onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+            chipType={config.chipType}
+          />
+        </div>
       )}
 
       {/* PCM / SAMPLE PANEL */}
