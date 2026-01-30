@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Music } from 'lucide-react';
-import type { InstrumentConfig } from '../../types/instrument';
-import { ToneEngine } from '../../engine/ToneEngine';
+import type { InstrumentConfig } from '@typedefs/instrument';
+import { ToneEngine } from '@engine/ToneEngine';
 
 interface TestKeyboardProps {
   instrument: InstrumentConfig;
