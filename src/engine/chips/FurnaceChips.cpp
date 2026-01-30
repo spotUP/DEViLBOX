@@ -340,41 +340,65 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void furnace_init_chips(int sample_rate) {
     g_sample_rate = sample_rate > 0 ? sample_rate : 48000;  // Save for cycle calculations
-    OPN2_Reset(&opn2_chip); OPM_Reset(&opm_chip); OPL3_Reset(&opl3_chip_inst, sample_rate); YMPSG_Init(&psg_chip, 1, 0x0001, 0x0008, 16); GB_apu_init(&gb_chip);
-    
+
+    EM_ASM({ console.log('[FurnaceWASM] Init chips at sample rate:', $0); }, g_sample_rate);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: OPN2, OPM, OPL3, PSG, GB...'); });
+    OPN2_Reset(&opn2_chip);
+    OPM_Reset(&opm_chip);
+    OPL3_Reset(&opl3_chip_inst, g_sample_rate);
+    YMPSG_Init(&psg_chip, 1, 0x0001, 0x0008, 16);
+    GB_apu_init(&gb_chip);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: NES APU/DMC/FDS/MMC5...'); });
     if (nes_apu) delete nes_apu; nes_apu = new xgm::NES_APU(); nes_apu->SetOption(0, 0);
     if (nes_dmc) delete nes_dmc; nes_dmc = new xgm::NES_DMC(); nes_dmc->SetOption(0, 0);
     if (nes_fds) delete nes_fds; nes_fds = new xgm::NES_FDS();
     if (nes_mmc5) delete nes_mmc5; nes_mmc5 = new xgm::NES_MMC5();
-    if (pce_chip) delete pce_chip; pce_chip = new PCE_PSG(0); if (!blip_pce) blip_pce = blip_new(4096); blip_set_rates(blip_pce, 3579545 * 2, sample_rate);
-    if (scc_chip) delete scc_chip; scc_chip = new scc_impl(); if (!blip_scc) blip_scc = blip_new(4096); blip_set_rates(blip_scc, 3579545, sample_rate);
-    if (n163_chip) delete n163_chip; n163_chip = new n163_core(); if (!blip_n163) blip_n163 = blip_new(4096); blip_set_rates(blip_n163, 1789773, sample_rate);
-    if (vrc6_chip) delete vrc6_chip; vrc6_chip = new vrcvi_impl(); if (!blip_vrc6) blip_vrc6 = blip_new(4096); blip_set_rates(blip_vrc6, 1789773, sample_rate);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: PCE, SCC, N163, VRC6...'); });
+    if (pce_chip) delete pce_chip; pce_chip = new PCE_PSG(0); if (!blip_pce) blip_pce = blip_new(4096); blip_set_rates(blip_pce, 3579545 * 2, g_sample_rate);
+    if (scc_chip) delete scc_chip; scc_chip = new scc_impl(); if (!blip_scc) blip_scc = blip_new(4096); blip_set_rates(blip_scc, 3579545, g_sample_rate);
+    if (n163_chip) delete n163_chip; n163_chip = new n163_core(); if (!blip_n163) blip_n163 = blip_new(4096); blip_set_rates(blip_n163, 1789773, g_sample_rate);
+    if (vrc6_chip) delete vrc6_chip; vrc6_chip = new vrcvi_impl(); if (!blip_vrc6) blip_vrc6 = blip_new(4096); blip_set_rates(blip_vrc6, 1789773, g_sample_rate);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: SID3, OPLL...'); });
     if (sid_chip) sid3_free(sid_chip); sid_chip = sid3_create(); sid3_set_clock_rate(sid_chip, 985248); sid3_reset(sid_chip);
     OPLL_Reset(&opll_chip, opll_type_ym2413);
+    EM_ASM({ console.log('[FurnaceWASM] Init: AY, OPNA, OPNB, OPN, OPNB-B...'); });
     if (ay_chip) delete ay_chip; ay_chip = new ay8910_device(1789773); ay_chip->device_start(); ay_chip->device_reset();
     if (opna_chip) delete opna_chip; opna_chip = new ymfm::ym2608(ymfm_intf); opna_chip->reset();
     if (opnb_chip) delete opnb_chip; opnb_chip = new ymfm::ym2610(ymfm_intf); opnb_chip->reset();
     if (opn_chip) delete opn_chip; opn_chip = new ymfm::ym2203(ymfm_intf); opn_chip->reset();
     if (opnb_b_chip) delete opnb_b_chip; opnb_b_chip = new ymfm::ym2610b(ymfm_intf); opnb_b_chip->reset();
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: TIA, SAA, OKI, ES5506, SWAN...'); });
     if (tia_chip) delete tia_chip; tia_chip = new TIA::Audio(); tia_chip->reset(false);
     if (saa_chip) delete saa_chip; saa_chip = new saa1099_device(); saa_chip->device_start();
     if (oki_chip) delete oki_chip; oki_chip = new msm6295_core(oki_intf); oki_chip->reset();
     if (es_chip) delete es_chip; es_chip = new es5506_core(es_intf); es_chip->reset();
     if (swan_chip) delete swan_chip; swan_chip = new WSwan(); swan_chip->SoundReset();
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: OPZ, Y8950, SNES, Lynx...'); });
     if (opz_chip) delete opz_chip; opz_chip = new ymfm::ym2414(ymfm_intf); opz_chip->reset();
     if (y8950_chip) delete y8950_chip; y8950_chip = new ymfm::y8950(ymfm_intf); y8950_chip->reset();
     if (snes_chip) delete snes_chip; snes_chip = new SPC_DSP(); snes_chip->init(NULL); snes_chip->reset();
     if (lynx_chip) delete lynx_chip; lynx_chip = new Lynx::Mikey(4000000);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: SegaPCM, YMZ, RF5C68, GA20...'); });
     if (segapcm_chip) delete segapcm_chip; segapcm_chip = new segapcm_device(); segapcm_chip->device_start();
     if (ymz_chip) delete ymz_chip; ymz_chip = new ymz280b_device(); ymz_chip->device_start(NULL);
     if (rf5_chip) delete rf5_chip; rf5_chip = new rf5c68_device(); rf5_chip->device_start(NULL);
     if (ga20_chip) delete ga20_chip; ga20_chip = new iremga20_device(ga20_intf);
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: VSU, UPD, K007232, K053260, X1_010...'); });
     if (vb_chip) delete vb_chip; vb_chip = new VSU();
     if (upd_chip) delete upd_chip; upd_chip = new upd1771c_device();
     if (k7232_chip) delete k7232_chip; k7232_chip = new k007232_core(k7232_intf); k7232_chip->reset();
     if (k53260_chip) delete k53260_chip; k53260_chip = new k053260_core(k53260_intf); k53260_chip->reset();
     if (x1_010_chip) delete x1_010_chip; x1_010_chip = new x1_010_impl(); x1_010_chip->reset();
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: OPL4, T6W28, POKEY...'); });
     if (opl4_chip) delete opl4_chip; opl4_chip = new YMF278(ymf278_mem); opl4_chip->reset();
     if (t6w28_chip) delete t6w28_chip; t6w28_chip = new MDFN_IEN_NGP::T6W28_Apu();
     MZPOKEYSND_Init(&pokey_chip); ResetPokeyState(&pokey_chip);
@@ -392,31 +416,43 @@ void furnace_init_chips(int sample_rate) {
     }
 
     // Additional chip init
+    EM_ASM({ console.log('[FurnaceWASM] Init: SID 6581/8580...'); });
     if (!sid_6581_chip) sid_6581_chip = (struct SID_chip*)malloc(sizeof(struct SID_chip));
-    dSID_init(sid_6581_chip, 985248, sample_rate, 0, 0); // model 0 = 6581
+    dSID_init(sid_6581_chip, 985248, g_sample_rate, 0, 0); // model 0 = 6581
     if (!sid_8580_chip) sid_8580_chip = (struct SID_chip*)malloc(sizeof(struct SID_chip));
-    dSID_init(sid_8580_chip, 985248, sample_rate, 1, 0); // model 1 = 8580
-    if (namco_chip) delete namco_chip; namco_chip = new namco_device(3072000); namco_chip->device_start(NULL);
+    dSID_init(sid_8580_chip, 985248, g_sample_rate, 1, 0); // model 1 = 8580
+
+    EM_ASM({ console.log('[FurnaceWASM] Init: Namco...'); });
+    if (namco_chip) delete namco_chip; namco_chip = new namco_device(3072000);
+    namco_chip->set_voices(3);  // Must set voices before device_start to avoid divide by zero
+    namco_chip->device_start(NULL);
+    EM_ASM({ console.log('[FurnaceWASM] Init: MSM6258...'); });
     if (msm6258_chip) delete msm6258_chip; msm6258_chip = new okim6258_device(4000000); msm6258_chip->device_start(); msm6258_chip->device_reset();
+    EM_ASM({ console.log('[FurnaceWASM] Init: MSM5232...'); });
     if (msm5232_chip) delete msm5232_chip; msm5232_chip = new msm5232_device(2000000); msm5232_chip->device_start(); msm5232_chip->device_reset();
+    EM_ASM({ console.log('[FurnaceWASM] Init: Namco/MSM done.'); });
 
     // Simple chip state init
+    EM_ASM({ console.log('[FurnaceWASM] Init: Simple chips (pcspkr, pong, pv1000, pokemini)...'); });
     pcspkr_state.freq = 440; pcspkr_state.enabled = false; pcspkr_state.phase = 0;
     memset(&pong_state, 0, sizeof(pong_state));
     memset(&pv1000_state, 0, sizeof(pv1000_state));
     memset(&pokemini_state, 0, sizeof(pokemini_state));
 
     // Bubble System Init
+    EM_ASM({ console.log('[FurnaceWASM] Init: Bubble System (k005289)...'); });
     if (bubble_timer) delete bubble_timer; bubble_timer = new k005289_core(); bubble_timer->reset();
     memset(bubble_waves, 0, sizeof(bubble_waves));
     memset(bubble_vol, 0, sizeof(bubble_vol));
 
     // PET Init (6522 shift register)
+    EM_ASM({ console.log('[FurnaceWASM] Init: PET (6522)...'); });
     memset(&pet_state, 0, sizeof(pet_state));
     pet_state.wave = 0xFF;  // Default square wave
     pet_state.sreg = 0xFF;
 
     // NDS Init
+    EM_ASM({ console.log('[FurnaceWASM] Init: NDS sound emu...'); });
     nds_intf.mem = nds_sample_mem;
     nds_intf.mem_size = sizeof(nds_sample_mem);
     if (nds_chip) delete nds_chip;
@@ -424,6 +460,7 @@ void furnace_init_chips(int sample_rate) {
     nds_chip->reset();
 
     // GBA DMA Init
+    EM_ASM({ console.log('[FurnaceWASM] Init: GBA DMA...'); });
     memset(&gba_dma_state, 0, sizeof(gba_dma_state));
     for (int i = 0; i < 2; i++) {
         gba_dma_state.chan[i].data = gba_sample_mem;
@@ -432,13 +469,15 @@ void furnace_init_chips(int sample_rate) {
     }
 
     // MultiPCM Init
+    EM_ASM({ console.log('[FurnaceWASM] Init: MultiPCM...'); });
     memset(&multipcm_state, 0, sizeof(multipcm_state));
 
     // VIC-20 Init (1MHz clock, ~31400 cycles/sec)
-    vic_sound_machine_init(&vic_chip, 48000, 1000000, false);
+    EM_ASM({ console.log('[FurnaceWASM] Init: VIC-20, TED, VERA, Supervision...'); });
+    vic_sound_machine_init(&vic_chip, g_sample_rate, 1000000, false);
 
     // TED Init (1.79MHz for NTSC)
-    ted_sound_machine_init(&ted_chip, 48000, 1789773);
+    ted_sound_machine_init(&ted_chip, g_sample_rate, 1789773);
     ted_sound_reset(&ted_chip);
 
     // VERA PSG Init
@@ -448,6 +487,7 @@ void furnace_init_chips(int sample_rate) {
     supervision_sound_reset(&svision_chip);
     supervision_sound_set_clock(&svision_chip, 4000000);
 
+    EM_ASM({ console.log('[FurnaceWASM] Init: SM8521, C140, QSound...'); });
     // SM8521 Init
     sm8521_reset(&sm8521_chip);
 
@@ -459,6 +499,7 @@ void furnace_init_chips(int sample_rate) {
     qsound_start(&qsound_chip_inst, 4000000);
     qsound_reset(&qsound_chip_inst);
 
+    EM_ASM({ console.log('[FurnaceWASM] Init: SNES DSP, ESFM...'); });
     // SNES Init (SPC DSP with 64KB RAM)
     memset(snes_ram, 0, sizeof(snes_ram));
     if (snes_chip) { delete snes_chip; }
@@ -473,6 +514,8 @@ void furnace_init_chips(int sample_rate) {
     reg_log.clear();
     logging_enabled = false;
     current_sample_time = 0;
+
+    EM_ASM({ console.log('[FurnaceWASM] ✓ All chips initialized successfully!'); });
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -735,7 +778,7 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
             case CHIP_OPL3: OPL3_GenerateResampled(&opl3_chip_inst, out16); buffer_l[i] = (float)out16[0] / 32768.0f; buffer_r[i] = (float)out16[1] / 32768.0f; break;
             case CHIP_PSG:  YMPSG_Clock(&psg_chip); YMPSG_GetOutput(&psg_chip, &out32[0], &out32[1]); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[1] / 32768.0f; break;
             case CHIP_NES:  if (nes_apu) { nes_apu->Tick(1); nes_dmc->Tick(1); nes_apu->Render(out32); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[0] / 32768.0f; } break;
-            case CHIP_GB: { int gb_cycles = 4194304 / g_sample_rate; GB_advance_cycles(&gb_chip, gb_cycles); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break; }
+            case CHIP_GB: { int gb_cycles = g_sample_rate > 0 ? (4194304 / g_sample_rate) : 87; GB_advance_cycles(&gb_chip, gb_cycles); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break; }
             case CHIP_SID:  if (sid_chip) { sid3_clock(sid_chip); buffer_l[i] = (float)sid_chip->output_l / 32768.0f; buffer_r[i] = (float)sid_chip->output_r / 32768.0f; } break;
             case CHIP_OPLL: OPLL_Clock(&opll_chip, opll_buf); buffer_l[i] = (float)opll_buf[0] / 32768.0f; buffer_r[i] = (float)opll_buf[1] / 32768.0f; break;
             case CHIP_TIA:  if (tia_chip) { tia_chip->tick(1); buffer_l[i] = (float)tia_chip->myCurrentSample[0] / 32768.0f; buffer_r[i] = (float)tia_chip->myCurrentSample[1] / 32768.0f; } break;
@@ -793,7 +836,8 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                     if (ch == 0 || ch == 3) left += out;
                     else right += out;
                     // Advance position (3546895 Hz PAL clock / period / sample rate)
-                    paula_chan[ch].pos += (3546895 / g_sample_rate) * 65536 / (paula_chan[ch].period > 0 ? paula_chan[ch].period : 1);
+                    int sr = g_sample_rate > 0 ? g_sample_rate : 48000;
+                    paula_chan[ch].pos += (3546895 / sr) * 65536 / (paula_chan[ch].period > 0 ? paula_chan[ch].period : 1);
                 }
                 buffer_l[i] = left * 0.5f;
                 buffer_r[i] = right * 0.5f;
