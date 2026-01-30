@@ -49,10 +49,19 @@ interface FileItem {
   handle?: FileSystemFileHandle | FileSystemDirectoryHandle;
 }
 
+// Helper to detect tracker module files (binary formats)
+const TRACKER_EXTENSIONS = ['.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', '.dbm', '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm', '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx'];
+
+function isTrackerModule(filename: string): boolean {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
+  return TRACKER_EXTENSIONS.includes(ext);
+}
+
 export const FileBrowser: React.FC<FileBrowserProps> = ({
   isOpen,
   onClose,
   onLoad,
+  onLoadTrackerModule,
   mode,
   currentProjectData,
   suggestedFilename = 'untitled.dbox',
@@ -94,7 +103,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         // Load from filesystem
         const dirHandle = getCurrentDirectory();
         if (dirHandle) {
-          const entries = await listDirectory(dirHandle, ['.dbox', '.mod', '.xm', '.it', '.s3m']);
+          const entries = await listDirectory(dirHandle, ['.dbox', ...TRACKER_EXTENSIONS]);
           items = entries.map((e: FileEntry) => ({
             id: e.path,
             name: e.name,
@@ -161,6 +170,32 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     setError(null);
 
     try {
+      // Check if this is a tracker module
+      if (isTrackerModule(selectedFile.name)) {
+        if (!onLoadTrackerModule) {
+          throw new Error('Tracker module loading not supported');
+        }
+
+        let buffer: ArrayBuffer;
+
+        if (selectedFile.source === 'filesystem' && selectedFile.handle) {
+          const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
+          buffer = await file.arrayBuffer();
+        } else if (selectedFile.source === 'bundled') {
+          const basePath = import.meta.env.BASE_URL || '/';
+          const response = await fetch(`${basePath}${selectedFile.path}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          buffer = await response.arrayBuffer();
+        } else {
+          throw new Error('Cannot load tracker module from this source');
+        }
+
+        await onLoadTrackerModule(buffer, selectedFile.name);
+        onClose();
+        return;
+      }
+
+      // JSON project file
       let data: object;
 
       if (selectedFile.source === 'library') {
@@ -243,29 +278,58 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     }
   };
 
+  // Handle loading a file (detect type and use appropriate callback)
+  const handleFileLoaded = async (file: File) => {
+    if (isTrackerModule(file.name)) {
+      // Binary tracker module - use onLoadTrackerModule
+      if (onLoadTrackerModule) {
+        const buffer = await file.arrayBuffer();
+        await onLoadTrackerModule(buffer, file.name);
+        onClose();
+      } else {
+        setError('Tracker module loading not supported in this context');
+      }
+    } else {
+      // JSON project file (.dbox)
+      try {
+        const content = await file.text();
+        const data = JSON.parse(content);
+        onLoad(data, file.name);
+        onClose();
+      } catch {
+        setError('Failed to parse file as JSON');
+      }
+    }
+  };
+
   // Use traditional file picker
   const handleBrowseFiles = async () => {
     if (isFileSystemAccessSupported()) {
-      const handles = await pickFiles({ multiple: false });
+      // Use File System Access API with all files option
+      const handles = await pickFiles({
+        multiple: false,
+        types: [
+          {
+            description: 'All Supported Files',
+            accept: {
+              'application/octet-stream': ['.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm'],
+            },
+          },
+        ],
+      });
       if (handles.length > 0) {
-        const content = await readFile(handles[0]);
-        const data = JSON.parse(content);
         const file = await handles[0].getFile();
-        onLoad(data, file.name);
-        onClose();
+        await handleFileLoaded(file);
       }
     } else {
       // Fallback to input element
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.dbox,.mod,.xm,.it,.s3m';
+      // Don't restrict - let user pick any file
       input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-          const content = await file.text();
-          const data = JSON.parse(content);
-          onLoad(data, file.name);
-          onClose();
+          await handleFileLoaded(file);
         }
       };
       input.click();
