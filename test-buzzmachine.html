@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buzzmachine Test</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1a1a1a;
+      color: #00ff00;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { color: #00ff00; }
+    button {
+      background: #333;
+      color: #00ff00;
+      border: 2px solid #00ff00;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:hover {
+      background: #00ff00;
+      color: #000;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #00ff00;
+    }
+    .log {
+      background: #000;
+      border: 1px solid #00ff00;
+      padding: 10px;
+      height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      margin: 5px 0;
+    }
+    .status.ok { background: #0f0; color: #000; }
+    .status.error { background: #f00; color: #fff; }
+    .status.pending { background: #ff0; color: #000; }
+  </style>
+</head>
+<body>
+  <h1>🔊 Buzzmachine Test Suite</h1>
+
+  <div class="section">
+    <h2>Status</h2>
+    <div id="status">
+      <div class="status pending">Checking WASM files...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Test Controls</h2>
+    <button id="testLoad">1. Load WASM Modules</button>
+    <button id="testAudio">2. Play Test Tone</button>
+    <button id="testDistortion">3. Test Distortion</button>
+    <button id="testSVF">4. Test SVF Filter</button>
+  </div>
+
+  <div class="section">
+    <h2>Console Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+
+    function addLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = type === 'error' ? '❌' : type === 'ok' ? '✅' : 'ℹ️';
+      log.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function setStatus(message, state) {
+      status.innerHTML = `<div class="status ${state}">${message}</div>`;
+    }
+
+    // Check if WASM files exist
+    async function checkWasmFiles() {
+      try {
+        const files = [
+          '/buzzmachines/Arguru_Distortion.js',
+          '/buzzmachines/Arguru_Distortion.wasm',
+          '/buzzmachines/Elak_SVF.js',
+          '/buzzmachines/Elak_SVF.wasm',
+        ];
+
+        for (const file of files) {
+          const response = await fetch(file, { method: 'HEAD' });
+          if (response.ok) {
+            addLog(`Found: ${file}`, 'ok');
+          } else {
+            addLog(`Missing: ${file}`, 'error');
+            setStatus('WASM files missing!', 'error');
+            return false;
+          }
+        }
+
+        setStatus('WASM files ready ✅', 'ok');
+        return true;
+      } catch (err) {
+        addLog(`Error checking files: ${err.message}`, 'error');
+        setStatus('Check failed', 'error');
+        return false;
+      }
+    }
+
+    // Test loading WASM modules
+    async function testLoadWasm() {
+      addLog('--- Loading WASM Modules ---');
+      try {
+        // Load Arguru Distortion
+        addLog('Loading Arguru Distortion...');
+        const distJS = await fetch('/buzzmachines/Arguru_Distortion.js').then(r => r.text());
+        const distWasm = await fetch('/buzzmachines/Arguru_Distortion.wasm').then(r => r.arrayBuffer());
+        addLog(`Distortion JS: ${distJS.length} bytes`, 'ok');
+        addLog(`Distortion WASM: ${distWasm.byteLength} bytes`, 'ok');
+
+        // Load Elak SVF
+        addLog('Loading Elak SVF...');
+        const svfJS = await fetch('/buzzmachines/Elak_SVF.js').then(r => r.text());
+        const svfWasm = await fetch('/buzzmachines/Elak_SVF.wasm').then(r => r.arrayBuffer());
+        addLog(`SVF JS: ${svfJS.length} bytes`, 'ok');
+        addLog(`SVF WASM: ${svfWasm.byteLength} bytes`, 'ok');
+
+        // Try to instantiate Arguru Distortion
+        addLog('Instantiating Arguru Distortion...');
+        const wrappedCode = distJS + '\nreturn ArguruDistortion;';
+        const factory = new Function(wrappedCode);
+        const ArguruDistortion = factory();
+
+        if (typeof ArguruDistortion === 'function') {
+          addLog('✅ Factory function loaded', 'ok');
+
+          const module = await ArguruDistortion({ wasmBinary: distWasm });
+          addLog('✅ WASM module instantiated', 'ok');
+
+          // Check exports
+          const exports = Object.keys(module).filter(k => k.startsWith('_buzz'));
+          addLog(`Exports: ${exports.join(', ')}`, 'ok');
+
+          // Try to get machine info
+          if (module._buzz_get_info) {
+            const infoPtr = module._buzz_get_info();
+            addLog(`Machine info pointer: 0x${infoPtr.toString(16)}`, 'ok');
+          }
+
+          setStatus('WASM loading successful ✅', 'ok');
+        } else {
+          throw new Error('Factory function not a function');
+        }
+      } catch (err) {
+        addLog(`Error: ${err.message}`, 'error');
+        addLog(err.stack, 'error');
+        setStatus('WASM loading failed ❌', 'error');
+      }
+    }
+
+    // Initialize
+    checkWasmFiles();
+
+    // Event listeners
+    document.getElementById('testLoad').addEventListener('click', testLoadWasm);
+    document.getElementById('testAudio').addEventListener('click', () => {
+      addLog('Audio test not implemented yet');
+    });
+    document.getElementById('testDistortion').addEventListener('click', () => {
+      addLog('Distortion test not implemented yet');
+    });
+    document.getElementById('testSVF').addEventListener('click', () => {
+      addLog('SVF test not implemented yet');
+    });
+  </script>
+</body>
+</html>
