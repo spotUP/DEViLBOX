@@ -110,4 +110,9 @@ class ITFilterProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('it-filter-processor', ITFilterProcessor);
+// Guard against re-registration during HMR
+try {
+  registerProcessor('it-filter-processor', ITFilterProcessor);
+} catch (e) {
+  // Already registered - ignore
+}

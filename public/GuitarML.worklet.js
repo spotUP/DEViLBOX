@@ -436,4 +436,9 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('guitarml-processor', GuitarMLProcessor);
+// Guard against re-registration during HMR
+try {
+  registerProcessor('guitarml-processor', GuitarMLProcessor);
+} catch (e) {
+  // Already registered - ignore
+}
