@@ -424,8 +424,9 @@ export class BuzzmachineEngine {
     try {
       this.nativeContext = context;
 
-      // Register AudioWorklet module
-      await context.audioWorklet.addModule('/Buzzmachine.worklet.js');
+      // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      await context.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js`);
       console.log('[BuzzmachineEngine] AudioWorklet registered');
 
       this.isLoaded = true;
@@ -475,10 +476,11 @@ export class BuzzmachineEngine {
   ): Promise<void> {
     const machineFile = this.getMachineFilename(machineType);
 
-    // Fetch JS and WASM files
+    // Fetch JS and WASM files (use BASE_URL for GitHub Pages compatibility)
+    const baseUrl = import.meta.env.BASE_URL || '/';
     const [jsResponse, wasmResponse] = await Promise.all([
-      fetch(`/buzzmachines/${machineFile}.js`),
-      fetch(`/buzzmachines/${machineFile}.wasm`),
+      fetch(`${baseUrl}buzzmachines/${machineFile}.js`),
+      fetch(`${baseUrl}buzzmachines/${machineFile}.wasm`),
     ]);
 
     if (!jsResponse.ok || !wasmResponse.ok) {
