@@ -1013,7 +1013,8 @@ const ToggleButton: React.FC<{
   </button>
 );
 
-const MacroMiniView: React.FC<{
+// @ts-expect-error Reserved for future use
+const _MacroMiniView: React.FC<{
   values: number[];
   loop?: number;
   release?: number;
@@ -1105,7 +1106,8 @@ const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   </div>
 );
 
-const WavetablePanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => (
+// @ts-expect-error Reserved for future use
+const _WavetablePanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => (
   <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
@@ -1406,7 +1408,8 @@ function isOperatorCarrier(algorithm: number, opIndex: number): boolean {
   return carrierMap[algorithm]?.includes(opIndex) ?? false;
 }
 
-function getMacroTypeName(type: number): string {
+// @ts-expect-error Reserved for future use
+function _getMacroTypeName(type: number): string {
   const names: Record<number, string> = {
     0: 'VOL', 1: 'ARP', 2: 'DUTY', 3: 'WAVE', 4: 'PITCH',
     5: 'EX1', 6: 'EX2', 7: 'EX3', 8: 'ALG', 9: 'FB',
