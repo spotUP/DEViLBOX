@@ -12,6 +12,7 @@ import { getButtonMapManager } from '../midi/ButtonMapManager';
 import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
+import { useSettingsStore } from './useSettingsStore';
 
 interface MIDIStore {
   // Status
@@ -35,6 +36,9 @@ interface MIDIStore {
 
   // Knob Control Target
   controlledInstrumentId: number | null;  // Which instrument the knobs control (null = all TB303)
+
+  // MIDI Note Transpose
+  midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
 
   // UI State
   showPatternDialog: boolean;
@@ -72,6 +76,9 @@ interface MIDIStore {
   sendCC: (cc: number, value: number, channel?: number) => void;
   midiOutputEnabled: boolean;
   setMidiOutputEnabled: (enabled: boolean) => void;
+
+  // MIDI Note Transpose
+  setMidiOctaveOffset: (offset: number) => void;
 }
 
 // Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
@@ -105,6 +112,7 @@ export const useMIDIStore = create<MIDIStore>()(
       learningParameter: null,
       lastActivityTimestamp: 0,
       controlledInstrumentId: null,  // null = control all TB303 instruments
+      midiOctaveOffset: 0,  // Default: no octave transpose
       showPatternDialog: false,
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
@@ -128,6 +136,8 @@ export const useMIDIStore = create<MIDIStore>()(
           const success = await manager.init();
 
           if (success) {
+            console.log('[useMIDIStore] MIDI initialized successfully, adding message handler');
+
             // Set up message handler for notes and CC
             manager.addMessageHandler((message) => {
               const store = get();
@@ -137,21 +147,59 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note On messages
               if (message.type === 'noteOn' && message.note !== undefined && message.velocity !== undefined) {
-                const trackerNote = midiToTrackerNote(message.note);
+                // Apply octave offset (each octave = 12 semitones)
+                const octaveOffset = store.midiOctaveOffset || 0;
+                const transposedNote = message.note + (octaveOffset * 12);
+
+                const trackerNote = midiToTrackerNote(transposedNote);
                 // Convert tracker format (C-4) to Tone.js format (C4)
                 const toneNote = trackerNote.replace('-', '');
 
                 // Get the instrument to play - use previewInstrument if set (for modal previews),
-                // otherwise fall back to currentInstrument
+                // otherwise use the currently selected instrument (same as keyboard)
                 const instrumentStore = useInstrumentStore.getState();
-                const targetInstrument = instrumentStore.previewInstrument || instrumentStore.currentInstrument;
+                const currentId = instrumentStore.currentInstrumentId;
+                const selectedInstrument = instrumentStore.instruments.find(i => i.id === currentId);
+                const targetInstrument = instrumentStore.previewInstrument ||
+                                         selectedInstrument ||
+                                         instrumentStore.instruments[0]; // Fall back to first instrument
+
+                // Calculate frequency for debugging
+                const freq = 440 * Math.pow(2, (transposedNote - 69) / 12);
+                console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} (offset ${octaveOffset}) -> ${toneNote} (${freq.toFixed(1)} Hz), instrument:`, targetInstrument?.name || 'NONE');
 
                 if (targetInstrument) {
+                  const engine = getToneEngine();
+                  const { midiPolyphonic } = useSettingsStore.getState();
+
+                  // Raw velocity from MIDI (0-127 -> 0-1)
+                  const rawVelocity = message.velocity / 127;
+                  // Apply square root curve to boost low velocities while preserving dynamics
+                  // Also ensure minimum velocity of 0.5 so soft notes are still audible
+                  const velocity = Math.max(0.5, Math.sqrt(rawVelocity));
+
                   activeMidiNotes.set(message.note, toneNote);
 
-                  const engine = getToneEngine();
-                  const velocity = message.velocity / 127;
-                  engine.triggerNoteAttack(targetInstrument.id, toneNote, 0, velocity, targetInstrument);
+                  if (midiPolyphonic) {
+                    // POLYPHONIC MODE: Each note gets its own voice channel
+                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument);
+                  } else {
+                    // MONOPHONIC MODE: Release previous notes first
+                    if (activeMidiNotes.size > 1) {
+                      for (const [midiNote, activeNote] of activeMidiNotes.entries()) {
+                        if (midiNote !== message.note) {
+                          engine.triggerPolyNoteRelease(targetInstrument.id, activeNote, targetInstrument);
+                        }
+                      }
+                      // Keep only the current note
+                      const currentNote = activeMidiNotes.get(message.note);
+                      activeMidiNotes.clear();
+                      if (currentNote) activeMidiNotes.set(message.note, currentNote);
+                    }
+                    engine.triggerPolyNoteAttack(targetInstrument.id, toneNote, velocity, targetInstrument);
+                  }
+                } else {
+                  console.warn('[useMIDIStore] No instruments available for MIDI playback');
                 }
                 return;
               }
@@ -162,13 +210,17 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (toneNote) {
                   activeMidiNotes.delete(message.note);
 
-                  // Get the instrument - use previewInstrument if set, otherwise currentInstrument
+                  // Get the instrument for release
                   const instrumentStore = useInstrumentStore.getState();
-                  const targetInstrument = instrumentStore.previewInstrument || instrumentStore.currentInstrument;
+                  const currentId = instrumentStore.currentInstrumentId;
+                  const selectedInstrument = instrumentStore.instruments.find(i => i.id === currentId);
+                  const targetInstrument = instrumentStore.previewInstrument ||
+                                           selectedInstrument ||
+                                           instrumentStore.instruments[0];
 
                   if (targetInstrument) {
                     const engine = getToneEngine();
-                    engine.triggerNoteRelease(targetInstrument.id, toneNote, 0, targetInstrument);
+                    engine.triggerPolyNoteRelease(targetInstrument.id, toneNote, targetInstrument);
                   }
                 }
                 return;
@@ -222,10 +274,23 @@ export const useMIDIStore = create<MIDIStore>()(
             // Subscribe to device changes
             manager.onDeviceChange(() => {
               get().refreshDevices();
+              // Auto-connect to first device if none selected
+              const state = get();
+              if (!state.selectedInputId && state.inputDevices.length > 0) {
+                console.log('[useMIDIStore] Auto-connecting to first MIDI input:', state.inputDevices[0].name);
+                get().selectInput(state.inputDevices[0].id);
+              }
             });
 
             // Initial device refresh
             get().refreshDevices();
+
+            // Auto-connect to first available input device
+            const currentState = get();
+            if (!currentState.selectedInputId && currentState.inputDevices.length > 0) {
+              console.log('[useMIDIStore] Auto-connecting to first MIDI input:', currentState.inputDevices[0].name);
+              await get().selectInput(currentState.inputDevices[0].id);
+            }
 
             // Initialize CCMapManager for generalized MIDI Learn
             const ccMapManager = getCCMapManager();
@@ -416,6 +481,13 @@ export const useMIDIStore = create<MIDIStore>()(
           state.midiOutputEnabled = enabled;
         });
       },
+
+      // Set MIDI octave offset (-4 to +4)
+      setMidiOctaveOffset: (offset) => {
+        set((state) => {
+          state.midiOctaveOffset = Math.max(-4, Math.min(4, offset));
+        });
+      },
     })),
     {
       name: 'midi-settings',
@@ -426,6 +498,7 @@ export const useMIDIStore = create<MIDIStore>()(
         selectedOutputId: state.selectedOutputId,
         controlledInstrumentId: state.controlledInstrumentId,
         midiOutputEnabled: state.midiOutputEnabled,
+        midiOctaveOffset: state.midiOctaveOffset,
       }),
     }
   )
