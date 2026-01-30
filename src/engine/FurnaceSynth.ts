@@ -209,14 +209,16 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         }
         console.log('[FurnaceSynth] ✓ WASM chip engine ready, chipType:', this.config.chipType);
 
-        // CRITICAL: Only call updateParameters if not currently playing a note
-        // The async init can complete AFTER a note starts, and we don't want to
-        // overwrite operator parameters during active playback
-        if (!this.wasmNoteTriggered) {
-          this.updateParameters();
-          console.log('[FurnaceSynth] ✓ Initial parameters written to WASM');
-        } else {
-          console.log('[FurnaceSynth] ⚠ Skipping init params - note already triggered');
+        // Write parameters to WASM
+        this.updateParameters();
+        console.log('[FurnaceSynth] ✓ Initial parameters written to WASM');
+
+        // If a note is already active (WASM finished loading mid-note), write frequency and key-on
+        if (this.isNoteOn && this.activeNoteFreq > 0) {
+          console.log('[FurnaceSynth] ✓ WASM ready mid-note, writing frequency and key-on for', this.activeNoteFreq.toFixed(1), 'Hz');
+          this.updateFrequency(this.activeNoteFreq);
+          this.writeKeyOn(this.velocity);
+          this.wasmNoteTriggered = true;
         }
       } else {
         console.warn('[FurnaceSynth] WASM engine not initialized, using fallback');
@@ -609,6 +611,15 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA0 + chanOffset), fnum & 0xFF);
       // Register A4-A6: Block (bits 3-5), F-Number high (bits 0-2)
       this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA4 + chanOffset), ((block & 7) << 3) | ((fnum >> 8) & 7));
+    } else if (this.config.chipType === FurnaceChipType.OPN) { // OPN/YM2203 (47)
+      // OPN uses same frequency format as OPN2 but only has 3 channels (no second bank)
+      const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
+      const opnChanOffset = this.channelIndex % 3;
+
+      // Register A0-A2: F-Number low (8 bits)
+      this.chipEngine.write(FurnaceChipType.OPN, 0xA0 + opnChanOffset, fnum & 0xFF);
+      // Register A4-A6: Block (bits 3-5), F-Number high (bits 0-2)
+      this.chipEngine.write(FurnaceChipType.OPN, 0xA4 + opnChanOffset, ((block & 7) << 3) | ((fnum >> 8) & 7));
     } else if (this.config.chipType === FurnaceChipType.OPM) { // OPM (1)
       const { kc, kf } = FurnacePitchUtils.freqToOPM(freq);
 
@@ -743,6 +754,21 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
       case 26: // OPL4 (FurnaceChipType.OPL4)
         FurnaceRegisterMapper.mapOPL4(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 47: // OPN/YM2203 (FurnaceChipType.OPN)
+        // OPN is similar to OPNA but simpler (3 FM + 3 SSG channels, no ADPCM)
+        FurnaceRegisterMapper.mapOPN(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 48: // OPNB-B/YM2610B (FurnaceChipType.OPNB_B)
+        // Extended Neo Geo - similar to OPNB
+        FurnaceRegisterMapper.mapOPNB(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 49: // ESFM (FurnaceChipType.ESFM)
+        // Enhanced OPL3 - use OPL3 mapper
+        FurnaceRegisterMapper.mapOPL3(this.chipEngine, this.channelIndex, this.config);
         break;
 
       // === PSG/SQUARE WAVE CHIPS ===
@@ -1193,6 +1219,13 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         const opnbKonOffs = [1, 2, 5, 6];
         const opnbKonOff = opnbKonOffs[chan & 3];
         this.chipEngine.write(FurnaceChipType.OPNB, 0x28, 0xF0 | opnbKonOff);
+        break;
+      }
+
+      case FurnaceChipType.OPN: { // 47 - YM2203 (3 FM channels only)
+        const opnChanOff = chan % 3;
+        const opnKeyOn = 0xF0 | opnChanOff; // No second bank on OPN
+        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnKeyOn);
         break;
       }
 
@@ -2125,6 +2158,11 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         const opnbKonOffs = [1, 2, 5, 6];
         const opnbKonOff = opnbKonOffs[chan & 3];
         this.chipEngine.write(FurnaceChipType.OPNB, 0x28, opnbKonOff);  // Key off (no 0xF0)
+        break;
+      }
+      case FurnaceChipType.OPN: { // 47 - YM2203 (3 FM channels)
+        const opnChanOff = chan % 3;
+        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnChanOff);  // Key off (no 0xF0)
         break;
       }
       case FurnaceChipType.OPZ: { // 22 - TX81Z/YM2414

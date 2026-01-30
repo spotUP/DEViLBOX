@@ -424,6 +424,11 @@ export class BuzzmachineEngine {
     try {
       this.nativeContext = context;
 
+      // Check if AudioWorklet is available
+      if (!context.audioWorklet) {
+        throw new Error('AudioWorklet not supported in this context');
+      }
+
       // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
       const baseUrl = import.meta.env.BASE_URL || '/';
       await context.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js`);
