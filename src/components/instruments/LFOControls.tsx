@@ -188,7 +188,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
             max={20}
             step={0.1}
             onChange={(v) => updateLFO({ rate: v })}
-            size="sm"
+            size="md"
             color="#a855f7"
           />
           <input
@@ -216,7 +216,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
             min={0}
             max={100}
             onChange={(v) => updateLFO({ filterAmount: v })}
-            size="sm"
+            size="lg"
             color="#22d3ee"
           />
           <div className="text-[10px] text-text-secondary mt-1">{lfo.filterAmount}%</div>
@@ -233,7 +233,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
             min={0}
             max={100}
             onChange={(v) => updateLFO({ pitchAmount: v })}
-            size="sm"
+            size="lg"
             color="#facc15"
           />
           <div className="text-[10px] text-text-secondary mt-1">{lfo.pitchAmount} cents</div>
@@ -250,7 +250,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
             min={0}
             max={100}
             onChange={(v) => updateLFO({ volumeAmount: v })}
-            size="sm"
+            size="lg"
             color="#22c55e"
           />
           <div className="text-[10px] text-text-secondary mt-1">{lfo.volumeAmount}%</div>

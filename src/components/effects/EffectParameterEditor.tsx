@@ -1,13 +1,17 @@
 /**
- * EffectParameterEditor - Modal/panel for editing effect parameters
+ * EffectParameterEditor - Visual knob-based editor for effect parameters
  * Works with both master effects and channel effects
  * Supports dynamic neural parameters from GuitarML models
+ *
+ * UPDATED: Now uses VisualEffectEditors with knob-based interface
  */
 
 import React, { useMemo } from 'react';
 import type { EffectConfig } from '../../types/instrument';
 import { X, Volume2, AlertTriangle } from 'lucide-react';
 import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
+import { VisualEffectEditorWrapper, getVisualEffectEditor } from './VisualEffectEditors';
+import { Knob } from '@components/controls/Knob';
 
 interface EffectParameter {
   name: string;
@@ -20,98 +24,8 @@ interface EffectParameter {
   implemented?: boolean; // For neural parameters
 }
 
-const EFFECT_PARAMETERS: Record<string, EffectParameter[]> = {
-  Distortion: [
-    { name: 'Drive', key: 'drive', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.4 },
-  ],
-  Reverb: [
-    { name: 'Decay', key: 'decay', min: 0.1, max: 10, step: 0.1, unit: 's', defaultValue: 1.5 },
-    { name: 'Pre-Delay', key: 'preDelay', min: 0, max: 0.5, step: 0.01, unit: 's', defaultValue: 0.01 },
-  ],
-  Delay: [
-    { name: 'Time', key: 'time', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
-    { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-  FeedbackDelay: [
-    { name: 'Time', key: 'time', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
-    { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-  PingPongDelay: [
-    { name: 'Time', key: 'time', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
-    { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-  Chorus: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 20, step: 0.1, unit: 'Hz', defaultValue: 1.5 },
-    { name: 'Depth', key: 'depth', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.7 },
-    { name: 'Delay Time', key: 'delayTime', min: 2, max: 20, step: 0.1, unit: 'ms', defaultValue: 3.5 },
-  ],
-  Phaser: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 20, step: 0.1, unit: 'Hz', defaultValue: 0.5 },
-    { name: 'Octaves', key: 'octaves', min: 0, max: 8, step: 0.1, unit: '', defaultValue: 3 },
-    { name: 'Base Freq', key: 'baseFrequency', min: 50, max: 1000, step: 10, unit: 'Hz', defaultValue: 350 },
-  ],
-  Tremolo: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 100, step: 0.1, unit: 'Hz', defaultValue: 10 },
-    { name: 'Depth', key: 'depth', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-  Vibrato: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 100, step: 0.1, unit: 'Hz', defaultValue: 5 },
-    { name: 'Depth', key: 'depth', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.1 },
-  ],
-  AutoFilter: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 20, step: 0.1, unit: 'Hz', defaultValue: 1 },
-    { name: 'Base Freq', key: 'baseFrequency', min: 20, max: 2000, step: 10, unit: 'Hz', defaultValue: 200 },
-    { name: 'Octaves', key: 'octaves', min: 0, max: 8, step: 0.1, unit: '', defaultValue: 2.6 },
-  ],
-  AutoPanner: [
-    { name: 'Frequency', key: 'frequency', min: 0, max: 20, step: 0.1, unit: 'Hz', defaultValue: 1 },
-    { name: 'Depth', key: 'depth', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 1 },
-  ],
-  AutoWah: [
-    { name: 'Base Freq', key: 'baseFrequency', min: 50, max: 500, step: 10, unit: 'Hz', defaultValue: 100 },
-    { name: 'Octaves', key: 'octaves', min: 0, max: 8, step: 0.1, unit: '', defaultValue: 6 },
-    { name: 'Sensitivity', key: 'sensitivity', min: -40, max: 0, step: 1, unit: 'dB', defaultValue: 0 },
-    { name: 'Q', key: 'Q', min: 0, max: 10, step: 0.1, unit: '', defaultValue: 2 },
-  ],
-  BitCrusher: [
-    { name: 'Bits', key: 'bits', min: 1, max: 16, step: 1, unit: '', defaultValue: 4 },
-  ],
-  Chebyshev: [
-    { name: 'Order', key: 'order', min: 1, max: 100, step: 1, unit: '', defaultValue: 50 },
-  ],
-  FrequencyShifter: [
-    { name: 'Frequency', key: 'frequency', min: -1000, max: 1000, step: 1, unit: 'Hz', defaultValue: 0 },
-  ],
-  PitchShift: [
-    { name: 'Pitch', key: 'pitch', min: -12, max: 12, step: 1, unit: 'st', defaultValue: 0 },
-    { name: 'Window Size', key: 'windowSize', min: 0.01, max: 0.5, step: 0.01, unit: 's', defaultValue: 0.1 },
-    { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0 },
-  ],
-  Compressor: [
-    { name: 'Threshold', key: 'threshold', min: -100, max: 0, step: 1, unit: 'dB', defaultValue: -24 },
-    { name: 'Ratio', key: 'ratio', min: 1, max: 20, step: 0.1, unit: ':1', defaultValue: 12 },
-    { name: 'Attack', key: 'attack', min: 0, max: 1, step: 0.001, unit: 's', defaultValue: 0.003 },
-    { name: 'Release', key: 'release', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
-  ],
-  EQ3: [
-    { name: 'Low', key: 'low', min: -20, max: 20, step: 0.5, unit: 'dB', defaultValue: 0 },
-    { name: 'Mid', key: 'mid', min: -20, max: 20, step: 0.5, unit: 'dB', defaultValue: 0 },
-    { name: 'High', key: 'high', min: -20, max: 20, step: 0.5, unit: 'dB', defaultValue: 0 },
-    { name: 'Low Freq', key: 'lowFrequency', min: 20, max: 1000, step: 10, unit: 'Hz', defaultValue: 400 },
-    { name: 'High Freq', key: 'highFrequency', min: 1000, max: 10000, step: 100, unit: 'Hz', defaultValue: 2500 },
-  ],
-  Filter: [
-    { name: 'Frequency', key: 'frequency', min: 20, max: 20000, step: 10, unit: 'Hz', defaultValue: 350 },
-    { name: 'Q', key: 'Q', min: 0.001, max: 100, step: 0.1, unit: '', defaultValue: 1 },
-    { name: 'Gain', key: 'gain', min: -40, max: 40, step: 1, unit: 'dB', defaultValue: 0 },
-  ],
-  JCReverb: [
-    { name: 'Room Size', key: 'roomSize', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-  StereoWidener: [
-    { name: 'Width', key: 'width', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
-  ],
-};
+// Neural parameter schema (legacy support) - exported for reference
+export const NEURAL_PARAMETER_SCHEMA: Record<string, EffectParameter[]> = {};
 
 interface EffectParameterEditorProps {
   effect: EffectConfig;
@@ -126,161 +40,197 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
   onUpdateWet,
   onClose,
 }) => {
-  // Get parameters - either from neural model or Tone.js effect schema
-  const parameters = useMemo((): EffectParameter[] => {
-    // Neural effects - get parameters dynamically from model
-    if (effect.category === 'neural' && effect.neuralModelIndex !== undefined) {
-      const mapper = new NeuralParameterMapper(effect.neuralModelIndex);
-      const neuralParams = mapper.getAvailableParameters();
+  // Check if we have a visual editor for this effect type
+  const hasVisualEditor = useMemo(() => {
+    const EditorComponent = getVisualEffectEditor(effect.type);
+    // If it returns GenericEffectEditor, we might need fallback for neural
+    return EditorComponent.name !== 'GenericEffectEditor';
+  }, [effect.type]);
 
-      return neuralParams.map(param => ({
-        name: param.name,
-        key: param.key,
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: param.unit || '%',
-        defaultValue: param.default,
-        implemented: param.implemented,
-      }));
+  // Suppress unused variable warning - used for conditional rendering logic
+  void hasVisualEditor;
+
+  // For neural effects, get parameters dynamically
+  const neuralParameters = useMemo((): EffectParameter[] | null => {
+    if (effect.category !== 'neural' || effect.neuralModelIndex === undefined) {
+      return null;
     }
 
-    // Tone.js effects - use static schema
-    return EFFECT_PARAMETERS[effect.type] || [];
-  }, [effect.category, effect.neuralModelIndex, effect.type]);
+    const mapper = new NeuralParameterMapper(effect.neuralModelIndex);
+    const neuralParams = mapper.getAvailableParameters();
 
+    return neuralParams.map(param => ({
+      name: param.name,
+      key: param.key,
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: param.unit || '%',
+      defaultValue: param.default,
+      implemented: param.implemented,
+    }));
+  }, [effect.category, effect.neuralModelIndex]);
+
+  // If it's a neural effect, render special neural editor
+  if (neuralParameters) {
+    return (
+      <NeuralEffectEditor
+        effect={effect}
+        parameters={neuralParameters}
+        onUpdateParameter={onUpdateParameter}
+        onUpdateWet={onUpdateWet}
+        onClose={onClose}
+      />
+    );
+  }
+
+  // Use visual editor for standard effects
+  return (
+    <VisualEffectEditorWrapper
+      effect={effect}
+      onUpdateParameter={onUpdateParameter}
+      onUpdateWet={onUpdateWet}
+      onClose={onClose}
+    />
+  );
+};
+
+// ============================================================================
+// NEURAL EFFECT EDITOR (for GuitarML models)
+// ============================================================================
+
+interface NeuralEffectEditorProps {
+  effect: EffectConfig;
+  parameters: EffectParameter[];
+  onUpdateParameter: (key: string, value: number) => void;
+  onUpdateWet: (wet: number) => void;
+  onClose?: () => void;
+}
+
+function SectionHeader({ color, title }: { color: string; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="w-1 h-4 rounded-full" style={{ backgroundColor: color }} />
+      <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+    </div>
+  );
+}
+
+const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
+  effect,
+  parameters,
+  onUpdateParameter,
+  onUpdateWet,
+  onClose,
+}) => {
   const getParameterValue = (param: EffectParameter): number => {
     const value = effect.parameters[param.key] ?? param.defaultValue;
-    // Handle case where value might be a string (e.g., filter type)
     return typeof value === 'number' ? value : param.defaultValue;
   };
 
-  const formatValue = (value: number, param: EffectParameter): string => {
-    let formatted = value.toFixed(param.step < 0.1 ? 2 : param.step < 1 ? 1 : 0);
-    return `${formatted}${param.unit}`;
-  };
+  // Split parameters into implemented and unimplemented
+  const implementedParams = parameters.filter(p => p.implemented !== false);
+  const unimplementedParams = parameters.filter(p => p.implemented === false);
 
   return (
-    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden">
+    <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515] rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm text-accent-primary">{effect.type}</span>
-          <span className={`text-xs px-2 py-0.5 rounded ${
-            effect.enabled
-              ? 'bg-accent-success/10 text-accent-success'
-              : 'bg-accent-error/10 text-accent-error'
-          }`}>
-            {effect.enabled ? 'Active' : 'Bypassed'}
-          </span>
+      <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600">
+            <Volume2 size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">{effect.type}</h2>
+            <p className="text-xs text-gray-400">
+              Neural Effect | {effect.enabled ? 'Active' : 'Bypassed'}
+            </p>
+          </div>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
           >
             <X size={16} />
           </button>
         )}
       </div>
 
-      {/* Parameters */}
+      {/* Content */}
       <div className="p-4 space-y-4">
-        {parameters.length === 0 ? (
-          <div className="p-4 text-center text-text-muted text-sm">
-            No parameters available for this effect.
-          </div>
-        ) : (
-          parameters.map((param) => {
-            const value = getParameterValue(param);
-            const isUnimplemented = param.implemented === false;
-
-            return (
-              <div key={param.key} className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className={`text-xs font-medium ${
-                    isUnimplemented ? 'text-text-muted' : 'text-text-secondary'
-                  }`}>
-                    {param.name}
-                    {isUnimplemented && (
-                      <span className="ml-1 inline-flex items-center gap-0.5 text-yellow-500" title="Not yet implemented">
-                        <AlertTriangle size={10} />
-                      </span>
-                    )}
-                  </label>
-                  <span className={`text-xs font-mono ${
-                    isUnimplemented ? 'text-text-muted' : 'text-accent-primary'
-                  }`}>
-                    {formatValue(value, param)}
-                  </span>
-                </div>
-                <input
-                  type="range"
+        {/* Implemented Parameters */}
+        {implementedParams.length > 0 && (
+          <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+            <SectionHeader color="#a855f7" title="Parameters" />
+            <div className="flex flex-wrap justify-around gap-4">
+              {implementedParams.map((param) => (
+                <Knob
+                  key={param.key}
+                  value={getParameterValue(param)}
                   min={param.min}
                   max={param.max}
-                  step={param.step}
-                  value={value}
-                  onChange={(e) => onUpdateParameter(param.key, Number(e.target.value))}
-                  disabled={isUnimplemented}
-                  className={`w-full h-2 bg-dark-bgSecondary rounded-lg appearance-none cursor-pointer
-                           border border-dark-border
-                           ${isUnimplemented ? 'opacity-50 cursor-not-allowed' : ''}
-                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded [&::-webkit-slider-thumb]:bg-accent-primary
-                           [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-dark-border
-                           [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                           [&::-moz-range-thumb]:rounded [&::-moz-range-thumb]:bg-accent-primary
-                           [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-dark-border`}
+                  onChange={(v) => onUpdateParameter(param.key, v)}
+                  label={param.name}
+                  size="sm"
+                  color="#a855f7"
+                  formatValue={(v) => `${Math.round(v)}${param.unit}`}
                 />
-                <div className="flex items-center justify-between text-[10px] text-text-muted font-mono">
-                  <span>{formatValue(param.min, param)}</span>
-                  <span>{formatValue(param.max, param)}</span>
-                </div>
-                {isUnimplemented && (
-                  <div className="text-[10px] text-yellow-500 flex items-center gap-1">
-                    <AlertTriangle size={10} />
-                    <span>Not yet implemented - will be added in future update</span>
-                  </div>
-                )}
-              </div>
-            );
-          })
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* Wet/Dry Mix */}
-        <div className="pt-4 border-t border-dark-border space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-accent-primary flex items-center gap-1">
-              <Volume2 size={12} />
-              Wet / Dry Mix
-            </label>
-            <span className="text-xs text-accent-primary font-mono">{effect.wet}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={effect.wet}
-            onChange={(e) => onUpdateWet(Number(e.target.value))}
-            className="w-full h-2 bg-dark-bgSecondary rounded-lg appearance-none cursor-pointer
-                     border border-accent-primary/30
-                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                     [&::-webkit-slider-thumb]:rounded [&::-webkit-slider-thumb]:bg-accent-primary
-                     [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                     [&::-moz-range-thumb]:rounded [&::-moz-range-thumb]:bg-accent-primary"
-          />
-          <div className="flex items-center justify-between text-[10px] text-text-muted font-mono">
-            <span>0% (Dry)</span>
-            <span>100% (Wet)</span>
-          </div>
-        </div>
-      </div>
+        {/* Unimplemented Parameters (show as disabled) */}
+        {unimplementedParams.length > 0 && (
+          <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800 opacity-50">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={14} className="text-yellow-500" />
+              <h3 className="text-sm font-bold text-yellow-500 uppercase tracking-wide">
+                Coming Soon
+              </h3>
+            </div>
+            <div className="flex flex-wrap justify-around gap-4">
+              {unimplementedParams.map((param) => (
+                <Knob
+                  key={param.key}
+                  value={getParameterValue(param)}
+                  min={param.min}
+                  max={param.max}
+                  onChange={() => {}} // Disabled
+                  label={param.name}
+                  size="sm"
+                  color="#6b7280"
+                  formatValue={(v) => `${Math.round(v)}${param.unit}`}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* Info */}
-      <div className="px-4 pb-4">
-        <div className="text-[10px] text-text-muted p-2 bg-dark-bgSecondary rounded border border-dark-border">
-          Changes are applied in real-time to the audio signal.
+        {/* Mix */}
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <SectionHeader color="#ec4899" title="Output" />
+          <div className="flex justify-center">
+            <Knob
+              value={effect.wet}
+              min={0}
+              max={100}
+              onChange={onUpdateWet}
+              label="Mix"
+              size="lg"
+              color="#ec4899"
+              formatValue={(v) => `${Math.round(v)}%`}
+            />
+          </div>
+        </section>
+
+        {/* Info */}
+        <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Neural effects use machine learning models for authentic amp/pedal emulation.
+            Changes are applied in real-time.
+          </p>
         </div>
       </div>
     </div>

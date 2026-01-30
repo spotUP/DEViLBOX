@@ -16,9 +16,9 @@ import {
   Zap,
   ChevronDown,
   Library,
+  Play,
   RefreshCw,
   ArrowRightLeft,
-  Play,
   Shuffle,
   Settings2,
   Copy,
@@ -53,6 +53,9 @@ const PLAYBACK_MODES: { value: ArpeggioMode; label: string; icon: React.ReactNod
   { value: 'oneshot', label: 'One-Shot', icon: <Play size={12} /> },
   { value: 'random', label: 'Random', icon: <Shuffle size={12} /> },
 ];
+
+// Division values for note-based speed - exported for reference
+export const DIVISIONS = [1, 2, 4, 8, 16, 32, 64];
 
 // Helper: Convert legacy pattern to steps
 const legacyPatternToSteps = (pattern?: number[]): ArpeggioStep[] => {

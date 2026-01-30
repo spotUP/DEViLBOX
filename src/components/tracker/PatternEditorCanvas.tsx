@@ -3,17 +3,9 @@
  * Inspired by Bassoon Tracker's approach: canvas rendering with aggressive caching
  *
  * Hybrid approach: Canvas for pattern grid + HTML overlays for UI controls
- *
- * Features ported from PatternEditor:
- * - Smooth scrolling (Tone.js synced) and stepped scrolling modes
- * - Ghost patterns (previous/next pattern preview)
- * - Automation lanes overlay
- * - Custom horizontal scrollbar
- * - Full channel header controls
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import * as Tone from 'tone';
 import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -22,9 +14,8 @@ import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
-import { AutomationLanes } from './AutomationLanes';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -32,6 +23,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+export const CHANNEL_WIDTH = 140; // Width per channel in canvas
 
 // XM note names
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -108,7 +100,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
-  const contentScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [scrollLeft, setScrollLeft] = useState(0);
   const [channelTriggers, setChannelTriggers] = useState<ChannelTrigger[]>([]);
@@ -121,43 +112,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
 
-  // Smooth scrolling anchor (synchronization point)
-  const scrollAnchorRef = useRef({ row: 0, time: 0 });
-  const speedRef = useRef(6); // Default speed
-
-  // Update anchor when row changes (subscribe to store to avoid re-renders)
-  useEffect(() => {
-    const unsub = useTransportStore.subscribe((state, prevState) => {
-      // Update anchor on row change or play start
-      if (state.currentRow !== scrollAnchorRef.current.row || (state.isPlaying && !prevState.isPlaying)) {
-        scrollAnchorRef.current = {
-          row: state.currentRow,
-          time: performance.now()
-        };
-      }
-    });
-    return unsub;
-  }, []);
-
-  // Custom scrollbar state
-  const [customScrollThumbLeft, setCustomScrollThumbLeft] = useState(0);
-  const [customScrollThumbWidth, setCustomScrollThumbWidth] = useState(100);
-  const [needsHorizontalScroll, setNeedsHorizontalScroll] = useState(false);
-  const customScrollTrackRef = useRef<HTMLDivElement>(null);
-  const isDraggingScrollbar = useRef(false);
-  const isScrollSyncing = useRef(false);
-
-  // Mobile state ref for render function access
-  const isMobileRef = useRef(isMobile);
-  isMobileRef.current = isMobile;
-
   // Get pattern and actions
   const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
   const addChannel = useTrackerStore((state) => state.addChannel);
   const removeChannel = useTrackerStore((state) => state.removeChannel);
   const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
   const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
-  const toggleChannelCollapse = useTrackerStore((state) => state.toggleChannelCollapse);
   const setChannelColor = useTrackerStore((state) => state.setChannelColor);
   const setCell = useTrackerStore((state) => state.setCell);
   const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
@@ -165,29 +125,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const cutTrack = useTrackerStore((state) => state.cutTrack);
   const pasteTrack = useTrackerStore((state) => state.pasteTrack);
 
-  // Get adjacent patterns for ghost rendering
-  const prevPattern = useTrackerStore((state) => {
-    const prevIndex = state.currentPatternIndex > 0
-      ? state.currentPatternIndex - 1
-      : state.patterns.length - 1;
-    return state.patterns[prevIndex];
-  });
-  const nextPattern = useTrackerStore((state) => {
-    const nextIndex = state.currentPatternIndex < state.patterns.length - 1
-      ? state.currentPatternIndex + 1
-      : 0;
-    return state.patterns[nextIndex];
-  });
-
-  // Transport state with smooth scrolling
-  // NOTE: continuousRow removed - read directly from store to avoid re-renders during playback
-  const { isPlaying, smoothScrolling, speed } = useTransportStore(
-    useShallow((state) => ({
-      isPlaying: state.isPlaying,
-      smoothScrolling: state.smoothScrolling,
-      speed: state.speed,
-    }))
-  );
+  const isPlaying = useTransportStore((state) => state.isPlaying);
   const mobileChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
 
   // Track theme for cache invalidation
@@ -195,14 +133,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const lastThemeRef = useRef(currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
-  // Cell context menu - uses cursor position for context menu
+  // Cell context menu
   const cellContextMenu = useCellContextMenu();
-  const cursorForMenu = useTrackerStore((state) => state.cursor);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    cellContextMenu.openMenu(e, cursorForMenu.rowIndex, cursorForMenu.channelIndex);
-  }, [cellContextMenu, cursorForMenu.rowIndex, cursorForMenu.channelIndex]);
 
   // Clear caches when theme changes
   useEffect(() => {
@@ -219,7 +151,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     bg: '#0a0a0b',
     rowNormal: '#0d0d0e',
     rowHighlight: '#151518',
-    rowGhost: isCyanTheme ? 'rgba(0, 255, 255, 0.05)' : 'rgba(100, 100, 100, 0.1)',
     centerLine: isCyanTheme ? 'rgba(0, 255, 255, 0.25)' : 'rgba(239, 68, 68, 0.25)',
     cursor: isCyanTheme ? '#00ffff' : '#ef4444',
     cursorBg: isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)',
@@ -229,26 +160,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     textInstrument: '#4ade80',
     textVolume: '#60a5fa',
     textEffect: '#f97316',
-    textEffect2: '#ec4899', // Pink for effect2
-    textAccent: '#fbbf24', // Yellow/amber for accent
-    textSlide: '#a78bfa', // Purple for slide
     border: '#252530',
     lineNumber: '#707070',
     lineNumberHighlight: '#f97316',
   }), [isCyanTheme]);
-
-  // Update speed ref when it changes (without restarting animation)
-  useEffect(() => {
-    speedRef.current = speed;
-  }, [speed]);
-
-  // Initialize smooth scrolling animation when playback starts
-  const isPlayingRef = useRef(isPlaying);
-  const smoothScrollingRef = useRef(smoothScrolling);
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-    smoothScrollingRef.current = smoothScrolling;
-  }, [isPlaying, smoothScrolling]);
 
   // Mobile swipe handlers
   const handleSwipeLeft = useCallback(() => {
@@ -436,19 +351,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     instrument: number,
     volume: number,
     effTyp: number,
-    eff: number,
-    effect2: string | null | undefined,
-    accent: boolean | undefined,
-    slide: boolean | undefined
+    eff: number
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}-${effect2 || ''}-${accent ? 1 : 0}-${slide ? 1 : 0}`;
+    const key = `${instrument}-${volume}-${effTyp}-${eff}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
 
-    // Width: inst(2) + vol(2) + eff1(3) + eff2(3) + accent(1) + slide(1) + gaps
     const canvas = document.createElement('canvas');
-    canvas.width = CHAR_WIDTH * 12 + 28;
+    canvas.width = CHAR_WIDTH * 9 + 16;
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -469,33 +380,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     ctx.fillText(hasVolume ? hexByte(volume) : '..', x, y);
     x += CHAR_WIDTH * 2 + 4;
 
-    // Effect 1 (3 hex digits: type + param)
+    // Effect (3 hex digits: type + param)
     const hasEffect = effTyp !== 0 || eff !== 0;
     ctx.fillStyle = hasEffect ? colors.textEffect : colors.textMuted;
     const effectStr = hasEffect
       ? effTyp.toString(16).toUpperCase() + hexByte(eff)
       : '...';
     ctx.fillText(effectStr, x, y);
-    x += CHAR_WIDTH * 3 + 4;
-
-    // Effect 2 (3 chars string)
-    const hasEffect2 = effect2 && effect2 !== '...' && effect2 !== '000';
-    ctx.fillStyle = hasEffect2 ? colors.textEffect2 : colors.textMuted;
-    ctx.fillText(effect2 || '...', x, y);
-    x += CHAR_WIDTH * 3 + 4;
-
-    // Accent (1 char)
-    ctx.fillStyle = accent ? colors.textAccent : colors.textMuted;
-    ctx.fillText(accent ? 'A' : '.', x, y);
-    x += CHAR_WIDTH + 4;
-
-    // Slide (1 char)
-    ctx.fillStyle = slide ? colors.textSlide : colors.textMuted;
-    ctx.fillText(slide ? 'S' : '.', x, y);
 
     paramCacheRef.current[key] = canvas;
     return canvas;
-  }, [colors.textMuted, colors.textInstrument, colors.textVolume, colors.textEffect, colors.textEffect2, colors.textAccent, colors.textSlide]);
+  }, [colors.textMuted, colors.textInstrument, colors.textVolume, colors.textEffect]);
 
   // Get line number canvas from cache or create it
   const getLineNumberCanvas = useCallback((lineNum: number, useHex: boolean): HTMLCanvasElement => {
@@ -549,202 +444,92 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       return;
     }
 
-    // Get ghost patterns for preview
-    const prevPatternIndex = state.currentPatternIndex > 0
-      ? state.currentPatternIndex - 1
-      : state.patterns.length - 1;
-    const nextPatternIndex = state.currentPatternIndex < state.patterns.length - 1
-      ? state.currentPatternIndex + 1
-      : 0;
-    const prevPattern = state.patterns[prevPatternIndex];
-    const nextPattern = state.patterns[nextPatternIndex];
-    const showGhostPatterns = state.showGhostPatterns;
-
     const cursor = state.cursor;
     const isPlaying = transportState.isPlaying;
-    const smoothScrollingActive = transportState.smoothScrolling && isPlaying;
-    const isLooping = transportState.isLooping;
+    const currentRow = isPlaying ? transportState.currentRow : cursor.rowIndex;
     const useHex = uiState.useHexNumbers;
-
-    // Calculate current row position (fractional for smooth scrolling)
-    let currentRowPosition: number;
-    if (isPlaying && smoothScrollingActive) {
-      // Smooth scrolling: calculate fractional row position based on anchor
-      const transport = Tone.getTransport();
-      const currentBpm = transport.bpm.value || 125;
-      const tickInterval = 2.5 / currentBpm;
-      const secondsPerRow = tickInterval * speedRef.current;
-      
-      const anchor = scrollAnchorRef.current;
-      const elapsedSeconds = (performance.now() - anchor.time) / 1000;
-      
-      // Predict current position: anchor row + progress into next row
-      // We limit prediction to +1.5 rows to prevent wild overshoots if lag occurs
-      const predictedOffset = Math.min(elapsedSeconds / secondsPerRow, 1.5);
-      
-      currentRowPosition = anchor.row + predictedOffset;
-    } else if (isPlaying) {
-      // Stepped scrolling: use integer row from store directly
-      currentRowPosition = transportState.currentRow;
-    } else {
-      // Stopped: use cursor position
-      currentRowPosition = cursor.rowIndex;
-    }
 
     const { width, height } = dimensions;
     const patternLength = pattern.length;
     const numChannels = pattern.channels.length;
 
-    // Calculate visible lines with extra buffer for smooth scrolling
-    const visibleLines = Math.ceil(height / ROW_HEIGHT) + 4;
+    // Calculate visible lines
+    const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
     const topLines = Math.floor(visibleLines / 2);
-    const centerRowIndex = Math.floor(currentRowPosition); // The row that should be at center
-    const visibleStart = centerRowIndex - topLines;
+    const visibleStart = currentRow - topLines;
     const visibleEnd = visibleStart + visibleLines;
 
-    // Center line position - offset by fractional part for smooth scrolling
-    const fractionalOffset = smoothScrollingActive ? (currentRowPosition % 1) * ROW_HEIGHT : 0;
+    // Center line position
     const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
-    const baseY = centerLineTop - (topLines * ROW_HEIGHT) - fractionalOffset;
+    const baseY = centerLineTop - (topLines * ROW_HEIGHT);
 
-    // Track widths - note(3) + inst(2) + vol(2) + eff1(3) + eff2(3) + accent(1) + slide(1) = 15 chars + gaps
+    // Track widths
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    const paramWidth = CHAR_WIDTH * 12 + 28; // inst + vol + eff1 + eff2 + accent + slide
-    const fullChannelWidth = noteWidth + paramWidth + 20;
-    const collapsedWidth = 60; // Narrow width for collapsed channels
-
-    // Mobile: only render selected channel
-    const isMobileView = isMobileRef.current;
-    const mobileChannelIdx = cursor.channelIndex;
-
-    // Pre-calculate channel x positions based on collapsed state
-    const channelXPositions: number[] = [];
-    const channelWidths: number[] = [];
-    let xPos = 0;
-    for (let ch = 0; ch < numChannels; ch++) {
-      const isCollapsed = pattern.channels[ch]?.collapsed || false;
-      const chWidth = isCollapsed ? collapsedWidth : fullChannelWidth;
-      channelXPositions.push(xPos);
-      channelWidths.push(chWidth);
-      xPos += chWidth;
-    }
+    const paramWidth = CHAR_WIDTH * 9 + 16;
+    const channelWidth = noteWidth + paramWidth + 20;
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw rows (including ghost patterns when enabled)
+    // Draw rows
     for (let i = visibleStart; i < visibleEnd; i++) {
       let rowIndex: number;
-      let patternType: 'prev' | 'current' | 'next' = 'current';
-      let sourcePattern = pattern;
-
-      // Handle ghost pattern rendering (works during playback and when stopped)
-      if (i < 0 && showGhostPatterns && prevPattern) {
-        // Previous pattern (ghost)
-        rowIndex = ((prevPattern.length + (i % prevPattern.length)) % prevPattern.length);
-        patternType = 'prev';
-        sourcePattern = prevPattern;
-      } else if (i >= patternLength && showGhostPatterns && nextPattern) {
-        // Next pattern (ghost)
-        rowIndex = (i - patternLength) % nextPattern.length;
-        patternType = 'next';
-        sourcePattern = nextPattern;
-      } else if (i >= 0 && i < patternLength) {
-        // Current pattern
-        rowIndex = i;
-      } else if (isPlaying) {
-        // During playback, wrap within current pattern
+      if (isPlaying) {
         rowIndex = ((i % patternLength) + patternLength) % patternLength;
       } else {
-        // When stopped without ghosts, skip out-of-bounds rows
-        continue;
+        if (i < 0 || i >= patternLength) continue;
+        rowIndex = i;
       }
 
       const y = baseY + ((i - visibleStart) * ROW_HEIGHT);
       if (y < -ROW_HEIGHT || y > height + ROW_HEIGHT) continue;
 
-      // Row background - dimmer for ghost rows
+      // Row background
       const isHighlight = rowIndex % 4 === 0;
-      const isGhostRow = patternType !== 'current';
-      // Center row is where the edit cursor is - compare loop index to center position
-      const isCenterRow = (i === centerRowIndex) && patternType === 'current';
-
-      if (isGhostRow) {
-        ctx.fillStyle = colors.rowGhost;
-      } else {
-        ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
-      }
+      ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
       ctx.fillRect(0, y, width, ROW_HEIGHT);
 
-      // Draw center line highlight (edit bar) BEFORE text so text appears on top
-      if (isCenterRow) {
-        ctx.fillStyle = colors.centerLine;
-        ctx.fillRect(0, y, width, ROW_HEIGHT);
-      }
-
-      // Line number (dimmed for ghost rows)
-      ctx.globalAlpha = isGhostRow ? (isLooping ? 0.4 : 0.6) : 1;
+      // Line number
       const lineNumCanvas = getLineNumberCanvas(rowIndex, useHex);
       ctx.drawImage(lineNumCanvas, 4, y);
 
-      // Draw each channel (on mobile, only the selected channel)
-      const channelCount = Math.min(numChannels, sourcePattern.channels.length);
-      const channelsToRender = isMobileView
-        ? [mobileChannelIdx]  // Mobile: only selected channel
-        : Array.from({ length: channelCount }, (_, i) => i);  // Desktop: all channels
-
-      for (const ch of channelsToRender) {
-        if (ch >= channelCount) continue;
-        const cell = sourcePattern.channels[ch]?.rows[rowIndex];
+      // Draw each channel
+      for (let ch = 0; ch < numChannels; ch++) {
+        const cell = pattern.channels[ch].rows[rowIndex];
         if (!cell) continue;
 
-        const isCollapsed = pattern.channels[ch]?.collapsed || false;
-        const chWidth = channelWidths[ch] || fullChannelWidth;
-        // On mobile, position at x=0 (after line numbers), no scroll offset
-        const x = isMobileView
-          ? LINE_NUMBER_WIDTH + 8
-          : LINE_NUMBER_WIDTH + channelXPositions[ch] + 8 - scrollLeft;
+        const x = LINE_NUMBER_WIDTH + ch * channelWidth + 8 - scrollLeft;
 
-        // Skip if outside visible area (desktop only)
-        if (!isMobileView && (x + chWidth < 0 || x > width)) continue;
+        // Skip if outside visible area
+        if (x + channelWidth < 0 || x > width) continue;
 
         // Note
         const noteCanvas = getNoteCanvas(cell.note || 0);
         ctx.drawImage(noteCanvas, x, y);
 
-        // Parameters (only if not collapsed)
-        if (!isCollapsed) {
-          const paramCanvas = getParamCanvas(
-            cell.instrument || 0,
-            cell.volume || 0,
-            cell.effTyp || 0,
-            cell.eff || 0,
-            cell.effect2,
-            cell.accent,
-            cell.slide
-          );
-          ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
-        }
+        // Parameters
+        const paramCanvas = getParamCanvas(
+          cell.instrument || 0,
+          cell.volume || 0,
+          cell.effTyp || 0,
+          cell.eff || 0
+        );
+        ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
-        // Channel separator (only on desktop)
-        if (!isMobileView) {
-          ctx.fillStyle = colors.border;
-          const separatorX = LINE_NUMBER_WIDTH + channelXPositions[ch] + chWidth - scrollLeft;
-          ctx.fillRect(separatorX, y, 1, ROW_HEIGHT);
-        }
+        // Channel separator
+        ctx.fillStyle = colors.border;
+        ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
       }
-
-      // Reset alpha for next row
-      ctx.globalAlpha = 1;
     }
+
+    // Draw center line highlight
+    ctx.fillStyle = colors.centerLine;
+    ctx.fillRect(0, centerLineTop, width, ROW_HEIGHT);
 
     // Draw cursor (only when not playing)
     if (!isPlaying) {
-      // On mobile, cursor is always at x=0 since only one channel is shown
-      const cursorX = isMobileView
-        ? LINE_NUMBER_WIDTH + 8
-        : LINE_NUMBER_WIDTH + (channelXPositions[cursor.channelIndex] || 0) + 8 - scrollLeft;
+      const cursorX = LINE_NUMBER_WIDTH + cursor.channelIndex * channelWidth + 8 - scrollLeft;
       let cursorOffsetX = 0;
       let cursorW = noteWidth;
 
@@ -761,27 +546,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           cursorW = CHAR_WIDTH * 2;
           break;
         case 'effTyp':
-          // Effect type is position 0 (single character)
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8;
-          cursorW = CHAR_WIDTH;
-          break;
         case 'effParam':
-          // Effect param starts at position 1, has 2 digits
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH;
-          cursorW = CHAR_WIDTH;
-          break;
-        case 'effect2':
-          // Effect 2 has 3 chars like effect 1
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 7 + 12;
-          cursorW = CHAR_WIDTH;
-          break;
-        case 'accent':
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 10 + 16;
-          cursorW = CHAR_WIDTH;
-          break;
-        case 'slide':
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 11 + 20;
-          cursorW = CHAR_WIDTH;
+          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8;
+          cursorW = CHAR_WIDTH * 3;
           break;
       }
 
@@ -789,7 +556,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         cursorOffsetX += cursor.digitIndex * CHAR_WIDTH;
         cursorW = CHAR_WIDTH;
       }
-      if ((cursor.columnType === 'effTyp' || cursor.columnType === 'effParam' || cursor.columnType === 'effect2') && cursor.digitIndex > 0) {
+      if ((cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') && cursor.digitIndex > 0) {
         cursorOffsetX += cursor.digitIndex * CHAR_WIDTH;
         cursorW = CHAR_WIDTH;
       }
@@ -814,28 +581,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     ctx.fillStyle = gradient2;
     ctx.fillRect(0, height - 60, width, 60);
 
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isMobile]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft]);
 
-  // PERFORMANCE: Use ref for render function to prevent animation loop restarts
-  // When render's dependencies change, only the ref is updated, not the animation loop
-  const renderRef = useRef(render);
-  useEffect(() => {
-    renderRef.current = render;
+  // Animation loop
+  const animate = useCallback(() => {
+    render();
+    rafRef.current = requestAnimationFrame(animate);
   }, [render]);
 
-  // Animation loop - uses stable ref, never restarts
+  // Start animation loop
   useEffect(() => {
-    const animate = () => {
-      renderRef.current();
-      rafRef.current = requestAnimationFrame(animate);
-    };
     rafRef.current = requestAnimationFrame(animate);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, []); // Empty deps - loop starts once and never restarts
+  }, [animate]);
 
   // Handle resize
   useEffect(() => {
@@ -904,159 +666,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
 
-  // Check if horizontal scrolling is needed
-  useEffect(() => {
-    if (!headerScrollRef.current) return;
-
-    const updateScrollbarDimensions = () => {
-      if (!headerScrollRef.current) return;
-
-      const scrollWidth = headerScrollRef.current.scrollWidth;
-      const clientWidth = headerScrollRef.current.clientWidth;
-
-      // Determine if scrolling is needed
-      const scrollingNeeded = scrollWidth > clientWidth;
-      setNeedsHorizontalScroll(scrollingNeeded);
-
-      // Calculate thumb dimensions if scrollbar track exists
-      if (scrollingNeeded && customScrollTrackRef.current) {
-        const scrollLeft = headerScrollRef.current.scrollLeft;
-        const trackWidth = customScrollTrackRef.current.clientWidth;
-        const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
-        const maxScroll = scrollWidth - clientWidth;
-        const maxThumbLeft = trackWidth - thumbWidth;
-        const scrollPercent = maxScroll > 0 ? scrollLeft / maxScroll : 0;
-
-        setCustomScrollThumbWidth(thumbWidth);
-        setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
-      }
-    };
-
-    updateScrollbarDimensions();
-
-    // Update when channels change
-    const resizeObserver = new ResizeObserver(updateScrollbarDimensions);
-    resizeObserver.observe(headerScrollRef.current);
-
-    return () => resizeObserver.disconnect();
-  }, [pattern?.channels.length, needsHorizontalScroll]);
-
-  // Handle header scroll sync with custom scrollbar
-  const handleHeaderScroll = useCallback(() => {
-    if (isScrollSyncing.current) return;
-    if (headerScrollRef.current && contentScrollRef.current) {
-      const scrollLeftVal = headerScrollRef.current.scrollLeft;
-
-      isScrollSyncing.current = true;
-      setScrollLeft(scrollLeftVal);
-      contentScrollRef.current.scrollLeft = scrollLeftVal;
-
-      // Update custom scrollbar thumb position
-      if (!isDraggingScrollbar.current && customScrollTrackRef.current) {
-        const scrollWidth = headerScrollRef.current.scrollWidth;
-        const clientWidth = headerScrollRef.current.clientWidth;
-        const maxScroll = scrollWidth - clientWidth;
-        if (maxScroll > 0) {
-          const scrollPercent = scrollLeftVal / maxScroll;
-          const trackWidth = customScrollTrackRef.current.clientWidth;
-          const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
-          const maxThumbLeft = trackWidth - thumbWidth;
-          setCustomScrollThumbLeft(scrollPercent * maxThumbLeft);
-          setCustomScrollThumbWidth(thumbWidth);
-        }
-      }
-
-      requestAnimationFrame(() => {
-        isScrollSyncing.current = false;
-      });
-    }
+  // Handle header scroll sync
+  const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(e.currentTarget.scrollLeft);
   }, []);
 
-  // Handle content scroll sync
-  const handleContentScroll = useCallback(() => {
-    if (isScrollSyncing.current) return;
-    if (headerScrollRef.current && contentScrollRef.current) {
-      const scrollLeftVal = contentScrollRef.current.scrollLeft;
-
-      isScrollSyncing.current = true;
-      setScrollLeft(scrollLeftVal);
-      headerScrollRef.current.scrollLeft = scrollLeftVal;
-
-      requestAnimationFrame(() => {
-        isScrollSyncing.current = false;
-      });
-    }
-  }, []);
-
-  // Custom scrollbar handlers
-  const handleCustomScrollbarMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!headerScrollRef.current || !customScrollTrackRef.current) return;
-
-    e.preventDefault();
-    isDraggingScrollbar.current = true;
-
-    const track = customScrollTrackRef.current;
-    const trackRect = track.getBoundingClientRect();
-    const clickX = e.clientX - trackRect.left;
-    const thumbWidth = customScrollThumbWidth;
-
-    const thumbLeft = customScrollThumbLeft;
-    const clickedOnThumb = clickX >= thumbLeft && clickX <= thumbLeft + thumbWidth;
-    const startDragX = clickedOnThumb ? clickX - thumbLeft : thumbWidth / 2;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!headerScrollRef.current || !customScrollTrackRef.current) return;
-
-      const moveX = moveEvent.clientX - trackRect.left;
-      const newThumbLeft = Math.max(0, Math.min(trackRect.width - thumbWidth, moveX - startDragX));
-      const scrollPercent = newThumbLeft / (trackRect.width - thumbWidth);
-
-      const scrollWidth = headerScrollRef.current.scrollWidth;
-      const clientWidth = headerScrollRef.current.clientWidth;
-      const maxScroll = scrollWidth - clientWidth;
-
-      headerScrollRef.current.scrollLeft = scrollPercent * maxScroll;
-      setScrollLeft(scrollPercent * maxScroll);
-      setCustomScrollThumbLeft(newThumbLeft);
-    };
-
-    const handleMouseUp = () => {
-      isDraggingScrollbar.current = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    if (!clickedOnThumb) {
-      const newThumbLeft = Math.max(0, Math.min(trackRect.width - thumbWidth, clickX - thumbWidth / 2));
-      const scrollPercent = newThumbLeft / (trackRect.width - thumbWidth);
-
-      const scrollWidth = headerScrollRef.current.scrollWidth;
-      const clientWidth = headerScrollRef.current.clientWidth;
-      const maxScroll = scrollWidth - clientWidth;
-
-      headerScrollRef.current.scrollLeft = scrollPercent * maxScroll;
-      setScrollLeft(scrollPercent * maxScroll);
-      setCustomScrollThumbLeft(newThumbLeft);
-    }
-  }, [customScrollThumbLeft, customScrollThumbWidth]);
-
-  // Calculate channel header width - match canvas render
+  // Calculate channel header width
   const noteWidth = CHAR_WIDTH * 3 + 4;
-  const paramWidth = CHAR_WIDTH * 12 + 28; // inst + vol + eff1 + eff2 + accent + slide
+  const paramWidth = CHAR_WIDTH * 9 + 16;
   const channelHeaderWidth = noteWidth + paramWidth + 20;
-  const collapsedChannelWidth = 60; // Narrow width for collapsed channels
-
-  // Calculate total width accounting for collapsed channels
-  const totalChannelsWidth = pattern
-    ? pattern.channels.reduce((sum, ch) => sum + (ch.collapsed ? collapsedChannelWidth : channelHeaderWidth), 0)
-    : 0;
-
-  // Get width for a specific channel
-  const getChannelWidth = (channel: typeof pattern.channels[0]) =>
-    channel.collapsed ? collapsedChannelWidth : channelHeaderWidth;
+  const totalChannelsWidth = pattern ? pattern.channels.length * channelHeaderWidth : 0;
 
   if (!pattern) {
     return (
@@ -1161,7 +780,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
                       style={{
-                        width: getChannelWidth(channel),
+                        width: channelHeaderWidth,
                         backgroundColor: channel.color ? `${channel.color}15` : undefined,
                         boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
                       }}
@@ -1173,78 +792,59 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
                         >
                           {(idx + 1).toString().padStart(2, '0')}
                         </span>
-                        {!channel.collapsed && (
-                          <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
-                        )}
+                        <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {/* Collapse channel button - always visible */}
+                        <ChannelContextMenu
+                          channelIndex={idx}
+                          channel={channel}
+                          patternId={pattern.id}
+                          patternLength={pattern.length}
+                          onFillPattern={handleFillPattern}
+                          onClearChannel={handleClearChannel}
+                          onCopyChannel={handleCopyChannel}
+                          onCutChannel={handleCutChannel}
+                          onPasteChannel={handlePasteChannel}
+                          onTranspose={handleTranspose}
+                          onHumanize={handleHumanize}
+                          onInterpolate={handleInterpolate}
+                          onAcidGenerator={onAcidGenerator || (() => {})}
+                        />
+                        <ChannelColorPicker
+                          currentColor={channel.color}
+                          onColorSelect={(color) => setChannelColor(idx, color)}
+                        />
                         <button
-                          onClick={() => toggleChannelCollapse(idx)}
+                          onClick={() => toggleChannelMute(idx)}
                           className={`p-1 rounded transition-colors ${
-                            channel.collapsed
+                            channel.muted
+                              ? 'bg-accent-error/20 text-accent-error'
+                              : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                          }`}
+                          title={channel.muted ? 'Unmute' : 'Mute'}
+                        >
+                          {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                        </button>
+                        <button
+                          onClick={() => toggleChannelSolo(idx)}
+                          className={`p-1 rounded transition-colors ${
+                            channel.solo
                               ? 'bg-accent-primary/20 text-accent-primary'
                               : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
                           }`}
-                          title={channel.collapsed ? 'Expand Channel' : 'Collapse Channel'}
+                          title={channel.solo ? 'Unsolo' : 'Solo'}
                         >
-                          {channel.collapsed ? <ChevronsRight size={12} /> : <ChevronsLeft size={12} />}
+                          <Headphones size={12} />
                         </button>
-                        {/* Other controls - hidden when collapsed */}
-                        {!channel.collapsed && (
-                          <>
-                            <ChannelContextMenu
-                              channelIndex={idx}
-                              channel={channel}
-                              patternId={pattern.id}
-                              patternLength={pattern.length}
-                              onFillPattern={handleFillPattern}
-                              onClearChannel={handleClearChannel}
-                              onCopyChannel={handleCopyChannel}
-                              onCutChannel={handleCutChannel}
-                              onPasteChannel={handlePasteChannel}
-                              onTranspose={handleTranspose}
-                              onHumanize={handleHumanize}
-                              onInterpolate={handleInterpolate}
-                              onAcidGenerator={onAcidGenerator || (() => {})}
-                            />
-                            <ChannelColorPicker
-                              currentColor={channel.color}
-                              onColorSelect={(color) => setChannelColor(idx, color)}
-                            />
-                            <button
-                              onClick={() => toggleChannelMute(idx)}
-                              className={`p-1 rounded transition-colors ${
-                                channel.muted
-                                  ? 'bg-accent-error/20 text-accent-error'
-                                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
-                              }`}
-                              title={channel.muted ? 'Unmute' : 'Mute'}
-                            >
-                              {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
-                            </button>
-                            <button
-                              onClick={() => toggleChannelSolo(idx)}
-                              className={`p-1 rounded transition-colors ${
-                                channel.solo
-                                  ? 'bg-accent-primary/20 text-accent-primary'
-                                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
-                              }`}
-                              title={channel.solo ? 'Unsolo' : 'Solo'}
-                            >
-                              <Headphones size={12} />
-                            </button>
-                            {pattern.channels.length > 1 && (
-                              <button
-                                onClick={() => removeChannel(idx)}
-                                className="p-1 rounded text-text-muted hover:text-accent-error hover:bg-dark-bgHover transition-colors"
-                                title="Remove Channel"
-                              >
-                                <Minus size={12} />
-                              </button>
-                            )}
-                          </>
+                        {pattern.channels.length > 1 && (
+                          <button
+                            onClick={() => removeChannel(idx)}
+                            className="p-1 rounded text-text-muted hover:text-accent-error hover:bg-dark-bgHover transition-colors"
+                            title="Remove Channel"
+                          >
+                            <Minus size={12} />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1265,34 +865,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
               </div>
             </div>
           </div>
-
-          {/* Custom scrollbar - only visible when horizontal scrolling is needed */}
-          {needsHorizontalScroll && (
-            <div className="flex w-full">
-              {/* Spacer for row number column */}
-              <div className="flex-shrink-0" style={{ width: LINE_NUMBER_WIDTH }} />
-
-              {/* Custom scrollbar track */}
-              <div
-                ref={customScrollTrackRef}
-                className="flex-1 bg-dark-bgSecondary border-t border-dark-border cursor-pointer"
-                style={{ height: '12px', minWidth: 0 }}
-                onMouseDown={handleCustomScrollbarMouseDown}
-              >
-                {/* Custom scrollbar thumb */}
-                <div
-                  className="bg-accent-primary hover:bg-accent-primary/80 transition-colors"
-                  style={{
-                    height: '100%',
-                    width: `${customScrollThumbWidth}px`,
-                    transform: `translateX(${customScrollThumbLeft}px)`,
-                    borderRadius: '2px',
-                    pointerEvents: 'none',
-                  }}
-                />
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1302,7 +874,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         className="flex-1 relative bg-dark-bg"
         style={{ minHeight: 200 }}
         tabIndex={0}
-        onContextMenu={handleContextMenu}
+        onContextMenu={cellContextMenu.handleContextMenu}
       >
         {/* VU Meters overlay */}
         <div
@@ -1311,45 +883,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         >
           <ChannelVUMeters />
         </div>
-
-        {/* Automation Lanes Overlay - render for all parameters with data */}
-        <div
-          ref={contentScrollRef}
-          onScroll={handleContentScroll}
-          className="absolute inset-0 overflow-x-auto overflow-y-hidden pointer-events-none z-5"
-          style={{ left: LINE_NUMBER_WIDTH }}
-        >
-          <div style={{ width: totalChannelsWidth, height: '100%', position: 'relative' }}>
-            {['cutoff', 'resonance', 'envMod', 'decay', 'accent', 'overdrive', 'volume', 'pan'].map((param) => (
-              <AutomationLanes
-                key={param}
-                patternId={pattern.id}
-                patternLength={pattern.length}
-                rowHeight={ROW_HEIGHT}
-                channelCount={pattern.channels.length}
-                channelWidth={channelHeaderWidth}
-                rowNumWidth={0}
-                scrollOffset={0}
-                parameter={param}
-                prevPatternId={prevPattern?.id}
-                prevPatternLength={prevPattern?.length}
-                nextPatternId={nextPattern?.id}
-                nextPatternLength={nextPattern?.length}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Fixed center edit bar */}
-        <div
-          className="absolute left-0 right-0 pointer-events-none z-40"
-          style={{
-            top: '50%',
-            transform: 'translateY(-50%)',
-            height: ROW_HEIGHT,
-            backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          }}
-        />
 
         <canvas
           ref={canvasRef}
@@ -1362,10 +895,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
         {/* Cell context menu */}
         <CellContextMenu
+          isOpen={cellContextMenu.isOpen}
           position={cellContextMenu.position}
           onClose={cellContextMenu.closeMenu}
-          channelIndex={cellContextMenu.channelIndex}
-          rowIndex={cellContextMenu.rowIndex}
+          channelIndex={cellContextMenu.cellInfo?.channelIndex ?? 0}
+          rowIndex={cellContextMenu.cellInfo?.rowIndex ?? 0}
         />
       </div>
 

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { MobileTabBar, type MobileTab } from '@components/layout/MobileTabBar';
 import { PatternEditor } from './PatternEditor';
-import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
+import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { Play, Square } from 'lucide-react';
@@ -75,7 +75,14 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
         {activeTab === 'instruments' && (
           <div className="h-full overflow-y-auto">
-            <InstrumentListPanel onEditInstrument={onShowInstruments} />
+            <InstrumentList
+              variant="ft2"
+              showPreviewOnClick={true}
+              showPresetButton={true}
+              showSamplePackButton={true}
+              showEditButton={true}
+              onEditInstrument={onShowInstruments}
+            />
           </div>
         )}
 

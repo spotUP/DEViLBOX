@@ -49,10 +49,7 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
         case 'Backspace':
           if (steps.length > 1) {
             e.preventDefault();
-            // Inline the remove logic to avoid stale closure
-            const newSteps = steps.filter((_, i) => i !== selectedIndex);
-            onChange(newSteps);
-            setSelectedIndex(Math.min(selectedIndex, newSteps.length - 1));
+            handleRemoveStep(selectedIndex);
           }
           break;
       }
@@ -60,7 +57,7 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [steps, selectedIndex, onChange]);
+  }, [steps.length, selectedIndex]);
 
   const handleUpdateStep = useCallback((index: number, step: ArpeggioStep) => {
     const newSteps = [...steps];

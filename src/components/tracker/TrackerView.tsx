@@ -26,7 +26,7 @@ import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity } from 'lucide-react';
-import { InstrumentListPanel } from '@components/instruments/InstrumentListPanel';
+import { InstrumentList } from '@components/instruments/InstrumentList';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
@@ -784,7 +784,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Instrument List Panel - Flex item 3 - Hide on narrow windows */}
         {windowWidth >= 900 && showInstrumentPanel && (
           <div className="flex-shrink-0 w-fit min-w-48 max-w-80 border-l border-ft2-border flex flex-col overflow-hidden animate-fade-in">
-            <InstrumentListPanel onEditInstrument={onShowInstruments} />
+            <InstrumentList
+              variant="ft2"
+              showPreviewOnClick={true}
+              showPresetButton={true}
+              showSamplePackButton={true}
+              showEditButton={true}
+              onEditInstrument={onShowInstruments}
+            />
           </div>
         )}
       </div>
