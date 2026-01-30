@@ -289,21 +289,72 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       // Convert patterns using native converter
       // Pass original buffer for libopenmpt playback if enabled
-      const result = format === 'XM'
-        ? convertXMModule(
-            patterns,
-            importMetadata.originalChannelCount,
-            importMetadata,
-            parsedInstruments.map(i => i.name),
-            useLibopenmpt ? info.arrayBuffer : undefined
-          )
-        : convertMODModule(
-            patterns,
-            importMetadata.originalChannelCount,
-            importMetadata,
-            parsedInstruments.map(i => i.name),
-            useLibopenmpt ? info.arrayBuffer : undefined
-          );
+      let result;
+      if (format === 'XM') {
+        result = convertXMModule(
+          patterns,
+          importMetadata.originalChannelCount,
+          importMetadata,
+          parsedInstruments.map(i => i.name),
+          useLibopenmpt ? info.arrayBuffer : undefined
+        );
+      } else if (format === 'MOD') {
+        result = convertMODModule(
+          patterns,
+          importMetadata.originalChannelCount,
+          importMetadata,
+          parsedInstruments.map(i => i.name),
+          useLibopenmpt ? info.arrayBuffer : undefined
+        );
+      } else if (format === 'FUR' || format === 'DMF') {
+        // Furnace and DefleMask patterns are already converted
+        // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
+        const patternOrder = importMetadata.modData?.patternOrderTable || [];
+        const patLen = patterns[0]?.length || 64;
+        const numChannels = patterns[0]?.[0]?.length || 4;
+        console.log(`[Import] ${format} pattern structure: ${patterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
+
+        result = {
+          patterns: patterns.map((pat: any[][], idx: number) => ({
+            id: `pattern-${idx}`,
+            name: `Pattern ${idx}`,
+            length: patLen,
+            channels: Array.from({ length: numChannels }, (_, ch) => ({
+              id: `channel-${ch}`,
+              name: `Channel ${ch + 1}`,
+              muted: false,
+              solo: false,
+              collapsed: false,
+              volume: 100,
+              pan: 0,
+              instrumentId: null,
+              color: null,
+              rows: pat.map((row: any[]) => {
+                const cell = row[ch] || {};
+                return {
+                  note: cell.note || 0,
+                  instrument: cell.instrument || 0,
+                  volume: cell.volume || 0,
+                  effTyp: cell.effectType || 0,
+                  eff: cell.effectParam || 0,
+                };
+              }),
+            })),
+          })),
+          order: patternOrder.length > 0 ? patternOrder : [0],
+          instrumentNames: parsedInstruments.map(i => i.name),
+        };
+        console.log(`[Import] ${format} patterns converted:`, result.patterns.length, 'patterns, first pattern has', result.patterns[0]?.channels?.length, 'channels');
+      } else {
+        // Unknown format - try MOD conversion as fallback
+        result = convertMODModule(
+          patterns,
+          importMetadata.originalChannelCount,
+          importMetadata,
+          parsedInstruments.map(i => i.name),
+          useLibopenmpt ? info.arrayBuffer : undefined
+        );
+      }
 
       if (result.patterns.length === 0) {
         alert(`Module "${info.metadata.title}" contains no patterns to import.`);
