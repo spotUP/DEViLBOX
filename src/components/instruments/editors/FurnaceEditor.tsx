@@ -299,7 +299,8 @@ const FMEnvelopeVisualization: React.FC<FMEnvelopeProps> = ({
       ref={canvasRef}
       width={width}
       height={height}
-      className="rounded border border-dark-border"
+      className="rounded border border-dark-border w-full"
+      style={{ maxWidth: '100%' }}
     />
   );
 };
@@ -729,7 +730,7 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
   return (
     <div className={`bg-gradient-to-br ${bgGradient} bg-dark-bgSecondary p-3 rounded-lg border ${borderColor} transition-colors`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleExpand}
@@ -770,8 +771,8 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
         </button>
       </div>
 
-      {/* Envelope Visualization */}
-      <div className="mb-3">
+      {/* Envelope Visualization - Full width */}
+      <div className="mb-3 w-full">
         <FMEnvelopeVisualization
           tl={op.tl}
           ar={op.ar}
@@ -783,206 +784,83 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
           maxArDr={ranges.ar.max}
           hasD2R={ranges.hasD2R}
           color={accentColor}
-          width={200}
-          height={40}
+          width={280}
+          height={48}
         />
       </div>
 
-      {/* Basic Parameters - Always Visible */}
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <Knob
-          label="TL"
-          value={op.tl}
-          min={ranges.tl.min}
-          max={ranges.tl.max}
-          onChange={(v) => onUpdate({ tl: Math.round(v) })}
-          size="sm"
-          color="#ef4444"
-          formatValue={(v) => String(Math.round(v))}
-        />
-        <Knob
-          label="MULT"
-          value={op.mult}
-          min={ranges.mult.min}
-          max={ranges.mult.max}
-          onChange={(v) => onUpdate({ mult: Math.round(v) })}
-          size="sm"
-          color="#22d3ee"
-          formatValue={(v) => String(Math.round(v))}
-        />
-        <Knob
-          label="DT"
-          value={op.dt}
-          min={ranges.dt.min}
-          max={ranges.dt.max}
-          onChange={(v) => onUpdate({ dt: Math.round(v) })}
-          size="sm"
-          color="#a78bfa"
-          formatValue={(v) => {
-            const val = Math.round(v);
-            return val > 0 ? `+${val}` : String(val);
-          }}
-        />
+      {/* Row 1: TL, MULT, DT */}
+      <div className="flex justify-between items-center gap-1 mb-2">
+        <Knob label="TL" value={op.tl} min={ranges.tl.min} max={ranges.tl.max}
+          onChange={(v) => onUpdate({ tl: Math.round(v) })} size="sm" color="#ef4444"
+          formatValue={(v) => String(Math.round(v))} />
+        <Knob label="MULT" value={op.mult} min={ranges.mult.min} max={ranges.mult.max}
+          onChange={(v) => onUpdate({ mult: Math.round(v) })} size="sm" color="#22d3ee"
+          formatValue={(v) => String(Math.round(v))} />
+        <Knob label="DT" value={op.dt} min={ranges.dt.min} max={ranges.dt.max}
+          onChange={(v) => onUpdate({ dt: Math.round(v) })} size="sm" color="#a78bfa"
+          formatValue={(v) => { const val = Math.round(v); return val > 0 ? `+${val}` : String(val); }} />
       </div>
 
-      {/* Envelope Parameters */}
-      <div className="grid grid-cols-4 gap-1.5 mb-2">
-        <Knob
-          label="AR"
-          value={op.ar}
-          min={ranges.ar.min}
-          max={ranges.ar.max}
-          onChange={(v) => onUpdate({ ar: Math.round(v) })}
-          size="sm"
-          color="#10b981"
-          formatValue={(v) => String(Math.round(v))}
-        />
-        <Knob
-          label="DR"
-          value={op.dr}
-          min={ranges.dr.min}
-          max={ranges.dr.max}
-          onChange={(v) => onUpdate({ dr: Math.round(v) })}
-          size="sm"
-          color="#f59e0b"
-          formatValue={(v) => String(Math.round(v))}
-        />
-        <Knob
-          label="SL"
-          value={op.sl}
-          min={ranges.sl.min}
-          max={ranges.sl.max}
-          onChange={(v) => onUpdate({ sl: Math.round(v) })}
-          size="sm"
-          color="#8b5cf6"
-          formatValue={(v) => String(Math.round(v))}
-        />
-        <Knob
-          label="RR"
-          value={op.rr}
-          min={ranges.rr.min}
-          max={ranges.rr.max}
-          onChange={(v) => onUpdate({ rr: Math.round(v) })}
-          size="sm"
-          color="#ec4899"
-          formatValue={(v) => String(Math.round(v))}
-        />
+      {/* Row 2: AR, DR, SL, RR (envelope row) */}
+      <div className="flex justify-between items-center gap-1 mb-2">
+        <Knob label="AR" value={op.ar} min={ranges.ar.min} max={ranges.ar.max}
+          onChange={(v) => onUpdate({ ar: Math.round(v) })} size="sm" color="#10b981"
+          formatValue={(v) => String(Math.round(v))} />
+        <Knob label="DR" value={op.dr} min={ranges.dr.min} max={ranges.dr.max}
+          onChange={(v) => onUpdate({ dr: Math.round(v) })} size="sm" color="#f59e0b"
+          formatValue={(v) => String(Math.round(v))} />
+        <Knob label="SL" value={op.sl} min={ranges.sl.min} max={ranges.sl.max}
+          onChange={(v) => onUpdate({ sl: Math.round(v) })} size="sm" color="#8b5cf6"
+          formatValue={(v) => String(Math.round(v))} />
+        <Knob label="RR" value={op.rr} min={ranges.rr.min} max={ranges.rr.max}
+          onChange={(v) => onUpdate({ rr: Math.round(v) })} size="sm" color="#ec4899"
+          formatValue={(v) => String(Math.round(v))} />
       </div>
 
-      {/* Expanded Parameters */}
+      {/* Row 3: D2R, RS + flags (expanded or show if has params) */}
       {isExpanded && (
-        <div className="pt-2 border-t border-dark-border mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200">
-          {/* D2R (if supported) */}
-          {ranges.hasD2R && (
-            <div className="flex justify-center">
-              <Knob
-                label="D2R"
-                value={op.d2r ?? 0}
-                min={ranges.d2r.min}
-                max={ranges.d2r.max}
-                onChange={(v) => onUpdate({ d2r: Math.round(v) })}
-                size="sm"
-                color="#fb923c"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            </div>
-          )}
+        <div className="pt-2 border-t border-dark-border mt-1 animate-in slide-in-from-top-2 duration-200">
+          {/* Row 3: D2R, RS, DT2, KSL, WS - all in one horizontal row */}
+          <div className="flex justify-center items-center gap-3 mb-2">
+            {ranges.hasD2R && (
+              <Knob label="D2R" value={op.d2r ?? 0} min={ranges.d2r.min} max={ranges.d2r.max}
+                onChange={(v) => onUpdate({ d2r: Math.round(v) })} size="sm" color="#fb923c"
+                formatValue={(v) => String(Math.round(v))} />
+            )}
+            {ranges.rs.max > 0 && (
+              <Knob label="RS" value={op.rs} min={ranges.rs.min} max={ranges.rs.max}
+                onChange={(v) => onUpdate({ rs: Math.round(v) })} size="sm" color="#06b6d4"
+                formatValue={(v) => String(Math.round(v))} />
+            )}
+            {ranges.hasDT2 && (
+              <Knob label="DT2" value={op.dt2 ?? 0} min={0} max={3}
+                onChange={(v) => onUpdate({ dt2: Math.round(v) })} size="sm" color="#c084fc"
+                formatValue={(v) => String(Math.round(v))} />
+            )}
+            {ranges.ksl && (
+              <Knob label="KSL" value={op.ksl} min={ranges.ksl.min} max={ranges.ksl.max}
+                onChange={(v) => onUpdate({ ksl: Math.round(v) })} size="sm" color="#fbbf24"
+                formatValue={(v) => String(Math.round(v))} />
+            )}
+            {ranges.hasWS && (
+              <Knob label="WS" value={op.ws} min={0} max={7}
+                onChange={(v) => onUpdate({ ws: Math.round(v) })} size="sm" color="#34d399"
+                formatValue={(v) => String(Math.round(v))} />
+            )}
+          </div>
 
-          {/* Rate Scaling */}
-          {ranges.rs.max > 0 && (
-            <div className="flex justify-center">
-              <Knob
-                label="RS"
-                value={op.rs}
-                min={ranges.rs.min}
-                max={ranges.rs.max}
-                onChange={(v) => onUpdate({ rs: Math.round(v) })}
-                size="sm"
-                color="#06b6d4"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            </div>
-          )}
-
-          {/* DT2 (OPM/OPZ) */}
-          {ranges.hasDT2 && (
-            <div className="flex justify-center">
-              <Knob
-                label="DT2"
-                value={op.dt2 ?? 0}
-                min={0}
-                max={3}
-                onChange={(v) => onUpdate({ dt2: Math.round(v) })}
-                size="sm"
-                color="#c084fc"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            </div>
-          )}
-
-          {/* KSL (OPL) */}
-          {ranges.ksl && (
-            <div className="flex justify-center">
-              <Knob
-                label="KSL"
-                value={op.ksl}
-                min={ranges.ksl.min}
-                max={ranges.ksl.max}
-                onChange={(v) => onUpdate({ ksl: Math.round(v) })}
-                size="sm"
-                color="#fbbf24"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            </div>
-          )}
-
-          {/* Waveform Select (OPL) */}
-          {ranges.hasWS && (
-            <div className="flex justify-center">
-              <Knob
-                label="WS"
-                value={op.ws}
-                min={0}
-                max={7}
-                onChange={(v) => onUpdate({ ws: Math.round(v) })}
-                size="sm"
-                color="#34d399"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            </div>
-          )}
-
-          {/* Boolean Flags */}
-          <div className="flex flex-wrap gap-1 justify-center">
-            <ToggleButton
-              label="AM"
-              value={op.am}
-              onChange={(v) => onUpdate({ am: v })}
-            />
+          {/* Boolean Flags - horizontal row */}
+          <div className="flex justify-center gap-2">
+            <ToggleButton label="AM" value={op.am} onChange={(v) => onUpdate({ am: v })} />
             {ranges.hasSSG && (
-              <ToggleButton
-                label="SSG"
-                value={(op.ssg ?? 0) > 0}
-                onChange={(v) => onUpdate({ ssg: v ? 8 : 0 })}
-              />
+              <ToggleButton label="SSG" value={(op.ssg ?? 0) > 0} onChange={(v) => onUpdate({ ssg: v ? 8 : 0 })} />
             )}
             {ranges.hasWS && (
               <>
-                <ToggleButton
-                  label="VIB"
-                  value={op.vib}
-                  onChange={(v) => onUpdate({ vib: v })}
-                />
-                <ToggleButton
-                  label="SUS"
-                  value={op.sus}
-                  onChange={(v) => onUpdate({ sus: v })}
-                />
-                <ToggleButton
-                  label="KSR"
-                  value={op.ksr}
-                  onChange={(v) => onUpdate({ ksr: v })}
-                />
+                <ToggleButton label="VIB" value={op.vib} onChange={(v) => onUpdate({ vib: v })} />
+                <ToggleButton label="SUS" value={op.sus} onChange={(v) => onUpdate({ sus: v })} />
+                <ToggleButton label="KSR" value={op.ksr} onChange={(v) => onUpdate({ ksr: v })} />
               </>
             )}
           </div>
@@ -1343,52 +1221,53 @@ function getChipCategory(id: number): "FM" | "PSG" | "Wavetable" | "PCM" | "Othe
 }
 
 function getChipName(id: number): string {
+  // Descriptive names with console/platform info
   const names: Record<number, string> = {
     0: "Sega Genesis (YM2612)",
-    1: "Arcade FM (YM2151)",
-    2: "Yamaha OPL3 (YMF262)",
-    3: "Sega PSG (SN76489)",
+    1: "Arcade / X68000 (YM2151)",
+    2: "AdLib / Sound Blaster (OPL3)",
+    3: "Sega Master System (SN76489)",
     4: "Nintendo NES (2A03)",
-    5: "Game Boy (LR35902)",
-    6: "PC Engine (HuC6280)",
-    7: "Konami SCC",
-    8: "Namco 163",
-    9: "Konami VRC6",
+    5: "Nintendo Game Boy (LR35902)",
+    6: "PC Engine / TurboGrafx (HuC6280)",
+    7: "Konami MSX (SCC)",
+    8: "Namco Arcade (N163)",
+    9: "Famicom (VRC6)",
     10: "Commodore 64 (SID)",
-    11: "Yamaha OPLL (YM2413)",
-    12: "AY-3-8910",
-    13: "Yamaha OPNA (YM2608)",
-    14: "Yamaha OPNB (YM2610)",
-    15: "Atari TIA",
+    11: "MSX / Sega (OPLL)",
+    12: "ZX Spectrum / Amstrad (AY-3-8910)",
+    13: "NEC PC-98 (OPNA)",
+    14: "Neo Geo (OPNB)",
+    15: "Atari 2600 (TIA)",
     16: "Famicom Disk System",
-    17: "Famicom MMC5",
-    18: "Philips SAA1099",
-    19: "WonderSwan",
-    20: "OKI MSM6295",
-    21: "Ensoniq ES5506",
-    22: "Yamaha OPZ (YM2414)",
-    23: "Yamaha Y8950",
+    17: "Famicom (MMC5)",
+    18: "SAM Coupe (SAA1099)",
+    19: "Bandai WonderSwan",
+    20: "Arcade (OKI MSM6295)",
+    21: "Ensoniq (ES5506)",
+    22: "Yamaha TX81Z (OPZ)",
+    23: "MSX-Audio (Y8950)",
     24: "Super Nintendo (SPC700)",
     25: "Atari Lynx",
-    26: "Yamaha OPL4",
-    27: "SegaPCM",
-    28: "Yamaha YMZ280B",
-    29: "Ricoh RF5C68",
-    30: "Irem GA20",
-    31: "Namco C140",
-    32: "Capcom QSound",
+    26: "Yamaha (OPL4)",
+    27: "Sega Arcade (SegaPCM)",
+    28: "Yamaha (YMZ280B)",
+    29: "Sega CD (RF5C68)",
+    30: "Irem Arcade (GA20)",
+    31: "Namco Arcade (C140)",
+    32: "Capcom Arcade (QSound)",
     33: "Commodore VIC-20",
-    34: "Commodore TED",
+    34: "Commodore Plus/4 (TED)",
     35: "Watara Supervision",
-    36: "Commander X16 VERA",
-    37: "Sharp SM8521",
+    36: "Commander X16 (VERA)",
+    37: "Game Gear (SM8521)",
     38: "Konami Bubble System",
-    39: "Konami K007232",
-    40: "Konami K053260",
-    41: "Seta X1-010",
-    42: "NEC uPD1771",
-    43: "Toshiba T6W28",
-    44: "Virtual Boy (VSU)",
+    39: "Konami Arcade (K007232)",
+    40: "Konami Arcade (K053260)",
+    41: "Seta Arcade (X1-010)",
+    42: "NEC (μPD1771)",
+    43: "Toshiba (T6W28)",
+    44: "Nintendo Virtual Boy",
   };
   return names[id] || `Unknown Chip (${id})`;
 }

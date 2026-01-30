@@ -452,13 +452,24 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
         ))}
 
         {wavetables.length < maxWavetables && (
-          <button
-            onClick={addWavetable}
-            className="px-3 py-1.5 rounded border border-dashed border-dark-border text-text-muted hover:text-text-primary hover:border-accent text-[10px] font-mono flex items-center gap-1"
-          >
-            <Plus size={12} />
-            Add
-          </button>
+          <>
+            <button
+              onClick={addWavetable}
+              className="px-3 py-1.5 rounded border border-dashed border-dark-border text-text-muted hover:text-text-primary hover:border-accent text-[10px] font-mono flex items-center gap-1"
+            >
+              <Plus size={12} />
+              Add
+            </button>
+            {selectedWave !== null && (
+              <button
+                onClick={() => duplicateWavetable(selectedWave)}
+                className="px-3 py-1.5 rounded border border-dashed border-dark-border text-text-muted hover:text-text-primary hover:border-cyan-500 text-[10px] font-mono flex items-center gap-1"
+              >
+                <Copy size={12} />
+                Duplicate
+              </button>
+            )}
+          </>
         )}
       </div>
 

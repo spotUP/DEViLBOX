@@ -19,7 +19,11 @@ import {
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_GRANULAR,
   DEFAULT_WOBBLE_BASS,
+  DEFAULT_TB303,
+  DEFAULT_FURNACE,
+  DEFAULT_DRUMKIT,
 } from '@typedefs/instrument';
+import { ToneEngine } from '@engine/ToneEngine';
 import { Knob } from '@components/controls/Knob';
 import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { FT2SampleEditor } from '../FT2SampleEditor';
@@ -29,7 +33,7 @@ import { BuzzmachineEditor } from './BuzzmachineEditor';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { LFOControls } from '../LFOControls';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
-import { getSynthInfo, SYNTH_INFO } from '@constants/synthCategories';
+import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import type { SynthType } from '@typedefs/instrument';
 import * as LucideIcons from 'lucide-react';
@@ -507,20 +511,74 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-white">{synthInfo.name}</h2>
-              {/* Quick Synth Type Selector */}
+              {/* Quick Synth Type Selector with Categories */}
               <select
                 value={instrument.synthType}
-                onChange={(e) => onChange({ synthType: e.target.value as SynthType })}
-                className="px-2 py-0.5 text-xs font-medium bg-gray-800 border border-gray-700 rounded text-gray-300 hover:border-gray-500 focus:border-blue-500 focus:outline-none cursor-pointer"
-                title="Quick switch synth type"
+                onChange={(e) => {
+                  const newType = e.target.value as SynthType;
+                  if (newType === instrument.synthType) return;
+
+                  // Invalidate ToneEngine cache so it recreates the instrument
+                  ToneEngine.getInstance().invalidateInstrument(instrument.id);
+
+                  // Build update with cleared configs and new type
+                  const updates: Partial<InstrumentConfig> = {
+                    synthType: newType,
+                    // Clear all synth-specific configs
+                    tb303: undefined,
+                    drumMachine: undefined,
+                    chipSynth: undefined,
+                    pwmSynth: undefined,
+                    wavetable: undefined,
+                    granular: undefined,
+                    superSaw: undefined,
+                    polySynth: undefined,
+                    organ: undefined,
+                    stringMachine: undefined,
+                    formantSynth: undefined,
+                    furnace: undefined,
+                    wobbleBass: undefined,
+                    drumKit: undefined,
+                  };
+
+                  // Initialize appropriate default config
+                  switch (newType) {
+                    case 'TB303': updates.tb303 = { ...DEFAULT_TB303 }; break;
+                    case 'DrumMachine': updates.drumMachine = { ...DEFAULT_DRUM_MACHINE }; break;
+                    case 'ChipSynth': updates.chipSynth = { ...DEFAULT_CHIP_SYNTH }; break;
+                    case 'PWMSynth': updates.pwmSynth = { ...DEFAULT_PWM_SYNTH }; break;
+                    case 'Wavetable': updates.wavetable = { ...DEFAULT_WAVETABLE }; break;
+                    case 'GranularSynth': updates.granular = { ...DEFAULT_GRANULAR }; break;
+                    case 'SuperSaw': updates.superSaw = { ...DEFAULT_SUPERSAW }; break;
+                    case 'PolySynth': updates.polySynth = { ...DEFAULT_POLYSYNTH }; break;
+                    case 'Organ': updates.organ = { ...DEFAULT_ORGAN }; break;
+                    case 'StringMachine': updates.stringMachine = { ...DEFAULT_STRING_MACHINE }; break;
+                    case 'FormantSynth': updates.formantSynth = { ...DEFAULT_FORMANT_SYNTH }; break;
+                    case 'WobbleBass': updates.wobbleBass = { ...DEFAULT_WOBBLE_BASS }; break;
+                    case 'DrumKit': updates.drumKit = { ...DEFAULT_DRUMKIT }; break;
+                  }
+                  // Furnace types get default furnace config
+                  if (newType.startsWith('Furnace')) {
+                    updates.furnace = { ...DEFAULT_FURNACE };
+                  }
+
+                  onChange(updates);
+                }}
+                className="px-2 py-1 text-sm font-medium bg-gray-800 border border-gray-700 rounded text-white hover:border-gray-500 focus:border-blue-500 focus:outline-none cursor-pointer"
+                title="Switch synth type"
               >
-                {Object.values(SYNTH_INFO)
-                  .sort((a, b) => a.shortName.localeCompare(b.shortName))
-                  .map((synth) => (
-                    <option key={synth.type} value={synth.type}>
-                      {synth.shortName}
-                    </option>
+                {SYNTH_CATEGORIES
+                  .filter((cat) => cat.id !== 'all-furnace') // Skip redundant "all" category
+                  .map((category) => (
+                    <optgroup key={category.id} label={category.name}>
+                      {category.synths
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((synth) => (
+                          <option key={`${category.id}-${synth.type}`} value={synth.type}>
+                            {synth.name}
+                          </option>
+                        ))}
+                    </optgroup>
                   ))}
               </select>
             </div>
@@ -581,7 +639,7 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
             {vizMode === 'oscilloscope' ? (
               <InstrumentOscilloscope
                 instrumentId={instrument.id}
-                width={300}
+                width="auto"
                 height={60}
                 color="#4ade80"
                 backgroundColor="#000000"
@@ -589,7 +647,7 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
             ) : (
               <InstrumentSpectrum
                 instrumentId={instrument.id}
-                width={300}
+                width="auto"
                 height={60}
                 barCount={48}
                 color="#22c55e"
