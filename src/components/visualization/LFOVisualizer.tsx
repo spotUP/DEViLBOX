@@ -110,7 +110,9 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
   const lastTimeRef = useRef(0);
 
   // Subscribe to visualization store for LFO phase
+  const lfoPhases = useVisualizationStore((state) => state.lfoPhases);
   const setLFOPhase = useVisualizationStore((state) => state.setLFOPhase);
+  void lfoPhases; // Available for multi-LFO display
 
   // Padding and dimensions
   const padding = { top: 4, right: 4, bottom: 16, left: 4 };

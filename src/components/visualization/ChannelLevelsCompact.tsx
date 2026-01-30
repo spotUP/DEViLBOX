@@ -13,6 +13,8 @@ interface ChannelLevelsCompactProps {
 }
 
 const DECAY_RATE = 0.88;
+const TARGET_FPS = 30;
+export const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
 export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   height = 100,
@@ -39,7 +41,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   }, [numChannels]);
 
   // Animation loop
-  const animate = useCallback(() => {
+  const animate = useCallback((_timestamp: number) => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) {
