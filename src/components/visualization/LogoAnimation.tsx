@@ -1,12 +1,10 @@
 /**
  * LogoAnimation - Displays the Up Rough logo SVG animation
- * Theme-aware and audio-reactive after the draw animation completes
- * Plays the "outro" animation when music stops
+ * Theme-aware, click to skip to next visualizer
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useThemeStore } from '@stores/useThemeStore';
-import { useAudioStore, useTransportStore } from '@stores';
 
 interface LogoAnimationProps {
   height?: number;
@@ -19,25 +17,19 @@ const ANIMATION_STOP_MS = 10000;
 
 export const LogoAnimation: React.FC<LogoAnimationProps> = ({
   height = 100,
+  onComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string | null>(null);
-  const [key, setKey] = useState(0);
+  const [key, _setKey] = useState(0); // Used for animation restart (disabled - now skips instead)
   const animationRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use refs for animation state to avoid stale closure issues
   const animationCompleteRef = useRef(false);
-  const outroPlayedRef = useRef(false);
-  const wasPlayingRef = useRef(false);
-  const scaleRef = useRef(1);
-  const glowRef = useRef(0);
-  const rotateRef = useRef(0);
 
   const { currentThemeId } = useThemeStore();
-  const { analyserNode } = useAudioStore();
-  const isPlaying = useTransportStore((state) => state.isPlaying);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
   // Load SVG content
@@ -71,28 +63,10 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     }
   }, []);
 
-  // Resume all CSS animations in the SVG (for outro)
-  const resumeAnimations = useCallback(() => {
-    if (!svgContainerRef.current) return;
-
-    const svg = svgContainerRef.current.querySelector('svg');
-    if (svg) {
-      const allElements = svg.querySelectorAll('*');
-      allElements.forEach(el => {
-        (el as HTMLElement).style.animationPlayState = 'running';
-      });
-      svg.style.animationPlayState = 'running';
-    }
-  }, []);
 
   // Reset animation state when key changes (animation restarts)
   useEffect(() => {
-    // Reset all animation state
     animationCompleteRef.current = false;
-    outroPlayedRef.current = false;
-    scaleRef.current = 1;
-    glowRef.current = 0;
-    rotateRef.current = 0;
 
     // Clear any existing timer
     if (timerRef.current) {
@@ -103,6 +77,8 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     timerRef.current = setTimeout(() => {
       pauseAnimations();
       animationCompleteRef.current = true;
+      // Notify parent that animation is complete (can skip to next visualizer)
+      onComplete?.();
     }, ANIMATION_STOP_MS);
 
     return () => {
@@ -110,29 +86,10 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
         clearTimeout(timerRef.current);
       }
     };
-  }, [key, pauseAnimations]);
+  }, [key, pauseAnimations, onComplete]);
 
-  // Detect when music stops to play outro
-  useEffect(() => {
-    // Check for transition from playing to stopped
-    if (wasPlayingRef.current && !isPlaying && animationCompleteRef.current && !outroPlayedRef.current) {
-      // Music just stopped and we're in the "frozen" state - play the outro!
-      outroPlayedRef.current = true;
 
-      // Clear any audio-reactive styles
-      if (svgContainerRef.current) {
-        svgContainerRef.current.style.transform = '';
-        svgContainerRef.current.style.filter = '';
-      }
-
-      // Resume the animation to play the outro (the exit animation)
-      resumeAnimations();
-    }
-
-    wasPlayingRef.current = isPlaying;
-  }, [isPlaying, resumeAnimations]);
-
-  // Audio-reactive animation (only after draw animation completes)
+  // Simple color animation (no audio-reactive effects)
   const animate = useCallback(() => {
     if (!svgContainerRef.current) {
       animationRef.current = requestAnimationFrame(animate);
@@ -142,58 +99,13 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     const container = svgContainerRef.current;
     const baseColor = isCyanTheme ? '#00ffff' : '#00d4aa';
 
-    // Check if draw animation is still in progress or outro is playing
-    if (!animationCompleteRef.current || outroPlayedRef.current) {
-      // During draw/outro animation, just set the base color, no effects
-      container.style.color = baseColor;
-      if (!outroPlayedRef.current) {
-        container.style.transform = '';
-        container.style.filter = '';
-      }
-      animationRef.current = requestAnimationFrame(animate);
-      return;
-    }
-
-    // --- Animation complete: apply audio-reactive effects ---
-
-    let level = 0;
-
-    if (analyserNode && isPlaying) {
-      const waveform = analyserNode.getValue() as Float32Array;
-      // Calculate RMS level
-      let sum = 0;
-      for (let i = 0; i < waveform.length; i++) {
-        sum += waveform[i] * waveform[i];
-      }
-      level = Math.sqrt(sum / waveform.length);
-    }
-
-    // Smooth scale interpolation - pulse with the beat
-    const targetScale = 1 + level * 0.25;
-    scaleRef.current += (targetScale - scaleRef.current) * 0.4;
-
-    // Glow intensity based on audio
-    const targetGlow = level * 30;
-    glowRef.current += (targetGlow - glowRef.current) * 0.3;
-
-    // Subtle rotation wobble synced to audio
-    if (isPlaying && level > 0.05) {
-      rotateRef.current += (Math.random() - 0.5) * level * 3;
-      rotateRef.current *= 0.9; // Decay back to center
-    } else {
-      rotateRef.current *= 0.95;
-    }
-
-    // Apply transforms
-    container.style.transform = `scale(${scaleRef.current}) rotate(${rotateRef.current}deg)`;
-
-    // Dynamic brightness and glow based on audio
-    const brightness = 100 + level * 50;
+    // Just set the base color, no effects
     container.style.color = baseColor;
-    container.style.filter = `brightness(${brightness}%) drop-shadow(0 0 ${glowRef.current}px ${baseColor})`;
+    container.style.transform = '';
+    container.style.filter = '';
 
     animationRef.current = requestAnimationFrame(animate);
-  }, [analyserNode, isPlaying, isCyanTheme]);
+  }, [isCyanTheme]);
 
   // Start/stop animation loop
   useEffect(() => {
@@ -207,15 +119,19 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     };
   }, [animate]);
 
-  // Restart animation on click
+  // Skip animation on click (go to next visualizer)
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Don't trigger parent's visualizer cycle
-    // Reset styles immediately
-    if (svgContainerRef.current) {
-      svgContainerRef.current.style.transform = '';
-      svgContainerRef.current.style.filter = '';
+    // Clear any pending timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
     }
-    setKey(prev => prev + 1);
+    // Cancel animation frame
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    // Skip to next visualizer
+    onComplete?.();
   };
 
   const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
@@ -230,7 +146,7 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
         backgroundColor: bgColor,
       }}
       onClick={handleClick}
-      title="Click to restart animation"
+      title="Click to skip"
     >
       {svgContent ? (
         <div
