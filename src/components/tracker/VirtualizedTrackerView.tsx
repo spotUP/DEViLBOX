@@ -56,6 +56,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   const isPlaying = useTransportStore((state) => state.isPlaying);
   const smoothScrolling = useTransportStore((state) => state.smoothScrolling);
   const bpm = useTransportStore((state) => state.bpm);
+  const speed = useTransportStore((state) => state.speed);
   const loopStartRow = useTransportStore((state) => state.loopStartRow);
 
   // Instrument store selector
@@ -101,14 +102,14 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
   useAnimationFrame(
     'pattern-smooth-scroll',
     isPlaying && smoothScrollingEnabled ? () => {
-      const speed = 6;
+      // Calculate row duration: 2.5ms per tick at 125 BPM, speed ticks per row
       const secondsPerRow = (2.5 / bpm) * speed;
       const durationMs = secondsPerRow * 1000;
       const elapsed = performance.now() - startTimeRef.current;
       const progress = Math.min(elapsed / durationMs, 1);
       setSmoothOffset(progress);
     } : null,
-    [isPlaying, smoothScrollingEnabled, bpm]
+    [isPlaying, smoothScrollingEnabled, bpm, speed]
   );
 
   useEffect(() => {
