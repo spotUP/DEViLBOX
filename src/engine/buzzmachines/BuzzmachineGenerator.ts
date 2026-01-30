@@ -164,6 +164,9 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     time?: Tone.Unit.Time,
     velocity: number = 1
   ): this {
+    // Normalize null to undefined for Tone.js compatibility
+    const normalizedTime = time ?? undefined;
+
     if (this.useWasmEngine && this.workletNode) {
       // Send note-on message to WASM
       const freq = Tone.Frequency(note).toFrequency();
@@ -171,13 +174,13 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
         type: 'noteOn',
         frequency: freq,
         velocity: Math.round(velocity * 127),
-        time: time !== undefined ? Tone.Time(time).toSeconds() : undefined,
+        time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
       });
     } else if (this.fallbackSynth) {
       if (this.fallbackSynth instanceof Tone.NoiseSynth) {
-        this.fallbackSynth.triggerAttack(time, velocity);
+        this.fallbackSynth.triggerAttack(normalizedTime, velocity);
       } else {
-        (this.fallbackSynth as Tone.Synth).triggerAttack(note, time, velocity);
+        (this.fallbackSynth as Tone.Synth).triggerAttack(note, normalizedTime, velocity);
       }
     }
     return this;
@@ -187,13 +190,16 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
    * Release a note
    */
   public triggerRelease(time?: Tone.Unit.Time): this {
+    // Normalize null to undefined for Tone.js compatibility
+    const normalizedTime = time ?? undefined;
+
     if (this.useWasmEngine && this.workletNode) {
       this.workletNode.port.postMessage({
         type: 'noteOff',
-        time: time !== undefined ? Tone.Time(time).toSeconds() : undefined,
+        time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
       });
     } else if (this.fallbackSynth) {
-      this.fallbackSynth.triggerRelease(time);
+      this.fallbackSynth.triggerRelease(normalizedTime);
     }
     return this;
   }
@@ -207,7 +213,9 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     time?: Tone.Unit.Time,
     velocity: number = 1
   ): this {
-    const computedTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
+    // Normalize null to undefined for Tone.js compatibility
+    const normalizedTime = time ?? undefined;
+    const computedTime = normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : Tone.now();
     const computedDuration = Tone.Time(duration).toSeconds();
 
     this.triggerAttack(note, computedTime, velocity);
