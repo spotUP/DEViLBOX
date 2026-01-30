@@ -10,8 +10,7 @@
  */
 
 import * as Tone from 'tone';
-import type { LFOConfig, LFOWaveform, LFOSyncDivision } from '@typedefs/instrument';
-import { LFO_SYNC_RATES } from '@typedefs/instrument';
+import type { LFOConfig, LFOWaveform } from '@typedefs/instrument';
 
 export interface ModulationTargets {
   filterFrequency?: Tone.Param<'frequency'> | Tone.Signal<'frequency'>;
@@ -34,15 +33,16 @@ export class LFOModulator {
   // Connected targets
   private targets: ModulationTargets = {};
 
+  // Base values for modulation (public for external access)
+  public baseFilterFreq: number = 1000;
+  public baseFilterQ: number = 1;
+
   constructor(config: LFOConfig) {
     this.config = { ...config };
 
-    // Calculate rate (either from sync division or free rate)
-    const rate = this.calculateRate();
-
     // Create the main LFO
     this.lfo = new Tone.LFO({
-      frequency: rate,
+      frequency: config.rate,
       type: this.mapWaveform(config.waveform),
       min: -1,
       max: 1,
@@ -51,42 +51,6 @@ export class LFOModulator {
 
     if (config.enabled) {
       this.lfo.start();
-    }
-  }
-
-  /**
-   * Calculate LFO rate from sync division or free rate
-   */
-  private calculateRate(): number {
-    if (!this.config.sync || this.config.syncDivision === 'free') {
-      return this.config.rate;
-    }
-
-    const bpm = Tone.getTransport().bpm.value || 120;
-    const syncDiv = this.config.syncDivision || '1/4';
-    const baseMultiplier = LFO_SYNC_RATES[syncDiv] || 2;
-
-    // Convert BPM to Hz and apply multiplier
-    // At 120 BPM, quarter notes = 2 Hz
-    return (bpm / 60) * (baseMultiplier / 2);
-  }
-
-  /**
-   * Get rate for a specific sync division at a given BPM
-   */
-  public static getRateForSync(syncDivision: LFOSyncDivision, bpm: number = 120): number {
-    if (syncDivision === 'free') return 5; // Default free rate
-    const baseMultiplier = LFO_SYNC_RATES[syncDivision] || 2;
-    return (bpm / 60) * (baseMultiplier / 2);
-  }
-
-  /**
-   * Update LFO rate when BPM changes (call from transport)
-   */
-  public syncToTransport(): void {
-    if (this.config.sync && this.config.syncDivision !== 'free') {
-      const newRate = this.calculateRate();
-      this.lfo.frequency.value = newRate;
     }
   }
 
@@ -105,13 +69,13 @@ export class LFOModulator {
 
   /**
    * Connect LFO to filter frequency modulation
-   * Note: For true audio-rate filter modulation, use Tone.AutoFilter instead.
-   * This method sets up the infrastructure for manual modulation updates.
    */
   public connectFilter(
     filterNode: Tone.Filter | Tone.BiquadFilter | { frequency: Tone.Param<'frequency'>; Q?: Tone.Param<'number'> },
-    _baseFrequency: number = 1000
+    baseFrequency: number = 1000
   ): void {
+    this.baseFilterFreq = baseFrequency;
+
     if (this.config.filterAmount === 0) return;
 
     // Create multiplier to scale LFO output to filter range
@@ -127,12 +91,17 @@ export class LFOModulator {
       // Store target for later updates
       this.targets.filterFrequency = filterNode.frequency;
 
+      // Use Tone's built-in frequency scaling
+      // Create a signal for frequency base value (reserved for future audio-rate modulation)
+      const freqSignal = new Tone.Signal(baseFrequency, 'frequency');
+      void freqSignal; // Reserved for true audio-rate filter modulation
+
       // Create an Add to offset the LFO (convert -1..1 to 0..2 range)
       const offset = new Tone.Add(1);
       this.filterScaler.connect(offset);
 
-      // Note: True audio-rate filter freq modulation is complex in Tone.js
-      // For best results, use Tone.AutoFilter or manual interval-based updates
+      // For now, use a simpler approach with interval-based modulation
+      // as true audio-rate filter freq modulation is complex in Tone.js
     }
   }
 
@@ -161,8 +130,7 @@ export class LFOModulator {
    * Connect LFO to volume for tremolo effect
    */
   public connectVolume(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    gainNode: Tone.Gain | { gain: Tone.Param<any> }
+    gainNode: Tone.Gain | { gain: Tone.Param<'normalRange'> }
   ): void {
     if (this.config.volumeAmount === 0) return;
 
@@ -189,9 +157,9 @@ export class LFOModulator {
   public updateConfig(config: Partial<LFOConfig>): void {
     this.config = { ...this.config, ...config };
 
-    // Update rate (recalculate if sync changed)
-    if (config.rate !== undefined || config.sync !== undefined || config.syncDivision !== undefined) {
-      this.lfo.frequency.value = this.calculateRate();
+    // Update LFO parameters
+    if (config.rate !== undefined) {
+      this.lfo.frequency.value = config.rate;
     }
 
     if (config.waveform !== undefined) {
@@ -339,52 +307,3 @@ export function createAutoFilter(
     },
   }).start();
 }
-
-/**
- * Create tempo-synced auto filter for wobble bass
- */
-export function createSyncedAutoFilter(
-  syncDivision: LFOSyncDivision,
-  depth: number,
-  baseFrequency: number = 800,
-  resonance: number = 5,
-  bpm: number = 120
-): Tone.AutoFilter {
-  const rate = LFOModulator.getRateForSync(syncDivision, bpm);
-  const octaves = (depth / 100) * 4;
-
-  return new Tone.AutoFilter({
-    frequency: rate,
-    type: 'sine',
-    depth: 1,
-    baseFrequency: baseFrequency,
-    octaves: octaves,
-    filter: {
-      type: 'lowpass',
-      rolloff: -24,
-      Q: resonance,
-    },
-  }).start();
-}
-
-/**
- * Get all available sync divisions for UI
- */
-export const LFO_SYNC_OPTIONS: { value: LFOSyncDivision; label: string }[] = [
-  { value: 'free', label: 'Free' },
-  { value: '1/1', label: '1 Bar' },
-  { value: '1/2', label: '1/2' },
-  { value: '1/2T', label: '1/2 T' },
-  { value: '1/2D', label: '1/2 D' },
-  { value: '1/4', label: '1/4' },
-  { value: '1/4T', label: '1/4 T' },
-  { value: '1/4D', label: '1/4 D' },
-  { value: '1/8', label: '1/8' },
-  { value: '1/8T', label: '1/8 T' },
-  { value: '1/8D', label: '1/8 D' },
-  { value: '1/16', label: '1/16' },
-  { value: '1/16T', label: '1/16 T' },
-  { value: '1/16D', label: '1/16 D' },
-  { value: '1/32', label: '1/32' },
-  { value: '1/32T', label: '1/32 T' },
-];

@@ -5,12 +5,12 @@
  */
 
 // Supported module formats
-export type ModuleFormat = 
-  | 'MOD' | 'XM' | 'S3M' | 'IT' 
-  | 'DBM' | 'DIGI' | 'MTM' | 'MED' 
-  | 'OKT' | '669' | 'FAR' | 'ULT' 
-  | 'STM' | 'STX' | 'PT36' | 'SFX' 
-  | 'NATIVE';
+export type ModuleFormat =
+  | 'MOD' | 'XM' | 'S3M' | 'IT'
+  | 'DBM' | 'DIGI' | 'MTM' | 'MED'
+  | 'OKT' | '669' | 'FAR' | 'ULT'
+  | 'STM' | 'STX' | 'PT36' | 'SFX'
+  | 'FUR' | 'NATIVE';
 
 // Format-specific configuration
 export interface FormatConfig {

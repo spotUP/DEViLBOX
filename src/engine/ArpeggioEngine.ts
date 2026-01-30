@@ -11,15 +11,13 @@
  */
 
 import * as Tone from 'tone';
-import type { ArpeggioConfig, ArpeggioStep } from '@typedefs/instrument';
+import type { ArpeggioConfig, ArpeggioStep, ArpeggioMode as _ArpeggioMode, ArpeggioSpeedUnit as _ArpeggioSpeedUnit } from '@typedefs/instrument';
 
 export interface ArpeggioEngineOptions {
   config: ArpeggioConfig;
   onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  /** Called when a note should start. Use scheduledTime for sample-accurate timing. */
-  onNoteOn?: (note: string, velocity: number, duration: number, scheduledTime: number) => void;
-  /** Called when a note should release. Use scheduledTime for sample-accurate timing. */
-  onNoteOff?: (note: string, scheduledTime: number) => void;
+  onNoteOn?: (note: string, velocity: number, duration: number) => void;
+  onNoteOff?: (note: string) => void;
 }
 
 export class ArpeggioEngine {
@@ -34,8 +32,8 @@ export class ArpeggioEngine {
 
   // Callbacks
   private onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  private onNoteOn?: (note: string, velocity: number, duration: number, scheduledTime: number) => void;
-  private onNoteOff?: (note: string, scheduledTime: number) => void;
+  private onNoteOn?: (note: string, velocity: number, duration: number) => void;
+  private onNoteOff?: (note: string) => void;
 
   // Track which note is currently playing for proper release
   private currentPlayingNote: string | null = null;
@@ -100,6 +98,25 @@ export class ArpeggioEngine {
   }
 
   /**
+   * Calculate swing-adjusted timing for a step
+   * @public Available for external swing calculation
+   */
+  public getSwingAdjustedTime(baseTime: number, stepIndex: number): number {
+    const swing = (this.config.swing ?? 0) / 100;
+    if (swing === 0) return baseTime;
+
+    // Apply swing to even-numbered steps (0, 2, 4...)
+    // Odd steps stay on beat, even steps push late
+    if (stepIndex % 2 === 0) {
+      const interval = typeof this.getInterval() === 'number'
+        ? this.getInterval() as number
+        : 0.066; // ~15Hz default
+      return baseTime + (interval * swing * 0.5);
+    }
+    return baseTime;
+  }
+
+  /**
    * Get the next step index based on playback mode
    */
   private getNextStepIndex(): number {
@@ -134,12 +151,8 @@ export class ArpeggioEngine {
         // One-shot: 0,1,2,3 then stop
         const nextOneShot = this.currentStepIndex + 1;
         if (nextOneShot >= numSteps) {
-          // Schedule stop on next tick to allow final note to play
+          // Mark as stopped but return last index
           this.isPlaying = false;
-          // Stop the loop after current iteration
-          if (this.loop) {
-            this.loop.stop();
-          }
           return numSteps - 1;
         }
         return nextOneShot;
@@ -185,7 +198,6 @@ export class ArpeggioEngine {
 
   /**
    * Process a single arpeggio step
-   * @param _time - Scheduled time (from Tone.Loop, available for precise scheduling)
    */
   private processStep(_time: number): void {
     if (!this.isPlaying) return;
@@ -213,20 +225,19 @@ export class ArpeggioEngine {
 
     // Calculate gate length
     const gate = (step.gate ?? 100) / 100;
-    const rawInterval = this.getInterval();
-    const interval = typeof rawInterval === 'number'
-      ? rawInterval
-      : Tone.Time(rawInterval).toSeconds();
+    const interval = typeof this.getInterval() === 'number'
+      ? this.getInterval() as number
+      : Tone.Time(this.getInterval()).toSeconds();
     const duration = interval * gate * 0.95; // 95% to avoid overlap
 
-    // Release previous note if still playing (slightly before new note for clean transition)
+    // Release previous note if still playing
     if (this.currentPlayingNote && this.onNoteOff) {
-      this.onNoteOff(this.currentPlayingNote, _time);
+      this.onNoteOff(this.currentPlayingNote);
     }
 
-    // Trigger the note at the precisely scheduled time
+    // Trigger the note
     if (this.onNoteOn) {
-      this.onNoteOn(targetNote, velocity, duration, _time);
+      this.onNoteOn(targetNote, velocity, duration);
     }
     this.currentPlayingNote = targetNote;
 
@@ -258,12 +269,6 @@ export class ArpeggioEngine {
     this.isPlaying = true;
     this.heldNotes.add(note);
 
-    // Ensure Transport is started (required for Tone.Loop to work)
-    const transport = Tone.getTransport();
-    if (transport.state !== 'started') {
-      transport.start();
-    }
-
     // Create and start the loop
     const interval = this.getInterval();
 
@@ -291,9 +296,9 @@ export class ArpeggioEngine {
       this.heldNotes.clear();
     }
 
-    // Release current note immediately
+    // Release current note
     if (this.currentPlayingNote && this.onNoteOff) {
-      this.onNoteOff(this.currentPlayingNote, Tone.now());
+      this.onNoteOff(this.currentPlayingNote);
       this.currentPlayingNote = null;
     }
 

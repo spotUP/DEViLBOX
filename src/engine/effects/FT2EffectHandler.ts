@@ -7,7 +7,6 @@
  */
 
 import type { TrackerCell } from '../../types/tracker';
-import { xmNoteToString } from '../../lib/xmConversions';
 
 /**
  * Effect waveform types for vibrato/tremolo
@@ -37,6 +36,7 @@ interface ChannelMemory {
   tremoloPhase: number; // Current phase (0-63)
   tremoloWaveform: EffectWaveform; // E7x
   tremoloRetrigger: boolean; // E7x bit 2
+  tremoloValue: number; // Current tremolo delta for volume modulation
 
   // Volume
   volumeSlide: number; // Axy
@@ -51,14 +51,6 @@ interface ChannelMemory {
 
   // Note delay/retrigger
   retriggerTick: number; // E9x counter
-
-  // Note fade (EFx)
-  noteFadeTick: number; // Tick at which fade starts (0 = disabled)
-  noteFadeSpeed: number; // Volume decrease per tick
-
-  // Envelope control (S7x - Impulse Tracker style)
-  volumeEnvelopeEnabled: boolean; // S77/S78
-  pitchEnvelopeEnabled: boolean; // S79/S7A
 
   // Current state
   currentVolume: number; // 0-64
@@ -126,16 +118,13 @@ export class FT2EffectHandler {
         tremoloPhase: 0,
         tremoloWaveform: 'sine',
         tremoloRetrigger: true,
+        tremoloValue: 0,
         volumeSlide: 0,
         sampleOffset: 0,
         loopStart: 0,
         loopCount: 0,
         loopRow: 0,
         retriggerTick: 0,
-        noteFadeTick: 0,
-        noteFadeSpeed: 0,
-        volumeEnvelopeEnabled: true,
-        pitchEnvelopeEnabled: true,
         currentVolume: 64,
         currentPanning: 128,
         currentPitch: 440,
@@ -155,10 +144,7 @@ export class FT2EffectHandler {
     triggerNote: (note: string, instrument: number | null) => void
   ): FlowControl {
     const mem = this.getChannelMemory(channelIdx);
-    // Convert numeric XM format to string format for processing
-    const effect = cell.effTyp && cell.effTyp !== 0
-      ? `${cell.effTyp.toString(16).toUpperCase()}${(cell.eff || 0).toString(16).padStart(2, '0').toUpperCase()}`
-      : null;
+    const effect = cell.effect;
     const effect2 = cell.effect2;
 
     // Reset flow control
@@ -179,11 +165,17 @@ export class FT2EffectHandler {
     }
 
     // Trigger note if present (unless delayed by EDx)
-    // Convert numeric note to string if needed
-    const noteStr = typeof cell.note === 'number' && cell.note > 0 && cell.note < 97
-      ? xmNoteToString(cell.note)
-      : typeof cell.note === 'string' ? cell.note : null;
-    if (noteStr && noteStr !== '===' && !this.hasNoteDelay(effect) && !this.hasNoteDelay(effect2)) {
+    // Note: cell.note can be number (1-96) or string ("C-4")
+    // 97 = note off, 0 = empty
+    const hasNote = typeof cell.note === 'number'
+      ? (cell.note > 0 && cell.note < 97)
+      : (cell.note && cell.note !== '---' && cell.note !== '===');
+
+    if (hasNote && !this.hasNoteDelay(effect) && !this.hasNoteDelay(effect2)) {
+      // Convert numeric note to string if needed
+      const noteStr = typeof cell.note === 'number'
+        ? this.noteNumToString(cell.note)
+        : cell.note;
       triggerNote(noteStr, cell.instrument);
 
       // Reset vibrato phase if retrigger is enabled
@@ -196,7 +188,7 @@ export class FT2EffectHandler {
 
       // Set portamento target if 3xx is active
       if (effect?.startsWith('3') || effect2?.startsWith('3')) {
-        mem.tonePortamentoTarget = noteStr ? this.noteToFrequency(noteStr) : 0;
+        mem.tonePortamentoTarget = this.noteToFrequency(noteStr);
       }
     }
 
@@ -293,59 +285,6 @@ export class FT2EffectHandler {
           mem.volumeSlide = param;
         }
         break;
-
-      case 'S': // Special commands (Impulse Tracker style)
-        this.processSpecialCommand(effect, mem);
-        break;
-    }
-  }
-
-  /**
-   * Process special (Sxy) commands - Impulse Tracker style
-   * S7x - Envelope control
-   */
-  private processSpecialCommand(effect: string, mem: ChannelMemory): void {
-    const x = parseInt(effect.charAt(1), 16);
-    const y = parseInt(effect.charAt(2), 16);
-
-    switch (x) {
-      case 0x7: // S7x - Envelope control
-        switch (y) {
-          case 0x7: // S77 - Volume envelope off
-            mem.volumeEnvelopeEnabled = false;
-            break;
-          case 0x8: // S78 - Volume envelope on
-            mem.volumeEnvelopeEnabled = true;
-            break;
-          case 0x9: // S79 - Pitch envelope off
-            mem.pitchEnvelopeEnabled = false;
-            break;
-          case 0xA: // S7A - Pitch envelope on
-            mem.pitchEnvelopeEnabled = true;
-            break;
-          case 0xB: // S7B - Pan envelope off
-            // Could add pan envelope control later
-            break;
-          case 0xC: // S7C - Pan envelope on
-            // Could add pan envelope control later
-            break;
-        }
-        break;
-
-      // Other S commands can be added here
-      // S0x - Set filter (Amiga)
-      // S1x - Set glissando control
-      // S2x - Set finetune
-      // S3x - Set vibrato waveform
-      // S4x - Set tremolo waveform
-      // S8x - Set panning (coarse)
-      // S9x - Sound control (note cut, note off, note fade)
-      // SAx - Set high offset
-      // SBx - Pattern loop
-      // SCx - Note cut
-      // SDx - Note delay
-      // SEx - Pattern delay
-      // SFx - Set active macro
     }
   }
 
@@ -414,23 +353,8 @@ export class FT2EffectHandler {
         }
         break;
 
-      case 0xD: // EDx - Note delay (handled elsewhere)
-        break;
-
       case 0xE: // EEx - Pattern delay
         this.flowControl.patternDelay = y;
-        break;
-
-      case 0xF: // EFx - Note fade
-        // y = fade speed (1-F). Higher = faster fade
-        // Start fading immediately on tick 0, continue on subsequent ticks
-        if (y > 0) {
-          mem.noteFadeTick = 1; // Start fading from tick 1
-          mem.noteFadeSpeed = y; // Volume decrease per tick (1-15)
-        } else {
-          mem.noteFadeTick = 0; // Disable fade
-          mem.noteFadeSpeed = 0;
-        }
         break;
     }
   }
@@ -450,7 +374,6 @@ export class FT2EffectHandler {
     this.processTremolo(mem);
     this.processVolumeSlide(mem);
     this.processNoteCut(mem, currentTick);
-    this.processNoteFade(mem, currentTick);
     this.processNoteRetrigger(mem, currentTick);
   }
 
@@ -516,12 +439,13 @@ export class FT2EffectHandler {
    */
   private processTremolo(mem: ChannelMemory): void {
     if (mem.tremoloDepth > 0) {
-      // const delta = this.calculateWaveformValue(
-      //   mem.tremoloWaveform,
-      //   mem.tremoloPhase,
-      //   mem.tremoloDepth
-      // );
-      // Apply to volume (implementation would modulate audio volume)
+      const delta = this.calculateWaveformValue(
+        mem.tremoloWaveform,
+        mem.tremoloPhase,
+        mem.tremoloDepth
+      );
+      // Store delta for volume modulation (to be applied by audio engine)
+      mem.tremoloValue = delta;
       mem.tremoloPhase = (mem.tremoloPhase + mem.tremoloSpeed) & 0x3F;
     }
   }
@@ -547,16 +471,6 @@ export class FT2EffectHandler {
    */
   private processNoteCut(_mem: ChannelMemory, _tick: number): void {
     // Would be triggered by stored cut tick from tick 0 processing
-  }
-
-  /**
-   * EFx - Note fade (gradual volume decrease)
-   */
-  private processNoteFade(mem: ChannelMemory, tick: number): void {
-    if (mem.noteFadeTick > 0 && tick >= mem.noteFadeTick) {
-      // Decrease volume by fade speed each tick
-      mem.currentVolume = Math.max(0, mem.currentVolume - mem.noteFadeSpeed);
-    }
   }
 
   /**
@@ -613,6 +527,20 @@ export class FT2EffectHandler {
   private hasNoteDelay(effect: string | null | undefined): boolean {
     if (!effect) return false;
     return effect.toUpperCase().startsWith('ED') && effect !== 'ED0';
+  }
+
+  /**
+   * Convert numeric note value (1-96) to string format ("C-4")
+   * XM format: 1=C-0, 12=B-0, 13=C-1, ..., 96=B-7
+   */
+  private noteNumToString(noteNum: number): string {
+    if (noteNum <= 0 || noteNum > 96) return 'C-4'; // Default
+
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteIndex = (noteNum - 1) % 12;
+    const octave = Math.floor((noteNum - 1) / 12);
+
+    return `${noteNames[noteIndex]}-${octave}`;
   }
 
   /**

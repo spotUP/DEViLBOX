@@ -12,6 +12,7 @@ import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
+import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
 
 interface VoiceState {
   instrument: any;
@@ -46,6 +47,8 @@ export class ToneEngine {
   public instruments: Map<string, Tone.PolySynth | Tone.Synth | any>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<string, string> = new Map();
+  // Track loading promises for samplers/players (keyed by instrument key)
+  private instrumentLoadingPromises: Map<string, Promise<void>> = new Map();
 
   // Active voices per channel (for IT NNA support)
   private activeVoices: Map<number, VoiceState[]> = new Map();
@@ -95,6 +98,15 @@ export class ToneEngine {
 
   // ===== PERFORMANCE OPTIMIZATION: Pre-computed lookup tables =====
 
+  // MIDI note frequency LUT (128 entries, A4=440Hz standard)
+  public static readonly MIDI_FREQ_LUT: Float64Array = (() => {
+    const lut = new Float64Array(128);
+    for (let i = 0; i < 128; i++) {
+      lut[i] = 440 * Math.pow(2, (i - 69) / 12);
+    }
+    return lut;
+  })();
+
   // Filter cutoff frequency LUT (128 entries, exponential curve 100Hz to 10kHz)
   private static readonly FILTER_CUTOFF_LUT: Float64Array = (() => {
     const lut = new Float64Array(128);
@@ -104,6 +116,9 @@ export class ToneEngine {
     }
     return lut;
   })();
+
+  // Pitch cents LUT for common pitch multipliers (avoid Math.log2 in hot path)
+  public static readonly PITCH_CENTS_CACHE: Map<number, number> = new Map();
 
   // Metronome synth and state
   private metronomeSynth: Tone.MembraneSynth | null = null;
@@ -167,8 +182,27 @@ export class ToneEngine {
 
   /**
    * Helper to decode an ArrayBuffer to an AudioBuffer
+   * Also handles AudioBuffer (returns as-is) and Uint8Array (converts to ArrayBuffer)
    */
-  public async decodeAudioData(buffer: ArrayBuffer): Promise<AudioBuffer> {
+  public async decodeAudioData(buffer: ArrayBuffer | AudioBuffer | Uint8Array): Promise<AudioBuffer> {
+    // If already an AudioBuffer, return as-is
+    if (buffer instanceof AudioBuffer) {
+      return buffer;
+    }
+
+    // If Uint8Array, convert to ArrayBuffer
+    if (buffer instanceof Uint8Array) {
+      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+      return await Tone.getContext().rawContext.decodeAudioData(arrayBuffer);
+    }
+
+    // Verify it's actually an ArrayBuffer before trying to slice
+    if (!(buffer instanceof ArrayBuffer)) {
+      console.error('[ToneEngine] decodeAudioData: expected ArrayBuffer but got:', typeof buffer, buffer);
+      throw new Error(`Invalid buffer type: ${typeof buffer}`);
+    }
+
+    // ArrayBuffer - decode it (slice to create a copy for decoding)
     return await Tone.getContext().rawContext.decodeAudioData(buffer.slice(0));
   }
 
@@ -187,6 +221,21 @@ export class ToneEngine {
   public async init(): Promise<void> {
     if (Tone.getContext().state === 'suspended') {
       await Tone.start();
+    }
+
+    // Wait for context to actually be running (Tone.start() may return before state changes)
+    const ctx = Tone.getContext().rawContext;
+    if (ctx.state !== 'running') {
+      await new Promise<void>((resolve) => {
+        const checkState = () => {
+          if (ctx.state === 'running') {
+            resolve();
+          } else {
+            setTimeout(checkState, 10);
+          }
+        };
+        checkState();
+      });
     }
 
     // Pre-load TB303 AudioWorklet (prevents async loading delay for TB-303 synth)
@@ -210,6 +259,17 @@ export class ToneEngine {
       } catch (error) {
         console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
       }
+    }
+
+    // Pre-initialize Furnace WASM chip engine
+    // This ensures the WASM is ready before any Furnace synths are created
+    try {
+      const furnaceEngine = FurnaceChipEngine.getInstance();
+      // Pass Tone.js context - the engine will extract the native AudioContext
+      await furnaceEngine.init(Tone.getContext());
+      console.log('[ToneEngine] Furnace WASM chip engine initialized');
+    } catch (error) {
+      console.warn('[ToneEngine] Furnace WASM init failed, will use fallback synths:', error);
     }
 
     // Load AmigaFilter worklet handled by its class
@@ -254,7 +314,16 @@ export class ToneEngine {
     // Wait for all audio buffers to load
     if (samplerConfigs.length > 0) {
       try {
+        // Wait for Tone.js internal loading (URL-based samples)
         await Tone.loaded();
+
+        // Also wait for any custom buffer loading promises (ArrayBuffer-based samples)
+        const pendingLoads = Array.from(this.instrumentLoadingPromises.values());
+        if (pendingLoads.length > 0) {
+          console.log(`[ToneEngine] Waiting for ${pendingLoads.length} samples to decode...`);
+          await Promise.all(pendingLoads);
+          console.log(`[ToneEngine] All ${pendingLoads.length} samples loaded`);
+        }
       } catch (error) {
         console.error('[ToneEngine] Some samples failed to load:', error);
       }
@@ -720,57 +789,91 @@ export class ToneEngine {
         }
 
         // Prepend BASE_URL for relative paths (handles /DEViLBOX/ prefix in production)
+        // But skip if URL already starts with BASE_URL to avoid double prefix
         if (sampleUrl && sampleUrl.startsWith('/') && !sampleUrl.startsWith('//')) {
           const baseUrl = import.meta.env.BASE_URL || '/';
-          // Avoid double slashes - BASE_URL includes trailing slash
-          sampleUrl = baseUrl.endsWith('/') && sampleUrl.startsWith('/')
-            ? baseUrl + sampleUrl.slice(1)
-            : baseUrl + sampleUrl;
+          // Check if URL already has BASE_URL prefix (sample packs already include it)
+          const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+          if (normalizedBase !== '/' && !sampleUrl.startsWith(normalizedBase)) {
+            // Only prepend if not already prefixed
+            sampleUrl = baseUrl.endsWith('/') && sampleUrl.startsWith('/')
+              ? baseUrl + sampleUrl.slice(1)
+              : baseUrl + sampleUrl;
+          }
         }
 
         // If we have a stored edited buffer, use that instead of URL
+        // Note: audioBuffer can be ArrayBuffer, Uint8Array, or base64 string (from persistence)
         if (storedBuffer) {
-          const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
-
-          if (hasLoop || usePeriodPlayback) {
-            instrument = new Tone.Player({
-              loop: hasLoop,
-              loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
-              loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
-              volume: config.volume || 0,
-            });
-            // Store as 'Player' type for proper handling in other methods
-            this.instrumentSynthTypes.set(key, 'Player');
-
-            // Load the stored buffer asynchronously
-            (async () => {
-              try {
-                const audioBuffer = await this.decodeAudioData(storedBuffer);
-                (instrument as Tone.Player).buffer = new Tone.ToneAudioBuffer(audioBuffer);
-                console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
-              } catch (err) {
-                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+          // Convert base64 string to ArrayBuffer if needed
+          let bufferToUse: ArrayBuffer | Uint8Array | null = storedBuffer;
+          if (typeof storedBuffer === 'string') {
+            try {
+              // Base64 decode
+              const binaryString = atob(storedBuffer);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
               }
-            })();
-          } else {
-            // Non-looping: Use Tone.Sampler
-            instrument = new Tone.Sampler({
-              volume: config.volume || -12,
-            });
-
-            // Load the stored buffer asynchronously
-            (async () => {
-              try {
-                const audioBuffer = await this.decodeAudioData(storedBuffer);
-                const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-                (instrument as Tone.Sampler).add(baseNote as Tone.Unit.Note, toneBuffer);
-                console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
-              } catch (err) {
-                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
-              }
-            })();
+              bufferToUse = bytes.buffer;
+            } catch (e) {
+              console.warn(`[ToneEngine] Sampler ${instrumentId}: audioBuffer is string but not valid base64, skipping`);
+              bufferToUse = null;
+            }
           }
-        } else if (sampleUrl) {
+
+          if (bufferToUse) {
+            const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
+
+            if (hasLoop || usePeriodPlayback) {
+              instrument = new Tone.Player({
+                loop: hasLoop,
+                loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
+                loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
+                volume: config.volume || 0,
+              });
+              // Store as 'Player' type for proper handling in other methods
+              this.instrumentSynthTypes.set(key, 'Player');
+
+              // Load the stored buffer asynchronously and track the promise
+              const bufferForDecode = bufferToUse;
+              const playerRef = instrument as Tone.Player;
+              const loadPromise = (async () => {
+                try {
+                  const audioBuffer = await this.decodeAudioData(bufferForDecode);
+                  playerRef.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
+                } catch (err) {
+                  console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+                }
+              })();
+              this.instrumentLoadingPromises.set(key, loadPromise);
+            } else {
+              // Non-looping: Use Tone.Sampler
+              instrument = new Tone.Sampler({
+                volume: config.volume || -12,
+              });
+
+              // Load the stored buffer asynchronously and track the promise
+              const bufferForDecode = bufferToUse;
+              const samplerRef = instrument as Tone.Sampler;
+              const loadPromise = (async () => {
+                try {
+                  const audioBuffer = await this.decodeAudioData(bufferForDecode);
+                  const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+                  samplerRef.add(baseNote as Tone.Unit.Note, toneBuffer);
+                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
+                } catch (err) {
+                  console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+                }
+              })();
+              this.instrumentLoadingPromises.set(key, loadPromise);
+            }
+          }
+        }
+
+        // If no instrument created from stored buffer, try URL
+        if (!instrument && sampleUrl) {
           // CRITICAL: For MOD/XM samples or looping samples, use Tone.Player
           // Tone.Player allows direct playbackRate control for accurate pitch
           // Tone.Sampler rounds to nearest semitone, losing precision
@@ -806,9 +909,11 @@ export class ToneEngine {
               },
             });
           }
-        } else {
-          // No sample - create empty sampler (will be silent)
-          console.warn(`[ToneEngine] Sampler ${instrumentId} has no sample URL`);
+        }
+
+        // If still no instrument created, create empty sampler (will be silent)
+        if (!instrument) {
+          console.warn(`[ToneEngine] Sampler ${instrumentId} has no valid sample source`);
           instrument = new Tone.Sampler({
             volume: config.volume || -12,
           });
@@ -881,7 +986,75 @@ export class ToneEngine {
       case 'FormantSynth':
       case 'Wavetable':
       case 'WobbleBass':
-      case 'Furnace': {
+      case 'Furnace':
+      // Furnace chip-specific synth types - all use FurnaceSynth with different chip IDs
+      // FM Synthesis Chips
+      case 'FurnaceOPN':
+      case 'FurnaceOPM':
+      case 'FurnaceOPL':
+      case 'FurnaceOPLL':
+      case 'FurnaceOPZ':
+      case 'FurnaceOPNA':
+      case 'FurnaceOPNB':
+      case 'FurnaceOPL4':
+      case 'FurnaceY8950':
+      case 'FurnaceESFM':
+      // Console PSG Chips
+      case 'FurnaceNES':
+      case 'FurnaceGB':
+      case 'FurnacePSG':
+      case 'FurnacePCE':
+      case 'FurnaceSNES':
+      case 'FurnaceVB':
+      case 'FurnaceLynx':
+      case 'FurnaceSWAN':
+      // NES Expansion Audio
+      case 'FurnaceVRC6':
+      case 'FurnaceVRC7':
+      case 'FurnaceN163':
+      case 'FurnaceFDS':
+      case 'FurnaceMMC5':
+      // Computer Chips
+      case 'FurnaceC64':
+      case 'FurnaceSID6581':
+      case 'FurnaceSID8580':
+      case 'FurnaceAY':
+      case 'FurnaceVIC':
+      case 'FurnaceSAA':
+      case 'FurnaceTED':
+      case 'FurnaceVERA':
+      // Arcade PCM Chips
+      case 'FurnaceSEGAPCM':
+      case 'FurnaceQSOUND':
+      case 'FurnaceES5506':
+      case 'FurnaceRF5C68':
+      case 'FurnaceC140':
+      case 'FurnaceK007232':
+      case 'FurnaceK053260':
+      case 'FurnaceGA20':
+      case 'FurnaceOKI':
+      case 'FurnaceYMZ280B':
+      // Wavetable Chips
+      case 'FurnaceSCC':
+      case 'FurnaceX1_010':
+      case 'FurnaceBUBBLE':
+      // Other
+      case 'FurnaceTIA':
+      case 'FurnaceSM8521':
+      case 'FurnaceT6W28':
+      case 'FurnaceSUPERVISION':
+      case 'FurnaceUPD1771':
+      // Buzzmachine Generators (WASM-emulated Buzz synths)
+      case 'BuzzDTMF':
+      case 'BuzzFreqBomb':
+      case 'BuzzKick':
+      case 'BuzzKickXP':
+      case 'BuzzNoise':
+      case 'BuzzTrilok':
+      case 'Buzz4FM2F':
+      case 'BuzzDynamite6':
+      case 'BuzzM3':
+      case 'Buzz3o3': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
@@ -1525,7 +1698,8 @@ export class ToneEngine {
         config.synthType === 'DuoSynth' ||
         config.synthType === 'MetalSynth' ||
         config.synthType === 'MembraneSynth' ||
-        config.synthType === 'TB303'
+        config.synthType === 'TB303' ||
+        config.synthType === 'Furnace'
       ) {
         // These synths use triggerRelease(time) - no note parameter
         instrument.triggerRelease(safeTime);
@@ -1637,12 +1811,17 @@ export class ToneEngine {
     if (channelIndex !== undefined) {
       // 1. Handle Past Note Actions (NNA)
       let voices = this.activeVoices.get(channelIndex) || [];
-      
+
       if (nnaAction === 0) { // CUT (Standard MOD/XM/S3M behavior)
+        // IMPORTANT: Don't stop voices that use the same instrument instance as the new note
+        // This prevents mono synths (like FurnaceSynth) from having keyOff called right after keyOn
         voices.forEach(v => {
-          this.stopVoice(v, safeTime);
+          if (v.instrument !== instrument) {
+            this.stopVoice(v, safeTime);
+          }
         });
-        voices = [];
+        // Filter out voices that were stopped, keep those using the same instrument
+        voices = voices.filter(v => v.instrument === instrument);
       } else {
         // IT NNA: Continue, Note Off, or Fade
         voices.forEach(v => {
@@ -1667,14 +1846,21 @@ export class ToneEngine {
       } else if (config.synthType === 'Synth') {
         voiceNode = new Tone.Synth(instrument.get());
       } else {
-        voiceNode = instrument; // Fallback for specialized synths
+        voiceNode = instrument; // Fallback for specialized synths (mono synths like FurnaceSynth)
       }
 
       // 3. Create new voice state and routing chain
-      const voice = this.createVoice(channelIndex, voiceNode, note, config);
-      voiceNode.connect(voice.nodes.gain);
-      
-      voices.push(voice);
+      // For mono synths where voiceNode === instrument, check if voice already exists
+      const existingVoiceIndex = voices.findIndex(v => v.instrument === voiceNode);
+      if (existingVoiceIndex >= 0) {
+        // Mono synth: reuse existing voice entry, just update the note
+        voices[existingVoiceIndex].note = note;
+      } else {
+        // Create new voice entry
+        const voice = this.createVoice(channelIndex, voiceNode, note, config);
+        voiceNode.connect(voice.nodes.gain);
+        voices.push(voice);
+      }
       this.activeVoices.set(channelIndex, voices);
 
       // 4. Trigger the playback
@@ -1700,7 +1886,12 @@ export class ToneEngine {
           const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
           voiceNode.start(safeTime, offset);
         } else if (voiceNode.triggerAttack) {
-          voiceNode.triggerAttack(note, safeTime, velocity);
+          // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
+          if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
+            voiceNode.triggerAttack(safeTime, velocity);
+          } else {
+            voiceNode.triggerAttack(note, safeTime, velocity);
+          }
         }
       } catch (e) {
         console.error(`[ToneEngine] Voice trigger error:`, e);
