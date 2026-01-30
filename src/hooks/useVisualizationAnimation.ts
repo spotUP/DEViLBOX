@@ -15,7 +15,8 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 
-// Target: 30fps = ~33.33ms per frame (configurable via fps option)
+// 30fps = ~33.33ms per frame
+export const FRAME_INTERVAL = 1000 / 30;
 
 interface UseVisualizationAnimationOptions {
   /**

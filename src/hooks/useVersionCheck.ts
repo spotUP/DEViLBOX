@@ -19,19 +19,22 @@ export function useVersionCheck(checkIntervalMs: number = 5 * 60 * 1000) {
   const [latestVersion, setLatestVersion] = useState<VersionInfo | null>(null);
 
   const checkForUpdates = async () => {
-    // Skip version check in development mode
+    // Skip version check in development
     if (import.meta.env.DEV) {
       return;
     }
 
     try {
-      // Add timestamp to prevent caching
-      const response = await fetch(`/DEViLBOX/version.json?t=${Date.now()}`, {
+      // Use Vite's base URL (e.g., '/DEViLBOX/' in production)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const versionUrl = `${baseUrl}version.json?t=${Date.now()}`;
+
+      const response = await fetch(versionUrl, {
         cache: 'no-cache',
       });
 
       if (!response.ok) {
-        console.warn('Failed to check for updates:', response.status);
+        // Silently ignore - version.json may not exist
         return;
       }
 
@@ -47,7 +50,10 @@ export function useVersionCheck(checkIntervalMs: number = 5 * 60 * 1000) {
         setUpdateAvailable(true);
       }
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      // Silently ignore version check errors (network issues, etc.)
+      if (import.meta.env.DEV) {
+        console.debug('Version check skipped:', error);
+      }
     }
   };
 

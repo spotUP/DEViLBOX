@@ -55,7 +55,9 @@ export type SynthType =
   | 'FurnaceFDS'      // Famicom Disk System
   | 'FurnaceMMC5'     // MMC5 (Castlevania 3 US)
   // Computer Chips
-  | 'FurnaceC64'      // Commodore 64 (SID)
+  | 'FurnaceC64'      // Commodore 64 (SID3 - enhanced)
+  | 'FurnaceSID6581'  // Classic SID 6581 (warm/gritty)
+  | 'FurnaceSID8580'  // Classic SID 8580 (cleaner)
   | 'FurnaceAY'       // AY-3-8910 (ZX Spectrum, MSX)
   | 'FurnaceVIC'      // VIC-20
   | 'FurnaceSAA'      // Philips SAA1099
@@ -82,17 +84,55 @@ export type SynthType =
   | 'FurnaceT6W28'    // NEC PC-6001
   | 'FurnaceSUPERVISION' // Watara Supervision
   | 'FurnaceUPD1771'  // NEC μPD1771
+  // NEW Chips (47-72)
+  | 'FurnaceOPN2203'  // YM2203 (PC-88/98, simpler OPNA)
+  | 'FurnaceOPNBB'    // YM2610B (Extended Neo Geo)
+  | 'FurnaceAY8930'   // Enhanced AY (Microchip)
+  | 'FurnaceNDS'      // Nintendo DS Sound
+  | 'FurnaceGBA'      // GBA DMA Sound
+  | 'FurnacePOKEMINI' // Pokemon Mini
+  | 'FurnaceNAMCO'    // Namco WSG (Pac-Man, Galaga)
+  | 'FurnacePET'      // Commodore PET
+  | 'FurnacePOKEY'    // Atari POKEY (Atari 800/5200)
+  | 'FurnaceMSM6258'  // OKI MSM6258 ADPCM
+  | 'FurnaceMSM5232'  // OKI MSM5232 8-voice synth
+  | 'FurnaceMULTIPCM' // Sega MultiPCM (System 32)
+  | 'FurnaceAMIGA'    // Amiga Paula (4 channel)
+  | 'FurnacePCSPKR'   // PC Speaker (internal beeper)
+  | 'FurnacePONG'     // AY-3-8500 (original Pong chip)
+  | 'FurnacePV1000'   // Casio PV-1000
+  | 'FurnaceDAVE'     // Enterprise DAVE
+  | 'FurnaceSU'       // Sound Unit
+  | 'FurnacePOWERNOISE' // Power Noise
+  | 'FurnaceZXBEEPER' // ZX Spectrum beeper
+  | 'FurnaceSCVTONE'  // Epoch Super Cassette Vision
+  | 'FurnacePCMDAC'   // Generic PCM DAC
   // Bass synths
   | 'WobbleBass'
+  // Buzzmachines (Jeskola Buzz effects as synths)
+  | 'Buzzmachine'
   // Multi-sample instruments
   | 'DrumKit'
   // Module playback (libopenmpt)
-  | 'ChiptuneModule';
+  | 'ChiptuneModule'
+  // Buzzmachine Generators (WASM-emulated Buzz synths)
+  | 'BuzzDTMF'         // CyanPhase DTMF (phone tones)
+  | 'BuzzFreqBomb'     // Elenzil Frequency Bomb
+  | 'BuzzKick'         // FSM Kick drum
+  | 'BuzzKickXP'       // FSM KickXP (extended kick)
+  | 'BuzzNoise'        // Jeskola Noise generator
+  | 'BuzzTrilok'       // Jeskola Trilok (bass drum)
+  | 'Buzz4FM2F'        // MadBrain 4FM2F (4-op FM)
+  | 'BuzzDynamite6'    // MadBrain Dynamite6 (additive)
+  | 'BuzzM3'           // Makk M3 (dual-osc synth)
+  | 'Buzz3o3';         // Oomek Aggressor 3o3 (TB-303 clone)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 // Extended waveform types for vibrato/tremolo effects (tracker formats)
 export type VibratoWaveformType = 'sine' | 'rampDown' | 'rampUp' | 'square' | 'random';
+
+// Extended waveform types for vibrato/tremolo effects (tracker formats)
 
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch';
 
@@ -352,20 +392,52 @@ export const DEFAULT_CHIPTUNE_MODULE: ChiptuneModuleConfig = {
 /**
  * SuperSaw Synthesizer Configuration
  * Multiple detuned sawtooth oscillators for massive trance/EDM sounds
+ * Inspired by Roland JP-8000/Access Virus supersaw
  */
 export interface SuperSawConfig {
   voices: number;               // 3-9 oscillators (default 7)
   detune: number;               // 0-100 cents spread between voices
   mix: number;                  // 0-100% center vs side voices
   stereoSpread: number;         // 0-100% panning width
+
+  // Advanced detuning (new)
+  spreadCurve?: 'linear' | 'exponential' | 'random';  // How voices spread across detune range
+  phaseMode?: 'free' | 'reset' | 'random';            // Phase behavior on note trigger
+  analogDrift?: number;         // 0-100% pitch drift for analog warmth
+
+  // Sub oscillator (new)
+  sub?: {
+    enabled: boolean;
+    octave: -1 | -2;            // Sub octave
+    waveform: 'sine' | 'square';
+    level: number;              // 0-100%
+  };
+
+  // PWM mode (new) - pulse waves instead of saws
+  pwm?: {
+    enabled: boolean;
+    width: number;              // 10-90% pulse width
+    modRate: number;            // 0-10 Hz PWM rate
+    modDepth: number;           // 0-100% modulation depth
+  };
+
   envelope: EnvelopeConfig;
   filter: {
     type: FilterType;
     cutoff: number;             // 20-20000 Hz
     resonance: number;          // 0-100%
     envelopeAmount: number;     // -100 to 100%
+    keyTracking?: number;       // 0-100%
   };
   filterEnvelope: EnvelopeConfig;
+
+  // Pitch envelope (new)
+  pitchEnvelope?: {
+    enabled: boolean;
+    amount: number;             // -24 to +24 semitones
+    attack: number;             // 0-2000ms
+    decay: number;              // 0-2000ms
+  };
 }
 
 export const DEFAULT_SUPERSAW: SuperSawConfig = {
@@ -706,14 +778,25 @@ export const DEFAULT_ARPEGGIO: ArpeggioConfig = {
 
 /**
  * ChipSynth Configuration (8-bit)
+ * Hardware-accurate parameters based on NES/GB/C64 chips
  */
 export interface ChipSynthConfig {
+  // Chip emulation target (new)
+  chip?: 'nes' | 'gb' | 'c64' | 'ay' | 'sn76489' | 'generic';
+
   channel: 'pulse1' | 'pulse2' | 'triangle' | 'noise';
   pulse?: {
-    duty: 12.5 | 25 | 50;       // Duty cycle percentage
+    duty: 12.5 | 25 | 50 | 75;  // Duty cycle percentage (75% = inverted 25%)
+    // Hardware sweep (NES-style, new)
+    sweep?: {
+      enabled: boolean;
+      period: number;           // 0-7 (sweep speed)
+      direction: 'up' | 'down';
+      shift: number;            // 0-7 (pitch change amount)
+    };
   };
   noise?: {
-    mode: 'white' | 'periodic';
+    mode: 'white' | 'periodic' | 'metallic';  // metallic = looped noise
     period: number;             // For periodic noise
   };
   bitDepth: number;             // 4-16 bits
@@ -724,6 +807,37 @@ export interface ChipSynthConfig {
     speed: number;              // 0-20 Hz
     depth: number;              // 0-100%
     delay: number;              // ms before vibrato starts
+  };
+
+  // Hardware volume envelope (GB/NES style, new)
+  hardwareEnvelope?: {
+    enabled: boolean;
+    initialVolume: number;      // 0-15
+    direction: 'up' | 'down';   // Volume sweep direction
+    period: number;             // 0-7 (sweep speed, 0=disable)
+  };
+
+  // Ring modulation (C64 style, new)
+  ringMod?: {
+    enabled: boolean;
+    sourceChannel: 'pulse1' | 'pulse2' | 'triangle';
+  };
+
+  // Hard sync (C64 style, new)
+  sync?: {
+    enabled: boolean;
+    sourceChannel: 'pulse1' | 'pulse2' | 'triangle';
+  };
+
+  // Macro system (Furnace-style, new)
+  macros?: {
+    volume?: number[];          // Volume sequence (0-15)
+    arpeggio?: number[];        // Note offset sequence
+    duty?: number[];            // Duty cycle sequence (0-3 for pulse)
+    pitch?: number[];           // Pitch offset sequence
+    waveform?: number[];        // Waveform sequence
+    loopPoint?: number;         // Where to loop (-1 = no loop)
+    releasePoint?: number;      // Release point (-1 = none)
   };
 }
 
@@ -1073,6 +1187,72 @@ export const DEFAULT_WOBBLE_BASS: WobbleBassConfig = {
   },
 };
 
+/**
+ * WobbleBass Configuration
+ * Dedicated bass synth for dubstep, DnB, jungle wobble and growl basses
+ * Features dual oscillators, FM, Reese-style detuning, aggressive filter, and tempo-synced LFO
+ */
+
+
+
+
+/**
+ * Buzzmachine Configuration
+ * For Jeskola Buzz machine effects used as synths/generators
+ *
+ * Machine types match the BuzzmachineType const in BuzzmachineEngine.ts
+ */
+export type BuzzmachineType =
+  // Distortion/Saturation
+  | 'ArguruDistortion'
+  | 'ElakDist2'
+  | 'JeskolaDistortion'
+  | 'GeonikOverdrive'
+  | 'GraueSoftSat'
+  | 'WhiteNoiseStereoDist'
+  // Filters
+  | 'ElakSVF'
+  | 'CyanPhaseNotch'
+  | 'QZfilter'
+  | 'FSMPhilta'
+  // Delay/Reverb
+  | 'JeskolaDelay'
+  | 'JeskolaCrossDelay'
+  | 'JeskolaFreeverb'
+  | 'FSMPanzerDelay'
+  // Chorus/Modulation
+  | 'FSMChorus'
+  | 'FSMChorus2'
+  | 'WhiteNoiseWhiteChorus'
+  | 'BigyoFrequencyShifter'
+  // Dynamics
+  | 'GeonikCompressor'
+  | 'LdSLimit'
+  | 'OomekExciter'
+  | 'OomekMasterizer'
+  | 'DedaCodeStereoGain'
+  // Generators
+  | 'FSMKick'
+  | 'FSMKickXP'
+  | 'JeskolaTrilok'
+  | 'JeskolaNoise'
+  | 'OomekAggressor'
+  | 'MadBrain4FM2F'
+  | 'MadBrainDynamite6'
+  | 'MakkM3'
+  | 'CyanPhaseDTMF'
+  | 'ElenzilFrequencyBomb';
+
+export interface BuzzmachineConfig {
+  machineType: BuzzmachineType;
+  parameters: Record<number, number>;  // Parameter index -> value
+}
+
+export const DEFAULT_BUZZMACHINE: BuzzmachineConfig = {
+  machineType: 'ArguruDistortion',
+  parameters: {},
+};
+
 export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   vowel: 'A',
   vowelMorph: {
@@ -1210,14 +1390,16 @@ export interface FurnaceGBConfig {
   envDir: number;        // Direction (0=decrease, 1=increase)
   envLen: number;        // Length 0-7
   soundLen: number;      // Sound length 0-63
+  duty?: number;         // Duty cycle 0-3 (12.5%, 25%, 50%, 75%)
   // Hardware sequence (for precise envelope control)
-  hwSeqLen: number;
-  hwSeq: Array<{
+  hwSeqEnabled?: boolean; // Enable hardware sequence
+  hwSeqLen?: number;
+  hwSeq?: Array<{
     cmd: number;         // Command type
     data: number;        // Command data
   }>;
-  softEnv: boolean;      // Use software envelope
-  alwaysInit: boolean;   // Always initialize
+  softEnv?: boolean;      // Use software envelope
+  alwaysInit?: boolean;   // Always initialize
 }
 
 // C64 SID (DIV_INS_C64)
@@ -1233,14 +1415,16 @@ export interface FurnaceC64Config {
   duty: number;          // Pulse duty 0-4095
   ringMod: boolean;      // Ring modulation
   oscSync: boolean;      // Oscillator sync
-  toFilter: boolean;     // Route to filter
-  initFilter: boolean;   // Initialize filter
-  filterResonance: number; // 0-15
-  filterCutoff: number;  // 0-2047
-  filterLP: boolean;     // Low-pass filter
-  filterBP: boolean;     // Band-pass filter
-  filterHP: boolean;     // High-pass filter
-  filterCh3Off: boolean; // Disable channel 3
+  toFilter?: boolean;    // Route to filter
+  initFilter?: boolean;  // Initialize filter
+  filterOn?: boolean;    // Filter enabled (editor alias)
+  filterRes?: number;    // Filter resonance (editor alias) 0-15
+  filterResonance?: number; // 0-15
+  filterCutoff?: number; // 0-2047
+  filterLP?: boolean;    // Low-pass filter
+  filterBP?: boolean;    // Band-pass filter
+  filterHP?: boolean;    // High-pass filter
+  filterCh3Off?: boolean; // Disable channel 3
 }
 
 // Amiga (DIV_INS_AMIGA)
@@ -1278,15 +1462,15 @@ export interface FurnaceFDSConfig {
 // SNES (DIV_INS_SNES)
 export interface FurnaceSNESConfig {
   useEnv: boolean;       // Use hardware envelope
-  gainMode: number;      // Gain mode
+  gainMode: number | string; // Gain mode (number for raw, string for named modes)
   gain: number;          // Gain value
   a: number;             // Attack
   d: number;             // Decay
   s: number;             // Sustain level
   r: number;             // Release
   // BRR sample settings
-  d2: number;            // Decay 2
-  sus: number;           // Sustain mode
+  d2?: number;           // Decay 2
+  sus?: number;          // Sustain mode
 }
 
 // ESFM (DIV_INS_ESFM)
@@ -1364,12 +1548,40 @@ export interface FurnaceConfig {
   snes?: FurnaceSNESConfig;
   esfm?: FurnaceESFMConfig;
   es5506?: FurnaceES5506Config;
+
+  // Additional chip configs (editor-specific)
+  nes?: {
+    dutyNoise: number;
+    envMode: 'length' | 'env';
+    envValue: number;
+    sweepEnabled: boolean;
+    sweepPeriod: number;
+    sweepNegate: boolean;
+    sweepShift: number;
+  };
+  psg?: {
+    duty: number;
+    width: number;
+    noiseMode: 'white' | 'periodic';
+    attack: number;
+    decay: number;
+    sustain: number;
+    release: number;
+  };
+  pcm?: {
+    sampleRate: number;
+    loopStart: number;
+    loopEnd: number;
+    loopPoint: number;
+    bitDepth: number;
+    loopEnabled: boolean;
+  };
 }
 
 export const DEFAULT_FURNACE: FurnaceConfig = {
   chipType: 1, // FM (OPN2/Genesis)
-  algorithm: 0,
-  feedback: 0,
+  algorithm: 4, // Algorithm 4: OP1+OP2->OP3, OP4 carrier (classic FM brass/strings)
+  feedback: 4,  // Moderate feedback for richer harmonics
   fms: 0,
   ams: 0,
   fms2: 0,
@@ -1377,31 +1589,108 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
   ops: 4,
   opllPreset: 0,
   fixedDrums: false,
-  operators: Array.from({ length: 4 }, () => ({
-    enabled: true,
-    mult: 1,
-    tl: 0,
-    ar: 31,
-    dr: 0,
-    d2r: 0,
-    sl: 0,
-    rr: 15,
-    dt: 0,
-    dt2: 0,
-    rs: 0,
-    am: false,
-    ksr: false,
-    ksl: 0,
-    sus: false,
-    vib: false,
-    ws: 0,
-    ssg: 0,
-    // OPZ extensions
-    dam: 0,
-    dvb: 0,
-    egt: false,
-    kvs: 0,
-  })),
+  operators: [
+    // OP1 - Modulator
+    {
+      enabled: true,
+      mult: 2,    // 2x frequency ratio
+      tl: 40,     // Moderate modulation depth
+      ar: 31,     // Fast attack
+      dr: 8,      // Moderate decay
+      d2r: 2,     // Slow secondary decay
+      sl: 4,      // Sustain at ~75%
+      rr: 6,      // Moderate release
+      dt: 0,
+      dt2: 0,
+      rs: 0,
+      am: false,
+      ksr: false,
+      ksl: 0,
+      sus: false,
+      vib: false,
+      ws: 0,
+      ssg: 0,
+      dam: 0,
+      dvb: 0,
+      egt: false,
+      kvs: 0,
+    },
+    // OP2 - Modulator
+    {
+      enabled: true,
+      mult: 1,    // 1x frequency ratio
+      tl: 50,     // Lower modulation
+      ar: 28,     // Fast attack
+      dr: 6,      // Moderate decay
+      d2r: 2,
+      sl: 4,
+      rr: 6,
+      dt: 0,
+      dt2: 0,
+      rs: 0,
+      am: false,
+      ksr: false,
+      ksl: 0,
+      sus: false,
+      vib: false,
+      ws: 0,
+      ssg: 0,
+      dam: 0,
+      dvb: 0,
+      egt: false,
+      kvs: 0,
+    },
+    // OP3 - Carrier (outputs for algorithm 4)
+    {
+      enabled: true,
+      mult: 1,
+      tl: 0,      // Full volume (carrier)
+      ar: 31,
+      dr: 10,
+      d2r: 4,
+      sl: 2,
+      rr: 6,
+      dt: 0,
+      dt2: 0,
+      rs: 0,
+      am: false,
+      ksr: false,
+      ksl: 0,
+      sus: false,
+      vib: false,
+      ws: 0,
+      ssg: 0,
+      dam: 0,
+      dvb: 0,
+      egt: false,
+      kvs: 0,
+    },
+    // OP4 - Carrier (always outputs in algorithm 4)
+    {
+      enabled: true,
+      mult: 1,
+      tl: 0,      // Full volume (carrier)
+      ar: 31,
+      dr: 8,
+      d2r: 3,
+      sl: 3,
+      rr: 5,      // Slightly slower release for tail
+      dt: 0,
+      dt2: 0,
+      rs: 0,
+      am: false,
+      ksr: false,
+      ksl: 0,
+      sus: false,
+      vib: false,
+      ws: 0,
+      ssg: 0,
+      dam: 0,
+      dvb: 0,
+      egt: false,
+      kvs: 0,
+    },
+  ],
   macros: [],
   opMacros: Array.from({ length: 4 }, () => ({})),
   wavetables: [],
@@ -1431,7 +1720,31 @@ export type AudioEffectType =
   | 'StereoWidener'
   | 'TapeSaturation'
   | 'SidechainCompressor'
-  | 'Neural'; // Neural effects category
+  | 'Neural' // Neural effects category
+  // Buzzmachines (WASM-emulated Buzz effects)
+  | 'BuzzDistortion'   // Arguru Distortion
+  | 'BuzzSVF'          // Elak State Variable Filter
+  | 'BuzzDelay'        // Jeskola Delay
+  | 'BuzzChorus'       // FSM Chorus
+  | 'BuzzCompressor'   // Geonik Compressor
+  | 'BuzzOverdrive'    // Geonik Overdrive
+  | 'BuzzDistortion2'  // Jeskola Distortion
+  | 'BuzzCrossDelay'   // Jeskola Cross Delay
+  | 'BuzzPhilta'       // FSM Philta (filter)
+  | 'BuzzDist2'        // Elak Dist2
+  | 'BuzzFreeverb'     // Jeskola Freeverb (reverb)
+  | 'BuzzFreqShift'    // Bigyo Frequency Shifter
+  | 'BuzzNotch'        // CyanPhase Notch Filter
+  | 'BuzzStereoGain'   // DedaCode Stereo Gain
+  | 'BuzzSoftSat'      // Graue Soft Saturation
+  | 'BuzzLimiter'      // Ld Soft Limiter
+  | 'BuzzExciter'      // Oomek Exciter
+  | 'BuzzMasterizer'   // Oomek Masterizer
+  | 'BuzzStereoDist'   // WhiteNoise Stereo Distortion
+  | 'BuzzWhiteChorus'  // WhiteNoise White Chorus
+  | 'BuzzZfilter'      // Q Zfilter
+  | 'BuzzChorus2'      // FSM Chorus 2
+  | 'BuzzPanzerDelay'; // FSM Panzer Delay
 
 export type EffectCategory = 'tonejs' | 'neural';
 
@@ -1449,7 +1762,7 @@ export interface EffectConfig {
 }
 
 export interface InstrumentMetadata {
-  importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M';
+  importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
   originalEnvelope?: any; // Preserved point-based envelope for future editor
   autoVibrato?: any; // Preserved auto-vibrato settings
   preservedSample?: {
@@ -1629,6 +1942,24 @@ export const DEFAULT_LFO: LFOConfig = {
 };
 
 /**
+ * LFO (Low Frequency Oscillator) Configuration
+ * Provides audio-rate modulation for filter, pitch, and amplitude
+ */
+
+// Tempo-synced LFO divisions (T=triplet, D=dotted)
+
+// Mapping from sync division to rate multiplier (at 120 BPM)
+
+
+
+/**
+ * LFO (Low Frequency Oscillator) Configuration
+ * Provides audio-rate modulation for filter, pitch, and amplitude
+ */
+
+
+
+/**
  * Instrument type discriminator for XM compatibility
  * - 'sample': Standard XM sampled instrument
  * - 'synth': DEViLBOX synthesizer (extension)
@@ -1660,6 +1991,8 @@ export interface InstrumentConfig {
   furnace?: FurnaceConfig;
   // Bass synths
   wobbleBass?: WobbleBassConfig;
+  // Buzzmachines
+  buzzmachine?: BuzzmachineConfig;
   // Drumkit/Keymap (multi-sample)
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)

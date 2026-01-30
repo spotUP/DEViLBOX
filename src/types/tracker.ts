@@ -75,6 +75,7 @@ export interface TrackerCell {
   eff: EffectParam;             // 0x00-0xFF (effect parameter)
 
   // DEViLBOX extensions (stored in extended format)
+  effect?: string;              // Legacy string format (e.g., "E01", "300") - combines effTyp+eff
   effect2?: string;             // Second effect (legacy string format)
 
   // TB-303 specific columns
@@ -178,6 +179,76 @@ export interface ParsedSample {
   length: number; // Total sample length in frames
 }
 
+/**
+ * Furnace macro data for playback
+ * Macros control instrument parameters per-tick (volume, arpeggio, duty, etc.)
+ */
+export interface FurnaceMacroData {
+  type: number;      // Macro type code (0=vol, 1=arp, 2=duty, 3=wave, 4=pitch, etc.)
+  data: number[];    // Macro values (up to 256 steps)
+  loop: number;      // Loop point (-1 = no loop)
+  release: number;   // Release point (-1 = none)
+  speed: number;     // Macro speed (1 = every tick, 2 = every 2 ticks, etc.)
+}
+
+/**
+ * Furnace wavetable data for wavetable chips (GB, N163, PCE, SCC, etc.)
+ */
+export interface FurnaceWavetableData {
+  id: number;
+  data: number[];    // Waveform samples (4-bit to 8-bit depending on chip)
+  len?: number;      // Length (if different from data.length)
+  max?: number;      // Max value (height)
+}
+
+/**
+ * Furnace-specific instrument data
+ * Preserves chip-specific parameters for authentic playback
+ */
+export interface FurnaceInstrumentData {
+  chipType: number;              // DIV_INS_* type
+  synthType: string;             // Mapped SynthType for DEViLBOX engine
+
+  // FM parameters (for FM chips: OPN, OPM, OPL, OPLL, etc.)
+  fm?: {
+    algorithm: number;
+    feedback: number;
+    fms?: number;
+    ams?: number;
+    ops?: number;
+    opllPreset?: number;
+    operators: Array<{
+      enabled: boolean;
+      mult: number;
+      tl: number;
+      ar: number;
+      dr: number;
+      d2r: number;
+      sl: number;
+      rr: number;
+      dt: number;
+      dt2?: number;
+      rs?: number;
+      am?: boolean;
+      ksr?: boolean;
+      ksl?: number;
+      sus?: boolean;
+      vib?: boolean;
+      ws?: number;
+      ssg?: number;
+    }>;
+  };
+
+  // Macros for per-tick parameter changes
+  macros: FurnaceMacroData[];
+
+  // Wavetables for wavetable chips
+  wavetables: FurnaceWavetableData[];
+
+  // Chip-specific config (optional)
+  chipConfig?: Record<string, any>;
+}
+
 export interface ParsedInstrument {
   id: number;
   name: string;
@@ -188,6 +259,9 @@ export interface ParsedInstrument {
   fadeout: number; // Volume fadeout speed (0-4095)
   volumeType: 'envelope' | 'none';
   panningType: 'envelope' | 'none';
+
+  // Furnace-specific data (for .fur imports)
+  furnace?: FurnaceInstrumentData;
 }
 
 /**
@@ -195,7 +269,7 @@ export interface ParsedInstrument {
  * Preserves original module data for editing and re-export
  */
 export interface ImportMetadata {
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M';
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
   sourceFile: string;
   importedAt: string;
   originalChannelCount: number;

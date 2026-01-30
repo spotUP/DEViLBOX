@@ -271,7 +271,8 @@ export function getFT2EffectDescription(effectString: string | null): EffectDesc
 
   const command = effectString[0].toUpperCase();
   const param1 = effectString[1].toUpperCase();
-  // const param2 = effectString[2].toUpperCase(); // Reserved for future use
+  const param2 = effectString[2].toUpperCase();
+  void param2; // Second parameter byte (used for detailed effect descriptions)
 
   // Check for E-command (extended)
   if (command === 'E') {
@@ -329,76 +330,79 @@ export function getAllFT2EffectCommands(): EffectDescription[] {
 }
 
 /**
- * Volume column effect descriptions
+ * Get description for XM volume column value
+ * XM volume column format:
+ * - 0x00-0x0F: Nothing (empty)
+ * - 0x10-0x50: Set volume (0-64)
+ * - 0x60-0x6F: Volume slide down
+ * - 0x70-0x7F: Volume slide up
+ * - 0x80-0x8F: Fine volume slide down
+ * - 0x90-0x9F: Fine volume slide up
+ * - 0xA0-0xAF: Set vibrato speed
+ * - 0xB0-0xBF: Vibrato (depth)
+ * - 0xC0-0xCF: Set panning (0-F)
+ * - 0xD0-0xDF: Panning slide left
+ * - 0xE0-0xEF: Panning slide right
+ * - 0xF0-0xFF: Tone portamento
  */
-export function getVolumeColumnDescription(value: number | null): string | null {
-  if (value === null || value === undefined) return null;
+export function getVolumeColumnDescription(value: number): string | null {
+  if (value === null || value === undefined || value < 0x10) {
+    return null;
+  }
 
-  // Volume set (0x10-0x50)
   if (value >= 0x10 && value <= 0x50) {
     const vol = value - 0x10;
-    return `Set Volume: ${vol}/64 (0x${vol.toString(16).toUpperCase().padStart(2, '0')} hex)`;
+    return `Set Volume: ${vol}`;
   }
 
-  // Volume slide down (0x60-0x6F)
   if (value >= 0x60 && value <= 0x6F) {
-    const speed = value - 0x60;
-    return `Volume Slide Down\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)\nContinuous effect (every tick)`;
+    const speed = value & 0x0F;
+    return `Volume Slide Down: -${speed}`;
   }
 
-  // Volume slide up (0x70-0x7F)
   if (value >= 0x70 && value <= 0x7F) {
-    const speed = value - 0x70;
-    return `Volume Slide Up\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)\nContinuous effect (every tick)`;
+    const speed = value & 0x0F;
+    return `Volume Slide Up: +${speed}`;
   }
 
-  // Fine volume slide down (0x80-0x8F)
   if (value >= 0x80 && value <= 0x8F) {
-    const amount = value - 0x80;
-    return `Fine Volume Slide Down\nAmount: ${amount}/15 (0x${amount.toString(16).toUpperCase()} hex)\nOne-time at tick 0`;
+    const speed = value & 0x0F;
+    return `Fine Volume Slide Down: -${speed}`;
   }
 
-  // Fine volume slide up (0x90-0x9F)
   if (value >= 0x90 && value <= 0x9F) {
-    const amount = value - 0x90;
-    return `Fine Volume Slide Up\nAmount: ${amount}/15 (0x${amount.toString(16).toUpperCase()} hex)\nOne-time at tick 0`;
+    const speed = value & 0x0F;
+    return `Fine Volume Slide Up: +${speed}`;
   }
 
-  // Set vibrato speed (0xA0-0xAF)
   if (value >= 0xA0 && value <= 0xAF) {
-    const speed = value - 0xA0;
-    return `Set Vibrato Speed\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)`;
+    const speed = value & 0x0F;
+    return `Set Vibrato Speed: ${speed}`;
   }
 
-  // Vibrato (0xB0-0xBF)
   if (value >= 0xB0 && value <= 0xBF) {
-    const depth = value - 0xB0;
-    return `Vibrato\nDepth: ${depth}/15 (0x${depth.toString(16).toUpperCase()} hex)\nContinuous effect (every tick)`;
+    const depth = value & 0x0F;
+    return `Vibrato Depth: ${depth}`;
   }
 
-  // Set panning (0xC0-0xCF)
   if (value >= 0xC0 && value <= 0xCF) {
-    const pan = value - 0xC0;
-    const panPercent = Math.round((pan / 15) * 100);
-    return `Set Panning\nPosition: ${pan}/15 (${panPercent}%)\n0=left, 7-8=center, 15=right`;
+    const pan = value & 0x0F;
+    return `Set Panning: ${pan} (0=left, F=right)`;
   }
 
-  // Panning slide left (0xD0-0xDF)
   if (value >= 0xD0 && value <= 0xDF) {
-    const speed = value - 0xD0;
-    return `Panning Slide Left\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)`;
+    const speed = value & 0x0F;
+    return `Panning Slide Left: ${speed}`;
   }
 
-  // Panning slide right (0xE0-0xEF)
   if (value >= 0xE0 && value <= 0xEF) {
-    const speed = value - 0xE0;
-    return `Panning Slide Right\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)`;
+    const speed = value & 0x0F;
+    return `Panning Slide Right: ${speed}`;
   }
 
-  // Tone portamento (0xF0-0xFF)
   if (value >= 0xF0 && value <= 0xFF) {
-    const speed = value - 0xF0;
-    return `Tone Portamento\nSpeed: ${speed}/15 (0x${speed.toString(16).toUpperCase()} hex)\nSlide pitch toward target note`;
+    const speed = value & 0x0F;
+    return `Tone Portamento: speed ${speed}`;
   }
 
   return null;
