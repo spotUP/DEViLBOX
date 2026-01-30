@@ -20,6 +20,7 @@ interface MiniKeyboardProps {
 
 // Key configuration
 const NOTES_PER_OCTAVE = 12;
+export const WHITE_KEY_INDICES = [0, 2, 4, 5, 7, 9, 11]; // C, D, E, F, G, A, B
 const BLACK_KEY_INDICES = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A#
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -54,22 +55,18 @@ export const MiniKeyboard: React.FC<MiniKeyboardProps> = ({
 }) => {
   // Parse base note
   const baseNoteIndex = useMemo(() => {
-    const match = baseNote.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+    const match = baseNote.match(/^([A-Ga-g][#b]?)(-?\d+)$/);
     if (!match) return 48; // Default C4
 
-    const noteName = match[1].toUpperCase();
-    const accidental = match[2];
-    const octave = parseInt(match[3], 10);
+    const noteName = match[1].toUpperCase().replace('B', '#').charAt(0);
+    const hasSharp = match[1].includes('#');
+    const octave = parseInt(match[2], 10);
 
     const noteNameToIndex: Record<string, number> = {
       'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11,
     };
 
-    let noteIndex = noteNameToIndex[noteName] ?? 0;
-    if (accidental === '#') noteIndex += 1;
-    if (accidental === 'b') noteIndex -= 1;
-
-    return (octave + 1) * 12 + noteIndex;
+    return (octave + 1) * 12 + noteNameToIndex[noteName] + (hasSharp ? 1 : 0);
   }, [baseNote]);
 
   // Calculate which notes are in the pattern

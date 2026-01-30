@@ -1,20 +1,25 @@
 /**
  * EditInstrumentModal - Unified modal for creating and editing instruments
  * Supports both "create" mode (with synth selection) and "edit" mode (direct editing)
+ *
+ * Routes to specialized VST-style editors based on synth type:
+ * - TB303 → VisualTB303Editor
+ * - Furnace/FurnaceXXX → FurnaceEditor
+ * - Buzzmachine/BuzzXXX → BuzzmachineEditor
+ * - Sampler/Player/GranularSynth → SampleEditor
+ * - Everything else → VisualSynthEditor
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
-import { VisualTB303Editor } from './VisualTB303Editor';
-import { VisualSynthEditor } from './VisualSynthEditor';
-import { EffectChain } from './EffectChain';
-import { TestKeyboard } from './TestKeyboard';
-import { SavePresetDialog } from './SavePresetDialog';
+import { VisualTB303Editor, VisualSynthEditor, FurnaceEditor, BuzzmachineEditor } from './editors';
+import { SampleEditor } from './SampleEditor';
+import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
+import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
-import { CategorizedSynthSelector } from './CategorizedSynthSelector';
 import * as LucideIcons from 'lucide-react';
-import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Check, Search, Settings, Sparkles, Music2, Zap as _Zap, Save, Keyboard, ChevronDown, ChevronUp } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
@@ -31,10 +36,32 @@ import {
   DEFAULT_ORGAN,
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
+  DEFAULT_FURNACE,
+  DEFAULT_BUZZMACHINE,
+  DEFAULT_WOBBLE_BASS,
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 
-type EditorTab = 'sound' | 'effects' | 'browse';
+// ============================================================================
+// SYNTH TYPE CATEGORIZATION HELPERS
+// ============================================================================
+
+/** Check if synth type uses Furnace chip emulation editor */
+function isFurnaceType(synthType: SynthType): boolean {
+  return synthType === 'Furnace' || synthType.startsWith('Furnace');
+}
+
+/** Check if synth type uses Buzzmachine editor */
+function isBuzzmachineType(synthType: SynthType): boolean {
+  return synthType === 'Buzzmachine' || synthType.startsWith('Buzz');
+}
+
+/** Check if synth type uses Sample editor */
+function isSampleType(synthType: SynthType): boolean {
+  return ['Sampler', 'Player', 'GranularSynth', 'DrumKit', 'ChiptuneModule'].includes(synthType);
+}
+
+type EditorTab = 'sound' | 'effects';
 
 interface EditInstrumentModalProps {
   isOpen: boolean;
@@ -48,16 +75,15 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   onClose,
   createMode = false,
 }) => {
-  // Use selectors for proper reactivity - don't use the getter!
-  const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
-  const instruments = useInstrumentStore(state => state.instruments);
-  const createInstrument = useInstrumentStore(state => state.createInstrument);
-  const updateInstrument = useInstrumentStore(state => state.updateInstrument);
-  const setPreviewInstrument = useInstrumentStore(state => state.setPreviewInstrument);
-  const setCurrentInstrument = useInstrumentStore(state => state.setCurrentInstrument);
+  const instruments = useInstrumentStore((state) => state.instruments);
+  const currentInstrumentId = useInstrumentStore((state) => state.currentInstrumentId);
+  const createInstrument = useInstrumentStore((state) => state.createInstrument);
+  const updateInstrument = useInstrumentStore((state) => state.updateInstrument);
+  const setPreviewInstrument = useInstrumentStore((state) => state.setPreviewInstrument);
+  const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
 
-  // Derive currentInstrument from state for proper re-renders
-  const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
+  // Compute currentInstrument from instruments and currentInstrumentId
+  const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId) || null;
 
   // Create mode state
   const [isCreating, setIsCreating] = useState(createMode);
@@ -70,6 +96,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
   const [showKeyboard, setShowKeyboard] = useState(true);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showSynthBrowser, setShowSynthBrowser] = useState(false);
 
   // Reset to create mode when prop changes
   useEffect(() => {
@@ -79,10 +106,24 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
       setInstrumentName('303 Classic');
       setTempInstrument(createTempInstrument('TB303'));
     } else if (isOpen && !createMode) {
-      setIsCreating(false);
-      setTempInstrument(null);
+      if (instruments.length === 0) {
+        // No instruments exist - auto-enter create mode
+        setIsCreating(true);
+        setSelectedSynthType('TB303');
+        setInstrumentName('303 Classic');
+        setTempInstrument(createTempInstrument('TB303'));
+      } else if (!currentInstrument) {
+        // Instruments exist but none selected - select first one
+        setIsCreating(false);
+        setTempInstrument(null);
+        setCurrentInstrument(instruments[0].id);
+      } else {
+        // Instrument already selected - just edit it
+        setIsCreating(false);
+        setTempInstrument(null);
+      }
     }
-  }, [isOpen, createMode]);
+  }, [isOpen, createMode, currentInstrument, instruments, setCurrentInstrument]);
 
   // Set preview instrument for MIDI keyboard in create mode
   useEffect(() => {
@@ -161,16 +202,6 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     ToneEngine.getInstance().invalidateInstrument(-1);
     setTempInstrument((prev) => prev ? { ...prev, ...updates } : null);
   }, []);
-
-  // Handle TB303 changes in create mode
-  const handleTB303Change = useCallback((config: Partial<NonNullable<InstrumentConfig['tb303']>>) => {
-    if (!tempInstrument?.tb303) return;
-    ToneEngine.getInstance().invalidateInstrument(-1);
-    setTempInstrument((prev) => prev ? {
-      ...prev,
-      tb303: { ...prev.tb303!, ...config },
-    } : null);
-  }, [tempInstrument?.tb303]);
 
   // Handle switching to create mode
   const handleStartCreate = () => {
@@ -292,16 +323,14 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
             {/* Right: Editor + Keyboard */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Editor */}
+              {/* Editor - Route to specialized editor based on synth type */}
               <div className="flex-1 overflow-y-auto scrollbar-modern">
-                {tempInstrument?.synthType === 'TB303' && tempInstrument.tb303 ? (
-                  <VisualTB303Editor config={tempInstrument.tb303} onChange={handleTB303Change} />
-                ) : tempInstrument ? (
-                  <VisualSynthEditor
+                {tempInstrument && (
+                  <InstrumentEditor
                     instrument={tempInstrument}
                     onChange={handleUpdateTempInstrument}
                   />
-                ) : null}
+                )}
               </div>
 
               {/* Test Keyboard */}
@@ -315,42 +344,10 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     );
   }
 
-  // EDIT MODE UI
-  if (!currentInstrument) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/90">
-        <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Music2 size={48} className="mx-auto mb-4 opacity-50 text-text-muted" />
-              <p className="text-text-muted mb-4">No instrument selected</p>
-              <button
-                onClick={handleStartCreate}
-                className="flex items-center gap-2 px-4 py-2 bg-accent-primary rounded-lg text-text-inverse hover:bg-accent-primary/80 transition-colors mx-auto"
-              >
-                <LucideIcons.Plus size={16} />
-                Create Instrument
-              </button>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="fixed top-3 right-3 z-10 flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
-            title="Close (Escape)"
-          >
-            <X size={18} />
-            <span className="text-sm font-medium">Close</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Tab definitions
   const tabs = [
     { id: 'sound' as const, label: 'Sound', icon: Settings },
     { id: 'effects' as const, label: 'Effects', icon: Sparkles },
-    { id: 'browse' as const, label: 'Browse', icon: Music2 },
   ];
 
   return (
@@ -358,136 +355,193 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
           {/* Left Sidebar: Instrument List */}
-          <div className="w-fit min-w-48 max-w-80 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
+          <div className="w-52 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
             <InstrumentList
               maxHeight="100%"
               showActions={true}
+              onCreateNew={handleStartCreate}
             />
           </div>
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg bg-dark-bg ${synthInfo?.color || 'text-text-primary'}`}>
-                  <IconComponent size={20} />
+            {currentInstrument ? (
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-dark-bg ${synthInfo?.color || 'text-text-primary'}`}>
+                      <IconComponent size={20} />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={currentInstrument.name}
+                        onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
+                        className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
+                      />
+                      <p className="text-xs text-text-muted">
+                        {synthInfo?.name || currentInstrument.synthType} <span className="opacity-50">|</span> ID: {currentInstrument.id.toString(16).toUpperCase().padStart(2, '0')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowSynthBrowser(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bg hover:bg-dark-bgTertiary text-text-primary transition-colors text-sm border border-dark-border"
+                      title="Change synth type"
+                    >
+                      <Music2 size={14} />
+                      Browse Synths
+                    </button>
+                    <button
+                      onClick={() => setShowSaveDialog(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bg hover:bg-dark-bgTertiary text-text-primary transition-colors text-sm border border-dark-border"
+                      title="Save as preset"
+                    >
+                      <Save size={14} />
+                      Save
+                    </button>
+                    <button
+                      onClick={handleClose}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
+                      title="Close (Escape)"
+                    >
+                      <X size={18} />
+                      <span className="text-sm font-medium">Close</span>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <input
-                    type="text"
-                    value={currentInstrument.name}
-                    onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
-                    className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
-                  />
-                  <p className="text-xs text-text-muted">
-                    {synthInfo?.name || currentInstrument.synthType} <span className="opacity-50">|</span> ID: {currentInstrument.id.toString(16).toUpperCase().padStart(2, '0')}
-                  </p>
+
+                {/* Tab Bar */}
+                <div className="flex items-center gap-1 px-4 py-2 border-b border-dark-border bg-dark-bg">
+                  {tabs.map((tab) => {
+                    const TabIcon = tab.icon;
+                    const isActive = activeTab === tab.id;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`
+                          flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
+                          ${isActive
+                            ? 'bg-dark-bgSecondary text-accent-primary border-accent-primary'
+                            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary border-transparent'
+                          }
+                        `}
+                      >
+                        <TabIcon size={16} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowSaveDialog(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bg hover:bg-dark-bgTertiary text-text-primary transition-colors text-sm border border-dark-border"
-                  title="Save as preset"
-                >
-                  <Save size={14} />
-                  Save
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
-                  title="Close (Escape)"
-                >
-                  <X size={18} />
-                  <span className="text-sm font-medium">Close</span>
-                </button>
-              </div>
-            </div>
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto scrollbar-modern">
+                  {activeTab === 'sound' && (
+                    <div className="overflow-y-auto">
+                      <InstrumentEditor
+                        instrument={currentInstrument}
+                        onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
+                      />
+                    </div>
+                  )}
 
-            {/* Tab Bar */}
-            <div className="flex items-center gap-1 px-4 py-2 border-b border-dark-border bg-dark-bg">
-              {tabs.map((tab) => {
-                const TabIcon = tab.icon;
-                const isActive = activeTab === tab.id;
-
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
-                      ${isActive
-                        ? 'bg-dark-bgSecondary text-accent-primary border-accent-primary'
-                        : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary border-transparent'
-                      }
-                    `}
-                  >
-                    <TabIcon size={16} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto scrollbar-modern">
-              {activeTab === 'sound' && (
-                <div className="overflow-y-auto">
-                  {currentInstrument.synthType === 'TB303' && currentInstrument.tb303 ? (
-                    <VisualTB303Editor
-                      config={currentInstrument.tb303}
-                      onChange={(tb303Updates) => updateInstrument(currentInstrument.id, {
-                        tb303: { ...currentInstrument.tb303!, ...tb303Updates }
-                      })}
-                    />
-                  ) : (
-                    <VisualSynthEditor
-                      instrument={currentInstrument}
-                      onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
-                    />
+                  {activeTab === 'effects' && (
+                    <div className="p-4">
+                      <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
+                    </div>
                   )}
                 </div>
-              )}
 
-              {activeTab === 'effects' && (
-                <div className="p-4">
-                  <EffectChain instrumentId={currentInstrument.id} effects={currentInstrument.effects || []} />
+                {/* Synth Browser Modal */}
+                {showSynthBrowser && (
+                  <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center">
+                    <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-[90%] max-w-4xl max-h-[85vh] flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+                        <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                          <Music2 size={20} className="text-accent-primary" />
+                          Browse Synth Types
+                        </h3>
+                        <button
+                          onClick={() => setShowSynthBrowser(false)}
+                          className="p-1.5 rounded hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4">
+                        <CategorizedSynthSelector
+                          onSelect={(type) => {
+                            handleSynthTypeChange(type);
+                            setShowSynthBrowser(false);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* No instrument selected - show prompt */
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+                  <h2 className="text-lg font-semibold text-text-primary">Instrument Editor</h2>
+                  <button
+                    onClick={handleClose}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-text-primary border border-dark-border"
+                    title="Close (Escape)"
+                  >
+                    <X size={18} />
+                    <span className="text-sm font-medium">Close</span>
+                  </button>
                 </div>
-              )}
-
-              {activeTab === 'browse' && (
-                <div className="p-4">
-                  <CategorizedSynthSelector onSelect={handleSynthTypeChange} />
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Music2 size={48} className="mx-auto mb-4 opacity-50 text-text-muted" />
+                    <p className="text-text-muted mb-2">No instrument selected</p>
+                    <p className="text-text-muted text-sm mb-4">Select an instrument from the list or create a new one</p>
+                    <button
+                      onClick={handleStartCreate}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent-primary rounded-lg text-text-inverse hover:bg-accent-primary/80 transition-colors mx-auto"
+                    >
+                      <LucideIcons.Plus size={16} />
+                      Create Instrument
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Test Keyboard (Collapsible) */}
-            <div className="border-t border-dark-border">
-              <button
-                onClick={() => setShowKeyboard(!showKeyboard)}
-                className="w-full px-4 py-2 flex items-center justify-between text-sm text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <Keyboard size={14} />
-                  Test Keyboard
-                </span>
-                {showKeyboard ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-              </button>
+            {/* Test Keyboard (Collapsible) - only show when instrument selected */}
+            {currentInstrument && (
+              <div className="border-t border-dark-border">
+                <button
+                  onClick={() => setShowKeyboard(!showKeyboard)}
+                  className="w-full px-4 py-2 flex items-center justify-between text-sm text-text-muted hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Keyboard size={14} />
+                    Test Keyboard
+                  </span>
+                  {showKeyboard ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
 
-              {showKeyboard && (
-                <div className="p-4 bg-dark-bgSecondary">
-                  <TestKeyboard instrument={currentInstrument} />
-                </div>
-              )}
-            </div>
+                {showKeyboard && (
+                  <div className="p-4 bg-dark-bgSecondary">
+                    <TestKeyboard instrument={currentInstrument} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Save Preset Dialog */}
-        {showSaveDialog && (
+        {showSaveDialog && currentInstrument && (
           <SavePresetDialog
             instrument={currentInstrument}
             onClose={() => setShowSaveDialog(false)}
@@ -497,6 +551,77 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     </div>
   );
 };
+
+// ============================================================================
+// INSTRUMENT EDITOR COMPONENT - Routes to correct editor based on synth type
+// ============================================================================
+
+interface InstrumentEditorProps {
+  instrument: InstrumentConfig;
+  onChange: (updates: Partial<InstrumentConfig>) => void;
+}
+
+const InstrumentEditor: React.FC<InstrumentEditorProps> = ({ instrument, onChange }) => {
+  const { synthType } = instrument;
+
+  // TB-303 - Dedicated acid bass editor
+  if (synthType === 'TB303' && instrument.tb303) {
+    return (
+      <VisualTB303Editor
+        config={instrument.tb303}
+        onChange={(tb303Updates) => onChange({
+          tb303: { ...instrument.tb303!, ...tb303Updates }
+        })}
+      />
+    );
+  }
+
+  // Furnace chip synths - FM/PSG/console chip emulation
+  if (isFurnaceType(synthType)) {
+    const furnaceConfig = instrument.furnace || { ...DEFAULT_FURNACE };
+    return (
+      <FurnaceEditor
+        config={furnaceConfig}
+        instrumentId={instrument.id}
+        onChange={(furnaceUpdates) => onChange({
+          furnace: { ...furnaceConfig, ...furnaceUpdates }
+        })}
+      />
+    );
+  }
+
+  // Buzzmachine - Classic tracker generators and effects
+  if (isBuzzmachineType(synthType)) {
+    return (
+      <BuzzmachineEditor
+        config={instrument}
+        onChange={onChange}
+      />
+    );
+  }
+
+  // Sample-based instruments
+  if (isSampleType(synthType)) {
+    return (
+      <SampleEditor
+        instrument={instrument}
+        onChange={onChange}
+      />
+    );
+  }
+
+  // All other synths - Generic VST-style editor
+  return (
+    <VisualSynthEditor
+      instrument={instrument}
+      onChange={onChange}
+    />
+  );
+};
+
+// ============================================================================
+// CREATE TEMP INSTRUMENT - Initializes config for any synth type
+// ============================================================================
 
 /**
  * Create a temporary instrument config for a given synth type
@@ -515,10 +640,90 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
     effects: [],
   };
 
+  // TB-303
+  if (synthType === 'TB303') {
+    base.tb303 = { ...DEFAULT_TB303 };
+    return base;
+  }
+
+  // Furnace chip synths
+  if (isFurnaceType(synthType)) {
+    base.furnace = { ...DEFAULT_FURNACE };
+    // Set chip type based on synthType
+    const chipTypeMap: Partial<Record<SynthType, number>> = {
+      'Furnace': 1,        // OPN2 (Genesis)
+      'FurnaceOPN': 0,     // YM2612
+      'FurnaceOPNA': 13,   // YM2608
+      'FurnaceOPNB': 14,   // YM2610
+      'FurnaceOPM': 1,     // YM2151
+      'FurnaceOPL': 2,     // YMF262
+      'FurnaceOPLL': 23,   // YM2413
+      'FurnaceOPL4': 26,   // YMF278
+      'FurnaceOPZ': 24,    // YM2414
+      'FurnaceESFM': 25,   // ESFM
+      'FurnaceNES': 3,     // 2A03
+      'FurnaceGB': 4,      // Game Boy
+      'FurnaceC64': 5,     // SID
+      'FurnaceSID6581': 5,
+      'FurnaceSID8580': 5,
+      'FurnaceAY': 6,      // AY-3-8910
+      'FurnacePSG': 7,     // SN76489
+      'FurnaceTIA': 8,     // Atari TIA
+      'FurnaceVERA': 9,    // Commander X16
+      'FurnaceSAA': 10,    // SAA1099
+      'FurnaceVIC': 11,    // VIC-20
+      'FurnaceLynx': 12,   // Atari Lynx
+      // ... more chip mappings as needed
+    };
+    if (chipTypeMap[synthType] !== undefined) {
+      base.furnace.chipType = chipTypeMap[synthType]!;
+    }
+    return base;
+  }
+
+  // Buzzmachine generators and effects
+  if (isBuzzmachineType(synthType)) {
+    base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
+    // Map synthType to machine type
+    const machineTypeMap: Partial<Record<SynthType, string>> = {
+      'Buzzmachine': 'ArguruDistortion',
+      'BuzzDTMF': 'CyanPhaseDTMF',
+      'BuzzFreqBomb': 'ElenzilFrequencyBomb',
+      'BuzzKick': 'FSMKick',
+      'BuzzKickXP': 'FSMKickXP',
+      'BuzzNoise': 'JeskolaNoise',
+      'BuzzTrilok': 'JeskolaTrilok',
+      'Buzz4FM2F': 'MadBrain4FM2F',
+      'BuzzDynamite6': 'MadBrainDynamite6',
+      'BuzzM3': 'MakkM3',
+      'Buzz3o3': 'OomekAggressor',
+    };
+    if (machineTypeMap[synthType]) {
+      base.buzzmachine.machineType = machineTypeMap[synthType] as any;
+    }
+    return base;
+  }
+
+  // Sample-based synths
+  if (synthType === 'GranularSynth') {
+    base.granular = { ...DEFAULT_GRANULAR };
+    return base;
+  }
+  if (synthType === 'Sampler' || synthType === 'Player') {
+    // Sample-based - minimal config, user loads sample
+    return base;
+  }
+  if (synthType === 'DrumKit') {
+    // DrumKit - keymap-based, needs sample mapping
+    return base;
+  }
+  if (synthType === 'ChiptuneModule') {
+    // Module playback - needs file load
+    return base;
+  }
+
+  // Standard synth types
   switch (synthType) {
-    case 'TB303':
-      base.tb303 = { ...DEFAULT_TB303 };
-      break;
     case 'DrumMachine':
       base.drumMachine = { ...DEFAULT_DRUM_MACHINE };
       break;
@@ -530,9 +735,6 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       break;
     case 'Wavetable':
       base.wavetable = { ...DEFAULT_WAVETABLE };
-      break;
-    case 'GranularSynth':
-      base.granular = { ...DEFAULT_GRANULAR };
       break;
     case 'SuperSaw':
       base.superSaw = { ...DEFAULT_SUPERSAW };
@@ -548,6 +750,9 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       break;
     case 'FormantSynth':
       base.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
+      break;
+    case 'WobbleBass':
+      base.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
       break;
   }
 

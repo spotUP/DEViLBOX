@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { X, Search, Music, Gamepad2, Cpu, CheckCircle } from 'lucide-react';
+import { X, Search, Music, Gamepad2, Cpu, Play as _Play, CheckCircle } from 'lucide-react';
 import {
   ALL_PRESETS,
   PRESETS_BY_ERA,
@@ -90,7 +90,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

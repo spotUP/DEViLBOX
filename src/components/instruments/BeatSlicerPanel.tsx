@@ -12,11 +12,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Zap, Grid3X3, MousePointer2, Play, Trash2,
-  Download, RefreshCw, ChevronDown, ChevronUp, X, Piano
+  Download, RefreshCw, ChevronDown, ChevronUp, X
 } from 'lucide-react';
-import { useInstrumentStore, useTransportStore, notify } from '../../stores';
-import type { InstrumentConfig, DrumKitKeyMapping } from '../../types/instrument';
-import { DEFAULT_DRUMKIT } from '../../types/instrument';
+import { useInstrumentStore, notify } from '../../stores';
+import { useTransportStore } from '../../stores/useTransportStore';
+import type { InstrumentConfig } from '../../types/instrument';
 import type { BeatSlice, BeatSliceConfig, SliceMode } from '../../types/beatSlicer';
 import { DEFAULT_BEAT_SLICE_CONFIG } from '../../types/beatSlicer';
 import { BeatSliceAnalyzer } from '../../lib/audio/BeatSliceAnalyzer';
@@ -136,65 +136,6 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
       setIsExporting(false);
     }
   }, [slices, instrument.id, createSlicedInstruments]);
-
-  // Get the createInstrument function
-  const createInstrument = useInstrumentStore((state) => state.createInstrument);
-
-  // Create DrumKit from slices
-  const [isCreatingKit, setIsCreatingKit] = useState(false);
-
-  const handleCreateDrumKit = useCallback(async () => {
-    if (slices.length === 0 || !audioBuffer) {
-      notify.error('No slices to create drumkit from');
-      return;
-    }
-
-    setIsCreatingKit(true);
-
-    try {
-      // Create keymap entries - map each slice to a note starting from C-1 (MIDI 24)
-      const keymap: DrumKitKeyMapping[] = slices.map((slice, index) => {
-        const midiNote = 24 + index; // C-1 = 24, C#1 = 25, D-1 = 26, etc.
-        return {
-          id: `slice-${index}`,
-          noteStart: midiNote,
-          noteEnd: midiNote,
-          sampleId: instrument.id.toString(),
-          sampleUrl: instrument.sample?.url || '',
-          sampleName: slice.label || `Slice ${index + 1}`,
-          pitchOffset: 0,
-          fineTune: 0,
-          volumeOffset: 0,
-          panOffset: 0,
-          // Store slice timing info in base note for reference
-          baseNote: undefined,
-        };
-      });
-
-      // Create a new DrumKit instrument
-      const newId = createInstrument({
-        name: `${instrument.name} Kit`,
-        synthType: 'DrumKit',
-        drumKit: {
-          ...DEFAULT_DRUMKIT,
-          keymap,
-          maxVoices: Math.min(slices.length, 16),
-        },
-        // Also keep the sample reference for loading slice audio
-        sample: instrument.sample ? {
-          ...instrument.sample,
-          slices: [...slices],
-        } : undefined,
-      });
-
-      notify.success(`Created DrumKit instrument #${newId} with ${slices.length} slices mapped to C-1 and up`);
-    } catch (error) {
-      console.error('[BeatSlicerPanel] DrumKit creation failed:', error);
-      notify.error('Failed to create DrumKit');
-    } finally {
-      setIsCreatingKit(false);
-    }
-  }, [slices, audioBuffer, instrument, createInstrument]);
 
   // Format time display
   const formatTime = (seconds: number): string => {
@@ -396,43 +337,24 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
             </div>
           )}
 
-          {/* Export Buttons */}
+          {/* Export Button */}
           {slices.length > 0 && (
-            <div className="space-y-2">
-              <button
-                onClick={handleExportSlices}
-                disabled={isExporting}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-cursor text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isExporting ? (
-                  <RefreshCw size={12} className="animate-spin" />
-                ) : (
-                  <Download size={12} />
-                )}
-                <span>
-                  {isExporting
-                    ? 'Creating...'
-                    : `Create ${slices.length} Sliced Instrument${slices.length > 1 ? 's' : ''}`}
-                </span>
-              </button>
-
-              <button
-                onClick={handleCreateDrumKit}
-                disabled={isCreatingKit}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-highlight text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingKit ? (
-                  <RefreshCw size={12} className="animate-spin" />
-                ) : (
-                  <Piano size={12} />
-                )}
-                <span>
-                  {isCreatingKit
-                    ? 'Creating Kit...'
-                    : `Create DrumKit (${slices.length} keys from C-1)`}
-                </span>
-              </button>
-            </div>
+            <button
+              onClick={handleExportSlices}
+              disabled={isExporting}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-cursor text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExporting ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <Download size={12} />
+              )}
+              <span>
+                {isExporting
+                  ? 'Creating...'
+                  : `Create ${slices.length} Sliced Instrument${slices.length > 1 ? 's' : ''}`}
+              </span>
+            </button>
           )}
 
           {/* Help Text */}

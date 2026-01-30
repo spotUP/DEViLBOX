@@ -19,6 +19,7 @@ import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
 
 interface CellContextMenuProps {
+  isOpen?: boolean;
   position: { x: number; y: number } | null;
   onClose: () => void;
   rowIndex: number;
@@ -267,10 +268,23 @@ export const useCellContextMenu = () => {
     setMenuState((prev) => ({ ...prev, position: null }));
   }, []);
 
+  // Handler for canvas context menu events (calculates row/channel from event)
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // The canvas caller should set data attributes or we compute from position
+    // For now, return early - the caller should use openMenu directly
+    e.preventDefault();
+  }, []);
+
   return {
     ...menuState,
     openMenu,
     closeMenu,
     isOpen: menuState.position !== null,
+    // Additional properties for PatternEditorCanvas compatibility
+    handleContextMenu,
+    cellInfo: menuState.position ? {
+      rowIndex: menuState.rowIndex,
+      channelIndex: menuState.channelIndex,
+    } : null,
   };
 };
