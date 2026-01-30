@@ -191,6 +191,7 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
    */
   public triggerRelease(time?: Tone.Unit.Time): this {
     // Normalize null to undefined for Tone.js compatibility
+    // IMPORTANT: Don't pass undefined to Tone.js - call without argument instead
     const normalizedTime = time ?? undefined;
 
     if (this.useWasmEngine && this.workletNode) {
@@ -199,7 +200,12 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
         time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
       });
     } else if (this.fallbackSynth) {
-      this.fallbackSynth.triggerRelease(normalizedTime);
+      // Call without argument if time is undefined - don't pass undefined explicitly
+      if (normalizedTime !== undefined) {
+        this.fallbackSynth.triggerRelease(normalizedTime);
+      } else {
+        this.fallbackSynth.triggerRelease();
+      }
     }
     return this;
   }

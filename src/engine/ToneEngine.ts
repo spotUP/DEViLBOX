@@ -50,6 +50,14 @@ export class ToneEngine {
   // Track loading promises for samplers/players (keyed by instrument key)
   private instrumentLoadingPromises: Map<string, Promise<void>> = new Map();
 
+  // Polyphonic voice allocation for live keyboard/MIDI playing
+  // Maps note (e.g., "C4") to channel index used for that note
+  private liveVoiceAllocation: Map<string, number> = new Map();
+  // Pool of available channel indices for polyphonic playback (channels 100-115)
+  private liveVoicePool: number[] = [];
+  private static readonly LIVE_VOICE_BASE_CHANNEL = 100; // Start at channel 100 to avoid tracker channels
+  private static readonly MAX_LIVE_VOICES = 16;
+
   // Active voices per channel (for IT NNA support)
   private activeVoices: Map<number, VoiceState[]> = new Map();
 
@@ -168,6 +176,12 @@ export class ToneEngine {
 
     // Instrument map
     this.instruments = new Map();
+
+    // Initialize live voice pool (channels 100-115 for polyphonic keyboard/MIDI)
+    this.liveVoicePool = [];
+    for (let i = 0; i < ToneEngine.MAX_LIVE_VOICES; i++) {
+      this.liveVoicePool.push(ToneEngine.LIVE_VOICE_BASE_CHANNEL + i);
+    }
   }
 
   /**
@@ -549,10 +563,15 @@ export class ToneEngine {
     // PERFORMANCE FIX: Check for shared/legacy instrument before creating new one
     // Preload creates instruments with key ${id}--1, but playback uses ${id}-${channel}
     // Reuse the shared instance instead of creating expensive new synths per channel
+    // BUT: Don't reuse for live voice channels (100+) - those need separate instances for polyphony
+    const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
-    if (!isSharedType && this.instruments.has(legacyKey)) {
+    if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
+      console.log(`[ToneEngine] getInstrument: REUSING shared instance for key=${key}, legacyKey=${legacyKey}`);
       return this.instruments.get(legacyKey);
     }
+
+    console.log(`[ToneEngine] getInstrument: CREATING NEW instance for key=${key}, isLiveVoice=${isLiveVoiceChannel}, synthType=${config.synthType}`);
 
     // Create new instrument based on config
     let instrument: any;
@@ -1486,7 +1505,7 @@ export class ToneEngine {
     slide?: boolean,
     channelIndex?: number
   ): void {
-    const instrument = this.getInstrument(instrumentId, config);
+    const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument) {
       return;
@@ -1645,6 +1664,11 @@ export class ToneEngine {
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
         );
+        const isPoly = instrument instanceof Tone.PolySynth;
+        const instType = instrument.constructor?.name || 'unknown';
+        // Use object identity to track instances
+        const instId = (instrument as any).__debugId ?? ((instrument as any).__debugId = Math.random().toString(36).slice(2, 8));
+        console.log(`[ToneEngine] triggerAttack: note=${note}, time=${safeTime.toFixed(3)}, velocity=${finalVelocity.toFixed(2)}, isPoly=${isPoly}, type=${instType}, instId=${instId}, channelIdx=${channelIndex ?? 'none'}`);
         instrument.triggerAttack(note, safeTime, finalVelocity);
       }
     } catch (error) {
@@ -1659,9 +1683,10 @@ export class ToneEngine {
     instrumentId: number,
     note: string,
     time: number,
-    config: InstrumentConfig
+    config: InstrumentConfig,
+    channelIndex?: number
   ): void {
-    const instrument = this.getInstrument(instrumentId, config);
+    const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument || !instrument.triggerRelease) {
       return;
@@ -1699,7 +1724,16 @@ export class ToneEngine {
         config.synthType === 'MetalSynth' ||
         config.synthType === 'MembraneSynth' ||
         config.synthType === 'TB303' ||
-        config.synthType === 'Furnace'
+        config.synthType === 'Furnace' ||
+        // Buzzmachine generators (monophonic, no note parameter)
+        config.synthType === 'BuzzKick' ||
+        config.synthType === 'BuzzKickXP' ||
+        config.synthType === 'BuzzNoise' ||
+        config.synthType === 'BuzzTrilok' ||
+        config.synthType === 'Buzz4FM2F' ||
+        config.synthType === 'BuzzDynamite6' ||
+        config.synthType === 'BuzzM3' ||
+        config.synthType === 'Buzz3o3'
       ) {
         // These synths use triggerRelease(time) - no note parameter
         instrument.triggerRelease(safeTime);
@@ -1710,6 +1744,112 @@ export class ToneEngine {
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteRelease for ${config.synthType}:`, error);
     }
+  }
+
+  // Synth types that are natively polyphonic (PolySynth-based) and don't need voice allocation
+  // These either ARE PolySynths or wrap a PolySynth internally
+  private static readonly NATIVE_POLY_TYPES = new Set([
+    'Synth', 'FMSynth', 'AMSynth', 'PluckSynth', 'Sampler',
+    // InstrumentFactory types that use PolySynth internally
+    'SuperSaw', 'PolySynth', 'Organ', 'ChipSynth', 'PWMSynth',
+    'StringMachine', 'FormantSynth', 'Wavetable', 'WobbleBass'
+  ]);
+
+  /**
+   * Trigger a polyphonic note attack - allocates a voice channel automatically
+   * Use this for keyboard and MIDI playback when polyphonic mode is enabled
+   */
+  public triggerPolyNoteAttack(
+    instrumentId: number,
+    note: string,
+    velocity: number,
+    config: InstrumentConfig
+  ): void {
+    // For natively polyphonic synths (PolySynth-based), just use the shared instance
+    // They already support multiple simultaneous notes
+    // Also treat undefined synthType as polyphonic (default creates PolySynth)
+    const synthType = config.synthType;
+    const isNativePoly = !synthType || ToneEngine.NATIVE_POLY_TYPES.has(synthType);
+    console.log(`[ToneEngine] triggerPolyNoteAttack: synthType=${synthType}, isNativePoly=${isNativePoly}, inSet=${ToneEngine.NATIVE_POLY_TYPES.has(synthType || '')}`);
+    if (isNativePoly) {
+      // Track active notes for release
+      this.liveVoiceAllocation.set(note, -1); // -1 = using shared instance
+      console.log(`[ToneEngine] POLY ATTACK (native): note=${note}, synthType=${synthType ?? 'default'}`);
+      // Use shared instance (channelIndex undefined)
+      this.triggerNoteAttack(instrumentId, note, 0, velocity, config);
+      return;
+    }
+
+    // For monophonic synths (TB303, MonoSynth, etc.), allocate separate channel/instance
+    // Check if this note is already playing
+    if (this.liveVoiceAllocation.has(note)) {
+      // Release the old voice first
+      this.triggerPolyNoteRelease(instrumentId, note, config);
+    }
+
+    // Allocate a voice channel from the pool
+    if (this.liveVoicePool.length === 0) {
+      console.warn('[ToneEngine] No free voice channels for polyphonic playback');
+      return;
+    }
+
+    const channelIndex = this.liveVoicePool.shift()!;
+    this.liveVoiceAllocation.set(note, channelIndex);
+
+    console.log(`[ToneEngine] POLY ATTACK (allocated): note=${note}, channel=${channelIndex}, synthType=${synthType}`);
+
+    // Trigger the note on this channel (creates separate instance for monophonic synths)
+    this.triggerNoteAttack(instrumentId, note, 0, velocity, config, undefined, false, false, channelIndex);
+  }
+
+  /**
+   * Release a polyphonic note - frees the voice channel
+   */
+  public triggerPolyNoteRelease(
+    instrumentId: number,
+    note: string,
+    config: InstrumentConfig
+  ): void {
+    const channelIndex = this.liveVoiceAllocation.get(note);
+    if (channelIndex === undefined) {
+      return; // Note wasn't playing
+    }
+
+    this.liveVoiceAllocation.delete(note);
+
+    if (channelIndex === -1) {
+      // Native polyphonic synth - release on shared instance
+      this.triggerNoteRelease(instrumentId, note, 0, config);
+    } else {
+      // Allocated voice channel - release on specific instance
+      this.triggerNoteRelease(instrumentId, note, 0, config, channelIndex);
+      // Return the channel to the pool
+      this.liveVoicePool.push(channelIndex);
+    }
+  }
+
+  /**
+   * Release all polyphonic voices
+   */
+  public releaseAllPolyNotes(instrumentId: number, config: InstrumentConfig): void {
+    for (const [note, channelIndex] of this.liveVoiceAllocation.entries()) {
+      if (channelIndex === -1) {
+        // Native polyphonic synth
+        this.triggerNoteRelease(instrumentId, note, 0, config);
+      } else {
+        // Allocated voice channel
+        this.triggerNoteRelease(instrumentId, note, 0, config, channelIndex);
+        this.liveVoicePool.push(channelIndex);
+      }
+    }
+    this.liveVoiceAllocation.clear();
+  }
+
+  /**
+   * Check if polyphonic mode has any active notes
+   */
+  public hasActivePolyNotes(): boolean {
+    return this.liveVoiceAllocation.size > 0;
   }
 
   /**
