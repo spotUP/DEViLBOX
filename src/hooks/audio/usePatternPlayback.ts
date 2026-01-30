@@ -15,7 +15,7 @@ import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer'
 
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore();
-  const { isPlaying, isLooping: _isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
+  const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
   const { instruments } = useInstrumentStore();
   const { automation: _automation } = useAutomationStore();
   const { masterEffects } = useAudioStore();
@@ -63,25 +63,39 @@ export const usePatternPlayback = () => {
       console.log(`[Playback] ${patterns.length} patterns, ${patternOrder.length} positions, ${pattern.channels.length} channels`);
 
       // Load song into TrackerReplayer
+      // In loop mode, create a single-pattern song order to loop the current pattern
+      const loopPatternOrder = isLooping ? [currentPatternIndex] : patternOrder;
+
       replayer.loadSong({
         name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
         format,
         patterns,
         instruments,
-        songPositions: patternOrder,
-        songLength: modData?.songLength ?? patternOrder.length,
-        restartPosition: modData?.restartPosition ?? 0,
+        songPositions: loopPatternOrder,
+        songLength: isLooping ? 1 : (modData?.songLength ?? patternOrder.length),
+        restartPosition: 0,
         numChannels: pattern.channels.length,
         initialSpeed: modData?.initialSpeed ?? 6,
         initialBPM: modData?.initialBPM ?? bpm,
       });
 
       // Set callbacks for UI updates
+      // PERF: Track last values to avoid redundant store updates
+      let lastPatternNum = -1;
+      let lastPosition = -1;
+
       replayer.onRowChange = (row, patternNum, position) => {
         setCurrentRowThrottled(row, patterns[patternNum]?.length ?? 64);
-        if (row === 0) {
-          setCurrentPattern(patternNum);
-          setCurrentPosition(position);
+
+        // Only update pattern/position if they actually changed (avoids redundant renders)
+        if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
+          lastPatternNum = patternNum;
+          lastPosition = position;
+          // Batch these updates in a microtask to avoid blocking the audio callback
+          queueMicrotask(() => {
+            setCurrentPattern(patternNum);
+            setCurrentPosition(position);
+          });
         }
       };
 
@@ -112,7 +126,7 @@ export const usePatternPlayback = () => {
         replayer.onSongEnd = null;
       }
     };
-  }, [isPlaying, pattern, instruments, patternOrder, patterns, bpm, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled]);
+  }, [isPlaying, isLooping, pattern, instruments, patternOrder, patterns, bpm, currentPatternIndex, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled]);
 
   return {
     isPlaying,
