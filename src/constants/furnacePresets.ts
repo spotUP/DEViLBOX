@@ -2,127 +2,889 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 
 /**
  * Furnace Engine Factory Presets
- * Authentic instrument patches extracted from Furnace Tracker libraries.
+ * Authentic instrument patches for each chip type.
+ * Organized by chip category for easy browsing.
  */
 
+// Helper to create operator with defaults
+const op = (overrides: Partial<{
+  enabled: boolean; am: boolean; ar: number; dr: number; mult: number;
+  rr: number; sl: number; tl: number; dt2: number; rs: number; dt: number;
+  d2r: number; ssg: number; ksl: number; ksr: boolean; sus: boolean;
+  vib: boolean; ws: number;
+}> = {}) => ({
+  enabled: true, am: false, ar: 31, dr: 0, mult: 1, rr: 15, sl: 0, tl: 0,
+  dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false,
+  vib: false, ws: 0, ...overrides,
+});
+
+const disabledOp = () => op({ enabled: false, tl: 127, ar: 0, rr: 0 });
+
 export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
-  // === SEGA GENESIS (YM2612) ===
+  // ============================================
+  // SEGA GENESIS / MEGA DRIVE (YM2612 / OPN2)
+  // ============================================
   {
-    name: 'Genesis E. Bass 1a',
+    name: 'Genesis Bass',
     type: 'synth',
-    synthType: 'Furnace',
+    synthType: 'FurnaceOPN',
     volume: -6,
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1, // OPN2 in Furnace
-      algorithm: 0,
-      feedback: 1,
+      chipType: 1,
+      algorithm: 4,
+      feedback: 5,
       operators: [
-        { enabled: true, am: false, ar: 31, dr: 18, mult: 10, rr: 15, sl: 2, tl: 36, dt2: 0, rs: 0, dt: 3, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: false, ar: 31, dr: 15, mult: 2, rr: 15, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: false, ar: 31, dr: 15, mult: 1, rr: 15, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: true, ar: 31, dr: 15, mult: 2, rr: 15, sl: 0, tl: 0, dt2: 0, rs: 4, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
+        op({ mult: 1, tl: 20, ar: 31, dr: 8, sl: 2, rr: 8 }),
+        op({ mult: 2, tl: 30, ar: 31, dr: 12, sl: 4, rr: 6, dt: 3 }),
+        op({ mult: 1, tl: 25, ar: 31, dr: 10, sl: 3, rr: 8 }),
+        op({ mult: 4, tl: 35, ar: 28, dr: 15, sl: 5, rr: 10, dt: -1 }),
       ],
-      macros: [],
-      opMacros: [],
-      wavetables: []
+      macros: [], opMacros: [], wavetables: []
     }
   },
-
-  // === PC ADLIB (OPL3) ===
   {
-    name: 'OPL3 Slap Bass',
+    name: 'Genesis Lead',
     type: 'synth',
-    synthType: 'Furnace',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    furnace: {
-      chipType: 14, // OPL
-      algorithm: 0,
-      feedback: 0,
-      operators: [
-        { enabled: true, am: false, ar: 15, dr: 3, mult: 7, rr: 3, sl: 2, tl: 31, dt2: 0, rs: 0, dt: 5, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: false, ar: 15, dr: 0, mult: 1, rr: 15, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: false, am: false, ar: 0, dr: 0, mult: 0, rr: 0, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: true, ar: 3, dr: 3, mult: 1, rr: 29, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-      ],
-      macros: [],
-      opMacros: [],
-      wavetables: []
-    }
-  },
-
-  // === ATARI TIA ===
-  {
-    name: 'TIA Snare Drum',
-    type: 'synth',
-    synthType: 'Furnace',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    furnace: {
-      chipType: 8, // TIA
-      algorithm: 0,
-      feedback: 4,
-      operators: [
-        { enabled: true, am: false, ar: 31, dr: 8, mult: 5, rr: 3, sl: 15, tl: 42, dt2: 0, rs: 0, dt: 5, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: false, ar: 0, dr: 0, mult: 0, rr: 0, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 15, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: false, am: false, ar: 0, dr: 0, mult: 0, rr: 0, sl: 0, tl: 0, dt2: 0, rs: 1, dt: 2, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: false, am: true, ar: 1, dr: 4, mult: 15, rr: 18, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-      ],
-      macros: [],
-      opMacros: [],
-      wavetables: []
-    }
-  },
-
-  // === COMMANDER X16 (VERA) ===
-  {
-    name: 'VERA 0-3-5 Arp Lead',
-    type: 'synth',
-    synthType: 'Furnace',
-    volume: -10,
-    pan: 0,
-    effects: [],
-    furnace: {
-      chipType: 24, // VERA
-      algorithm: 0,
-      feedback: 4,
-      operators: [
-        { enabled: true, am: false, ar: 31, dr: 8, mult: 5, rr: 3, sl: 15, tl: 42, dt2: 0, rs: 0, dt: 5, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: true, am: false, ar: 0, dr: 0, mult: 0, rr: 0, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 15, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: false, am: false, ar: 0, dr: 0, mult: 0, rr: 0, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-        { enabled: false, am: true, ar: 1, dr: 4, mult: 15, rr: 18, sl: 0, tl: 0, dt2: 0, rs: 0, dt: 0, d2r: 0, ssg: 0, ksl: 0, ksr: false, sus: false, vib: false, ws: 0 },
-      ],
-      macros: [],
-      opMacros: [],
-      wavetables: []
-    }
-  },
-
-  // === KONAMI BUBBLE SYSTEM ===
-  {
-    name: 'Gradius Bubble Lead',
-    type: 'synth',
-    synthType: 'Furnace',
+    synthType: 'FurnaceOPN',
     volume: -8,
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 66, // Bubble System
-      algorithm: 0,
-      feedback: 0,
-      operators: [],
-      macros: [],
-      opMacros: [],
-      wavetables: [
-        { 
-          id: 0, 
-          data: [128, 150, 180, 200, 220, 240, 255, 240, 220, 200, 180, 150, 128, 100, 70, 50, 30, 15, 0, 15, 30, 50, 70, 100, 128, 128, 128, 128, 128, 128, 128, 128]
-        }
-      ]
+      chipType: 1,
+      algorithm: 5,
+      feedback: 6,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 4, sl: 1, rr: 6 }),
+        op({ mult: 3, tl: 35, ar: 31, dr: 8, sl: 3, rr: 8, dt: 2 }),
+        op({ mult: 2, tl: 30, ar: 31, dr: 6, sl: 2, rr: 8, dt: -2 }),
+        op({ mult: 1, tl: 15, ar: 31, dr: 10, sl: 4, rr: 10, am: true }),
+      ],
+      macros: [], opMacros: [], wavetables: []
     }
-  }
+  },
+  {
+    name: 'Genesis Brass',
+    type: 'synth',
+    synthType: 'FurnaceOPN',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 1,
+      algorithm: 2,
+      feedback: 7,
+      operators: [
+        op({ mult: 1, tl: 25, ar: 28, dr: 10, sl: 4, rr: 8 }),
+        op({ mult: 1, tl: 20, ar: 31, dr: 8, sl: 3, rr: 10 }),
+        op({ mult: 2, tl: 30, ar: 31, dr: 12, sl: 5, rr: 8, dt: 1 }),
+        op({ mult: 1, tl: 15, ar: 25, dr: 6, sl: 2, rr: 6 }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'Genesis Bell',
+    type: 'synth',
+    synthType: 'FurnaceOPN',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 1,
+      algorithm: 4,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 15, ar: 31, dr: 8, sl: 0, rr: 10 }),
+        op({ mult: 7, tl: 40, ar: 31, dr: 12, sl: 2, rr: 12, dt: 3 }),
+        op({ mult: 1, tl: 20, ar: 31, dr: 10, sl: 1, rr: 10 }),
+        op({ mult: 14, tl: 45, ar: 31, dr: 15, sl: 3, rr: 14, dt: -2 }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'Genesis Strings',
+    type: 'synth',
+    synthType: 'FurnaceOPN',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 1,
+      algorithm: 1,
+      feedback: 3,
+      operators: [
+        op({ mult: 1, tl: 20, ar: 20, dr: 5, sl: 2, rr: 8 }),
+        op({ mult: 2, tl: 35, ar: 25, dr: 8, sl: 4, rr: 10, dt: 1 }),
+        op({ mult: 1, tl: 25, ar: 22, dr: 6, sl: 3, rr: 8, dt: -1 }),
+        op({ mult: 3, tl: 40, ar: 28, dr: 10, sl: 5, rr: 12, am: true }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // YAMAHA OPM (X68000, Arcade)
+  // ============================================
+  {
+    name: 'OPM Synth Lead',
+    type: 'synth',
+    synthType: 'FurnaceOPM',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 33,
+      algorithm: 5,
+      feedback: 6,
+      operators: [
+        op({ mult: 1, tl: 15, ar: 31, dr: 5, sl: 1, rr: 6 }),
+        op({ mult: 3, tl: 40, ar: 31, dr: 8, sl: 3, rr: 8, dt: 2 }),
+        op({ mult: 2, tl: 35, ar: 31, dr: 10, sl: 4, rr: 8, dt: -2 }),
+        op({ mult: 1, tl: 25, ar: 31, dr: 12, sl: 5, rr: 10, am: true }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'OPM Electric Piano',
+    type: 'synth',
+    synthType: 'FurnaceOPM',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 33,
+      algorithm: 4,
+      feedback: 2,
+      operators: [
+        op({ mult: 1, tl: 18, ar: 31, dr: 10, sl: 3, rr: 8 }),
+        op({ mult: 14, tl: 50, ar: 31, dr: 15, sl: 5, rr: 10 }),
+        op({ mult: 1, tl: 20, ar: 31, dr: 12, sl: 4, rr: 10 }),
+        op({ mult: 1, tl: 45, ar: 31, dr: 18, sl: 6, rr: 12, dt: 1 }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // PC ADLIB / SOUND BLASTER (OPL3)
+  // ============================================
+  {
+    name: 'OPL3 Organ',
+    type: 'synth',
+    synthType: 'FurnaceOPL',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 14,
+      algorithm: 0,
+      feedback: 3,
+      operators: [
+        op({ mult: 2, tl: 30, ar: 15, dr: 4, sl: 8, rr: 5, ws: 1 }),
+        op({ mult: 1, tl: 0, ar: 15, dr: 2, sl: 4, rr: 8, ws: 0 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'OPL3 Slap Bass',
+    type: 'synth',
+    synthType: 'FurnaceOPL',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 14,
+      algorithm: 0,
+      feedback: 5,
+      operators: [
+        op({ mult: 4, tl: 35, ar: 15, dr: 6, sl: 3, rr: 4, ws: 0 }),
+        op({ mult: 1, tl: 0, ar: 15, dr: 3, sl: 2, rr: 6, ws: 0 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'OPL3 Brass',
+    type: 'synth',
+    synthType: 'FurnaceOPL',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 14,
+      algorithm: 0,
+      feedback: 4,
+      operators: [
+        op({ mult: 1, tl: 25, ar: 12, dr: 5, sl: 5, rr: 6, ws: 0 }),
+        op({ mult: 1, tl: 5, ar: 14, dr: 4, sl: 3, rr: 8, ws: 0 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // NINTENDO NES (2A03)
+  // ============================================
+  {
+    name: 'NES Pulse Lead',
+    type: 'synth',
+    synthType: 'FurnaceNES',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 34,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 0, ar: 31, dr: 0, sl: 0, rr: 12 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'NES Bass',
+    type: 'synth',
+    synthType: 'FurnaceNES',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 34,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 5, ar: 31, dr: 4, sl: 2, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'NES Triangle',
+    type: 'synth',
+    synthType: 'FurnaceNES',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 34,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 2, sl: 1, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // GAME BOY (DMG)
+  // ============================================
+  {
+    name: 'GB Pulse',
+    type: 'synth',
+    synthType: 'FurnaceGB',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 2,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 5, ar: 28, dr: 2, sl: 2, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'GB Wave Bass',
+    type: 'synth',
+    synthType: 'FurnaceGB',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 2,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 5, sl: 3, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'GB Arp Lead',
+    type: 'synth',
+    synthType: 'FurnaceGB',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 2,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 3, ar: 31, dr: 3, sl: 1, rr: 12 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // SEGA MASTER SYSTEM / PSG (SN76489)
+  // ============================================
+  {
+    name: 'PSG Square Lead',
+    type: 'synth',
+    synthType: 'FurnacePSG',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 8,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 4, sl: 3, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'PSG Bass',
+    type: 'synth',
+    synthType: 'FurnacePSG',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 8,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 12, ar: 31, dr: 6, sl: 4, rr: 6 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // COMMODORE 64 (SID)
+  // ============================================
+  {
+    name: 'SID Lead',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 3,
+      algorithm: 4,
+      feedback: 4,
+      operators: [
+        op({ mult: 1, tl: 15, ar: 25, dr: 8, sl: 5, rr: 8 }),
+        op({ mult: 2, tl: 35, ar: 31, dr: 10, sl: 6, rr: 10, dt: 1 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'SID Bass',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 3,
+      algorithm: 4,
+      feedback: 5,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 6, sl: 3, rr: 6 }),
+        op({ mult: 3, tl: 40, ar: 31, dr: 12, sl: 8, rr: 8, dt: 2 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'SID Pad',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 3,
+      algorithm: 2,
+      feedback: 3,
+      operators: [
+        op({ mult: 1, tl: 18, ar: 18, dr: 4, sl: 2, rr: 10 }),
+        op({ mult: 2, tl: 30, ar: 20, dr: 6, sl: 4, rr: 12, dt: -1 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // AY-3-8910 (ZX Spectrum, MSX, Atari ST)
+  // ============================================
+  {
+    name: 'AY Buzzy Lead',
+    type: 'synth',
+    synthType: 'FurnaceAY',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 5,
+      algorithm: 7,
+      feedback: 1,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 6, d2r: 2, sl: 4, rr: 6 }),
+        op({ mult: 3, tl: 50, ar: 31, dr: 8, sl: 8, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'AY Square Bass',
+    type: 'synth',
+    synthType: 'FurnaceAY',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 5,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 15, ar: 31, dr: 8, sl: 5, rr: 5 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // PC ENGINE / TURBOGRAFX (HuC6280)
+  // ============================================
+  {
+    name: 'PCE Wave Lead',
+    type: 'synth',
+    synthType: 'FurnacePCE',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 4,
+      algorithm: 6,
+      feedback: 2,
+      operators: [
+        op({ mult: 1, tl: 12, ar: 31, dr: 5, sl: 2, rr: 8 }),
+        op({ mult: 2, tl: 40, ar: 31, dr: 8, sl: 4, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'PCE Bass',
+    type: 'synth',
+    synthType: 'FurnacePCE',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 4,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 6, sl: 3, rr: 6 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // VRC6 (Famicom expansion)
+  // ============================================
+  {
+    name: 'VRC6 Pulse Lead',
+    type: 'synth',
+    synthType: 'FurnaceVRC6',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 21,
+      algorithm: 5,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 5, ar: 31, dr: 3, sl: 1, rr: 10 }),
+        op({ mult: 2, tl: 30, ar: 31, dr: 6, sl: 3, rr: 12 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'VRC6 Saw Bass',
+    type: 'synth',
+    synthType: 'FurnaceVRC6',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 21,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 5, sl: 2, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // N163 (Namco wavetable)
+  // ============================================
+  {
+    name: 'N163 Wave Lead',
+    type: 'synth',
+    synthType: 'FurnaceN163',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 22,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 4, sl: 2, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [],
+      wavetables: [{ id: 0, data: [8,10,12,14,15,14,12,10,8,6,4,2,1,2,4,6] }]
+    }
+  },
+
+  // ============================================
+  // ATARI TIA (2600)
+  // ============================================
+  {
+    name: 'TIA Buzzy',
+    type: 'synth',
+    synthType: 'FurnaceTIA',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 38,
+      algorithm: 7,
+      feedback: 7,
+      operators: [
+        op({ mult: 1, tl: 20, ar: 31, dr: 15, d2r: 5, sl: 8, rr: 4 }),
+        op({ mult: 5, tl: 45, ar: 31, dr: 20, sl: 10, rr: 6, dt: 2 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // VERA (Commander X16)
+  // ============================================
+  {
+    name: 'VERA PSG Lead',
+    type: 'synth',
+    synthType: 'FurnaceVERA',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 42,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 4, sl: 2, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // SCC (Konami wavetable)
+  // ============================================
+  {
+    name: 'SCC Wave',
+    type: 'synth',
+    synthType: 'FurnaceSCC',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 10,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 5, sl: 2, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [],
+      wavetables: [{ id: 0, data: [0,32,64,96,127,96,64,32,0,-32,-64,-96,-127,-96,-64,-32] }]
+    }
+  },
+
+  // ============================================
+  // OPLL (MSX, VRC7)
+  // ============================================
+  {
+    name: 'OPLL Piano',
+    type: 'synth',
+    synthType: 'FurnaceOPLL',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 9,
+      algorithm: 0,
+      feedback: 2,
+      operators: [
+        op({ mult: 4, tl: 35, ar: 15, dr: 5, sl: 6, rr: 7 }),
+        op({ mult: 1, tl: 0, ar: 15, dr: 3, sl: 3, rr: 6 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // SNES (S-DSP)
+  // ============================================
+  {
+    name: 'SNES Pad',
+    type: 'synth',
+    synthType: 'FurnaceSNES',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 41,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 12, ar: 20, dr: 4, sl: 2, rr: 12 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'SNES Bass',
+    type: 'synth',
+    synthType: 'FurnaceSNES',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 41,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 8, ar: 31, dr: 6, sl: 3, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // FDS (Famicom Disk System)
+  // ============================================
+  {
+    name: 'FDS Wave',
+    type: 'synth',
+    synthType: 'FurnaceFDS',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 23,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 4, sl: 2, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [],
+      wavetables: [{ id: 0, data: [32,40,48,56,63,56,48,40,32,24,16,8,0,8,16,24] }]
+    }
+  },
+
+  // ============================================
+  // VIC-20
+  // ============================================
+  {
+    name: 'VIC Pulse',
+    type: 'synth',
+    synthType: 'FurnaceVIC',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 32,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 12, ar: 31, dr: 5, sl: 3, rr: 8 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // SAA1099 (SAM Coupe, etc.)
+  // ============================================
+  {
+    name: 'SAA Square',
+    type: 'synth',
+    synthType: 'FurnaceSAA',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 31,
+      algorithm: 7,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 4, sl: 2, rr: 10 }),
+        disabledOp(),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // ESFM (Enhanced OPL)
+  // ============================================
+  {
+    name: 'ESFM Lead',
+    type: 'synth',
+    synthType: 'FurnaceESFM',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 48,
+      algorithm: 5,
+      feedback: 5,
+      operators: [
+        op({ mult: 1, tl: 15, ar: 15, dr: 4, sl: 2, rr: 6 }),
+        op({ mult: 3, tl: 35, ar: 15, dr: 6, sl: 4, rr: 8, dt: 1 }),
+        op({ mult: 2, tl: 30, ar: 15, dr: 5, sl: 3, rr: 8 }),
+        op({ mult: 1, tl: 20, ar: 15, dr: 8, sl: 5, rr: 10, am: true }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // OPZ (TX81Z style)
+  // ============================================
+  {
+    name: 'OPZ E.Piano',
+    type: 'synth',
+    synthType: 'FurnaceOPZ',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 40,
+      algorithm: 4,
+      feedback: 3,
+      operators: [
+        op({ mult: 1, tl: 18, ar: 31, dr: 10, sl: 3, rr: 8 }),
+        op({ mult: 14, tl: 48, ar: 31, dr: 14, sl: 5, rr: 10, dt: 1 }),
+        op({ mult: 1, tl: 20, ar: 31, dr: 12, sl: 4, rr: 10 }),
+        op({ mult: 1, tl: 45, ar: 31, dr: 16, sl: 6, rr: 12 }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
 ];
