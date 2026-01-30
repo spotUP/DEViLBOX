@@ -4,9 +4,12 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Music } from 'lucide-react';
+import { Music, ChevronDown, ChevronRight } from 'lucide-react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
+
+// localStorage key for collapsed state
+const STORAGE_KEY_COLLAPSED = 'devilbox-test-keyboard-collapsed';
 
 interface TestKeyboardProps {
   instrument: InstrumentConfig;
@@ -97,11 +100,29 @@ const WHITE_KEYS_PER_OCTAVE = 7;
 export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(400);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      // Default to collapsed
+      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(ToneEngine.getInstance());
   const activeNotesRef = useRef<Set<string>>(new Set());
   const instrumentRef = useRef(instrument);
   const isInitializedRef = useRef(false);
+
+  // Persist collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_COLLAPSED, String(isCollapsed));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [isCollapsed]);
 
   // Keep refs in sync
   useEffect(() => {
@@ -264,18 +285,33 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
 
   return (
     <div ref={containerRef} className="space-y-3 w-full">
-      {/* Title */}
-      <div className="flex items-center justify-between">
+      {/* Collapsible Header */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="flex items-center justify-between w-full group"
+      >
         <div className="flex items-center gap-2 text-sm font-bold text-ft2-highlight">
+          {isCollapsed ? (
+            <ChevronRight size={16} className="text-ft2-textDim group-hover:text-ft2-highlight transition-colors" />
+          ) : (
+            <ChevronDown size={16} className="text-ft2-textDim group-hover:text-ft2-highlight transition-colors" />
+          )}
           <Music size={16} />
           <span>TEST KEYBOARD</span>
+          {isCollapsed && activeNotes.size > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded">
+              {activeNotes.size} playing
+            </span>
+          )}
         </div>
         <div className="text-xs text-ft2-textDim font-mono">
           {numOctaves} octaves · FT2 layout
         </div>
-      </div>
+      </button>
 
-      {/* Piano Keyboard */}
+      {/* Piano Keyboard (collapsible) */}
+      {!isCollapsed && (
+      <>
       <div className="bg-ft2-header rounded border-2 border-ft2-border p-3">
         <div
           className="relative flex items-end justify-center"
@@ -411,6 +447,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
         />
         <span className="text-xs font-mono text-ft2-text">80%</span>
       </div>
+      </>
+      )}
     </div>
   );
 };
