@@ -46,10 +46,19 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     clearAll,
   } = useGridPattern(channelIndex);
 
-  const { currentRow, isPlaying } = useTransportStore();
+  const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
+
+  // Ref for scroll container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth scroll tracking refs
+  const lastStepRef = useRef<number>(-1);
+  const lastStepTimeRef = useRef<number>(0);
+  const currentScrollRef = useRef<number>(0);
+  const rafIdRef = useRef<number>(0);
 
   // Use a ref to access current steps without causing callback recreation
   const stepsRef = useRef(gridPattern.steps);
@@ -76,6 +85,70 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       setFocusedCell({ noteIndex: 11, stepIndex: 0 });
     }
   }, [focusedCell, maxSteps]);
+
+  // RAF-based smooth scrolling (only when smooth scrolling enabled)
+  useEffect(() => {
+    if (!isPlaying || !smoothScrolling) {
+      // Reset refs when not playing
+      lastStepRef.current = -1;
+      lastStepTimeRef.current = 0;
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Cell width (28px) + margin (4px) = 32px per step, plus row label width (48px)
+    const CELL_WIDTH = 32;
+    const LABEL_WIDTH = 48;
+    const msPerRow = (2.5 / bpm) * speed * 1000;
+
+    const animate = () => {
+      const now = performance.now();
+
+      // Detect step change
+      if (currentStep !== lastStepRef.current) {
+        lastStepRef.current = currentStep;
+        lastStepTimeRef.current = now;
+      }
+
+      // Calculate smooth progress between steps
+      const elapsed = now - lastStepTimeRef.current;
+      const progress = Math.min(elapsed / msPerRow, 1.0);
+
+      // Calculate target scroll position (current step + fractional progress to next)
+      const smoothStep = currentStep + progress;
+      const stepPosition = LABEL_WIDTH + (smoothStep * CELL_WIDTH);
+      const containerWidth = container.clientWidth;
+
+      // Keep the playhead in the center third of the view
+      const targetScroll = Math.max(0, stepPosition - containerWidth * 0.4);
+
+      // Lerp towards target for smooth movement
+      const lerpFactor = 0.15;
+      currentScrollRef.current += (targetScroll - currentScrollRef.current) * lerpFactor;
+
+      // Apply scroll
+      container.scrollLeft = currentScrollRef.current;
+
+      rafIdRef.current = requestAnimationFrame(animate);
+    };
+
+    // Initialize scroll position
+    currentScrollRef.current = container.scrollLeft;
+    rafIdRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
+    };
+  }, [isPlaying, smoothScrolling, bpm, speed, currentStep]);
 
   // Handle MIDI CC messages for parameter control
   useEffect(() => {
@@ -268,7 +341,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       />
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto p-2">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-2">
         <div
           ref={gridRef}
           className="inline-block min-w-full"
@@ -323,6 +396,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       stepIndex={stepIdx}
                       isActive={isActive}
                       isCurrentStep={currentStep === stepIdx}
+                      isTriggered={currentStep === stepIdx && isActive}
                       isFocused={isFocused}
                       accent={isActive ? step?.accent : false}
                       slide={isActive ? step?.slide : false}
