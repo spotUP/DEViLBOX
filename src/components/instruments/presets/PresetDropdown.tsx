@@ -60,7 +60,6 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
       PolySynth: 'polySynth',
       Wavetable: 'wavetable',
       GranularSynth: 'granular',
-      WobbleBass: 'wobbleBass',
     };
 
     const configKey = configKeyMap[synthType];

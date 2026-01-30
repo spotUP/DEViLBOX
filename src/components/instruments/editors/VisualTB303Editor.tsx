@@ -11,7 +11,7 @@ import { Knob } from '@components/controls/Knob';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
-import { TB303Tabs, type TB303Tab } from './SynthEditorTabs';
+import { TB303Tabs, type TB303Tab } from '../shared/SynthEditorTabs';
 
 interface VisualTB303EditorProps {
   config: TB303Config;

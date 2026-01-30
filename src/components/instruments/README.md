@@ -1,262 +1,136 @@
 # Instrument Components
 
-This directory contains the complete instrument and effects system for the Scribbleton tracker.
+This directory contains the complete instrument and effects system for the DEViLBOX tracker.
 
-## Component Overview
+## Directory Structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                InstrumentEditorDemo.tsx                  │
-│          Main container with tabbed interface           │
-│    ┌───────────────────────────────────────────┐       │
-│    │   PresetBrowser.tsx                       │       │
-│    │   • 36+ factory presets                   │       │
-│    │   • Search & filter                       │       │
-│    │   • Category tabs                         │       │
-│    └───────────────────────────────────────────┘       │
-│    ┌───────────────────────────────────────────┐       │
-│    │   InstrumentEditor.tsx                    │       │
-│    │   • Synth type selector                   │       │
-│    │   • Oscillator editor                     │       │
-│    │   • Envelope editor                       │       │
-│    │   • Filter editor                         │       │
-│    │   • TB-303 editor                         │       │
-│    └───────────────────────────────────────────┘       │
-│    ┌───────────────────────────────────────────┐       │
-│    │   EffectChain.tsx                         │       │
-│    │   • Drag & drop reordering                │       │
-│    │   • Add/remove effects                    │       │
-│    │   • On/off toggle                         │       │
-│    │   • Wet/dry mix                           │       │
-│    └───────────────────────────────────────────┘       │
-│    ┌───────────────────────────────────────────┐       │
-│    │   EffectPanel.tsx                         │       │
-│    │   • Auto-generated parameters             │       │
-│    │   • Real-time updates                     │       │
-│    │   • 21 effect types                       │       │
-│    └───────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────┘
+src/components/instruments/
+├── EditInstrumentModal.tsx    # Main entry point for creating/editing instruments
+├── InstrumentList.tsx         # Unified instrument list (default & FT2 variants)
+│
+├── editors/                   # Type-specific synth editors
+│   ├── VisualTB303Editor.tsx  # TB-303 acid bass editor
+│   ├── VisualSynthEditor.tsx  # All other synth types
+│   ├── FurnaceEditor.tsx      # Chip synth (Furnace) editor
+│   ├── BuzzmachineEditor.tsx  # Buzz machine editor
+│   └── JeskolaEditors.tsx     # Jeskola machine editors
+│
+├── presets/                   # Preset management
+│   ├── SavePresetDialog.tsx   # Save preset modal
+│   ├── LoadPresetModal.tsx    # Load preset modal
+│   ├── PresetDropdown.tsx     # Preset quick selector
+│   └── PresetBrowser.tsx      # Full preset browser
+│
+├── shared/                    # Shared components
+│   ├── TestKeyboard.tsx       # Virtual piano keyboard
+│   ├── CategorizedSynthSelector.tsx  # Synth type browser
+│   ├── EffectChain.tsx        # Effect chain editor
+│   └── SynthEditorTabs.tsx    # Tab components for editors
+│
+└── (other files)              # Additional editors and utilities
+    ├── ArpeggioEditor.tsx     # Arpeggio editor
+    ├── FT2SampleEditor.tsx    # FT2-style sample editor
+    ├── SampleEditor.tsx       # Sample editor
+    ├── EffectPanel.tsx        # Effect parameter editor
+    └── ...
 ```
-
-## File Structure
-
-### Core Components
-
-- **InstrumentEditor.tsx** - Main synth parameter editor
-- **InstrumentPanel.tsx** - Container with keyboard and controls
-- **SynthTypeSelector.tsx** - Synth type picker (12 types)
-- **OscillatorEditor.tsx** - Oscillator controls (waveform, detune, octave)
-- **EnvelopeEditor.tsx** - ADSR envelope editor
-- **FilterEditor.tsx** - Filter controls (type, cutoff, resonance)
-- **TB303Editor.tsx** - Specialized TB-303 acid bass editor
-- **TestKeyboard.tsx** - Virtual keyboard for testing
-
-### New Components (This System)
-
-- **EffectChain.tsx** - Visual effect chain with drag-and-drop
-- **EffectPanel.tsx** - Effect parameter editor
-- **PresetBrowser.tsx** - Enhanced preset browser
-- **InstrumentEditorDemo.tsx** - Complete demo integration
 
 ## Quick Start
 
-### 1. Use the Demo Component
+### Using EditInstrumentModal (Recommended)
 
 ```tsx
-import { InstrumentEditorDemo } from '@components/instruments/InstrumentEditorDemo';
+import { EditInstrumentModal } from '@components/instruments/EditInstrumentModal';
 
 function App() {
-  return <InstrumentEditorDemo />;
-}
-```
-
-### 2. Use Individual Components
-
-```tsx
-import { EffectChain } from '@components/instruments/EffectChain';
-import { EffectPanel } from '@components/instruments/EffectPanel';
-import { PresetBrowser } from '@components/instruments/PresetBrowser';
-
-function MyEditor() {
-  const { currentInstrument, currentInstrumentId } = useInstrumentStore();
-  const [editingEffect, setEditingEffect] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [createMode, setCreateMode] = useState(false);
 
   return (
-    <div>
-      <PresetBrowser instrumentId={currentInstrumentId} />
+    <>
+      <button onClick={() => { setCreateMode(false); setShowModal(true); }}>
+        Edit Instrument
+      </button>
+      <button onClick={() => { setCreateMode(true); setShowModal(true); }}>
+        Create Instrument
+      </button>
 
-      <EffectChain
-        instrumentId={currentInstrumentId}
-        effects={currentInstrument.effects}
-        onEditEffect={setEditingEffect}
+      <EditInstrumentModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        createMode={createMode}
       />
-
-      {editingEffect && (
-        <EffectPanel
-          instrumentId={currentInstrumentId}
-          effect={editingEffect}
-          onClose={() => setEditingEffect(null)}
-        />
-      )}
-    </div>
+    </>
   );
 }
 ```
 
-## Features
-
-### InstrumentFactory (Backend)
-✓ Creates all 12 Tone.js synth types
-✓ Applies oscillator, envelope, filter parameters
-✓ Special TB-303 support
-✓ Creates effect chains
-✓ Handles polyphony
-✓ Clean disposal
-
-### EffectChain (Frontend)
-✓ Visual signal flow diagram
-✓ Drag-and-drop reordering (@dnd-kit)
-✓ Add/remove effects
-✓ On/off toggle per effect
-✓ Wet/dry mix control
-✓ Edit parameters button
-
-### EffectPanel (Frontend)
-✓ Auto-generated parameter controls
-✓ 21 effect types supported
-✓ Real-time parameter updates
-✓ Proper ranges and units
-✓ Wet/dry mix control
-
-### PresetBrowser (Frontend)
-✓ 36+ factory presets
-✓ 5 categories (Bass, Leads, Pads, Drums, FX)
-✓ Search and filter
-✓ Hover preview
-✓ Click to load
-✓ Color-coded categories
-
-## Supported Synth Types (12)
-
-1. **Synth** - Basic polyphonic synthesizer
-2. **MonoSynth** - Monophonic synth with filter envelope
-3. **DuoSynth** - Dual oscillator synth
-4. **FMSynth** - Frequency modulation synthesis
-5. **AMSynth** - Amplitude modulation synthesis
-6. **PluckSynth** - Karplus-Strong string synthesis
-7. **MetalSynth** - Metallic/inharmonic synthesis
-8. **MembraneSynth** - Drum/membrane synthesis
-9. **NoiseSynth** - Filtered noise generator
-10. **TB303** - Authentic acid bass synthesizer
-11. **Sampler** - Sample playback
-12. **Player** - Audio file player
-
-## Supported Effect Types (21)
-
-### Time-Based
-- Delay, FeedbackDelay, PingPongDelay
-- Reverb, JCReverb
-
-### Modulation
-- Chorus, Phaser, Tremolo, Vibrato
-- AutoFilter, AutoPanner, AutoWah
-
-### Distortion
-- Distortion, BitCrusher, Chebyshev
-
-### Pitch
-- FrequencyShifter, PitchShift
-
-### Dynamics
-- Compressor
-
-### EQ/Filter
-- EQ3, Filter
-
-### Stereo
-- StereoWidener
-
-## Integration with Store
-
-All components use `useInstrumentStore` from Zustand:
-
-```typescript
-// Store actions used
-addEffect(instrumentId, effectType)
-removeEffect(instrumentId, effectId)
-updateEffect(instrumentId, effectId, updates)
-reorderEffects(instrumentId, fromIndex, toIndex)
-updateInstrument(instrumentId, updates)
-```
-
-## Styling
-
-All components use the FT2 tracker theme:
-- Dark blue background (#00005f)
-- Cyan highlights (#00ffff)
-- Yellow cursor (#ffff00)
-- Monospace fonts
-- Custom scrollbars
-- Border styles
-
-## Dependencies
-
-- **Tone.js** - Audio synthesis and effects
-- **@dnd-kit/core** - Drag and drop
-- **React** - UI framework
-- **TypeScript** - Type safety
-- **Zustand** - State management
-- **Tailwind CSS** - Styling
-
-## Related Files
-
-### Engine
-- `/src/engine/InstrumentFactory.ts` - Factory for creating instruments
-- `/src/engine/ToneEngine.ts` - Tone.js wrapper
-- `/src/engine/TB303Engine.ts` - TB-303 synthesizer
-
-### Types
-- `/src/types/instrument.ts` - All TypeScript types
-
-### Data
-- `/src/constants/factoryPresets.ts` - 36+ presets
-- `/src/constants/tb303Presets.ts` - TB-303 presets
-
-### Store
-- `/src/stores/useInstrumentStore.ts` - Instrument state management
-
-## Documentation
-
-See `/INSTRUMENT_SYSTEM.md` for comprehensive documentation including:
-- Architecture overview
-- Integration guide
-- TypeScript types
-- Performance considerations
-- Example code
-- Troubleshooting
-
-## Testing
-
-Run the demo to test all features:
+### Using InstrumentList
 
 ```tsx
-import { InstrumentEditorDemo } from '@components/instruments/InstrumentEditorDemo';
+import { InstrumentList } from '@components/instruments/InstrumentList';
 
-// This component includes:
-// - Preset browser
-// - Synth editor
-// - Effect chain
-// - Effect parameter editor
-// - Keyboard shortcuts
-// - Stats display
+// Default variant
+<InstrumentList maxHeight="400px" showActions={true} />
+
+// FT2 variant with full features
+<InstrumentList
+  variant="ft2"
+  showPreviewOnClick={true}
+  showPresetButton={true}
+  showSamplePackButton={true}
+  showEditButton={true}
+  onEditInstrument={(id) => openInstrumentModal(id)}
+/>
 ```
 
-## Keyboard Shortcuts (in Demo)
+## Component Details
 
-- **TAB** - Switch between Synth/Effects tabs
-- **ESC** - Close panels
-- Browser keyboard navigation for preset selection
+### EditInstrumentModal
 
----
+The main entry point for instrument editing. Supports two modes:
+- **Create mode**: Full synth browser, preview, name input
+- **Edit mode**: Sound/Effects/Browse tabs, preset management
 
-Built for Scribbleton Tracker - FastTracker 2 Clone
+Features:
+- Keyboard shortcuts (Z-M, Q-P) for playing notes
+- Collapsible test keyboard
+- Save/load presets
+- Reset to defaults
+
+### InstrumentList
+
+Unified component that replaces the old InstrumentList and InstrumentListPanel.
+
+Props:
+- `variant`: 'default' | 'ft2' - Styling variant
+- `compact`: boolean - Compact mode for sidebars
+- `showActions`: boolean - Show clone/delete buttons
+- `showPreviewOnClick`: boolean - Play note when selecting
+- `showPresetButton`: boolean - Show preset button (FT2)
+- `showSamplePackButton`: boolean - Show sample pack button (FT2)
+- `showEditButton`: boolean - Show edit button (FT2)
+- `onEditInstrument`: function - Callback when edit is clicked
+
+### Synth Editors
+
+All synth-specific editors are in the `editors/` folder:
+- `VisualTB303Editor` - Classic 303 knob layout
+- `VisualSynthEditor` - Generic synth with tabs for oscillator, filter, etc.
+- `FurnaceEditor` - Chip music synths (GB, NES, OPN2, etc.)
+
+### Preset System
+
+Preset components in `presets/`:
+- `PresetDropdown` - Quick preset selector dropdown
+- `LoadPresetModal` - Full preset browser modal
+- `SavePresetDialog` - Save current settings as preset
+
+### Shared Components
+
+Reusable components in `shared/`:
+- `TestKeyboard` - Interactive piano keyboard with FT2 key mapping
+- `CategorizedSynthSelector` - Searchable synth type browser
+- `EffectChain` - Drag-and-drop effect ordering
+- `SynthEditorTabs` - Tab components for editor layouts

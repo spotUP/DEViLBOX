@@ -22,12 +22,13 @@ import {
 } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { WaveformSelector } from '@components/ui/WaveformSelector';
-import { FT2SampleEditor } from './FT2SampleEditor';
-import { ArpeggioEditor } from './ArpeggioEditor';
+import { FT2SampleEditor } from '../FT2SampleEditor';
+import { ArpeggioEditor } from '../ArpeggioEditor';
 import { FurnaceEditor } from './FurnaceEditor';
-import { PresetDropdown } from './PresetDropdown';
-import { LFOControls } from './LFOControls';
-import { SynthEditorTabs, type SynthEditorTab } from './SynthEditorTabs';
+import { BuzzmachineEditor } from './BuzzmachineEditor';
+import { PresetDropdown } from '../presets/PresetDropdown';
+import { LFOControls } from '../LFOControls';
+import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { getSynthInfo, SYNTH_INFO } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import type { SynthType } from '@typedefs/instrument';
@@ -645,7 +646,18 @@ export const VisualSynthEditor: React.FC<VisualSynthEditorProps> = ({
         <div className="p-4 border-b border-gray-800">
           <FurnaceEditor
             config={instrument.furnace}
+            instrumentId={instrument.id}
             onChange={(furnace) => onChange({ furnace: { ...instrument.furnace!, ...furnace } })}
+          />
+        </div>
+      )}
+
+      {/* Buzzmachine Editor */}
+      {instrument.synthType === 'Buzzmachine' && (
+        <div className="p-4 border-b border-gray-800">
+          <BuzzmachineEditor
+            config={instrument}
+            onChange={onChange}
           />
         </div>
       )}
@@ -1779,7 +1791,62 @@ function renderSpecialParameters(
       );
     }
 
-    default:
-      return null;
+    // =========================================================================
+    // BASIC SYNTH - Simple oscillator + envelope + filter
+    // =========================================================================
+    case 'Synth':
+      return (
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <SectionHeader color="#a855f7" title="Basic Synth" />
+          <div className="text-center py-4">
+            <p className="text-gray-400 text-sm">
+              Simple polyphonic synthesizer
+            </p>
+            <p className="text-gray-500 text-xs mt-2">
+              Use the <span className="text-purple-400 font-medium">Oscillator</span>,{' '}
+              <span className="text-purple-400 font-medium">Envelope</span>, and{' '}
+              <span className="text-purple-400 font-medium">Filter</span> tabs to shape your sound.
+            </p>
+          </div>
+          <div className="flex justify-around items-end mt-4">
+            <Knob
+              value={params.portamento ?? 0}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={(v) => updateParam('portamento', v)}
+              label="Portamento"
+              color="#a855f7"
+              formatValue={(v) => `${(v * 1000).toFixed(0)}ms`}
+            />
+            <Knob
+              value={params.volume ?? 0}
+              min={-24}
+              max={6}
+              step={0.5}
+              onChange={(v) => updateParam('volume', v)}
+              label="Volume"
+              color="#a855f7"
+              formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`}
+            />
+          </div>
+        </section>
+      );
+
+    default: {
+      // Fallback for any unhandled synth types - show basic info
+      const info = getSynthInfo(instrument.synthType);
+      return (
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <SectionHeader color="#6b7280" title={info.name} />
+          <div className="text-center py-4">
+            <p className="text-gray-400 text-sm">{info.description}</p>
+            <p className="text-gray-500 text-xs mt-2">
+              Use the other tabs to configure this instrument.
+            </p>
+          </div>
+        </section>
+      );
+    }
   }
 }
