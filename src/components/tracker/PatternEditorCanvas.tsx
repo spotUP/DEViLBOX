@@ -18,7 +18,6 @@ import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
-import { getToneEngine } from '@engine/ToneEngine';
 
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
@@ -102,7 +101,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [scrollLeft, setScrollLeft] = useState(0);
-  const [channelTriggers, setChannelTriggers] = useState<ChannelTrigger[]>([]);
+  // PERF: Use ref instead of state for channel triggers to avoid re-renders
+  const channelTriggersRef = useRef<ChannelTrigger[]>([]);
 
   // Caches for rendered elements (Bassoon Tracker style)
   const noteCacheRef = useRef<NoteCache>({});
@@ -111,6 +111,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
+
 
   // Get pattern and actions
   const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
@@ -125,8 +126,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   const cutTrack = useTrackerStore((state) => state.cutTrack);
   const pasteTrack = useTrackerStore((state) => state.pasteTrack);
 
-  const isPlaying = useTransportStore((state) => state.isPlaying);
   const mobileChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
+
+  // Smooth scrolling refs - track time since last row change
+  const lastRowChangeTimeRef = useRef<number>(0);
+  const lastRowValueRef = useRef<number>(-1);
+  const lastSmoothOffsetRef = useRef<number>(0);
 
   // Track theme for cache invalidation
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -156,7 +161,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     cursorBg: isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)',
     text: '#e0e0e0',
     textMuted: '#505050',
-    textNote: '#ffffff',
+    textNote: '#909090',  // Grey by default, flashes white on current row
+    textNoteActive: '#ffffff',  // White for currently playing notes
     textInstrument: '#4ade80',
     textVolume: '#60a5fa',
     textEffect: '#f97316',
@@ -290,42 +296,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     }
   }, [pattern, setCell]);
 
-  // VU meter polling during playback
-  const vuPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // PERF: VU meter polling moved to ref-based update (no React re-renders)
+  // The ChannelVUMeters component handles its own animation loop
+  // Header VU indicators are updated via refs in the render loop
   useEffect(() => {
-    if (!isPlaying || !pattern) {
-      if (vuPollRef.current) {
-        clearInterval(vuPollRef.current);
-        vuPollRef.current = null;
-      }
-      return;
+    if (pattern) {
+      channelTriggersRef.current = pattern.channels.map(() => ({ level: 0, triggered: false }));
     }
-
-    const engine = getToneEngine();
-    const numChannels = pattern.channels.length;
-
-    const pollTriggers = () => {
-      const levels = engine.getChannelTriggerLevels(numChannels);
-      const newTriggers: ChannelTrigger[] = levels.map((level) => ({
-        level,
-        triggered: level > 0.01,
-      }));
-      setChannelTriggers(newTriggers);
-    };
-
-    vuPollRef.current = setInterval(pollTriggers, 100);
-
-    return () => {
-      if (vuPollRef.current) {
-        clearInterval(vuPollRef.current);
-        vuPollRef.current = null;
-      }
-    };
-  }, [isPlaying, pattern]);
+  }, [pattern?.channels.length]);
 
   // Get the note canvas from cache or create it
-  const getNoteCanvas = useCallback((note: number): HTMLCanvasElement => {
-    const key = `${note}`;
+  const getNoteCanvas = useCallback((note: number, isActive = false): HTMLCanvasElement => {
+    const key = `${note}-${isActive ? 'a' : 'n'}`;
     if (noteCacheRef.current[key]) {
       return noteCacheRef.current[key];
     }
@@ -339,12 +321,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     ctx.textBaseline = 'middle';
     ctx.fillStyle = note === 0 ? colors.textMuted :
                     note === 97 ? colors.textEffect :
-                    colors.textNote;
+                    (isActive ? colors.textNoteActive : colors.textNote);
     ctx.fillText(noteToString(note), 0, ROW_HEIGHT / 2);
 
     noteCacheRef.current[key] = canvas;
     return canvas;
-  }, [colors.textMuted, colors.textEffect, colors.textNote]);
+  }, [colors.textMuted, colors.textEffect, colors.textNote, colors.textNoteActive]);
 
   // Get parameter canvas from cache or create it
   const getParamCanvas = useCallback((
@@ -433,6 +415,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const uiState = useUIStore.getState();
 
     const pattern = state.patterns[state.currentPatternIndex];
+    const smoothScrolling = transportState.smoothScrolling;
+
     if (!pattern) {
       ctx.fillStyle = colors.bg;
       ctx.fillRect(0, 0, dimensions.width, dimensions.height);
@@ -448,10 +432,47 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const isPlaying = transportState.isPlaying;
     const currentRow = isPlaying ? transportState.currentRow : cursor.rowIndex;
     const useHex = uiState.useHexNumbers;
+    const speed = transportState.speed;
+    const bpm = transportState.bpm;
 
     const { width, height } = dimensions;
     const patternLength = pattern.length;
     const numChannels = pattern.channels.length;
+
+    // Smooth scrolling - interpolate based on time since last row change
+    let smoothOffset = 0;
+    if (isPlaying && smoothScrolling) {
+      const now = performance.now();
+
+      // Detect row change - when row advances, the visual position "jumps" forward by one row
+      // but the smooth offset resets to 0, so the net visual position stays continuous
+      if (currentRow !== lastRowValueRef.current) {
+        lastRowChangeTimeRef.current = now;
+        lastRowValueRef.current = currentRow;
+      }
+
+      // Calculate target progress through current row (0 to 1)
+      const secondsPerRow = (2.5 / bpm) * speed;
+      const msPerRow = secondsPerRow * 1000;
+      const elapsed = now - lastRowChangeTimeRef.current;
+      const targetProgress = Math.min(elapsed / msPerRow, 1.0);
+      const targetOffset = targetProgress * ROW_HEIGHT;
+
+      // Lerp to target to smooth out any timing jitter
+      const lerpFactor = 0.3; // How quickly to catch up (0.3 = 30% per frame)
+      smoothOffset = lastSmoothOffsetRef.current + (targetOffset - lastSmoothOffsetRef.current) * lerpFactor;
+
+      // Handle wrap-around: if target jumped back (row changed), snap faster
+      if (targetOffset < lastSmoothOffsetRef.current - ROW_HEIGHT * 0.5) {
+        smoothOffset = targetOffset; // Snap on row change
+      }
+
+      lastSmoothOffsetRef.current = smoothOffset;
+    } else {
+      // Reset tracking when not playing
+      lastRowValueRef.current = -1;
+      lastSmoothOffsetRef.current = 0;
+    }
 
     // Calculate visible lines
     const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
@@ -459,9 +480,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const visibleStart = currentRow - topLines;
     const visibleEnd = visibleStart + visibleLines;
 
-    // Center line position
+    // Center line position - apply smooth offset
     const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
-    const baseY = centerLineTop - (topLines * ROW_HEIGHT);
+    const baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
 
     // Track widths
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -504,8 +525,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         // Skip if outside visible area
         if (x + channelWidth < 0 || x > width) continue;
 
-        // Note
-        const noteCanvas = getNoteCanvas(cell.note || 0);
+        // Note - flash white on current playing row
+        const isCurrentPlayingRow = isPlaying && rowIndex === currentRow;
+        const noteCanvas = getNoteCanvas(cell.note || 0, isCurrentPlayingRow && cell.note > 0);
         ctx.drawImage(noteCanvas, x, y);
 
         // Parameters
@@ -686,7 +708,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   }
 
   const mobileChannel = pattern.channels[mobileChannelIndex];
-  const mobileTrigger = channelTriggers[mobileChannelIndex] || { level: 0, triggered: false };
+  const mobileTrigger = channelTriggersRef.current[mobileChannelIndex] || { level: 0, triggered: false };
 
   return (
     <div className="flex flex-col h-full" {...(isMobile ? swipeHandlers : {})}>
@@ -771,7 +793,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
                 {pattern.channels.map((channel, idx) => {
-                  const trigger = channelTriggers[idx] || { level: 0, triggered: false };
+                  const trigger = channelTriggersRef.current[idx] || { level: 0, triggered: false };
                   return (
                     <div
                       key={channel.id}
