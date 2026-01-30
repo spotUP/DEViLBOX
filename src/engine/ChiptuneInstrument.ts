@@ -124,36 +124,9 @@ export class ChiptuneInstrument {
   // ==========================================================================
 
   async play(): Promise<void> {
-    if (!this.player || !this.moduleData) {
-      const error = { type: 'not_ready', message: 'Player or module data not available' };
+    if (!this.player || !this.moduleData || !this.initialized) {
       console.error('[ChiptuneInstrument] Not ready for playback');
-      this.callbacks.onError?.(error);
       return;
-    }
-
-    // Wait for initialization if still pending
-    if (!this.initialized) {
-      console.log('[ChiptuneInstrument] Waiting for initialization...');
-      await new Promise<void>((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (this.initialized) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 50);
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          resolve();
-        }, 10000);
-      });
-
-      if (!this.initialized) {
-        const error = { type: 'init_timeout', message: 'Initialization timed out' };
-        console.error('[ChiptuneInstrument] Initialization timed out');
-        this.callbacks.onError?.(error);
-        return;
-      }
     }
 
     await this.player.play(this.moduleData);
@@ -251,8 +224,8 @@ export class ChiptuneInstrument {
   // GETTERS
   // ==========================================================================
 
-  get volume(): Tone.Param<'gain'> {
-    return this.output.gain;
+  get volume(): Tone.Param<'decibels'> {
+    return this.output.gain as unknown as Tone.Param<'decibels'>;
   }
 
   get duration(): number {

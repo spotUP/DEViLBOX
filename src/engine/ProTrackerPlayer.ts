@@ -12,81 +12,22 @@
  */
 
 import * as Tone from 'tone';
-import type { MODNote } from '@/lib/import/formats/MODParser';
 
 // ============================================================================
 // CONSTANTS (from pt2_replayer.c)
 // ============================================================================
 
 const AMIGA_PAL_FREQUENCY = 3546895; // Paula clock frequency (PAL)
+export const PERIOD_TABLE_LENGTH = 12 * 3;  // 3 octaves * 12 notes
+export const MAX_CHANNELS = 32;             // Support up to 32 channels (XM compatibility)
 
-// Period table with all 16 finetune variations (pt2_replayer.c periodTable)
-// 3 octaves × 12 notes × 16 finetunes
+// Period table (pt2_replayer.c periodTable)
+// 3 octaves, 12 notes each, finetune 0
 const periodTable = [
   // Finetune 0
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  // Finetune 1
-  850, 802, 757, 715, 674, 637, 601, 567, 535, 505, 477, 450,
-  425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 239, 225,
-  213, 201, 189, 179, 169, 159, 150, 142, 134, 126, 119, 113,
-  // Finetune 2
-  844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474, 447,
-  422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237, 224,
-  211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118, 112,
-  // Finetune 3
-  838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470, 444,
-  419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235, 222,
-  209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118, 111,
-  // Finetune 4
-  832, 785, 741, 699, 660, 623, 588, 555, 524, 495, 467, 441,
-  416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233, 220,
-  208, 196, 185, 175, 165, 156, 147, 139, 131, 124, 117, 110,
-  // Finetune 5
-  826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463, 437,
-  413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232, 219,
-  206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116, 109,
-  // Finetune 6
-  820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460, 434,
-  410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230, 217,
-  205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115, 109,
-  // Finetune 7
-  814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457, 431,
-  407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228, 216,
-  204, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114, 108,
-  // Finetune -8
-  907, 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480,
-  453, 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240,
-  226, 214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120,
-  // Finetune -7
-  900, 850, 802, 757, 715, 675, 636, 601, 567, 535, 505, 477,
-  450, 425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 238,
-  225, 212, 200, 189, 179, 169, 159, 150, 142, 134, 126, 119,
-  // Finetune -6
-  894, 844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474,
-  447, 422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237,
-  223, 211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118,
-  // Finetune -5
-  887, 838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470,
-  444, 419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235,
-  222, 209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118,
-  // Finetune -4
-  881, 832, 785, 741, 699, 660, 623, 588, 555, 524, 494, 467,
-  441, 416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233,
-  220, 208, 196, 185, 175, 165, 156, 147, 139, 131, 123, 117,
-  // Finetune -3
-  875, 826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463,
-  437, 413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232,
-  219, 206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116,
-  // Finetune -2
-  868, 820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460,
-  434, 410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230,
-  217, 205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115,
-  // Finetune -1
-  862, 814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457,
-  431, 407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228,
-  216, 203, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114,
+  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453, // C-1 to B-1
+  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226, // C-2 to B-2
+  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113, // C-3 to B-3
 ];
 
 // Vibrato/Tremolo waveforms (pt2_replayer.c vibratoTable)
@@ -94,36 +35,6 @@ const vibratoTable = [
   0, 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
   255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24
 ];
-
-/**
- * Get period from note index and finetune
- * @param noteIndex Note index (0-35 for 3 octaves)
- * @param finetune Finetune value (-8 to +7)
- */
-function getPeriod(noteIndex: number, finetune: number): number {
-  // Convert finetune to table index (0-15)
-  // Finetune 0-7 = index 0-7, finetune -8 to -1 = index 8-15
-  const finetuneIndex = finetune >= 0 ? finetune : finetune + 16;
-  const tableOffset = finetuneIndex * 36; // 36 notes per finetune
-  return periodTable[tableOffset + Math.min(35, Math.max(0, noteIndex))];
-}
-
-/**
- * Find note index from period value
- * Returns the closest note index for the given period
- */
-function periodToNoteIndex(period: number, finetune: number): number {
-  const finetuneIndex = finetune >= 0 ? finetune : finetune + 16;
-  const tableOffset = finetuneIndex * 36;
-
-  // Find closest match
-  for (let i = 0; i < 36; i++) {
-    if (periodTable[tableOffset + i] <= period) {
-      return i;
-    }
-  }
-  return 35; // Lowest note
-}
 
 // ============================================================================
 // TYPES
@@ -229,7 +140,6 @@ export class ProTrackerReplayer {
   private pBreakFlag = false;    // Pattern break pending
   private posJumpFlag = false;   // Position jump pending
   private posJumpPos = 0;        // Position to jump to
-  private patternDelay = 0;      // Pattern delay counter (EEE effect)
 
   // Channel states
   private channels: ChannelState[] = [];
@@ -604,12 +514,12 @@ export class ProTrackerReplayer {
         break;
 
       case 0x1: // Fine portamento up
-        ch.n_period = Math.max(1, ch.n_period - y);
+        ch.n_period = Math.max(113, ch.n_period - y);
         this.updatePeriod(ch, time);
         break;
 
       case 0x2: // Fine portamento down
-        ch.n_period = Math.min(32000, ch.n_period + y);
+        ch.n_period = Math.min(856, ch.n_period + y);
         this.updatePeriod(ch, time);
         break;
 
@@ -675,11 +585,7 @@ export class ProTrackerReplayer {
         break;
 
       case 0xE: // Pattern delay
-        // Set pattern delay - each row repeats (y + 1) times
-        // Only set if not already in a delay
-        if (this.patternDelay === 0) {
-          this.patternDelay = y;
-        }
+        // TODO: Implement pattern delay
         break;
 
       case 0xF: // Invert loop (Funk repeat)
@@ -715,12 +621,12 @@ export class ProTrackerReplayer {
         break;
 
       case 0x1: // Portamento up
-        ch.n_period = Math.max(1, ch.n_period - param);
+        ch.n_period = Math.max(113, ch.n_period - param);
         this.updatePeriod(ch, time);
         break;
 
       case 0x2: // Portamento down
-        ch.n_period = Math.min(32000, ch.n_period + param);
+        ch.n_period = Math.min(856, ch.n_period + param);
         this.updatePeriod(ch, time);
         break;
 
@@ -792,9 +698,9 @@ export class ProTrackerReplayer {
     // Cycle through base note, +x semitones, +y semitones
     const arpeggioTick = this.currentTick % 3;
     if (arpeggioTick === 1) {
-      period = this.periodPlusSemitones(ch.n_note, x, ch.n_finetune);
+      period = this.periodPlusSemitones(ch.n_note, x);
     } else if (arpeggioTick === 2) {
-      period = this.periodPlusSemitones(ch.n_note, y, ch.n_finetune);
+      period = this.periodPlusSemitones(ch.n_note, y);
     }
 
     ch.n_period = period;
@@ -802,12 +708,23 @@ export class ProTrackerReplayer {
   }
 
   /**
-   * Convert period + semitones to new period (using finetune table)
+   * Convert period + semitones to new period
    */
-  private periodPlusSemitones(period: number, semitones: number, finetune: number = 0): number {
-    const noteIndex = periodToNoteIndex(period, finetune);
-    const newIndex = Math.min(35, Math.max(0, noteIndex + semitones));
-    return getPeriod(newIndex, finetune);
+  private periodPlusSemitones(period: number, semitones: number): number {
+    // Find the note index for this period
+    let noteIndex = -1;
+    for (let i = 0; i < periodTable.length; i++) {
+      if (periodTable[i] <= period) {
+        noteIndex = i;
+        break;
+      }
+    }
+
+    if (noteIndex === -1) return period;
+
+    // Add semitones and clamp
+    const newIndex = Math.min(periodTable.length - 1, noteIndex + semitones);
+    return periodTable[newIndex];
   }
 
   /**
@@ -958,23 +875,24 @@ export class ProTrackerReplayer {
     // Connect to channel's gain node
     player.connect(ch.gainNode!);
 
-    ch.player = player;
+    // Check if buffer is loaded and start
+    const startPlayback = () => {
+      if (ch.player === player && this.playing) {
+        const startOffset = offset > 0 ? offset / sampleRate : 0;
+        player.start(time, startOffset);
+      }
+    };
 
-    // Wait for buffer to load then start
-    // Tone.Player.loaded is a Promise when using URL, boolean when using AudioBuffer
-    const loadPromise = player.loaded;
-    if (loadPromise && typeof loadPromise === 'object' && 'then' in loadPromise) {
-      (loadPromise as Promise<void>).then(() => {
-        if (ch.player === player && this.playing) {
-          const startOffset = offset > 0 ? offset / sampleRate : 0;
-          player.start(time, startOffset);
-        }
-      });
-    } else if (player.buffer && player.buffer.loaded) {
-      // Already loaded
-      const startOffset = offset > 0 ? offset / sampleRate : 0;
-      player.start(time, startOffset);
+    // Player.loaded is a boolean in Tone.js v14+
+    if (player.loaded) {
+      startPlayback();
+    } else {
+      // Fallback: wait for load event
+      player.onstop = () => {}; // Ensure player is ready
+      setTimeout(startPlayback, 0);
     }
+
+    ch.player = player;
   }
 
   /**
@@ -1011,7 +929,7 @@ export class ProTrackerReplayer {
     const sampleRate = ch.n_start?.sampleRate || 8363;
     const playbackRate = frequency / sampleRate;
 
-    (ch.player as any).playbackRate = playbackRate;
+    ch.player.playbackRate = playbackRate;
   }
 
   // ==========================================================================
@@ -1023,12 +941,6 @@ export class ProTrackerReplayer {
    */
   private advanceRow(): void {
     if (!this.module) return;
-
-    // Handle pattern delay (EEE effect) - repeat current row
-    if (this.patternDelay > 0) {
-      this.patternDelay--;
-      return; // Stay on current row
-    }
 
     // Handle pattern break
     if (this.pBreakFlag) {
@@ -1142,83 +1054,32 @@ export function disposeProTrackerReplayer(): void {
   }
 }
 
-// ============================================================================
-// CONVERTER - Bridge existing MOD parser to PTModule format
-// ============================================================================
-
-// Note: MODNote type is imported at top of file
-
 /**
- * Convert parsed MOD data to PTModule format for the replayer
+ * Create a PTModule from pre-converted data
+ * Used by useProTrackerPlayback hook after converting patterns/samples
  */
 export function convertToPTModule(
   title: string,
-  patterns: MODNote[][][],
-  samples: Array<{
-    name: string;
-    length: number;
-    finetune: number;
-    volume: number;
-    loopStart: number;
-    loopLength: number;
-    audioBuffer: AudioBuffer | null;
-    blobUrl: string | null;
-  }>,
+  patterns: PTCell[][][],
+  samples: PTSample[],
   songLength: number,
   restartPos: number,
   positions: number[],
   numChannels: number
 ): PTModule {
-  // Convert samples to PTSample format
-  const ptSamples: PTSample[] = [
-    // Index 0 is unused (samples are 1-indexed)
-    { name: '', length: 0, finetune: 0, volume: 0, loopStart: 0, loopLength: 0, audioBuffer: null, blobUrl: null }
+  // Ensure we have sample 0 (unused in ProTracker)
+  const allSamples: PTSample[] = [
+    { name: '', length: 0, finetune: 0, volume: 0, loopStart: 0, loopLength: 2, audioBuffer: null, blobUrl: null },
+    ...samples,
   ];
 
-  for (const sample of samples) {
-    ptSamples.push({
-      name: sample.name,
-      length: sample.length,
-      finetune: sample.finetune,
-      volume: sample.volume,
-      loopStart: sample.loopStart,
-      loopLength: sample.loopLength,
-      audioBuffer: sample.audioBuffer,
-      blobUrl: sample.blobUrl,
-    });
-  }
-
-  // Convert patterns to PTCell format
-  const ptPatterns: PTCell[][][] = [];
-
-  for (const pattern of patterns) {
-    const ptPattern: PTCell[][] = [];
-
-    for (const row of pattern) {
-      const ptRow: PTCell[] = [];
-
-      for (const note of row) {
-        ptRow.push({
-          note: note.period,      // Period value
-          sample: note.instrument,
-          effect: note.effect,
-          param: note.effectParam,
-        });
-      }
-
-      ptPattern.push(ptRow);
-    }
-
-    ptPatterns.push(ptPattern);
-  }
-
   return {
-    name: title,
-    samples: ptSamples,
+    name: title.substring(0, 20),
+    samples: allSamples,
     songLength,
     restartPos,
-    positions,
-    patterns: ptPatterns,
+    positions: positions.slice(0, 128),
+    patterns,
     numChannels,
   };
 }

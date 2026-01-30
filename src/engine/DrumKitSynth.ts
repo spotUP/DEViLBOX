@@ -178,6 +178,7 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
     player.start(startTime);
 
     // Track active voice
+    const playbackRate = this.calculatePlaybackRate(mapping, midiNote);
     const voice: ActiveVoice = {
       player,
       panner,
@@ -189,9 +190,7 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
     this.activeVoices.push(voice);
 
     // Auto-cleanup when sample finishes
-    // Access playbackRate as Param (has .value) or calculate from option
-    const rate = this.calculatePlaybackRate(mapping, midiNote);
-    const duration = buffer.duration / rate;
+    const duration = buffer.duration / playbackRate;
     setTimeout(() => {
       const idx = this.activeVoices.indexOf(voice);
       if (idx !== -1) {

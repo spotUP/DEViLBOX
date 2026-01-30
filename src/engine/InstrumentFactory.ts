@@ -18,6 +18,7 @@ import {
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
+  DEFAULT_FURNACE,
   VOWEL_FORMANTS,
 } from '../types/instrument';
 import { TB303Synth } from './TB303Engine';
@@ -29,6 +30,8 @@ import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { DrumKitSynth } from './DrumKitSynth';
+import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
+import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 
 export class InstrumentFactory {
   /**
@@ -80,6 +83,10 @@ export class InstrumentFactory {
 
       case 'Furnace':
         instrument = this.createFurnace(config);
+        break;
+
+      case 'Buzzmachine':
+        instrument = this.createBuzzmachine(config);
         break;
 
       // Furnace Chip Types - all use FurnaceSynth with different chip IDs
@@ -225,6 +232,7 @@ export class InstrumentFactory {
         instrument = this.createFurnaceWithChip(config, 50); // UPD1771
         break;
 
+
       case 'Sampler':
         // Check if this is a MOD/XM sample that needs period-based playback
         const hasMODMetadata = config.metadata?.modPlayback?.usePeriodPlayback;
@@ -294,6 +302,40 @@ export class InstrumentFactory {
 
       case 'DrumKit':
         instrument = this.createDrumKit(config);
+        break;
+
+      // Buzzmachine Generators (WASM-emulated Buzz synths)
+      case 'BuzzDTMF':
+        console.log('[InstrumentFactory] Creating BuzzDTMF generator');
+        instrument = new BuzzmachineGenerator(BuzzmachineType.CYANPHASE_DTMF);
+        break;
+      case 'BuzzFreqBomb':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.ELENZIL_FREQUENCYBOMB);
+        break;
+      case 'BuzzKick':
+        console.log('[InstrumentFactory] Creating BuzzKick generator');
+        instrument = new BuzzmachineGenerator(BuzzmachineType.FSM_KICK);
+        break;
+      case 'BuzzKickXP':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.FSM_KICKXP);
+        break;
+      case 'BuzzNoise':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.JESKOLA_NOISE);
+        break;
+      case 'BuzzTrilok':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.JESKOLA_TRILOK);
+        break;
+      case 'Buzz4FM2F':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.MADBRAIN_4FM2F);
+        break;
+      case 'BuzzDynamite6':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.MADBRAIN_DYNAMITE6);
+        break;
+      case 'BuzzM3':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.MAKK_M3);
+        break;
+      case 'Buzz3o3':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.OOMEK_AGGRESSOR);
         break;
 
       default:
@@ -542,6 +584,257 @@ export class InstrumentFactory {
           sidechainGain: (config.parameters.sidechainGain ?? 100) / 100,
           wet: wetValue,
         });
+
+      // Buzzmachines
+      case 'BuzzDistortion': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('ArguruDistortion');
+
+        // Apply parameters from config
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) {
+            synth.setParameter(paramIndex, value as number);
+          }
+        });
+
+        return synth;
+      }
+
+      case 'BuzzSVF': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('ElakSVF');
+
+        // Apply parameters from config
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) {
+            synth.setParameter(paramIndex, value as number);
+          }
+        });
+
+        return synth;
+      }
+
+      case 'BuzzDelay': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('JeskolaDelay');
+
+        // Apply parameters from config
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) {
+            synth.setParameter(paramIndex, value as number);
+          }
+        });
+
+        return synth;
+      }
+
+      case 'BuzzChorus': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('FSMChorus');
+
+        // Apply parameters from config
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) {
+            synth.setParameter(paramIndex, value as number);
+          }
+        });
+
+        return synth;
+      }
+
+      case 'BuzzCompressor': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('GeonikCompressor');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzOverdrive': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('GeonikOverdrive');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzDistortion2': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('JeskolaDistortion');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzCrossDelay': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('JeskolaCrossDelay');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzPhilta': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('FSMPhilta');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzDist2': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('ElakDist2');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzFreeverb': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('JeskolaFreeverb');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzFreqShift': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('BigyoFrequencyShifter');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzNotch': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('CyanPhaseNotch');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzStereoGain': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('DedaCodeStereoGain');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzSoftSat': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('GraueSoftSat');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzLimiter': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('LdSLimit');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzExciter': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('OomekExciter');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzMasterizer': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('OomekMasterizer');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzStereoDist': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('WhiteNoiseStereoDist');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzWhiteChorus': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('WhiteNoiseWhiteChorus');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzZfilter': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('QZfilter');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzChorus2': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('FSMChorus2');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
+
+      case 'BuzzPanzerDelay': {
+        const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+        const synth = new BuzzmachineSynth('FSMPanzerDelay');
+        Object.entries(config.parameters).forEach(([key, value]) => {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+        });
+        return synth;
+      }
 
       default:
         console.warn(`Unknown effect type: ${config.type}, creating bypass`);
@@ -1134,19 +1427,35 @@ export class InstrumentFactory {
    */
   private static createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {
     const dmConfig = config.drumMachine || DEFAULT_DRUM_MACHINE;
+    const is808 = dmConfig.machineType === '808';
 
     switch (dmConfig.drumType) {
       case 'kick': {
-        const kickConfig = {
-          pitch: 80,
+        // 808 vs 909 kick defaults - significantly different character
+        const kickDefaults808 = {
+          pitch: 48,          // 808: lower base frequency
+          pitchDecay: 50,
+          tone: 40,
+          toneDecay: 30,
+          decay: 200,         // 808: slightly shorter default
+          drive: 60,          // 808: more saturation
+          envAmount: 2.0,     // 808: less pitch sweep
+          envDuration: 110,   // 808: longer pitch envelope
+          filterFreq: 250,    // 808: much lower filter (warm/boomy)
+        };
+        const kickDefaults909 = {
+          pitch: 80,          // 909: higher, punchier
           pitchDecay: 50,
           tone: 50,
           toneDecay: 20,
           decay: 300,
           drive: 50,
-          envAmount: 2.5,
-          envDuration: 50,
-          filterFreq: 3000,
+          envAmount: 2.5,     // 909: more aggressive pitch sweep
+          envDuration: 50,    // 909: shorter, snappier
+          filterFreq: 3000,   // 909: bright/punchy
+        };
+        const kickConfig = {
+          ...(is808 ? kickDefaults808 : kickDefaults909),
           ...dmConfig.kick
         };
 
@@ -1224,20 +1533,35 @@ export class InstrumentFactory {
       }
 
       case 'snare': {
-        const snareConfig = {
-          pitch: 220,
+        // 808 vs 909 snare defaults
+        const snareDefaults808 = {
+          pitch: 238,           // 808: lower frequency body
+          tone: 35,             // 808: more body-focused
+          toneDecay: 200,       // 808: longer noise decay
+          snappy: 55,           // 808: less harsh noise
+          decay: 150,           // 808: slightly longer body
+          envAmount: 2.5,       // 808: less aggressive pitch sweep
+          envDuration: 25,      // 808: medium pitch envelope
+          filterType: 'lowpass' as const, // 808: lowpass for warmth
+          filterFreq: 2500,     // 808: warmer filter
+        };
+        const snareDefaults909 = {
+          pitch: 220,           // 909: slightly higher
           tone: 25,
-          toneDecay: 250,
-          snappy: 70,
-          decay: 100,
-          envAmount: 4.0,
-          envDuration: 10,
-          filterType: 'notch' as const,
+          toneDecay: 250,       // 909: longer
+          snappy: 70,           // 909: sharper noise
+          decay: 100,           // 909: snappier body
+          envAmount: 4.0,       // 909: aggressive pitch sweep
+          envDuration: 10,      // 909: very fast pitch drop
+          filterType: 'notch' as const, // 909: characteristic notch
           filterFreq: 1000,
+        };
+        const snareConfig = {
+          ...(is808 ? snareDefaults808 : snareDefaults909),
           ...dmConfig.snare
         };
 
-        // TR-909 snare: pitched body with aggressive pitch envelope + filtered noise
+        // Snare: pitched body with pitch envelope + filtered noise
         const body = new Tone.MembraneSynth({
           pitchDecay: snareConfig.envDuration / 1000, // 909: 10ms fast pitch drop
           octaves: Math.log2(snareConfig.envAmount) * 2, // 909: 4x = ~2 octaves
@@ -1308,14 +1632,17 @@ export class InstrumentFactory {
       }
 
       case 'hihat': {
-        const hhConfig = dmConfig.hihat || { tone: 50, decay: 100, metallic: 50 };
-        // Hi-hat: metal synth (909 uses samples, but MetalSynth is a good approximation)
+        // 808 vs 909 hihat defaults - 808 uses 6-square metallic, 909 samples
+        const hhDefaults808 = { tone: 40, decay: 80, metallic: 70 };   // 808: warmer, more metallic
+        const hhDefaults909 = { tone: 50, decay: 100, metallic: 50 }; // 909: crisper
+        const hhConfig = { ...(is808 ? hhDefaults808 : hhDefaults909), ...dmConfig.hihat };
+        // Hi-hat: metal synth approximation
         return new Tone.MetalSynth({
-          frequency: 200 + hhConfig.tone * 2,
+          frequency: is808 ? 180 + hhConfig.tone * 1.5 : 200 + hhConfig.tone * 2,
           envelope: {
             attack: 0.001,
             decay: hhConfig.decay / 1000,
-            release: 0.01,
+            release: is808 ? 0.02 : 0.01,
           },
           harmonicity: 5.1,
           modulationIndex: 32 + hhConfig.metallic / 3,
@@ -1326,19 +1653,31 @@ export class InstrumentFactory {
       }
 
       case 'clap': {
-        const clapConfig = {
-          tone: 55,
-          decay: 80,
+        // 808 vs 909 clap defaults
+        const clapDefaults808 = {
+          tone: 45,              // 808: slightly darker
+          decay: 120,            // 808: longer reverby tail
+          toneDecay: 350,        // 808: longer noise envelope
+          spread: 15,            // 808: wider spread for room effect
+          filterFreqs: [700, 1000] as [number, number], // 808: lower filter freqs
+          modulatorFreq: 30,
+        };
+        const clapDefaults909 = {
+          tone: 55,              // 909: brighter
+          decay: 80,             // 909: snappier
           toneDecay: 250,
-          spread: 10,
+          spread: 10,            // 909: tighter spread
           filterFreqs: [900, 1200] as [number, number],
           modulatorFreq: 40,
+        };
+        const clapConfig = {
+          ...(is808 ? clapDefaults808 : clapDefaults909),
           ...dmConfig.clap
         };
 
-        // TR-909 clap: Multiple delayed noise bursts with modulation
-        // The 909 creates the "clap" effect by triggering noise at slightly
-        // offset times (10ms spread) creating a richer, more realistic clap
+        // Clap: Multiple delayed noise bursts with filtering
+        // Creates the "clap" effect by triggering noise at slightly
+        // offset times creating a richer, more realistic clap
         const output = new Tone.Gain(1);
 
         // Create noise source for the sustained clap tail
@@ -1442,17 +1781,29 @@ export class InstrumentFactory {
       }
 
       case 'tom': {
-        const tomConfig = {
-          pitch: 200,
+        // 808 vs 909 tom defaults
+        const tomDefaults808 = {
+          pitch: 160,            // 808: slightly lower
+          decay: 300,            // 808: longer decay
+          tone: 2,               // 808: pure sine, minimal noise
+          toneDecay: 50,
+          envAmount: 1.5,        // 808: gentler pitch sweep
+          envDuration: 150,      // 808: longer envelope
+        };
+        const tomDefaults909 = {
+          pitch: 200,            // 909: punchier
           decay: 200,
-          tone: 5,
+          tone: 5,               // 909: slight noise
           toneDecay: 100,
-          envAmount: 2.0,
+          envAmount: 2.0,        // 909: more aggressive
           envDuration: 100,
+        };
+        const tomConfig = {
+          ...(is808 ? tomDefaults808 : tomDefaults909),
           ...dmConfig.tom
         };
 
-        // TR-909 tom: pitched sine with moderate pitch envelope
+        // Tom: pitched sine with pitch envelope
         const synth = new Tone.MembraneSynth({
           pitchDecay: tomConfig.envDuration / 1000,
           octaves: Math.log2(tomConfig.envAmount) * 2,
@@ -1513,16 +1864,26 @@ export class InstrumentFactory {
       }
 
       case 'rimshot': {
-        const rimConfig = {
-          decay: 30,
+        // 808 vs 909 rimshot defaults
+        const rimDefaults808 = {
+          decay: 45,             // 808: slightly longer decay
+          filterFreqs: [280, 450, 850] as [number, number, number], // 808: lower freqs
+          filterQ: 8.0,          // 808: slightly less resonant
+          saturation: 2.0,       // 808: less aggressive
+        };
+        const rimDefaults909 = {
+          decay: 30,             // 909: snappier
           filterFreqs: [220, 500, 950] as [number, number, number],
-          filterQ: 10.5,
-          saturation: 3.0,
+          filterQ: 10.5,         // 909: very resonant "ping"
+          saturation: 3.0,       // 909: more aggressive
+        };
+        const rimConfig = {
+          ...(is808 ? rimDefaults808 : rimDefaults909),
           ...dmConfig.rimshot
         };
 
-        // TR-909 rimshot: Parallel resonant bandpass filters with saturation
-        // The high Q creates the characteristic "ping" of the rimshot
+        // Rimshot: Parallel resonant bandpass filters with saturation
+        // The high Q creates the characteristic "ping"
         // Uses a short noise impulse to excite the resonant filters
 
         // Create noise burst as impulse source
@@ -2219,30 +2580,217 @@ export class InstrumentFactory {
     return new FurnaceSynth(config.furnace);
   }
 
+  private static createBuzzmachine(config: InstrumentConfig): BuzzmachineGenerator {
+    // Get machine type from config or default to ArguruDistortion
+    const machineTypeStr = config.buzzmachine?.machineType || 'ArguruDistortion';
+
+    // Map string machine type to BuzzmachineType enum
+    const machineTypeMap: Record<string, BuzzmachineType> = {
+      // Distortion/Saturation
+      'ArguruDistortion': BuzzmachineType.ARGURU_DISTORTION,
+      'ElakDist2': BuzzmachineType.ELAK_DIST2,
+      'JeskolaDistortion': BuzzmachineType.JESKOLA_DISTORTION,
+      'GeonikOverdrive': BuzzmachineType.GEONIK_OVERDRIVE,
+      'GraueSoftSat': BuzzmachineType.GRAUE_SOFTSAT,
+      'WhiteNoiseStereoDist': BuzzmachineType.WHITENOISE_STEREODIST,
+      // Filters
+      'ElakSVF': BuzzmachineType.ELAK_SVF,
+      'CyanPhaseNotch': BuzzmachineType.CYANPHASE_NOTCH,
+      'QZfilter': BuzzmachineType.Q_ZFILTER,
+      'FSMPhilta': BuzzmachineType.FSM_PHILTA,
+      // Delay/Reverb
+      'JeskolaDelay': BuzzmachineType.JESKOLA_DELAY,
+      'JeskolaCrossDelay': BuzzmachineType.JESKOLA_CROSSDELAY,
+      'JeskolaFreeverb': BuzzmachineType.JESKOLA_FREEVERB,
+      'FSMPanzerDelay': BuzzmachineType.FSM_PANZERDELAY,
+      // Chorus/Modulation
+      'FSMChorus': BuzzmachineType.FSM_CHORUS,
+      'FSMChorus2': BuzzmachineType.FSM_CHORUS2,
+      'WhiteNoiseWhiteChorus': BuzzmachineType.WHITENOISE_WHITECHORUS,
+      'BigyoFrequencyShifter': BuzzmachineType.BIGYO_FREQUENCYSHIFTER,
+      // Dynamics
+      'GeonikCompressor': BuzzmachineType.GEONIK_COMPRESSOR,
+      'LdSLimit': BuzzmachineType.LD_SLIMIT,
+      'OomekExciter': BuzzmachineType.OOMEK_EXCITER,
+      'OomekMasterizer': BuzzmachineType.OOMEK_MASTERIZER,
+      'DedaCodeStereoGain': BuzzmachineType.DEDACODE_STEREOGAIN,
+      // Generators
+      'FSMKick': BuzzmachineType.FSM_KICK,
+      'FSMKickXP': BuzzmachineType.FSM_KICKXP,
+      'JeskolaTrilok': BuzzmachineType.JESKOLA_TRILOK,
+      'JeskolaNoise': BuzzmachineType.JESKOLA_NOISE,
+      'OomekAggressor': BuzzmachineType.OOMEK_AGGRESSOR,
+      'MadBrain4FM2F': BuzzmachineType.MADBRAIN_4FM2F,
+      'MadBrainDynamite6': BuzzmachineType.MADBRAIN_DYNAMITE6,
+      'MakkM3': BuzzmachineType.MAKK_M3,
+      'CyanPhaseDTMF': BuzzmachineType.CYANPHASE_DTMF,
+      'ElenzilFrequencyBomb': BuzzmachineType.ELENZIL_FREQUENCYBOMB,
+    };
+
+    const machineType = machineTypeMap[machineTypeStr] ?? BuzzmachineType.ARGURU_DISTORTION;
+    return new BuzzmachineGenerator(machineType);
+  }
+
+
+  /**
+   * Chip-specific default configs for different Furnace chip types
+   * These provide characteristic sounds for each chip family
+   */
+  private static readonly CHIP_DEFAULTS: Record<number, Partial<import('@typedefs/instrument').FurnaceConfig>> = {
+    // FM Chips - use 4-operator FM synthesis
+    // FurnaceChipType: OPN2=0, OPM=1, OPL3=2, OPLL=11, etc.
+    0: { // OPN2 (Genesis) - punchy bass
+      algorithm: 4, feedback: 5,
+      operators: [
+        { enabled: true, mult: 1, tl: 20, ar: 31, dr: 8, d2r: 0, sl: 2, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 2, tl: 30, ar: 31, dr: 12, d2r: 0, sl: 4, rr: 6, dt: 3, am: false },
+        { enabled: true, mult: 1, tl: 25, ar: 31, dr: 10, d2r: 0, sl: 3, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 4, tl: 35, ar: 28, dr: 15, d2r: 0, sl: 5, rr: 10, dt: -1, am: false },
+      ],
+    },
+    1: { // OPM (X68000) - bright lead
+      algorithm: 5, feedback: 6,
+      operators: [
+        { enabled: true, mult: 1, tl: 15, ar: 31, dr: 5, d2r: 0, sl: 1, rr: 6, dt: 0, am: false },
+        { enabled: true, mult: 3, tl: 40, ar: 31, dr: 8, d2r: 0, sl: 3, rr: 8, dt: 2, am: false },
+        { enabled: true, mult: 2, tl: 35, ar: 31, dr: 10, d2r: 0, sl: 4, rr: 8, dt: -2, am: false },
+        { enabled: true, mult: 1, tl: 25, ar: 31, dr: 12, d2r: 0, sl: 5, rr: 10, dt: 0, am: true },
+      ],
+    },
+    2: { // OPL3 (AdLib) - organ-like
+      algorithm: 0, feedback: 3,
+      operators: [
+        { enabled: true, mult: 2, tl: 30, ar: 15, dr: 4, d2r: 0, sl: 8, rr: 5, dt: 0, ws: 1, am: false },
+        { enabled: true, mult: 1, tl: 0, ar: 15, dr: 2, d2r: 0, sl: 4, rr: 8, dt: 0, ws: 0, am: false },
+        { enabled: false, mult: 1, tl: 63, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, ws: 0, am: false },
+        { enabled: false, mult: 1, tl: 63, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, ws: 0, am: false },
+      ],
+    },
+    11: { // OPLL - simple FM
+      algorithm: 0, feedback: 2,
+      operators: [
+        { enabled: true, mult: 4, tl: 35, ar: 15, dr: 5, d2r: 0, sl: 6, rr: 7, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 0, ar: 15, dr: 3, d2r: 0, sl: 3, rr: 6, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 63, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 63, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    // Console chips - PSG style, use simpler synthesis
+    4: { // NES (2A03) - 8-bit pulse
+      algorithm: 7, feedback: 0,
+      operators: [
+        { enabled: true, mult: 1, tl: 0, ar: 31, dr: 0, d2r: 0, sl: 0, rr: 12, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    5: { // Game Boy - lo-fi pulse
+      algorithm: 7, feedback: 0,
+      operators: [
+        { enabled: true, mult: 1, tl: 5, ar: 28, dr: 2, d2r: 0, sl: 2, rr: 10, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    3: { // PSG (SN76489) - square wave
+      algorithm: 7, feedback: 0,
+      operators: [
+        { enabled: true, mult: 1, tl: 8, ar: 31, dr: 4, d2r: 0, sl: 3, rr: 8, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    12: { // AY-3-8910 - buzzy PSG
+      algorithm: 7, feedback: 1,
+      operators: [
+        { enabled: true, mult: 1, tl: 10, ar: 31, dr: 6, d2r: 2, sl: 4, rr: 6, dt: 0, am: false },
+        { enabled: true, mult: 3, tl: 50, ar: 31, dr: 8, d2r: 0, sl: 8, rr: 10, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    10: { // C64 SID - gritty
+      algorithm: 4, feedback: 4,
+      operators: [
+        { enabled: true, mult: 1, tl: 15, ar: 25, dr: 8, d2r: 3, sl: 5, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 2, tl: 35, ar: 31, dr: 10, d2r: 0, sl: 6, rr: 10, dt: 1, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    6: { // PCE/TurboGrafx - wavetable style
+      algorithm: 6, feedback: 2,
+      operators: [
+        { enabled: true, mult: 1, tl: 12, ar: 31, dr: 5, d2r: 0, sl: 2, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 2, tl: 40, ar: 31, dr: 8, d2r: 0, sl: 4, rr: 10, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    9: { // VRC6 - rich pulse
+      algorithm: 5, feedback: 0,
+      operators: [
+        { enabled: true, mult: 1, tl: 5, ar: 31, dr: 3, d2r: 0, sl: 1, rr: 10, dt: 0, am: false },
+        { enabled: true, mult: 2, tl: 30, ar: 31, dr: 6, d2r: 0, sl: 3, rr: 12, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+    8: { // N163 - wavetable
+      algorithm: 7, feedback: 0,
+      operators: [
+        { enabled: true, mult: 1, tl: 8, ar: 31, dr: 4, d2r: 0, sl: 2, rr: 8, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+      wavetables: [{ id: 0, data: [8,10,12,14,15,14,12,10,8,6,4,2,1,2,4,6] }],
+    },
+    15: { // TIA (Atari 2600) - harsh
+      algorithm: 7, feedback: 7,
+      operators: [
+        { enabled: true, mult: 1, tl: 20, ar: 31, dr: 15, d2r: 5, sl: 8, rr: 4, dt: 0, am: false },
+        { enabled: true, mult: 5, tl: 45, ar: 31, dr: 20, d2r: 0, sl: 10, rr: 6, dt: 2, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+        { enabled: false, mult: 1, tl: 127, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: 0, am: false },
+      ],
+    },
+  };
+
   /**
    * Create Furnace synth with specific chip type
    * Used for the individual chip type synths (FurnaceOPN, FurnaceNES, etc.)
    */
   private static createFurnaceWithChip(config: InstrumentConfig, chipType: number): FurnaceSynth {
-    const furnaceConfig = config.furnace || {
-      chipType,
-      algorithm: 0,
-      feedback: 0,
+    // Get chip-specific defaults or fall back to generic FM
+    const chipDefaults = this.CHIP_DEFAULTS[chipType] || {
+      algorithm: 0, feedback: 0,
       operators: [
-        { tl: 0, ar: 31, dr: 0, sr: 0, rr: 15, sl: 0, mul: 1, dt: 0 },
-        { tl: 40, ar: 31, dr: 10, sr: 5, rr: 8, sl: 8, mul: 2, dt: 0 },
-        { tl: 40, ar: 31, dr: 10, sr: 5, rr: 8, sl: 8, mul: 1, dt: 0 },
-        { tl: 20, ar: 31, dr: 15, sr: 0, rr: 10, sl: 4, mul: 1, dt: 0 },
+        { enabled: true, mult: 1, tl: 0, ar: 31, dr: 0, d2r: 0, sl: 0, rr: 15, dt: 0, am: false },
+        { enabled: true, mult: 2, tl: 40, ar: 31, dr: 10, d2r: 5, sl: 8, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 40, ar: 31, dr: 10, d2r: 5, sl: 8, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 20, ar: 31, dr: 15, d2r: 0, sl: 4, rr: 10, dt: 0, am: false },
       ],
+    };
+
+    const baseConfig = config.furnace || {
+      algorithm: chipDefaults.algorithm ?? 0,
+      feedback: chipDefaults.feedback ?? 0,
+      operators: chipDefaults.operators || [],
       macros: [],
       opMacros: [],
-      wavetables: [],
+      wavetables: chipDefaults.wavetables || [],
     };
-    // Override chip type
-    furnaceConfig.chipType = chipType;
+    // Create new object with overridden chip type (to avoid mutating frozen presets)
+    const furnaceConfig = {
+      ...baseConfig,
+      chipType,
+    };
     return new FurnaceSynth(furnaceConfig);
   }
-
   /**
    * PWMSynth - Pulse width modulation synth
    * Uses square wave with vibrato to simulate PWM effect
@@ -2450,6 +2998,20 @@ export class InstrumentFactory {
    */
   private static createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
     const wbConfig = config.wobbleBass || DEFAULT_WOBBLE_BASS;
+    console.log('[WobbleBass] Creating with config:', {
+      hasWobbleBass: !!config.wobbleBass,
+      envelope: wbConfig.envelope,
+      osc1: wbConfig.osc1,
+      filter: wbConfig.filter,
+      configVolume: config.volume,
+    });
+    console.log('[WobbleBass] Creating with config:', {
+      hasWobbleBass: !!config.wobbleBass,
+      envelope: wbConfig.envelope,
+      osc1: wbConfig.osc1,
+      filter: wbConfig.filter,
+      configVolume: config.volume,
+    });
     console.log('[WobbleBass] Creating with config:', {
       hasWobbleBass: !!config.wobbleBass,
       envelope: wbConfig.envelope,
@@ -2963,4 +3525,65 @@ export class InstrumentFactory {
       if (s.set) s.set({ detune: 0 });
     }, releaseTime * 1000);
   }
+}
+
+/**
+ * Get default furnace config for a given synth type
+ * Used when creating new instruments in the modal
+ */
+export function getDefaultFurnaceConfig(synthType: string): import('@typedefs/instrument').FurnaceConfig | undefined {
+  // Map synth type to chip ID
+  const chipTypeMap: Record<string, number> = {
+    'FurnaceOPN': 0, 'FurnaceOPM': 1, 'FurnaceOPL': 2, 'FurnacePSG': 3,
+    'FurnaceNES': 4, 'FurnaceGB': 5, 'FurnacePCE': 6, 'FurnaceSCC': 7,
+    'FurnaceN163': 8, 'FurnaceVRC6': 9, 'FurnaceC64': 10, 'FurnaceOPLL': 11,
+    'FurnaceAY': 12, 'FurnaceOPNA': 13, 'FurnaceOPNB': 14, 'FurnaceTIA': 15,
+    'FurnaceFDS': 16, 'FurnaceMMC5': 17, 'FurnaceSAA': 18, 'FurnaceSWAN': 19,
+    'FurnaceOKI': 20, 'FurnaceES5506': 21, 'FurnaceOPZ': 22, 'FurnaceY8950': 23,
+    'FurnaceSNES': 24, 'FurnaceLYNX': 25, 'FurnaceOPL4': 26, 'FurnaceSEGAPCM': 27,
+    'FurnaceYMZ280B': 28, 'FurnaceRF5C68': 29, 'FurnaceGA20': 30, 'FurnaceC140': 31,
+    'FurnaceQSOUND': 32, 'FurnaceVIC': 33, 'FurnaceTED': 34, 'FurnaceSUPERVISION': 35,
+    'FurnaceVERA': 36, 'FurnaceSM8521': 37, 'FurnaceBUBBLE': 38,
+    'FurnaceK007232': 39, 'FurnaceK053260': 40, 'FurnaceX1_010': 41,
+    'FurnaceUPD1771': 42, 'FurnaceT6W28': 43, 'FurnaceVB': 44,
+    'FurnaceSID6581': 45, 'FurnaceSID8580': 46,
+    // NEW Chips (47-72)
+    'FurnaceOPN2203': 47, 'FurnaceOPNBB': 48, 'FurnaceESFM': 49,
+    'FurnaceAY8930': 50, 'FurnaceNDS': 51, 'FurnaceGBA': 52,
+    'FurnacePOKEMINI': 54, 'FurnaceNAMCO': 55, 'FurnacePET': 56,
+    'FurnacePOKEY': 57, 'FurnaceMSM6258': 58, 'FurnaceMSM5232': 59,
+    'FurnaceMULTIPCM': 60, 'FurnaceAMIGA': 61, 'FurnacePCSPKR': 62,
+    'FurnacePONG': 63, 'FurnacePV1000': 64, 'FurnaceDAVE': 65,
+    'FurnaceSU': 66, 'FurnacePOWERNOISE': 68,
+    'FurnaceZXBEEPER': 69, 'FurnaceSCVTONE': 71, 'FurnacePCMDAC': 72,
+    'Furnace': 0, // Default to OPN
+  };
+
+  const chipType = chipTypeMap[synthType];
+  if (chipType === undefined) return undefined;
+
+  // Use DEFAULT_FURNACE as base (has good FM operator settings)
+  // Then override with the correct chip type
+  const config: import('@typedefs/instrument').FurnaceConfig = {
+    ...DEFAULT_FURNACE,
+    chipType,
+    // Deep copy operators to avoid mutation
+    operators: DEFAULT_FURNACE.operators.map(op => ({ ...op })),
+  };
+
+  // Add chip-specific defaults
+  if (synthType === 'FurnaceC64' || synthType === 'FurnaceSID6581' || synthType === 'FurnaceSID8580') {
+    config.c64 = {
+      triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+      a: 0, d: 8, s: 12, r: 6,
+      duty: 2048,
+      ringMod: false, oscSync: false,
+      toFilter: false, initFilter: false,
+      filterCutoff: 1024, filterResonance: 8,
+      filterLP: true, filterBP: false, filterHP: false,
+      filterCh3Off: false,
+    };
+  }
+
+  return config;
 }

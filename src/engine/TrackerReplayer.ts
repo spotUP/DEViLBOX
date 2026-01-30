@@ -15,14 +15,14 @@
 
 import * as Tone from 'tone';
 import type { Pattern } from '@/types';
-import type { InstrumentConfig, ChiptuneModuleConfig } from '@/types/instrument';
-import { getToneEngine } from './ToneEngine';
-import { ChiptuneInstrument } from './ChiptuneInstrument';
+import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
+import { FurnaceMacroType } from '@/types/instrument';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
+const AMIGA_PAL_FREQUENCY = 3546895;
 
 // Complete period table with all 16 finetune variations
 const PERIOD_TABLE = [
@@ -108,15 +108,11 @@ export type TrackerFormat = 'MOD' | 'XM' | 'IT' | 'S3M';
  * Channel state - all the per-channel data needed for playback
  */
 interface ChannelState {
-  // Channel index (for ToneEngine)
-  channelIndex: number;
-
   // Note state
   note: number;                  // Current note (period for MOD, note number for XM)
   period: number;                // Current period (after effects)
   volume: number;                // Current volume (0-64)
   panning: number;               // Current panning (0-255, 128=center)
-  xmNote: number;                // XM note number (for non-period-based playback)
 
   // Sample state
   sampleNum: number;             // Current sample/instrument number
@@ -133,14 +129,24 @@ interface ChannelState {
   tremoloCmd: number;            // Tremolo speed/depth
   waveControl: number;           // Waveform control
   retrigCount: number;           // Retrigger counter
+  retrigVolSlide: number;        // Retrigger volume slide (IT Rxy)
   patternLoopRow: number;        // Pattern loop start row
   patternLoopCount: number;      // Pattern loop counter
-  glissando: boolean;            // E3x: Glissando control (slide in semitones)
-  hasNoteInRow: boolean;         // For E9x retrigger - tracks if row has a note (pt2-clone: n_note > 0)
+  globalVolSlide: number;        // Global volume slide memory (Hxx)
+  panSlide: number;              // Pan slide memory (Pxx)
 
-  // TB-303 specific
-  accent: boolean;
-  slide: boolean;
+  // Macro state (Furnace instruments)
+  macroPos: number;              // Current position in macros
+  macroReleased: boolean;        // Whether note has been released
+  macroPitchOffset: number;      // Current pitch offset from macros
+  macroArpNote: number;          // Current arpeggio note offset
+  macroDuty: number;             // Current duty cycle from macro
+  macroWaveform: number;         // Current waveform from macro
+
+  // Audio nodes
+  player: Tone.Player | null;
+  gainNode: Tone.Gain;
+  panNode: Tone.Panner;
 
   // Instrument reference
   instrument: InstrumentConfig | null;
@@ -160,12 +166,6 @@ export interface TrackerSong {
   numChannels: number;
   initialSpeed: number;
   initialBPM: number;
-  // Original module data for libopenmpt playback (sample-accurate effects)
-  originalModuleData?: {
-    base64: string;
-    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
-    sourceFile?: string;
-  };
 }
 
 // ============================================================================
@@ -183,31 +183,23 @@ export class TrackerReplayer {
   private currentTick = 0;       // Current tick (0 to speed-1)
   private speed = 6;             // Ticks per row
   private bpm = 125;             // Beats per minute
+  private globalVolume = 64;     // Global volume (0-64)
 
   // Pattern break/jump
   private pBreakPos = 0;
   private pBreakFlag = false;
   private posJumpFlag = false;
   private posJumpPos = 0;
-
-  // EEx pattern delay - two-stage system matching pt2-clone
-  // pattDelTime is set when E command is encountered
-  // pattDelTime2 is the active countdown (effects still process during delay)
-  private pattDelTime = 0;
-  private pattDelTime2 = 0;
+  private patternDelay = 0;      // EEx pattern delay
 
   // Channels
   private channels: ChannelState[] = [];
 
-  // Instrument lookup map for O(1) access (built from song.instruments)
-  private instrumentMap: Map<number, InstrumentConfig> = new Map();
-
   // Tick timer
   private tickLoop: Tone.Loop | null = null;
 
-  // Libopenmpt playback mode for sample-accurate module playback
-  private useLibopenmpt = false;
-  private chiptuneInstrument: ChiptuneInstrument | null = null;
+  // Master output
+  private masterGain: Tone.Gain;
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -215,25 +207,7 @@ export class TrackerReplayer {
   public onTickProcess: ((tick: number, row: number) => void) | null = null;
 
   constructor() {
-    // ToneEngine manages all audio routing
-  }
-
-  // ==========================================================================
-  // VOLUME/PANNING HELPERS
-  // ==========================================================================
-
-  private setChannelVolume(ch: ChannelState): void {
-    const engine = getToneEngine();
-    // Convert 0-64 to dB (-Infinity to 0)
-    const volumeDb = ch.volume > 0 ? -60 + (ch.volume / 64) * 60 : -Infinity;
-    engine.setChannelVolume(ch.channelIndex, volumeDb);
-  }
-
-  private setChannelPanning(ch: ChannelState): void {
-    const engine = getToneEngine();
-    // Convert 0-255 (128=center) to -1 to 1
-    const pan = (ch.panning - 128) / 128;
-    engine.setChannelPan(ch.channelIndex, pan * 100); // ToneEngine uses -100 to 100
+    this.masterGain = new Tone.Gain(1).toDestination();
   }
 
   // ==========================================================================
@@ -258,47 +232,31 @@ export class TrackerReplayer {
     this.bpm = song.initialBPM;
     this.pBreakFlag = false;
     this.posJumpFlag = false;
-    this.pattDelTime = 0;
-    this.pattDelTime2 = 0;
+    this.patternDelay = 0;
 
-    // Build instrument lookup map for O(1) access during playback
-    this.instrumentMap.clear();
-    for (const inst of song.instruments) {
-      this.instrumentMap.set(inst.id, inst);
-    }
-
-    // Pre-load all sample buffers
-    this.preloadSamples(song.instruments);
-
+    console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
   }
 
-  private sampleBufferCache: Map<string, Tone.ToneAudioBuffer> = new Map();
-
-  private preloadSamples(instruments: InstrumentConfig[]): void {
-    const urls: string[] = [];
-    for (const inst of instruments) {
-      if (inst.sample?.url && !this.sampleBufferCache.has(inst.sample.url)) {
-        urls.push(inst.sample.url);
-      }
+  private createChannel(index: number, totalChannels: number): ChannelState {
+    // Amiga-style panning: 0,3 = left, 1,2 = right (for 4ch)
+    let panValue = 0;
+    if (totalChannels === 4) {
+      panValue = (index === 0 || index === 3) ? -0.7 : 0.7;
+    } else {
+      // For >4 channels, alternate L/R
+      panValue = (index % 2 === 0) ? -0.5 : 0.5;
     }
 
-    if (urls.length > 0) {
-      urls.forEach(url => {
-        const buffer = new Tone.ToneAudioBuffer(url, () => {
-        });
-        this.sampleBufferCache.set(url, buffer);
-      });
-    }
-  }
+    const panNode = new Tone.Panner(panValue);
+    const gainNode = new Tone.Gain(1);
+    gainNode.connect(panNode);
+    panNode.connect(this.masterGain);
 
-  private createChannel(index: number, _totalChannels: number): ChannelState {
     return {
-      channelIndex: index,
       note: 0,
       period: 0,
       volume: 64,
       panning: 128,
-      xmNote: 0,
       sampleNum: 0,
       sampleOffset: 0,
       finetune: 0,
@@ -311,12 +269,20 @@ export class TrackerReplayer {
       tremoloCmd: 0,
       waveControl: 0,
       retrigCount: 0,
+      retrigVolSlide: 0,
       patternLoopRow: 0,
       patternLoopCount: 0,
-      glissando: false,
-      hasNoteInRow: false,
-      accent: false,
-      slide: false,
+      globalVolSlide: 0,
+      panSlide: 0,
+      macroPos: 0,
+      macroReleased: false,
+      macroPitchOffset: 0,
+      macroArpNote: 0,
+      macroDuty: 0,
+      macroWaveform: 0,
+      player: null,
+      gainNode,
+      panNode,
       instrument: null,
     };
   }
@@ -325,114 +291,26 @@ export class TrackerReplayer {
   // PLAYBACK CONTROL
   // ==========================================================================
 
-  private tickEventId: number | null = null;
-
   async play(): Promise<void> {
     if (!this.song || this.playing) return;
 
     await Tone.start();
-
-    // Check if we should use libopenmpt for sample-accurate playback
-    if (this.useLibopenmpt && this.song.originalModuleData?.base64) {
-      console.log('[TrackerReplayer] Using libopenmpt for sample-accurate playback');
-      await this.playWithLibopenmpt();
-      return;
-    }
-
-    // Native Tone.js-based playback
     this.playing = true;
 
-    // CRITICAL: Reset transport to time 0 before starting
-    // This ensures scheduled events start correctly
-    const transport = Tone.getTransport();
-    transport.cancel(); // Clear any pending events
-    transport.position = 0; // Reset to time 0
-
-    // Use Transport.scheduleRepeat for more reliable timing
+    // Create tick timer
     const tickInterval = 2.5 / this.bpm;
-    this.tickEventId = transport.scheduleRepeat((time) => {
+    this.tickLoop = new Tone.Loop((time) => {
       this.processTick(time);
-    }, tickInterval, 0);
+    }, tickInterval);
 
-    console.log('[TrackerReplayer] Starting playback:', {
-      speed: this.speed,
-      bpm: this.bpm,
-      tickInterval,
-      songLength: this.song.songLength,
-      numPatterns: this.song.patterns.length,
-    });
+    this.tickLoop.start(0);
+    Tone.getTransport().start();
 
-    transport.start();
-
-  }
-
-  /**
-   * Play using libopenmpt for sample-accurate module playback
-   */
-  private async playWithLibopenmpt(): Promise<void> {
-    if (!this.song?.originalModuleData) return;
-
-    const config: ChiptuneModuleConfig = {
-      moduleData: this.song.originalModuleData.base64,
-      format: this.song.originalModuleData.format,
-      sourceFile: this.song.originalModuleData.sourceFile,
-      useLibopenmpt: true,
-      repeatCount: 0,
-      stereoSeparation: 100,
-      interpolationFilter: 0,
-    };
-
-    // Dispose previous instance if exists (defensive)
-    if (this.chiptuneInstrument) {
-      this.chiptuneInstrument.dispose();
-      this.chiptuneInstrument = null;
-    }
-
-    // Create ChiptuneInstrument with callbacks for position tracking
-    this.chiptuneInstrument = new ChiptuneInstrument(config, {
-      onProgress: (data) => {
-        // Update position tracking
-        this.songPos = data.order;
-        this.pattPos = data.row;
-        if (this.onRowChange) {
-          this.onRowChange(data.row, data.pattern, data.order);
-        }
-      },
-      onEnded: () => {
-        this.playing = false;
-        if (this.onSongEnd) {
-          this.onSongEnd();
-        }
-      },
-      onError: (error) => {
-        console.error('[TrackerReplayer] libopenmpt error:', error);
-        this.playing = false;
-      },
-    });
-
-    // Connect to destination
-    this.chiptuneInstrument.toDestination();
-
-    // play() will wait for initialization internally
-    this.playing = true;
-    await this.chiptuneInstrument.play();
+    console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed}`);
   }
 
   stop(): void {
     this.playing = false;
-
-    // Stop libopenmpt playback if active
-    if (this.chiptuneInstrument) {
-      this.chiptuneInstrument.stop();
-      this.chiptuneInstrument.dispose();
-      this.chiptuneInstrument = null;
-    }
-
-    // Clear tick event
-    if (this.tickEventId !== null) {
-      Tone.getTransport().clear(this.tickEventId);
-      this.tickEventId = null;
-    }
 
     if (this.tickLoop) {
       this.tickLoop.stop();
@@ -440,56 +318,36 @@ export class TrackerReplayer {
       this.tickLoop = null;
     }
 
-    // Cancel ALL scheduled transport events (prevents lingering scheduled notes)
-    Tone.getTransport().cancel();
-    Tone.getTransport().stop();
-
-    // Stop all channels individually (for proper release envelopes)
+    // Stop all channels
     for (const ch of this.channels) {
       this.stopChannel(ch);
     }
-
-    // CRITICAL: Force-release ALL sounds immediately via ToneEngine
-    // This catches any notes that weren't properly tracked or have long release times
-    const engine = getToneEngine();
-    engine.releaseAll();
-
-    // Clear note tracking
-    this.lastNotePerChannel.clear();
 
     // Reset position
     this.songPos = 0;
     this.pattPos = 0;
     this.currentTick = 0;
 
+    console.log('[TrackerReplayer] Stopped');
   }
 
   pause(): void {
-    Tone.getTransport().pause();
+    if (this.tickLoop) {
+      this.tickLoop.stop();
+    }
     this.playing = false;
   }
 
   resume(): void {
-    if (this.song) {
-      Tone.getTransport().start();
+    if (this.tickLoop && this.song) {
+      this.tickLoop.start();
       this.playing = true;
     }
   }
 
   private updateTickInterval(): void {
-    // For Tone.Loop (legacy)
     if (this.tickLoop) {
       this.tickLoop.interval = 2.5 / this.bpm;
-    }
-
-    // For scheduleRepeat - need to reschedule with new interval
-    if (this.tickEventId !== null && this.playing) {
-      const transport = Tone.getTransport();
-      transport.clear(this.tickEventId);
-      const tickInterval = 2.5 / this.bpm;
-      this.tickEventId = transport.scheduleRepeat((time) => {
-        this.processTick(time);
-      }, tickInterval, transport.seconds);
     }
   }
 
@@ -500,63 +358,36 @@ export class TrackerReplayer {
   private processTick(time: number): void {
     if (!this.song || !this.playing) return;
 
+    // Ensure time is always valid
+    const safeTime = time ?? Tone.now();
+
+    // Handle pattern delay
+    if (this.patternDelay > 0) {
+      this.patternDelay--;
+      return;
+    }
+
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
-    if (patternNum === undefined) {
-      console.error('[TrackerReplayer] Invalid songPos:', this.songPos, 'songPositions:', this.song.songPositions);
-      this.stop();
-      return;
-    }
     const pattern = this.song.patterns[patternNum];
-    if (!pattern) {
-      console.error('[TrackerReplayer] Pattern not found:', patternNum);
-      this.stop();
-      return;
-    }
-
-    // Log row changes (only on tick 0 to reduce spam)
-    if (this.currentTick === 0) {
-      console.log('[TrackerReplayer] Row:', this.pattPos, '/', pattern.length, 'Pattern:', patternNum, 'Pos:', this.songPos, '/', this.song.songLength);
-    }
-
-    const engine = getToneEngine();
+    if (!pattern) return;
 
     // Process all channels
     for (let ch = 0; ch < this.channels.length; ch++) {
       const channel = this.channels[ch];
-      const patternChannel = pattern.channels[ch];
-      const row = patternChannel?.rows[this.pattPos];
+      const row = pattern.channels[ch]?.rows[this.pattPos];
       if (!row) continue;
 
-      // Check ToneEngine for real-time mute state (handles solo logic too)
-      // This allows mute/solo to work during playback
-      if (engine.isChannelMuted(ch)) {
-        continue;
-      }
-
       if (this.currentTick === 0) {
-        // Tick 0: Check pattern delay state
-        if (this.pattDelTime2 === 0) {
-          // No pattern delay active - read new row data normally
-          this.processRow(ch, channel, row, time);
-        } else {
-          // Pattern delay active on tick 0 - only process effects, don't read notes
-          // This matches pt2-clone behavior: effects continue during pattern delay
-          this.processEffectTick(ch, channel, row, time);
-        }
+        // Tick 0: Read new row data
+        this.processRow(ch, channel, row, safeTime);
       } else {
-        // Ticks 1+: Process continuous effects (always, including during pattern delay)
-        this.processEffectTick(ch, channel, row, time);
+        // Ticks 1+: Process continuous effects
+        this.processEffectTick(ch, channel, row, safeTime);
       }
-    }
 
-    // After processing all channels on tick 0, handle pattern delay state
-    if (this.currentTick === 0) {
-      // Copy pending delay to active delay (two-stage system from pt2-clone)
-      if (this.pattDelTime > 0) {
-        this.pattDelTime2 = this.pattDelTime;
-        this.pattDelTime = 0;
-      }
+      // Process Furnace macros every tick
+      this.processMacros(channel, safeTime);
     }
 
     // Notify tick processing
@@ -568,7 +399,7 @@ export class TrackerReplayer {
     this.currentTick++;
     if (this.currentTick >= this.speed) {
       this.currentTick = 0;
-      this.advanceRowWithDelay();
+      this.advanceRow();
     }
   }
 
@@ -579,76 +410,41 @@ export class TrackerReplayer {
   private processRow(chIndex: number, ch: ChannelState, row: any, time: number): void {
     if (!this.song) return;
 
-    // Get first effect column (XM format: effTyp/eff)
-    const effect = row.effTyp ?? 0;
-    const param = row.eff ?? 0;
+    // Get effect info
+    const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
+    const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
+    void x; void y; // Effect parameters used in extended effect handling below
 
-    // Check if row has a note for E9x retrigger (pt2-clone: n_note & 0xFFF > 0)
-    const noteValue = row.note;
-    const rawPeriod = row.period;
-    ch.hasNoteInRow = (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') ||
-                      (rawPeriod && rawPeriod > 0);
-
-    // Get second effect column (string format like "F1A")
-    const effect2Str = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
-    const effect2 = effect2Str ? parseInt(effect2Str[0], 16) : 0;
-    const param2 = effect2Str ? parseInt(effect2Str.substring(1), 16) : 0;
-
-    // Handle TB-303 accent/slide columns
-    ch.accent = row.accent ?? false;
-    ch.slide = row.slide ?? false;
-
-    // Handle instrument change (O(1) lookup from pre-built map)
+    // Handle instrument change
     const instNum = row.instrument ?? 0;
     if (instNum > 0) {
-      const instrument = this.instrumentMap.get(instNum);
+      const instrument = this.song.instruments.find(i => i.id === instNum);
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
-        // Use sample's default volume if available, otherwise full volume
-        ch.volume = instrument.metadata?.modPlayback?.defaultVolume ?? 64;
+        ch.volume = 64; // Reset volume on instrument change
         ch.finetune = instrument.metadata?.modPlayback?.finetune ?? 0;
+
+        // Apply volume immediately
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
       }
     }
 
-    // Store XM note for non-period-based instruments
-    if (typeof row.note === 'number' && row.note > 0 && row.note < 97) {
-      ch.xmNote = row.note;
-    }
-
-    // Debug: log row data on first few rows of first pattern
-    if (this.pattPos < 5 && chIndex === 0) {
-      console.log('[TrackerReplayer] Row data ch0:', {
-        note: noteValue,
-        period: rawPeriod,
-        inst: row.instrument,
-        effTyp: row.effTyp,
-        eff: row.eff,
-        effect: effect,
-        param: param
-      });
-    }
-
+    // Handle note
+    const noteValue = row.note;
     if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
       // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
       if (effect === 3 || effect === 5) {
-        // Use raw period if available, otherwise convert from note
-        ch.portaTarget = rawPeriod > 0 ? rawPeriod : this.noteToPeriod(noteValue, ch.finetune);
+        ch.portaTarget = this.noteToPeriod(noteValue, ch.finetune);
         if (param !== 0 && effect === 3) {
           ch.tonePortaSpeed = param;
         }
       } else {
         // Normal note - trigger
-        // IMPORTANT: Use raw period from MOD data if available for accurate playback
-        if (rawPeriod > 0) {
-          ch.note = rawPeriod;
-          ch.period = rawPeriod;
-          console.log('[TrackerReplayer] Using raw period:', rawPeriod, 'for note:', noteValue);
-        } else {
-          ch.note = this.noteToPeriod(noteValue, ch.finetune);
-          ch.period = ch.note;
-          console.log('[TrackerReplayer] Converted note to period:', ch.period, 'from note:', noteValue);
-        }
+        ch.note = this.noteToPeriod(noteValue, ch.finetune);
+        ch.period = ch.note;
 
         // Handle sample offset (9xx)
         let offset = 0;
@@ -657,14 +453,8 @@ export class TrackerReplayer {
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
         }
 
-        // Check for note delay (EDx) - if present, don't trigger on tick 0
-        const hasNoteDelay = (effect === 0xE && ((param >> 4) & 0x0F) === 0xD && (param & 0x0F) > 0);
-
-        if (!hasNoteDelay) {
-          // Trigger the note immediately
-          this.triggerNote(ch, time, offset);
-        }
-        // Note: if hasNoteDelay, the note will be triggered in doEffectTick at the specified tick
+        // Trigger the note
+        this.triggerNote(ch, time, offset);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -674,20 +464,18 @@ export class TrackerReplayer {
 
     // Handle note off
     if (noteValue === 97 || noteValue === '===') {
-      this.stopChannel(ch, time);
+      this.releaseMacros(ch);
+      this.stopChannel(ch);
     }
 
     // Handle volume column (XM)
     if (row.volume !== undefined && row.volume >= 0x10 && row.volume <= 0x50) {
       ch.volume = row.volume - 0x10;
-      this.setChannelVolume(ch);
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
     }
 
-    // Process tick-0 effects (both effect columns)
+    // Process tick-0 effects
     this.processEffect0(chIndex, ch, effect, param, time);
-    if (effect2 !== 0 || param2 !== 0) {
-      this.processEffect0(chIndex, ch, effect2, param2, time);
-    }
   }
 
   // ==========================================================================
@@ -732,7 +520,7 @@ export class TrackerReplayer {
 
       case 0x8: // Set panning
         ch.panning = param;
-        this.setChannelPanning(ch);
+        ch.panNode.pan.setValueAtTime((param - 128) / 128, time);
         break;
 
       case 0x9: // Sample offset - handled in note processing
@@ -743,20 +531,17 @@ export class TrackerReplayer {
         break;
 
       case 0xB: // Position jump
-        console.log('[TrackerReplayer] Effect Bxx (position jump) at row', this.pattPos, '-> pos', param);
         this.posJumpPos = param;
         this.posJumpFlag = true;
         this.pBreakFlag = true;
         break;
 
       case 0xC: // Set volume
-        console.log('[TrackerReplayer] Effect Cxx (set volume) ch', ch.channelIndex, 'vol', param);
         ch.volume = Math.min(64, param);
-        this.setChannelVolume(ch);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
 
       case 0xD: // Pattern break
-        console.log('[TrackerReplayer] Effect Dxx (pattern break) at row', this.pattPos, '-> row', x * 10 + y);
         this.pBreakPos = x * 10 + y; // BCD
         if (this.pBreakPos > 63) this.pBreakPos = 0;
         this.pBreakFlag = true;
@@ -768,31 +553,39 @@ export class TrackerReplayer {
 
       case 0xF: // Set speed/tempo
         if (param === 0) {
-          // F00 = STOP song (ProTracker spec)
-          console.log('[TrackerReplayer] Effect F00 - stopping song');
-          this.stop();
+          // F00 = stop in some trackers
         } else if (param < 0x20) {
-          // 01-1F = VBlank speed (ticks per row)
           this.speed = param;
         } else {
-          // 20-FF = BPM (CIA timing)
           this.bpm = param;
           this.updateTickInterval();
         }
         break;
+
+      // === IT/Furnace Extended Effects ===
+      case 0x10: // Global volume (Gxx)
+        this.globalVolume = Math.min(64, param);
+        this.updateAllChannelVolumes(time);
+        break;
+
+      case 0x11: // Global volume slide (Hxx)
+        // Store for per-tick processing
+        if (param !== 0) ch.globalVolSlide = param;
+        break;
+
+      case 0x19: // Pan slide (Pxx) - also used for Furnace panning effects
+        if (param !== 0) ch.panSlide = param;
+        break;
+
+      case 0x1B: // Retrigger with volume slide (Rxy) - IT style
+        ch.retrigCount = param & 0x0F;
+        ch.retrigVolSlide = (param >> 4) & 0x0F;
+        break;
     }
   }
 
-  private processExtendedEffect0(_chIndex: number, ch: ChannelState, x: number, y: number, _time: number): void {
-    const engine = getToneEngine();
-
+  private processExtendedEffect0(_chIndex: number, ch: ChannelState, x: number, y: number, time: number): void {
     switch (x) {
-      case 0x0: // Filter on/off (E0x)
-        // E00 = filter ON (LED on, softer sound)
-        // E01 = filter OFF (LED off, brighter sound)
-        engine.setAmigaFilter(y === 0);
-        break;
-
       case 0x1: // Fine porta up
         ch.period = Math.max(113, ch.period - y);
         this.updatePeriod(ch);
@@ -801,11 +594,6 @@ export class TrackerReplayer {
       case 0x2: // Fine porta down
         ch.period = Math.min(856, ch.period + y);
         this.updatePeriod(ch);
-        break;
-
-      case 0x3: // Glissando control (E3x)
-        // When on, tone portamento slides in semitones instead of smooth
-        ch.glissando = y !== 0;
         break;
 
       case 0x4: // Vibrato waveform
@@ -828,10 +616,6 @@ export class TrackerReplayer {
           if (ch.patternLoopCount !== 0) {
             this.pBreakPos = ch.patternLoopRow;
             this.pBreakFlag = true;
-            // IMPORTANT: Set posJumpPos to current position to prevent songPos from incrementing
-            // Pattern loops should stay in the same pattern, just jump back to loop start row
-            this.posJumpPos = this.songPos;
-            this.posJumpFlag = true;
           }
         }
         break;
@@ -840,28 +624,22 @@ export class TrackerReplayer {
         ch.waveControl = (ch.waveControl & 0x0F) | ((y & 0x0F) << 4);
         break;
 
-      case 0x9: // Retrigger - handled in doEffectTick using modulo-based triggering (pt2-clone)
-        // E9x doesn't need tick-0 processing; the modulo check happens on all ticks in doEffectTick
+      case 0x9: // Retrigger
+        ch.retrigCount = y;
         break;
 
       case 0xA: // Fine volume up
         ch.volume = Math.min(64, ch.volume + y);
-        this.setChannelVolume(ch);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
 
       case 0xB: // Fine volume down
         ch.volume = Math.max(0, ch.volume - y);
-        this.setChannelVolume(ch);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
 
-      // Note: ECx (note cut) and EDx (note delay) are handled in doEffectTick
-      // They don't need tick-0 processing
-
-      case 0xE: // Pattern delay (EEx) - pt2-clone uses y+1 with two-stage system
-        // Only set if no delay is already active (pattDelTime2 === 0)
-        if (this.pattDelTime2 === 0) {
-          this.pattDelTime = y + 1;
-        }
+      case 0xE: // Pattern delay
+        this.patternDelay = y * this.speed;
         break;
     }
   }
@@ -871,21 +649,8 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private processEffectTick(_chIndex: number, ch: ChannelState, row: any, time: number): void {
-    // Process first effect column
-    const effect = row.effTyp ?? 0;
-    const param = row.eff ?? 0;
-    this.doEffectTick(ch, effect, param, time);
-
-    // Process second effect column
-    const effect2Str = row.effect2 && row.effect2 !== '...' ? row.effect2 : null;
-    if (effect2Str) {
-      const effect2 = parseInt(effect2Str[0], 16);
-      const param2 = parseInt(effect2Str.substring(1), 16);
-      this.doEffectTick(ch, effect2, param2, time);
-    }
-  }
-
-  private doEffectTick(ch: ChannelState, effect: number, param: number, time: number): void {
+    const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
+    const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
@@ -932,21 +697,40 @@ export class TrackerReplayer {
 
       case 0xE: // Extended effects
         if (x === 0x9 && y > 0) {
-          // Retrigger (E9x) - pt2-clone uses modulo-based triggering
-          // If tick 0 AND row has a note, skip (pt2-clone: n_note & 0xFFF > 0)
-          // Otherwise, if tick % y == 0, retrigger
-          if (this.currentTick === 0 && ch.hasNoteInRow) {
-            // Don't retrigger on tick 0 if row has a note (it was/will be triggered)
-          } else if (this.currentTick % y === 0) {
+          // Retrigger
+          ch.retrigCount--;
+          if (ch.retrigCount <= 0) {
+            ch.retrigCount = y;
             this.triggerNote(ch, time, 0);
           }
         } else if (x === 0xC && y === this.currentTick) {
-          // Note cut - ProTracker spec: "the volume is just turned down" (not actually stopped)
+          // Note cut
           ch.volume = 0;
-          this.setChannelVolume(ch);
+          ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
           // Note delay
           this.triggerNote(ch, time, 0);
+        }
+        break;
+
+      // === IT/Furnace Extended Effects (per-tick) ===
+      case 0x11: // Global volume slide (Hxx)
+        this.doGlobalVolumeSlide(ch.globalVolSlide, time);
+        break;
+
+      case 0x19: // Pan slide (Pxx)
+        this.doPanSlide(ch, ch.panSlide, time);
+        break;
+
+      case 0x1B: // Retrigger with volume slide (Rxy)
+        if (ch.retrigCount > 0) {
+          ch.retrigCount--;
+          if (ch.retrigCount <= 0) {
+            ch.retrigCount = param & 0x0F;
+            // Apply volume slide based on retrigVolSlide
+            this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
+            this.triggerNote(ch, time, 0);
+          }
         }
         break;
     }
@@ -983,36 +767,7 @@ export class TrackerReplayer {
       if (ch.period < ch.portaTarget) ch.period = ch.portaTarget;
     }
 
-    // E3x Glissando: slide in semitones instead of smooth
-    if (ch.glissando) {
-      // Quantize period to nearest note in period table
-      const quantizedPeriod = this.quantizePeriodToNote(ch.period, ch.finetune);
-      this.updatePeriodDirect(ch, quantizedPeriod);
-    } else {
-      this.updatePeriod(ch);
-    }
-  }
-
-  /**
-   * Quantize a period value to the nearest note in the period table
-   * Used for E3x glissando control
-   */
-  private quantizePeriodToNote(period: number, finetune: number): number {
-    const ftIndex = finetune >= 0 ? finetune : finetune + 16;
-    const offset = ftIndex * 36;
-
-    let closestIndex = 0;
-    let closestDiff = Math.abs(PERIOD_TABLE[offset] - period);
-
-    for (let i = 1; i < 36; i++) {
-      const diff = Math.abs(PERIOD_TABLE[offset + i] - period);
-      if (diff < closestDiff) {
-        closestDiff = diff;
-        closestIndex = i;
-      }
-    }
-
-    return PERIOD_TABLE[offset + closestIndex];
+    this.updatePeriod(ch);
   }
 
   private doVibrato(ch: ChannelState): void {
@@ -1038,7 +793,7 @@ export class TrackerReplayer {
     ch.vibratoPos = (ch.vibratoPos + speed) & 63;
   }
 
-  private doTremolo(ch: ChannelState, _time: number): void {
+  private doTremolo(ch: ChannelState, time: number): void {
     const speed = (ch.tremoloCmd >> 4) & 0x0F;
     const depth = ch.tremoloCmd & 0x0F;
 
@@ -1057,15 +812,13 @@ export class TrackerReplayer {
     let delta = (value * depth) >> 6;
     if (ch.tremoloPos >= 32) delta = -delta;
 
-    // Tremolo temporarily modifies volume without changing ch.volume
     const newVol = Math.max(0, Math.min(64, ch.volume + delta));
-    const engine = getToneEngine();
-    engine.setChannelVolume(ch.channelIndex, -60 + (newVol / 64) * 60);
+    ch.gainNode.gain.setValueAtTime(newVol / 64, time);
 
     ch.tremoloPos = (ch.tremoloPos + speed) & 63;
   }
 
-  private doVolumeSlide(ch: ChannelState, param: number, _time: number): void {
+  private doVolumeSlide(ch: ChannelState, param: number, time: number): void {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
@@ -1075,135 +828,271 @@ export class TrackerReplayer {
       ch.volume = Math.max(0, ch.volume - y);
     }
 
-    this.setChannelVolume(ch);
-  }
-
-  // ==========================================================================
-  // VOICE CONTROL (via ToneEngine)
-  // ==========================================================================
-
-  // Track last note per channel for explicit note-off
-  private lastNotePerChannel: Map<number, string> = new Map();
-
-  private triggerNote(ch: ChannelState, time: number, _offset: number): void {
-    if (!ch.instrument) {
-      console.warn('[TrackerReplayer] triggerNote: No instrument for channel', ch.channelIndex);
-      return;
-    }
-
-    const engine = getToneEngine();
-    const config = ch.instrument;
-
-    // Convert to note string - prefer XM note number for accuracy with synths
-    let noteStr: string;
-    if (ch.xmNote > 0 && ch.xmNote < 97) {
-      // XM note number: 1 = C-0, 13 = C-1, 25 = C-2, etc.
-      noteStr = this.xmNoteToString(ch.xmNote);
-    } else if (ch.period > 0) {
-      // Fallback to period conversion for MOD files
-      noteStr = this.periodToNoteString(ch.period, ch.finetune);
-    } else {
-      noteStr = 'C4'; // Default (Tone.js format - no dash!)
-    }
-
-    // Use velocity based on channel volume (0-64 -> 0-1)
-    const velocity = ch.volume / 64;
-
-
-    // For TB-303 with slide, call triggerNoteAttack with slide flag
-    // TB303Engine.triggerAttack handles sliding: it ramps frequency instead of retriggering
-    if (config.synthType === 'TB303' && ch.slide) {
-      engine.triggerNoteAttack(
-        config.id,
-        noteStr,
-        time,
-        velocity,
-        config,
-        ch.period,
-        ch.accent,
-        ch.slide, // slide flag tells TB303Engine to do portamento
-        ch.channelIndex
-      );
-      this.lastNotePerChannel.set(ch.channelIndex, noteStr);
-      engine.triggerChannelMeter(ch.channelIndex, velocity);
-      return;
-    }
-
-    // Calculate row duration for one-shot sounds
-    const tickDuration = 2.5 / this.bpm;
-    const rowDuration = tickDuration * this.speed;
-
-    // Determine if this is a one-shot (drums) or sustained (synths) instrument
-    const isOneShot = ['MembraneSynth', 'NoiseSynth', 'MetalSynth', 'PluckSynth'].includes(config.synthType || '');
-
-    if (isOneShot) {
-      // One-shot drums: use triggerNote with appropriate duration
-      let duration = rowDuration * 2;
-      if (config.synthType === 'MembraneSynth') duration = rowDuration * 4;
-      if (config.synthType === 'MetalSynth') duration = rowDuration * 3;
-
-      engine.triggerNote(
-        config.id,
-        noteStr,
-        duration,
-        time,  // Use scheduled time for precise timing
-        velocity,
-        config,
-        ch.accent,
-        ch.slide,
-        ch.channelIndex,
-        ch.period,
-        0
-      );
-    } else {
-      // Sustained synths (TB303, Synth, etc.): use triggerAttack
-      // Notes sustain until next note or explicit release
-      // Pass channelIndex for slide/accent support on non-TB303 synths
-      engine.triggerNoteAttack(
-        config.id,
-        noteStr,
-        time,  // Use scheduled time for precise timing
-        velocity,
-        config,
-        ch.period,
-        ch.accent,
-        ch.slide,
-        ch.channelIndex
-      );
-    }
-
-    // Track this note for explicit note-off commands only
-    this.lastNotePerChannel.set(ch.channelIndex, noteStr);
-
-    // Trigger VU meter for visual feedback
-    engine.triggerChannelMeter(ch.channelIndex, velocity);
+    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
   }
 
   /**
-   * Convert XM note number to note string
-   * XM: 1 = C-0, 13 = C-1, 25 = C-2, 37 = C-3, 49 = C-4, etc.
-   * Note: Tone.js expects "C4" format (no dash), not "C-4" (dash would be parsed as negative octave!)
+   * Global volume slide (effect Hxx)
+   * x = slide up, y = slide down
    */
-  private xmNoteToString(xmNote: number): string {
-    if (xmNote <= 0 || xmNote >= 97) return 'C4';
+  private doGlobalVolumeSlide(param: number, time: number): void {
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
 
-    // Tone.js format: no dashes for natural notes (C4, D4, E4 - NOT C-4, D-4, E-4)
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const noteIndex = (xmNote - 1) % 12;
-    const octave = Math.floor((xmNote - 1) / 12);
+    if (x > 0) {
+      this.globalVolume = Math.min(64, this.globalVolume + x);
+    } else if (y > 0) {
+      this.globalVolume = Math.max(0, this.globalVolume - y);
+    }
 
-    return `${noteNames[noteIndex]}${octave}`;
+    this.updateAllChannelVolumes(time);
   }
 
-  private stopChannel(ch: ChannelState, time?: number): void {
-    if (!ch.instrument) return;
+  /**
+   * Pan slide (effect Pxx)
+   * x = slide right, y = slide left
+   */
+  private doPanSlide(ch: ChannelState, param: number, time: number): void {
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
 
-    const engine = getToneEngine();
-    // Use tracked note if available, otherwise derive from period
-    const noteStr = this.lastNotePerChannel.get(ch.channelIndex)
-      || this.periodToNoteString(ch.period, ch.finetune);
-    engine.triggerNoteRelease(ch.instrument.id, noteStr, time ?? Tone.now(), ch.instrument);
-    this.lastNotePerChannel.delete(ch.channelIndex);
+    if (x > 0) {
+      ch.panning = Math.min(255, ch.panning + x);
+    } else if (y > 0) {
+      ch.panning = Math.max(0, ch.panning - y);
+    }
+
+    ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+  }
+
+  /**
+   * Apply volume slide for IT-style retrigger (Rxy)
+   * Based on the y nibble value
+   */
+  private applyRetrigVolSlide(ch: ChannelState, slideType: number, time: number): void {
+    switch (slideType) {
+      case 0: break; // No change
+      case 1: ch.volume = Math.max(0, ch.volume - 1); break;
+      case 2: ch.volume = Math.max(0, ch.volume - 2); break;
+      case 3: ch.volume = Math.max(0, ch.volume - 4); break;
+      case 4: ch.volume = Math.max(0, ch.volume - 8); break;
+      case 5: ch.volume = Math.max(0, ch.volume - 16); break;
+      case 6: ch.volume = Math.floor(ch.volume * 2 / 3); break;
+      case 7: ch.volume = Math.floor(ch.volume / 2); break;
+      case 8: break; // No change
+      case 9: ch.volume = Math.min(64, ch.volume + 1); break;
+      case 10: ch.volume = Math.min(64, ch.volume + 2); break;
+      case 11: ch.volume = Math.min(64, ch.volume + 4); break;
+      case 12: ch.volume = Math.min(64, ch.volume + 8); break;
+      case 13: ch.volume = Math.min(64, ch.volume + 16); break;
+      case 14: ch.volume = Math.min(64, Math.floor(ch.volume * 3 / 2)); break;
+      case 15: ch.volume = Math.min(64, ch.volume * 2); break;
+    }
+    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+  }
+
+  // ==========================================================================
+  // MACRO PROCESSING (Furnace instruments)
+  // ==========================================================================
+
+  /**
+   * Process Furnace instrument macros for a channel
+   * Called every tick to apply macro values
+   */
+  private processMacros(ch: ChannelState, time: number): void {
+    if (!ch.instrument?.furnace?.macros) return;
+
+    const macros = ch.instrument.furnace.macros as FurnaceMacro[];
+    if (macros.length === 0) return;
+
+    for (const macro of macros) {
+      if (!macro.data || macro.data.length === 0) continue;
+
+      // Get current macro position, handling loop/release
+      let pos = ch.macroPos;
+      const speed = macro.speed || 1;
+
+      // Only advance every 'speed' ticks
+      if (this.currentTick % speed !== 0) continue;
+
+      // Handle release point
+      if (ch.macroReleased && macro.release >= 0 && pos < macro.release) {
+        pos = macro.release;
+      }
+
+      // Handle loop
+      if (pos >= macro.data.length) {
+        if (macro.loop >= 0 && macro.loop < macro.data.length) {
+          // If released and loop is before release, stay at end
+          if (ch.macroReleased && macro.release >= 0 && macro.loop < macro.release) {
+            pos = macro.data.length - 1;
+          } else {
+            pos = macro.loop;
+          }
+        } else {
+          pos = macro.data.length - 1; // Stay at last value
+        }
+      }
+
+      const value = macro.data[pos] ?? 0;
+      this.applyMacroValue(ch, macro.type, value, time);
+    }
+
+    // Advance macro position
+    ch.macroPos++;
+  }
+
+  /**
+   * Apply a macro value to a channel based on macro type
+   */
+  private applyMacroValue(ch: ChannelState, macroType: number, value: number, time: number): void {
+    switch (macroType) {
+      case FurnaceMacroType.VOL: // Volume (0-15 for most chips, scale to 0-64)
+        ch.volume = Math.round((value / 15) * 64);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64 * (this.globalVolume / 64), time);
+        break;
+
+      case FurnaceMacroType.ARP: // Arpeggio (note offset, can be negative)
+        ch.macroArpNote = value > 127 ? value - 256 : value; // Handle signed
+        if (ch.period > 0) {
+          // Apply arpeggio as period change
+          const semitoneRatio = Math.pow(2, ch.macroArpNote / 12);
+          const newPeriod = Math.round(ch.note / semitoneRatio);
+          this.updatePeriodDirect(ch, newPeriod);
+        }
+        break;
+
+      case FurnaceMacroType.DUTY: // Duty cycle
+        ch.macroDuty = value;
+        // Note: duty changes need to be handled by the synth engine
+        // For now, store for potential use
+        break;
+
+      case FurnaceMacroType.WAVE: // Waveform
+        ch.macroWaveform = value;
+        // Note: waveform changes need wavetable support
+        break;
+
+      case FurnaceMacroType.PITCH: // Pitch offset (fine pitch)
+        ch.macroPitchOffset = value > 127 ? value - 256 : value; // Signed
+        if (ch.period > 0) {
+          // Apply as small period adjustment
+          const pitchAdjust = ch.macroPitchOffset / 64; // Scale to reasonable range
+          const newPeriod = Math.round(ch.period * (1 - pitchAdjust * 0.01));
+          this.updatePeriodDirect(ch, Math.max(113, Math.min(856, newPeriod)));
+        }
+        break;
+
+      case FurnaceMacroType.EX1: // Extra 1 (chip-specific)
+      case FurnaceMacroType.EX2: // Extra 2
+      case FurnaceMacroType.EX3: // Extra 3
+      case FurnaceMacroType.EX4: // Extra 4
+      case FurnaceMacroType.EX5: // Extra 5
+      case FurnaceMacroType.EX6: // Extra 6
+      case FurnaceMacroType.EX7: // Extra 7
+      case FurnaceMacroType.EX8: // Extra 8
+        // Chip-specific macros - would need per-chip handling
+        break;
+
+      case FurnaceMacroType.ALG: // Algorithm (FM)
+      case FurnaceMacroType.FB: // Feedback (FM)
+      case FurnaceMacroType.FMS: // FM LFO speed
+      case FurnaceMacroType.AMS: // AM LFO speed
+        // FM macros - need FurnaceSynth integration
+        break;
+
+      case FurnaceMacroType.PAN_L: // Pan left
+        ch.panning = Math.max(0, 128 - value * 8);
+        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+        break;
+
+      case FurnaceMacroType.PAN_R: // Pan right
+        ch.panning = Math.min(255, 128 + value * 8);
+        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+        break;
+
+      case FurnaceMacroType.PHASE_RESET: // Phase reset
+        // Would need synth integration
+        break;
+    }
+  }
+
+  /**
+   * Handle note release for macros
+   */
+  private releaseMacros(ch: ChannelState): void {
+    ch.macroReleased = true;
+  }
+
+  // ==========================================================================
+  // VOICE CONTROL
+  // ==========================================================================
+
+  private triggerNote(ch: ChannelState, time: number, offset: number): void {
+    this.stopChannel(ch);
+
+    // Reset macro state on note trigger
+    ch.macroPos = 0;
+    ch.macroReleased = false;
+    ch.macroPitchOffset = 0;
+    ch.macroArpNote = 0;
+
+    if (!ch.instrument || !ch.instrument.sample?.url) return;
+
+    const sample = ch.instrument.sample;
+    const sampleRate = sample.sampleRate || 8363;
+
+    // Calculate playback rate from period
+    const frequency = AMIGA_PAL_FREQUENCY / ch.period;
+    const playbackRate = frequency / sampleRate;
+
+    // Create player
+    const hasLoop = sample.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
+
+    const player = new Tone.Player({
+      url: sample.url,
+      loop: hasLoop,
+      loopStart: hasLoop ? (sample.loopStart ?? 0) / sampleRate : 0,
+      loopEnd: hasLoop ? (sample.loopEnd ?? 0) / sampleRate : 0,
+      playbackRate,
+    });
+
+    player.connect(ch.gainNode);
+
+    // Check if buffer is loaded and start
+    const startPlayback = () => {
+      try {
+        if (ch.player === player && this.playing && player.loaded && player.buffer?.loaded) {
+          const startOffset = offset > 0 ? offset / sampleRate : 0;
+          // Ensure time is valid (use current time if null/undefined)
+          const safeTime = time ?? Tone.now();
+          player.start(safeTime, startOffset);
+        }
+      } catch (e) {
+        // Silently ignore playback errors (sample not ready, etc.)
+        console.debug('[TrackerReplayer] Playback start failed:', e);
+      }
+    };
+
+    // Player.loaded is a boolean in Tone.js v14+
+    if (player.loaded && player.buffer?.loaded) {
+      startPlayback();
+    } else {
+      // Fallback: wait for buffer to load
+      setTimeout(startPlayback, 10);
+    }
+
+    ch.player = player;
+  }
+
+  private stopChannel(ch: ChannelState): void {
+    if (ch.player) {
+      try {
+        if (ch.player.state === 'started') ch.player.stop();
+        ch.player.dispose();
+      } catch (e) {}
+      ch.player = null;
+    }
   }
 
   private updatePeriod(ch: ChannelState): void {
@@ -1211,50 +1100,23 @@ export class TrackerReplayer {
   }
 
   private updatePeriodDirect(ch: ChannelState, period: number): void {
-    // Real-time period changes for vibrato/portamento
-    // Convert Amiga period to frequency and update via ToneEngine
-    if (period <= 0 || !ch.instrument) return;
+    if (!ch.player || period === 0) return;
 
-    const engine = getToneEngine();
-
-    // Calculate frequency from Amiga period
-    // Formula: frequency = AMIGA_PAL_FREQUENCY / (period * 2)
-    // AMIGA_PAL_FREQUENCY = 3546895 Hz (Paula clock)
-    const AMIGA_PAL_FREQUENCY = 3546895;
-    const frequency = AMIGA_PAL_FREQUENCY / (period * 2);
-
-    // Update channel frequency via ToneEngine
-    engine.setChannelFrequency(ch.channelIndex, frequency);
+    const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
+    const frequency = AMIGA_PAL_FREQUENCY / period;
+    ch.player.playbackRate = frequency / sampleRate;
   }
 
   /**
-   * Convert period to note string (e.g., "C4", "F#3")
-   * Note: Tone.js expects "C4" format (no dash), not "C-4" (dash would be parsed as negative octave!)
+   * Update all channel volumes based on current global volume
+   * Used when global volume changes (effect Gxx)
    */
-  private periodToNoteString(period: number, finetune: number): string {
-    if (period === 0) return 'C4';
-
-    // Find closest note in period table
-    const ftIndex = finetune >= 0 ? finetune : finetune + 16;
-    const offset = ftIndex * 36;
-
-    let closestIndex = 0;
-    let closestDiff = Math.abs(PERIOD_TABLE[offset] - period);
-
-    for (let i = 1; i < 36; i++) {
-      const diff = Math.abs(PERIOD_TABLE[offset + i] - period);
-      if (diff < closestDiff) {
-        closestDiff = diff;
-        closestIndex = i;
-      }
+  private updateAllChannelVolumes(time: number): void {
+    const globalScale = this.globalVolume / 64;
+    for (const ch of this.channels) {
+      const effectiveVolume = (ch.volume / 64) * globalScale;
+      ch.gainNode.gain.setValueAtTime(effectiveVolume, time);
     }
-
-    // Tone.js format: no dashes for natural notes (C4, D4, E4 - NOT C-4, D-4, E-4)
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const octave = Math.floor(closestIndex / 12) + 1;
-    const noteInOctave = closestIndex % 12;
-
-    return `${noteNames[noteInOctave]}${octave}`;
   }
 
   // ==========================================================================
@@ -1319,45 +1181,11 @@ export class TrackerReplayer {
   // ROW ADVANCEMENT
   // ==========================================================================
 
-  /**
-   * Advance row with pattern delay handling (pt2-clone two-stage system)
-   */
-  private advanceRowWithDelay(): void {
-    if (!this.song) return;
-
-    // Handle pattern delay countdown
-    if (this.pattDelTime2 > 0) {
-      this.pattDelTime2--;
-      if (this.pattDelTime2 > 0) {
-        // Delay still active - stay on current row
-        // Notify (for UI update)
-        if (this.onRowChange && this.song) {
-          const pattNum = this.song.songPositions[this.songPos];
-          this.onRowChange(this.pattPos, pattNum, this.songPos);
-        }
-        return;
-      }
-      // Delay just expired (pattDelTime2 === 0), fall through to advance
-    }
-
-    // Normal row advancement
-    this.advanceRow();
-  }
-
   private advanceRow(): void {
     if (!this.song) return;
 
-    const prevPos = this.songPos;
-    const prevRow = this.pattPos;
-
     // Pattern break
     if (this.pBreakFlag) {
-      console.log('[TrackerReplayer] Pattern break:', {
-        from: { pos: prevPos, row: prevRow },
-        breakPos: this.pBreakPos,
-        posJumpFlag: this.posJumpFlag,
-        posJumpPos: this.posJumpPos,
-      });
       this.pattPos = this.pBreakPos;
       this.pBreakFlag = false;
       this.pBreakPos = 0;
@@ -1371,10 +1199,6 @@ export class TrackerReplayer {
 
     // Position jump
     if (this.posJumpFlag) {
-      console.log('[TrackerReplayer] Position jump:', {
-        from: prevPos,
-        to: this.posJumpPos,
-      });
       this.songPos = this.posJumpPos;
       this.posJumpFlag = false;
     }
@@ -1387,12 +1211,10 @@ export class TrackerReplayer {
     if (this.pattPos >= patternLength) {
       this.pattPos = 0;
       this.songPos++;
-      console.log('[TrackerReplayer] Pattern end, advancing to pos:', this.songPos);
     }
 
     // Song end
     if (this.songPos >= this.song.songLength) {
-      console.log('[TrackerReplayer] Song end, restarting at:', this.song.restartPosition);
       this.songPos = this.song.restartPosition < this.song.songLength
         ? this.song.restartPosition
         : 0;
@@ -1418,52 +1240,18 @@ export class TrackerReplayer {
   getCurrentTick(): number { return this.currentTick; }
 
   // ==========================================================================
-  // LIBOPENMPT PLAYBACK MODE
-  // ==========================================================================
-
-  /**
-   * Enable or disable libopenmpt playback mode
-   * When enabled, uses libopenmpt WASM for sample-accurate module playback
-   * This provides authentic vibrato, portamento, and effects that Tone.js can't handle
-   */
-  setUseLibopenmpt(enable: boolean): void {
-    this.useLibopenmpt = enable;
-  }
-
-  /**
-   * Check if libopenmpt mode is enabled
-   */
-  getUseLibopenmpt(): boolean {
-    return this.useLibopenmpt;
-  }
-
-  /**
-   * Check if current song has original module data for libopenmpt playback
-   */
-  hasOriginalModuleData(): boolean {
-    return !!this.song?.originalModuleData?.base64;
-  }
-
-  /**
-   * Get the current playback mode description
-   */
-  getPlaybackMode(): 'native' | 'libopenmpt' {
-    return this.useLibopenmpt && this.hasOriginalModuleData() ? 'libopenmpt' : 'native';
-  }
-
-  // ==========================================================================
   // CLEANUP
   // ==========================================================================
 
   dispose(): void {
     this.stop();
+    for (const ch of this.channels) {
+      ch.gainNode.dispose();
+      ch.panNode.dispose();
+    }
+    this.masterGain.dispose();
     this.channels = [];
     this.song = null;
-    this.sampleBufferCache.clear();
-    if (this.chiptuneInstrument) {
-      this.chiptuneInstrument.dispose();
-      this.chiptuneInstrument = null;
-    }
   }
 }
 
