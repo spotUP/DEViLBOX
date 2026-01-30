@@ -211,7 +211,7 @@ export async function pickFiles(options?: {
         {
           description: 'Tracker Modules',
           accept: {
-            'audio/x-mod': ['.mod', '.xm', '.it', '.s3m'],
+            'audio/x-mod': ['.mod', '.xm', '.it', '.s3m', '.fur'],
           },
         },
       ],
