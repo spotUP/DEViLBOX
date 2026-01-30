@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-30T20:10:48.964Z
+ * Generated: 2026-01-30T22:50:03.471Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '148';
-export const BUILD_HASH = '319eeba';
+export const BUILD_NUMBER = '162';
+export const BUILD_HASH = '8a4055e';
 export const BUILD_DATE = '2026-01-30';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,62 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-30',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add CRITICAL git safety rules to CLAUDE.md'
+      },
+      {
+        type: 'feature',
+        description: 'Add deploy.sh script for quick commit/push/deploy'
+      },
+      {
+        type: 'improvement',
+        description: 'Update generated changelog'
+      },
+      {
+        type: 'improvement',
+        description: 'Update synth categories and organization'
+      },
+      {
+        type: 'improvement',
+        description: 'Enhance audio engine and synth handling'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve module and instrument import handling'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve file browser and file system access'
+      },
+      {
+        type: 'improvement',
+        description: 'Enhance tracker input handling and FT2 toolbar'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve MIDI handling and settings management'
+      },
+      {
+        type: 'improvement',
+        description: 'Enhance instrument visualization components'
+      },
+      {
+        type: 'improvement',
+        description: 'Refactor Furnace and synth editors for unified architecture'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve TestKeyboard and InstrumentList collapsible behavior'
+      },
+      {
+        type: 'improvement',
+        description: 'Update FurnaceChips WASM build with improved chip emulation'
+      },
+      {
+        type: 'improvement',
+        description: 'Unify instrument editor architecture with common template'
+      },
       {
         type: 'improvement',
         description: 'Make TestKeyboard and InstrumentList collapsible, collapsed by default'
@@ -186,62 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix TD-3 MIDI CC mappings and add debug logging'
-      },
-      {
-        type: 'fix',
-        description: 'Fix .dbox module loading path'
-      },
-      {
-        type: 'fix',
-        description: 'Add Furnace and DefleMask module import support, fix AudioWorklet issues'
-      },
-      {
-        type: 'fix',
-        description: 'Add voice debug logging'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Cxx volume command to update active voice gains'
-      },
-      {
-        type: 'fix',
-        description: 'Add ToneEngine volume debug logging'
-      },
-      {
-        type: 'fix',
-        description: 'Add debug logging for effect parsing in TrackerReplayer'
-      },
-      {
-        type: 'fix',
-        description: 'Fix MOD instrument ID mapping during import'
-      },
-      {
-        type: 'improvement',
-        description: 'Update generated changelog'
-      },
-      {
-        type: 'fix',
-        description: 'Fix AmigaFilter by deferring worklet init until context running'
-      },
-      {
-        type: 'fix',
-        description: 'Fix sample URLs not surviving page refresh'
-      },
-      {
-        type: 'fix',
-        description: 'Fix AmigaFilter AudioWorkletNode context detection'
-      },
-      {
-        type: 'feature',
-        description: 'Add velocity modulation, loop points, and performance optimizations'
-      },
-      {
-        type: 'improvement',
-        description: 'Furnace integration phases 3-5: chip export + macro system'
-      },
-      {
-        type: 'improvement',
-        description: 'Refactor duplicated effect logic into BaseFormatHandler'
       }
     ]
   }
