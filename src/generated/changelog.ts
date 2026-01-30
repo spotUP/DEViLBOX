@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-30T14:47:30.126Z
+ * Generated: 2026-01-30T20:10:48.964Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '130';
-export const BUILD_HASH = '077acef';
+export const BUILD_NUMBER = '148';
+export const BUILD_HASH = '319eeba';
 export const BUILD_DATE = '2026-01-30';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -29,6 +29,84 @@ export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-30',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Make TestKeyboard and InstrumentList collapsible, collapsed by default'
+      },
+      {
+        type: 'improvement',
+        description: 'Scroll to selected synth when opening instrument selector'
+      },
+      {
+        type: 'improvement',
+        description: 'Remember instrument selector filter and scroll position'
+      },
+      {
+        type: 'fix',
+        description: 'Fix Buzzmachine paths for GitHub Pages deployment'
+      },
+      {
+        type: 'fix',
+        description: 'Add All Furnace Chips category and fix Buzzmachine null time error'
+      },
+      {
+        type: 'fix',
+        description: 'Fix unused variable TypeScript errors'
+      },
+      {
+        type: 'improvement',
+        description: 'Update instrument editors'
+      },
+      {
+        type: 'feature',
+        description: 'Add project documentation and handover guides'
+      },
+      {
+        type: 'improvement',
+        description: 'Update AudioWorklets and project configuration'
+      },
+      {
+        type: 'feature',
+        description: 'Update hooks, types, and stores for new features'
+      },
+      {
+        type: 'improvement',
+        description: 'Update UI components for improved editing experience'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve import/export with format handlers and tests'
+      },
+      {
+        type: 'feature',
+        description: 'Expand synth presets and add Furnace wavetable support'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve audio engine with Furnace synth enhancements'
+      },
+      {
+        type: 'feature',
+        description: 'Add visualization components for instrument editors'
+      },
+      {
+        type: 'feature',
+        description: 'Add Buzzmachines WASM effect plugins'
+      },
+      {
+        type: 'improvement',
+        description: 'Reorganize instrument components into subdirectories'
+      },
+      {
+        type: 'fix',
+        description: 'Fix Furnace chip emulators: 8 broken chips, ESFM, minor issues'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-28',
     changes: [
       {
@@ -94,7 +172,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-27',
     changes: [
       {
@@ -164,84 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Refactor duplicated effect logic into BaseFormatHandler'
-      },
-      {
-        type: 'fix',
-        description: 'Fix MOD arpeggio wraparound at period table boundaries'
-      },
-      {
-        type: 'fix',
-        description: 'Fix format-aware period conversion and IT auto-vibrato'
-      },
-      {
-        type: 'feature',
-        description: 'Update changelog and add Serena config'
-      },
-      {
-        type: 'improvement',
-        description: 'Update documentation and handoff files'
-      },
-      {
-        type: 'improvement',
-        description: 'Update dependencies'
-      },
-      {
-        type: 'feature',
-        description: 'Update presets and add master presets'
-      },
-      {
-        type: 'feature',
-        description: 'Add audio processing utilities and update exporters'
-      },
-      {
-        type: 'improvement',
-        description: 'Update UI components for Furnace and effects'
-      },
-      {
-        type: 'improvement',
-        description: 'Extend types and stores for Furnace integration'
-      },
-      {
-        type: 'feature',
-        description: 'Add Furnace format support and FM presets'
-      },
-      {
-        type: 'feature',
-        description: 'Add Furnace chip engine (WASM-based emulation)'
-      },
-      {
-        type: 'improvement',
-        description: 'Update core engine with multi-format support'
-      },
-      {
-        type: 'feature',
-        description: 'Add effect compliance test suite'
-      },
-      {
-        type: 'improvement',
-        description: 'Refactor effect system with format-specific handlers'
-      },
-      {
-        type: 'feature',
-        description: 'Add chip music exporters (VGM, ZSM, SAP, TIunA) and DefleMask parser'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-2',
-    date: '2026-01-26',
-    changes: [
-      {
-        type: 'improvement',
-        description: 'Audit and strict ProTracker effect alignment'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Tremolo (7xy) effect accuracy'
-      },
-      {
-        type: 'fix',
-        description: 'Fix smooth scrolling jumpiness'
       }
     ]
   }
