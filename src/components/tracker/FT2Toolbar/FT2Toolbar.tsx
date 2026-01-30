@@ -9,7 +9,7 @@
  * └─────────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
@@ -167,6 +167,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setCurrentPattern,
     duplicatePattern,
     deletePattern,
+    addPattern,
     expandPattern,
     shrinkPattern,
     resizePattern,
@@ -179,6 +180,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     editStep,
     toggleRecordMode,
     setEditStep,
+    reset: resetTracker,
   } = useTrackerStore();
 
   const {
@@ -186,6 +188,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     isLooping,
     bpm,
     setBPM,
+    speed,
+    setSpeed,
     setIsLooping,
     play,
     stop,
@@ -195,7 +199,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
   useProjectPersistence();
-  const { instruments, loadInstruments } = useInstrumentStore();
+  const { instruments, loadInstruments, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
   const { curves } = useAutomationStore();
@@ -211,7 +215,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+
+  // PERF: Memoize logo animation complete callback to prevent re-renders
+  const handleLogoAnimationComplete = useCallback(() => {
+    setVizMode('waveform');
+  }, []);
 
   // Handle fullscreen changes from keyboard (F11) or other sources
   React.useEffect(() => {
@@ -599,6 +609,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const handleDeletePosition = () => { if (songLength > 1) deletePattern(currentPatternIndex); };
   const handlePatternChange = (newPat: number) => handlePositionChange(newPat);
 
+  // Handle song length changes (add/remove patterns)
+  const handleSongLengthChange = (newLength: number) => {
+    const currentLength = patterns.length;
+    if (newLength > currentLength) {
+      // Add new empty patterns
+      for (let i = currentLength; i < newLength; i++) {
+        addPattern(patternLength);
+      }
+    } else if (newLength < currentLength && newLength >= 1) {
+      // Remove patterns from the end
+      for (let i = currentLength - 1; i >= newLength; i--) {
+        deletePattern(i);
+      }
+    }
+  };
+
   const handlePlaySong = async () => {
     if (isPlaying && !isLooping) stop();
     else {
@@ -668,7 +694,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 <FT2NumericInput label="Pattern" value={currentPatternIndex} onChange={handlePatternChange} min={0} max={songLength - 1} format="hex" />
               </div>
               <div className="ft2-section ft2-section-tempo">
-                <FT2NumericInput label="Speed" value={6} onChange={() => {}} min={1} max={31} format="hex" />
+                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
               </div>
               <div className="ft2-section ft2-section-pattern">
                 <FT2NumericInput
@@ -696,7 +722,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           {!compactToolbar && (
             <div className="ft2-toolbar-row">
               <div className="ft2-section ft2-section-pos">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={() => {}} min={1} max={256} format="hex" />
+                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
               </div>
               <div className="ft2-section ft2-section-tempo">
                 <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
@@ -714,7 +740,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
               <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
-              
+              <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
+
               <div ref={presetsButtonRef}>
                 <Button variant={showPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowPresetsMenu(!showPresetsMenu)} disabled={isLoading}>Presets</Button>
               </div>
@@ -790,7 +817,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />}
               {vizMode === 'channels' && <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />}
               {vizMode === 'stereo' && <StereoField height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'logo' && <LogoAnimation height={compactToolbar ? 70 : 100} onComplete={() => setVizMode('waveform')} />}
+              {vizMode === 'logo' && <LogoAnimation height={compactToolbar ? 70 : 100} onComplete={handleLogoAnimationComplete} />}
               {vizMode === 'envelope' && <EnvelopeVisualizer attack={3} decay={instruments.find(i => i.synthType === 'TB303')?.parameters?.decay ?? 200} sustain={0} release={50} envMod={instruments.find(i => i.synthType === 'TB303')?.parameters?.envMod ?? 60} height={compactToolbar ? 70 : 100} color="var(--color-synth-envelope)" label="Filter Envelope" />}
               {vizMode === 'accent' && <AccentChargeVisualizer charge={0} sweepSpeed={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.sweepSpeed ?? 'normal'} enabled={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.accentSweepEnabled ?? true} height={compactToolbar ? 70 : 100} color="var(--color-synth-accent)" />}
             </>
@@ -831,6 +858,62 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           if (moduleInfo) await handleModuleImport(moduleInfo);
         } catch (error) { notify.error('Failed to load module'); }
       }} />
+
+      {/* Clear Modal */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+          <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h2 className="text-lg font-bold text-text-primary mb-4">Clear Project</h2>
+            <p className="text-sm text-text-secondary mb-6">What would you like to clear?</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  if (isPlaying) { stop(); engine.releaseAll(); }
+                  resetInstruments();
+                  setShowClearModal(false);
+                  notify.success('Instruments cleared');
+                }}
+              >
+                Clear Instruments
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  if (isPlaying) { stop(); engine.releaseAll(); }
+                  resetTracker();
+                  setShowClearModal(false);
+                  notify.success('Song data cleared');
+                }}
+              >
+                Clear Song Data
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  if (isPlaying) { stop(); engine.releaseAll(); }
+                  resetInstruments();
+                  resetTracker();
+                  setShowClearModal(false);
+                  notify.success('Project cleared');
+                }}
+              >
+                Clear Both
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowClearModal(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
