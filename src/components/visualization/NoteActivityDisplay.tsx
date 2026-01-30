@@ -159,6 +159,7 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
     whiteKeyIndex = 0;
     for (let octave = octaveStart; octave < octaveEnd; octave++) {
       for (let i = 0; i < WHITE_NOTES.length; i++) {
+        // WHITE_NOTES[i] gives us the note position in octave, used for black key detection below
         const x = whiteKeyIndex * whiteKeyWidth;
 
         // Check if there's a black key after this white key

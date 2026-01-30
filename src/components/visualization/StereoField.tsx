@@ -50,6 +50,8 @@ export const StereoField: React.FC<StereoFieldProps> = ({
     const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
     const gridColor = isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)';
     const dotColor = isCyanTheme ? '#00ffff' : '#00d4aa';
+    const trailColor = isCyanTheme ? 'rgba(0, 255, 255, 0.3)' : 'rgba(0, 212, 170, 0.3)';
+    void trailColor; // Reserved for trail rendering feature
 
     if (!isPlaying) {
       // Draw static state

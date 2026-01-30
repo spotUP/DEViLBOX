@@ -9,7 +9,7 @@
  * - 30fps animation
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState as _useState } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useVisualizationStore } from '@stores/useVisualizationStore';
 
@@ -44,6 +44,10 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const playheadPosRef = useRef(0);
+  const lastStageRef = useRef<ADSRStage>('idle');
+  void playheadPosRef; // Reserved for playhead animation
+  void lastStageRef; // Reserved for stage change detection
 
   // Subscribe to visualization store
   const adsrStages = useVisualizationStore((state) => state.adsrStages);
