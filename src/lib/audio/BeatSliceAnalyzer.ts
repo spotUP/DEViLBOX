@@ -12,6 +12,7 @@ import type {
   BeatSlice,
   BeatSliceConfig,
   TransientAnalysisResult,
+  GridAnalysisParams as _GridAnalysisParams,
 } from '../../types/beatSlicer';
 
 // FFT parameters for spectral analysis
@@ -22,13 +23,13 @@ const HOP_SIZE = 512;
  * Generate unique ID for slices
  */
 function generateSliceId(): string {
-  return `slice_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  return `slice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
  * Compute the magnitude spectrum from FFT data
  */
-function computeMagnitudeSpectrum(real: Float32Array<ArrayBufferLike>, imag: Float32Array<ArrayBufferLike>): Float32Array {
+function computeMagnitudeSpectrum(real: Float32Array, imag: Float32Array): Float32Array {
   const magnitude = new Float32Array(real.length);
   for (let i = 0; i < real.length; i++) {
     magnitude[i] = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]);
@@ -107,8 +108,8 @@ function fft(real: Float32Array, imag: Float32Array): void {
  * Uses half-wave rectification (only positive changes count)
  */
 function computeSpectralFlux(
-  currentSpectrum: Float32Array<ArrayBufferLike>,
-  previousSpectrum: Float32Array<ArrayBufferLike>
+  currentSpectrum: Float32Array,
+  previousSpectrum: Float32Array
 ): number {
   let flux = 0;
   for (let i = 0; i < currentSpectrum.length; i++) {
@@ -193,7 +194,7 @@ export function detectTransients(
 
   // Compute spectral flux for each frame
   const spectralFlux = new Float32Array(numFrames);
-  let previousSpectrum: Float32Array<ArrayBufferLike> = new Float32Array(FFT_SIZE / 2);
+  let previousSpectrum = new Float32Array(FFT_SIZE / 2);
 
   for (let frameIdx = 0; frameIdx < numFrames; frameIdx++) {
     const startSample = frameIdx * HOP_SIZE;
@@ -218,7 +219,7 @@ export function detectTransients(
 
     // Compute spectral flux
     spectralFlux[frameIdx] = computeSpectralFlux(spectrum, previousSpectrum);
-    previousSpectrum = spectrum;
+    previousSpectrum = new Float32Array(spectrum);
   }
 
   // Compute adaptive threshold
@@ -384,6 +385,8 @@ export function addManualSlice(
   config: BeatSliceConfig
 ): BeatSlice[] {
   const sampleRate = audioBuffer.sampleRate;
+  const totalFrames = audioBuffer.length;
+  void totalFrames; // Available for bounds validation
   const monoData = getMonoData(audioBuffer);
 
   // Snap to zero crossing if enabled

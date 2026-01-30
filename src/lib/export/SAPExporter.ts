@@ -18,10 +18,7 @@ import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import type { RegisterWrite } from './VGMExporter';
 import { parseRegisterLog } from './VGMExporter';
 
-/**
- * POKEY Register addresses (relative to $D200)
- * Exported for documentation and potential UI use
- */
+// POKEY Register addresses (relative to $D200) - exported for documentation
 export const POKEY_REG = {
   AUDF1: 0x00,  // Audio frequency 1
   AUDC1: 0x01,  // Audio control 1
@@ -41,10 +38,7 @@ export const POKEY_REG = {
   SKCTLS: 0x0F, // Serial control
 } as const;
 
-/**
- * Standard POKEY clock rates
- * Exported for documentation and potential UI use
- */
+// Standard POKEY clock rates - exported for documentation
 export const POKEY_CLOCKS = {
   NTSC: 1789773,  // NTSC (North America)
   PAL: 1773447,   // PAL (Europe)
@@ -167,9 +161,8 @@ function buildRawPOKEYData(
   // Group by frame
   const frameGroups = groupWritesByFrame(allWrites, samplesPerFrame);
 
-  // Find max frame (handle empty case)
-  const frameKeys = Array.from(frameGroups.keys());
-  const maxFrame = frameKeys.length > 0 ? Math.max(...frameKeys) : 0;
+  // Find max frame
+  const maxFrame = Math.max(...frameGroups.keys(), 0);
   const frameCount = maxFrame + 1;
 
   // Bytes per frame: 9 for mono, 18 for stereo

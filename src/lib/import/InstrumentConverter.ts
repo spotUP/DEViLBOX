@@ -1,6 +1,6 @@
 /**
  * Instrument Converter
- * Converts MOD/XM samples to DEViLBOX Sampler instruments
+ * Converts MOD/XM samples and Furnace instruments to DEViLBOX InstrumentConfig
  * Preserves original envelope data for future point-based editor
  */
 
@@ -14,6 +14,8 @@ import type {
   SampleConfig,
   InstrumentMetadata,
   SynthType,
+  FurnaceConfig,
+  FurnaceMacro,
 } from '../../types/instrument';
 import {
   convertEnvelopeToADSR,
@@ -22,6 +24,7 @@ import {
 
 /**
  * Convert parsed instrument to DEViLBOX instrument config
+ * Handles both sample-based (MOD/XM) and synth-based (Furnace) instruments
  */
 export function convertToInstrument(
   parsed: ParsedInstrument,
@@ -30,6 +33,54 @@ export function convertToInstrument(
 ): InstrumentConfig[] {
   const instruments: InstrumentConfig[] = [];
 
+  // Check if this is a Furnace instrument (chip synth)
+  if (parsed.furnace) {
+    const synthType = parsed.furnace.synthType;
+
+    // Sample-based Furnace instruments (Amiga, SNES, etc.) should use sample conversion
+    // They need actual sample data, not FurnaceConfig
+    const isSampleBased = synthType === 'Sampler' || synthType === 'Player';
+
+    if (isSampleBased) {
+      // Use standard sample conversion for sample-based Furnace instruments
+      if (parsed.samples.length > 0) {
+        for (let i = 0; i < parsed.samples.length; i++) {
+          const sample = parsed.samples[i];
+          const sampleInst = convertSampleToInstrument(
+            sample,
+            parsed,
+            instrumentId + i,
+            sourceFormat
+          );
+          instruments.push(sampleInst);
+        }
+      } else {
+        // No samples - create a placeholder instrument
+        console.warn(`[InstrumentConverter] Furnace Sampler instrument ${instrumentId} "${parsed.name}" has no samples`);
+      }
+      return instruments;
+    }
+
+    // Chip synths (GB, NES, FM, etc.) use FurnaceConfig
+    const furnaceInst = convertFurnaceInstrument(parsed, instrumentId);
+    instruments.push(furnaceInst);
+
+    // If the Furnace chip instrument also has samples (rare), add those too
+    for (let i = 0; i < parsed.samples.length; i++) {
+      const sample = parsed.samples[i];
+      const sampleInst = convertSampleToInstrument(
+        sample,
+        parsed,
+        instrumentId + i + 1, // Offset by 1 since the main synth takes instrumentId
+        sourceFormat
+      );
+      instruments.push(sampleInst);
+    }
+
+    return instruments;
+  }
+
+  // Standard sample-based conversion for MOD/XM/IT/S3M
   // XM instruments can have multiple samples
   // Create one DEViLBOX instrument per sample (simplest approach)
   // Use sequential IDs: instrumentId, instrumentId+1, instrumentId+2, etc.
@@ -48,13 +99,106 @@ export function convertToInstrument(
 }
 
 /**
+ * Convert Furnace instrument to DEViLBOX InstrumentConfig
+ * Preserves FM, macro, and wavetable data for chip-accurate playback
+ */
+function convertFurnaceInstrument(
+  parsed: ParsedInstrument,
+  instrumentId: number
+): InstrumentConfig {
+  const furnaceData = parsed.furnace!;
+  const synthType = furnaceData.synthType as SynthType;
+
+  // Build FurnaceConfig from FurnaceInstrumentData
+  const furnaceConfig: FurnaceConfig = {
+    chipType: furnaceData.chipType,
+
+    // FM parameters (default to safe values if not present)
+    algorithm: furnaceData.fm?.algorithm ?? 0,
+    feedback: furnaceData.fm?.feedback ?? 0,
+    fms: furnaceData.fm?.fms ?? 0,
+    ams: furnaceData.fm?.ams ?? 0,
+    ops: furnaceData.fm?.ops ?? 4,
+    opllPreset: furnaceData.fm?.opllPreset ?? 0,
+
+    // Operators (provide empty array if no FM)
+    operators: furnaceData.fm?.operators?.map(op => ({
+      enabled: op.enabled,
+      mult: op.mult,
+      tl: op.tl,
+      ar: op.ar,
+      dr: op.dr,
+      d2r: op.d2r ?? 0,
+      sl: op.sl,
+      rr: op.rr,
+      dt: op.dt,
+      dt2: op.dt2 ?? 0,
+      rs: op.rs ?? 0,
+      am: op.am ?? false,
+      ksr: op.ksr ?? false,
+      ksl: op.ksl ?? 0,
+      sus: op.sus ?? false,
+      vib: op.vib ?? false,
+      ws: op.ws ?? 0,
+      ssg: op.ssg ?? 0,
+    })) ?? [],
+
+    // Convert macros from FurnaceMacroData to FurnaceMacro
+    macros: furnaceData.macros.map(m => ({
+      type: m.type,
+      data: [...m.data],
+      loop: m.loop,
+      release: m.release,
+      speed: m.speed,
+    } as FurnaceMacro)),
+
+    // Per-operator macros (empty for now, could be extended)
+    opMacros: [],
+
+    // Wavetables
+    wavetables: furnaceData.wavetables.map(wt => ({
+      id: wt.id,
+      data: [...wt.data],
+      len: wt.len,
+      max: wt.max,
+    })),
+  };
+
+  // Create the instrument config
+  const instrument: InstrumentConfig = {
+    id: instrumentId,
+    name: parsed.name || `Furnace Inst ${instrumentId}`,
+    type: 'synth' as const,
+    synthType,
+    envelope: {
+      attack: 10,
+      decay: 100,
+      sustain: 80,
+      release: 100,
+    },
+    effects: [],
+    volume: 0, // Unity gain
+    pan: 0,
+    metadata: {
+      importedFrom: 'FUR',
+    },
+    furnace: furnaceConfig,
+    parameters: {},
+  };
+
+  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}`);
+
+  return instrument;
+}
+
+/**
  * Convert a single sample to Sampler instrument
  */
 function convertSampleToInstrument(
   sample: ParsedSample,
   parentInstrument: ParsedInstrument,
   instrumentId: number,
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M'
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR'
 ): InstrumentConfig {
   // Convert sample PCM data to AudioBuffer and blob URL
   const { audioBuffer, blobUrl } = convertPCMToAudioBuffer(sample);
@@ -94,7 +238,7 @@ function convertSampleToInstrument(
 
   // Create metadata
   const metadata: InstrumentMetadata = {
-    importedFrom: sourceFormat,
+    importedFrom: sourceFormat === 'FUR' ? 'FUR' : sourceFormat,
     originalEnvelope: parentInstrument.volumeEnvelope,
     autoVibrato: parentInstrument.autoVibrato,
     preservedSample: {
@@ -197,7 +341,8 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
   const dataUrl = `data:audio/wav;base64,${base64}`;
 
   return {
-    audioBuffer: samples16bit.buffer,
+    // Return WAV buffer (not raw PCM) so ToneEngine.decodeAudioData can decode it
+    audioBuffer: wavArrayBuffer,
     blobUrl: dataUrl,
   };
 }

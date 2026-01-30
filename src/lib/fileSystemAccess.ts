@@ -201,14 +201,7 @@ export async function pickFiles(options?: {
   try {
     const handles = await (window as any).showOpenFilePicker({
       multiple: options?.multiple ?? false,
-      excludeAcceptAllOption: false, // Allow "All Files" option
       types: options?.types ?? [
-        {
-          description: 'All Supported Formats',
-          accept: {
-            'application/octet-stream': ['.dbox', '.mod', '.xm', '.it', '.s3m', '.sqs', '.seq'],
-          },
-        },
         {
           description: 'DEViLBOX Modules',
           accept: {
@@ -219,12 +212,6 @@ export async function pickFiles(options?: {
           description: 'Tracker Modules',
           accept: {
             'audio/x-mod': ['.mod', '.xm', '.it', '.s3m'],
-          },
-        },
-        {
-          description: 'TD-3 Patterns',
-          accept: {
-            'application/octet-stream': ['.sqs', '.seq'],
           },
         },
       ],

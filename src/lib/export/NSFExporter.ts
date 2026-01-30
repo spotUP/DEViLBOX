@@ -23,6 +23,30 @@ import type { RegisterWrite } from './VGMExporter';
 const NSF_HEADER_SIZE = 128;
 const NSF_MAGIC = [0x4E, 0x45, 0x53, 0x4D, 0x1A]; // "NESM\x1A"
 
+// APU register addresses - exported for documentation
+export const APU_REGS = {
+  PULSE1_VOL: 0x4000,
+  PULSE1_SWEEP: 0x4001,
+  PULSE1_LO: 0x4002,
+  PULSE1_HI: 0x4003,
+  PULSE2_VOL: 0x4004,
+  PULSE2_SWEEP: 0x4005,
+  PULSE2_LO: 0x4006,
+  PULSE2_HI: 0x4007,
+  TRI_LINEAR: 0x4008,
+  TRI_LO: 0x400A,
+  TRI_HI: 0x400B,
+  NOISE_VOL: 0x400C,
+  NOISE_LO: 0x400E,
+  NOISE_HI: 0x400F,
+  DMC_FREQ: 0x4010,
+  DMC_RAW: 0x4011,
+  DMC_START: 0x4012,
+  DMC_LEN: 0x4013,
+  STATUS: 0x4015,
+  FRAME_CTR: 0x4017,
+} as const;
+
 // Frame rate
 const FRAME_RATE = 60;
 const SAMPLES_PER_FRAME = 44100 / FRAME_RATE;

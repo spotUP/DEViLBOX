@@ -14,16 +14,15 @@ import type { EnvelopeConfig } from '../../types/instrument';
  * Convert point-based envelope to ADSR approximation
  */
 export function convertEnvelopeToADSR(
-  envelope: EnvelopePoints | undefined
+  envelope: EnvelopePoints | undefined,
+  defaultSustain: number = 0
 ): EnvelopeConfig {
-  // Default envelope for samples without volume envelope data
-  // MOD/Amiga samples: NO envelope processing - just play raw sample
-  // This envelope is effectively transparent (instant attack/release, full sustain)
+  // Default tracker-style envelope (fast attack, decay to silence)
   const defaultEnvelope: EnvelopeConfig = {
-    attack: 0.001,  // Near-instant (can't be 0 in Tone.js)
-    decay: 0.001,   // Near-instant (skip decay phase)
-    sustain: 100,   // Full volume - no envelope shaping
-    release: 0.001, // Near-instant cutoff on note off
+    attack: 10,
+    decay: 500,
+    sustain: defaultSustain,
+    release: 100,
   };
 
   if (!envelope || !envelope.enabled || envelope.points.length < 2) {

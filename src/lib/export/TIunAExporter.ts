@@ -20,10 +20,7 @@ import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import type { RegisterWrite } from './VGMExporter';
 import { parseRegisterLog } from './VGMExporter';
 
-/**
- * TIA Register offsets (relative to $15 or 0 for our purposes)
- * Exported for documentation and potential UI use
- */
+// TIA Register offsets (relative to $15 or 0 for our purposes) - exported for documentation
 export const TIA_REG = {
   AUDC0: 0,   // Distortion + volume CH0
   AUDC1: 1,   // Distortion + volume CH1
@@ -33,10 +30,7 @@ export const TIA_REG = {
   AUDV1: 5,   // Volume CH1 (0-15)
 } as const;
 
-/**
- * TIA Distortion types (upper 4 bits of AUDCx)
- * Exported for documentation and potential UI use
- */
+// TIA Distortion types (upper 4 bits of AUDCx) - exported for documentation
 export const TIA_DISTORTION = {
   SILENT: 0x00,
   BUZZ: 0x10,       // 4-bit poly
@@ -131,9 +125,8 @@ function buildTIAFrameData(
     frameGroups.get(frame)!.push(write);
   }
 
-  // Find max frame (handle empty case)
-  const frameKeys = Array.from(frameGroups.keys());
-  const maxFrame = frameKeys.length > 0 ? Math.max(...frameKeys) : 0;
+  // Find max frame
+  const maxFrame = Math.max(...frameGroups.keys(), 0);
   const frameCount = maxFrame + 1;
 
   // 6 bytes per frame: AUDC0, AUDC1, AUDF0, AUDF1, AUDV0, AUDV1
@@ -232,14 +225,13 @@ export function exportToTIunAText(
   }
 
   const currentState = new Uint8Array(6);
-  const textFrameKeys = Array.from(frameGroups.keys());
-  const maxFrame = textFrameKeys.length > 0 ? Math.max(...textFrameKeys) : 0;
+  const maxFrame = Math.max(...frameGroups.keys(), 0);
 
   for (let frame = 0; frame <= maxFrame; frame++) {
     const frameWrites = frameGroups.get(frame) || [];
 
     for (const write of frameWrites) {
-      const reg = write.port >= 0x15 ? write.port - 0x15 : write.port;
+      let reg = write.port >= 0x15 ? write.port - 0x15 : write.port;
       if (reg >= 0 && reg < 6) {
         currentState[reg] = write.data;
       }

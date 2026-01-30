@@ -19,12 +19,95 @@ import type {
   ParsedInstrument,
   ParsedSample,
   ImportMetadata,
+  FurnaceInstrumentData,
+  FurnaceMacroData as _FurnaceMacroData,
+  FurnaceWavetableData as _FurnaceWavetableData,
 } from '../../../types/tracker';
-import type { FurnaceConfig, FurnaceOperatorConfig } from '../../../types/instrument';
+import type { FurnaceConfig, FurnaceOperatorConfig, SynthType } from '../../../types/instrument';
 import { DEFAULT_FURNACE } from '../../../types/instrument';
 
 // Format version constants
 const DIV_ENGINE_VERSION = 228;
+
+/**
+ * Furnace instrument type (DIV_INS_*) to DEViLBOX SynthType mapping
+ * Based on furnace-master/src/engine/instrument.h
+ */
+const FURNACE_TYPE_MAP: Record<number, SynthType> = {
+  0: 'ChipSynth',           // DIV_INS_STD - Standard
+  1: 'FurnaceOPN',          // DIV_INS_FM - FM synthesis (Genesis/Megadrive)
+  2: 'FurnaceGB',           // DIV_INS_GB - Game Boy
+  3: 'FurnaceC64',          // DIV_INS_C64 - Commodore 64 SID
+  4: 'Sampler',             // DIV_INS_AMIGA - Amiga samples
+  5: 'FurnacePCE',          // DIV_INS_PCE - PC Engine / TurboGrafx-16
+  6: 'FurnaceAY',           // DIV_INS_AY - AY-3-8910 (ZX Spectrum, MSX)
+  7: 'FurnaceAY',           // DIV_INS_AY8930 - AY8930 (enhanced AY)
+  8: 'FurnaceTIA',          // DIV_INS_TIA - Atari 2600
+  9: 'FurnaceSAA',          // DIV_INS_SAA1099 - Philips SAA1099
+  10: 'FurnaceVIC',         // DIV_INS_VIC - VIC-20
+  11: 'ChipSynth',          // DIV_INS_PET - Commodore PET
+  12: 'FurnaceVRC6',        // DIV_INS_VRC6 - Konami VRC6
+  13: 'FurnaceOPLL',        // DIV_INS_OPLL - Yamaha YM2413
+  14: 'FurnaceOPL',         // DIV_INS_OPL - Yamaha YM3526/YM3812/YMF262
+  15: 'FurnaceFDS',         // DIV_INS_FDS - Famicom Disk System
+  16: 'FurnaceVB',          // DIV_INS_VBOY - Virtual Boy
+  17: 'FurnaceN163',        // DIV_INS_N163 - Namco 163
+  18: 'FurnaceSCC',         // DIV_INS_SCC - Konami SCC
+  19: 'FurnaceOPZ',         // DIV_INS_OPZ - Yamaha YM2414
+  20: 'ChipSynth',          // DIV_INS_POKEY - Atari POKEY
+  21: 'ChipSynth',          // DIV_INS_BEEPER - PC Speaker
+  22: 'FurnaceSWAN',        // DIV_INS_SWAN - WonderSwan
+  23: 'FurnaceLynx',        // DIV_INS_MIKEY - Atari Lynx
+  24: 'FurnaceVERA',        // DIV_INS_VERA - Commander X16
+  25: 'FurnaceX1_010',      // DIV_INS_X1_010 - Seta X1-010
+  26: 'FurnaceVRC6',        // DIV_INS_VRC6_SAW - VRC6 Sawtooth
+  27: 'FurnaceES5506',      // DIV_INS_ES5506 - Ensoniq ES5506
+  28: 'Sampler',            // DIV_INS_MULTIPCM - Sega MultiPCM
+  29: 'FurnaceSNES',        // DIV_INS_SNES - Super Nintendo
+  30: 'ChipSynth',          // DIV_INS_SU - Sound Unit
+  31: 'ChipSynth',          // DIV_INS_NAMCO - Namco WSG
+  32: 'FurnaceOPL',         // DIV_INS_OPL_DRUMS - OPL Drums
+  33: 'FurnaceOPM',         // DIV_INS_OPM - Yamaha YM2151
+  34: 'FurnaceNES',         // DIV_INS_NES - Nintendo NES
+  35: 'Sampler',            // DIV_INS_MSM6258 - OKI MSM6258
+  36: 'FurnaceOKI',         // DIV_INS_MSM6295 - OKI MSM6295
+  37: 'Sampler',            // DIV_INS_ADPCMA - YM2610 ADPCM-A
+  38: 'Sampler',            // DIV_INS_ADPCMB - YM2610 ADPCM-B
+  39: 'FurnaceSEGAPCM',     // DIV_INS_SEGAPCM - Sega PCM
+  40: 'FurnaceQSOUND',      // DIV_INS_QSOUND - Capcom QSound
+  41: 'FurnaceYMZ280B',     // DIV_INS_YMZ280B - Yamaha YMZ280B
+  42: 'FurnaceRF5C68',      // DIV_INS_RF5C68 - Ricoh RF5C68
+  43: 'ChipSynth',          // DIV_INS_MSM5232 - OKI MSM5232
+  44: 'FurnaceT6W28',       // DIV_INS_T6W28 - NEC T6W28
+  45: 'FurnaceK007232',     // DIV_INS_K007232 - Konami K007232
+  46: 'FurnaceGA20',        // DIV_INS_GA20 - Irem GA20
+  47: 'ChipSynth',          // DIV_INS_POKEMINI - Pokemon Mini
+  48: 'FurnaceSM8521',      // DIV_INS_SM8521 - Sharp SM8521
+  49: 'ChipSynth',          // DIV_INS_PV1000 - Casio PV-1000
+  50: 'FurnaceK053260',     // DIV_INS_K053260 - Konami K053260
+  52: 'FurnaceTED',         // DIV_INS_TED - Commodore Plus/4
+  53: 'FurnaceC140',        // DIV_INS_C140 - Namco C140
+  54: 'Sampler',            // DIV_INS_C219 - Namco C219
+  55: 'FurnaceESFM',        // DIV_INS_ESFM - ESS ESFM
+  56: 'ChipSynth',          // DIV_INS_POWERNOISE - Power Noise
+  57: 'ChipSynth',          // DIV_INS_POWERNOISE_SLOPE - Power Noise Slope
+  58: 'ChipSynth',          // DIV_INS_DAVE - Enterprise DAVE
+  59: 'Sampler',            // DIV_INS_NDS - Nintendo DS
+  60: 'Sampler',            // DIV_INS_GBA_DMA - Game Boy Advance DMA
+  61: 'Sampler',            // DIV_INS_GBA_MINMOD - Game Boy Advance MinMod
+  62: 'ChipSynth',          // DIV_INS_BIFURCATOR - Bifurcator
+  63: 'FurnaceC64',         // DIV_INS_SID2 - SID2
+  64: 'FurnaceSUPERVISION', // DIV_INS_SUPERVISION - Watara Supervision
+  65: 'FurnaceUPD1771',     // DIV_INS_UPD1771C - NEC μPD1771C
+  66: 'FurnaceC64',         // DIV_INS_SID3 - SID3
+};
+
+/**
+ * Map Furnace instrument type to SynthType
+ */
+function mapFurnaceInstrumentType(furType: number): SynthType {
+  return FURNACE_TYPE_MAP[furType] || 'ChipSynth';
+}
 
 // Note conversion tables from fur.cpp
 const newFormatNotes: number[] = [
@@ -345,8 +428,7 @@ function readString(reader: BinaryReader): string {
 export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModule> {
   const rawData = new Uint8Array(buffer);
   const data = decompressFur(rawData);
-  const arrayBuffer = data.buffer as ArrayBuffer;
-  const reader = new BinaryReader(arrayBuffer);
+  const reader = new BinaryReader(data.buffer as ArrayBuffer);
 
   // Read magic header (16 bytes)
   const magic = reader.readMagic(16);
@@ -396,10 +478,10 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
 
   if (version >= 240) {
     // New format (INF2)
-    await parseNewFormat(reader, module, version, arrayBuffer);
+    await parseNewFormat(reader, module, version, data.buffer as ArrayBuffer);
   } else {
     // Old format (INFO)
-    await parseOldFormat(reader, module, version, arrayBuffer);
+    await parseOldFormat(reader, module, version, data.buffer as ArrayBuffer);
   }
 
   return module;
@@ -663,7 +745,8 @@ async function parseOldFormat(
   const insLen = reader.readUint16();
   const waveLen = reader.readUint16();
   const sampleLen = reader.readUint16();
-  reader.readUint32(); // numberOfPats - not used, patterns are parsed from elements
+  const numberOfPats = reader.readUint32();
+  void numberOfPats; // Pattern count for allocation hints
 
   // Sound chips (32 bytes)
   const chips: number[] = [];
@@ -757,8 +840,9 @@ async function parseOldFormat(
   }
   module.chans = tchans;
 
-  // Read pattern pointers (not used - patterns are at explicit pointers)
-  if (reader.readUint32) reader.readUint32();
+  // Read pattern pointers
+  const patternCount = reader.readUint32 ? reader.readUint32() : 0;
+  void patternCount; // Pattern count for validation
 
   // Orders
   subsong.orders = [];
@@ -1082,6 +1166,7 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
   const flags = reader.readUint8();
   const opCount = flags & 0x0F;
   const opEnabled = (flags >> 4) & 0x0F;
+  config.ops = opCount;
 
   // Base data
   const algFb = reader.readUint8();
@@ -1091,12 +1176,9 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
   const fmsAms = reader.readUint8();
   config.fms = fmsAms & 0x07;
   config.ams = (fmsAms >> 3) & 0x03;
-  config.fms2 = (fmsAms >> 5) & 0x07;
 
   const llPatchAm2 = reader.readUint8();
   config.opllPreset = llPatchAm2 & 0x1F;
-  config.ams2 = (llPatchAm2 >> 5) & 0x03;
-  config.ops = opCount;
 
   // Read operators
   for (let i = 0; i < opCount; i++) {
@@ -1123,15 +1205,11 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
       ksl: (amDr >> 5) & 0x03,
       am: ((amDr >> 7) & 1) !== 0,
       d2r: egtD2r & 0x1F,
-      // egt: ((egtD2r >> 5) & 1) !== 0,
       sl: (slRr >> 4) & 0x0F,
       rr: slRr & 0x0F,
       ssg: dvbSsg & 0x0F,
-      dvb: (dvbSsg >> 4) & 0x0F,
       ws: damDt2Ws & 0x07,
       dt2: (damDt2Ws >> 3) & 0x03,
-      dam: (damDt2Ws >> 5) & 0x07,
-      egt: ((egtD2r >> 5) & 1) !== 0,
     };
 
     config.operators.push(op);
@@ -1159,8 +1237,7 @@ function parseFMDataOld(reader: BinaryReader, _version: number): FurnaceConfig {
 
   const opCount = reader.readUint8();
   config.ops = opCount;
-  const opllPreset = reader.readUint8();
-  config.opllPreset = opllPreset;
+  config.opllPreset = reader.readUint8() & 0x1F;
   reader.skip(2); // reserved
 
   for (let i = 0; i < 4; i++) {
@@ -1393,6 +1470,8 @@ function parsePattern(
     // Get pattern length from subsong
     const subsong = subsongs[pat.subsong] || subsongs[0];
     const patLen = subsong?.patLen || 64;
+    const effectCols = subsong?.effectColumns[pat.channel] || 1;
+    void effectCols; // Effect column count for multi-effect parsing
 
     // Initialize rows
     for (let i = 0; i < patLen; i++) {
@@ -1582,16 +1661,83 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   patterns: any[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
-  // Convert instruments
+  // Convert instruments with full Furnace data preservation
   const instruments: ParsedInstrument[] = module.instruments.map((inst, idx) => {
     const samples: ParsedSample[] = [];
+    
+    // Map Furnace instrument type to SynthType
+    const synthType = mapFurnaceInstrumentType(inst.type);
+    const isSampleBased = synthType === 'Sampler' || synthType === 'Player';
 
     // Convert samples referenced by this instrument
-    for (const sampleIdx of inst.samples) {
-      if (sampleIdx < module.samples.length) {
-        const furSample = module.samples[sampleIdx];
-        samples.push(convertFurnaceSample(furSample, sampleIdx));
+    if (inst.samples && inst.samples.length > 0) {
+      for (const sampleIdx of inst.samples) {
+        if (sampleIdx < module.samples.length) {
+          const furSample = module.samples[sampleIdx];
+          samples.push(convertFurnaceSample(furSample, sampleIdx));
+        }
       }
+    } else if (isSampleBased && idx < module.samples.length) {
+      // Default sample association for Amiga-style instruments
+      // When inst.samples is empty, use sample[idx] for instrument[idx]
+      const furSample = module.samples[idx];
+      samples.push(convertFurnaceSample(furSample, idx));
+    }
+
+    // Build FurnaceInstrumentData for chip-accurate playback
+    const furnaceData: FurnaceInstrumentData = {
+      chipType: inst.type,
+      synthType,
+      macros: inst.macros.map(m => ({
+        type: m.code,
+        data: [...m.data],
+        loop: m.loop,
+        release: m.release,
+        speed: m.speed,
+      })),
+      wavetables: inst.wavetables
+        .filter(wIdx => wIdx < module.wavetables.length)
+        .map(wIdx => {
+          const wt = module.wavetables[wIdx];
+          return {
+            id: wIdx,
+            data: [...wt.data],
+            len: wt.width,
+            max: wt.height,
+          };
+        }),
+    };
+
+    // Add FM parameters if present
+    if (inst.fm) {
+      furnaceData.fm = {
+        algorithm: inst.fm.algorithm,
+        feedback: inst.fm.feedback,
+        fms: inst.fm.fms,
+        ams: inst.fm.ams,
+        ops: inst.fm.ops,
+        opllPreset: inst.fm.opllPreset,
+        operators: inst.fm.operators.map((op: any) => ({
+          enabled: op.enable,
+          mult: op.mult,
+          tl: op.tl,
+          ar: op.ar,
+          dr: op.dr,
+          d2r: op.d2r,
+          sl: op.sl,
+          rr: op.rr,
+          dt: op.dt,
+          dt2: op.dt2,
+          rs: op.rs,
+          am: op.am,
+          ksr: op.ksr,
+          ksl: op.ksl,
+          sus: op.sus,
+          vib: op.vib,
+          ws: op.ws,
+          ssg: op.ssg,
+        })),
+      };
     }
 
     return {
@@ -1601,6 +1747,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
       fadeout: 0,
       volumeType: 'none' as const,
       panningType: 'none' as const,
+      furnace: furnaceData,
     };
   });
 
@@ -1698,7 +1845,7 @@ function convertFurnaceSample(furSample: FurnaceSample, id: number): ParsedSampl
     for (let i = 0; i < furSample.length; i++) {
       data16[i] = (furSample.data as Int8Array)[i] * 256;
     }
-    pcmData = data16.buffer as ArrayBuffer;
+    pcmData = data16.buffer;
   } else {
     // Other formats - create empty buffer
     pcmData = new ArrayBuffer(furSample.length * 2);
@@ -1765,30 +1912,112 @@ function convertFurnaceCell(cell: FurnacePatternCell): any {
 }
 
 /**
- * Map Furnace effect to XM effect
+ * Map Furnace effect to XM/IT effect
+ * Returns the mapped effect code, or the original if it's a Furnace-specific effect
+ * that needs custom handling in the replayer
  */
 function mapFurnaceEffect(furEffect: number): number {
-  // Furnace effects roughly match XM effects for common commands
+  // Comprehensive Furnace to XM/IT effect mapping
+  // Based on Furnace source: src/engine/playback.cpp
+
   const mapping: Record<number, number> = {
+    // === Standard Effects (0x00-0x0F) - mostly 1:1 with XM ===
     0x00: 0x00, // Arpeggio
-    0x01: 0x01, // Porta up
-    0x02: 0x02, // Porta down
-    0x03: 0x03, // Tone porta
+    0x01: 0x01, // Pitch slide up
+    0x02: 0x02, // Pitch slide down
+    0x03: 0x03, // Portamento (tone porta)
     0x04: 0x04, // Vibrato
-    0x05: 0x05, // Porta + vol slide
-    0x06: 0x06, // Vibrato + vol slide
+    0x05: 0x06, // Vol slide + vibrato (Furnace swaps 05/06 vs XM)
+    0x06: 0x05, // Vol slide + porta
     0x07: 0x07, // Tremolo
-    0x08: 0x08, // Panning
-    0x09: 0x09, // Sample offset
-    0x0A: 0x0A, // Vol slide
+    0x08: 0x08, // Panning (4-bit split)
+    0x09: 0x0F, // Groove/speed 1 → map to set speed
+    0x0A: 0x0A, // Volume slide
     0x0B: 0x0B, // Position jump
-    0x0C: 0x0C, // Set volume
+    0x0C: 0xE9, // Retrigger → XM extended retrigger (E9x)
     0x0D: 0x0D, // Pattern break
     0x0F: 0x0F, // Set speed/tempo
-    0x10: 0x10, // Set global volume
+
+    // === Global Effects (0x10-0x1F) ===
+    0x10: 0x10, // Set global volume (G in IT)
+    0x11: 0x11, // Global volume slide (H in IT)
+
+    // === Panning Effects (0x80-0x8F) ===
+    0x80: 0x08, // Panning linear → standard panning
+    0x81: 0x08, // Panning left → standard panning
+    0x82: 0x08, // Panning right → standard panning
+    0x83: 0x19, // Pan slide → IT P command
+    0x84: 0x19, // Panbrello → approximate with pan slide
+    0x88: 0x08, // Panning rear → standard panning
+    0x89: 0x08, // Panning left (8-bit) → standard panning
+    0x8A: 0x08, // Panning right (8-bit) → standard panning
+
+    // === Sample Position Effects (0x90-0x9F) ===
+    0x90: 0x09, // Set sample position → sample offset
+    0x91: 0x09,
+    0x92: 0x09,
+    0x93: 0x09,
+    0x94: 0x09,
+    0x95: 0x09,
+    0x96: 0x09,
+    0x97: 0x09,
+    0x98: 0x09,
+    0x99: 0x09,
+    0x9A: 0x09,
+    0x9B: 0x09,
+    0x9C: 0x09,
+    0x9D: 0x09,
+    0x9E: 0x09,
+    0x9F: 0x09,
+
+    // === Frequency Effects (0xC0-0xC3) ===
+    // These set Hz directly - map to speed/tempo as approximation
+    0xC0: 0x0F,
+    0xC1: 0x0F,
+    0xC2: 0x0F,
+    0xC3: 0x0F,
+
+    // === Volume Effects (0xD0-0xDF) ===
+    0xD3: 0x0A, // Volume portamento → volume slide
+    0xD4: 0x0A, // Volume portamento fast → volume slide
+    0xDC: 0xEC, // Delayed mute → note cut
+
+    // === Extended Effects (0xE0-0xEF) ===
+    0xE0: 0x00, // Arp speed → keep as arpeggio (param changes timing)
+    0xE1: 0xE1, // Fine porta up → XM fine porta up
+    0xE2: 0xE2, // Fine porta down → XM fine porta down
+    0xE3: 0xE4, // Vibrato shape → XM vibrato waveform
+    0xE4: 0x04, // Vibrato fine → standard vibrato
+    0xE5: 0x00, // Set pitch → custom (no XM equivalent)
+    0xE6: 0x03, // Delayed legato → portamento
+    0xE7: 0x00, // Delayed macro release → custom
+    0xE8: 0x03, // Delayed legato up → portamento
+    0xE9: 0x03, // Delayed legato down → portamento
+    0xEA: 0x00, // Legato mode → custom
+    0xEB: 0x00, // Sample bank → custom
+    0xEC: 0xEC, // Note cut → XM note cut
+    0xED: 0xED, // Note delay → XM note delay
+    0xEE: 0x00, // External command → custom
+
+    // === Fine Control Effects (0xF0-0xFF) ===
+    0xF0: 0x0F, // Set Hz by tempo → speed
+    0xF1: 0xE1, // Single pitch up → fine porta up
+    0xF2: 0xE2, // Single pitch down → fine porta down
+    0xF3: 0xEA, // Fine vol up → XM fine vol up
+    0xF4: 0xEB, // Fine vol down → XM fine vol down
+    0xF5: 0x00, // Disable macro → custom
+    0xF6: 0x00, // Enable macro → custom
+    0xF7: 0x00, // Restart macro → custom
+    0xF8: 0xEA, // Single vol up → fine vol up
+    0xF9: 0xEB, // Single vol down → fine vol down
+    0xFA: 0x0A, // Fast vol slide → vol slide
+    0xFC: 0xEC, // Note release → note cut
+    0xFD: 0x0F, // Virtual tempo num → speed
+    0xFE: 0x0F, // Virtual tempo den → speed
+    0xFF: 0x00, // Stop song → custom
   };
 
-  return mapping[furEffect] ?? 0;
+  return mapping[furEffect] ?? furEffect; // Pass through unmapped effects
 }
 
 /**
