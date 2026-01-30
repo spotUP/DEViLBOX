@@ -329,19 +329,11 @@ export class FurnaceChipEngine {
         this.isLoaded = true;
         console.log('[FurnaceChipEngine] ✓ WASM chips initialized successfully');
 
-        // Add debug message handler
+        // Message handler for status only (debug/heartbeat logging disabled for performance)
         this.workletNode!.port.addEventListener('message', (event: MessageEvent) => {
-          if (event.data.type === 'debug') {
-            console.log('[FurnaceChipEngine] Worklet debug:', event.data.message, event.data);
-          }
-        });
-
-        // Add debug and status message handler
-        this.workletNode!.port.addEventListener('message', (event: MessageEvent) => {
-          if (event.data.type === 'debug') {
-            console.log('[FurnaceChipEngine] Worklet:', event.data.message, event.data);
-          } else if (event.data.type === 'status') {
-            console.log('[FurnaceChipEngine] Worklet status:', event.data);
+          // Debug and heartbeat messages silenced for performance
+          if (event.data.type === 'status') {
+            // Status logging disabled for performance
           }
         });
 
