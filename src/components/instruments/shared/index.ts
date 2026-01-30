@@ -7,3 +7,5 @@ export { TestKeyboard } from './TestKeyboard';
 export { CategorizedSynthSelector } from './CategorizedSynthSelector';
 export { EffectChain } from './EffectChain';
 export { SynthEditorTabs } from './SynthEditorTabs';
+export { EditorHeader, VisualizationRow } from './EditorHeader';
+export type { EditorHeaderProps, VizMode } from './EditorHeader';

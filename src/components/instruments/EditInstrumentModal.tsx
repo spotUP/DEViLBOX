@@ -13,13 +13,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
-import { VisualTB303Editor, VisualSynthEditor, FurnaceEditor, BuzzmachineEditor } from './editors';
-import { SampleEditor } from './SampleEditor';
+import { UnifiedInstrumentEditor } from './editors';
 import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
-import { X, Check, Search, Settings, Sparkles, Music2, Zap as _Zap, Save, Keyboard, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Check, Search, Settings, Sparkles, Music2, Zap as _Zap, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
@@ -54,11 +53,6 @@ function isFurnaceType(synthType: SynthType): boolean {
 /** Check if synth type uses Buzzmachine editor */
 function isBuzzmachineType(synthType: SynthType): boolean {
   return synthType === 'Buzzmachine' || synthType.startsWith('Buzz');
-}
-
-/** Check if synth type uses Sample editor */
-function isSampleType(synthType: SynthType): boolean {
-  return ['Sampler', 'Player', 'GranularSynth', 'DrumKit', 'ChiptuneModule'].includes(synthType);
 }
 
 type EditorTab = 'sound' | 'effects';
@@ -97,6 +91,25 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   const [showKeyboard, setShowKeyboard] = useState(true);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
+
+  // Left panel collapsed state (persisted)
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('devilbox-editor-left-panel-collapsed');
+      return saved === null ? true : saved === 'true'; // Default collapsed
+    } catch {
+      return true;
+    }
+  });
+
+  // Persist left panel state
+  useEffect(() => {
+    try {
+      localStorage.setItem('devilbox-editor-left-panel-collapsed', String(leftPanelCollapsed));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [leftPanelCollapsed]);
 
   // Reset to create mode when prop changes
   useEffect(() => {
@@ -215,6 +228,28 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   const handleSynthTypeChange = useCallback((_synthType: SynthType) => {
     setActiveTab('sound');
   }, []);
+
+  // Navigate to previous/next instrument
+  const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
+  const currentIndex = sortedInstruments.findIndex((i) => i.id === currentInstrumentId);
+
+  const handlePrevInstrument = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentInstrument(sortedInstruments[currentIndex - 1].id);
+    } else if (sortedInstruments.length > 0) {
+      // Wrap to last instrument
+      setCurrentInstrument(sortedInstruments[sortedInstruments.length - 1].id);
+    }
+  }, [currentIndex, sortedInstruments, setCurrentInstrument]);
+
+  const handleNextInstrument = useCallback(() => {
+    if (currentIndex < sortedInstruments.length - 1) {
+      setCurrentInstrument(sortedInstruments[currentIndex + 1].id);
+    } else if (sortedInstruments.length > 0) {
+      // Wrap to first instrument
+      setCurrentInstrument(sortedInstruments[0].id);
+    }
+  }, [currentIndex, sortedInstruments, setCurrentInstrument]);
 
   if (!isOpen) return null;
 
@@ -354,13 +389,39 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/90">
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
-          {/* Left Sidebar: Instrument List */}
-          <div className="w-52 border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary">
-            <InstrumentList
-              maxHeight="100%"
-              showActions={true}
-              onCreateNew={handleStartCreate}
-            />
+          {/* Left Sidebar: Instrument List (Collapsible) */}
+          <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-52'}`}>
+            {leftPanelCollapsed ? (
+              // Collapsed state - just show expand button
+              <button
+                onClick={() => setLeftPanelCollapsed(false)}
+                className="w-full h-full flex items-start justify-center pt-3 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
+                title="Show instrument list"
+              >
+                <ChevronRight size={16} />
+              </button>
+            ) : (
+              // Expanded state - show instrument list with collapse button
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between px-2 py-1 border-b border-dark-border">
+                  <span className="text-xs font-medium text-text-muted">Instruments</span>
+                  <button
+                    onClick={() => setLeftPanelCollapsed(true)}
+                    className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded transition-colors"
+                    title="Hide instrument list"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <InstrumentList
+                    maxHeight="100%"
+                    showActions={true}
+                    onCreateNew={handleStartCreate}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Main Content Area */}
@@ -369,21 +430,44 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
               <>
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {/* Previous Instrument Button */}
+                    <button
+                      onClick={handlePrevInstrument}
+                      className="p-1.5 rounded hover:bg-dark-bgTertiary text-text-muted hover:text-text-primary transition-colors"
+                      title="Previous instrument"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+
                     <div className={`p-2 rounded-lg bg-dark-bg ${synthInfo?.color || 'text-text-primary'}`}>
                       <IconComponent size={20} />
                     </div>
                     <div>
-                      <input
-                        type="text"
-                        value={currentInstrument.name}
-                        onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
-                        className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
-                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={currentInstrument.name}
+                          onChange={(e) => updateInstrument(currentInstrument.id, { name: e.target.value })}
+                          className="bg-transparent text-text-primary font-semibold text-lg focus:outline-none focus:ring-1 focus:ring-accent-primary rounded px-1 -ml-1"
+                        />
+                        <span className="text-xs text-text-muted font-mono">
+                          ({currentIndex + 1}/{sortedInstruments.length})
+                        </span>
+                      </div>
                       <p className="text-xs text-text-muted">
                         {synthInfo?.name || currentInstrument.synthType} <span className="opacity-50">|</span> ID: {currentInstrument.id.toString(16).toUpperCase().padStart(2, '0')}
                       </p>
                     </div>
+
+                    {/* Next Instrument Button */}
+                    <button
+                      onClick={handleNextInstrument}
+                      className="p-1.5 rounded hover:bg-dark-bgTertiary text-text-muted hover:text-text-primary transition-colors"
+                      title="Next instrument"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -553,7 +637,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 };
 
 // ============================================================================
-// INSTRUMENT EDITOR COMPONENT - Routes to correct editor based on synth type
+// INSTRUMENT EDITOR COMPONENT - Uses UnifiedInstrumentEditor
 // ============================================================================
 
 interface InstrumentEditorProps {
@@ -561,61 +645,20 @@ interface InstrumentEditorProps {
   onChange: (updates: Partial<InstrumentConfig>) => void;
 }
 
+/**
+ * InstrumentEditor - Wrapper that renders the UnifiedInstrumentEditor
+ *
+ * This component provides a clean interface for both create mode and edit mode
+ * while delegating all the rendering logic to UnifiedInstrumentEditor.
+ */
 const InstrumentEditor: React.FC<InstrumentEditorProps> = ({ instrument, onChange }) => {
-  const { synthType } = instrument;
-
-  // TB-303 - Dedicated acid bass editor
-  if (synthType === 'TB303' && instrument.tb303) {
-    return (
-      <VisualTB303Editor
-        config={instrument.tb303}
-        onChange={(tb303Updates) => onChange({
-          tb303: { ...instrument.tb303!, ...tb303Updates }
-        })}
-      />
-    );
-  }
-
-  // Furnace chip synths - FM/PSG/console chip emulation
-  if (isFurnaceType(synthType)) {
-    const furnaceConfig = instrument.furnace || { ...DEFAULT_FURNACE };
-    return (
-      <FurnaceEditor
-        config={furnaceConfig}
-        instrumentId={instrument.id}
-        onChange={(furnaceUpdates) => onChange({
-          furnace: { ...furnaceConfig, ...furnaceUpdates }
-        })}
-      />
-    );
-  }
-
-  // Buzzmachine - Classic tracker generators and effects
-  if (isBuzzmachineType(synthType)) {
-    return (
-      <BuzzmachineEditor
-        config={instrument}
-        onChange={onChange}
-      />
-    );
-  }
-
-  // Sample-based instruments
-  if (isSampleType(synthType)) {
-    return (
-      <SampleEditor
+  return (
+    <div className="instrument-editor-wrapper">
+      <UnifiedInstrumentEditor
         instrument={instrument}
         onChange={onChange}
       />
-    );
-  }
-
-  // All other synths - Generic VST-style editor
-  return (
-    <VisualSynthEditor
-      instrument={instrument}
-      onChange={onChange}
-    />
+    </div>
   );
 };
 
