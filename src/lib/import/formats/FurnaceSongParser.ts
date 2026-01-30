@@ -671,11 +671,23 @@ async function parseNewFormat(
   }
 
   // Parse patterns
+  console.log(`[FurnaceParser] Parsing ${patPtr.length} pattern pointers...`);
   for (const ptr of patPtr) {
     reader.seek(ptr);
     const pat = parsePattern(reader, module.chans, module.subsongs, version);
     const key = `${pat.subsong}_${pat.channel}_${pat.index}`;
     module.patterns.set(key, pat);
+    // Debug: Log first pattern with data
+    if (module.patterns.size <= 3) {
+      const hasData = pat.rows.some(r => r.note >= 0 || r.instrument >= 0 || r.effects.length > 0);
+      console.log(`[FurnaceParser] Stored pattern key="${key}" rows=${pat.rows.length} hasData=${hasData}`);
+      if (hasData) {
+        const firstDataRow = pat.rows.findIndex(r => r.note >= 0 || r.instrument >= 0);
+        if (firstDataRow >= 0) {
+          console.log(`[FurnaceParser] First data row ${firstDataRow}:`, pat.rows[firstDataRow]);
+        }
+      }
+    }
   }
 
   // Parse comment
@@ -944,6 +956,11 @@ async function parseOldFormat(
       const pat = parsePattern(reader, module.chans, module.subsongs, version);
       const key = `${pat.subsong}_${pat.channel}_${pat.index}`;
       module.patterns.set(key, pat);
+      // Debug: Log first patterns with data
+      if (module.patterns.size <= 3) {
+        const hasData = pat.rows.some(r => r.note >= 0 || r.instrument >= 0 || r.effects.length > 0);
+        console.log(`[FurnaceParser v2] Stored pattern key="${key}" rows=${pat.rows.length} hasData=${hasData}`);
+      }
     } catch (e) {
       console.warn('[FurnaceSongParser] Error parsing pattern:', e);
     }
@@ -1764,6 +1781,13 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     0
   );
 
+  // Debug: Log pattern map keys
+  console.log('[FurnaceParser] Pattern map size:', module.patterns.size);
+  console.log('[FurnaceParser] Pattern keys (first 20):', Array.from(module.patterns.keys()).slice(0, 20));
+  console.log('[FurnaceParser] Looking for patterns 0 to', maxPatIdx, 'with', module.chans, 'channels');
+  console.log('[FurnaceParser] Subsong patLen:', subsong.patLen);
+  console.log('[FurnaceParser] Orders:', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
+
   for (let patIdx = 0; patIdx <= maxPatIdx; patIdx++) {
     const patternRows: any[][] = [];
 
@@ -1776,7 +1800,12 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
 
         if (pattern && pattern.rows[row]) {
           const cell = pattern.rows[row];
-          rowCells.push(convertFurnaceCell(cell));
+          const converted = convertFurnaceCell(cell);
+          // Debug first non-empty cell per pattern
+          if (patIdx === 0 && row < 5 && ch === 0 && (cell.note >= 0 || cell.instrument >= 0)) {
+            console.log(`[FurnaceParser] Pat ${patIdx} Row ${row} Ch ${ch}: raw`, cell, '-> converted', converted);
+          }
+          rowCells.push(converted);
         } else {
           rowCells.push({
             note: 0,
@@ -1792,6 +1821,16 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     }
 
     patterns.push(patternRows);
+  }
+
+  // Debug: Log converted patterns summary
+  const nonEmptyPatterns = patterns.filter(pat =>
+    pat.some(row => row.some(cell => cell.note > 0 || cell.instrument > 0 || cell.effectType > 0))
+  );
+  console.log(`[FurnaceParser] Converted ${patterns.length} patterns, ${nonEmptyPatterns.length} have data`);
+  if (patterns.length > 0 && patterns[0].length > 0) {
+    console.log('[FurnaceParser] First pattern row 0:', patterns[0][0]);
+    console.log('[FurnaceParser] First pattern row 1:', patterns[0][1]);
   }
 
   return {
@@ -1880,9 +1919,15 @@ function convertFurnaceCell(cell: FurnacePatternCell): any {
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
     note = 97; // XM note off
   } else if (cell.note >= 0 && cell.note <= 12) {
-    // Convert note + octave to XM format
-    const octave = cell.octave < 0 ? 0 : cell.octave;
-    note = (octave * 12) + cell.note + 1;
+    // Furnace new format: note 12 = C, 1 = C#, 2 = D, ..., 11 = B
+    // XM format: semitone 0 = C, 1 = C#, ..., 11 = B
+    // Furnace stores C with octave one less than the actual octave
+    const semitone = cell.note === 12 ? 0 : cell.note;
+    // Adjust octave for C (note 12) - Furnace stores it one lower
+    const adjustedOctave = cell.note === 12 ? cell.octave + 1 : cell.octave;
+    const finalOctave = adjustedOctave < 0 ? 0 : adjustedOctave;
+    // XM note: octave * 12 + semitone + 1 (XM notes are 1-96)
+    note = (finalOctave * 12) + semitone + 1;
     if (note > 96) note = 96;
     if (note < 1) note = 0;
   }

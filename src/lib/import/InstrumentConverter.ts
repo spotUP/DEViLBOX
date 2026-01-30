@@ -29,9 +29,12 @@ import {
 export function convertToInstrument(
   parsed: ParsedInstrument,
   instrumentId: number,
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M'
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF'
 ): InstrumentConfig[] {
   const instruments: InstrumentConfig[] = [];
+
+  // Debug: Log what we're converting
+  console.log(`[InstrumentConverter] Converting instrument ${instrumentId}: "${parsed.name}" hasFurnace=${!!parsed.furnace} samples=${parsed.samples?.length || 0}`);
 
   // Check if this is a Furnace instrument (chip synth)
   if (parsed.furnace) {
@@ -198,7 +201,7 @@ function convertSampleToInstrument(
   sample: ParsedSample,
   parentInstrument: ParsedInstrument,
   instrumentId: number,
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR'
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF'
 ): InstrumentConfig {
   // Convert sample PCM data to AudioBuffer and blob URL
   const { audioBuffer, blobUrl } = convertPCMToAudioBuffer(sample);
@@ -238,7 +241,7 @@ function convertSampleToInstrument(
 
   // Create metadata
   const metadata: InstrumentMetadata = {
-    importedFrom: sourceFormat === 'FUR' ? 'FUR' : sourceFormat,
+    importedFrom: sourceFormat === 'FUR' || sourceFormat === 'DMF' ? 'FUR' : sourceFormat,
     originalEnvelope: parentInstrument.volumeEnvelope,
     autoVibrato: parentInstrument.autoVibrato,
     preservedSample: {

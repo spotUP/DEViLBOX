@@ -15,6 +15,7 @@ export class FurnacePitchUtils {
   // Reference: Furnace genesis.h, ym2203.h, fmshared_OPN.h
   public static readonly CLOCK_OPN2 = 7670454;     // Genesis NTSC (COLOR_NTSC * 15 / 7)
   public static readonly CLOCK_OPN2_PAL = 7600489; // Genesis PAL
+  public static readonly CLOCK_OPN = 4000000;      // YM2203 PC-88/98 (4MHz typical)
   public static readonly CLOCK_OPM  = 3579545;     // Arcade standard
 
   // Frequency bases (clock * prescaler factor) - used for F-Number calculation
