@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Music, ChevronDown, ChevronRight } from 'lucide-react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
+import { useSettingsStore } from '@stores/useSettingsStore';
 
 // localStorage key for collapsed state
 const STORAGE_KEY_COLLAPSED = 'devilbox-test-keyboard-collapsed';
@@ -205,9 +206,29 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
 
     const engine = engineRef.current;
     const inst = instrument;
+    const { midiPolyphonic } = useSettingsStore.getState();
 
-    engine.triggerNoteAttack(inst.id, note, 0, 0.8, inst);
-    setActiveNotes((prev) => new Set(prev).add(note));
+    console.log(`[TestKeyboard] attackNote: ${note}, polyphonic=${midiPolyphonic}, activeNotes=${activeNotesRef.current.size}, synthType=${inst.synthType}`);
+
+    if (midiPolyphonic) {
+      // Polyphonic mode: use voice allocation for proper chord support
+      engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
+    } else {
+      // Monophonic mode: release all other notes first
+      for (const activeNote of activeNotesRef.current) {
+        engine.triggerPolyNoteRelease(inst.id, activeNote, inst);
+      }
+      engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
+    }
+
+    setActiveNotes((prev) => {
+      if (midiPolyphonic) {
+        return new Set(prev).add(note);
+      } else {
+        // Monophonic: only keep the new note
+        return new Set([note]);
+      }
+    });
   }, [instrument]);
 
   // Release note - stops the sustained note
@@ -215,7 +236,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     const engine = engineRef.current;
     const inst = instrument;
 
-    engine.triggerNoteRelease(inst.id, note, 0, inst);
+    engine.triggerPolyNoteRelease(inst.id, note, inst);
     setActiveNotes((prev) => {
       const next = new Set(prev);
       next.delete(note);
@@ -309,9 +330,13 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
         </div>
       </button>
 
-      {/* Piano Keyboard (collapsible) */}
-      {!isCollapsed && (
-      <>
+      {/* Piano Keyboard (collapsible with animation) */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
+        }`}
+      >
+      <div className="space-y-3 pt-2">
       <div className="bg-ft2-header rounded border-2 border-ft2-border p-3">
         <div
           className="relative flex items-end justify-center"
@@ -447,8 +472,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
         />
         <span className="text-xs font-mono text-ft2-text">80%</span>
       </div>
-      </>
-      )}
+      </div>
+      </div>
     </div>
   );
 };
