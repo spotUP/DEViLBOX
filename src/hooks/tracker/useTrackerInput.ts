@@ -7,6 +7,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { stringNoteToXM } from '@/lib/xmConversions';
 
@@ -224,7 +225,14 @@ export const useTrackerInput = () => {
 
       // PERFORMANCE: Trigger audio FIRST before any state updates
       // State updates can cause React re-renders which delay audio
-      engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
+      const { midiPolyphonic } = useSettingsStore.getState();
+      if (midiPolyphonic) {
+        // Polyphonic mode: use voice allocation for proper chord support
+        engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument);
+      } else {
+        // Monophonic mode: use legacy direct attack
+        engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
+      }
 
       // Track the held note with channel info (ref update, no re-render)
       heldNotesRef.current.set(key, {
@@ -247,9 +255,15 @@ export const useTrackerInput = () => {
       if (!heldNote) return;
 
       const engine = getToneEngine();
+      const instrument = instruments.find((i) => i.id === heldNote.instrumentId);
 
-      // Release the note
-      engine.releaseNote(heldNote.instrumentId, heldNote.note);
+      // Release the note - use polyphonic API if enabled
+      const { midiPolyphonic } = useSettingsStore.getState();
+      if (midiPolyphonic && instrument) {
+        engine.triggerPolyNoteRelease(heldNote.instrumentId, heldNote.note, instrument);
+      } else {
+        engine.releaseNote(heldNote.instrumentId, heldNote.note);
+      }
 
       // FT2: Track key-off for multi-channel allocation
       setKeyOff(heldNote.channelIndex);
@@ -263,7 +277,7 @@ export const useTrackerInput = () => {
       // Remove from held notes
       heldNotesRef.current.delete(key);
     },
-    [setKeyOff, recReleaseEnabled, recordMode, isPlaying, setCell, playbackRow]
+    [instruments, setKeyOff, recReleaseEnabled, recordMode, isPlaying, setCell, playbackRow]
   );
 
   // Enter note into cell

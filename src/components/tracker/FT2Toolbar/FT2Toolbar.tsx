@@ -17,7 +17,7 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { StereoField } from '@components/visualization/StereoField';
@@ -211,6 +211,28 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+
+  // Handle fullscreen changes from keyboard (F11) or other sources
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error('Failed to toggle fullscreen:', err);
+    }
+  };
   
   const modulesMenuRef = useRef<HTMLDivElement>(null);
   const modulesButtonRef = useRef<HTMLDivElement>(null);
@@ -421,6 +443,45 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           result = convertXMModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
         } else if (format === 'MOD') {
           result = convertMODModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+        } else if (format === 'FUR' || format === 'DMF') {
+          // Furnace and DefleMask patterns are already converted
+          // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
+          const patternOrder = importMetadata.modData?.patternOrderTable || [];
+          const patLen = nativePatterns[0]?.length || 64;
+          const numChannels = nativePatterns[0]?.[0]?.length || 4;
+          console.log(`[Import] ${format} pattern structure: ${nativePatterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
+
+          result = {
+            patterns: nativePatterns.map((pat: any[][], idx: number) => ({
+              id: `pattern-${idx}`,
+              name: `Pattern ${idx}`,
+              length: patLen,
+              channels: Array.from({ length: numChannels }, (_, ch) => ({
+                id: `channel-${ch}`,
+                name: `Channel ${ch + 1}`,
+                muted: false,
+                solo: false,
+                collapsed: false,
+                volume: 100,
+                pan: 0,
+                instrumentId: null,
+                color: null,
+                rows: pat.map((row: any[]) => {
+                  const cell = row[ch] || {};
+                  return {
+                    note: cell.note || 0,
+                    instrument: cell.instrument || 0,
+                    volume: cell.volume || 0,
+                    effTyp: cell.effectType || 0,
+                    eff: cell.effectParam || 0,
+                  };
+                }),
+              })),
+            })),
+            order: patternOrder.length > 0 ? patternOrder : [0],
+            instrumentNames,
+          };
+          console.log(`[Import] ${format} patterns converted:`, result.patterns.length, 'patterns, first pattern has', result.patterns[0]?.channels?.length, 'channels');
         } else {
           notify.error(`Unsupported native format: ${format}`);
           return;
@@ -708,6 +769,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               
               <Button variant="ghost" size="sm" onClick={onShowHelp}>Help</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
+              <Button
+                variant={isFullscreen ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
+              >
+                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </Button>
             </div>
           </div>
         </div>
