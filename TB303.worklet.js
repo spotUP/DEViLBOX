@@ -886,4 +886,9 @@ class TB303Processor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('tb303-processor', TB303Processor);
+// Guard against re-registration during HMR
+try {
+  registerProcessor('tb303-processor', TB303Processor);
+} catch (e) {
+  // Already registered - ignore
+}
