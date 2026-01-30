@@ -11,7 +11,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Waves, Plus, Minus, RotateCcw, Trash2, Copy, Wand2 } from 'lucide-react';
+import { Waves, Plus, RotateCcw, Trash2, Copy, Wand2 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
