@@ -16,10 +16,6 @@ const MIDI_VELOCITY_MIN = 1;
 const MIDI_VELOCITY_MAX = 127;
 const VELOCITY_WHEEL_STEP = 5;
 
-// Velocity opacity visualization constants
-const VELOCITY_OPACITY_MIN = 0.3;
-const VELOCITY_OPACITY_MAX = 1.0;
-const VELOCITY_OPACITY_RANGE = VELOCITY_OPACITY_MAX - VELOCITY_OPACITY_MIN;
 
 interface GridCellProps {
   isActive: boolean;
@@ -207,6 +203,7 @@ interface NoteCellProps {
   stepIndex: number;
   isActive: boolean;
   isCurrentStep: boolean;
+  isTriggered?: boolean; // Flash when note plays
   isFocused?: boolean;
   accent?: boolean;
   slide?: boolean;
@@ -225,6 +222,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   stepIndex,
   isActive,
   isCurrentStep,
+  isTriggered = false,
   isFocused = false,
   accent = false,
   slide = false,
@@ -305,21 +303,26 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
     onFocus?.();
   }, [onFocus]);
 
-  // Calculate velocity-based opacity (30-100% range for better visibility)
-  const velocityToOpacity = (vel: number) => {
-    return VELOCITY_OPACITY_MIN + (vel / MIDI_VELOCITY_MAX) * VELOCITY_OPACITY_RANGE;
+  // Calculate velocity indicator - use ring width instead of opacity for punchy colors
+  const getVelocityRing = () => {
+    if (!isActive || velocity >= 100) return '';
+    // Lower velocity = thinner inner shadow to indicate softer hit
+    if (velocity < 50) return 'ring-1 ring-inset ring-black/30';
+    if (velocity < 80) return 'ring-1 ring-inset ring-black/15';
+    return '';
   };
 
-  // Determine base color based on state
+  // Determine base color based on state - match button colors exactly
   const getBaseClasses = () => {
     if (!isActive) {
       return 'bg-dark-bgTertiary hover:bg-dark-bgActive border-dark-border';
     }
-    // Accent notes get orange tint
+    // Accent notes get bright orange - same as warning buttons
     if (accent) {
-      return 'bg-accent-warning/80 hover:bg-accent-warning border-accent-warning';
+      return 'bg-accent-warning hover:brightness-110 border-accent-warning/50';
     }
-    return 'bg-accent-primary hover:bg-accent-primary/80 border-accent-primary/50';
+    // Normal notes get bright teal - same as Play buttons
+    return 'bg-accent-primary hover:brightness-110 border-accent-primary/50';
   };
 
   // Determine border color based on octave shift
@@ -345,9 +348,10 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           ${isCurrentStep ? 'ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg' : getOctaveBorderClasses()}
           ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
           ${isActive ? 'shadow-sm' : ''}
+          ${isTriggered && isActive ? '!bg-white scale-110 shadow-lg shadow-white/50' : ''}
+          ${getVelocityRing()}
           focus:outline-none
         `}
-        style={isActive ? { opacity: velocityToOpacity(velocity) } : undefined}
         title={isActive ? `Velocity: ${velocity} | Shift+click: accent, Ctrl+click: slide, Alt+click: octave, Scroll: velocity` : ''}
         aria-label={`Step ${stepIndex + 1}, Note ${NOTE_NAMES[noteIndex]}${isActive ? `, Active` : ''}`}
         aria-pressed={isActive}
