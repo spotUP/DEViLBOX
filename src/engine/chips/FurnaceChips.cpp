@@ -28,10 +28,13 @@ extern "C" {
 }
 
 // C++ Headers
-#include "ay8910.h"   
-#include "ymfm_opn.h" 
+#include "ay8910.h"
+#include "ymfm_opn.h"
 #include "ymfm_opz.h"
 #include "ymfm_opl.h"
+
+// ESFMu (has its own extern "C" guards)
+#include "esfm.h"
 
 // NES NSFPlay (C++)
 #include "nes_apu.h"
@@ -71,6 +74,12 @@ using namespace vgsound_emu;
 // OPL4 Header
 #include "ymf278b/ymf278.h"
 
+// Additional chips
+#include "namco.h"
+#include "oki/okim6258.h"
+#include "oki/msm5232.h"
+#include "dsid.h"  // Classic SID 6581/8580
+
 // Types
 typedef int32_t stream_sample_t;
 
@@ -85,6 +94,7 @@ struct RegisterWrite {
 static std::vector<RegisterWrite> reg_log;
 static bool logging_enabled = false;
 static uint32_t current_sample_time = 0;
+static int g_sample_rate = 48000;  // Output sample rate for cycle calculations
 
 // Interfaces
 class msm6295_intf_impl : public vgsound_emu_mem_intf { public: msm6295_intf_impl() : vgsound_emu_mem_intf() {} };
@@ -146,6 +156,8 @@ static SID3* sid_chip = NULL;
 static ay8910_device* ay_chip = NULL;
 static ymfm::ym2608* opna_chip = NULL;
 static ymfm::ym2610* opnb_chip = NULL;
+static ymfm::ym2203* opn_chip = NULL;    // YM2203 (3 FM + 3 PSG)
+static ymfm::ym2610b* opnb_b_chip = NULL; // YM2610B (6 FM + 4 ADPCM)
 static TIA::Audio* tia_chip = NULL;
 static saa1099_device* saa_chip = NULL;
 static msm6295_core* oki_chip = NULL;
@@ -166,6 +178,133 @@ static k053260_core* k53260_chip = NULL;
 static x1_010_impl* x1_010_chip = NULL;
 static YMF278* opl4_chip = NULL;
 static MDFN_IEN_NGP::T6W28_Apu* t6w28_chip = NULL;
+static PokeyState pokey_chip;
+
+// VIC-20 instance
+static sound_vic20_t vic_chip;
+
+// TED instance
+static struct plus4_sound_s ted_chip;
+
+// VERA PSG instance
+static struct VERA_PSG vera_chip;
+
+// Supervision instance
+static struct svision_t svision_chip;
+
+// SM8521 instance
+static struct sm8521_t sm8521_chip;
+
+// C140 instance
+static struct c140_t c140_chip;
+
+// QSound instance
+static struct qsound_chip qsound_chip_inst;
+
+// SNES RAM (64KB for SPC700)
+static uint8_t snes_ram[65536];
+
+// Additional chip instances
+static struct SID_chip* sid_6581_chip = NULL;  // Classic SID 6581
+static struct SID_chip* sid_8580_chip = NULL;  // Classic SID 8580
+static namco_device* namco_chip = NULL;        // Namco WSG
+static okim6258_device* msm6258_chip = NULL;   // OKI ADPCM
+static msm5232_device* msm5232_chip = NULL;    // MSM5232 8-voice
+static esfm_chip esfm_chip_inst;               // ESFM (ESS enhanced OPL3)
+
+// Simple chip states for custom implementations
+static struct {
+    uint32_t freq;      // PC Speaker frequency
+    bool enabled;
+    float phase;
+} pcspkr_state;
+
+static struct {
+    float phase[2];     // Pong has 2 oscillators
+    uint16_t freq[2];
+    uint8_t vol[2];
+} pong_state;
+
+static struct {
+    uint8_t regs[8];    // PV-1000 has 3 tone channels
+    float phase[3];
+} pv1000_state;
+
+static struct {
+    uint8_t regs[4];    // Pokemon Mini has 3 sound channels
+    float phase[3];
+} pokemini_state;
+
+// PET (Commodore PET 6522 shift register)
+static struct {
+    uint8_t regs[16];   // 6522 VIA registers
+    uint8_t sreg;       // Shift register (wave pattern)
+    uint8_t wave;       // Wave pattern to load
+    int32_t cnt;        // Period counter
+    int16_t out;        // Current output
+    bool enable;        // Sound enabled
+} pet_state;
+
+// NDS Sound Interface
+class nds_intf_impl : public nds_sound_emu::nds_sound_intf {
+public:
+    uint8_t* mem;
+    uint32_t mem_size;
+    nds_intf_impl() : mem(nullptr), mem_size(0) {}
+    uint8_t read_byte(uint32_t addr) override {
+        if (mem && addr < mem_size) return mem[addr];
+        return 0;
+    }
+};
+static nds_intf_impl nds_intf;
+static nds_sound_emu::nds_sound_t* nds_chip = nullptr;
+static uint8_t nds_sample_mem[4*1024*1024];  // 4MB for NDS samples
+
+// GBA DMA (2-channel sample playback)
+static struct {
+    struct {
+        int32_t pos;        // Position (16.16 fixed point)
+        int32_t freq;       // Frequency (16.16 increment)
+        uint8_t vol;        // Volume (0-15)
+        uint8_t pan;        // Pan (bit 0=R, bit 1=L)
+        bool active;
+        int8_t* data;       // Sample pointer
+        int32_t length;     // Length
+        int32_t loopStart;
+        int32_t loopEnd;
+        bool loop;
+    } chan[2];
+} gba_dma_state;
+static int8_t gba_sample_mem[2*1024*1024];  // 2MB for GBA samples
+
+// MultiPCM (28-channel sample playback)
+static struct {
+    struct {
+        uint32_t pos;       // Position (16.16 fixed point)
+        uint16_t freq;      // F-number
+        uint8_t octave;     // Octave
+        uint8_t pan;        // Pan (4-bit L, 4-bit R)
+        uint8_t tl;         // Total level
+        uint16_t sample;    // Sample number
+        bool keyOn;
+    } slot[28];
+    uint8_t selSlot;        // Selected slot
+} multipcm_state;
+static int8_t multipcm_sample_mem[4*1024*1024];  // 4MB for MultiPCM samples
+
+// Amiga Paula state
+struct PaulaChannel {
+    uint32_t pos;       // Sample position (16.16 fixed point)
+    uint32_t period;    // Period (divider)
+    uint8_t volume;     // Volume (0-64)
+    int8_t* data;       // Sample data pointer
+    uint32_t length;    // Sample length in bytes
+    uint32_t loopStart; // Loop start
+    uint32_t loopLen;   // Loop length (0 = no loop)
+    bool enabled;
+};
+static PaulaChannel paula_chan[4];
+static int8_t paula_sample_mem[524288];  // 512KB sample memory
 
 // Bubble System (K005289) Custom implementation
 static k005289_core* bubble_timer = NULL;
@@ -185,13 +324,22 @@ enum ChipType {
     CHIP_OPLL=11, CHIP_AY=12, CHIP_OPNA=13, CHIP_OPNB=14, CHIP_TIA=15, CHIP_FDS=16, CHIP_MMC5=17, CHIP_SAA=18, CHIP_SWAN=19, CHIP_OKI=20, CHIP_ES5506=21,
     CHIP_OPZ=22, CHIP_Y8950=23, CHIP_SNES=24, CHIP_LYNX=25, CHIP_OPL4=26, CHIP_SEGAPCM=27, CHIP_YMZ280B=28, CHIP_RF5C68=29, CHIP_GA20=30, CHIP_C140=31,
     CHIP_QSOUND=32, CHIP_VIC=33, CHIP_TED=34, CHIP_SUPERVISION=35, CHIP_VERA=36, CHIP_SM8521=37, CHIP_BUBBLE=38, CHIP_K007232=39, CHIP_K053260=40,
-    CHIP_X1_010=41, CHIP_UPD1771=42, CHIP_T6W28=43, CHIP_VB=44
+    CHIP_X1_010=41, CHIP_UPD1771=42, CHIP_T6W28=43, CHIP_VB=44,
+    // Additional chips (47+)
+    CHIP_OPN=47, CHIP_OPNB_B=48,
+    CHIP_SID_6581=45, CHIP_SID_8580=46,
+    CHIP_ESFM=49, CHIP_AY8930=50,
+    CHIP_NDS=51, CHIP_GBA_DMA=52, CHIP_GBA_MINMOD=53, CHIP_POKEMINI=54,
+    CHIP_NAMCO=55, CHIP_PET=56, CHIP_POKEY=57,
+    CHIP_MSM6258=58, CHIP_MSM5232=59, CHIP_MULTIPCM=60,
+    CHIP_AMIGA=61, CHIP_PCSPKR=62, CHIP_PONG=63, CHIP_PV1000=64
 };
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void furnace_init_chips(int sample_rate) {
+    g_sample_rate = sample_rate > 0 ? sample_rate : 48000;  // Save for cycle calculations
     OPN2_Reset(&opn2_chip); OPM_Reset(&opm_chip); OPL3_Reset(&opl3_chip_inst, sample_rate); YMPSG_Init(&psg_chip, 1, 0x0001, 0x0008, 16); GB_apu_init(&gb_chip);
     
     if (nes_apu) delete nes_apu; nes_apu = new xgm::NES_APU(); nes_apu->SetOption(0, 0);
@@ -207,6 +355,8 @@ void furnace_init_chips(int sample_rate) {
     if (ay_chip) delete ay_chip; ay_chip = new ay8910_device(1789773); ay_chip->device_start(); ay_chip->device_reset();
     if (opna_chip) delete opna_chip; opna_chip = new ymfm::ym2608(ymfm_intf); opna_chip->reset();
     if (opnb_chip) delete opnb_chip; opnb_chip = new ymfm::ym2610(ymfm_intf); opnb_chip->reset();
+    if (opn_chip) delete opn_chip; opn_chip = new ymfm::ym2203(ymfm_intf); opn_chip->reset();
+    if (opnb_b_chip) delete opnb_b_chip; opnb_b_chip = new ymfm::ym2610b(ymfm_intf); opnb_b_chip->reset();
     if (tia_chip) delete tia_chip; tia_chip = new TIA::Audio(); tia_chip->reset(false);
     if (saa_chip) delete saa_chip; saa_chip = new saa1099_device(); saa_chip->device_start();
     if (oki_chip) delete oki_chip; oki_chip = new msm6295_core(oki_intf); oki_chip->reset();
@@ -227,11 +377,97 @@ void furnace_init_chips(int sample_rate) {
     if (x1_010_chip) delete x1_010_chip; x1_010_chip = new x1_010_impl(); x1_010_chip->reset();
     if (opl4_chip) delete opl4_chip; opl4_chip = new YMF278(ymf278_mem); opl4_chip->reset();
     if (t6w28_chip) delete t6w28_chip; t6w28_chip = new MDFN_IEN_NGP::T6W28_Apu();
+    MZPOKEYSND_Init(&pokey_chip); ResetPokeyState(&pokey_chip);
+
+    // Paula Init
+    for (int i = 0; i < 4; i++) {
+        paula_chan[i].pos = 0;
+        paula_chan[i].period = 428; // Default period (~8363 Hz at PAL rate)
+        paula_chan[i].volume = 64;
+        paula_chan[i].data = paula_sample_mem;
+        paula_chan[i].length = 0;
+        paula_chan[i].loopStart = 0;
+        paula_chan[i].loopLen = 0;
+        paula_chan[i].enabled = false;
+    }
+
+    // Additional chip init
+    if (!sid_6581_chip) sid_6581_chip = (struct SID_chip*)malloc(sizeof(struct SID_chip));
+    dSID_init(sid_6581_chip, 985248, sample_rate, 0, 0); // model 0 = 6581
+    if (!sid_8580_chip) sid_8580_chip = (struct SID_chip*)malloc(sizeof(struct SID_chip));
+    dSID_init(sid_8580_chip, 985248, sample_rate, 1, 0); // model 1 = 8580
+    if (namco_chip) delete namco_chip; namco_chip = new namco_device(3072000); namco_chip->device_start(NULL);
+    if (msm6258_chip) delete msm6258_chip; msm6258_chip = new okim6258_device(4000000); msm6258_chip->device_start(); msm6258_chip->device_reset();
+    if (msm5232_chip) delete msm5232_chip; msm5232_chip = new msm5232_device(2000000); msm5232_chip->device_start(); msm5232_chip->device_reset();
+
+    // Simple chip state init
+    pcspkr_state.freq = 440; pcspkr_state.enabled = false; pcspkr_state.phase = 0;
+    memset(&pong_state, 0, sizeof(pong_state));
+    memset(&pv1000_state, 0, sizeof(pv1000_state));
+    memset(&pokemini_state, 0, sizeof(pokemini_state));
 
     // Bubble System Init
     if (bubble_timer) delete bubble_timer; bubble_timer = new k005289_core(); bubble_timer->reset();
     memset(bubble_waves, 0, sizeof(bubble_waves));
     memset(bubble_vol, 0, sizeof(bubble_vol));
+
+    // PET Init (6522 shift register)
+    memset(&pet_state, 0, sizeof(pet_state));
+    pet_state.wave = 0xFF;  // Default square wave
+    pet_state.sreg = 0xFF;
+
+    // NDS Init
+    nds_intf.mem = nds_sample_mem;
+    nds_intf.mem_size = sizeof(nds_sample_mem);
+    if (nds_chip) delete nds_chip;
+    nds_chip = new nds_sound_emu::nds_sound_t(nds_intf);
+    nds_chip->reset();
+
+    // GBA DMA Init
+    memset(&gba_dma_state, 0, sizeof(gba_dma_state));
+    for (int i = 0; i < 2; i++) {
+        gba_dma_state.chan[i].data = gba_sample_mem;
+        gba_dma_state.chan[i].vol = 15;
+        gba_dma_state.chan[i].pan = 3;  // Center
+    }
+
+    // MultiPCM Init
+    memset(&multipcm_state, 0, sizeof(multipcm_state));
+
+    // VIC-20 Init (1MHz clock, ~31400 cycles/sec)
+    vic_sound_machine_init(&vic_chip, 48000, 1000000, false);
+
+    // TED Init (1.79MHz for NTSC)
+    ted_sound_machine_init(&ted_chip, 48000, 1789773);
+    ted_sound_reset(&ted_chip);
+
+    // VERA PSG Init
+    psg_reset(&vera_chip);
+
+    // Supervision Init
+    supervision_sound_reset(&svision_chip);
+    supervision_sound_set_clock(&svision_chip, 4000000);
+
+    // SM8521 Init
+    sm8521_reset(&sm8521_chip);
+
+    // C140 Init
+    c140_init(&c140_chip);
+    c140_reset(&c140_chip);
+
+    // QSound Init (4MHz clock)
+    qsound_start(&qsound_chip_inst, 4000000);
+    qsound_reset(&qsound_chip_inst);
+
+    // SNES Init (SPC DSP with 64KB RAM)
+    memset(snes_ram, 0, sizeof(snes_ram));
+    if (snes_chip) { delete snes_chip; }
+    snes_chip = new SPC_DSP();
+    snes_chip->init(snes_ram);
+    snes_chip->reset();
+
+    // ESFM Init (ESS enhanced OPL3)
+    ESFM_init(&esfm_chip_inst, 1);  // fast mode enabled
 
     // Logging Init
     reg_log.clear();
@@ -266,6 +502,12 @@ void furnace_set_wavetable(int type, int index, uint8_t* data, int length) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int furnace_upload_sample(int chip_type, uint32_t offset, const uint8_t* data, uint32_t length) {
+    // Stub: sample uploads not implemented in minimal version
+    return -1;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void furnace_chip_write(int type, uint32_t port, uint8_t data) {
     if (logging_enabled) {
         reg_log.push_back({current_sample_time, (uint8_t)type, port, data});
@@ -287,6 +529,8 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
         case CHIP_AY:   if (ay_chip) { ay_chip->address_w(port); ay_chip->data_w(data); } break;
         case CHIP_OPNA: if (opna_chip) opna_chip->write(port, data); break;
         case CHIP_OPNB: if (opnb_chip) opnb_chip->write(port, data); break;
+        case CHIP_OPN: if (opn_chip) { opn_chip->write(0, port & 0xFF); opn_chip->write(1, data); } break;
+        case CHIP_OPNB_B: if (opnb_b_chip) { int bank = (port >> 8) & 1; opnb_b_chip->write(0 + bank * 2, port & 0xFF); opnb_b_chip->write(1 + bank * 2, data); } break;
         case CHIP_TIA:  if (tia_chip) tia_chip->write(port, data); break;
         case CHIP_FDS:  if (nes_fds) nes_fds->Write(port, data); break;
         case CHIP_MMC5: if (nes_mmc5) nes_mmc5->Write(port, data); break;
@@ -309,7 +553,7 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
             if (port == 0) t6w28_chip->write_data_left(0, data);
             else t6w28_chip->write_data_right(0, data);
             break;
-        case CHIP_BUBBLE: 
+        case CHIP_BUBBLE:
             if (port < 2) {
                 bubble_timer->load(port, (data << 8) | data);
                 bubble_timer->update(port);
@@ -317,6 +561,156 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
                 bubble_vol[port-2] = data & 0x1F;
             }
             break;
+        case CHIP_POKEY: Update_pokey_sound_mz(&pokey_chip, port, data, 4); break;
+        case CHIP_AMIGA: {
+            // Register layout per channel (0x10 bytes per channel):
+            // 0x00: Volume (0-64)
+            // 0x02-0x03: Period (big-endian 16-bit)
+            // 0x04-0x07: Sample start offset (32-bit)
+            // 0x08-0x0B: Sample length (32-bit)
+            // 0x0C: Control (bit 0 = enable)
+            int ch = (port >> 4) & 3;
+            int reg = port & 0x0F;
+            switch (reg) {
+                case 0x00: paula_chan[ch].volume = data > 64 ? 64 : data; break;
+                case 0x02: paula_chan[ch].period = (paula_chan[ch].period & 0x00FF) | (data << 8); break;
+                case 0x03: paula_chan[ch].period = (paula_chan[ch].period & 0xFF00) | data; break;
+                case 0x04: paula_chan[ch].data = paula_sample_mem + (data * 0x10000); break; // High byte of address
+                case 0x08: paula_chan[ch].length = data * 0x10000; break; // Length high byte
+                case 0x09: paula_chan[ch].length = (paula_chan[ch].length & 0xFF0000) | (data << 8); break;
+                case 0x0C:
+                    paula_chan[ch].enabled = (data & 1);
+                    if (data & 1) paula_chan[ch].pos = 0;
+                    break;
+            }
+            break;
+        }
+        // Additional chips
+        case CHIP_SID_6581: if (sid_6581_chip) dSID_write(sid_6581_chip, port, data); break;
+        case CHIP_SID_8580: if (sid_8580_chip) dSID_write(sid_8580_chip, port, data); break;
+        case CHIP_NAMCO: if (namco_chip) namco_chip->pacman_sound_w(port, data); break;
+        case CHIP_MSM6258: if (msm6258_chip) { if (port == 0) msm6258_chip->ctrl_w(data); else msm6258_chip->data_w(data); } break;
+        case CHIP_MSM5232: if (msm5232_chip) msm5232_chip->write(port, data); break;
+        case CHIP_ESFM: ESFM_write_reg(&esfm_chip_inst, (uint16_t)port, data); break;
+        case CHIP_AY8930: if (ay_chip) { ay_chip->address_w(port); ay_chip->data_w(data); } break; // Enhanced AY uses same interface
+        case CHIP_PCSPKR:
+            if (port == 0) pcspkr_state.freq = data | ((pcspkr_state.freq & 0xFF00));
+            else if (port == 1) pcspkr_state.freq = (data << 8) | (pcspkr_state.freq & 0xFF);
+            else if (port == 2) pcspkr_state.enabled = data & 1;
+            break;
+        case CHIP_PONG:
+            if (port < 2) pong_state.freq[port] = data | ((pong_state.freq[port] & 0xFF00));
+            else if (port < 4) pong_state.freq[port-2] = (data << 8) | (pong_state.freq[port-2] & 0xFF);
+            else if (port < 6) pong_state.vol[port-4] = data;
+            break;
+        case CHIP_PV1000:
+            if (port < 8) pv1000_state.regs[port] = data;
+            break;
+        case CHIP_POKEMINI:
+            if (port < 4) pokemini_state.regs[port] = data;
+            break;
+        case CHIP_PET: {
+            // PET 6522 VIA registers:
+            // 0x08: T2L (timer low byte)
+            // 0x09: T2H (timer high byte) - 0 means hw shift register mode
+            // 0x0A: SR (shift register - wave pattern)
+            // 0x0B: ACR (aux control - bit 4 enables output)
+            if (port < 16) pet_state.regs[port] = data;
+            if (port == 0x0A) {
+                pet_state.wave = data;
+                pet_state.sreg = data;
+            }
+            if (port == 0x0B) {
+                pet_state.enable = (data & 0x10) != 0;
+            }
+            break;
+        }
+        case CHIP_NDS:
+            if (nds_chip) {
+                // NDS register writes: port is address, data is value
+                // Addresses 0x400-0x50F are sound registers
+                nds_chip->write8(port, data);
+            }
+            break;
+        case CHIP_GBA_DMA: {
+            // Register layout per channel (0x10 bytes each):
+            // 0x00: Volume (0-15)
+            // 0x01: Pan (bit 0=R, bit 1=L)
+            // 0x02-0x05: Sample offset (32-bit)
+            // 0x06-0x09: Sample length (32-bit)
+            // 0x0A-0x0D: Frequency (32-bit fixed point)
+            // 0x0E: Control (bit 0=enable, bit 1=loop)
+            int ch = (port >> 4) & 1;
+            int reg = port & 0x0F;
+            switch (reg) {
+                case 0x00: gba_dma_state.chan[ch].vol = data & 0x0F; break;
+                case 0x01: gba_dma_state.chan[ch].pan = data & 3; break;
+                case 0x02: gba_dma_state.chan[ch].data = gba_sample_mem + (data << 16); break;
+                case 0x06: gba_dma_state.chan[ch].length = data << 16; break;
+                case 0x07: gba_dma_state.chan[ch].length = (gba_dma_state.chan[ch].length & 0xFF0000) | (data << 8); break;
+                case 0x0A: gba_dma_state.chan[ch].freq = data << 16; break;
+                case 0x0B: gba_dma_state.chan[ch].freq = (gba_dma_state.chan[ch].freq & 0xFF0000) | (data << 8); break;
+                case 0x0E:
+                    gba_dma_state.chan[ch].active = data & 1;
+                    gba_dma_state.chan[ch].loop = data & 2;
+                    if (data & 1) gba_dma_state.chan[ch].pos = 0;
+                    break;
+            }
+            break;
+        }
+        case CHIP_GBA_MINMOD: /* GBA MinMod - uses same as GBA_DMA */ break;
+        case CHIP_SNES:
+            if (snes_chip) snes_chip->write(port, data);
+            break;
+        case CHIP_VIC:
+            vic_sound_machine_store(&vic_chip, port, data);
+            break;
+        case CHIP_TED:
+            ted_sound_machine_store(&ted_chip, port, data);
+            break;
+        case CHIP_VERA:
+            psg_writereg(&vera_chip, port, data);
+            break;
+        case CHIP_SUPERVISION:
+            supervision_memorymap_registers_write(&svision_chip, port, data);
+            break;
+        case CHIP_SM8521:
+            sm8521_write(&sm8521_chip, port, data);
+            break;
+        case CHIP_C140:
+            c140_write(&c140_chip, port, data);
+            break;
+        case CHIP_QSOUND:
+            qsound_w(&qsound_chip_inst, port, data);
+            break;
+        case CHIP_MULTIPCM: {
+            // MultiPCM register layout:
+            // Write slot select to port 1, then write data to port 0-7
+            // Registers per slot: Pan, SampleL, SampleH+FreqL, FreqH+Oct, KeyOn, TL, LFO, AM
+            if (port == 0x100) {
+                multipcm_state.selSlot = data & 0x1F;
+            } else if (multipcm_state.selSlot < 28) {
+                int slot = multipcm_state.selSlot;
+                switch (port & 7) {
+                    case 0: multipcm_state.slot[slot].pan = data; break;
+                    case 1: multipcm_state.slot[slot].sample = (multipcm_state.slot[slot].sample & 0x100) | data; break;
+                    case 2:
+                        multipcm_state.slot[slot].sample = (multipcm_state.slot[slot].sample & 0xFF) | ((data & 1) << 8);
+                        multipcm_state.slot[slot].freq = (multipcm_state.slot[slot].freq & 0xFF00) | ((data >> 1) << 1);
+                        break;
+                    case 3:
+                        multipcm_state.slot[slot].freq = (multipcm_state.slot[slot].freq & 0x00FE) | (data << 8);
+                        multipcm_state.slot[slot].octave = (data >> 4) & 0x0F;
+                        break;
+                    case 4:
+                        multipcm_state.slot[slot].keyOn = (data & 0x80) != 0;
+                        if (data & 0x80) multipcm_state.slot[slot].pos = 0;
+                        break;
+                    case 5: multipcm_state.slot[slot].tl = data; break;
+                }
+            }
+            break;
+        }
     }
 }
 
@@ -324,6 +718,8 @@ EMSCRIPTEN_KEEPALIVE
 void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length) {
     ymfm::ym2608::output_data output_2608;
     ymfm::ym2610::output_data output_2610;
+    ymfm::ym2203::output_data output_2203;
+    ymfm::ym2610b::output_data output_2610b;
     ymfm::ym2414::output_data output_2414;
     ymfm::y8950::output_data output_8950;
     
@@ -339,12 +735,14 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
             case CHIP_OPL3: OPL3_GenerateResampled(&opl3_chip_inst, out16); buffer_l[i] = (float)out16[0] / 32768.0f; buffer_r[i] = (float)out16[1] / 32768.0f; break;
             case CHIP_PSG:  YMPSG_Clock(&psg_chip); YMPSG_GetOutput(&psg_chip, &out32[0], &out32[1]); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[1] / 32768.0f; break;
             case CHIP_NES:  if (nes_apu) { nes_apu->Tick(1); nes_dmc->Tick(1); nes_apu->Render(out32); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[0] / 32768.0f; } break;
-            case CHIP_GB:   GB_advance_cycles(&gb_chip, 80); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break;
+            case CHIP_GB: { int gb_cycles = 4194304 / g_sample_rate; GB_advance_cycles(&gb_chip, gb_cycles); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break; }
             case CHIP_SID:  if (sid_chip) { sid3_clock(sid_chip); buffer_l[i] = (float)sid_chip->output_l / 32768.0f; buffer_r[i] = (float)sid_chip->output_r / 32768.0f; } break;
             case CHIP_OPLL: OPLL_Clock(&opll_chip, opll_buf); buffer_l[i] = (float)opll_buf[0] / 32768.0f; buffer_r[i] = (float)opll_buf[1] / 32768.0f; break;
             case CHIP_TIA:  if (tia_chip) { tia_chip->tick(1); buffer_l[i] = (float)tia_chip->myCurrentSample[0] / 32768.0f; buffer_r[i] = (float)tia_chip->myCurrentSample[1] / 32768.0f; } break;
             case CHIP_OPNA: if (opna_chip) { opna_chip->generate(&output_2608); buffer_l[i] = (float)output_2608.data[0] / 32768.0f; buffer_r[i] = (float)output_2608.data[1] / 32768.0f; } break;
             case CHIP_OPNB: if (opnb_chip) { opnb_chip->generate(&output_2610); buffer_l[i] = (float)output_2610.data[0] / 32768.0f; buffer_r[i] = (float)output_2610.data[1] / 32768.0f; } break;
+            case CHIP_OPN: if (opn_chip) { opn_chip->generate(&output_2203); buffer_l[i] = (float)output_2203.data[0] / 32768.0f; buffer_r[i] = (float)output_2203.data[0] / 32768.0f; } break;
+            case CHIP_OPNB_B: if (opnb_b_chip) { opnb_b_chip->generate(&output_2610b); buffer_l[i] = (float)output_2610b.data[0] / 32768.0f; buffer_r[i] = (float)output_2610b.data[1] / 32768.0f; } break;
             case CHIP_AY:   if (ay_chip) { short ay_o[3]; ay_chip->sound_stream_update(ay_o, 1); float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f); buffer_l[i] = m; buffer_r[i] = m; } break;
             case CHIP_SWAN: if (swan_chip) { int16_t s_o[2]; swan_chip->SoundUpdate(); swan_chip->SoundFlush(s_o, 1); buffer_l[i] = (float)s_o[0]/32768.0f; buffer_r[i] = (float)s_o[1]/32768.0f; } break;
             case CHIP_OPZ: if (opz_chip) { opz_chip->generate(&output_2414); buffer_l[i] = (float)output_2414.data[0] / 32768.0f; buffer_r[i] = (float)output_2414.data[1] / 32768.0f; } break;
@@ -366,6 +764,304 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                     buffer_r[i] = mix * 0.5f;
                 }
                 break;
+            case CHIP_POKEY: {
+                int16_t pokey_buf;
+                mzpokeysnd_process_16(&pokey_chip, &pokey_buf, 1);
+                buffer_l[i] = (float)pokey_buf / 32768.0f;
+                buffer_r[i] = (float)pokey_buf / 32768.0f;
+                break;
+            }
+            case CHIP_AMIGA: {
+                // Paula outputs to L/R with channels 0,3 left and 1,2 right
+                float left = 0, right = 0;
+                for (int ch = 0; ch < 4; ch++) {
+                    if (!paula_chan[ch].enabled || paula_chan[ch].length == 0) continue;
+                    // Get sample (8-bit signed)
+                    uint32_t idx = paula_chan[ch].pos >> 16;
+                    if (idx >= paula_chan[ch].length) {
+                        if (paula_chan[ch].loopLen > 0) {
+                            paula_chan[ch].pos = paula_chan[ch].loopStart << 16;
+                            idx = paula_chan[ch].loopStart;
+                        } else {
+                            paula_chan[ch].enabled = false;
+                            continue;
+                        }
+                    }
+                    int8_t sample = paula_chan[ch].data[idx];
+                    float out = (sample / 128.0f) * (paula_chan[ch].volume / 64.0f);
+                    // Channels 0,3 to left, 1,2 to right
+                    if (ch == 0 || ch == 3) left += out;
+                    else right += out;
+                    // Advance position (3546895 Hz PAL clock / period / sample rate)
+                    paula_chan[ch].pos += (3546895 / g_sample_rate) * 65536 / (paula_chan[ch].period > 0 ? paula_chan[ch].period : 1);
+                }
+                buffer_l[i] = left * 0.5f;
+                buffer_r[i] = right * 0.5f;
+                break;
+            }
+            // Additional chip renders
+            case CHIP_SID_6581: if (sid_6581_chip) {
+                double out = dSID_render(sid_6581_chip);
+                buffer_l[i] = (float)(out / 32768.0);
+                buffer_r[i] = (float)(out / 32768.0);
+            } break;
+            case CHIP_SID_8580: if (sid_8580_chip) {
+                double out = dSID_render(sid_8580_chip);
+                buffer_l[i] = (float)(out / 32768.0);
+                buffer_r[i] = (float)(out / 32768.0);
+            } break;
+            case CHIP_NAMCO: if (namco_chip) {
+                short out[2];
+                short* outPtrs[2] = {&out[0], &out[1]};
+                namco_chip->sound_stream_update(outPtrs, 1);
+                buffer_l[i] = (float)out[0] / 32768.0f;
+                buffer_r[i] = (float)out[1] / 32768.0f;
+            } break;
+            case CHIP_MSM6258: if (msm6258_chip) {
+                short out;
+                msm6258_chip->sound_stream_update(&out, 1);
+                buffer_l[i] = (float)out / 32768.0f;
+                buffer_r[i] = (float)out / 32768.0f;
+            } break;
+            case CHIP_MSM5232: if (msm5232_chip) {
+                short out;
+                msm5232_chip->sound_stream_update(&out);
+                buffer_l[i] = (float)out / 32768.0f;
+                buffer_r[i] = (float)out / 32768.0f;
+            } break;
+            case CHIP_ESFM: {
+                // ESFM uses its own ESFMu emulator
+                int16_t esfm_buf[2];
+                ESFM_generate(&esfm_chip_inst, esfm_buf);
+                buffer_l[i] = (float)esfm_buf[0] / 32768.0f;
+                buffer_r[i] = (float)esfm_buf[1] / 32768.0f;
+                break;
+            }
+            case CHIP_AY8930: // Enhanced AY uses same render as AY
+                if (ay_chip) {
+                    short ay_o[3];
+                    ay_chip->sound_stream_update(ay_o, 1);
+                    float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f);
+                    buffer_l[i] = m;
+                    buffer_r[i] = m;
+                }
+                break;
+            case CHIP_PCSPKR: {
+                // Simple square wave PC speaker
+                if (pcspkr_state.enabled && pcspkr_state.freq > 0) {
+                    pcspkr_state.phase += (float)pcspkr_state.freq / 48000.0f;
+                    if (pcspkr_state.phase >= 1.0f) pcspkr_state.phase -= 1.0f;
+                    buffer_l[i] = buffer_r[i] = (pcspkr_state.phase < 0.5f) ? 0.3f : -0.3f;
+                } else {
+                    buffer_l[i] = buffer_r[i] = 0;
+                }
+                break;
+            }
+            case CHIP_PONG: {
+                // Simple 2-oscillator pong sound
+                float out = 0;
+                for (int ch = 0; ch < 2; ch++) {
+                    if (pong_state.freq[ch] > 0) {
+                        pong_state.phase[ch] += (float)pong_state.freq[ch] / 48000.0f;
+                        if (pong_state.phase[ch] >= 1.0f) pong_state.phase[ch] -= 1.0f;
+                        out += ((pong_state.phase[ch] < 0.5f) ? 0.2f : -0.2f) * (pong_state.vol[ch] / 15.0f);
+                    }
+                }
+                buffer_l[i] = buffer_r[i] = out;
+                break;
+            }
+            case CHIP_PV1000: {
+                // Simple 3-channel square wave
+                float out = 0;
+                for (int ch = 0; ch < 3; ch++) {
+                    uint16_t freq = pv1000_state.regs[ch * 2] | (pv1000_state.regs[ch * 2 + 1] << 8);
+                    if (freq > 0) {
+                        pv1000_state.phase[ch] += (float)freq / 48000.0f;
+                        if (pv1000_state.phase[ch] >= 1.0f) pv1000_state.phase[ch] -= 1.0f;
+                        out += (pv1000_state.phase[ch] < 0.5f) ? 0.15f : -0.15f;
+                    }
+                }
+                buffer_l[i] = buffer_r[i] = out;
+                break;
+            }
+            case CHIP_POKEMINI: {
+                // Simple square wave for Pokemon Mini
+                uint16_t freq = pokemini_state.regs[0] | (pokemini_state.regs[1] << 8);
+                if (freq > 0) {
+                    pokemini_state.phase[0] += (float)freq / 48000.0f;
+                    if (pokemini_state.phase[0] >= 1.0f) pokemini_state.phase[0] -= 1.0f;
+                    buffer_l[i] = buffer_r[i] = (pokemini_state.phase[0] < 0.5f) ? 0.2f : -0.2f;
+                } else {
+                    buffer_l[i] = buffer_r[i] = 0;
+                }
+                break;
+            }
+            case CHIP_PET: {
+                // PET 6522 shift register emulation
+                // Based on Furnace pet.cpp acquire()
+                if (pet_state.enable) {
+                    int reload = pet_state.regs[0x08] * 2 + 4;
+                    if (pet_state.regs[0x09] != 0) {
+                        reload += pet_state.regs[0x09] * 512;
+                    }
+                    // Shift register cycling
+                    if (4 > pet_state.cnt) {
+                        pet_state.out = (pet_state.sreg & 1) ? 16000 : -16000;
+                        pet_state.sreg = (pet_state.sreg >> 1) | ((pet_state.sreg & 1) << 7);
+                        pet_state.cnt += reload - 4;
+                    } else {
+                        pet_state.cnt -= 4;
+                    }
+                    buffer_l[i] = buffer_r[i] = pet_state.out / 32768.0f;
+                } else {
+                    buffer_l[i] = buffer_r[i] = 0;
+                }
+                break;
+            }
+            case CHIP_NDS:
+                if (nds_chip) {
+                    // Tick NDS sound and get output
+                    nds_chip->tick(1);
+                    // Get stereo output (16 channels summed)
+                    int32_t left = 0, right = 0;
+                    for (int ch = 0; ch < 16; ch++) {
+                        left += nds_chip->chan_lout(ch);
+                        right += nds_chip->chan_rout(ch);
+                    }
+                    buffer_l[i] = (float)(left >> 8) / 32768.0f;
+                    buffer_r[i] = (float)(right >> 8) / 32768.0f;
+                } else {
+                    buffer_l[i] = buffer_r[i] = 0;
+                }
+                break;
+            case CHIP_GBA_DMA: {
+                // GBA DMA 2-channel sample playback
+                float left = 0, right = 0;
+                for (int ch = 0; ch < 2; ch++) {
+                    if (!gba_dma_state.chan[ch].active || gba_dma_state.chan[ch].length == 0) continue;
+                    // Get sample (8-bit signed)
+                    int32_t idx = gba_dma_state.chan[ch].pos >> 16;
+                    if (idx >= gba_dma_state.chan[ch].length) {
+                        if (gba_dma_state.chan[ch].loop) {
+                            gba_dma_state.chan[ch].pos = 0;
+                            idx = 0;
+                        } else {
+                            gba_dma_state.chan[ch].active = false;
+                            continue;
+                        }
+                    }
+                    int8_t sample = gba_dma_state.chan[ch].data[idx];
+                    float out = (sample / 128.0f) * (gba_dma_state.chan[ch].vol / 15.0f);
+                    if (gba_dma_state.chan[ch].pan & 2) left += out;
+                    if (gba_dma_state.chan[ch].pan & 1) right += out;
+                    // Advance position
+                    gba_dma_state.chan[ch].pos += gba_dma_state.chan[ch].freq >> 8;
+                }
+                buffer_l[i] = left * 0.5f;
+                buffer_r[i] = right * 0.5f;
+                break;
+            }
+            case CHIP_GBA_MINMOD:
+                // GBA MinMod uses same output as GBA_DMA for now
+                buffer_l[i] = buffer_r[i] = 0;
+                break;
+            case CHIP_MULTIPCM: {
+                // MultiPCM 28-channel sample playback
+                float left = 0, right = 0;
+                for (int slot = 0; slot < 28; slot++) {
+                    if (!multipcm_state.slot[slot].keyOn) continue;
+                    // Simple sample playback
+                    uint32_t idx = multipcm_state.slot[slot].pos >> 16;
+                    // Get sample from ROM (8-bit signed)
+                    int8_t sample = multipcm_sample_mem[
+                        (multipcm_state.slot[slot].sample * 0x10000 + idx) & 0x3FFFFF];
+                    // Apply total level attenuation
+                    float vol = 1.0f - (multipcm_state.slot[slot].tl / 127.0f);
+                    float out = (sample / 128.0f) * vol;
+                    // Apply pan (4-bit L, 4-bit R in pan byte)
+                    float panL = (multipcm_state.slot[slot].pan >> 4) / 15.0f;
+                    float panR = (multipcm_state.slot[slot].pan & 0x0F) / 15.0f;
+                    left += out * panL;
+                    right += out * panR;
+                    // Advance position based on frequency and octave
+                    int32_t inc = multipcm_state.slot[slot].freq;
+                    int oct = (int8_t)(multipcm_state.slot[slot].octave << 4) >> 4; // Sign extend
+                    if (oct >= 0) inc <<= oct;
+                    else inc >>= -oct;
+                    multipcm_state.slot[slot].pos += inc >> 2;
+                }
+                buffer_l[i] = left / 14.0f;  // Normalize for 28 channels
+                buffer_r[i] = right / 14.0f;
+                break;
+            }
+            case CHIP_VIC: {
+                // VIC-20 - use calculate_samples API
+                int16_t buf[2];
+                vic_sound_machine_calculate_samples(&vic_chip, buf, 1, 1, 0, 256);
+                buffer_l[i] = buffer_r[i] = buf[0] / 32768.0f;
+                break;
+            }
+            case CHIP_TED: {
+                // TED (Plus/4) - use calculate_samples API
+                int16_t buf[2];
+                ted_sound_machine_calculate_samples(&ted_chip, buf, 1, 1);
+                buffer_l[i] = buffer_r[i] = buf[0] / 32768.0f;
+                break;
+            }
+            case CHIP_VERA: {
+                // VERA PSG - render stereo
+                int16_t bufL, bufR;
+                psg_render(&vera_chip, &bufL, &bufR, 1);
+                buffer_l[i] = bufL / 32768.0f;
+                buffer_r[i] = bufR / 32768.0f;
+                break;
+            }
+            case CHIP_SUPERVISION: {
+                // Supervision - stream update (uint8 interleaved stereo)
+                uint8_t stream[4];  // 2 bytes stereo at 8-bit
+                supervision_sound_stream_update(&svision_chip, stream, 2);
+                // Convert from unsigned 8-bit to float
+                buffer_l[i] = (stream[0] - 128) / 128.0f;
+                buffer_r[i] = (stream[1] - 128) / 128.0f;
+                break;
+            }
+            case CHIP_SM8521: {
+                // SM8521 - tick and read output
+                sm8521_sound_tick(&sm8521_chip, 1);
+                buffer_l[i] = buffer_r[i] = sm8521_chip.out / 32768.0f;
+                break;
+            }
+            case CHIP_C140: {
+                // C140 - tick and read outputs
+                c140_tick(&c140_chip, 1);
+                buffer_l[i] = c140_chip.lout / 32768.0f;
+                buffer_r[i] = c140_chip.rout / 32768.0f;
+                break;
+            }
+            case CHIP_QSOUND: {
+                // QSound - stream update
+                int16_t* outputs[2];
+                int16_t left, right;
+                outputs[0] = &left;
+                outputs[1] = &right;
+                qsound_stream_update(&qsound_chip_inst, outputs, 1);
+                buffer_l[i] = left / 32768.0f;
+                buffer_r[i] = right / 32768.0f;
+                break;
+            }
+            case CHIP_SNES: {
+                // SNES SPC700 DSP - run and read stereo output
+                if (snes_chip) {
+                    short stereo_buf[2];
+                    snes_chip->set_output(stereo_buf, 1);
+                    snes_chip->run(32);  // ~32 clocks per sample at 32kHz
+                    buffer_l[i] = stereo_buf[0] / 32768.0f;
+                    buffer_r[i] = stereo_buf[1] / 32768.0f;
+                } else {
+                    buffer_l[i] = buffer_r[i] = 0;
+                }
+                break;
+            }
             default: buffer_l[i] = 0; buffer_r[i] = 0; break;
         }
         current_sample_time++;

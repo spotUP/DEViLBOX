@@ -31,6 +31,7 @@ emcc src/engine/chips/FurnaceChips.cpp \
     "$SOUND_DIR/nes_nsfplay/nes_dmc.cpp" \
     "$SOUND_DIR/pce_psg.cpp" \
     "$SOUND_DIR/sid3.c" \
+    "src/engine/chips/furnace/dsid.c" \
     "$SOUND_DIR/ay8910.cpp" \
     "$BASE_DIR/Nuked-OPLL/opll.c" \
     "$SOUND_DIR/ymfm/ymfm_opn.cpp" \
@@ -55,6 +56,7 @@ emcc src/engine/chips/FurnaceChips.cpp \
     "$SOUND_DIR/vera_psg.c" \
     "$SOUND_DIR/vera_pcm.c" \
     "$SOUND_DIR/ted-sound.c" \
+    "$SOUND_DIR/sm8521.c" \
     "$SOUND_DIR/upd1771.cpp" \
     "$SOUND_DIR/t6w28/T6W28_Apu.cpp" \
     "$SOUND_DIR/tia/Audio.cpp" \
@@ -65,6 +67,10 @@ emcc src/engine/chips/FurnaceChips.cpp \
     "$SOUND_DIR/nes_nsfplay/nes_fds.cpp" \
     "$SOUND_DIR/nes_nsfplay/nes_mmc5.cpp" \
     "$SOUND_DIR/swan_mdfn.cpp" \
+    "$SOUND_DIR/swan.c" \
+    "$SOUND_DIR/namco.cpp" \
+    "$SOUND_DIR/oki/okim6258.cpp" \
+    "$SOUND_DIR/oki/msm5232.cpp" \
     "$VGSOUND_BASE/msm6295/msm6295.cpp" \
     "$VGSOUND_BASE/es550x/es5506.cpp" \
     "$VGSOUND_BASE/es550x/es550x.cpp" \
@@ -79,7 +85,10 @@ emcc src/engine/chips/FurnaceChips.cpp \
     "$VGSOUND_BASE/x1_010/x1_010.cpp" \
     "$VGSOUND_BASE/core/vox/vox.cpp" \
     "$BASE_DIR/blip_buf/blip_buf.c" \
+    "$BASE_DIR/ESFMu/esfm.c" \
+    "$BASE_DIR/ESFMu/esfm_registers.c" \
     -I "$BASE_DIR/opn" \
+    -I "$BASE_DIR/ESFMu" \
     -I "$BASE_DIR/opm" \
     -I "$BASE_DIR/opl" \
     -I "$BASE_DIR/Nuked-PSG" \
@@ -94,6 +103,8 @@ emcc src/engine/chips/FurnaceChips.cpp \
     -I "$SOUND_DIR/t6w28" \
     -I "$SOUND_DIR/ga20" \
     -I "$SOUND_DIR" \
+    -I "$SOUND_DIR/oki" \
+    -I "$SOUND_DIR/c64_d" \
     -I "$SOUND_DIR/ymfm" \
     -I "$VGSOUND_BASE" \
     -I "Reference Code/furnace-master/extern/vgsound_emu-modified/vgsound_emu" \
@@ -104,8 +115,8 @@ emcc src/engine/chips/FurnaceChips.cpp \
     -I "Reference Code/furnace-master/src" \
     -O3 \
     -s WASM=1 \
-    -s EXPORTED_FUNCTIONS='["_furnace_init_chips", "_furnace_chip_write", "_furnace_chip_render", "_furnace_set_wavetable", "_furnace_set_logging", "_furnace_get_log_size", "_furnace_get_log_data", "_malloc", "_free"]' \
-    -s EXPORTED_RUNTIME_METHODS='["cwrap", "setValue", "getValue"]' \
+    -s EXPORTED_FUNCTIONS='["_furnace_init_chips", "_furnace_chip_write", "_furnace_chip_render", "_furnace_set_wavetable", "_furnace_upload_sample", "_furnace_set_logging", "_furnace_get_log_size", "_furnace_get_log_data", "_malloc", "_free"]' \
+    -s EXPORTED_RUNTIME_METHODS='["cwrap", "setValue", "getValue", "HEAPU8", "HEAPF32", "wasmMemory"]' \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s MODULARIZE=1 \
     -s EXPORT_NAME="FurnaceChips" \
