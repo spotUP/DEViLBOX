@@ -5,16 +5,16 @@
  * - Real-time waveform visualization
  * - 30fps animation with idle detection
  * - Configurable colors and size
- * - Auto-scales to container
+ * - Auto-scales to container when width="auto"
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getToneEngine } from '@engine/ToneEngine';
 
 interface InstrumentOscilloscopeProps {
   instrumentId: number;
-  width?: number;
+  width?: number | 'auto';
   height?: number;
   color?: string;
   backgroundColor?: string;
@@ -34,8 +34,37 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
   lineWidth = 1.5,
   className = '',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(width === 'auto' ? 200 : width);
+
+  // Handle responsive width with ResizeObserver
+  useEffect(() => {
+    if (width !== 'auto') {
+      setCanvasWidth(width);
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0) {
+        setCanvasWidth(Math.floor(rect.width));
+      }
+    };
+
+    // Initial measurement
+    updateWidth();
+
+    // Watch for container resize
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [width]);
 
   // Initialize canvas context
   useEffect(() => {
@@ -49,7 +78,7 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
 
     // Clear gradient cache when color changes
     gradientCache.clear();
-  }, [color]);
+  }, [color, canvasWidth]);
 
   // Animation frame callback
   const onFrame = useCallback((): boolean => {
@@ -134,13 +163,24 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     enabled: true,
   });
 
-  return (
+  // Wrap in container for auto-width measurement
+  const canvas = (
     <canvas
       ref={canvasRef}
-      width={width}
+      width={canvasWidth}
       height={height}
       className={`rounded ${className}`}
-      style={{ backgroundColor }}
+      style={{ backgroundColor, width: width === 'auto' ? '100%' : undefined }}
     />
   );
+
+  if (width === 'auto') {
+    return (
+      <div ref={containerRef} className="w-full h-full">
+        {canvas}
+      </div>
+    );
+  }
+
+  return canvas;
 };
