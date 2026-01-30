@@ -66,15 +66,19 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
     createInstrument,
     deleteInstrument,
     cloneInstrument,
+    updateInstrument,
   } = useInstrumentStore();
 
   const { useHexNumbers } = useUIStore();
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showSamplePackModal, setShowSamplePackModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
       // Default to collapsed
@@ -165,6 +169,39 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
   const handleClone = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     cloneInstrument(id);
+  };
+
+  // Start editing instrument name
+  const handleStartEdit = (e: React.MouseEvent, id: number, name: string) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditingName(name);
+    // Focus the input after render
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  // Save edited name
+  const handleSaveEdit = () => {
+    if (editingId !== null && editingName.trim()) {
+      updateInstrument(editingId, { name: editingName.trim() });
+    }
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  // Handle key press in edit input
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
   };
 
   // Sort instruments by ID
@@ -308,10 +345,28 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
                 {/* Icon */}
                 <IconComponent size={12} className={isSelected ? 'text-ft2-bg' : (synthInfo?.color || 'text-ft2-highlight')} />
 
-                {/* Name */}
-                <span className="text-xs font-mono whitespace-nowrap">
-                  {instrument.name}
-                </span>
+                {/* Name (double-click to edit) */}
+                {editingId === instrument.id ? (
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={handleSaveEdit}
+                    onKeyDown={handleEditKeyDown}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs font-mono bg-ft2-bg border border-ft2-cursor px-1 py-0.5 rounded text-ft2-text focus:outline-none w-24"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="text-xs font-mono whitespace-nowrap cursor-text"
+                    onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
+                    title="Double-click to rename"
+                  >
+                    {instrument.name}
+                  </span>
+                )}
 
                 {/* Synth Type Badge */}
                 <span className={`text-[9px] px-1 rounded ${isSelected ? 'bg-ft2-bg/20 text-ft2-bg' : 'bg-ft2-header text-ft2-textDim'}`}>
@@ -373,15 +428,31 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
                   className={synthInfo?.color || 'text-accent-primary'}
                 />
 
-                {/* Instrument name */}
-                <span
-                  className={`
-                    text-sm whitespace-nowrap
-                    ${isSelected ? 'text-text-primary' : 'text-text-secondary'}
-                  `}
-                >
-                  {instrument.name}
-                </span>
+                {/* Instrument name (double-click to edit) */}
+                {editingId === instrument.id ? (
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={handleSaveEdit}
+                    onKeyDown={handleEditKeyDown}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm bg-dark-bg border border-accent-primary px-1 py-0.5 rounded text-text-primary focus:outline-none w-28"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className={`
+                      text-sm whitespace-nowrap cursor-text
+                      ${isSelected ? 'text-text-primary' : 'text-text-secondary'}
+                    `}
+                    onDoubleClick={(e) => handleStartEdit(e, instrument.id, instrument.name)}
+                    title="Double-click to rename"
+                  >
+                    {instrument.name}
+                  </span>
+                )}
 
                 {/* Synth type badge (non-compact only) */}
                 {!compact && (
