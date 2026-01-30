@@ -250,14 +250,16 @@ export class FurnaceChipEngine {
       }
 
       // Fetch WASM binary and JS module to pass to worklet
-      const wasmUrl = `${baseUrl}FurnaceChips.wasm`;
-      const jsUrl = `${baseUrl}FurnaceChips.js`;
+      // Add cache-busting to ensure fresh WASM is loaded after rebuilds
+      const cacheBuster = `?v=${Date.now()}`;
+      const wasmUrl = `${baseUrl}FurnaceChips.wasm${cacheBuster}`;
+      const jsUrl = `${baseUrl}FurnaceChips.js${cacheBuster}`;
       console.log('[FurnaceChipEngine] Fetching WASM from:', wasmUrl);
       console.log('[FurnaceChipEngine] Fetching JS from:', jsUrl);
 
       const [wasmResponse, jsResponse] = await Promise.all([
-        fetch(wasmUrl),
-        fetch(jsUrl)
+        fetch(wasmUrl, { cache: 'no-store' }),
+        fetch(jsUrl, { cache: 'no-store' })
       ]);
 
       if (!wasmResponse.ok) {

@@ -119,8 +119,12 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
         console.log('[FurnaceWorklet] HEAPF32 already available on module');
       }
 
-      this.furnaceModule._furnace_init_chips(sampleRate);
-      console.log('[FurnaceWorklet] Chips initialized at', sampleRate, 'Hz');
+      // Log and validate sampleRate before using
+      const safeSampleRate = (typeof sampleRate === 'number' && sampleRate > 0) ? sampleRate : 48000;
+      console.log('[FurnaceWorklet] sampleRate:', sampleRate, 'using:', safeSampleRate, 'type:', typeof sampleRate);
+
+      this.furnaceModule._furnace_init_chips(safeSampleRate);
+      console.log('[FurnaceWorklet] Chips initialized at', safeSampleRate, 'Hz');
 
       this.leftBufferPtr = this.furnaceModule._malloc(128 * 4);
       this.rightBufferPtr = this.furnaceModule._malloc(128 * 4);
