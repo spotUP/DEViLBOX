@@ -57,7 +57,7 @@ let lastUpdateTime = 0;
 let pendingRow: number | null = null;
 let pendingPatternLength: number | undefined = undefined;
 let throttleTimer: number | null = null;
-const THROTTLE_INTERVAL = 33; // ~30 updates per second for smoother stepped scrolling
+const THROTTLE_INTERVAL = 20; // 50Hz for Amiga PAL feel
 
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({
@@ -170,7 +170,7 @@ export const useTransportStore = create<TransportStore>()(
         }
       }),
 
-    // Throttled version of setCurrentRow for playback (reduces re-renders from 60/sec to 12/sec)
+    // Throttled version of setCurrentRow for playback - limits to 50Hz for Amiga PAL feel
     setCurrentRowThrottled: (row, patternLength) => {
       const now = performance.now();
 

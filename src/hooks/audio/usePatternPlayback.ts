@@ -7,18 +7,17 @@
  * - Ticks 1+: process continuous effects
  */
 
-import { useEffect, useRef } from 'react';
-import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore } from '@stores';
+import { useEffect, useCallback as _useCallback, useRef } from 'react';
+import { useTrackerStore, useTransportStore, useInstrumentStore, useAutomationStore, useAudioStore } from '@stores';
+import { useLiveModeStore as _useLiveModeStore } from '@stores/useLiveModeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 
-// Destructure setSpeed for use in callbacks (avoids stale closure issues)
-const getSetSpeed = () => useTransportStore.getState().setSpeed;
-
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore();
-  const { isPlaying, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
+  const { isPlaying, isLooping: _isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
   const { instruments } = useInstrumentStore();
+  const { automation: _automation } = useAutomationStore();
   const { masterEffects } = useAudioStore();
 
   const actualPatternIndex = patternOrder[currentPositionIndex] ?? currentPatternIndex;
@@ -28,11 +27,6 @@ export const usePatternPlayback = () => {
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
-
-  // Track last pattern/position/speed to avoid unnecessary state updates
-  const lastPatternRef = useRef(-1);
-  const lastPositionRef = useRef(-1);
-  const lastSpeedRef = useRef(-1);
 
   // Sync BPM changes to engine (for visualization, metronome, etc.)
   useEffect(() => {
@@ -65,67 +59,46 @@ export const usePatternPlayback = () => {
       const format = (pattern.importMetadata?.sourceFormat ?? 'XM') as TrackerFormat;
       const modData = pattern.importMetadata?.modData;
 
+      console.log(`[Playback] Starting real-time playback (${format})`);
+      console.log(`[Playback] ${patterns.length} patterns, ${patternOrder.length} positions, ${pattern.channels.length} channels`);
 
-      // Start playback asynchronously after preloading instruments
-      const startPlayback = async () => {
-        // Preload all instruments into ToneEngine
-        await engine.preloadInstruments(instruments);
+      // Load song into TrackerReplayer
+      replayer.loadSong({
+        name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
+        format,
+        patterns,
+        instruments,
+        songPositions: patternOrder,
+        songLength: modData?.songLength ?? patternOrder.length,
+        restartPosition: modData?.restartPosition ?? 0,
+        numChannels: pattern.channels.length,
+        initialSpeed: modData?.initialSpeed ?? 6,
+        initialBPM: modData?.initialBPM ?? bpm,
+      });
 
-        // Load song into TrackerReplayer
-        replayer.loadSong({
-          name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
-          format,
-          patterns,
-          instruments,
-          songPositions: patternOrder,
-          songLength: modData?.songLength ?? patternOrder.length,
-          restartPosition: modData?.restartPosition ?? 0,
-          numChannels: pattern.channels.length,
-          initialSpeed: modData?.initialSpeed ?? 6,
-          initialBPM: modData?.initialBPM ?? bpm,
-        });
-
-        // Sync initial speed from replayer
-        getSetSpeed()(replayer.getSpeed());
-
-        // Set callbacks for UI updates
-        replayer.onRowChange = (row, patternNum, position) => {
-          setCurrentRowThrottled(row, patterns[patternNum]?.length ?? 64);
-          // Sync speed only when it changes (Fxx command)
-          const currentSpeed = replayer.getSpeed();
-          if (currentSpeed !== lastSpeedRef.current) {
-            lastSpeedRef.current = currentSpeed;
-            getSetSpeed()(currentSpeed);
-          }
-          // Only update pattern/position when they actually change (avoid unnecessary re-renders)
-          if (patternNum !== lastPatternRef.current) {
-            lastPatternRef.current = patternNum;
-            setCurrentPattern(patternNum);
-          }
-          if (position !== lastPositionRef.current) {
-            lastPositionRef.current = position;
-            setCurrentPosition(position);
-          }
-        };
-
-        replayer.onSongEnd = () => {
-          // Could trigger stop or loop behavior here
-        };
-
-        // Start real-time playback
-        await replayer.play();
+      // Set callbacks for UI updates
+      replayer.onRowChange = (row, patternNum, position) => {
+        setCurrentRowThrottled(row, patterns[patternNum]?.length ?? 64);
+        if (row === 0) {
+          setCurrentPattern(patternNum);
+          setCurrentPosition(position);
+        }
       };
 
-      startPlayback().catch((err) => {
+      replayer.onSongEnd = () => {
+        console.log('[Playback] Song ended');
+        // Could trigger stop or loop behavior here
+      };
+
+      // Start real-time playback
+      replayer.play().catch((err) => {
         console.error('Failed to start playback:', err);
       });
 
     } else if (!isPlaying && hasStartedRef.current) {
       // Stop playback
+      console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
-      lastPatternRef.current = -1;
-      lastPositionRef.current = -1;
-      lastSpeedRef.current = -1;
       replayer.stop();
       replayer.onRowChange = null;
       replayer.onSongEnd = null;

@@ -71,9 +71,11 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
       options.onSongEnd?.();
     };
 
-    // PERF: Don't update React state on every tick - it blocks audio scheduling!
-    // currentTick is not used in any UI components, so we only call the optional callback
     replayer.onTickProcess = (tick, row) => {
+      setState(prev => ({
+        ...prev,
+        currentTick: tick,
+      }));
       options.onTickProcess?.(tick, row);
     };
 
@@ -98,12 +100,6 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
       restartPosition?: number;
       initialSpeed?: number;
       initialBPM?: number;
-      // Original module data for libopenmpt playback
-      originalModuleData?: {
-        base64: string;
-        format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
-        sourceFile?: string;
-      };
     } = {}
   ) => {
     const replayer = replayerRef.current;
@@ -119,7 +115,6 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
       numChannels: patterns[0]?.channels.length ?? 4,
       initialSpeed: options.initialSpeed ?? 6,
       initialBPM: options.initialBPM ?? 125,
-      originalModuleData: options.originalModuleData,
     };
 
     replayer.loadSong(song);
@@ -134,7 +129,7 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
       currentTick: 0,
     }));
 
-    console.log(`[useTrackerPlayback] Loaded: ${song.name}, ${song.numChannels}ch, ${patterns.length} patterns, libopenmpt: ${options.originalModuleData ? 'available' : 'no'}`);
+    console.log(`[useTrackerPlayback] Loaded: ${song.name}, ${song.numChannels}ch, ${patterns.length} patterns`);
   }, []);
 
   /**
@@ -190,35 +185,6 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
     }
   }, [state.isPlaying, state.isPaused, play, pause, resume]);
 
-  /**
-   * Enable or disable libopenmpt playback mode
-   * When enabled, uses libopenmpt WASM for sample-accurate module playback
-   */
-  const setUseLibopenmpt = useCallback((enable: boolean) => {
-    replayerRef.current.setUseLibopenmpt(enable);
-  }, []);
-
-  /**
-   * Check if libopenmpt mode is enabled
-   */
-  const getUseLibopenmpt = useCallback(() => {
-    return replayerRef.current.getUseLibopenmpt();
-  }, []);
-
-  /**
-   * Check if current song has original module data for libopenmpt playback
-   */
-  const hasOriginalModuleData = useCallback(() => {
-    return replayerRef.current.hasOriginalModuleData();
-  }, []);
-
-  /**
-   * Get the current playback mode
-   */
-  const getPlaybackMode = useCallback(() => {
-    return replayerRef.current.getPlaybackMode();
-  }, []);
-
   // Cleanup
   useEffect(() => {
     return () => {
@@ -234,11 +200,6 @@ export function useTrackerPlayback(options: UseTrackerPlaybackOptions = {}) {
     pause,
     resume,
     togglePlayback,
-    // Libopenmpt playback mode controls
-    setUseLibopenmpt,
-    getUseLibopenmpt,
-    hasOriginalModuleData,
-    getPlaybackMode,
   };
 }
 

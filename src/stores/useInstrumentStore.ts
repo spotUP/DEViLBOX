@@ -18,6 +18,7 @@ import {
   DEFAULT_TB303,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
+import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
@@ -113,9 +114,9 @@ const findNextId = (existingIds: number[]): number => {
 
 export const useInstrumentStore = create<InstrumentStore>()(
   immer((set, get) => ({
-    // Initial state - Start with TB-303 Classic preset (ID 1, XM-compatible)
-    instruments: [{ ...TB303_PRESETS[0], id: 1, type: 'synth' } as InstrumentConfig],
-    currentInstrumentId: 1,
+    // Initial state - Start empty, user creates instruments as needed
+    instruments: [],
+    currentInstrumentId: 0,  // 0 = no instrument selected
     get currentInstrument() {
       const state = get();
       return state.instruments.find((inst) => inst.id === state.currentInstrumentId) || null;
@@ -163,7 +164,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.stringMachine ||
         updates.formantSynth ||
         updates.wavetable ||
-        updates.granular
+        updates.granular ||
+        updates.furnace
       );
 
       set((state) => {
@@ -183,6 +185,14 @@ export const useInstrumentStore = create<InstrumentStore>()(
               (instrument as any)[key] = value;
             }
           });
+
+          // Auto-initialize furnace config when synthType changes to a Furnace type
+          if (synthTypeChanging && updates.synthType?.startsWith('Furnace') && !instrument.furnace) {
+            const furnaceConfig = getDefaultFurnaceConfig(updates.synthType);
+            if (furnaceConfig) {
+              instrument.furnace = furnaceConfig;
+            }
+          }
         }
       });
 
@@ -280,9 +290,44 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === id);
         if (instrument) {
-          // Reset to default TB-303 preset
+          // Preserve the current synth type
+          const currentSynthType = instrument.synthType;
+
+          // Reset to default for the current synth type
           const defaultInst = createDefaultInstrument(id);
-          Object.assign(instrument, defaultInst);
+
+          // Clear all synth-specific configs first
+          Object.assign(instrument, {
+            ...defaultInst,
+            synthType: currentSynthType,
+            name: instrument.name, // Keep the name
+            tb303: undefined,
+            drumMachine: undefined,
+            chipSynth: undefined,
+            pwmSynth: undefined,
+            wavetable: undefined,
+            granular: undefined,
+            superSaw: undefined,
+            polySynth: undefined,
+            organ: undefined,
+            stringMachine: undefined,
+            formantSynth: undefined,
+            furnace: undefined,
+            chiptuneModule: undefined,
+            wobbleBass: undefined,
+            drumKit: undefined,
+          });
+
+          // Initialize the appropriate config for the synth type
+          if (currentSynthType === 'TB303') {
+            instrument.tb303 = { ...DEFAULT_TB303 };
+          } else if (currentSynthType.startsWith('Furnace')) {
+            const furnaceConfig = getDefaultFurnaceConfig(currentSynthType);
+            if (furnaceConfig) {
+              instrument.furnace = furnaceConfig;
+            }
+          }
+          // Other synth types use the generic oscillator/envelope/filter which are already set
         }
       });
 

@@ -32,22 +32,22 @@ interface UseProTrackerPlaybackOptions {
 }
 
 /**
- * Convert DEViLBOX Pattern to MODNote format for the replayer
+ * Convert DEViLBOX Pattern to PTCell format for the replayer
  */
-function convertPatternToMODNotes(pattern: Pattern): import('@/lib/import/formats/MODParser').MODNote[][] {
-  const rows: import('@/lib/import/formats/MODParser').MODNote[][] = [];
+function convertPatternToPTCells(pattern: Pattern): import('@/engine/ProTrackerPlayer').PTCell[][] {
+  const rows: import('@/engine/ProTrackerPlayer').PTCell[][] = [];
 
   for (let row = 0; row < pattern.length; row++) {
-    const rowData: import('@/lib/import/formats/MODParser').MODNote[] = [];
+    const rowData: import('@/engine/ProTrackerPlayer').PTCell[] = [];
 
     for (let ch = 0; ch < pattern.channels.length; ch++) {
       const cell = pattern.channels[ch].rows[row];
 
-      // Convert cell to MODNote format
-      let period = 0;
-      let instrument = 0;
+      // Convert cell to PTCell format
+      let note = 0; // Period value
+      let sample = 0;
       let effect = 0;
-      let effectParam = 0;
+      let param = 0;
 
       // Handle note (XM numeric format or string)
       if (typeof cell.note === 'number' && cell.note > 0 && cell.note < 97) {
@@ -64,30 +64,30 @@ function convertPatternToMODNotes(pattern: Pattern): import('@/lib/import/format
             428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
             214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
           ];
-          period = periodTableFT0[ptNoteIndex] || 0;
+          note = periodTableFT0[ptNoteIndex] || 0;
         }
       } else if (typeof cell.note === 'string' && cell.note !== '...' && cell.note !== '===') {
         // String format note (e.g., "C-4", "C#3")
-        period = noteStringToPeriod(cell.note);
+        note = noteStringToPeriod(cell.note);
       }
 
-      // Handle instrument
+      // Handle instrument -> sample
       if (cell.instrument && cell.instrument > 0) {
-        instrument = cell.instrument;
+        sample = cell.instrument;
       }
 
       // Handle effect (XM format: effTyp + eff)
       if (cell.effTyp !== undefined && cell.effTyp !== 0) {
         effect = cell.effTyp;
-        effectParam = cell.eff ?? 0;
-      } else if (cell.effect2 && cell.effect2 !== '...') {
+        param = cell.eff ?? 0;
+      } else if (cell.effect && cell.effect !== '...') {
         // String format effect (e.g., "C40", "F06")
-        const parsed = parseEffectString(cell.effect2);
+        const parsed = parseEffectString(cell.effect);
         effect = parsed.effect;
-        effectParam = parsed.param;
+        param = parsed.param;
       }
 
-      rowData.push({ period, instrument, effect, effectParam });
+      rowData.push({ note, sample, effect, param });
     }
 
     rows.push(rowData);
@@ -241,7 +241,7 @@ export function useProTrackerPlayback(options: UseProTrackerPlaybackOptions = {}
     const replayer = replayerRef.current;
 
     // Convert patterns to MODNote format
-    const modPatterns = patterns.map(p => convertPatternToMODNotes(p));
+    const modPatterns = patterns.map(p => convertPatternToPTCells(p));
 
     // Convert instruments to PTSample format
     const samples: PTSample[] = [];
