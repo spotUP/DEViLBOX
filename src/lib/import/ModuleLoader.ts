@@ -54,10 +54,10 @@ export interface ModuleInfo {
   file: File;  // Original file for sample extraction
   // Native parser data (if available)
   nativeData?: {
-    format: 'XM' | 'MOD';
+    format: 'XM' | 'MOD' | 'FUR' | 'DMF';
     importMetadata: ImportMetadata;
     instruments: ParsedInstrument[];
-    patterns: any[][];  // XMNote[][] or MODNote[][]
+    patterns: any[][];  // XMNote[][] or MODNote[][] or converted patterns
   };
 }
 
@@ -239,7 +239,7 @@ async function loadWithNativeParser(
         channels: result.metadata.originalChannelCount,
       });
       return {
-        format: 'XM', // Use XM format for effect handling compatibility
+        format: 'FUR', // Furnace format - patterns already converted
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as any,
@@ -254,7 +254,7 @@ async function loadWithNativeParser(
         channels: result.metadata.originalChannelCount,
       });
       return {
-        format: 'XM', // Use XM format for effect handling compatibility
+        format: 'DMF', // DefleMask format - patterns already converted
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as any,

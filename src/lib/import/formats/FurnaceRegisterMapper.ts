@@ -602,6 +602,62 @@ export class FurnaceRegisterMapper {
   }
 
   /**
+   * Map OPN (YM2203) registers - simpler version of OPNA
+   * 3 FM channels + 3 SSG channels, no ADPCM
+   * Reference: ym2203.cpp
+   */
+  public static mapOPN(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
+    const chip = FurnaceChipType.OPN;
+    // OPN only has 3 FM channels (0-2), no second bank
+    const chanOffset = channel % 3;
+
+    // === INIT REGISTERS ===
+    engine.write(chip, 0x22, 0x08);   // LFO enable
+
+    // === FM REGISTERS ===
+    // Algorithm & Feedback
+    const b0Val = ((config.feedback & 7) << 3) | (config.algorithm & 7);
+    engine.write(chip, 0xB0 + chanOffset, b0Val);
+
+    // AMS + FMS (no panning on OPN - mono chip)
+    const ams = config.ams ?? 0;
+    const fms = config.fms ?? 0;
+    const b4Val = ((ams & 3) << 4) | (fms & 7);
+    engine.write(chip, 0xB4 + chanOffset, b4Val);
+
+    // Operator parameters - same slot mapping as OPN2
+    const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+
+    config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
+      const opOff = opOffsets[i] + chanOffset;
+
+      // DT + MULT
+      const dtNative = this.furnaceDtToOPN2(op.dt);
+      engine.write(chip, 0x30 + opOff, ((dtNative & 7) << 4) | (op.mult & 0x0F));
+
+      // Total Level
+      engine.write(chip, 0x40 + opOff, op.tl & 0x7F);
+
+      // RS + AR
+      engine.write(chip, 0x50 + opOff, ((op.rs & 3) << 6) | (op.ar & 0x1F));
+
+      // AM + DR
+      engine.write(chip, 0x60 + opOff, (op.am ? 0x80 : 0) | (op.dr & 0x1F));
+
+      // D2R
+      engine.write(chip, 0x70 + opOff, op.d2r & 0x1F);
+
+      // SL + RR
+      engine.write(chip, 0x80 + opOff, ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
+
+      // SSG-EG
+      engine.write(chip, 0x90 + opOff, op.ssg & 0x0F);
+    });
+
+    console.log(`[mapOPN] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
+  }
+
+  /**
    * Map OPNB (YM2610/YM2610B) registers
    * Reference: ym2610.cpp reset()
    */
