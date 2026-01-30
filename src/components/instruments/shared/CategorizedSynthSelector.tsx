@@ -3,10 +3,15 @@
  * Replaces the flat grid with organized categories
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
+
+// localStorage keys for persisting UI state
+const STORAGE_KEY_CATEGORY = 'devilbox-synth-selector-category';
+const STORAGE_KEY_SEARCH = 'devilbox-synth-selector-search';
+const STORAGE_KEY_SCROLL = 'devilbox-synth-selector-scroll';
 import {
   DEFAULT_TB303,
   DEFAULT_DRUM_MACHINE,
@@ -48,8 +53,87 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   const currentInstrument = instruments.find(inst => inst.id === currentInstrumentId) || null;
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [hoveredSynth, setHoveredSynth] = useState<SynthType | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Initialize state from localStorage for persistence
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_SEARCH) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_CATEGORY) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Ref for scroll container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isRestoringScroll = useRef(false);
+
+  // Persist filter state to localStorage
+  useEffect(() => {
+    try {
+      if (selectedCategory) {
+        localStorage.setItem(STORAGE_KEY_CATEGORY, selectedCategory);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CATEGORY);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    try {
+      if (searchQuery) {
+        localStorage.setItem(STORAGE_KEY_SEARCH, searchQuery);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_SEARCH);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [searchQuery]);
+
+  // Save scroll position on scroll (debounced)
+  const handleScroll = useCallback(() => {
+    if (isRestoringScroll.current) return;
+    const container = scrollContainerRef.current;
+    if (container) {
+      try {
+        localStorage.setItem(STORAGE_KEY_SCROLL, String(container.scrollTop));
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  }, []);
+
+  // Restore scroll position on mount
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      try {
+        const savedScroll = localStorage.getItem(STORAGE_KEY_SCROLL);
+        if (savedScroll) {
+          isRestoringScroll.current = true;
+          // Use requestAnimationFrame to ensure DOM is ready
+          requestAnimationFrame(() => {
+            container.scrollTop = parseInt(savedScroll, 10) || 0;
+            // Reset flag after a short delay
+            setTimeout(() => {
+              isRestoringScroll.current = false;
+            }, 100);
+          });
+        }
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  }, []);
 
   // Filter categories and synths based on search and category selection
   const filteredCategories = useMemo(() => {
@@ -300,7 +384,11 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
   // Full categorized view
   return (
-    <div className="space-y-4">
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="space-y-4 max-h-full overflow-y-auto"
+    >
       {/* Search and Filter Header */}
       <div className="space-y-3 sticky top-0 bg-dark-bg pb-3 z-10">
         {/* Search bar */}
