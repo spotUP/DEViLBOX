@@ -35,14 +35,14 @@ interface XMHeader {
 }
 
 /**
- * XM Pattern Header
+ * XM Pattern Header - exported for documentation
  */
-// interface XMPatternHeader {
-//   headerLength: number;
-//   packingType: number; // Always 0
-//   rowCount: number; // 1-256
-//   packedDataSize: number;
-// }
+export interface XMPatternHeader {
+  headerLength: number;
+  packingType: number; // Always 0
+  rowCount: number; // 1-256
+  packedDataSize: number;
+}
 
 /**
  * XM Pattern Note (unpacked)
@@ -56,34 +56,34 @@ export interface XMNote {
 }
 
 /**
- * XM Instrument Header (243 bytes for v1.04)
+ * XM Instrument Header (243 bytes for v1.04) - exported for documentation
  */
-// interface XMInstrumentHeader {
-//   size: number; // Header size
-//   name: string; // 22 bytes
-//   type: number; // Always 0
-//   sampleCount: number; // 0-16 samples per instrument
-//   sampleHeaderSize: number; // 40 bytes if samples > 0
-//
-//   // Sample mapping (96 bytes) - note number to sample number
-//   sampleMap: number[];
-//
-//   // Volume envelope (48 bytes)
-//   volumeEnvelope: EnvelopePoints;
-//
-//   // Panning envelope (48 bytes)
-//   panningEnvelope: EnvelopePoints;
-//
-//   volumeType: number; // Bit 0: on, 1: sustain, 2: loop
-//   panningType: number; // Bit 0: on, 1: sustain, 2: loop
-//
-//   vibratoType: number; // 0-3
-//   vibratoSweep: number;
-//   vibratoDepth: number;
-//   vibratoRate: number;
-//
-//   volumeFadeout: number; // 0-4095
-// }
+export interface XMInstrumentHeader {
+  size: number; // Header size
+  name: string; // 22 bytes
+  type: number; // Always 0
+  sampleCount: number; // 0-16 samples per instrument
+  sampleHeaderSize: number; // 40 bytes if samples > 0
+
+  // Sample mapping (96 bytes) - note number to sample number
+  sampleMap: number[];
+
+  // Volume envelope (48 bytes)
+  volumeEnvelope: EnvelopePoints;
+
+  // Panning envelope (48 bytes)
+  panningEnvelope: EnvelopePoints;
+
+  volumeType: number; // Bit 0: on, 1: sustain, 2: loop
+  panningType: number; // Bit 0: on, 1: sustain, 2: loop
+
+  vibratoType: number; // 0-3
+  vibratoSweep: number;
+  vibratoDepth: number;
+  vibratoRate: number;
+
+  volumeFadeout: number; // 0-4095
+}
 
 /**
  * XM Sample Header (40 bytes)
@@ -149,7 +149,7 @@ export async function parseXM(buffer: ArrayBuffer): Promise<{
       channelNames: Array.from({ length: header.channelCount }, (_, i) => `Channel ${i + 1}`),
       songLength: header.songLength,
       restartPosition: header.restartPosition,
-      patternOrderTable: header.patternOrderTable.slice(0, header.songLength),
+      patternOrderTable: header.patternOrderTable,
     },
     xmData: {
       frequencyType: (header.flags & 0x01) ? 'linear' : 'amiga',
@@ -270,10 +270,12 @@ function readXMPattern(view: DataView, offset: number, channelCount: number): {
   const startOffset = offset;
 
   // Read pattern header (9 bytes)
-  // const headerLength = view.getUint32(offset, true);
+  const headerLength = view.getUint32(offset, true);
+  void headerLength; // Header length for format validation
   offset += 4;
 
-  // const packingType = view.getUint8(offset);
+  const packingType = view.getUint8(offset);
+  void packingType; // Packing type (always 0 in current format)
   offset += 1;
 
   const rowCount = view.getUint16(offset, true) || 64; // Default to 64 if 0
@@ -353,8 +355,9 @@ function readXMInstrument(view: DataView, offset: number): {
   const name = readString(view, offset, 22).trim();
   offset += 22;
 
-  // Read type (1 byte)
-  // const type = view.getUint8(offset);
+  // Read type (1 byte) - always 0 in XM format
+  const instType = view.getUint8(offset);
+  void instType; // Instrument type (reserved, always 0)
   offset += 1;
 
   // Read sample count (2 bytes)

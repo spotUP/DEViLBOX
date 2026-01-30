@@ -17,10 +17,7 @@ import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import type { RegisterWrite } from './VGMExporter';
 import { parseRegisterLog } from './VGMExporter';
 
-/**
- * ZSM Command bytes
- * Exported for documentation and potential UI use
- */
+// ZSM Commands - exported for documentation
 export const ZSM_CMD = {
   // YM2151 write: 0x40-0x7F (register in lower 6 bits, data follows)
   YM_BASE: 0x40,
@@ -63,6 +60,17 @@ function veraRegToZSM(reg: number): number {
   // VERA PSG base is 0x1F9C0 in VERA memory space
   // But for ZSM, we use simple 0-63 offset
   return reg & 0x3F;
+}
+
+/**
+ * Convert YM2151 register write to ZSM command
+ * @public Exported for external use in YM2151 tools
+ */
+export function ymRegToZSM(reg: number): number {
+  // YM2151 has registers 0x00-0xFF
+  // ZSM encodes as 0x40 | (reg >> 2), followed by ((reg & 3) << 6) | data
+  // Actually simpler: just output raw register + data pairs
+  return reg;
 }
 
 /**
@@ -172,19 +180,22 @@ export function exportToZSM(
     // Encode chip writes
     if (write.chipType === FurnaceChipType.OPM) {
       usesYM = true;
-      // YM2151 write: ZSM uses compact 2-byte encoding for low registers
+      // YM2151 write: two bytes - register then data
+      // ZSM format uses a compact encoding
       const reg = write.port & 0xFF;
 
-      // ZSM YM2151 encoding:
-      // - Registers 0x00-0x3E (0-62): 2 bytes - (0x40 + reg), data
-      // - Register 0x3F+ (63+): 3 bytes - 0x7F, reg, data
-      if (reg < 0x3F) {
-        // Compact 2-byte encoding for registers 0-62
-        commands.push(0x40 + reg);
-        commands.push(write.data);
+      // Group register by type for efficiency
+      // For simplicity, output raw: 0x40 + high nibble, then low nibble + data
+      // Actually ZSM uses: byte 1 = 0x40 | (reg >> 1), byte 2 = ((reg & 1) << 7) | data
+      // This allows 2 bytes per write instead of 3
+
+      if (reg < 0x80) {
+        // Registers 0x00-0x7F: single byte + data
+        commands.push(0x40 | (reg >> 1));
+        commands.push(((reg & 1) << 7) | (write.data & 0x7F));
       } else {
-        // Extended 3-byte encoding for registers 63+
-        commands.push(0x7F); // Extended marker
+        // High registers need extended encoding
+        commands.push(0x40 | 0x3F); // Extended marker
         commands.push(reg);
         commands.push(write.data);
       }
@@ -197,10 +208,8 @@ export function exportToZSM(
     }
   }
 
-  // Note: ZSM doesn't use an explicit end marker - end is determined by
-  // reaching PCM offset (if set) or end of file. We add a final 1-tick
-  // delay to ensure clean ending.
-  commands.push(0x80); // Final 1-tick delay (0x80 | 0 = delay 1)
+  // End marker
+  commands.push(0x80, 0x00);
 
   // Calculate offsets
   const musicDataSize = commands.length;

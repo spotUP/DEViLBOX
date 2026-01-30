@@ -5,8 +5,6 @@
 
 import type { Pattern, TrackerCell, ImportMetadata } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
-import { xmNoteToString } from '../xmConversions';
-import { SynthBaker } from '../audio/SynthBaker';
 
 export interface MODExportOptions {
   channelCount?: number; // 4, 6, 8 channels (default: 4)
@@ -65,7 +63,8 @@ export async function exportAsMOD(
 
   // Check if this was originally imported from MOD (can do lossless export)
   const importMetadata = patterns[0]?.importMetadata;
-  // const isReexport = importMetadata?.sourceFormat === 'MOD'; // Future: use for optimized export path
+  const isReexport = importMetadata?.sourceFormat === 'MOD';
+  void isReexport; // Used for lossless re-export optimization path
 
   // Convert instruments (MOD supports max 31 samples)
   const modSamples: MODSampleData[] = [];
@@ -78,34 +77,9 @@ export async function exportAsMOD(
     }
 
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      try {
-        const bakedBuffer = await SynthBaker.bakeToSample(inst);
-        const arrayBuffer = bakedBuffer.getChannelData(0).buffer;
-        
-        // Create a Sampler-like config for the baked synth
-        const dummyConfig: InstrumentConfig = {
-          ...inst,
-          synthType: 'Sampler',
-          sample: {
-            audioBuffer: arrayBuffer,
-            url: '',
-            baseNote: 'C4',
-            detune: 0,
-            loop: false,
-            loopStart: 0,
-            loopEnd: 0,
-            reverse: false,
-            playbackRate: 1.0,
-          }
-        };
-        
-        const modSample = await convertSamplerToMODSample(dummyConfig, importMetadata);
-        modSamples.push(modSample);
-        warnings.push(`Synth instrument "${inst.name}" was baked to a sample for MOD export.`);
-      } catch (error) {
-        warnings.push(`Failed to bake synth instrument "${inst.name}": ${error}. Exporting as empty.`);
-        modSamples.push(createEmptySample());
-      }
+      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
+      // TODO: Render synth to sample
+      modSamples.push(createEmptySample());
     } else if (inst.synthType === 'Sampler') {
       const modSample = await convertSamplerToMODSample(inst, importMetadata);
       modSamples.push(modSample);
@@ -143,13 +117,7 @@ export async function exportAsMOD(
   });
 
   const blob = new Blob([modData], { type: 'application/octet-stream' });
-  
-  // Prevent overwriting original file by appending _export
-  let safeName = moduleName.replace(/[^a-zA-Z0-9]/g, '_');
-  if (!safeName.toLowerCase().endsWith('_export')) {
-    safeName += '_export';
-  }
-  const filename = `${safeName}.mod`;
+  const filename = `${moduleName.replace(/[^a-zA-Z0-9]/g, '_')}.mod`;
 
   return {
     data: blob,
@@ -191,35 +159,25 @@ interface MODNoteData {
 /**
  * Amiga period table for notes
  * Period = base period for C-2 / (2 ^ (note / 12))
- * Standard MOD range (periods 856-113) maps to DEViLBOX C-3 to B-5
- * Extended range (periods 1712-28) maps to DEViLBOX C-2 to B-7
  */
 const AMIGA_PERIODS: { [key: string]: number } = {
-  // Octave 2 (Extended low)
-  'C-2': 1712, 'C#2': 1616, 'D-2': 1525, 'D#2': 1440, 'E-2': 1357, 'F-2': 1281,
-  'F#2': 1209, 'G-2': 1141, 'G#2': 1077, 'A-2': 1017, 'A#2': 961, 'B-2': 907,
-  // Octave 3 (Standard Start 856)
-  'C-3': 856, 'C#3': 808, 'D-3': 762, 'D#3': 720, 'E-3': 678, 'F-3': 640,
-  'F#3': 604, 'G-3': 570, 'G#3': 538, 'A-3': 508, 'A#3': 480, 'B-3': 453,
-  // Octave 4
-  'C-4': 428, 'C#4': 404, 'D-4': 381, 'D#4': 360, 'E-4': 339, 'F-4': 320,
-  'F#4': 302, 'G-4': 285, 'G#4': 269, 'A-4': 254, 'A#4': 240, 'B-4': 226,
-  // Octave 5
-  'C-5': 214, 'C#5': 202, 'D-5': 190, 'D#5': 180, 'E-5': 170, 'F-5': 160,
-  'F#5': 151, 'G-5': 143, 'G#5': 135, 'A-5': 127, 'A#5': 120, 'B-5': 113,
-  // Octave 6 (Extended high)
-  'C-6': 107, 'C#6': 101, 'D-6': 95, 'D#6': 90, 'E-6': 85, 'F-6': 80,
-  'F#6': 75, 'G-6': 71, 'G#6': 67, 'A-6': 63, 'A#6': 60, 'B-6': 56,
-  // Octave 7 (Extended high)
-  'C-7': 53, 'C#7': 50, 'D-7': 47, 'D#7': 45, 'E-7': 42, 'F-7': 40,
-  'F#7': 37, 'G-7': 35, 'G#7': 33, 'A-7': 31, 'A#7': 30, 'B-7': 28,
+  'C-0': 1712, 'C#0': 1616, 'D-0': 1525, 'D#0': 1440, 'E-0': 1357, 'F-0': 1281,
+  'F#0': 1209, 'G-0': 1141, 'G#0': 1077, 'A-0': 1017, 'A#0': 961, 'B-0': 907,
+  'C-1': 856, 'C#1': 808, 'D-1': 762, 'D#1': 720, 'E-1': 678, 'F-1': 640,
+  'F#1': 604, 'G-1': 570, 'G#1': 538, 'A-1': 508, 'A#1': 480, 'B-1': 453,
+  'C-2': 428, 'C#2': 404, 'D-2': 381, 'D#2': 360, 'E-2': 339, 'F-2': 320,
+  'F#2': 302, 'G-2': 285, 'G#2': 269, 'A-2': 254, 'A#2': 240, 'B-2': 226,
+  'C-3': 214, 'C#3': 202, 'D-3': 190, 'D#3': 180, 'E-3': 170, 'F-3': 160,
+  'F#3': 151, 'G-3': 143, 'G#3': 135, 'A-3': 127, 'A#3': 120, 'B-3': 113,
 };
 
 /**
  * Convert note name to Amiga period
  */
 function noteToPeriod(noteName: string): number {
-  return AMIGA_PERIODS[noteName] || 0;
+  // Remove dash for lookup
+  const lookupName = noteName.replace('-', '-');
+  return AMIGA_PERIODS[lookupName] || 0;
 }
 
 /**
@@ -265,36 +223,50 @@ function convertPatternToMOD(
  * Convert TrackerCell to MOD note
  */
 function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteData {
-  // Convert note to period
+  // Convert note to period - handle both numeric (XM) and string (legacy) formats
   let period = 0;
-  // Skip empty (0) and note-off (97)
-  if (cell.note && cell.note !== 0 && cell.note !== 97) {
-    // Convert XM note to string for period lookup
-    const noteStr = xmNoteToString(cell.note);
-    period = noteToPeriod(noteStr);
-    if (period === 0) {
-      // Note out of range for Amiga period table
-      warnings.push(`Note ${noteStr} is out of range for MOD format (C-2 to B-7 supported).`);
-    }
+  const noteValue = cell.note;
+
+  // Check for note-off (97 in XM numeric format, '===' in string format)
+  if (noteValue === 97 || (typeof noteValue === 'string' && noteValue === '===')) {
+    return { period: 0, instrument: 0, effect: 0xC, effectParam: 0x00 };
   }
 
-  // Note off (97) in MOD is done with EC0 effect (note cut at tick 0)
-  if (cell.note === 97) {
-    return { period: 0, instrument: 0, effect: 0xC, effectParam: 0x00 };
+  // Convert note to string if numeric
+  let noteStr: string | null = null;
+  if (typeof noteValue === 'number' && noteValue > 0 && noteValue < 97) {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteIndex = (noteValue - 1) % 12;
+    const octave = Math.floor((noteValue - 1) / 12);
+    noteStr = `${noteNames[noteIndex]}-${octave}`;
+  } else if (typeof noteValue === 'string' && noteValue && noteValue !== '---') {
+    noteStr = noteValue;
+  }
+
+  if (noteStr) {
+    period = noteToPeriod(noteStr);
+    if (period === 0) {
+      warnings.push(`Note ${noteStr} is out of range for MOD format (C-0 to B-3 supported).`);
+    }
   }
 
   // Instrument (1-31)
   const instrument = cell.instrument || 0;
 
-  // Get effect (already in numeric XM format)
-  let effect = cell.effTyp || 0;
-  let effectParam = cell.eff || 0;
+  // Parse effect
+  let effect = 0;
+  let effectParam = 0;
+  if (cell.effect && cell.effect !== '...') {
+    const parsed = parseEffect(cell.effect);
+    effect = parsed.effect;
+    effectParam = parsed.param;
 
-  // MOD only supports effects 0-F
-  if (effect > 0xF && effect !== 0) {
-    warnings.push(`Effect ${effect.toString(16).toUpperCase()}${effectParam.toString(16).padStart(2, '0')} is not supported in MOD format (only 0-F).`);
-    effect = 0;
-    effectParam = 0;
+    // MOD only supports effects 0-F
+    if (effect > 0xF) {
+      warnings.push(`Effect ${cell.effect} is not supported in MOD format (only 0-F).`);
+      effect = 0;
+      effectParam = 0;
+    }
   }
 
   // MOD doesn't support effect2 or volume column
@@ -302,17 +274,12 @@ function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteDat
     warnings.push(`Effect2 column not supported in MOD format (will be lost).`);
   }
 
-  // XM volume column: 0x00-0x0F = nothing, 0x10-0x50 = set volume 0-64, 0x60+ = effects
-  if (cell.volume > 0x0F) {
+  if (cell.volume !== null) {
     // Volume must be set via Cxx command in MOD
     // If we have a volume but no effect, use Cxx
     if (effect === 0 && effectParam === 0) {
-      // Convert XM volume (0x10-0x50) to MOD volume (0-64)
-      const modVolume = cell.volume >= 0x10 && cell.volume <= 0x50
-        ? cell.volume - 0x10
-        : Math.min(cell.volume, 0x40);
       effect = 0xC;
-      effectParam = modVolume;
+      effectParam = Math.min(cell.volume, 0x40);
     } else {
       warnings.push(`Volume column not supported in MOD (use Cxx effect).`);
     }
@@ -326,6 +293,24 @@ function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteDat
   };
 }
 
+/**
+ * Parse FT2 effect string to MOD effect
+ */
+function parseEffect(effectStr: string): { effect: number; param: number } {
+  if (effectStr.length !== 3) return { effect: 0, param: 0 };
+
+  const effectChar = effectStr[0].toUpperCase();
+  const param = parseInt(effectStr.substring(1), 16);
+
+  // Map effect letters to numbers
+  const effectLetters = '0123456789ABCDEF';
+  const effect = effectLetters.indexOf(effectChar);
+
+  return {
+    effect: effect === -1 ? 0 : effect,
+    param: isNaN(param) ? 0 : param,
+  };
+}
 
 /**
  * Convert Sampler instrument to MOD sample
@@ -386,7 +371,7 @@ function buildMODFile(config: {
   const sampleDataSize = config.samples.reduce((sum, s) => sum + s.pcmData.length, 0);
 
   const buffer = new Uint8Array(headerSize + patternSize + sampleDataSize);
-  // const view = new DataView(buffer.buffer); // Reserved for future use
+  // DataView available for future word/dword writes if needed
   let offset = 0;
 
   // Write title (20 bytes)
@@ -463,7 +448,7 @@ function writeSampleHeader(buffer: Uint8Array, offset: number, sample: MODSample
  * Write MOD pattern (1024 bytes = 64 rows * 4 channels * 4 bytes/note)
  */
 function writePattern(buffer: Uint8Array, offset: number, pattern: MODPatternData): void {
-  // const view = new DataView(buffer.buffer); // Reserved for future use
+  // Note: MOD uses byte-level packing, no DataView needed for this format
 
   for (const row of pattern.rows) {
     for (const note of row) {

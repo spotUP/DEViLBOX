@@ -103,30 +103,24 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     const sampleData = readMODSampleData(view, offset, sampleHeader);
     offset += sampleHeader.length * 2; // Length is in words
 
-    // MOD samples are 8-bit, so length in samples = length in bytes = words * 2
-    const lengthInSamples = sampleHeader.length * 2;
-
     const sample: ParsedSample = {
-      id: i + 1, // MOD instruments are 1-31 (1-indexed)
+      id: i,
       name: sampleHeader.name,
       pcmData: sampleData,
-      // Loop points are in words, convert to samples (bytes for 8-bit)
-      loopStart: sampleHeader.loopStart * 2,
-      loopLength: sampleHeader.loopLength * 2,
-      // ProTracker spec: loop enabled when length > 2 words (not > 1)
-      // This prevents short loop glitches
-      loopType: sampleHeader.loopLength > 2 ? 'forward' : 'none',
+      loopStart: sampleHeader.loopStart,
+      loopLength: sampleHeader.loopLength,
+      loopType: sampleHeader.loopLength > 1 ? 'forward' : 'none',
       volume: sampleHeader.volume,
       finetune: sampleHeader.finetune,
       relativeNote: 0, // MOD doesn't have relative note
       panning: 128, // Center (MOD doesn't have per-sample panning)
       bitDepth: 8,
       sampleRate: 8363, // Amiga C-2 sample rate (8363 Hz)
-      length: lengthInSamples,
+      length: sampleHeader.length,
     };
 
     instruments.push({
-      id: i + 1, // MOD instruments are 1-31 (1-indexed, matching pattern cell references)
+      id: i,
       name: sampleHeader.name,
       samples: [sample],
       fadeout: 0,
@@ -151,7 +145,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
       channelNames: Array.from({ length: header.channelCount }, (_, i) => `Channel ${i + 1}`),
       songLength: header.songLength,
       restartPosition: header.restartPosition,
-      patternOrderTable: header.patternOrderTable.slice(0, header.songLength),
+      patternOrderTable: header.patternOrderTable,
     },
     originalSamples: {},
     envelopes: {},
@@ -262,16 +256,13 @@ function readMODPattern(
       // Byte 3: ffffffff - effect parameter
 
       const period = ((byte0 & 0x0F) << 8) | byte1;
-      // Byte 0 bits 7-4: upper nibble of instrument (bits 4-7)
-      // Byte 2 bits 7-4: lower nibble of instrument (bits 0-3)
-      // Combined: ((byte0 & 0xF0) | (byte2 & 0xF0) >> 4) gives 0-31
-      const instrument = (byte0 & 0xF0) | ((byte2 & 0xF0) >> 4);
+      const instrument = ((byte0 & 0xF0) >> 4) | (byte2 & 0xF0);
       const effect = byte2 & 0x0F;
       const effectParam = byte3;
 
       rowNotes.push({
         period,
-        instrument, // Already in 0-31 range (or 0-15 for some formats)
+        instrument: instrument >> 4, // Convert to 1-31 range
         effect,
         effectParam,
       });
@@ -285,8 +276,6 @@ function readMODPattern(
 
 /**
  * Read MOD sample data (8-bit signed PCM)
- * Returns Int8Array for proper type detection downstream
- * Note: We normalize later in InstrumentConverter to avoid data corruption
  */
 function readMODSampleData(
   view: DataView,
@@ -297,9 +286,7 @@ function readMODSampleData(
   const samples = new Int8Array(length);
 
   for (let i = 0; i < length; i++) {
-    const byte = view.getInt8(offset + i);
-    // ProTracker quirk: first 2 bytes often contain clicks, zero them out
-    samples[i] = i < 2 ? 0 : byte;
+    samples[i] = view.getInt8(offset + i);
   }
 
   return samples.buffer;
@@ -320,33 +307,19 @@ function readString(view: DataView, offset: number, maxLength: number): string {
 
 /**
  * Convert Amiga period to note name
- * Amiga period table with modern MIDI octave numbering
- * MOD C-2 (period 428) = MIDI C4 (middle C)
+ * Amiga period table (C-1 to B-3)
  */
 export function periodToNote(period: number): string | null {
   if (period === 0) return null;
 
-  // Amiga period table converted to Tone.js format (no dashes)
-  // Octaves shifted +2 (MOD C-1 = modern C3, MOD C-2 = modern C4, etc.)
+  // Amiga period table (linearized for accuracy)
   const PERIOD_TABLE: { [key: number]: string } = {
-    // Octave 0 (Extended) -> Tone.js Octave 2
-    1712: 'C2', 1616: 'C#2', 1525: 'D2', 1440: 'D#2', 1357: 'E2', 1281: 'F2',
-    1209: 'F#2', 1141: 'G2', 1077: 'G#2', 1017: 'A2', 961: 'A#2', 907: 'B2',
-    // Octave 1 -> Tone.js Octave 3
-    856: 'C3', 808: 'C#3', 762: 'D3', 720: 'D#3', 678: 'E3', 640: 'F3',
-    604: 'F#3', 570: 'G3', 538: 'G#3', 508: 'A3', 480: 'A#3', 453: 'B3',
-    // Octave 2 -> Tone.js Octave 4
-    428: 'C4', 404: 'C#4', 381: 'D4', 360: 'D#4', 339: 'E4', 320: 'F4',
-    302: 'F#4', 285: 'G4', 269: 'G#4', 254: 'A4', 240: 'A#4', 226: 'B4',
-    // Octave 3 -> Tone.js Octave 5
-    214: 'C5', 202: 'C#5', 190: 'D5', 180: 'D#5', 170: 'E5', 160: 'F5',
-    151: 'F#5', 143: 'G5', 135: 'G#5', 127: 'A5', 120: 'A#5', 113: 'B5',
-    // Octave 4 (Extended) -> Tone.js Octave 6
-    107: 'C6', 101: 'C#6', 95: 'D6', 90: 'D#6', 85: 'E6', 80: 'F6',
-    75: 'F#6', 71: 'G6', 67: 'G#6', 63: 'A6', 60: 'A#6', 56: 'B6',
-    // Octave 5 (Extended) -> Tone.js Octave 7
-    53: 'C7', 50: 'C#7', 47: 'D7', 45: 'D#7', 42: 'E7', 40: 'F7',
-    37: 'F#7', 35: 'G7', 33: 'G#7', 31: 'A7', 30: 'A#7', 28: 'B7',
+    856: 'C-1', 808: 'C#1', 762: 'D-1', 720: 'D#1', 678: 'E-1', 640: 'F-1',
+    604: 'F#1', 570: 'G-1', 538: 'G#1', 508: 'A-1', 480: 'A#1', 453: 'B-1',
+    428: 'C-2', 404: 'C#2', 381: 'D-2', 360: 'D#2', 339: 'E-2', 320: 'F-2',
+    302: 'F#2', 285: 'G-2', 269: 'G#2', 254: 'A-2', 240: 'A#2', 226: 'B-2',
+    214: 'C-3', 202: 'C#3', 190: 'D-3', 180: 'D#3', 170: 'E-3', 160: 'F-3',
+    151: 'F#3', 143: 'G-3', 135: 'G#3', 127: 'A-3', 120: 'A#3', 113: 'B-3',
   };
 
   // Find closest period

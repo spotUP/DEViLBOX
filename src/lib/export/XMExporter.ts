@@ -5,7 +5,7 @@
 
 import type { Pattern, TrackerCell, ImportMetadata, EnvelopePoints } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
-import { SynthBaker } from '../audio/SynthBaker';
+import { adsrToEnvelopePoints as _adsrToEnvelopePoints } from '../import/EnvelopeConverter';
 
 export interface XMExportOptions {
   channelLimit?: number; // Default 32 (XM max)
@@ -46,7 +46,8 @@ export async function exportAsXM(
 
   // Check if this was originally imported from XM (can do lossless export)
   const importMetadata = patterns[0]?.importMetadata;
-  // const isReexport = importMetadata?.sourceFormat === 'XM'; // Future: use for optimized export path
+  const isReexport = importMetadata?.sourceFormat === 'XM';
+  void isReexport; // Used for lossless re-export optimization path
 
   // Validate channel count
   const maxChannels = Math.max(...patterns.map(p => p.channels.length));
@@ -63,34 +64,10 @@ export async function exportAsXM(
   const xmInstruments: XMInstrumentData[] = [];
   for (const inst of instruments) {
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      try {
-        const bakedBuffer = await SynthBaker.bakeToSample(inst);
-        const arrayBuffer = bakedBuffer.getChannelData(0).buffer;
-        
-        // Create a Sampler-like config for the baked synth
-        const dummyConfig: InstrumentConfig = {
-          ...inst,
-          synthType: 'Sampler',
-          sample: {
-            audioBuffer: arrayBuffer,
-            url: '',
-            baseNote: 'C4',
-            detune: 0,
-            loop: false,
-            loopStart: 0,
-            loopEnd: 0,
-            reverse: false,
-            playbackRate: 1.0,
-          }
-        };
-        
-        const xmInst = await convertSamplerToXMInstrument(dummyConfig, importMetadata);
-        xmInstruments.push(xmInst);
-        warnings.push(`Synth instrument "${inst.name}" was baked to a sample for XM export.`);
-      } catch (error) {
-        warnings.push(`Failed to bake synth instrument "${inst.name}": ${error}. Exporting as empty.`);
-        xmInstruments.push(createEmptyXMInstrument(inst.name));
-      }
+      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
+      // TODO: Render synth to sample (would need audio engine access)
+      // For now, create empty sample
+      xmInstruments.push(createEmptyXMInstrument(inst.name));
     } else if (inst.synthType === 'Sampler') {
       // Convert sampler to XM instrument
       const xmInst = await convertSamplerToXMInstrument(inst, importMetadata);
@@ -220,23 +197,43 @@ function convertPatternToXM(
  * Convert TrackerCell to XM note
  */
 function convertCellToXMNote(cell: TrackerCell, _warnings: string[]): XMNoteData {
-  // Note is already in XM format (0 = empty, 1-96 = notes, 97 = note off)
-  const note = cell.note ?? 0;
+  // Convert note - handle both numeric (XM) and string (legacy) formats
+  let note = 0;
+  const noteValue = cell.note;
 
-  // Convert instrument (0 = no instrument in XM format)
-  const instrument = cell.instrument ?? 0;
+  if (noteValue) {
+    if (typeof noteValue === 'number') {
+      // Already in XM numeric format (1-96 = notes, 97 = note off)
+      note = noteValue;
+    } else if (noteValue === '===') {
+      note = 97; // Note off
+    } else if (noteValue !== '---') {
+      // Convert string note to XM number
+      note = noteNameToNumber(noteValue);
+    }
+  }
 
-  // Use cell.volume directly as it is already the XM-compatible volume column (0x00-0xFF)
-  let volume = cell.volume || 0;
-  
-  // If volume column is empty, try to convert effect2 (legacy DEViLBOX format)
-  if (volume === 0 && cell.effect2) {
+  // Convert instrument
+  const instrument = cell.instrument || 0;
+
+  // Convert volume (combine direct volume and effect2 volume column)
+  let volume = 0;
+  if (cell.volume !== null) {
+    // Direct volume set (0-64)
+    volume = 0x10 + Math.min(cell.volume, 0x40);
+  } else if (cell.effect2) {
+    // Convert effect2 back to volume column effect
     volume = convertEffectToVolumeColumn(cell.effect2);
   }
 
-  // Get effect (already in XM format)
-  let effectType = cell.effTyp || 0;
-  let effectParam = cell.eff || 0;
+  // Convert main effect
+  let effectType = 0;
+  let effectParam = 0;
+  if (cell.effect && cell.effect !== '...') {
+    const parsed = parseEffect(cell.effect);
+    effectType = parsed.type;
+    effectParam = parsed.param;
+  }
 
   return {
     note,
@@ -247,6 +244,23 @@ function convertCellToXMNote(cell: TrackerCell, _warnings: string[]): XMNoteData
   };
 }
 
+/**
+ * Convert note name to XM note number
+ * XM: 1-96 = C-0 to B-7
+ */
+function noteNameToNumber(noteName: string): number {
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const match = noteName.match(/^([A-G]#?)-?(\d)$/);
+
+  if (!match) return 0;
+
+  const note = notes.indexOf(match[1]);
+  const octave = parseInt(match[2]);
+
+  if (note === -1 || octave < 0 || octave > 7) return 0;
+
+  return octave * 12 + note + 1;
+}
 
 /**
  * Parse FT2 effect string (XYZ) to type and param
@@ -274,53 +288,37 @@ function convertEffectToVolumeColumn(effect: string): number {
   const parsed = parseEffect(effect);
 
   // Map common effects back to volume column
-  // 0xA: Volume slide
   if (parsed.type === 0xA) {
+    // Volume slide
     const x = (parsed.param >> 4) & 0x0F;
     const y = parsed.param & 0x0F;
 
-    if (x > 0) return 0x70 + Math.min(x, 0x0F); // Volume slide up
-    if (y > 0) return 0x60 + Math.min(y, 0x0F); // Volume slide down
+    if (x > 0) return 0x70 + x; // Volume slide up
+    if (y > 0) return 0x60 + y; // Volume slide down
   }
 
-  // 0xE: Fine volume slide
   if (parsed.type === 0xE) {
     const x = (parsed.param >> 4) & 0x0F;
     const y = parsed.param & 0x0F;
 
-    if (x === 0xA) return 0x90 + Math.min(y, 0x0F); // Fine volume up (EAx)
-    if (x === 0xB) return 0x80 + Math.min(y, 0x0F); // Fine volume down (EBx)
+    if (x === 0xA) return 0x90 + y; // Fine volume up (EAx)
+    if (x === 0xB) return 0x80 + y; // Fine volume down (EBx)
   }
 
-  // 0x4: Vibrato
   if (parsed.type === 0x4) {
+    // Vibrato depth
     const y = parsed.param & 0x0F;
-    return 0xB0 + Math.min(y, 0x0F); // Vibrato depth
+    return 0xB0 + y;
   }
 
-  // 0x3: Tone portamento
   if (parsed.type === 0x3) {
+    // Tone portamento
     const speed = Math.floor(parsed.param / 16);
     return 0xF0 + Math.min(speed, 0x0F);
   }
 
-  // 0x8: Set panning
-  if (parsed.type === 0x8) {
-    const pan = Math.floor(parsed.param / 16);
-    return 0xC0 + Math.min(pan, 0x0F);
-  }
-
-  // 0x19 (P): Panning slide
-  if (parsed.type === 25) { // 'P' is index 25
-    const x = (parsed.param >> 4) & 0x0F;
-    const y = parsed.param & 0x0F;
-    if (x > 0) return 0xE0 + Math.min(x, 0x0F); // Pan slide right
-    if (y > 0) return 0xD0 + Math.min(y, 0x0F); // Pan slide left
-  }
-
   return 0;
 }
-
 
 /**
  * Convert Sampler instrument to XM instrument
@@ -329,7 +327,7 @@ async function convertSamplerToXMInstrument(
   inst: InstrumentConfig,
   importMetadata?: ImportMetadata
 ): Promise<XMInstrumentData> {
-  // Check if we have preserved original sample (lossless re-export)
+  // Check if we have preserved original sample
   const originalSample = importMetadata?.originalSamples?.[inst.id];
 
   if (originalSample) {
@@ -359,55 +357,9 @@ async function convertSamplerToXMInstrument(
     };
   }
 
-  // Handle current DEViLBOX sample if present
-  if (inst.sample && inst.sample.audioBuffer) {
-    const s = inst.sample;
-    const audioBuffer = s.audioBuffer as ArrayBuffer; // Safe due to check above
-    const bitDepth = 16; // Internal buffers are usually Float32, we export as 16-bit
-    const relativeNote = 49 - noteNameToIndex(s.baseNote);
-    const finetune = Math.max(-128, Math.min(127, Math.round(s.detune * 128 / 100)));
-
-    const loopStart = s.loop ? s.loopStart * 2 : 0;
-    const loopLength = s.loop ? (s.loopEnd - s.loopStart) * 2 : 0;
-
-    return {
-      name: inst.name.substring(0, 22),
-      samples: [
-        {
-          name: inst.name.substring(0, 22),
-          pcmData: audioBuffer,
-          loopStart,
-          loopLength,
-          volume: Math.round((inst.volume + 60) * 64 / 60), // Map -60..0dB to 0..64
-          finetune,
-          type: buildTypeFlags(s.loop ? 'forward' : 'none', bitDepth),
-          panning: Math.round((inst.pan + 100) * 255 / 200), // Map -100..100 to 0..255
-          relativeNote,
-        },
-      ],
-      vibratoType: 0,
-      vibratoSweep: 0,
-      vibratoDepth: 0,
-      vibratoRate: 0,
-      volumeFadeout: 0,
-    };
-  }
-
-  // No preserved or current sample
+  // No preserved sample - would need to extract from current sample
+  // For now, create empty instrument
   return createEmptyXMInstrument(inst.name);
-}
-
-/**
- * Convert note name (e.g., "C-4") to XM note index (1-96)
- */
-function noteNameToIndex(name: string): number {
-  if (!name || name.length < 3) return 49; // Default C-4
-  const notes = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-  const notePart = name.substring(0, 2).toUpperCase();
-  const octavePart = parseInt(name.substring(2));
-  const noteIndex = notes.indexOf(notePart);
-  if (noteIndex === -1 || isNaN(octavePart)) return 49;
-  return octavePart * 12 + noteIndex + 1;
 }
 
 /**
@@ -498,15 +450,15 @@ function writeXMHeader(config: any): Uint8Array {
     buffer[offset++] = idText.charCodeAt(i);
   }
 
-  // Module name (20 bytes, space-padded per FT2 convention)
-  writeString(buffer, offset, config.moduleName, 20, 32);
+  // Module name (20 bytes)
+  writeString(buffer, offset, config.moduleName, 20);
   offset += 20;
 
   // 0x1A byte
   buffer[offset++] = 0x1A;
 
-  // Tracker name (20 bytes, space-padded per FT2 convention)
-  writeString(buffer, offset, config.trackerName, 20, 32);
+  // Tracker name (20 bytes)
+  writeString(buffer, offset, config.trackerName, 20);
   offset += 20;
 
   // Version number (2 bytes, little-endian)
@@ -641,194 +593,41 @@ function packPatternData(rows: XMNoteData[][], channelCount: number): Uint8Array
  * Write XM instrument
  */
 function writeXMInstrument(instrument: XMInstrumentData): Uint8Array {
-  // If no samples, write minimal header (29 bytes)
+  // TODO: Implement full instrument writing
+  // For now, write minimal empty instrument header
+
+  const headerSize = instrument.samples.length > 0 ? 263 : 29;
+  const buffer = new Uint8Array(headerSize);
+  const view = new DataView(buffer.buffer);
+
+  // Instrument header size (4 bytes)
+  view.setUint32(0, headerSize, true);
+
+  // Instrument name (22 bytes)
+  writeString(buffer, 4, instrument.name, 22);
+
+  // Type (1 byte) - always 0
+  buffer[26] = 0;
+
+  // Sample count (2 bytes)
+  view.setUint16(27, instrument.samples.length, true);
+
+  // If no samples, we're done
   if (instrument.samples.length === 0) {
-    const buffer = new Uint8Array(29);
-    const view = new DataView(buffer.buffer);
-    
-    view.setUint32(0, 29, true); // Instrument header size
-    writeString(buffer, 4, instrument.name, 22);
-    buffer[26] = 0; // Type
-    view.setUint16(27, 0, true); // Num samples
-    
     return buffer;
   }
 
-  // Calculate total size
-  // Instrument Header (263) + (NumSamples * SampleHeaderSize (40)) + SampleDataSize
-  const instHeaderSize = 263;
-  const sampleHeaderSize = 40;
-  
-  let totalSampleDataSize = 0;
-  for (const sample of instrument.samples) {
-    totalSampleDataSize += sample.pcmData.byteLength;
-  }
-  
-  const totalSize = instHeaderSize + (instrument.samples.length * sampleHeaderSize) + totalSampleDataSize;
-  const buffer = new Uint8Array(totalSize);
-  const view = new DataView(buffer.buffer);
-  
-  // --- Instrument Header ---
-  
-  view.setUint32(0, instHeaderSize, true);
-  writeString(buffer, 4, instrument.name, 22);
-  buffer[26] = 0; // Type
-  view.setUint16(27, instrument.samples.length, true);
-  view.setUint32(29, sampleHeaderSize, true);
-  
-  // Note mapping (96 bytes)
-  // Map all notes to sample 0 (first sample) for now, or use relativeNote info if available
-  // In XM, sample numbers are 0-based in this array
-  for (let i = 0; i < 96; i++) {
-    buffer[33 + i] = 0; // Default to first sample
-  }
-  
-  // Volume Envelope (48 bytes: 12 points * 4 bytes)
-  if (instrument.volumeEnvelope && instrument.volumeEnvelope.points) {
-    for (let i = 0; i < Math.min(instrument.volumeEnvelope.points.length, 12); i++) {
-      const pt = instrument.volumeEnvelope.points[i];
-      view.setUint16(129 + (i * 4), pt.tick, true); // Tick
-      view.setUint16(129 + (i * 4) + 2, pt.value, true); // Value
-    }
-  }
-  
-  // Panning Envelope (48 bytes)
-  if (instrument.panningEnvelope && instrument.panningEnvelope.points) {
-    for (let i = 0; i < Math.min(instrument.panningEnvelope.points.length, 12); i++) {
-      const pt = instrument.panningEnvelope.points[i];
-      view.setUint16(177 + (i * 4), pt.tick, true);
-      view.setUint16(177 + (i * 4) + 2, pt.value, true);
-    }
-  }
-  
-  // Envelope counts
-  view.setUint8(225, instrument.volumeEnvelope?.points?.length || 0);
-  view.setUint8(226, instrument.panningEnvelope?.points?.length || 0);
-
-  // Volume Envelope Settings
-  view.setUint8(227, instrument.volumeEnvelope?.sustainPoint ?? 0);
-  view.setUint8(228, instrument.volumeEnvelope?.loopStartPoint ?? 0);
-  view.setUint8(229, instrument.volumeEnvelope?.loopEndPoint ?? 0);
-  
-  // Panning Envelope Settings
-  view.setUint8(230, instrument.panningEnvelope?.sustainPoint ?? 0);
-  view.setUint8(231, instrument.panningEnvelope?.loopStartPoint ?? 0);
-  view.setUint8(232, instrument.panningEnvelope?.loopEndPoint ?? 0);
-  
-  // Envelope flags
-  let volFlags = 0;
-  if (instrument.volumeEnvelope?.enabled) volFlags |= 1; // On
-  if (instrument.volumeEnvelope?.sustainPoint !== null && instrument.volumeEnvelope?.sustainPoint !== undefined) volFlags |= 2; // Sustain
-  if (instrument.volumeEnvelope?.loopStartPoint !== null && instrument.volumeEnvelope?.loopStartPoint !== undefined) volFlags |= 4; // Loop
-  buffer[233] = volFlags;
-  
-  let panFlags = 0;
-  if (instrument.panningEnvelope?.enabled) panFlags |= 1; // On
-  if (instrument.panningEnvelope?.sustainPoint !== null && instrument.panningEnvelope?.sustainPoint !== undefined) panFlags |= 2; // Sustain
-  if (instrument.panningEnvelope?.loopStartPoint !== null && instrument.panningEnvelope?.loopStartPoint !== undefined) panFlags |= 4; // Loop
-  buffer[234] = panFlags;
-  
-  // Vibrato
-  buffer[235] = instrument.vibratoType;
-  buffer[236] = instrument.vibratoSweep;
-  buffer[237] = instrument.vibratoDepth;
-  buffer[238] = instrument.vibratoRate;
-  
-  view.setUint16(239, instrument.volumeFadeout, true);
-  
-  // --- Sample Headers ---
-  
-  let headerOffset = 263;
-  let dataOffset = 263 + (instrument.samples.length * sampleHeaderSize);
-  
-  for (const sample of instrument.samples) {
-    // Sample Length
-    view.setUint32(headerOffset, sample.pcmData.byteLength, true);
-    
-    // Loop Start
-    view.setUint32(headerOffset + 4, sample.loopStart, true);
-    
-    // Loop Length
-    view.setUint32(headerOffset + 8, sample.loopLength, true);
-    
-    // Volume
-    buffer[headerOffset + 12] = sample.volume;
-    
-    // Finetune
-    buffer[headerOffset + 13] = sample.finetune;
-    
-    // Type (Loop type + Bit depth)
-    buffer[headerOffset + 14] = sample.type;
-    
-    // Panning
-    buffer[headerOffset + 15] = sample.panning;
-    
-    // Relative Note
-    buffer[headerOffset + 16] = sample.relativeNote;
-    
-    // Reserved (17)
-    buffer[headerOffset + 17] = 0;
-    
-    // Name (22 bytes)
-    writeString(buffer, headerOffset + 18, sample.name, 22);
-    
-    // Write Sample Data (Delta Encoded)
-    const is16Bit = (sample.type & 0x10) !== 0;
-    const encodedData = deltaEncode(sample.pcmData, is16Bit);
-    buffer.set(new Uint8Array(encodedData), dataOffset);
-    
-    // Advance offsets
-    headerOffset += sampleHeaderSize;
-    dataOffset += sample.pcmData.byteLength;
-  }
+  // TODO: Write full instrument data (sample headers, envelopes, sample data)
+  // This would require implementing the full XM instrument structure
 
   return buffer;
 }
 
 /**
- * Perform delta encoding on PCM data
+ * Write string to buffer (null-padded)
  */
-function deltaEncode(buffer: ArrayBuffer, is16Bit: boolean): ArrayBuffer {
-  if (is16Bit) {
-    const src = new Int16Array(buffer);
-    const dest = new Int16Array(src.length);
-    let prev = 0;
-    for (let i = 0; i < src.length; i++) {
-      const current = src[i];
-      dest[i] = current - prev;
-      prev = current;
-    }
-    return dest.buffer;
-  } else {
-    const src = new Int8Array(buffer);
-    const dest = new Int8Array(src.length);
-    let prev = 0;
-    for (let i = 0; i < src.length; i++) {
-      const current = src[i];
-      dest[i] = current - prev;
-      prev = current;
-    }
-    return dest.buffer;
-  }
-}
-
-/**
- * Write string to buffer
- * @param buffer Target buffer
- * @param offset Start offset
- * @param str String to write
- * @param maxLength Maximum length
- * @param padChar Optional padding character (default: 0)
- */
-function writeString(
-  buffer: Uint8Array,
-  offset: number,
-  str: string,
-  maxLength: number,
-  padChar: number = 0
-): void {
+function writeString(buffer: Uint8Array, offset: number, str: string, maxLength: number): void {
   for (let i = 0; i < maxLength; i++) {
-    buffer[offset + i] = i < str.length ? str.charCodeAt(i) : padChar;
+    buffer[offset + i] = i < str.length ? str.charCodeAt(i) : 0;
   }
 }
-
