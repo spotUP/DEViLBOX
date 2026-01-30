@@ -112,28 +112,44 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
     }
   }, []);
 
-  // Restore scroll position on mount
+  // Restore scroll position on mount, or scroll to selected synth
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container) {
+    if (!container) return;
+
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      isRestoringScroll.current = true;
+
+      // First priority: scroll to currently selected synth
+      if (currentInstrument?.synthType) {
+        const selectedElement = container.querySelector(
+          `[data-synth-type="${currentInstrument.synthType}"]`
+        );
+        if (selectedElement) {
+          selectedElement.scrollIntoView({ block: 'center', behavior: 'instant' });
+          setTimeout(() => {
+            isRestoringScroll.current = false;
+          }, 100);
+          return;
+        }
+      }
+
+      // Fallback: restore saved scroll position
       try {
         const savedScroll = localStorage.getItem(STORAGE_KEY_SCROLL);
         if (savedScroll) {
-          isRestoringScroll.current = true;
-          // Use requestAnimationFrame to ensure DOM is ready
-          requestAnimationFrame(() => {
-            container.scrollTop = parseInt(savedScroll, 10) || 0;
-            // Reset flag after a short delay
-            setTimeout(() => {
-              isRestoringScroll.current = false;
-            }, 100);
-          });
+          container.scrollTop = parseInt(savedScroll, 10) || 0;
         }
       } catch {
         // Ignore storage errors
       }
-    }
-  }, []);
+
+      setTimeout(() => {
+        isRestoringScroll.current = false;
+      }, 100);
+    });
+  }, []); // Only run on mount
 
   // Filter categories and synths based on search and category selection
   const filteredCategories = useMemo(() => {
@@ -267,6 +283,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
     return (
       <div
         key={synth.type}
+        data-synth-type={synth.type}
         onClick={() => handleSelectSynth(synth.type)}
         onMouseEnter={() => setHoveredSynth(synth.type)}
         onMouseLeave={() => setHoveredSynth(null)}
@@ -354,6 +371,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
             return (
               <button
                 key={synth.type}
+                data-synth-type={synth.type}
                 onClick={() => handleSelectSynth(synth.type)}
                 className={`
                   flex items-center gap-2 p-2 rounded-lg border text-left transition-all
