@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-28T03:46:43.738Z
+ * Generated: 2026-01-30T14:47:30.126Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '127';
-export const BUILD_HASH = '622c48c';
-export const BUILD_DATE = '2026-01-28';
+export const BUILD_NUMBER = '130';
+export const BUILD_HASH = '077acef';
+export const BUILD_DATE = '2026-01-30';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
@@ -31,6 +31,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-28',
     changes: [
+      {
+        type: 'fix',
+        description: 'Fix Furnace instrument parsing and register mapping'
+      },
+      {
+        type: 'improvement',
+        description: 'Expand Furnace instrument types with comprehensive chip support'
+      },
+      {
+        type: 'improvement',
+        description: 'Retry WASM init on note trigger'
+      },
       {
         type: 'improvement',
         description: 'Simplify Furnace WASM AudioContext detection'
@@ -230,18 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix smooth scrolling jumpiness'
-      },
-      {
-        type: 'fix',
-        description: 'Fix MOD pitch shift logic'
-      },
-      {
-        type: 'fix',
-        description: 'Fix MOD octave pitch mapping'
-      },
-      {
-        type: 'improvement',
-        description: 'Prevent MOD export from overwriting source files'
       }
     ]
   }

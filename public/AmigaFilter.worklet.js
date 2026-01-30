@@ -103,4 +103,9 @@ class AmigaFilterProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('amiga-filter-processor', AmigaFilterProcessor);
+// Guard against re-registration during HMR
+try {
+  registerProcessor('amiga-filter-processor', AmigaFilterProcessor);
+} catch (e) {
+  // Already registered - ignore
+}
