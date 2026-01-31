@@ -17,6 +17,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { TB303Synth } from '@engine/TB303Engine';
+import { TB303AccurateSynth } from '@engine/TB303AccurateSynth';
 import { getManualOverrideManager } from '@engine/ManualOverrideManager';
 import type { DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_DEVIL_FISH } from '@typedefs/instrument';
@@ -298,7 +299,7 @@ const TB303KnobPanelComponent: React.FC = () => {
     const engineInstruments = (engine as any).instruments as Map<string, any>;
     if (engineInstruments) {
       engineInstruments.forEach((instrument) => {
-        if (instrument instanceof TB303Synth) {
+        if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth) {
           instrument.enableDevilFish(true, devilFishConfig);
         }
       });
@@ -531,13 +532,13 @@ const TB303KnobPanelComponent: React.FC = () => {
       engine, patterns, currentPatternIndex, curves, interpolateAutomation, automationToParam]);
 
   // Update TB303 instruments (all or just the selected one based on controlledInstrumentId)
-  const updateAllTB303 = useCallback((setter: (synth: TB303Synth) => void) => {
+  const updateAllTB303 = useCallback((setter: (synth: TB303Synth | TB303AccurateSynth) => void) => {
     // Access internal instruments map
     const engineInstruments = (engine as any).instruments as Map<number, any>;
     if (!engineInstruments) return;
 
     engineInstruments.forEach((instrument, id) => {
-      if (instrument instanceof TB303Synth) {
+      if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth) {
         // If controlledInstrumentId is set, only update that instrument
         // If null, update all TB303 instruments
         if (controlledInstrumentId === null || controlledInstrumentId === id) {
