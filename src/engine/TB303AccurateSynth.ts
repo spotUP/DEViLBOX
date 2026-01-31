@@ -70,6 +70,10 @@ export class TB303AccurateSynth {
     // this.currentNote = null;
   }
 
+  releaseAll() {
+    this.triggerRelease();
+  }
+
   // Parameter setters matching TB303Synth interface
   setCutoff(value: number) {
     this.engine.setParameter('cutoff', value);
@@ -156,6 +160,11 @@ export class TB303AccurateSynth {
 
   setAccentSweepEnabled(enabled: boolean) {
     this.engine.setAccentSweepEnabled(enabled);
+  }
+
+  setQuality(_quality: 'high' | 'medium' | 'low') {
+    // Accurate engine currently doesn't have simplified quality modes
+    // but we add this stub for compatibility with ToneEngine
   }
 
   // Connection methods
