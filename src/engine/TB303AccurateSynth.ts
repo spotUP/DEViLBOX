@@ -43,7 +43,7 @@ export class TB303AccurateSynth {
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
     const vel = Math.round(velocity * 127);
 
-    const now = Tone.now();
+    const now = Tone.immediate(); // Use immediate time for comparison
     const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
     const delayMs = Math.max(0, (scheduleTime - now) * 1000);
     const durationMs = duration ? Tone.Time(duration).toSeconds() * 1000 : 0;
@@ -57,7 +57,8 @@ export class TB303AccurateSynth {
       }
     };
 
-    if (delayMs > 0) {
+    // Use a small threshold (10ms) to avoid setTimeout overhead for interactive notes
+    if (delayMs > 10) {
       setTimeout(trigger, delayMs);
     } else {
       trigger();
@@ -68,11 +69,11 @@ export class TB303AccurateSynth {
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
     const vel = Math.round(velocity * 127);
 
-    const now = Tone.now();
+    const now = Tone.immediate();
     const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
     const delayMs = Math.max(0, (scheduleTime - now) * 1000);
 
-    if (delayMs > 0) {
+    if (delayMs > 10) {
       setTimeout(() => {
         this.engine.noteOn(midiNote, vel, accent || false, slide || false);
       }, delayMs);
@@ -82,11 +83,11 @@ export class TB303AccurateSynth {
   }
 
   triggerRelease(time?: Tone.Unit.Time) {
-    const now = Tone.now();
+    const now = Tone.immediate();
     const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
     const delayMs = Math.max(0, (scheduleTime - now) * 1000);
 
-    if (delayMs > 0) {
+    if (delayMs > 10) {
       setTimeout(() => {
         this.engine.noteOff();
       }, delayMs);

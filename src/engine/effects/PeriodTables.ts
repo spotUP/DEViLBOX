@@ -5,12 +5,42 @@
  * Supports standard Amiga periods (logarithmic frequency) and XM linear periods.
  */
 
+import { getToneEngine } from '../ToneEngine';
+
 // ProTracker note range limits
 export const PT_MIN_PERIOD = 54;   // Amiga C-5 (approx)
 export const PT_MAX_PERIOD = 32000; // Very low note
 
 // Notes per octave
 export const NOTES_PER_OCTAVE = 12;
+
+/**
+ * Period to Frequency (Hz)
+ */
+export function periodToFrequency(period: number, ntsc: boolean = false): number {
+  if (period <= 0) return 0;
+  
+  const wasm = getToneEngine().getWasmInstance();
+  if (wasm && !ntsc && typeof wasm.periodToHz === 'function') {
+    return wasm.periodToHz(period);
+  }
+
+  return (ntsc ? 3579545 : 3546895) / (period * 2); // Corrected formula: clock / (period * 2)
+}
+
+/**
+ * Frequency (Hz) to Amiga Period
+ */
+export function frequencyToPeriod(hz: number, ntsc: boolean = false): number {
+  if (hz <= 0) return 65535;
+
+  const wasm = getToneEngine().getWasmInstance();
+  if (wasm && !ntsc && typeof wasm.hzToPeriod === 'function') {
+    return wasm.hzToPeriod(hz);
+  }
+
+  return (ntsc ? 3579545 : 3546895) / (hz * 2);
+}
 
 /**
  * ProTracker vibrato sine table (32 values, 0-255 range)
@@ -200,11 +230,6 @@ export function noteStringToXMLinearPeriod(note: string, finetune: number = 0): 
 export function xmLinearPeriodToFrequency(linearPeriod: number): number {
   if (linearPeriod <= 0) return 0;
   return 8363 * Math.pow(2, (4608 - linearPeriod) / 768);
-}
-
-export function periodToFrequency(period: number, ntsc: boolean = false): number {
-  if (period <= 0) return 0;
-  return (ntsc ? 3579545 : 3546895) / period;
 }
 
 export function getArpeggioPeriod(period: number, offset: number, finetune: number = 0, emulateBugs: boolean = false): number {
