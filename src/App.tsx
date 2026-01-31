@@ -19,6 +19,7 @@ import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
+import { usePadTriggers } from './hooks/usePadTriggers';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
@@ -28,6 +29,7 @@ import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { ToastContainer } from '@components/common/ToastContainer';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
+import { DrumpadEditorModal } from '@components/midi/DrumpadEditorModal';
 
 function App() {
   // Check for application updates
@@ -52,6 +54,7 @@ function App() {
   const [showPatterns, setShowPatterns] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [showInstrumentFX, setShowInstrumentFX] = useState(false);
+  const [showDrumpads, setShowDrumpads] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
 
@@ -64,6 +67,9 @@ function App() {
 
   // Register MIDI CC mappings for TB-303 parameters and tracker actions
   useMIDIActions();
+
+  // Register MIDI Pad triggers
+  usePadTriggers();
 
   const { updateMasterEffect } = useAudioStore();
 
@@ -435,6 +441,7 @@ function App() {
                 onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
                 onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
                 onShowInstruments={() => setShowInstrumentModal(true)}
+                onShowDrumpads={() => setShowDrumpads(true)}
                 showPatterns={showPatterns}
                 showMasterFX={showMasterFX}
                 showInstrumentFX={showInstrumentFX}
@@ -452,6 +459,7 @@ function App() {
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
       <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
+      <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />
       {showWhatsNew && <WhatsNewModal onClose={closeWhatsNew} />}
 
       {/* Effect Parameter Editor Modal */}
