@@ -25,7 +25,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
@@ -138,6 +138,7 @@ interface TrackerViewProps {
   onShowInstruments?: () => void;
   onShowImportModule?: () => void;
   onShowPatterns?: () => void;
+  onShowDrumpads?: () => void;
   showMasterFX?: boolean;
   showInstrumentFX?: boolean;
   showImportModule?: boolean;
@@ -151,6 +152,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowInstrumentFX,
   onShowInstruments,
   onShowImportModule,
+  onShowDrumpads,
   showMasterFX,
   showInstrumentFX,
   showImportModule: externalShowImportModule,
@@ -699,6 +701,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <span>Auto</span>
             </button>
           )}
+
+          {/* Drumpad Editor Toggle (any view) */}
+          <button
+            onClick={onShowDrumpads}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            title="Open Drumpad Editor"
+          >
+            <LayoutGrid size={12} />
+            <span>Pads</span>
+          </button>
 
           {/* Separator */}
           <div className="w-px h-4 bg-dark-border mx-1" />
