@@ -21,6 +21,7 @@ export interface GeneralCCMapping {
   max: number;                      // Parameter maximum value
   curve: 'linear' | 'logarithmic';  // Value curve
   displayName?: string;             // Human-readable name for UI
+  sensitivity?: number;             // 0.1 to 1.0, default 1.0 (lower = less sensitive)
 }
 
 /**
@@ -51,6 +52,19 @@ class CCMapManager {
 
   // Generalized mappings
   private mappings: Map<string, GeneralCCMapping> = new Map();
+
+  // CC value smoothing - tracks last values for interpolation
+  private lastCCValues: Map<string, number> = new Map(); // key: "cc-channel"
+  private smoothedValues: Map<string, number> = new Map();
+
+  // Global sensitivity (0.1 = very slow, 1.0 = direct, default 0.3 for smooth control)
+  private globalSensitivity: number = 0.3;
+
+  // Currently controlled instrument ID (null = control all TB-303 instruments)
+  private controlledInstrumentId: number | null = null;
+
+  // Listeners for controlled instrument changes
+  private controlledInstrumentListeners: Set<(instrumentId: number | null) => void> = new Set();
 
   // Learn mode state
   private learnState: LearnState = {
@@ -115,11 +129,26 @@ class CCMapManager {
       return;
     }
 
+    // Apply smoothing to the CC value
+    const ccKey = `${message.cc}-${message.channel}`;
+    const rawValue = message.value;
+    const lastSmoothed = this.smoothedValues.get(ccKey) ?? rawValue;
+
+    // Interpolate based on sensitivity (lower = smoother/slower)
+    const sensitivity = this.globalSensitivity;
+    const smoothedValue = lastSmoothed + (rawValue - lastSmoothed) * sensitivity;
+    this.smoothedValues.set(ccKey, smoothedValue);
+
     // Find matching mappings and apply
-    const ccValue = message.value;
     this.mappings.forEach((mapping) => {
       if (mapping.ccNumber !== message.cc) return;
       if (mapping.midiChannel !== undefined && mapping.midiChannel !== message.channel) return;
+
+      // Use per-mapping sensitivity if defined, otherwise use smoothed value
+      const effectiveSensitivity = mapping.sensitivity ?? 1.0;
+      const ccValue = effectiveSensitivity < 1.0
+        ? lastSmoothed + (rawValue - lastSmoothed) * effectiveSensitivity
+        : smoothedValue;
 
       const paramValue = this.ccToParameter(ccValue, mapping);
       this.notifyParameterChange(mapping.instrumentId, mapping.parameterPath, paramValue);
@@ -388,6 +417,74 @@ class CCMapManager {
         callback();
       } catch (error) {
         console.error('[CCMapManager] Mapping change callback error:', error);
+      }
+    });
+  }
+
+  // ==========================================================================
+  // Sensitivity Control
+  // ==========================================================================
+
+  /**
+   * Set global CC sensitivity (0.1 = very smooth/slow, 1.0 = direct/fast)
+   * Default is 0.3 for smooth knob control
+   */
+  setGlobalSensitivity(sensitivity: number): void {
+    this.globalSensitivity = Math.max(0.05, Math.min(1.0, sensitivity));
+    console.log(`[CCMapManager] Global sensitivity set to ${this.globalSensitivity}`);
+  }
+
+  /**
+   * Get current global CC sensitivity
+   */
+  getGlobalSensitivity(): number {
+    return this.globalSensitivity;
+  }
+
+  /**
+   * Reset smoothed values (call when switching instruments or contexts)
+   */
+  resetSmoothing(): void {
+    this.smoothedValues.clear();
+    this.lastCCValues.clear();
+  }
+
+  // ==========================================================================
+  // Controlled Instrument
+  // ==========================================================================
+
+  /**
+   * Set the instrument to control with MIDI CC
+   * @param instrumentId - The instrument ID to control, or null to control all TB-303 instruments
+   */
+  setControlledInstrument(instrumentId: number | null): void {
+    this.controlledInstrumentId = instrumentId;
+    this.resetSmoothing();
+    console.log(`[CCMapManager] Controlled instrument set to ${instrumentId ?? 'all'}`);
+    this.notifyControlledInstrumentChange(instrumentId);
+  }
+
+  /**
+   * Get the currently controlled instrument ID
+   */
+  getControlledInstrument(): number | null {
+    return this.controlledInstrumentId;
+  }
+
+  /**
+   * Subscribe to controlled instrument changes
+   */
+  onControlledInstrumentChange(callback: (instrumentId: number | null) => void): () => void {
+    this.controlledInstrumentListeners.add(callback);
+    return () => this.controlledInstrumentListeners.delete(callback);
+  }
+
+  private notifyControlledInstrumentChange(instrumentId: number | null): void {
+    this.controlledInstrumentListeners.forEach((callback) => {
+      try {
+        callback(instrumentId);
+      } catch (error) {
+        console.error('[CCMapManager] Controlled instrument change callback error:', error);
       }
     });
   }

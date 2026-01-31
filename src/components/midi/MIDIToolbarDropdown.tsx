@@ -5,7 +5,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
-import { Cable, CircleDot, AlertCircle, Loader2, RotateCcw, ArrowUpDown, Save, FolderOpen, Trash2 } from 'lucide-react';
+import { MIDILearnModal } from './MIDILearnModal';
+import { Cable, CircleDot, AlertCircle, Loader2, RotateCcw, ArrowUpDown, Save, FolderOpen, Trash2, Settings2 } from 'lucide-react';
 import type { TB303Parameter, CCMapping } from '../../midi/types';
 
 // Controller profile for saving/loading CC configurations
@@ -39,6 +40,7 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLearnModal, setShowLearnModal] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profiles, setProfiles] = useState<ControllerProfile[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -168,6 +170,7 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
   }, [profiles]);
 
   return (
+    <>
     <div className="relative" ref={dropdownRef}>
       {/* Toolbar Button */}
       <button
@@ -249,8 +252,20 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
                 />
               </div>
 
-              {/* TD-3 Pattern Transfer */}
-              <div className="px-4 py-2 border-b border-dark-border">
+              {/* Quick Actions */}
+              <div className="px-4 py-2 border-b border-dark-border space-y-2">
+                {/* MIDI Controller Setup */}
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowLearnModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-sm font-medium bg-accent-primary/20 border border-accent-primary/30 rounded flex items-center justify-center gap-2 hover:bg-accent-primary/30 transition-colors text-accent-primary"
+                >
+                  <Settings2 size={14} />
+                  MIDI Controller Setup...
+                </button>
+                {/* TD-3 Pattern Transfer */}
                 <button
                   onClick={() => {
                     setIsOpen(false);
@@ -430,6 +445,13 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
         </div>
       )}
     </div>
+
+    {/* MIDI Learn Modal */}
+    <MIDILearnModal
+      isOpen={showLearnModal}
+      onClose={() => setShowLearnModal(false)}
+    />
+    </>
   );
 };
 
