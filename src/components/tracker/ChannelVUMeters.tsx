@@ -12,7 +12,7 @@ import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 
 const DECAY_RATE = 0.88;
-const SWING_RANGE = 50;
+const SWING_RANGE = 25;  // Reduced from 50 to stay within channel bounds
 const SWING_SPEED = 0.8;
 const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
@@ -78,8 +78,21 @@ export const ChannelVUMeters: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Track last render time for throttling
+  const lastRenderTimeRef = useRef<number>(0);
+
   // Animation loop using requestAnimationFrame - NO React state updates
+  // Throttled to 30fps to reduce main thread load during playback
   const animate = useCallback(() => {
+    const now = performance.now();
+
+    // Throttle to ~30fps (33ms) to reduce main thread pressure
+    if (now - lastRenderTimeRef.current < 33) {
+      animationRef.current = requestAnimationFrame(animate);
+      return;
+    }
+    lastRenderTimeRef.current = now;
+
     const engine = getToneEngine();
     const triggerLevels = engine.getChannelTriggerLevels(numChannels);
 
