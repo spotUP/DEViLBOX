@@ -1006,6 +1006,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Zap',
     color: 'text-lime-500',
   },
+  DubSiren: {
+    type: 'DubSiren',
+    name: 'Dub Siren',
+    shortName: 'Siren',
+    description: 'Classic dub sound system siren with LFO and delay',
+    bestFor: ['Dub FX', 'Reggae', 'Sound system', 'Alerts'],
+    icon: 'Megaphone',
+    color: 'text-red-500',
+  },
 };
 
 // Organized categories
@@ -1014,7 +1023,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'bass',
     name: 'Bass',
     description: 'Deep and punchy bass synths',
-    synths: [SYNTH_INFO.TB303, SYNTH_INFO.MonoSynth, SYNTH_INFO.SuperSaw, SYNTH_INFO.WobbleBass],
+    synths: [SYNTH_INFO.TB303, SYNTH_INFO.MonoSynth, SYNTH_INFO.SuperSaw, SYNTH_INFO.WobbleBass, SYNTH_INFO.DubSiren],
   },
   {
     id: 'lead',

@@ -125,7 +125,8 @@ export type SynthType =
   | 'Buzz4FM2F'        // MadBrain 4FM2F (4-op FM)
   | 'BuzzDynamite6'    // MadBrain Dynamite6 (additive)
   | 'BuzzM3'           // Makk M3 (dual-osc synth)
-  | 'Buzz3o3';         // Oomek Aggressor 3o3 (TB-303 clone)
+  | 'Buzz3o3'          // Oomek Aggressor 3o3 (TB-303 clone)
+  | 'DubSiren';        // Dub Siren (Osc + LFO + Delay)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -1960,6 +1961,70 @@ export const DEFAULT_LFO: LFOConfig = {
 
 
 /**
+ * Dub Siren Configuration
+ * Classic dub sound effect generator with LFO and Delay
+ */
+export interface DubSirenConfig {
+  oscillator: {
+    type: 'sine' | 'square' | 'sawtooth' | 'triangle';
+    frequency: number; // Base frequency (60-1000 Hz)
+  };
+  lfo: {
+    enabled: boolean;
+    type: 'sine' | 'square' | 'sawtooth' | 'triangle';
+    rate: number; // 0-20 Hz
+    depth: number; // Modulation amount (0-1000)
+  };
+  delay: {
+    enabled: boolean;
+    time: number; // 0-1 seconds
+    feedback: number; // 0-1
+    wet: number; // 0-1
+  };
+  filter: {
+    enabled: boolean;
+    frequency: number; // 20-20000 Hz
+    type: FilterType;
+    rolloff: -12 | -24 | -48 | -96;
+  };
+  reverb: {
+    enabled: boolean;
+    decay: number; // seconds
+    wet: number; // 0-1
+  };
+}
+
+export const DEFAULT_DUB_SIREN: DubSirenConfig = {
+  oscillator: {
+    type: 'sine',
+    frequency: 440,
+  },
+  lfo: {
+    enabled: true,
+    type: 'square',
+    rate: 2,
+    depth: 100,
+  },
+  delay: {
+    enabled: true,
+    time: 0.3,
+    feedback: 0.4,
+    wet: 0.3,
+  },
+  filter: {
+    enabled: true,
+    type: 'lowpass',
+    frequency: 2000,
+    rolloff: -24,
+  },
+  reverb: {
+    enabled: true,
+    decay: 1.5,
+    wet: 0.1,
+  },
+};
+
+/**
  * Instrument type discriminator for XM compatibility
  * - 'sample': Standard XM sampled instrument
  * - 'synth': DEViLBOX synthesizer (extension)
@@ -1991,6 +2056,8 @@ export interface InstrumentConfig {
   furnace?: FurnaceConfig;
   // Bass synths
   wobbleBass?: WobbleBassConfig;
+  // Dub Siren
+  dubSiren?: DubSirenConfig;
   // Buzzmachines
   buzzmachine?: BuzzmachineConfig;
   // Drumkit/Keymap (multi-sample)

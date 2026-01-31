@@ -19,6 +19,7 @@ import {
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
   DEFAULT_FURNACE,
+  DEFAULT_DUB_SIREN,
   VOWEL_FORMANTS,
 } from '../types/instrument';
 import { TB303Synth } from './TB303Engine';
@@ -30,6 +31,7 @@ import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { DrumKitSynth } from './DrumKitSynth';
+import { DubSirenSynth } from './DubSirenSynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 
@@ -302,6 +304,10 @@ export class InstrumentFactory {
 
       case 'DrumKit':
         instrument = this.createDrumKit(config);
+        break;
+
+      case 'DubSiren':
+        instrument = this.createDubSiren(config);
         break;
 
       // Buzzmachine Generators (WASM-emulated Buzz synths)
@@ -3505,6 +3511,21 @@ export class InstrumentFactory {
     setTimeout(() => {
       if (s.set) s.set({ detune: sustainCents });
     }, totalADTime);
+  }
+
+  private static createDubSiren(config: InstrumentConfig): Tone.ToneAudioNode {
+    if (!config.dubSiren) {
+      // Create default if missing
+      config.dubSiren = DEFAULT_DUB_SIREN;
+    }
+    const synth = new DubSirenSynth(config.dubSiren);
+    
+    // Apply initial volume
+    if (config.volume !== undefined) {
+      synth.volume.value = config.volume;
+    }
+    
+    return synth as unknown as Tone.ToneAudioNode;
   }
 
   /**
