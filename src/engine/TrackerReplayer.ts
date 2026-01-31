@@ -605,7 +605,7 @@ export class TrackerReplayer {
         }
 
         // Trigger the note
-        this.triggerNote(ch, time, offset, chIndex);
+        this.triggerNote(ch, time, offset, chIndex, row.accent, row.slide);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -852,7 +852,7 @@ export class TrackerReplayer {
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-            this.triggerNote(ch, time, 0, chIndex);
+              this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
           }
         } else if (x === 0xC && y === this.currentTick) {
           // Note cut
@@ -860,7 +860,7 @@ export class TrackerReplayer {
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
           // Note delay
-          this.triggerNote(ch, time, 0, chIndex);
+            this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
         }
         break;
 
@@ -880,7 +880,7 @@ export class TrackerReplayer {
             ch.retrigCount = param & 0x0F;
             // Apply volume slide based on retrigVolSlide
             this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-            this.triggerNote(ch, time, 0, chIndex);
+              this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
           }
         }
         break;
@@ -1179,7 +1179,7 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number): void {
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean): void {
     const safeTime = time ?? Tone.now();
 
     // CRITICAL FIX: With lookahead scheduling, we can't dispose the previous player immediately!
@@ -1253,8 +1253,8 @@ export class TrackerReplayer {
         safeTime,
         velocity,
         ch.instrument,
-        false, // accent
-        false, // slide
+        accent, // accent
+        slide, // slide
         undefined, // channelIndex (let engine allocate)
         ch.period // period for MOD playback
       );
