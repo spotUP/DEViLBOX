@@ -103,12 +103,19 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     const sampleData = readMODSampleData(view, offset, sampleHeader);
     offset += sampleHeader.length * 2; // Length is in words
 
+    // Convert loop points from words to sample units (1 word = 2 bytes for 8-bit samples)
+    const loopStartSamples = sampleHeader.loopStart * 2;
+    const loopLengthSamples = sampleHeader.loopLength * 2;
+
+    // MOD instruments are 1-indexed (1-31) in pattern data
+    const instrumentId = i + 1;
+
     const sample: ParsedSample = {
-      id: i,
+      id: instrumentId,
       name: sampleHeader.name,
       pcmData: sampleData,
-      loopStart: sampleHeader.loopStart,
-      loopLength: sampleHeader.loopLength,
+      loopStart: loopStartSamples,
+      loopLength: loopLengthSamples,
       loopType: sampleHeader.loopLength > 1 ? 'forward' : 'none',
       volume: sampleHeader.volume,
       finetune: sampleHeader.finetune,
@@ -116,11 +123,11 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
       panning: 128, // Center (MOD doesn't have per-sample panning)
       bitDepth: 8,
       sampleRate: 8363, // Amiga C-2 sample rate (8363 Hz)
-      length: sampleHeader.length,
+      length: sampleHeader.length * 2, // Convert words to bytes
     };
 
     instruments.push({
-      id: i,
+      id: instrumentId,
       name: sampleHeader.name,
       samples: [sample],
       fadeout: 0,
@@ -256,13 +263,14 @@ function readMODPattern(
       // Byte 3: ffffffff - effect parameter
 
       const period = ((byte0 & 0x0F) << 8) | byte1;
-      const instrument = ((byte0 & 0xF0) >> 4) | (byte2 & 0xF0);
+      // Instrument: upper 4 bits from byte0[4-7], lower 4 bits from byte2[4-7]
+      const instrument = (byte0 & 0xF0) | ((byte2 & 0xF0) >> 4);
       const effect = byte2 & 0x0F;
       const effectParam = byte3;
 
       rowNotes.push({
         period,
-        instrument: instrument >> 4, // Convert to 1-31 range
+        instrument, // Already in 1-31 range (0 = no instrument)
         effect,
         effectParam,
       });
