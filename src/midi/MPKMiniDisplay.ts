@@ -16,7 +16,6 @@ const MANUFACTURER_ID = 0x47;  // Akai
 const PRODUCT_ID = 0x49;       // MPK Mini MK3
 const DIRECTION_SEND = 0x7F;
 const CMD_WRITE = 0x64;
-const CMD_QUERY = 0x66;
 
 // Program 0 = RAM (temporary, shown immediately)
 const PGM_NUM_RAM = 0x00;
@@ -50,7 +49,6 @@ interface KnobConfig {
 class MPKMiniDisplay {
   private static instance: MPKMiniDisplay | null = null;
   private currentPreset: Uint8Array | null = null;
-  private isConnected: boolean = false;
   private deviceName: string | null = null;
 
   private constructor() {}
@@ -72,13 +70,11 @@ class MPKMiniDisplay {
     for (const device of devices) {
       const name = device.name?.toLowerCase() || '';
       if (name.includes('mpk mini') || name.includes('mpkmini')) {
-        this.isConnected = true;
         this.deviceName = device.name || 'MPK Mini';
         return true;
       }
     }
 
-    this.isConnected = false;
     this.deviceName = null;
     return false;
   }

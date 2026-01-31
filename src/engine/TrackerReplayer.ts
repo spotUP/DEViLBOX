@@ -1291,7 +1291,7 @@ export class TrackerReplayer {
     //
     // Using finetune: each finetune unit shifts by ~1/8 semitone
     const basePeriod = 428; // C-2 base period
-    const finetune = sample?.finetune || 0;
+    const finetune = ch.finetune;
     const finetuneMultiplier = Math.pow(2, finetune / (8 * 12)); // finetune in 1/8 semitones
     const playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
 

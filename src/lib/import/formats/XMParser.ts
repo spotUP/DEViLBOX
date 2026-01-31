@@ -132,7 +132,7 @@ export async function parseXM(buffer: ArrayBuffer): Promise<{
     // XM instruments are 1-indexed (1-128) in pattern data
     instrument.parsed.id = i + 1;
     // Also update sample IDs to match
-    instrument.parsed.samples.forEach((sample, sampleIdx) => {
+    instrument.parsed.samples.forEach((sample, _sampleIdx) => {
       sample.id = i + 1; // Use instrument ID for sample (XM typically has 1 sample per instrument)
     });
     instruments.push(instrument.parsed);
