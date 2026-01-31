@@ -39,35 +39,60 @@ export class TB303AccurateSynth {
   }
 
   // Tone.js-compatible interface
-  triggerAttackRelease(note: string | number, duration?: Tone.Unit.Time, _time?: Tone.Unit.Time, velocity: number = 1, accent?: boolean, slide?: boolean) {
+  triggerAttackRelease(note: string | number, duration?: Tone.Unit.Time, time?: Tone.Unit.Time, velocity: number = 1, accent?: boolean, slide?: boolean) {
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
     const vel = Math.round(velocity * 127);
 
-    this.engine.noteOn(midiNote, vel, accent || false, slide || false);
+    const now = Tone.now();
+    const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
+    const delayMs = Math.max(0, (scheduleTime - now) * 1000);
+    const durationMs = duration ? Tone.Time(duration).toSeconds() * 1000 : 0;
 
-    // this.currentNote = midiNote;
+    const trigger = () => {
+      this.engine.noteOn(midiNote, vel, accent || false, slide || false);
+      if (durationMs > 0) {
+        setTimeout(() => {
+          this.engine.noteOff();
+        }, durationMs);
+      }
+    };
 
-    // Schedule note off if duration is provided
-    if (duration) {
-      const durationSeconds = Tone.Time(duration).toSeconds();
-      setTimeout(() => {
-        this.engine.noteOff();
-        // this.currentNote = null;
-      }, durationSeconds * 1000);
+    if (delayMs > 0) {
+      setTimeout(trigger, delayMs);
+    } else {
+      trigger();
     }
   }
 
-  triggerAttack(note: string | number, _time?: Tone.Unit.Time, velocity: number = 1, accent?: boolean, slide?: boolean) {
+  triggerAttack(note: string | number, time?: Tone.Unit.Time, velocity: number = 1, accent?: boolean, slide?: boolean) {
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
     const vel = Math.round(velocity * 127);
 
-    this.engine.noteOn(midiNote, vel, accent || false, slide || false);
-    // this.currentNote = midiNote;
+    const now = Tone.now();
+    const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
+    const delayMs = Math.max(0, (scheduleTime - now) * 1000);
+
+    if (delayMs > 0) {
+      setTimeout(() => {
+        this.engine.noteOn(midiNote, vel, accent || false, slide || false);
+      }, delayMs);
+    } else {
+      this.engine.noteOn(midiNote, vel, accent || false, slide || false);
+    }
   }
 
-  triggerRelease(_time?: Tone.Unit.Time) {
-    this.engine.noteOff();
-    // this.currentNote = null;
+  triggerRelease(time?: Tone.Unit.Time) {
+    const now = Tone.now();
+    const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : now;
+    const delayMs = Math.max(0, (scheduleTime - now) * 1000);
+
+    if (delayMs > 0) {
+      setTimeout(() => {
+        this.engine.noteOff();
+      }, delayMs);
+    } else {
+      this.engine.noteOff();
+    }
   }
 
   releaseAll() {
