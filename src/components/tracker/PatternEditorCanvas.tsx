@@ -18,6 +18,8 @@ import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
+import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
+import * as Tone from 'tone';
 
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
@@ -128,8 +130,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
   const mobileChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
 
-  // Smooth scrolling refs - track time since last row change
-  const lastRowChangeTimeRef = useRef<number>(0);
+  // Audio-synced display state ref (BassoonTracker pattern)
+  // This stores the last state retrieved from TrackerReplayer.getStateAtTime()
+  const lastAudioStateRef = useRef<DisplayState | null>(null);
+  // Fallback refs for when audio sync is not available
   const lastRowValueRef = useRef<number>(-1);
   const lastSmoothOffsetRef = useRef<number>(0);
 
@@ -333,15 +337,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     instrument: number,
     volume: number,
     effTyp: number,
-    eff: number
+    eff: number,
+    accent?: boolean,
+    slide?: boolean
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}`;
+    const key = `${instrument}-${volume}-${effTyp}-${eff}-${accent ? 'A' : ''}-${slide ? 'S' : ''}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
 
+    // TB-303 accent/slide adds 2 columns
+    const hasAcidColumns = accent !== undefined || slide !== undefined;
     const canvas = document.createElement('canvas');
-    canvas.width = CHAR_WIDTH * 9 + 16;
+    canvas.width = CHAR_WIDTH * 9 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0);
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -369,6 +377,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       ? effTyp.toString(16).toUpperCase() + hexByte(eff)
       : '...';
     ctx.fillText(effectStr, x, y);
+    x += CHAR_WIDTH * 3 + 4;
+
+    // TB-303 Accent/Slide columns (if present)
+    if (hasAcidColumns) {
+      // Accent - yellow/orange for active
+      ctx.fillStyle = accent ? '#f59e0b' : colors.textMuted;
+      ctx.fillText(accent ? 'A' : '.', x, y);
+      x += CHAR_WIDTH + 4;
+
+      // Slide - cyan/blue for active
+      ctx.fillStyle = slide ? '#06b6d4' : colors.textMuted;
+      ctx.fillText(slide ? 'S' : '.', x, y);
+    }
 
     paramCacheRef.current[key] = canvas;
     return canvas;
@@ -430,7 +451,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
     const cursor = state.cursor;
     const isPlaying = transportState.isPlaying;
-    const currentRow = isPlaying ? transportState.currentRow : cursor.rowIndex;
     const useHex = uiState.useHexNumbers;
     const speed = transportState.speed;
     const bpm = transportState.bpm;
@@ -439,37 +459,49 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const patternLength = pattern.length;
     const numChannels = pattern.channels.length;
 
-    // Smooth scrolling - interpolate based on time since last row change
+    // Audio-synced scrolling (BassoonTracker pattern)
+    // Get state from audio context time, NOT from wall-clock or store updates
+    let currentRow: number;
     let smoothOffset = 0;
+
     if (isPlaying && smoothScrolling) {
-      const now = performance.now();
+      const replayer = getTrackerReplayer();
 
-      // Detect row change - when row advances, the visual position "jumps" forward by one row
-      // but the smooth offset resets to 0, so the net visual position stays continuous
-      if (currentRow !== lastRowValueRef.current) {
-        lastRowChangeTimeRef.current = now;
+      // Get current Web Audio time with 10ms lookahead for latency compensation
+      // This is the KEY insight from BassoonTracker - sync to audio time, not wall clock
+      const audioTime = Tone.now() + 0.01;
+      const audioState = replayer.getStateAtTime(audioTime);
+
+      if (audioState) {
+        lastAudioStateRef.current = audioState;
+        currentRow = audioState.row;
+
+        // Calculate smooth offset based on time elapsed within current row
+        // Time since this row started = audioTime - audioState.time
+        const timeSinceRowStart = audioTime - audioState.time;
+        const secondsPerRow = (2.5 / bpm) * speed;
+
+        // Progress through current row (0 to 1)
+        const progress = Math.min(Math.max(timeSinceRowStart / secondsPerRow, 0), 1);
+        smoothOffset = progress * ROW_HEIGHT;
+
+        // Store for fallback
         lastRowValueRef.current = currentRow;
+        lastSmoothOffsetRef.current = smoothOffset;
+      } else {
+        // Fallback to store state if no audio state available yet
+        currentRow = transportState.currentRow;
       }
-
-      // Calculate target progress through current row (0 to 1)
-      const secondsPerRow = (2.5 / bpm) * speed;
-      const msPerRow = secondsPerRow * 1000;
-      const elapsed = now - lastRowChangeTimeRef.current;
-      const targetProgress = Math.min(elapsed / msPerRow, 1.0);
-      const targetOffset = targetProgress * ROW_HEIGHT;
-
-      // Lerp to target to smooth out any timing jitter
-      const lerpFactor = 0.3; // How quickly to catch up (0.3 = 30% per frame)
-      smoothOffset = lastSmoothOffsetRef.current + (targetOffset - lastSmoothOffsetRef.current) * lerpFactor;
-
-      // Handle wrap-around: if target jumped back (row changed), snap faster
-      if (targetOffset < lastSmoothOffsetRef.current - ROW_HEIGHT * 0.5) {
-        smoothOffset = targetOffset; // Snap on row change
-      }
-
-      lastSmoothOffsetRef.current = smoothOffset;
+    } else if (isPlaying) {
+      // Playing but not smooth scrolling - use store state directly
+      currentRow = transportState.currentRow;
+      // Reset audio state tracking
+      lastAudioStateRef.current = null;
     } else {
-      // Reset tracking when not playing
+      // Not playing - use cursor position
+      currentRow = cursor.rowIndex;
+      // Reset all tracking
+      lastAudioStateRef.current = null;
       lastRowValueRef.current = -1;
       lastSmoothOffsetRef.current = 0;
     }
@@ -530,12 +562,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         const noteCanvas = getNoteCanvas(cell.note || 0, isCurrentPlayingRow && cell.note > 0);
         ctx.drawImage(noteCanvas, x, y);
 
-        // Parameters
+        // Parameters (including TB-303 accent/slide if present)
         const paramCanvas = getParamCanvas(
           cell.instrument || 0,
           cell.volume || 0,
           cell.effTyp || 0,
-          cell.eff || 0
+          cell.eff || 0,
+          cell.accent,
+          cell.slide
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
@@ -605,9 +639,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
   }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft]);
 
-  // Animation loop
+  // Track last render time for frame skipping during playback
+  const lastRenderTimeRef = useRef<number>(0);
+
+  // Animation loop - throttle to 30fps during playback to give audio priority
   const animate = useCallback(() => {
-    render();
+    const now = performance.now();
+    const isPlaying = useTransportStore.getState().isPlaying;
+
+    // During playback, throttle to ~30fps (33ms) to reduce main thread load
+    // This gives audio scheduling more CPU time
+    const minFrameTime = isPlaying ? 33 : 16; // 30fps during playback, 60fps otherwise
+
+    if (now - lastRenderTimeRef.current >= minFrameTime) {
+      lastRenderTimeRef.current = now;
+      render();
+    }
+
     rafRef.current = requestAnimationFrame(animate);
   }, [render]);
 

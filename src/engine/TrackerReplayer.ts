@@ -17,6 +17,7 @@ import * as Tone from 'tone';
 import type { Pattern } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
+import { getToneEngine } from './ToneEngine';
 
 // ============================================================================
 // CONSTANTS
@@ -172,6 +173,17 @@ export interface TrackerSong {
 // TRACKER REPLAYER
 // ============================================================================
 
+/**
+ * Display state for audio-synced UI updates (BassoonTracker pattern)
+ */
+export interface DisplayState {
+  time: number;      // Web Audio time when this state becomes active
+  row: number;       // Pattern row
+  pattern: number;   // Pattern number
+  position: number;  // Song position index
+  tick: number;      // Current tick within row
+}
+
 export class TrackerReplayer {
   // Song data
   private song: TrackerSong | null = null;
@@ -200,6 +212,16 @@ export class TrackerReplayer {
 
   // Master output
   private masterGain: Tone.Gain;
+
+  // Audio-synced state queue for smooth scrolling (BassoonTracker pattern)
+  // States are queued with Web Audio timestamps during scheduling,
+  // then dequeued in render loop as audioContext.currentTime advances
+  private stateQueue: DisplayState[] = [];
+  private lastDequeuedState: DisplayState | null = null;
+  private static readonly MAX_STATE_QUEUE_SIZE = 256; // ~5 seconds at 50Hz
+
+  // Queue for deferred player disposal (to avoid disposing players before they finish)
+  private playersToDispose: Array<{ player: Tone.Player; disposeAfter: number }> = [];
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -235,6 +257,9 @@ export class TrackerReplayer {
     this.patternDelay = 0;
 
     console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
+    console.log(`[TrackerReplayer] Song positions: [${song.songPositions.join(', ')}], length: ${song.songLength}`);
+    console.log(`[TrackerReplayer] Pattern lengths: ${song.patterns.map((p, i) => `${i}:${p?.length ?? 'null'}`).join(', ')}`);
+    console.log(`[TrackerReplayer] Instruments:`, song.instruments.map(i => ({ id: i.id, name: i.name, hasSample: !!i.sample?.url })));
   }
 
   private createChannel(index: number, totalChannels: number): ChannelState {
@@ -291,27 +316,63 @@ export class TrackerReplayer {
   // PLAYBACK CONTROL
   // ==========================================================================
 
+  // Lookahead scheduling state (BassoonTracker pattern)
+  // BassoonTracker uses: 200ms initial buffer, 1 SECOND during playback, scheduler every 10ms
+  private scheduleAheadTime = 1.0; // Schedule 1 SECOND ahead (like BassoonTracker)
+  private schedulerInterval = 0.025; // Check every 25ms (BassoonTracker uses 10ms)
+  private nextScheduleTime = 0;
+
+  // Raw interval timer ID (more reliable than Tone.Loop for scheduling)
+  private schedulerTimerId: ReturnType<typeof setInterval> | null = null;
+
   async play(): Promise<void> {
     if (!this.song || this.playing) return;
 
     await Tone.start();
     this.playing = true;
 
-    // Create tick timer
-    const tickInterval = 2.5 / this.bpm;
-    this.tickLoop = new Tone.Loop((time) => {
-      this.processTick(time);
-    }, tickInterval);
+    // Initialize schedule position - start 100ms from now to build initial buffer
+    this.nextScheduleTime = Tone.now() + 0.1;
 
-    this.tickLoop.start(0);
-    Tone.getTransport().start();
+    // Use raw setInterval instead of Tone.Loop for more reliable scheduling
+    // Tone.Loop uses Transport which can be affected by main thread blocking
+    // setInterval + Tone.now() gives us independent timing
+    const scheduler = () => {
+      if (!this.playing) return;
 
-    console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed}`);
+      const currentTime = Tone.now();
+      const scheduleUntil = currentTime + this.scheduleAheadTime;
+      const tickInterval = 2.5 / this.bpm;
+
+      // Fill the buffer - schedule all ticks up to 1 second ahead
+      while (this.nextScheduleTime < scheduleUntil && this.playing) {
+        this.processTick(this.nextScheduleTime);
+        this.nextScheduleTime += tickInterval;
+      }
+
+      // Cleanup old players that have finished playing
+      this.cleanupDisposedPlayers(currentTime);
+    };
+
+    // Initial fill of the buffer
+    scheduler();
+
+    // Then keep filling every 25ms
+    this.schedulerTimerId = setInterval(scheduler, this.schedulerInterval * 1000);
+
+    console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed} (lookahead=${this.scheduleAheadTime}s)`);
   }
 
   stop(): void {
     this.playing = false;
 
+    // Clear the scheduler interval
+    if (this.schedulerTimerId !== null) {
+      clearInterval(this.schedulerTimerId);
+      this.schedulerTimerId = null;
+    }
+
+    // Legacy Tone.Loop cleanup (if any)
     if (this.tickLoop) {
       this.tickLoop.stop();
       this.tickLoop.dispose();
@@ -323,15 +384,29 @@ export class TrackerReplayer {
       this.stopChannel(ch);
     }
 
+    // Dispose any pending players immediately
+    for (const entry of this.playersToDispose) {
+      try { entry.player.dispose(); } catch (e) {}
+    }
+    this.playersToDispose = [];
+
     // Reset position
     this.songPos = 0;
     this.pattPos = 0;
     this.currentTick = 0;
 
+    // Clear audio-synced state queue
+    this.clearStateQueue();
+
     console.log('[TrackerReplayer] Stopped');
   }
 
   pause(): void {
+    // Clear the scheduler interval
+    if (this.schedulerTimerId !== null) {
+      clearInterval(this.schedulerTimerId);
+      this.schedulerTimerId = null;
+    }
     if (this.tickLoop) {
       this.tickLoop.stop();
     }
@@ -339,16 +414,30 @@ export class TrackerReplayer {
   }
 
   resume(): void {
-    if (this.tickLoop && this.song) {
-      this.tickLoop.start();
+    if (this.song && !this.playing) {
       this.playing = true;
+      // Resume scheduling from current audio time
+      this.nextScheduleTime = Tone.now() + 0.1;
+
+      const scheduler = () => {
+        if (!this.playing) return;
+        const currentTime = Tone.now();
+        const scheduleUntil = currentTime + this.scheduleAheadTime;
+        const tickInterval = 2.5 / this.bpm;
+        while (this.nextScheduleTime < scheduleUntil && this.playing) {
+          this.processTick(this.nextScheduleTime);
+          this.nextScheduleTime += tickInterval;
+        }
+      };
+
+      scheduler();
+      this.schedulerTimerId = setInterval(scheduler, this.schedulerInterval * 1000);
     }
   }
 
   private updateTickInterval(): void {
-    if (this.tickLoop) {
-      this.tickLoop.interval = 2.5 / this.bpm;
-    }
+    // With lookahead scheduling, tick interval is recalculated each scheduler run
+    // No need to update anything here - the scheduler reads this.bpm directly
   }
 
   // ==========================================================================
@@ -371,6 +460,11 @@ export class TrackerReplayer {
     const patternNum = this.song.songPositions[this.songPos];
     const pattern = this.song.patterns[patternNum];
     if (!pattern) return;
+
+    // Queue display state for audio-synced UI (tick 0 = start of row)
+    if (this.currentTick === 0) {
+      this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
+    }
 
     // Process all channels
     for (let ch = 0; ch < this.channels.length; ch++) {
@@ -403,6 +497,55 @@ export class TrackerReplayer {
     }
   }
 
+  /**
+   * Queue a display state for audio-synced UI updates.
+   * States are queued with Web Audio timestamps and dequeued in render loop.
+   */
+  private queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number): void {
+    const state: DisplayState = { time, row, pattern, position, tick };
+
+    // Limit queue size to prevent memory issues
+    if (this.stateQueue.length >= TrackerReplayer.MAX_STATE_QUEUE_SIZE) {
+      this.stateQueue.shift(); // Remove oldest
+    }
+
+    this.stateQueue.push(state);
+  }
+
+  /**
+   * Get display state for audio-synced UI rendering (BassoonTracker pattern).
+   * Call this in the render loop with audioContext.currentTime + lookahead.
+   * Returns the most recent state that should be displayed at the given time.
+   */
+  public getStateAtTime(time: number): DisplayState | null {
+    if (!this.playing) {
+      return this.lastDequeuedState;
+    }
+
+    // Dequeue states that are past the requested time
+    let result = this.lastDequeuedState;
+
+    while (this.stateQueue.length > 0) {
+      const state = this.stateQueue[0];
+      if (state.time <= time) {
+        result = this.stateQueue.shift()!;
+        this.lastDequeuedState = result;
+      } else {
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Clear the state queue (called on stop/reset)
+   */
+  private clearStateQueue(): void {
+    this.stateQueue = [];
+    this.lastDequeuedState = null;
+  }
+
   // ==========================================================================
   // ROW PROCESSING (TICK 0)
   // ==========================================================================
@@ -429,21 +572,29 @@ export class TrackerReplayer {
 
         // Apply volume immediately
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      } else {
+        console.log(`[TrackerReplayer] Instrument ${instNum} not found! Available IDs:`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
       }
     }
 
     // Handle note
     const noteValue = row.note;
+    const rawPeriod = (row as any).period;
+
     if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
+      // For MOD files, use the raw period stored in the row (if available)
+      // This is more accurate than converting XM note numbers
+      const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune);
+
       // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
       if (effect === 3 || effect === 5) {
-        ch.portaTarget = this.noteToPeriod(noteValue, ch.finetune);
+        ch.portaTarget = usePeriod;
         if (param !== 0 && effect === 3) {
           ch.tonePortaSpeed = param;
         }
       } else {
         // Normal note - trigger
-        ch.note = this.noteToPeriod(noteValue, ch.finetune);
+        ch.note = usePeriod;
         ch.period = ch.note;
 
         // Handle sample offset (9xx)
@@ -454,7 +605,7 @@ export class TrackerReplayer {
         }
 
         // Trigger the note
-        this.triggerNote(ch, time, offset);
+        this.triggerNote(ch, time, offset, chIndex);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -648,7 +799,7 @@ export class TrackerReplayer {
   // EFFECT PROCESSING (TICKS 1+)
   // ==========================================================================
 
-  private processEffectTick(_chIndex: number, ch: ChannelState, row: any, time: number): void {
+  private processEffectTick(chIndex: number, ch: ChannelState, row: any, time: number): void {
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
     const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
     const x = (param >> 4) & 0x0F;
@@ -701,7 +852,7 @@ export class TrackerReplayer {
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-            this.triggerNote(ch, time, 0);
+            this.triggerNote(ch, time, 0, chIndex);
           }
         } else if (x === 0xC && y === this.currentTick) {
           // Note cut
@@ -709,7 +860,7 @@ export class TrackerReplayer {
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
           // Note delay
-          this.triggerNote(ch, time, 0);
+          this.triggerNote(ch, time, 0, chIndex);
         }
         break;
 
@@ -729,7 +880,7 @@ export class TrackerReplayer {
             ch.retrigCount = param & 0x0F;
             // Apply volume slide based on retrigVolSlide
             this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-            this.triggerNote(ch, time, 0);
+            this.triggerNote(ch, time, 0, chIndex);
           }
         }
         break;
@@ -1028,8 +1179,25 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number): void {
-    this.stopChannel(ch);
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number): void {
+    const safeTime = time ?? Tone.now();
+
+    // CRITICAL FIX: With lookahead scheduling, we can't dispose the previous player immediately!
+    // The previous player might be scheduled to start in the future.
+    // Instead, schedule the previous player to stop at the new note's start time.
+    if (ch.player) {
+      const oldPlayer = ch.player;
+      try {
+        // Schedule stop at the new note's time (not immediately)
+        oldPlayer.stop(safeTime);
+        // Queue for disposal after the stop time has passed
+        // Add 0.5s buffer to ensure playback has fully stopped
+        this.playersToDispose.push({ player: oldPlayer, disposeAfter: safeTime + 0.5 });
+      } catch (e) {
+        // Player might already be stopped - dispose immediately
+        try { oldPlayer.dispose(); } catch (_) {}
+      }
+    }
 
     // Reset macro state on note trigger
     ch.macroPos = 0;
@@ -1037,52 +1205,123 @@ export class TrackerReplayer {
     ch.macroPitchOffset = 0;
     ch.macroArpNote = 0;
 
-    if (!ch.instrument || !ch.instrument.sample?.url) return;
-
-    const sample = ch.instrument.sample;
-    const sampleRate = sample.sampleRate || 8363;
-
-    // Calculate playback rate from period
-    const frequency = AMIGA_PAL_FREQUENCY / ch.period;
-    const playbackRate = frequency / sampleRate;
-
-    // Create player
-    const hasLoop = sample.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
-
-    const player = new Tone.Player({
-      url: sample.url,
-      loop: hasLoop,
-      loopStart: hasLoop ? (sample.loopStart ?? 0) / sampleRate : 0,
-      loopEnd: hasLoop ? (sample.loopEnd ?? 0) / sampleRate : 0,
-      playbackRate,
-    });
-
-    player.connect(ch.gainNode);
-
-    // Check if buffer is loaded and start
-    const startPlayback = () => {
-      try {
-        if (ch.player === player && this.playing && player.loaded && player.buffer?.loaded) {
-          const startOffset = offset > 0 ? offset / sampleRate : 0;
-          // Ensure time is valid (use current time if null/undefined)
-          const safeTime = time ?? Tone.now();
-          player.start(safeTime, startOffset);
-        }
-      } catch (e) {
-        // Silently ignore playback errors (sample not ready, etc.)
-        console.debug('[TrackerReplayer] Playback start failed:', e);
-      }
-    };
-
-    // Player.loaded is a boolean in Tone.js v14+
-    if (player.loaded && player.buffer?.loaded) {
-      startPlayback();
-    } else {
-      // Fallback: wait for buffer to load
-      setTimeout(startPlayback, 10);
+    if (!ch.instrument) {
+      console.log('[TrackerReplayer] No instrument assigned to channel');
+      return;
     }
 
+    const engine = getToneEngine();
+
+    // Convert period to note name for synth playback
+    const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+    const periodToNote = (period: number): string => {
+      // Find closest period in table
+      for (let oct = 0; oct < 8; oct++) {
+        for (let note = 0; note < 12; note++) {
+          const idx = oct * 12 + note;
+          if (idx < 36 && PERIOD_TABLE[idx] <= period) {
+            const noteName = noteNames[note];
+            return `${noteName.replace('-', '')}${oct + 1}`;
+          }
+        }
+      }
+      return 'C4'; // Default
+    };
+
+    const noteName = periodToNote(ch.period);
+    const velocity = ch.volume / 64;
+
+    // Schedule VU meter trigger at the correct audio time (not scheduling time)
+    // Use Tone.Draw to sync the visual update with audio playback
+    if (channelIndex !== undefined) {
+      Tone.Draw.schedule(() => {
+        engine.triggerChannelMeter(channelIndex, velocity);
+      }, safeTime);
+    }
+
+    // Check if this is a synth instrument (has synthType) or sample-based
+
+    if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
+      // Use ToneEngine for synth instruments (TB303, drums, etc.)
+      // Calculate duration based on speed/BPM (one row duration as default)
+      const rowDuration = (2.5 / this.bpm) * this.speed;
+
+      engine.triggerNote(
+        ch.instrument.id,
+        noteName,
+        rowDuration,
+        safeTime,
+        velocity,
+        ch.instrument,
+        false, // accent
+        false, // slide
+        undefined, // channelIndex (let engine allocate)
+        ch.period // period for MOD playback
+      );
+      return;
+    }
+
+    // Sample-based playback (MOD/XM imports with embedded samples)
+    // Get decoded AudioBuffer from ToneEngine (which decodes WAV to AudioBuffer during loading)
+    const decodedBuffer = engine.getDecodedBuffer(ch.instrument.id);
+
+
+    if (!decodedBuffer) {
+      console.log('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
+      return;
+    }
+
+    const sample = ch.instrument.sample;
+
+    // Check if period is valid (non-zero)
+    if (!ch.period || ch.period <= 0) {
+      console.log('[TrackerReplayer] Invalid period, skipping playback:', ch.period);
+      return;
+    }
+
+    // Calculate playback rate from period
+    //
+    // MOD samples are recorded at 8363 Hz for C-2 (period 428)
+    // The WAV file has sample rate 8363 in its header
+    // Browser decodes WAV to 44100 Hz but PRESERVES PITCH
+    // So playing at rate 1.0 = original pitch (C-2, period 428)
+    //
+    // For other periods: rate = basePeriod / currentPeriod
+    // Example: C-3 (period 214) = 428/214 = 2.0x (one octave up)
+    //
+    // Using finetune: each finetune unit shifts by ~1/8 semitone
+    const basePeriod = 428; // C-2 base period
+    const finetune = sample?.finetune || 0;
+    const finetuneMultiplier = Math.pow(2, finetune / (8 * 12)); // finetune in 1/8 semitones
+    const playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
+
+    // Use pre-decoded AudioBuffer from ToneEngine
+    const player = new Tone.Player();
+    const toneBuffer = new Tone.ToneAudioBuffer(decodedBuffer);
+    player.buffer = toneBuffer;
+
+    // Set playback parameters
+    // Use the decoded buffer's sample rate for time-based calculations (loop points, offsets)
+    const bufferSampleRate = decodedBuffer.sampleRate;
+    const hasLoop = sample?.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
+    if (hasLoop) {
+      player.loop = true;
+      // Loop points are in samples, convert to seconds using buffer's sample rate
+      player.loopStart = (sample.loopStart ?? 0) / bufferSampleRate;
+      player.loopEnd = (sample.loopEnd ?? 0) / bufferSampleRate;
+    }
+    player.playbackRate = playbackRate;
+
+    player.connect(ch.gainNode);
     ch.player = player;
+
+    // Start playback immediately - buffer is already loaded
+    try {
+      const startOffset = offset > 0 ? offset / bufferSampleRate : 0;
+      player.start(safeTime, startOffset);
+    } catch (e) {
+      console.log('[TrackerReplayer] Playback start failed:', e);
+    }
   }
 
   private stopChannel(ch: ChannelState): void {
@@ -1093,6 +1332,27 @@ export class TrackerReplayer {
       } catch (e) {}
       ch.player = null;
     }
+  }
+
+  /**
+   * Clean up players that have been scheduled for disposal after their stop time has passed.
+   * This prevents memory leaks from accumulating Tone.Player instances.
+   */
+  private cleanupDisposedPlayers(currentTime: number): void {
+    // Filter and dispose players whose disposal time has passed
+    const remaining: typeof this.playersToDispose = [];
+    for (const entry of this.playersToDispose) {
+      if (currentTime >= entry.disposeAfter) {
+        try {
+          entry.player.dispose();
+        } catch (e) {
+          // Ignore disposal errors
+        }
+      } else {
+        remaining.push(entry);
+      }
+    }
+    this.playersToDispose = remaining;
   }
 
   private updatePeriod(ch: ChannelState): void {
@@ -1124,11 +1384,50 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private noteToPeriod(note: any, finetune: number): number {
-    if (typeof note === 'number' && note > 0 && note < 97) {
-      // XM note number to period
-      const noteIndex = note - 1 - 12; // Adjust for octave offset
-      if (noteIndex >= 0 && noteIndex < 36) {
-        return this.getPeriod(noteIndex, finetune);
+    if (typeof note === 'number' && note > 0) {
+      // MOD files use period values directly (113-856), XM uses note numbers (1-96)
+      if (note >= 113 && note <= 856) {
+        // Already a period value (MOD format)
+        return note;
+      } else if (note < 97) {
+        // Note number (1-96): convert to period
+        // Note 1 = C-0, Note 13 = C-1, Note 25 = C-2, etc.
+        // Period table covers C-1 to B-3 (notes 13-48 in 1-based, or 12-47 in 0-based)
+
+        const noteIndex = note - 1; // Convert to 0-based
+
+        // Find which note within the period table's 3-octave range
+        // Period table: 0-11 = C-1 to B-1, 12-23 = C-2 to B-2, 24-35 = C-3 to B-3
+        let tableIndex = noteIndex;
+        let octaveShift = 0;
+
+        // If note is below C-1 (index 12), shift up
+        while (tableIndex < 12) {
+          tableIndex += 12;
+          octaveShift--;
+        }
+
+        // If note is above B-3 (index 47), shift down to table range
+        while (tableIndex > 47) {
+          tableIndex -= 12;
+          octaveShift++;
+        }
+
+        // Adjust to 0-35 range (C-1 = 0, B-3 = 35)
+        tableIndex -= 12;
+
+        if (tableIndex >= 0 && tableIndex < 36) {
+          let period = this.getPeriod(tableIndex, finetune);
+
+          // Adjust for octaves: period halves for each octave up, doubles for each octave down
+          if (octaveShift > 0) {
+            period = Math.round(period / Math.pow(2, octaveShift));
+          } else if (octaveShift < 0) {
+            period = Math.round(period * Math.pow(2, -octaveShift));
+          }
+
+          return period;
+        }
       }
     } else if (typeof note === 'string') {
       // String note to period
@@ -1215,6 +1514,7 @@ export class TrackerReplayer {
 
     // Song end
     if (this.songPos >= this.song.songLength) {
+      console.log(`[TrackerReplayer] Song end, restarting at position ${this.song.restartPosition}`);
       this.songPos = this.song.restartPosition < this.song.songLength
         ? this.song.restartPosition
         : 0;

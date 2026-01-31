@@ -49,6 +49,8 @@ export class ToneEngine {
   private instrumentSynthTypes: Map<string, string> = new Map();
   // Track loading promises for samplers/players (keyed by instrument key)
   private instrumentLoadingPromises: Map<string, Promise<void>> = new Map();
+  // Store decoded AudioBuffers for TrackerReplayer access (keyed by instrument ID)
+  private decodedAudioBuffers: Map<number, AudioBuffer> = new Map();
 
   // Polyphonic voice allocation for live keyboard/MIDI playing
   // Maps note (e.g., "C4") to channel index used for that note
@@ -230,12 +232,26 @@ export class ToneEngine {
   }
 
   /**
+   * Get a decoded AudioBuffer for an instrument (used by TrackerReplayer)
+   * Returns undefined if the instrument hasn't been loaded yet
+   */
+  public getDecodedBuffer(instrumentId: number): AudioBuffer | undefined {
+    return this.decodedAudioBuffers.get(instrumentId);
+  }
+
+  /**
    * Initialize audio context (must be called after user interaction)
    */
   public async init(): Promise<void> {
     if (Tone.getContext().state === 'suspended') {
       await Tone.start();
     }
+
+    // Configure Transport for rock-solid audio scheduling
+    // Higher lookahead = more buffer against main thread blocking, but more latency
+    // 200ms is a good balance for music playback (BassoonTracker uses similar values)
+    Tone.getContext().lookAhead = 0.2; // 200ms lookahead buffer
+    Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running (Tone.start() may return before state changes)
     const ctx = Tone.getContext().rawContext;
@@ -567,11 +583,8 @@ export class ToneEngine {
     const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
     if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
-      console.log(`[ToneEngine] getInstrument: REUSING shared instance for key=${key}, legacyKey=${legacyKey}`);
       return this.instruments.get(legacyKey);
     }
-
-    console.log(`[ToneEngine] getInstrument: CREATING NEW instance for key=${key}, isLiveVoice=${isLiveVoiceChannel}, synthType=${config.synthType}`);
 
     // Create new instrument based on config
     let instrument: any;
@@ -861,6 +874,8 @@ export class ToneEngine {
                 try {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   playerRef.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+                  // Store decoded buffer for TrackerReplayer
+                  this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                   console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
                 } catch (err) {
                   console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
@@ -881,6 +896,8 @@ export class ToneEngine {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
                   samplerRef.add(baseNote as Tone.Unit.Note, toneBuffer);
+                  // Store decoded buffer for TrackerReplayer
+                  this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                   console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
                 } catch (err) {
                   console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
@@ -899,18 +916,24 @@ export class ToneEngine {
           const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
 
           if (hasLoop || usePeriodPlayback) {
-            instrument = new Tone.Player({
+            const playerRef = new Tone.Player({
               url: sampleUrl,
               loop: hasLoop,
               loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
               loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
               volume: config.volume || 0, // Use unity gain - volume controlled via velocity
               onload: () => {
+                // Store decoded buffer for TrackerReplayer
+                const audioBuffer = playerRef.buffer.get();
+                if (audioBuffer) {
+                  this.decodedAudioBuffers.set(instrumentId, audioBuffer);
+                }
               },
               onerror: (err: Error) => {
                 console.error(`[ToneEngine] Player ${instrumentId} failed to load sample:`, err);
               },
             });
+            instrument = playerRef;
             // Store as 'Player' type for proper handling in other methods
             this.instrumentSynthTypes.set(key, 'Player');
           } else {
@@ -922,6 +945,8 @@ export class ToneEngine {
               urls,
               volume: config.volume || -12,
               onload: () => {
+                // For Sampler, we'd need to get the buffer differently
+                // TrackerReplayer primarily uses Player for MOD playback
               },
               onerror: (err: Error) => {
                 console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
@@ -1570,9 +1595,6 @@ export class ToneEngine {
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
 
-            // Debug logging for sample playback
-            console.log(`[ToneEngine] Play inst=${config.id} period=${period} fineP=${finetunedPeriod} freq=${frequency.toFixed(1)}Hz sampleRate=${sampleRate} bufRate=${player.buffer?.sampleRate} rate=${playbackRate.toFixed(4)}`);
-
             (player as any).playbackRate = playbackRate;
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
@@ -1581,9 +1603,6 @@ export class ToneEngine {
             const baseFreq = Tone.Frequency(baseNote).toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
-
-            // Debug logging for sample playback (non-period)
-            console.log(`[ToneEngine] Play inst=${config.id} note=${note} base=${baseNote} baseF=${baseFreq.toFixed(1)} targetF=${targetFreq.toFixed(1)} bufRate=${player.buffer?.sampleRate} rate=${playbackRate.toFixed(4)}`);
 
             (player as any).playbackRate = playbackRate;
           }
@@ -1664,11 +1683,6 @@ export class ToneEngine {
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
         );
-        const isPoly = instrument instanceof Tone.PolySynth;
-        const instType = instrument.constructor?.name || 'unknown';
-        // Use object identity to track instances
-        const instId = (instrument as any).__debugId ?? ((instrument as any).__debugId = Math.random().toString(36).slice(2, 8));
-        console.log(`[ToneEngine] triggerAttack: note=${note}, time=${safeTime.toFixed(3)}, velocity=${finalVelocity.toFixed(2)}, isPoly=${isPoly}, type=${instType}, instId=${instId}, channelIdx=${channelIndex ?? 'none'}`);
         instrument.triggerAttack(note, safeTime, finalVelocity);
       }
     } catch (error) {
@@ -1770,11 +1784,9 @@ export class ToneEngine {
     // Also treat undefined synthType as polyphonic (default creates PolySynth)
     const synthType = config.synthType;
     const isNativePoly = !synthType || ToneEngine.NATIVE_POLY_TYPES.has(synthType);
-    console.log(`[ToneEngine] triggerPolyNoteAttack: synthType=${synthType}, isNativePoly=${isNativePoly}, inSet=${ToneEngine.NATIVE_POLY_TYPES.has(synthType || '')}`);
     if (isNativePoly) {
       // Track active notes for release
       this.liveVoiceAllocation.set(note, -1); // -1 = using shared instance
-      console.log(`[ToneEngine] POLY ATTACK (native): note=${note}, synthType=${synthType ?? 'default'}`);
       // Use shared instance (channelIndex undefined)
       this.triggerNoteAttack(instrumentId, note, 0, velocity, config);
       return;
@@ -1795,8 +1807,6 @@ export class ToneEngine {
 
     const channelIndex = this.liveVoicePool.shift()!;
     this.liveVoiceAllocation.set(note, channelIndex);
-
-    console.log(`[ToneEngine] POLY ATTACK (allocated): note=${note}, channel=${channelIndex}, synthType=${synthType}`);
 
     // Trigger the note on this channel (creates separate instance for monophonic synths)
     this.triggerNoteAttack(instrumentId, note, 0, velocity, config, undefined, false, false, channelIndex);
