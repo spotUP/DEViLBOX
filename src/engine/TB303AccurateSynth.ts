@@ -138,6 +138,36 @@ export class TB303AccurateSynth {
     this.engine.setParameter('volume', volume);
   }
 
+  setBPM(_bpm: number) {
+    // Accurate engine uses ms-based slide time, independent of BPM
+  }
+
+  setTempoRelative(_enabled: boolean) {
+    // Accurate engine slide time is always absolute (ms)
+  }
+
+  setSlideTime(time: number) {
+    this.engine.setParameter('slideTime', time);
+  }
+
+  setWaveform(type: 'sawtooth' | 'square') {
+    const value = type === 'sawtooth' ? 0 : 1;
+    this.engine.setParameter('waveform', value);
+  }
+
+  // GuitarML Stubs (Neural Amp Modeler features not yet ported to Accurate engine)
+  async loadGuitarMLModel(_modelIndex: number): Promise<void> {
+    console.warn('[TB303AccurateSynth] GuitarML models not yet supported on accurate engine');
+  }
+
+  async setGuitarMLEnabled(_enabled: boolean): Promise<void> {
+    // Stub
+  }
+
+  setGuitarMLMix(_mix: number) {
+    // Stub
+  }
+
   // Devil Fish methods - Full implementation
   enableDevilFish(enabled: boolean, _config?: any) {
     this.engine.enableDevilFish(enabled);
