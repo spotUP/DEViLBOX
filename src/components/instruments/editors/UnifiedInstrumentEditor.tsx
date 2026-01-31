@@ -12,23 +12,30 @@
 
 import React, { useState, useCallback } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
-import { DEFAULT_FURNACE, DEFAULT_TB303 } from '@typedefs/instrument';
+import { 
+  DEFAULT_FURNACE, DEFAULT_TB303, DEFAULT_DUB_SIREN, DEFAULT_SYNARE,
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
+} from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { SynthEditorTabs, type SynthEditorTab, TB303Tabs, type TB303Tab } from '../shared/SynthEditorTabs';
 import { TB303Controls } from '../controls/TB303Controls';
 import { FurnaceControls } from '../controls/FurnaceControls';
 import { BuzzmachineControls } from '../controls/BuzzmachineControls';
 import { SampleControls } from '../controls/SampleControls';
+import { DubSirenControls } from '../controls/DubSirenControls';
+import { SynareControls } from '../controls/SynareControls';
+import { MAMEControls } from '../controls/MAMEControls';
 import { FilterCurve } from '@components/ui/FilterCurve';
 import { Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
+import { getToneEngine } from '@engine/ToneEngine';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
 import { renderSpecialParameters } from './VisualSynthEditorContent';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'synare' | 'mame';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -38,6 +45,11 @@ interface UnifiedInstrumentEditorProps {
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
 // ============================================================================
+
+/** Check if synth type uses MAME editor */
+function isMAMEType(synthType: SynthType): boolean {
+  return ['MAMEVFX', 'MAMEDOC', 'MAMERSA'].includes(synthType);
+}
 
 /** Check if synth type uses Furnace chip emulation editor */
 function isFurnaceType(synthType: SynthType): boolean {
@@ -54,12 +66,25 @@ function isSampleType(synthType: SynthType): boolean {
   return ['Sampler', 'Player', 'GranularSynth', 'DrumKit', 'ChiptuneModule'].includes(synthType);
 }
 
+/** Check if synth type is Dub Siren */
+function isDubSirenType(synthType: SynthType): boolean {
+  return synthType === 'DubSiren';
+}
+
+/** Check if synth type is Synare */
+function isSynareType(synthType: SynthType): boolean {
+  return synthType === 'Synare';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303') return 'tb303';
   if (isFurnaceType(synthType)) return 'furnace';
   if (isBuzzmachineType(synthType)) return 'buzzmachine';
   if (isSampleType(synthType)) return 'sample';
+  if (isDubSirenType(synthType)) return 'dubsiren';
+  if (isSynareType(synthType)) return 'synare';
+  if (isMAMEType(synthType)) return 'mame';
   return 'generic';
 }
 
@@ -90,6 +115,22 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     });
   }, [instrument.tb303, onChange]);
 
+  // Handle Dub Siren config updates
+  const handleDubSirenChange = useCallback((updates: Partial<typeof instrument.dubSiren>) => {
+    const currentDubSiren = instrument.dubSiren || DEFAULT_DUB_SIREN;
+    onChange({
+      dubSiren: { ...currentDubSiren, ...updates },
+    });
+  }, [instrument.dubSiren, onChange]);
+
+  // Handle Synare config updates
+  const handleSynareChange = useCallback((updates: Partial<typeof instrument.synare>) => {
+    const currentSynare = instrument.synare || DEFAULT_SYNARE;
+    onChange({
+      synare: { ...currentSynare, ...updates },
+    });
+  }, [instrument.synare, onChange]);
+
   // Handle Furnace config updates
   const handleFurnaceChange = useCallback((updates: Partial<typeof instrument.furnace>) => {
     const currentFurnace = instrument.furnace || DEFAULT_FURNACE;
@@ -97,6 +138,27 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       furnace: { ...currentFurnace, ...updates },
     });
   }, [instrument.furnace, onChange]);
+
+  // Handle MAME config updates
+  const handleMAMEChange = useCallback((updates: Partial<typeof instrument.mame>) => {
+    const currentMame = instrument.mame || (
+      instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC :
+      instrument.synthType === 'MAMERSA' ? DEFAULT_MAME_RSA :
+      DEFAULT_MAME_VFX
+    );
+    const newConfig = { ...currentMame, ...updates };
+    onChange({
+      mame: newConfig,
+    });
+    
+    // Real-time update
+    try {
+      const engine = getToneEngine();
+      engine.updateMAMEParameters(instrument.id, newConfig);
+    } catch (e) {
+      // Ignored
+    }
+  }, [instrument.mame, instrument.synthType, instrument.id, onChange]);
 
   // Determine which tabs to hide based on synth type for generic editor
   const getHiddenTabs = (): SynthEditorTab[] => {
@@ -261,6 +323,71 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <SampleControls
             instrument={instrument}
             onChange={onChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // DUB SIREN EDITOR
+  // ============================================================================
+  if (editorMode === 'dubsiren' && instrument.dubSiren) {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <DubSirenControls
+          config={instrument.dubSiren}
+          instrumentId={instrument.id}
+          onChange={handleDubSirenChange}
+        />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SYNARE EDITOR
+  // ============================================================================
+  if (editorMode === 'synare' && instrument.synare) {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <SynareControls
+          config={instrument.synare}
+          instrumentId={instrument.id}
+          onChange={handleSynareChange}
+        />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MAME SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'mame') {
+    const mameConfig = instrument.mame || (
+      instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC :
+      instrument.synthType === 'MAMERSA' ? DEFAULT_MAME_RSA :
+      DEFAULT_MAME_VFX
+    );
+
+    const mameHandle = getToneEngine().getMAMESynthHandle(instrument.id);
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {/* Use common header with visualization */}
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+        />
+
+        {/* MAME Controls */}
+        <div className="synth-editor-content overflow-y-auto p-4">
+          <MAMEControls
+            config={mameConfig}
+            handle={mameHandle}
+            onChange={handleMAMEChange}
           />
         </div>
       </div>

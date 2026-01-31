@@ -16,6 +16,8 @@ import {
   DEFAULT_ENVELOPE,
   DEFAULT_FILTER,
   DEFAULT_TB303,
+  DEFAULT_DUB_SIREN,
+  DEFAULT_SYNARE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -142,12 +144,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      console.log(`[InstrumentStore] Updating instrument ${id}`, updates);
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Check what's changing
       const synthTypeChanging = currentInstrument && updates.synthType && updates.synthType !== currentInstrument.synthType;
       const isPresetLoad = updates.name && updates.synthType; // Loading a preset has both name and synthType
-      const isTB303Update = updates.tb303 && currentInstrument?.synthType === 'TB303' && !synthTypeChanging;
 
       // Check if any sound-affecting parameters are changing (not just name/volume/pan)
       const soundParamsChanging = !!(
@@ -165,7 +167,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.formantSynth ||
         updates.wavetable ||
         updates.granular ||
-        updates.furnace
+        updates.furnace ||
+        updates.dubSiren ||
+        updates.synare
       );
 
       set((state) => {
@@ -193,27 +197,70 @@ export const useInstrumentStore = create<InstrumentStore>()(
               instrument.furnace = furnaceConfig;
             }
           }
+
+          // Auto-initialize Dub Siren config when synthType changes to 'DubSiren'
+          if (synthTypeChanging && updates.synthType === 'DubSiren' && !instrument.dubSiren) {
+            instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
+          }
+
+          // Auto-initialize Synare config when synthType changes to 'Synare'
+          if (synthTypeChanging && updates.synthType === 'Synare' && !instrument.synare) {
+            instrument.synare = { ...DEFAULT_SYNARE };
+          }
         }
       });
 
-      // Handle TB303 real-time updates specially (without recreating)
-      if (isTB303Update && !soundParamsChanging) {
+      // Handle real-time updates for specialized synths (without recreating)
+      if (!synthTypeChanging && !isPresetLoad) {
         try {
           const engine = getToneEngine();
           const updatedInstrument = get().instruments.find((inst) => inst.id === id);
-          if (updatedInstrument?.tb303) {
-            // Update core TB303 parameters
-            engine.updateTB303Parameters(id, updatedInstrument.tb303);
+          
+          if (updatedInstrument) {
+            if (updatedInstrument.synthType === 'TB303' && updatedInstrument.tb303 && updates.tb303) {
+              engine.updateTB303Parameters(id, updatedInstrument.tb303);
+              return; // Handled
+            }
+            
+            if (updatedInstrument.synthType === 'DubSiren' && updatedInstrument.dubSiren && updates.dubSiren) {
+              engine.updateDubSirenParameters(id, updatedInstrument.dubSiren);
+              return; // Handled
+            }
+            
+            if (updatedInstrument.synthType === 'Synare' && updatedInstrument.synare && updates.synare) {
+              engine.updateSynareParameters(id, updatedInstrument.synare);
+              return; // Handled
+            }
 
-            // Overdrive updates are handled by updateTB303Parameters
+            if (updatedInstrument.synthType.startsWith('Buzz') && updatedInstrument.buzzmachine && updates.buzzmachine) {
+              engine.updateBuzzmachineParameters(id, updatedInstrument.buzzmachine);
+              return; // Handled
+            }
+
+            if ((updatedInstrument.synthType === 'Furnace' || updatedInstrument.synthType.startsWith('Furnace')) && updatedInstrument.furnace && updates.furnace) {
+              engine.updateFurnaceParameters(id, updatedInstrument.furnace);
+              return; // Handled
+            }
+
+            // Handle complex synths with applyConfig pattern
+            const complexSynthTypes = ['SuperSaw', 'WobbleBass', 'Organ', 'DrumMachine', 'ChipSynth', 'PWMSynth', 'StringMachine', 'FormantSynth'];
+            if (complexSynthTypes.includes(updatedInstrument.synthType)) {
+              // Find the config key for this synth type (e.g. 'superSaw' for 'SuperSaw')
+              const configKey = updatedInstrument.synthType.charAt(0).toLowerCase() + updatedInstrument.synthType.slice(1);
+              const config = (updatedInstrument as any)[configKey];
+              if (config && (updates as any)[configKey]) {
+                engine.updateComplexSynthParameters(id, config);
+                return; // Handled
+              }
+            }
           }
         } catch (error) {
-          console.warn('[InstrumentStore] Could not update TB303 parameters:', error);
+          console.warn('[InstrumentStore] Could not update synth parameters:', error);
         }
-        return;
       }
 
       // Invalidate the cached Tone.js instrument for any sound-affecting changes
+      // (only if not handled by real-time update path above)
       if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
         try {
           const engine = getToneEngine();
@@ -316,11 +363,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
             chiptuneModule: undefined,
             wobbleBass: undefined,
             drumKit: undefined,
+            dubSiren: undefined,
+            synare: undefined,
           });
 
           // Initialize the appropriate config for the synth type
           if (currentSynthType === 'TB303') {
             instrument.tb303 = { ...DEFAULT_TB303 };
+          } else if (currentSynthType === 'DubSiren') {
+            instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
+          } else if (currentSynthType === 'Synare') {
+            instrument.synare = { ...DEFAULT_SYNARE };
           } else if (currentSynthType.startsWith('Furnace')) {
             const furnaceConfig = getDefaultFurnaceConfig(currentSynthType);
             if (furnaceConfig) {

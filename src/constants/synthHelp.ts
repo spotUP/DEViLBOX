@@ -424,6 +424,93 @@ Plays back existing tracker music with sample-accurate accuracy using libopenmpt
       'Respects all original tracker effects.',
     ],
   },
+
+  DubSiren: {
+    overview: `A classic dub sound system siren generator. It uses a single oscillator
+modulated by an LFO to create rising and falling alert tones, processed through
+delay and reverb for that signature "space" echo effect.`,
+    keyParameters: [
+      { name: 'Oscillator Type', description: 'Waveform shape: Sine (smooth), Square (harsh), Sawtooth (bright), Triangle (warm).' },
+      { name: 'Frequency', description: 'Base pitch of the siren.' },
+      { name: 'LFO Rate', description: 'Speed of the pitch modulation.' },
+      { name: 'LFO Depth', description: 'Amount of pitch variation - higher values create wider sweeps.' },
+      { name: 'Delay Time', description: 'Echo spacing - essential for the dub character.' },
+      { name: 'Delay Feedback', description: 'Number of echo repeats - high values create infinite trails.' },
+    ],
+    tips: [
+      'Use high LFO depth and medium rate for classic rising/falling alerts.',
+      'Square LFO with high depth creates a trilling "police" siren effect.',
+      'High delay feedback (70%+) creates the signature dub "wash" sound.',
+      'Modulate the frequency manually while the siren is playing for extra expression.',
+      'Use the filter to thin out the sound for more "lo-fi" sound system vibes.',
+    ],
+    trackerUsage: 'Trigger notes to start the siren. Use pitch bend or vibrato commands for extra modulation.',
+  },
+
+  Synare: {
+    overview: `The Synare 3 is a classic analog electronic percussion synthesizer from the 1970s.
+It is famous for the "disco tom" sound—a resonant, descending pitch sweep—and is a staple of
+classic Dub and Reggae percussion. It combines dual square/pulse oscillators with a noise generator
+and a highly resonant 24dB low-pass filter.`,
+    keyParameters: [
+      { name: 'Tune', description: 'Base frequency of the oscillators.' },
+      { name: 'Pitch Sweep', description: 'Enables the signature descending "pyiuuu" sound. Range controls the drop amount, Time controls the speed.' },
+      { name: 'Noise Mix', description: 'Adds white/pink noise for snare-like or gritty textures.' },
+      { name: 'Filter Resonance', description: 'Emphasis at the cutoff frequency. High resonance creates the "singing" tom sound.' },
+      { name: 'Decay', description: 'How long the sound lasts. Use short decay for clicks, long for deep toms.' },
+    ],
+    tips: [
+      'For classic disco toms, use a square wave, high resonance, and a wide pitch sweep.',
+      'Add a small amount of noise to make the percussion sound more like a real drum hit.',
+      'Use the LFO on pitch for strange, sci-fi percussive effects.',
+      'The Synare is perfect for adding "flavor" hits on top of your main drum pattern.',
+    ],
+    trackerUsage: 'Trigger with short notes. Use velocity to control the impact level.',
+  },
+
+  MAMEVFX: {
+    overview: `Ensoniq VFX engine using bit-perfect MAME emulation of the ES5506 (OTTO) chip.
+This engine requires the official MAME ROM set to function. It provides 32 voices of
+advanced wavetable synthesis with high-fidelity interpolation.`,
+    keyParameters: [
+      { name: 'Clock', description: 'Emulation speed. Standard is 16MHz.' },
+      { name: 'ROM ZIP', description: 'Requires standard MAME ensvfx.zip or vfx.zip archive.' },
+    ],
+    tips: [
+      'Upload the official ensvfx.zip from your MAME ROMs collection.',
+      'The engine will automatically extract the OS and wavetable ROMs.',
+      'Great for early 90s digital pads and atmospheric sounds.',
+    ],
+  },
+
+  MAMEDOC: {
+    overview: `Ensoniq ESQ-1 / SQ-80 engine using bit-perfect MAME emulation of the ES5503 (DOC) chip.
+This classic 8-bit wavetable engine is famous for its gritty, warm digital character and 
+analog-style modulation.`,
+    keyParameters: [
+      { name: 'Clock', description: 'Emulation speed. Standard is 16MHz.' },
+      { name: 'ROM ZIP', description: 'Requires standard MAME esq1.zip archive.' },
+    ],
+    tips: [
+      'Upload the official esq1.zip from your MAME ROMs collection.',
+      'Includes the original factory waveforms and OS.',
+      'Perfect for vintage synthwave bass and crystalline bells.',
+    ],
+  },
+
+  MAMERSA: {
+    overview: `Roland Structured Adaptive (SA) synthesis engine from the MKS-20 and RD-1000.
+Famous for the iconic "SA Piano" and "EP" sounds that defined 80s pop and gospel.`,
+    keyParameters: [
+      { name: 'Clock', description: 'Emulation speed. Standard is 20MHz.' },
+      { name: 'ROM ZIP', description: 'Requires standard MAME mks20.zip archive.' },
+    ],
+    tips: [
+      'Upload the official mks20.zip from your MAME ROMs collection.',
+      'Provides bit-accurate reproduction of Roland\'s signature SA piano algorithm.',
+      'Essential for that classic 80s studio piano sound.',
+    ],
+  },
 };
 
 /**

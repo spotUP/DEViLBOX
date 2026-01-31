@@ -144,6 +144,7 @@ interface FT2ToolbarProps {
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onShowPatternOrder?: () => void;
+  onShowDrumpads?: () => void;
   showPatterns?: boolean;
   showMasterFX?: boolean;
   showInstrumentFX?: boolean;
@@ -157,6 +158,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowInstrumentFX,
   onShowInstruments,
   onShowPatternOrder,
+  onShowDrumpads,
   showPatterns,
   showMasterFX,
   showInstrumentFX,
@@ -774,9 +776,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns}>Patterns</Button>
               <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
               <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instr</Button>
-              <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX}>Instrument FX</Button>
-                        <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
-                        
+                            <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX}>Instrument FX</Button>
+                            <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>
+                            <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>                        
                         <div ref={fxPresetsButtonRef}>
                           <Button variant={showFxPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowFxPresetsMenu(!showFxPresetsMenu)}>FX Presets</Button>
                         </div>

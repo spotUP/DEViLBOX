@@ -9,3 +9,5 @@ export { TB303Controls } from './TB303Controls';
 export { FurnaceControls } from './FurnaceControls';
 export { BuzzmachineControls } from './BuzzmachineControls';
 export { SampleControls } from './SampleControls';
+export { DubSirenControls } from './DubSirenControls';
+export { SynareControls } from './SynareControls';

@@ -5,14 +5,16 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
-import type { MIDIDeviceInfo, CCMapping, TB303Parameter } from '../midi/types';
+import type { MIDIDeviceInfo, CCMapping, TB303Parameter, KnobBankMode, MappableParameter } from '../midi/types';
 import { getMIDIManager } from '../midi/MIDIManager';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
+import { getPadMappingManager } from '../midi/PadMappingManager';
 import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
+import { KNOB_BANKS } from '../midi/knobBanks';
 
 interface MIDIStore {
   // Status
@@ -36,12 +38,14 @@ interface MIDIStore {
 
   // Knob Control Target
   controlledInstrumentId: number | null;  // Which instrument the knobs control (null = all TB303)
+  knobBank: KnobBankMode;
 
   // MIDI Note Transpose
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
 
   // UI State
   showPatternDialog: boolean;
+  showKnobBar: boolean;
 
   // Actions
   init: () => Promise<boolean>;
@@ -63,6 +67,7 @@ interface MIDIStore {
   // UI Actions
   openPatternDialog: () => void;
   closePatternDialog: () => void;
+  setShowKnobBar: (show: boolean) => void;
 
   // CC value handlers (set by TB303KnobPanel to receive MIDI CC updates)
   // Note: Using Record instead of Map because immer doesn't handle Map correctly
@@ -71,6 +76,7 @@ interface MIDIStore {
 
   // Knob control target
   setControlledInstrument: (id: number | null) => void;
+  setKnobBank: (bank: KnobBankMode) => void;
 
   // MIDI Output - send CC to external hardware (e.g., TD-3-MO)
   sendCC: (cc: number, value: number, channel?: number) => void;
@@ -80,6 +86,119 @@ interface MIDIStore {
   // MIDI Note Transpose
   setMidiOctaveOffset: (offset: number) => void;
 }
+
+// Helper to update parameters from bank CC
+const updateBankParameter = (param: MappableParameter, value: number) => {
+  const normalized = value / 127;
+  const instrumentStore = useInstrumentStore.getState();
+  const currentId = instrumentStore.currentInstrumentId;
+  const instrument = instrumentStore.instruments.find(i => i.id === currentId);
+
+  if (!instrument) return;
+
+  switch (param) {
+    // 303 Main
+    case 'cutoff':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: 50 + (normalized * 17950) } } });
+      break;
+    case 'resonance':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, resonance: normalized * 100 } } });
+      break;
+    case 'envMod':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, envMod: normalized * 100 } } });
+      break;
+    case 'decay':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, decay: 30 + (normalized * 2970) } } });
+      break;
+    case 'accent':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, accent: { amount: normalized * 100 } } });
+      break;
+    case 'overdrive':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, overdrive: { ...instrument.tb303!.overdrive, amount: normalized * 100 } } });
+      break;
+    case 'slideTime':
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: 10 + (normalized * 490) } } });
+      break;
+
+    // Siren
+    case 'siren.osc.frequency':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, oscillator: { ...instrument.dubSiren.oscillator, frequency: 60 + (normalized * 940) } } });
+      break;
+    case 'siren.lfo.rate':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, lfo: { ...instrument.dubSiren.lfo, rate: 0.1 + (normalized * 19.9) } } });
+      break;
+    case 'siren.lfo.depth':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, lfo: { ...instrument.dubSiren.lfo, depth: normalized * 500 } } });
+      break;
+    case 'siren.delay.time':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, delay: { ...instrument.dubSiren.delay, time: 0.01 + (normalized * 0.99) } } });
+      break;
+    case 'siren.delay.feedback':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, delay: { ...instrument.dubSiren.delay, feedback: normalized * 0.95 } } });
+      break;
+    case 'siren.delay.wet':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, delay: { ...instrument.dubSiren.delay, wet: normalized } } });
+      break;
+    case 'siren.filter.frequency':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, filter: { ...instrument.dubSiren.filter, frequency: 20 + (normalized * 9980) } } });
+      break;
+    case 'siren.reverb.wet':
+      if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, reverb: { ...instrument.dubSiren.reverb, wet: normalized } } });
+      break;
+
+    // FX (assuming Space Echo / Bi-Phase are in master for now, or instrument chain?)
+    // User asked for "all effects", typically means master or active instrument.
+    // Let's target the first effect of type X in the instrument chain.
+    case 'echo.rate': {
+      const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, rate: 50 + (normalized * 950) } });
+      break;
+    }
+    case 'echo.intensity': {
+      const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, intensity: normalized * 1.2 } });
+      break;
+    }
+    case 'echo.echoVolume': {
+      const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, echoVolume: normalized } });
+      break;
+    }
+    case 'echo.reverbVolume': {
+      const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, reverbVolume: normalized } });
+      break;
+    }
+    case 'echo.mode': {
+      const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, mode: Math.floor(1 + normalized * 11) } });
+      break;
+    }
+    case 'biphase.rateA': {
+      const fx = instrument.effects.find(e => e.type === 'BiPhase');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, rateA: 0.1 + (normalized * 9.9) } });
+      break;
+    }
+    case 'biphase.feedback': {
+      const fx = instrument.effects.find(e => e.type === 'BiPhase');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, feedback: normalized * 0.95 } });
+      break;
+    }
+    case 'biphase.routing': {
+      const fx = instrument.effects.find(e => e.type === 'BiPhase');
+      if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, routing: normalized > 0.5 ? 1 : 0 } });
+      break;
+    }
+
+    // Mixer
+    case 'mixer.volume':
+      instrumentStore.updateInstrument(instrument.id, { volume: -60 + (normalized * 60) });
+      break;
+    case 'mixer.pan':
+      instrumentStore.updateInstrument(instrument.id, { pan: -100 + (normalized * 200) });
+      break;
+  }
+};
 
 // Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
 const DEFAULT_CC_MAPPINGS: CCMapping[] = [
@@ -112,8 +231,10 @@ export const useMIDIStore = create<MIDIStore>()(
       learningParameter: null,
       lastActivityTimestamp: 0,
       controlledInstrumentId: null,  // null = control all TB303 instruments
+      knobBank: '303',
       midiOctaveOffset: 0,  // Default: no octave transpose
       showPatternDialog: false,
+      showKnobBar: true,
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
       // Initialize MIDI
@@ -147,6 +268,20 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note On messages
               if (message.type === 'noteOn' && message.note !== undefined && message.velocity !== undefined) {
+                // EXCLUSIVE: Check if this note is handled by the PadMappingManager
+                // If it is, skip global "chromatic" keyboard handling to avoid double-triggering
+                const padManager = getPadMappingManager();
+                if (padManager.getMapping(message.channel, message.note)) {
+                  // console.log(`[useMIDIStore] Skipping global handling for mapped pad: ${message.note}`);
+                  return;
+                }
+
+                // Check if note matches bank switch (Akai MPK Mini Pads: 36, 37, 38, 39)
+                if (message.note === 36) { store.setKnobBank('303'); return; }
+                if (message.note === 37) { store.setKnobBank('Siren'); return; }
+                if (message.note === 38) { store.setKnobBank('FX'); return; }
+                if (message.note === 39) { store.setKnobBank('Mixer'); return; }
+
                 // Apply octave offset (each octave = 12 semitones)
                 const octaveOffset = store.midiOctaveOffset || 0;
                 const transposedNote = message.note + (octaveOffset * 12);
@@ -169,6 +304,13 @@ export const useMIDIStore = create<MIDIStore>()(
                 console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} (offset ${octaveOffset}) -> ${toneNote} (${freq.toFixed(1)} Hz), instrument:`, targetInstrument?.name || 'NONE');
 
                 if (targetInstrument) {
+                  // AUTO-SWITCH BANK: If it's a Dub Siren, switch to Siren bank
+                  if (targetInstrument.synthType === 'DubSiren' && store.knobBank !== 'Siren') {
+                    store.setKnobBank('Siren');
+                  } else if (targetInstrument.synthType === 'TB303' && store.knobBank !== '303') {
+                    store.setKnobBank('303');
+                  }
+
                   const engine = getToneEngine();
                   const { midiPolyphonic } = useSettingsStore.getState();
 
@@ -206,6 +348,12 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note Off messages
               if (message.type === 'noteOff' && message.note !== undefined) {
+                // EXCLUSIVE: Check if this note is handled by the PadMappingManager
+                const padManager = getPadMappingManager();
+                if (padManager.getMapping(message.channel, message.note)) {
+                  return;
+                }
+
                 const toneNote = activeMidiNotes.get(message.note);
                 if (toneNote) {
                   activeMidiNotes.delete(message.note);
@@ -226,10 +374,47 @@ export const useMIDIStore = create<MIDIStore>()(
                 return;
               }
 
+              // Handle Pitch Bend (X-axis on MPK Mini joystick)
+              if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
+                // Map -8192..8191 to 0..1 range
+                const normalized = (message.pitchBend + 8192) / 16383;
+                
+                // If controlling Dub Siren, map Pitch Bend to Frequency
+                const instrumentStore = useInstrumentStore.getState();
+                const currentId = instrumentStore.currentInstrumentId;
+                const instrument = instrumentStore.instruments.find(i => i.id === currentId);
+                
+                if (instrument?.synthType === 'DubSiren' && instrument.dubSiren) {
+                  // Map center (0.5) to current base frequency or a reasonable range
+                  // Let's use a wide sweep: 60Hz to 1500Hz
+                  const freq = 60 + (normalized * 1440);
+                  instrumentStore.updateInstrument(instrument.id, { 
+                    dubSiren: { ...instrument.dubSiren, oscillator: { ...instrument.dubSiren.oscillator, frequency: freq } } 
+                  });
+                }
+                return;
+              }
+
               // Handle CC messages
               if (message.type === 'cc' && message.cc !== undefined && message.value !== undefined) {
                 // Debug: Log all CC messages to help diagnose TD-3 issues
                 console.log(`[MIDI CC] CC ${message.cc} = ${message.value} (ch ${message.channel})`);
+
+                // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
+                if (message.cc === 1) {
+                  const normalized = message.value / 127;
+                  const instrumentStore = useInstrumentStore.getState();
+                  const currentId = instrumentStore.currentInstrumentId;
+                  const instrument = instrumentStore.instruments.find(i => i.id === currentId);
+                  
+                  if (instrument?.synthType === 'DubSiren' && instrument.dubSiren) {
+                    // Map Y-axis to LFO Rate (0.1 to 20Hz)
+                    const rate = 0.1 + (normalized * 19.9);
+                    instrumentStore.updateInstrument(instrument.id, { 
+                      dubSiren: { ...instrument.dubSiren, lfo: { ...instrument.dubSiren.lfo, rate } } 
+                    });
+                  }
+                }
 
                 // Check if we're learning
                 if (store.isLearning && store.learningParameter) {
@@ -237,7 +422,17 @@ export const useMIDIStore = create<MIDIStore>()(
                   return;
                 }
 
-                // Find mapping for this CC
+                // Handle Bank Knobs (CC 70-77)
+                if (message.cc >= 70 && message.cc <= 77) {
+                  const bankAssignments = KNOB_BANKS[store.knobBank];
+                  const assignment = bankAssignments.find(a => a.cc === message.cc);
+                  if (assignment) {
+                    updateBankParameter(assignment.param, message.value);
+                    return;
+                  }
+                }
+
+                // Find mapping for this CC (legacy/manual mapping)
                 const mapping = store.ccMappings.find((m) => m.ccNumber === message.cc);
                 console.log(`[MIDI CC] Mapping for CC ${message.cc}:`, mapping ? mapping.parameter : 'NONE');
 
@@ -260,7 +455,7 @@ export const useMIDIStore = create<MIDIStore>()(
                   }
 
                   // Call registered handler for this parameter (using external Map)
-                  const handler = ccHandlersMap.get(mapping.parameter);
+                  const handler = ccHandlersMap.get(mapping.parameter as TB303Parameter);
                   if (handler) {
                     console.log(`[MIDI CC] Calling handler for ${mapping.parameter} with value ${paramValue.toFixed(2)}`);
                     handler(paramValue);
@@ -409,7 +604,7 @@ export const useMIDIStore = create<MIDIStore>()(
           ? { ...existingDefault, ccNumber }
           : {
               ccNumber,
-              parameter: learningParameter,
+              parameter: learningParameter as MappableParameter,
               min: 0,
               max: 100,
               curve: 'linear',
@@ -428,9 +623,14 @@ export const useMIDIStore = create<MIDIStore>()(
 
       // Update activity timestamp
       updateActivity: () => {
-        set((state) => {
-          state.lastActivityTimestamp = Date.now();
-        });
+        const now = Date.now();
+        const last = get().lastActivityTimestamp;
+        // Only update state once every 100ms to prevent React render loops from rapid MIDI data
+        if (now - last > 100) {
+          set((state) => {
+            state.lastActivityTimestamp = now;
+          });
+        }
       },
 
       // Open pattern dialog
@@ -461,6 +661,18 @@ export const useMIDIStore = create<MIDIStore>()(
       setControlledInstrument: (id) => {
         set((state) => {
           state.controlledInstrumentId = id;
+        });
+      },
+
+      setKnobBank: (bank) => {
+        set((state) => {
+          state.knobBank = bank;
+        });
+      },
+
+      setShowKnobBar: (show) => {
+        set((state) => {
+          state.showKnobBar = show;
         });
       },
 
@@ -497,9 +709,12 @@ export const useMIDIStore = create<MIDIStore>()(
         selectedInputId: state.selectedInputId,
         selectedOutputId: state.selectedOutputId,
         controlledInstrumentId: state.controlledInstrumentId,
+        knobBank: state.knobBank,
+        showKnobBar: state.showKnobBar,
         midiOutputEnabled: state.midiOutputEnabled,
         midiOctaveOffset: state.midiOctaveOffset,
       }),
     }
   )
 );
+

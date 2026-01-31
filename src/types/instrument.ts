@@ -126,7 +126,12 @@ export type SynthType =
   | 'BuzzDynamite6'    // MadBrain Dynamite6 (additive)
   | 'BuzzM3'           // Makk M3 (dual-osc synth)
   | 'Buzz3o3'          // Oomek Aggressor 3o3 (TB-303 clone)
-  | 'DubSiren';        // Dub Siren (Osc + LFO + Delay)
+  | 'MAMEVFX'          // Ensoniq VFX (ES5506)
+  | 'MAMEDOC'          // Ensoniq ESQ-1 (ES5503)
+  | 'MAMERSA'          // Roland SA (MKS-20/RD-1000)
+  | 'MAMESWP30'        // Yamaha SWP30 (AWM2)
+  | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
+  | 'Synare';          // Synare 3 (Electronic Percussion)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
@@ -364,6 +369,41 @@ export const DEFAULT_GRANULAR: GranularConfig = {
     cutoff: 20000,
     resonance: 0,
   },
+};
+
+export interface MAMEConfig {
+  type: 'vfx' | 'doc' | 'rsa' | 'swp30';
+  clock: number;
+  romsLoaded: boolean;
+  registers: Record<number, number>;
+}
+
+export const DEFAULT_MAME_VFX: MAMEConfig = {
+  type: 'vfx',
+  clock: 16000000,
+  romsLoaded: false,
+  registers: {},
+};
+
+export const DEFAULT_MAME_DOC: MAMEConfig = {
+  type: 'doc',
+  clock: 1000000,
+  romsLoaded: false,
+  registers: {},
+};
+
+export const DEFAULT_MAME_RSA: MAMEConfig = {
+  type: 'rsa',
+  clock: 20000000,
+  romsLoaded: false,
+  registers: {},
+};
+
+export const DEFAULT_MAME_SWP30: MAMEConfig = {
+  type: 'swp30',
+  clock: 33868800,
+  romsLoaded: false,
+  registers: {},
 };
 
 /**
@@ -1721,6 +1761,9 @@ export type AudioEffectType =
   | 'StereoWidener'
   | 'TapeSaturation'
   | 'SidechainCompressor'
+  | 'SpaceEcho'
+  | 'BiPhase'
+  | 'DubFilter'
   | 'Neural' // Neural effects category
   // Buzzmachines (WASM-emulated Buzz effects)
   | 'BuzzDistortion'   // Arguru Distortion
@@ -2025,6 +2068,90 @@ export const DEFAULT_DUB_SIREN: DubSirenConfig = {
 };
 
 /**
+ * Synare 3 Configuration
+ * Analog electronic percussion synthesizer
+ */
+export interface SynareConfig {
+  oscillator: {
+    type: 'square' | 'pulse';
+    tune: number; // Base frequency (Hz)
+    fine: number; // Fine tune (cents)
+  };
+  oscillator2: {
+    enabled: boolean;
+    detune: number; // Semitones from Osc 1
+    mix: number;    // 0-1
+  };
+  noise: {
+    enabled: boolean;
+    type: 'white' | 'pink';
+    mix: number;    // 0-1
+    color: number;  // 0-100 (Lowpass cutoff)
+  };
+  filter: {
+    cutoff: number; // 20-20000 Hz
+    resonance: number; // 0-100%
+    envMod: number; // 0-100%
+    decay: number; // 10-2000ms
+  };
+  lfo: {
+    enabled: boolean;
+    rate: number; // 0.1-20 Hz
+    depth: number; // 0-100%
+    target: 'pitch' | 'filter' | 'both';
+  };
+  envelope: {
+    decay: number; // 10-2000ms (Amp decay)
+    sustain: number; // 0-1 (Simulates gate hold)
+  };
+  sweep: {
+    enabled: boolean;
+    amount: number; // Pitch drop amount (semitones)
+    time: number;   // Sweep time (ms)
+  };
+}
+
+export const DEFAULT_SYNARE: SynareConfig = {
+  oscillator: {
+    type: 'square',
+    tune: 200,
+    fine: 0,
+  },
+  oscillator2: {
+    enabled: false,
+    detune: 0,
+    mix: 0.5,
+  },
+  noise: {
+    enabled: true,
+    type: 'white',
+    mix: 0.2,
+    color: 100,
+  },
+  filter: {
+    cutoff: 800,
+    resonance: 60,
+    envMod: 70,
+    decay: 200,
+  },
+  lfo: {
+    enabled: false,
+    rate: 5,
+    depth: 0,
+    target: 'pitch',
+  },
+  envelope: {
+    decay: 300,
+    sustain: 0,
+  },
+  sweep: {
+    enabled: true,
+    amount: 24,
+    time: 150,
+  },
+};
+
+/**
  * Instrument type discriminator for XM compatibility
  * - 'sample': Standard XM sampled instrument
  * - 'synth': DEViLBOX synthesizer (extension)
@@ -2058,6 +2185,10 @@ export interface InstrumentConfig {
   wobbleBass?: WobbleBassConfig;
   // Dub Siren
   dubSiren?: DubSirenConfig;
+  // Synare 3
+  synare?: SynareConfig;
+  // MAME synths
+  mame?: MAMEConfig;
   // Buzzmachines
   buzzmachine?: BuzzmachineConfig;
   // Drumkit/Keymap (multi-sample)
@@ -2069,6 +2200,8 @@ export interface InstrumentConfig {
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100
+  monophonic?: boolean; // If true, force monophonic playback (one voice at a time)
+  isLive?: boolean; // If true, bypass lookahead buffer for instant triggering during playback
   lfo?: LFOConfig; // Global LFO for filter/pitch/volume modulation
   parameters?: Record<string, any>; // Additional synth-specific parameters (e.g., sample URLs)
   metadata?: InstrumentMetadata; // Import metadata and transformation history

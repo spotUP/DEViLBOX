@@ -33,7 +33,15 @@ if [ -d "node_modules/.vite" ]; then
     rm -rf node_modules/.vite
 fi
 
-# 3. Determine build target (default: web for GitHub Pages)
+# 3. Build WebAssembly DSP components (DevilboxDSP.wasm)
+echo "Building WebAssembly DSP modules..."
+npm run asbuild
+if [ $? -ne 0 ]; then
+    echo "CRITICAL: WASM build failed. Stopping."
+    exit 1
+fi
+
+# 4. Determine build target (default: web for GitHub Pages)
 TARGET="${1:-web}"
 
 echo ""
@@ -41,6 +49,9 @@ echo "Build target: $TARGET"
 echo ""
 
 case $TARGET in
+    wasm)
+        echo "WASM-only build complete."
+        ;;
     web|1)
         echo "Building for Web (GitHub Pages)..."
         npm run build

@@ -35,9 +35,41 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer';
+
+export type MappableParameter =
+  | TB303Parameter
+  // Dub Siren
+  | 'siren.osc.frequency'
+  | 'siren.lfo.rate'
+  | 'siren.lfo.depth'
+  | 'siren.delay.time'
+  | 'siren.delay.feedback'
+  | 'siren.delay.wet'
+  | 'siren.filter.frequency'
+  | 'siren.reverb.wet'
+  // Space Echo
+  | 'echo.rate'
+  | 'echo.intensity'
+  | 'echo.echoVolume'
+  | 'echo.reverbVolume'
+  | 'echo.mode'
+  | 'echo.bass'
+  | 'echo.treble'
+  // Bi-Phase
+  | 'biphase.rateA'
+  | 'biphase.depthA'
+  | 'biphase.rateB'
+  | 'biphase.depthB'
+  | 'biphase.feedback'
+  | 'biphase.routing'
+  // Mixer
+  | 'mixer.volume'
+  | 'mixer.pan';
+
 export interface CCMapping {
   ccNumber: number;
-  parameter: TB303Parameter;
+  parameter: MappableParameter;
   min: number;
   max: number;
   curve: 'linear' | 'logarithmic';

@@ -3,9 +3,16 @@
  */
 
 import React from 'react';
-import { useTrackerStore, useTransportStore, useAudioStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useMIDIStore } from '@stores';
+import { MIDIKnobControlBar } from '../midi/MIDIKnobControlBar';
+import { Lightbulb } from 'lucide-react';
 
-export const StatusBar: React.FC = React.memo(() => {
+interface StatusBarProps {
+  onShowTips?: () => void;
+}
+
+export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) => {
+  const showKnobBar = useMIDIStore((state) => state.showKnobBar);
   // Optimize: Only subscribe to specific values, not entire patterns array
   const cursor = useTrackerStore((state) => state.cursor);
   const currentOctave = useTrackerStore((state) => state.currentOctave);
@@ -24,8 +31,12 @@ export const StatusBar: React.FC = React.memo(() => {
   const songPositionDisplay = `${currentPositionIndex.toString(16).padStart(2, '0').toUpperCase()}/${patternOrderLength.toString(16).padStart(2, '0').toUpperCase()}`;
 
   return (
-    <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
-      {/* Left: Cursor Position */}
+    <div className="flex flex-col">
+      {/* Integrated MIDI Knob Bar */}
+      {showKnobBar && <MIDIKnobControlBar />}
+      
+      <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
+        {/* Left: Cursor Position */}
       <div className="flex items-center gap-4">
         <span className="text-text-secondary">
           Row <span className="text-accent-primary font-semibold">{rowDisplay}</span>
@@ -69,8 +80,19 @@ export const StatusBar: React.FC = React.memo(() => {
         </span>
       </div>
 
-      {/* Right: Audio State */}
-      <div className="flex items-center gap-2">
+      {/* Right: Audio State & Tips */}
+      <div className="flex items-center gap-4">
+        {onShowTips && (
+          <button
+            onClick={onShowTips}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-accent-warning/10 text-accent-warning hover:bg-accent-warning/20 transition-colors"
+            title="Tip of the Day"
+          >
+            <Lightbulb size={12} />
+            <span className="text-[10px] font-bold uppercase tracking-tight">Tips</span>
+          </button>
+        )}
+
         <span
           className={`flex items-center gap-1.5 ${
             contextState === 'running' ? 'text-accent-success' : 'text-text-muted'
@@ -81,5 +103,6 @@ export const StatusBar: React.FC = React.memo(() => {
         </span>
       </div>
     </div>
+  </div>
   );
 });

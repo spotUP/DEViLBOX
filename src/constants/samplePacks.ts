@@ -3,6 +3,7 @@
  */
 
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
+import { normalizeUrl } from '@utils/urlUtils';
 
 /**
  * Helper to create SampleInfo from filename
@@ -21,7 +22,7 @@ function createSampleInfo(filename: string, category: SampleCategory, basePath: 
     filename,
     name: cleanName || nameWithoutExt,
     category,
-    url: `${basePath}/${category}/${encodeURIComponent(filename)}`,
+    url: normalizeUrl(`${basePath}/${category}/${encodeURIComponent(filename)}`),
   };
 }
 
@@ -30,7 +31,7 @@ function createSampleInfo(filename: string, category: SampleCategory, basePath: 
 // By Legowelt - 229 samples of electro drum machine sounds
 // ============================================================================
 
-const DRUMNIBUS_BASE_PATH = '/samples/packs/drumnibus';
+const DRUMNIBUS_BASE_PATH = 'data/samples/packs/drumnibus';
 
 const DRUMNIBUS_KICKS: string[] = [
   'BB_Electro1short.wav',
@@ -281,7 +282,7 @@ export const DRUMNIBUS_PACK: SamplePack = {
   name: 'Drumnibus Electro Drums',
   author: 'Legowelt',
   description: 'A collection of 229 electro drum machine samples. Classic analog-style kicks, snares, hi-hats, percussion and FX sounds perfect for electro, techno, and electronic music production.',
-  coverImage: '/samples/packs/drumnibus/cover.png',
+  coverImage: normalizeUrl('data/samples/packs/drumnibus/cover.png'),
   basePath: DRUMNIBUS_BASE_PATH,
   categories: ['kicks', 'snares', 'hihats', 'percussion', 'fx'],
   samples: {

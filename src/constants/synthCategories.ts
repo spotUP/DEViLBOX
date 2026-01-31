@@ -1006,6 +1006,42 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Zap',
     color: 'text-lime-500',
   },
+  MAMEVFX: {
+    type: 'MAMEVFX',
+    name: 'Ensoniq VFX',
+    shortName: 'VFX',
+    description: 'Ensoniq ES5506 (OTTO) 32-voice wavetable synthesis',
+    bestFor: ['Evolving pads', '90s digital', 'Cinematic', 'Layers'],
+    icon: 'AudioLines',
+    color: 'text-pink-400',
+  },
+  MAMEDOC: {
+    type: 'MAMEDOC',
+    name: 'Ensoniq ESQ-1',
+    shortName: 'DOC',
+    description: 'Ensoniq ES5503 (DOC) 8-bit wavetable synthesis',
+    bestFor: ['Lo-fi digital', 'ESQ-1 pads', 'Gritty bass', '80s digital'],
+    icon: 'Waves',
+    color: 'text-amber-400',
+  },
+  MAMERSA: {
+    type: 'MAMERSA',
+    name: 'Roland SA',
+    shortName: 'MKS20',
+    description: 'Roland Structured Adaptive Synthesis (MKS-20/RD-1000)',
+    bestFor: ['Electric piano', 'Authentic piano', '80s keys'],
+    icon: 'Piano',
+    color: 'text-sky-400',
+  },
+  MAMESWP30: {
+    type: 'MAMESWP30',
+    name: 'Yamaha SWP30',
+    shortName: 'AWM2',
+    description: 'Yamaha SWP30 (AWM2) 64-voice ROMpler/DSP engine',
+    bestFor: ['Realistic instruments', '90s ROMpler', 'Advanced effects', 'AWM2 sounds'],
+    icon: 'Cpu',
+    color: 'text-emerald-400',
+  },
   DubSiren: {
     type: 'DubSiren',
     name: 'Dub Siren',
@@ -1014,6 +1050,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     bestFor: ['Dub FX', 'Reggae', 'Sound system', 'Alerts'],
     icon: 'Megaphone',
     color: 'text-red-500',
+  },
+  Synare: {
+    type: 'Synare',
+    name: 'Synare 3',
+    shortName: 'Synare',
+    description: 'Classic electronic percussion synthesizer for "disco tom" and dub sounds',
+    bestFor: ['Dub percussion', 'Disco toms', 'Electronic drums', 'SFX'],
+    icon: 'Drum',
+    color: 'text-yellow-500',
   },
 };
 
@@ -1045,7 +1090,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'drums',
     name: 'Drums',
     description: 'Percussion and drum synthesis',
-    synths: [SYNTH_INFO.MembraneSynth, SYNTH_INFO.MetalSynth, SYNTH_INFO.NoiseSynth, SYNTH_INFO.DrumMachine, SYNTH_INFO.DrumKit],
+    synths: [SYNTH_INFO.MembraneSynth, SYNTH_INFO.MetalSynth, SYNTH_INFO.NoiseSynth, SYNTH_INFO.DrumMachine, SYNTH_INFO.DrumKit, SYNTH_INFO.Synare],
   },
   {
     id: 'pads',
@@ -1271,6 +1316,30 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.BuzzNoise,       // Noise generator
       SYNTH_INFO.BuzzFreqBomb,    // Frequency sweep
       SYNTH_INFO.BuzzDTMF,        // Phone tones
+    ],
+  },
+  {
+    id: 'fx',
+    name: 'FX',
+    description: 'Sound effects and noise generators',
+    synths: [
+      SYNTH_INFO.DubSiren,
+      SYNTH_INFO.NoiseSynth,
+      SYNTH_INFO.BuzzFreqBomb,
+      SYNTH_INFO.BuzzNoise,
+      SYNTH_INFO.BuzzDTMF,
+      SYNTH_INFO.Synare,
+    ],
+  },
+  {
+    id: 'mame-synths',
+    name: '🎹 MAME Classics',
+    description: 'Authentic hardware-accurate classic synths',
+    synths: [
+      SYNTH_INFO.MAMEVFX,
+      SYNTH_INFO.MAMEDOC,
+      SYNTH_INFO.MAMERSA,
+      SYNTH_INFO.MAMESWP30,
     ],
   },
 ];

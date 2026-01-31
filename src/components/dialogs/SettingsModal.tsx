@@ -31,6 +31,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setAmigaLimits,
     linearInterpolation,
     setLinearInterpolation,
+    audioLatency,
+    setAudioLatency,
+    autoLatency,
+    setAutoLatency,
     midiPolyphonic,
     setMidiPolyphonic
   } = useSettingsStore();
@@ -211,6 +215,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   label=""
                   value={linearInterpolation}
                   onChange={setLinearInterpolation}
+                  size="sm"
+                />
+              </div>
+
+              {/* Audio Latency */}
+              <div className="flex items-center justify-between border-t border-ft2-border/30 pt-3">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Audio Latency Mode:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Low latency for live jamming vs stable playback</span>
+                </div>
+                <select
+                  value={audioLatency}
+                  onChange={(e) => setAudioLatency(e.target.value as any)}
+                  className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                >
+                  <option value="interactive">Interactive (10ms)</option>
+                  <option value="balanced">Balanced (50ms)</option>
+                  <option value="playback">Stable (150ms)</option>
+                </select>
+              </div>
+
+              {/* Auto Latency Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Dynamic Latency:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Instant (10ms) when stopped, stable when playing</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={autoLatency}
+                  onChange={setAutoLatency}
                   size="sm"
                 />
               </div>

@@ -20,6 +20,71 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   const [isLearning, setIsLearning] = useState(false);
   const [activeBank, setActiveBank] = useState<'A' | 'B'>('A');
 
+  // Load General Preset
+  const handleLoadPreset = (_type: 'auto' | '808' | '909' | 'drumnibus') => {
+    // Clear existing for these notes
+    // Standard Akai MPK Mini notes Ch 10
+    const startNote = 36;
+    const notes = Array.from({ length: 16 }, (_, i) => startNote + i);
+    
+    notes.forEach(n => {
+      const mapping = padManager.getMapping(9, n);
+      if (mapping) padManager.removeMapping(mapping.id);
+    });
+
+    // Helper to find instrument by keywords or synth type
+    const findInst = (keywords: string[], synthType?: string) => {
+      // 1. Try exact name match
+      let found = instruments.find(inst => 
+        keywords.some(k => inst.name.toLowerCase().includes(k.toLowerCase()))
+      );
+      
+      // 2. Fallback to synth type match if keywords match synth name (e.g. "Synare", "DrumMachine")
+      if (!found && synthType) {
+        found = instruments.find(inst => inst.synthType === synthType);
+      }
+
+      // 3. Fallback to broader keyword search in metadata
+      if (!found) {
+        found = instruments.find(inst => 
+          keywords.some(k => inst.synthType.toLowerCase().includes(k.toLowerCase()))
+        );
+      }
+
+      return found;
+    };
+
+    // Define search patterns for drum slots
+    const slots = [
+      { keywords: ['Kick', 'BD', 'Bass Drum'], synthType: 'DrumMachine', note: 36 },
+      { keywords: ['Snare', 'SD'], synthType: 'DrumMachine', note: 38 },
+      { keywords: ['Clap', 'CP'], synthType: 'DrumMachine', note: 39 },
+      { keywords: ['Closed Hat', 'CH', 'HH'], synthType: 'DrumMachine', note: 42 },
+      { keywords: ['Open Hat', 'OH'], synthType: 'DrumMachine', note: 46 },
+      { keywords: ['Rim', 'RS'], synthType: 'DrumMachine', note: 37 },
+      { keywords: ['Tom', 'Low'], synthType: 'DrumMachine', note: 41 },
+      { keywords: ['Tom', 'Hi'], synthType: 'DrumMachine', note: 43 },
+      { keywords: ['Synare', 'Disco'], synthType: 'Synare', note: 40 },
+      { keywords: ['Siren', 'Dub'], synthType: 'DubSiren', note: 48 }, // Pad 13 (Bank B start)
+    ];
+
+    slots.forEach(slot => {
+      const inst = findInst(slot.keywords);
+      if (inst) {
+        padManager.setMapping({
+          id: `9-${slot.note}`,
+          inputChannel: 9,
+          inputNote: slot.note,
+          type: 'instrument',
+          targetInstrumentId: inst.id,
+          targetNote: 60
+        });
+      }
+    });
+
+    refreshMappings();
+  };
+
   // Initialize
   useEffect(() => {
     if (isOpen && isEnabled) {
@@ -160,10 +225,21 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
       <div className="bg-dark-bg border border-dark-border rounded-lg w-[800px] h-[600px] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border">
-          <h2 className="text-xl font-semibold text-text-primary flex items-center gap-3">
-            <LayoutGrid size={24} />
-            Drumpad Editor
-          </h2>
+          <div className="flex items-center gap-6">
+            <h2 className="text-xl font-semibold text-text-primary flex items-center gap-3">
+              <LayoutGrid size={24} />
+              Drumpad Editor
+            </h2>
+            <div className="flex items-center gap-2 bg-dark-bgSecondary p-1 rounded-lg">
+              <span className="text-[10px] font-bold text-text-muted uppercase px-2">Auto-Map:</span>
+              <button 
+                onClick={() => handleLoadPreset('auto')}
+                className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-white rounded transition-colors uppercase"
+              >
+                Match Names
+              </button>
+            </div>
+          </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary">
             <X size={24} />
           </button>

@@ -12,7 +12,7 @@ import { ExportDialog } from '@lib/export/ExportDialog';
 import { PatternManagement } from '@components/pattern/PatternManagement';
 import { MasterEffectsModal, InstrumentEffectsModal, EffectParameterEditor } from '@components/effects';
 import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
-import { WhatsNewModal, useWhatsNew } from '@components/dialogs/WhatsNewModal';
+import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
 import { useHistoryStore } from './stores/useHistoryStore';
@@ -30,6 +30,7 @@ import { ToastContainer } from '@components/common/ToastContainer';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { DrumpadEditorModal } from '@components/midi/DrumpadEditorModal';
+import { TipOfTheDay } from '@components/dialogs/TipOfTheDay';
 
 function App() {
   // Check for application updates
@@ -55,12 +56,34 @@ function App() {
   const [showMasterFX, setShowMasterFX] = useState(false);
   const [showInstrumentFX, setShowInstrumentFX] = useState(false);
   const [showDrumpads, setShowDrumpads] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [tipsInitialTab, setTipsInitialTab] = useState<'tips' | 'changelog'>('tips');
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
 
-  const { showPatternDialog: showTD3Pattern, closePatternDialog } = useMIDIStore();
+  const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
   const { applyAutoCompact } = useUIStore();
-  const { showModal: showWhatsNew, closeModal: closeWhatsNew } = useWhatsNew();
+
+  // Unified startup logic: Show Tips or What's New
+  useEffect(() => {
+    const SEEN_VERSION_KEY = 'devilbox-seen-version';
+    const seenVersion = localStorage.getItem(SEEN_VERSION_KEY);
+    const showTipsAtStartup = localStorage.getItem('show-tips-at-startup') !== 'false';
+
+    const hasNewVersion = seenVersion !== currentVersion.buildNumber;
+
+    if (hasNewVersion) {
+      // Prioritize Changelog for new versions
+      setTipsInitialTab('changelog');
+      const timer = setTimeout(() => setShowTips(true), 1000);
+      return () => clearTimeout(timer);
+    } else if (showTipsAtStartup) {
+      // Otherwise show Tips if enabled
+      setTipsInitialTab('tips');
+      const timer = setTimeout(() => setShowTips(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentVersion.buildNumber]);
 
   // Register MIDI button mappings for transport/navigation control
   useButtonMappings();
@@ -184,6 +207,13 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'P') {
         e.preventDefault();
         setShowPatterns(!showPatterns);
+        return;
+      }
+
+      // Ctrl+K: Toggle MIDI Knob Bar
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowKnobBar(!showKnobBar);
         return;
       }
 
@@ -450,6 +480,9 @@ function App() {
           </div>
 
         </div>
+        
+        {/* Global Status Bar (includes MIDI Knob Bar) */}
+        <StatusBar onShowTips={() => setShowTips(true)} />
       </div>
 
       {/* Modals */}
@@ -460,7 +493,11 @@ function App() {
       <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />
       <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
       <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />
-      {showWhatsNew && <WhatsNewModal onClose={closeWhatsNew} />}
+      <TipOfTheDay 
+        isOpen={showTips} 
+        onClose={() => setShowTips(false)} 
+        initialTab={tipsInitialTab}
+      />
 
       {/* Effect Parameter Editor Modal */}
       {editingEffect && (

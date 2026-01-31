@@ -44,6 +44,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const [adjustedPosition, setAdjustedPosition] = useState(position);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [submenuPosition, setSubmenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const submenuTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Adjust position to stay within viewport
   useEffect(() => {
@@ -76,6 +77,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        // Also check if click is in any submenu (which are portals)
+        // This is complex because we have multiple portals.
+        // For simplicity, we'll let the portal ContextMenu handle its own outside clicks.
         onClose();
       }
     };
@@ -92,106 +96,39 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      if (submenuTimerRef.current) clearTimeout(submenuTimerRef.current);
     };
   }, [onClose]);
 
   const handleSubmenuEnter = useCallback((itemId: string, element: HTMLElement) => {
+    if (submenuTimerRef.current) {
+      clearTimeout(submenuTimerRef.current);
+      submenuTimerRef.current = null;
+    }
     const rect = element.getBoundingClientRect();
     setActiveSubmenu(itemId);
     setSubmenuPosition({
-      x: rect.right - 4,
-      y: rect.top,
+      x: rect.right - 2,
+      y: rect.top - 4,
     });
   }, []);
 
   const handleSubmenuLeave = useCallback(() => {
-    // Delay closing to allow moving to submenu
-    setTimeout(() => {
+    if (submenuTimerRef.current) clearTimeout(submenuTimerRef.current);
+    submenuTimerRef.current = setTimeout(() => {
       setActiveSubmenu(null);
       setSubmenuPosition(null);
-    }, 100);
+    }, 300); // Sufficient time to move mouse to submenu
+  }, []);
+
+  const handleMouseEnterSubmenu = useCallback(() => {
+    if (submenuTimerRef.current) {
+      clearTimeout(submenuTimerRef.current);
+      submenuTimerRef.current = null;
+    }
   }, []);
 
   if (!position) return null;
-
-  const renderMenuItem = (item: MenuItemType, index: number) => {
-    // Guard against undefined items
-    if (!item) return null;
-
-    if (item.type === 'divider') {
-      return (
-        <div
-          key={`divider-${index}`}
-          className="h-px bg-dark-border my-1 mx-2"
-        />
-      );
-    }
-
-    const hasSubmenu = item.submenu && item.submenu.length > 0;
-
-    return (
-      <div
-        key={item.id}
-        className={`
-          flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors
-          ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-bgHover'}
-          ${item.danger ? 'text-accent-error hover:bg-accent-error/10' : 'text-text-secondary'}
-        `}
-        onClick={() => {
-          if (item.disabled) return;
-          if (hasSubmenu) return; // Submenu opens on hover
-          item.onClick?.();
-          onClose();
-        }}
-        onMouseEnter={(e) => {
-          if (hasSubmenu) {
-            handleSubmenuEnter(item.id, e.currentTarget);
-          }
-        }}
-        onMouseLeave={() => {
-          if (hasSubmenu) {
-            handleSubmenuLeave();
-          }
-        }}
-      >
-        {/* Checkbox/Radio indicator */}
-        {item.checked !== undefined && (
-          <span className="w-4 flex justify-center">
-            {item.radio ? (
-              item.checked ? (
-                <Circle size={8} className="fill-accent-primary text-accent-primary" />
-              ) : null
-            ) : item.checked ? (
-              <Check size={14} className="text-accent-primary" />
-            ) : null}
-          </span>
-        )}
-
-        {/* Icon */}
-        {item.icon && <span className="w-4 flex justify-center">{item.icon}</span>}
-
-        {/* Label */}
-        <span className="flex-1">{item.label}</span>
-
-        {/* Shortcut */}
-        {item.shortcut && (
-          <span className="text-xs text-text-muted ml-4">{item.shortcut}</span>
-        )}
-
-        {/* Submenu arrow */}
-        {hasSubmenu && <ChevronRight size={14} className="text-text-muted" />}
-
-        {/* Submenu */}
-        {hasSubmenu && activeSubmenu === item.id && submenuPosition && (
-          <ContextMenuPortal
-            items={item.submenu!}
-            position={submenuPosition}
-            onClose={onClose}
-          />
-        )}
-      </div>
-    );
-  };
 
   return createPortal(
     <div
@@ -205,8 +142,95 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         left: adjustedPosition?.x ?? position.x,
         top: adjustedPosition?.y ?? position.y,
       }}
+      onMouseEnter={handleMouseEnterSubmenu}
     >
-      {items.map((item, index) => renderMenuItem(item, index))}
+      {items.length === 0 ? (
+        <div className="px-4 py-2 text-xs text-text-muted italic">Empty</div>
+      ) : (
+        items.map((item, index) => {
+          // Guard against undefined items
+          if (!item) return null;
+
+          if (item.type === 'divider') {
+            return (
+              <div
+                key={`divider-${index}`}
+                className="h-px bg-dark-border my-1 mx-2"
+              />
+            );
+          }
+
+          const hasSubmenu = item.submenu && item.submenu.length > 0;
+
+          return (
+            <div
+              key={item.id}
+              className={`
+                flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors
+                ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-bgHover'}
+                ${item.danger ? 'text-accent-error hover:bg-accent-error/10' : 'text-text-secondary'}
+                ${activeSubmenu === item.id ? 'bg-dark-bgHover' : ''}
+              `}
+              onClick={() => {
+                if (item.disabled) return;
+                if (hasSubmenu) return; // Submenu opens on hover
+                item.onClick?.();
+                onClose();
+              }}
+              onMouseEnter={(e) => {
+                if (hasSubmenu) {
+                  handleSubmenuEnter(item.id, e.currentTarget);
+                } else {
+                  // Close any open submenu when hovering over a non-submenu item
+                  setActiveSubmenu(null);
+                  setSubmenuPosition(null);
+                }
+              }}
+              onMouseLeave={() => {
+                if (hasSubmenu) {
+                  handleSubmenuLeave();
+                }
+              }}
+            >
+              {/* Checkbox/Radio indicator */}
+              {item.checked !== undefined && (
+                <span className="w-4 flex justify-center">
+                  {item.radio ? (
+                    item.checked ? (
+                      <Circle size={8} className="fill-accent-primary text-accent-primary" />
+                    ) : null
+                  ) : item.checked ? (
+                    <Check size={14} className="text-accent-primary" />
+                  ) : null}
+                </span>
+              )}
+
+              {/* Icon */}
+              {item.icon && <span className="w-4 flex justify-center">{item.icon}</span>}
+
+              {/* Label */}
+              <span className="flex-1">{item.label}</span>
+
+              {/* Shortcut */}
+              {item.shortcut && (
+                <span className="text-xs text-text-muted ml-4">{item.shortcut}</span>
+              )}
+
+              {/* Submenu arrow */}
+              {hasSubmenu && <ChevronRight size={14} className="text-text-muted" />}
+
+              {/* Submenu */}
+              {hasSubmenu && activeSubmenu === item.id && submenuPosition && (
+                <ContextMenuPortal
+                  items={item.submenu!}
+                  position={submenuPosition}
+                  onClose={onClose}
+                />
+              )}
+            </div>
+          );
+        })
+      )}
     </div>,
     document.body
   );

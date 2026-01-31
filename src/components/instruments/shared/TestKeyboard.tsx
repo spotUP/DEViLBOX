@@ -4,13 +4,9 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Music, ChevronDown, ChevronRight } from 'lucide-react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 import { useSettingsStore } from '@stores/useSettingsStore';
-
-// localStorage key for collapsed state
-const STORAGE_KEY_COLLAPSED = 'devilbox-test-keyboard-collapsed';
 
 interface TestKeyboardProps {
   instrument: InstrumentConfig;
@@ -101,34 +97,10 @@ const WHITE_KEYS_PER_OCTAVE = 7;
 export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(400);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    try {
-      // Default to collapsed
-      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
-      return saved === null ? true : saved === 'true';
-    } catch {
-      return true;
-    }
-  });
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(ToneEngine.getInstance());
   const activeNotesRef = useRef<Set<string>>(new Set());
-  const instrumentRef = useRef(instrument);
   const isInitializedRef = useRef(false);
-
-  // Persist collapsed state
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_COLLAPSED, String(isCollapsed));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [isCollapsed]);
-
-  // Keep refs in sync
-  useEffect(() => {
-    instrumentRef.current = instrument;
-  }, [instrument]);
 
   useEffect(() => {
     activeNotesRef.current = activeNotes;
@@ -153,7 +125,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   }, []);
 
   // Calculate number of octaves that fit
-  const { numOctaves, whiteKeyWidth, keys } = useMemo(() => {
+  const { whiteKeyWidth, keys } = useMemo(() => {
     // Calculate how many octaves fit
     // Each octave has 7 white keys, plus we need 1 extra for the final C
     const availableWidth = containerWidth - 8; // Some margin
@@ -306,36 +278,6 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
 
   return (
     <div ref={containerRef} className="space-y-3 w-full">
-      {/* Collapsible Header */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="flex items-center justify-between w-full group"
-      >
-        <div className="flex items-center gap-2 text-sm font-bold text-ft2-highlight">
-          {isCollapsed ? (
-            <ChevronRight size={16} className="text-ft2-textDim group-hover:text-ft2-highlight transition-colors" />
-          ) : (
-            <ChevronDown size={16} className="text-ft2-textDim group-hover:text-ft2-highlight transition-colors" />
-          )}
-          <Music size={16} />
-          <span>TEST KEYBOARD</span>
-          {isCollapsed && activeNotes.size > 0 && (
-            <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded">
-              {activeNotes.size} playing
-            </span>
-          )}
-        </div>
-        <div className="text-xs text-ft2-textDim font-mono">
-          {numOctaves} octaves · FT2 layout
-        </div>
-      </button>
-
-      {/* Piano Keyboard (collapsible with animation) */}
-      <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
-        }`}
-      >
       <div className="space-y-3 pt-2">
       <div className="bg-ft2-header rounded border-2 border-ft2-border p-3">
         <div
@@ -471,7 +413,6 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
           className="flex-1 h-1 bg-ft2-bg rounded-lg appearance-none cursor-pointer accent-ft2-cursor"
         />
         <span className="text-xs font-mono text-ft2-text">80%</span>
-      </div>
       </div>
       </div>
     </div>
