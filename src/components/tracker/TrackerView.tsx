@@ -602,6 +602,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onShowInstrumentFX={onShowInstrumentFX}
           onShowInstruments={onShowInstruments}
           onShowPatternOrder={() => setShowPatternOrder(true)}
+          onShowDrumpads={onShowDrumpads}
           showMasterFX={showMasterFX}
           showInstrumentFX={showInstrumentFX}
         />

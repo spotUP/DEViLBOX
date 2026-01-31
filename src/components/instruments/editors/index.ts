@@ -9,6 +9,7 @@ export { UnifiedInstrumentEditor } from './UnifiedInstrumentEditor';
 // Legacy editors (for backward compatibility during transition)
 export { VisualTB303Editor } from './VisualTB303Editor';
 export { VisualSynthEditor } from './VisualSynthEditor';
+export { VisualMAMEEditor } from './VisualMAMEEditor';
 export { FurnaceEditor } from './FurnaceEditor';
 export { BuzzmachineEditor } from './BuzzmachineEditor';
 export { getJeskolaEditor, MakkM3Editor, FSMKickEditor, FSMKickXPEditor, JeskolaTrilokEditor } from './JeskolaEditors';

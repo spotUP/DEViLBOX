@@ -41,8 +41,10 @@ const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[]
   { type: 'Delay', label: 'Delay', category: 'Time' },
   { type: 'FeedbackDelay', label: 'Feedback Delay', category: 'Time' },
   { type: 'PingPongDelay', label: 'Ping Pong Delay', category: 'Time' },
+  { type: 'SpaceEcho', label: 'Space Echo', category: 'Time' },
 
   // Modulation
+  { type: 'BiPhase', label: 'Bi-Phase', category: 'Modulation' },
   { type: 'Chorus', label: 'Chorus', category: 'Modulation' },
   { type: 'Phaser', label: 'Phaser', category: 'Modulation' },
   { type: 'Tremolo', label: 'Tremolo', category: 'Modulation' },
@@ -52,6 +54,7 @@ const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[]
   { type: 'AutoWah', label: 'Auto Wah', category: 'Modulation' },
 
   // Pitch/Filter
+  { type: 'DubFilter', label: 'Dub Filter', category: 'Filter' },
   { type: 'Filter', label: 'Filter', category: 'Filter' },
   { type: 'PitchShift', label: 'Pitch Shift', category: 'Pitch' },
   { type: 'FrequencyShifter', label: 'Freq Shifter', category: 'Pitch' },

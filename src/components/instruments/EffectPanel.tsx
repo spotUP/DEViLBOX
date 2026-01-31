@@ -56,6 +56,28 @@ const EFFECT_PARAMETERS: Record<string, EffectParameter[]> = {
     { name: 'Time', key: 'time', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
     { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.5 },
   ],
+  SpaceEcho: [
+    { name: 'Mode', key: 'mode', min: 1, max: 12, step: 1, unit: '', defaultValue: 4 },
+    { name: 'Rate', key: 'rate', min: 50, max: 1000, step: 1, unit: 'ms', defaultValue: 300 },
+    { name: 'Intensity', key: 'intensity', min: 0, max: 1.2, step: 0.01, unit: '', defaultValue: 0.5 },
+    { name: 'Echo Vol', key: 'echoVolume', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.8 },
+    { name: 'Reverb Vol', key: 'reverbVolume', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.3 },
+    { name: 'Bass', key: 'bass', min: -20, max: 20, step: 1, unit: 'dB', defaultValue: 0 },
+    { name: 'Treble', key: 'treble', min: -20, max: 20, step: 1, unit: 'dB', defaultValue: 0 },
+  ],
+  BiPhase: [
+    { name: 'Routing', key: 'routing', min: 0, max: 1, step: 1, unit: '0=Par/1=Ser', defaultValue: 0 },
+    { name: 'Rate A', key: 'rateA', min: 0.1, max: 10, step: 0.1, unit: 'Hz', defaultValue: 0.5 },
+    { name: 'Depth A', key: 'depthA', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.6 },
+    { name: 'Rate B', key: 'rateB', min: 0.1, max: 10, step: 0.1, unit: 'Hz', defaultValue: 4.0 },
+    { name: 'Depth B', key: 'depthB', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.4 },
+    { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.3 },
+  ],
+  DubFilter: [
+    { name: 'Cutoff', key: 'cutoff', min: 20, max: 10000, step: 1, unit: 'Hz', defaultValue: 20 },
+    { name: 'Resonance', key: 'resonance', min: 0, max: 100, step: 1, unit: '', defaultValue: 10 },
+    { name: 'Drive', key: 'gain', min: 0.5, max: 2, step: 0.01, unit: 'x', defaultValue: 1 },
+  ],
   PingPongDelay: [
     { name: 'Time', key: 'time', min: 0, max: 1, step: 0.01, unit: 's', defaultValue: 0.25 },
     { name: 'Feedback', key: 'feedback', min: 0, max: 0.95, step: 0.01, unit: '', defaultValue: 0.5 },

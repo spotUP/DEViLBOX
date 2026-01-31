@@ -33,14 +33,14 @@ export function usePadTriggers() {
           instrument.id, 
           noteName, 
           vel,
-          instrument // instrument config
+          { ...instrument, isLive: true } // Force Live mode for pad triggers
         );
       } else {
         // Note Off
         engine.triggerPolyNoteRelease(
           instrument.id,
           noteName,
-          instrument // instrument config
+          { ...instrument, isLive: true } // Force Live mode for pad triggers
         );
       }
     };

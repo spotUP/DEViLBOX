@@ -3,7 +3,7 @@
  * Shows different options based on Live vs Edit mode
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   Music,
   Trash2,
@@ -75,7 +75,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore();
   const { updateInstrument } = useInstrumentStore();
 
-  const handleApplyChannelFxPreset = (presetName: string) => {
+  const handleApplyChannelFxPreset = useCallback((presetName: string) => {
     const preset = MASTER_FX_PRESETS.find(p => p.name === presetName);
     if (!preset || !channel.instrumentId) return;
 
@@ -86,7 +86,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
 
     updateInstrument(channel.instrumentId, { effects: effects as any });
     notify.success(`Applied ${preset.name} to CH ${(channelIndex + 1).toString().padStart(2, '0')}`);
-  };
+  }, [channel.instrumentId, channelIndex, updateInstrument]);
 
   const showLane = getShowLane(channelIndex);
   const curves = getCurvesForPattern(patternId, channelIndex);
@@ -363,19 +363,27 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         id: 'fx-presets',
         label: 'FX Presets',
         icon: <Sparkles size={14} />,
-        submenu: Object.entries(MASTER_FX_PRESETS.reduce((acc, preset) => {
-          if (!acc[preset.category]) acc[preset.category] = [];
-          acc[preset.category].push(preset);
-          return acc;
-        }, {} as Record<string, typeof MASTER_FX_PRESETS>)).map(([category, presets]) => ({
-          id: `fx-cat-${category}`,
-          label: category,
-          submenu: presets.map(preset => ({
-            id: `fx-preset-${preset.name}`,
-            label: preset.name,
-            onClick: () => handleApplyChannelFxPreset(preset.name),
-          }))
-        })),
+        submenu: (() => {
+          // Group presets by category
+          const categories: Record<string, typeof MASTER_FX_PRESETS> = {};
+          
+          MASTER_FX_PRESETS.forEach(preset => {
+            const cat = preset.category || 'General';
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push(preset);
+          });
+
+          // Convert to menu items
+          return Object.keys(categories).sort().map(category => ({
+            id: `fx-cat-${category.toLowerCase()}`,
+            label: category,
+            submenu: categories[category].map(preset => ({
+              id: `fx-preset-${preset.name.replace(/\s+/g, '-')}`,
+              label: preset.name,
+              onClick: () => handleApplyChannelFxPreset(preset.name),
+            }))
+          }));
+        })(),
       },
       { type: 'divider' },
       // Transpose submenu

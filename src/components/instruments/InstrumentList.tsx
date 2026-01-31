@@ -8,11 +8,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
-// localStorage key for collapsed state
-const STORAGE_KEY_COLLAPSED = 'devilbox-instrument-list-collapsed';
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 import { LoadPresetModal } from './presets';
 import { SamplePackBrowser } from './SamplePackBrowser';
@@ -79,26 +77,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
   const [showSamplePackModal, setShowSamplePackModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    try {
-      // Default to collapsed
-      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
-      return saved === null ? true : saved === 'true';
-    } catch {
-      return true;
-    }
-  });
 
   const isFT2 = variant === 'ft2';
-
-  // Persist collapsed state
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_COLLAPSED, String(isCollapsed));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [isCollapsed]);
 
   // Scroll to selected instrument when it changes
   useEffect(() => {
@@ -217,52 +197,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
   const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton);
 
   return (
-    <div className={`flex flex-col ${isCollapsed ? '' : 'h-full'} ${isFT2 ? 'bg-ft2-bg' : ''}`}>
-      {/* Collapsible Header */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className={
-          isFT2
-            ? 'flex items-center justify-between w-full px-3 py-2 bg-ft2-header border-b-2 border-ft2-border group'
-            : 'flex items-center justify-between w-full px-3 py-2 border-b border-dark-border bg-dark-bgSecondary group'
-        }
-      >
-        <div className="flex items-center gap-2">
-          {isCollapsed ? (
-            <ChevronRight size={14} className={isFT2 ? 'text-ft2-textDim group-hover:text-ft2-highlight' : 'text-text-muted group-hover:text-text-primary'} />
-          ) : (
-            <ChevronDown size={14} className={isFT2 ? 'text-ft2-textDim group-hover:text-ft2-highlight' : 'text-text-muted group-hover:text-text-primary'} />
-          )}
-          {isFT2 ? (
-            <span className="text-ft2-highlight text-xs font-bold tracking-wide">INSTRUMENTS</span>
-          ) : (
-            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">
-              Instruments
-            </span>
-          )}
-          {isCollapsed && (
-            <span className={isFT2 ? 'text-ft2-textDim text-[10px] font-mono' : 'text-[10px] text-text-muted'}>
-              ({instruments.length})
-            </span>
-          )}
-        </div>
-        {!isCollapsed && showActions && !isFT2 && (
-          <div
-            onClick={(e) => { e.stopPropagation(); handleAdd(); }}
-            className="p-1 text-text-muted hover:text-accent-primary transition-colors"
-            title="Add new instrument"
-          >
-            <Plus size={14} />
-          </div>
-        )}
-      </button>
-
-      {/* Collapsible Content */}
-      {!isCollapsed && (
-      <>
+    <div className={`flex flex-col h-full ${isFT2 ? 'bg-ft2-bg border-l border-ft2-border' : ''}`}>
       {/* Action Buttons (FT2 variant) */}
       {showActionBar && (
-        <div className="px-2 py-2 bg-ft2-header border-b border-ft2-border">
+        <div className="px-2 py-2 bg-ft2-header border-b border-ft2-border flex-shrink-0">
           <div className="grid grid-cols-4 gap-1">
             <button
               onClick={handleAdd}
@@ -312,6 +250,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
         className={`flex-1 overflow-y-auto ${isFT2 ? 'scrollbar-ft2 min-h-0' : 'scrollbar-modern'}`}
         style={!isFT2 ? { maxHeight } : undefined}
       >
+        <div className="flex flex-col divide-y divide-ft2-border/30">
         {sortedInstruments.map((instrument) => {
           const synthInfo = getSynthInfo(instrument.synthType);
           const isSelected = instrument.id === currentInstrumentId;
@@ -500,6 +439,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
             </InstrumentContextMenu>
           );
         })}
+        </div>
       </div>
 
       {/* Footer with count */}
@@ -512,8 +452,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
           {instruments.length} instrument{instruments.length !== 1 ? 's' : ''}
         </span>
       </div>
-      </>
-      )}
 
       {/* Modals (FT2 variant) */}
       {showLoadModal && (

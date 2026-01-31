@@ -7,6 +7,8 @@
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { TB303_PRESETS } from './tb303Presets';
 import { FURNACE_PRESETS } from './furnacePresets';
+import { DUB_SIREN_PRESETS } from './dubSirenPresets';
+import { SYNARE_PRESETS } from './synarePresets';
 
 // BASS PRESETS (12)
 
@@ -644,6 +646,9 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   // === TB-303 PRESETS (from tb303Presets.ts) ===
   // All comprehensive TB-303 presets including acidbox, dittytoy references, etc.
   ...TB303_PRESETS,
+  
+  // === DUB SIREN PRESETS ===
+  ...DUB_SIREN_PRESETS,
 ];
 
 // ============================================================================
@@ -885,6 +890,9 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     volume: -14,
     pan: 0,
   },
+  
+  // === SYNARE PRESETS ===
+  ...SYNARE_PRESETS,
 ];
 
 // ============================================================================
@@ -1673,7 +1681,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Kick',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-kick.wav',
+      url: 'data/samples/tr505/tr505-kick.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1691,7 +1699,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Snare',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-snare.wav',
+      url: 'data/samples/tr505/tr505-snare.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1709,7 +1717,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Clap',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-clap.wav',
+      url: 'data/samples/tr505/tr505-clap.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1727,7 +1735,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Closed Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-hihat-closed.wav',
+      url: 'data/samples/tr505/tr505-hihat-closed.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1745,7 +1753,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Open Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-hihat-open.wav',
+      url: 'data/samples/tr505/tr505-hihat-open.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1763,7 +1771,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Rim',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-rim.wav',
+      url: 'data/samples/tr505/tr505-rim.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1781,7 +1789,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Low Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-tom-l.wav',
+      url: 'data/samples/tr505/tr505-tom-l.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1799,7 +1807,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Mid Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-tom-m.wav',
+      url: 'data/samples/tr505/tr505-tom-m.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1817,7 +1825,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 High Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-tom-h.wav',
+      url: 'data/samples/tr505/tr505-tom-h.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1835,7 +1843,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Crash',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-crash.wav',
+      url: 'data/samples/tr505/tr505-crash.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1853,7 +1861,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Ride',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-ride.wav',
+      url: 'data/samples/tr505/tr505-ride.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1871,7 +1879,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Low Cowbell',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-cowb-l.wav',
+      url: 'data/samples/tr505/tr505-cowb-l.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1889,7 +1897,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 High Cowbell',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-cowb-h.wav',
+      url: 'data/samples/tr505/tr505-cowb-h.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1907,7 +1915,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Low Conga',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-conga-l.wav',
+      url: 'data/samples/tr505/tr505-conga-l.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1925,7 +1933,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 High Conga',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-conga-h.wav',
+      url: 'data/samples/tr505/tr505-conga-h.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1943,7 +1951,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '505 Timbale',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr505/tr505-timbal.wav',
+      url: 'data/samples/tr505/tr505-timbal.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1969,7 +1977,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Kick',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-kick.wav',
+      url: 'data/samples/tr707/tr707-kick.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -1987,7 +1995,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Kick Rumble',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-kick-rumble.wav',
+      url: 'data/samples/tr707/tr707-kick-rumble.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2005,7 +2013,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Snare',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-snare.wav',
+      url: 'data/samples/tr707/tr707-snare.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2023,7 +2031,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Clap',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-clap.wav',
+      url: 'data/samples/tr707/tr707-clap.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2041,7 +2049,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Closed Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-hihat-closed.wav',
+      url: 'data/samples/tr707/tr707-hihat-closed.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2059,7 +2067,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Open Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-hihat-open.wav',
+      url: 'data/samples/tr707/tr707-hihat-open.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2077,7 +2085,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Rim',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-rim.wav',
+      url: 'data/samples/tr707/tr707-rim.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2095,7 +2103,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Low Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-tom-l.wav',
+      url: 'data/samples/tr707/tr707-tom-l.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2113,7 +2121,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Low Tom Rumble',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-tom-l-rumble.wav',
+      url: 'data/samples/tr707/tr707-tom-l-rumble.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2131,7 +2139,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Mid Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-tom-m.wav',
+      url: 'data/samples/tr707/tr707-tom-m.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2149,7 +2157,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 High Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-tom-h.wav',
+      url: 'data/samples/tr707/tr707-tom-h.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2167,7 +2175,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Cowbell',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-cowbell.wav',
+      url: 'data/samples/tr707/tr707-cowbell.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2185,7 +2193,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Crash',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-crash.wav',
+      url: 'data/samples/tr707/tr707-crash.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2203,7 +2211,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Ride',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-ride.wav',
+      url: 'data/samples/tr707/tr707-ride.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2221,7 +2229,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: '707 Tambourine',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/tr707/tr707-tambourine.wav',
+      url: 'data/samples/tr707/tr707-tambourine.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2248,7 +2256,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN 808 A1200',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      url: 'data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2266,7 +2274,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Electro Kick',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/kicks/BD_Electro1shorter.wav',
+      url: 'data/samples/packs/drumnibus/kicks/BD_Electro1shorter.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2284,7 +2292,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN SubThud',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/kicks/BD_SubThud.wav',
+      url: 'data/samples/packs/drumnibus/kicks/BD_SubThud.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2302,7 +2310,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Punchtron Kick',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/kicks/BD_Punchtron.wav',
+      url: 'data/samples/packs/drumnibus/kicks/BD_Punchtron.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2321,7 +2329,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN 808 Snare',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/snares/SD_808A1200.wav',
+      url: 'data/samples/packs/drumnibus/snares/SD_808A1200.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2339,7 +2347,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Analog Noise',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/snares/SD_Analog%20Noise1.wav',
+      url: 'data/samples/packs/drumnibus/snares/SD_Analog%20Noise1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2357,7 +2365,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Electro 7000',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/snares/SD_electro7000.wav',
+      url: 'data/samples/packs/drumnibus/snares/SD_electro7000.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2375,7 +2383,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Wolf Snare',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/snares/SD_Wolf1.wav',
+      url: 'data/samples/packs/drumnibus/snares/SD_Wolf1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2394,7 +2402,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Closed Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/hihats/CH_Digidap.wav',
+      url: 'data/samples/packs/drumnibus/hihats/CH_Digidap.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2412,7 +2420,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Open Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/hihats/OH_Digidap.wav',
+      url: 'data/samples/packs/drumnibus/hihats/OH_Digidap.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2430,7 +2438,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Analog Hat',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/hihats/OH_AnalogHihat1.wav',
+      url: 'data/samples/packs/drumnibus/hihats/OH_AnalogHihat1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2448,7 +2456,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Cymbal',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/hihats/CYM_Synthique.wav',
+      url: 'data/samples/packs/drumnibus/hihats/CYM_Synthique.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2467,7 +2475,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Clap',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/percussion/CLAP_Punchtron.wav',
+      url: 'data/samples/packs/drumnibus/percussion/CLAP_Punchtron.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2485,7 +2493,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Clave',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/percussion/CLAVE_Simple.wav',
+      url: 'data/samples/packs/drumnibus/percussion/CLAVE_Simple.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2503,7 +2511,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Tom',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/percussion/TOM_Magnotron.wav',
+      url: 'data/samples/packs/drumnibus/percussion/TOM_Magnotron.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2521,7 +2529,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Lazer',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/percussion/LAZ_R900.wav',
+      url: 'data/samples/packs/drumnibus/percussion/LAZ_R900.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2540,7 +2548,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Sonar',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/fx/FX_Sonar.wav',
+      url: 'data/samples/packs/drumnibus/fx/FX_Sonar.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2558,7 +2566,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Laser',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/fx/FX_NomiLaser1.wav',
+      url: 'data/samples/packs/drumnibus/fx/FX_NomiLaser1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2576,7 +2584,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Burst',
     synthType: 'Sampler',
     sample: {
-      url: '/samples/packs/drumnibus/fx/FX_Burst1.wav',
+      url: 'data/samples/packs/drumnibus/fx/FX_Burst1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
@@ -2623,6 +2631,8 @@ export const PRESET_CATEGORIES = {
   Chip: CHIP_PRESETS,
   Furnace: FURNACE_PRESETS,
   FX: FX_PRESETS,
+  DubSiren: DUB_SIREN_PRESETS,
+  Synare: SYNARE_PRESETS,
   Drumnibus: DRUMNIBUS_PRESETS,
 };
 

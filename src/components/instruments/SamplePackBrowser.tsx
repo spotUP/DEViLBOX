@@ -3,24 +3,13 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import * as Tone from 'tone';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SAMPLE_PACKS } from '@constants/samplePacks';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
-import {
-  X,
-  Search,
-  Check,
-  Play,
-  Square,
-  Package,
-  Disc3,
-  Music,
-  Sparkles,
-  ChevronLeft as _ChevronLeft,
-  Volume2 as _Volume2,
-} from 'lucide-react';
-import * as Tone from 'tone';
+import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square } from 'lucide-react';
+import { normalizeUrl } from '@utils/urlUtils';
 
 interface SamplePackBrowserProps {
   onClose: () => void;
@@ -78,7 +67,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
       // Create and play the sample
       const player = new Tone.Player({
-        url: sample.url,
+        url: normalizeUrl(sample.url),
         onload: () => {
           player.start();
         },
@@ -216,7 +205,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                   <div className="flex items-start gap-3">
                     {pack.coverImage ? (
                       <img
-                        src={pack.coverImage}
+                        src={normalizeUrl(pack.coverImage)}
                         alt={pack.name}
                         className="w-12 h-12 rounded object-cover"
                       />

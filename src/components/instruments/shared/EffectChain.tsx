@@ -51,6 +51,9 @@ const AVAILABLE_EFFECTS: EffectType[] = [
   'Filter',
   'JCReverb',
   'StereoWidener',
+  'SpaceEcho',
+  'BiPhase',
+  'DubFilter',
 ];
 
 interface SortableEffectProps {

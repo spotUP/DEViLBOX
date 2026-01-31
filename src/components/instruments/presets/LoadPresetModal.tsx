@@ -84,6 +84,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       Chip: 'text-cyan-400',
       Furnace: 'text-teal-400',
       FX: 'text-green-400',
+      DubSiren: 'text-red-500',
+      Synare: 'text-yellow-500',
       Drumnibus: 'text-emerald-400',
     };
     return colors[category] || 'text-ft2-highlight';

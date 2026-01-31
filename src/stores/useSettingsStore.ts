@@ -14,6 +14,8 @@ interface SettingsStore {
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
+  audioLatency: 'interactive' | 'balanced' | 'playback'; // interactive=10ms, balanced=50ms, playback=150ms
+  autoLatency: boolean; // If true, switch to interactive when stopped, balanced when playing
 
   // MIDI Settings
   midiPolyphonic: boolean;   // Enable polyphonic MIDI playback (multiple simultaneous notes)
@@ -23,6 +25,8 @@ interface SettingsStore {
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
+  setAudioLatency: (latency: 'interactive' | 'balanced' | 'playback') => void;
+  setAutoLatency: (enabled: boolean) => void;
   setMidiPolyphonic: (enabled: boolean) => void;
 }
 
@@ -34,6 +38,8 @@ export const useSettingsStore = create<SettingsStore>()(
       linearInterpolation: true,
       masterTuning: 440,
       performanceQuality: 'high',
+      audioLatency: 'balanced', // Default to balanced (50ms)
+      autoLatency: true, // Auto-switch by default
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
 
     // Actions
@@ -57,6 +63,16 @@ export const useSettingsStore = create<SettingsStore>()(
         state.performanceQuality = performanceQuality;
       }),
 
+    setAudioLatency: (audioLatency) =>
+      set((state) => {
+        state.audioLatency = audioLatency;
+      }),
+
+    setAutoLatency: (autoLatency) =>
+      set((state) => {
+        state.autoLatency = autoLatency;
+      }),
+
       setMidiPolyphonic: (midiPolyphonic) =>
         set((state) => {
           state.midiPolyphonic = midiPolyphonic;
@@ -69,6 +85,8 @@ export const useSettingsStore = create<SettingsStore>()(
         linearInterpolation: state.linearInterpolation,
         masterTuning: state.masterTuning,
         performanceQuality: state.performanceQuality,
+        audioLatency: state.audioLatency,
+        autoLatency: state.autoLatency,
         midiPolyphonic: state.midiPolyphonic,
       }),
     }

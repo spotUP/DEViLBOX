@@ -8,7 +8,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 export interface MasterFxPreset {
   name: string;
   description: string;
-  category: 'Clean' | 'Club' | 'Lo-Fi' | 'Ambient' | 'Aggressive';
+  category: 'Clean' | 'Club' | 'Lo-Fi' | 'Ambient' | 'Aggressive' | 'Dub';
   effects: Omit<EffectConfig, 'id'>[];
 }
 
@@ -488,6 +488,57 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         enabled: true,
         wet: 100,
         parameters: { low: 6, mid: 0, high: 5 },
+      },
+    ],
+  },
+
+  // === DUB & REGGAE ===
+  {
+    name: 'Dub Station',
+    description: 'Space Echo and Bi-Phase for authentic dub vibes',
+    category: 'Dub',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'SpaceEcho',
+        enabled: true,
+        wet: 40,
+        parameters: { mode: 4, rate: 300, intensity: 0.6, echoVolume: 0.8, reverbVolume: 0.2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'BiPhase',
+        enabled: true,
+        wet: 30,
+        parameters: { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 },
+      },
+    ],
+  },
+  {
+    name: 'Sound System',
+    description: 'Heavy subs and performance filtering',
+    category: 'Dub',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 6, mid: -2, high: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'DubFilter',
+        enabled: true,
+        wet: 100,
+        parameters: { cutoff: 20, resonance: 15, gain: 1.2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -15, ratio: 4, attack: 0.01, release: 0.2 },
       },
     ],
   },

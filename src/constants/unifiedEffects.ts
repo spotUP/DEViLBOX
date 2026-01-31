@@ -96,8 +96,22 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Reverb & Delay',
     description: 'Stereo delay that bounces between left and right',
   },
+  {
+    category: 'tonejs',
+    type: 'SpaceEcho',
+    label: 'Space Echo',
+    group: 'Reverb & Delay',
+    description: 'Roland RE-201 emulation with 3 heads and spring reverb',
+  },
 
   // ===== MODULATION (Tone.js) =====
+  {
+    category: 'tonejs',
+    type: 'BiPhase',
+    label: 'Bi-Phase',
+    group: 'Modulation',
+    description: 'Dual-stage phaser with series/parallel routing',
+  },
   {
     category: 'tonejs',
     type: 'Chorus',
@@ -141,6 +155,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     label: 'Filter',
     group: 'Filter',
     description: 'Resonant filter with multiple types',
+  },
+  {
+    category: 'tonejs',
+    type: 'DubFilter',
+    label: 'Dub Filter',
+    group: 'Filter',
+    description: 'King Tubby-style resonant high-pass filter for dramatic sweeps',
   },
   {
     category: 'tonejs',

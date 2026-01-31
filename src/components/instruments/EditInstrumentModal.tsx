@@ -38,6 +38,8 @@ import {
   DEFAULT_FURNACE,
   DEFAULT_BUZZMACHINE,
   DEFAULT_WOBBLE_BASS,
+  DEFAULT_DUB_SIREN,
+  DEFAULT_SYNARE,
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 
@@ -796,6 +798,12 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       break;
     case 'WobbleBass':
       base.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
+      break;
+    case 'DubSiren':
+      base.dubSiren = { ...DEFAULT_DUB_SIREN };
+      break;
+    case 'Synare':
+      base.synare = { ...DEFAULT_SYNARE };
       break;
   }
 

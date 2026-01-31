@@ -11,7 +11,7 @@
 
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Activity, BarChart2, HelpCircle } from 'lucide-react';
+import { Activity, BarChart2, HelpCircle, Layers, User, Radio } from 'lucide-react';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -39,6 +39,8 @@ import {
   DEFAULT_BUZZMACHINE,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
+  DEFAULT_DUB_SIREN,
+  DEFAULT_SYNARE,
 } from '@typedefs/instrument';
 
 export type VizMode = 'oscilloscope' | 'spectrum';
@@ -101,6 +103,9 @@ function handleSynthTypeChange(
     wobbleBass: undefined,
     drumKit: undefined,
     buzzmachine: undefined,
+    dubSiren: undefined,
+    synare: undefined,
+    effects: [],
   };
 
   // Initialize appropriate default config
@@ -118,6 +123,55 @@ function handleSynthTypeChange(
     case 'FormantSynth': updates.formantSynth = { ...DEFAULT_FORMANT_SYNTH }; break;
     case 'WobbleBass': updates.wobbleBass = { ...DEFAULT_WOBBLE_BASS }; break;
     case 'DrumKit': updates.drumKit = { ...DEFAULT_DRUMKIT }; break;
+    case 'DubSiren': 
+      updates.dubSiren = { ...DEFAULT_DUB_SIREN };
+      // Add default dub effects
+      updates.effects = [
+        {
+          id: Math.random().toString(36).substring(7),
+          category: 'tonejs',
+          type: 'SpaceEcho',
+          enabled: true,
+          wet: 80,
+          parameters: {
+            mode: 4,
+            rate: 350,
+            intensity: 0.6,
+            echoVolume: 0.8,
+            reverbVolume: 0.3,
+          }
+        },
+        {
+          id: Math.random().toString(36).substring(7),
+          category: 'tonejs',
+          type: 'DubFilter',
+          enabled: true,
+          wet: 100,
+          parameters: {
+            cutoff: 45, // Resonant lowpass
+            resonance: 4,
+            gain: 1.2,
+          }
+        }
+      ];
+      break;
+    case 'Synare':
+      updates.synare = { ...DEFAULT_SYNARE };
+      // Add a bit of reverb for Synare
+      updates.effects = [
+        {
+          id: Math.random().toString(36).substring(7),
+          category: 'tonejs',
+          type: 'Reverb',
+          enabled: true,
+          wet: 30,
+          parameters: {
+            decay: 2.5,
+            preDelay: 0.01,
+          }
+        }
+      ];
+      break;
   }
   // Furnace types get default furnace config
   if (newType.startsWith('Furnace')) {
@@ -199,6 +253,38 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <p className="text-xs text-gray-400 truncate">{synthInfo.description}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Live Mode Toggle */}
+            <button
+              onClick={() => onChange({ isLive: !instrument.isLive })}
+              className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                instrument.isLive
+                  ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                  : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+              }`}
+              title={instrument.isLive ? 'Live Mode Active: Bypasses lookahead for zero-latency jamming' : 'Enable Live Mode: Bypasses lookahead buffer'}
+            >
+              <Radio size={14} className={instrument.isLive ? 'animate-pulse' : ''} />
+              <span className="text-[10px] font-bold uppercase tracking-tight">
+                {instrument.isLive ? 'LIVE' : 'STD'}
+              </span>
+            </button>
+
+            {/* Polyphony Toggle */}
+            <button
+              onClick={() => onChange({ monophonic: !instrument.monophonic })}
+              className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                instrument.monophonic
+                  ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/50'
+                  : 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+              }`}
+              title={instrument.monophonic ? 'Switch to Polyphonic' : 'Switch to Monophonic'}
+            >
+              {instrument.monophonic ? <User size={14} /> : <Layers size={14} />}
+              <span className="text-[10px] font-bold uppercase tracking-tight">
+                {instrument.monophonic ? 'Mono' : 'Poly'}
+              </span>
+            </button>
+
             <PresetDropdown
               synthType={instrument.synthType}
               instrument={instrument}

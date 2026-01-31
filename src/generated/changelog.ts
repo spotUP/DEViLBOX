@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-31T01:24:51.115Z
+ * Generated: 2026-01-31T18:56:34.327Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '169';
-export const BUILD_HASH = '668b834';
+export const BUILD_NUMBER = '179';
+export const BUILD_HASH = '97feb56';
 export const BUILD_DATE = '2026-01-31';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,46 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-31',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add Dub Siren synth'
+      },
+      {
+        type: 'feature',
+        description: 'Add Drumpad Editor for custom pad mapping'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve integration issues from MIDI and engine updates'
+      },
+      {
+        type: 'fix',
+        description: 'Implement scheduled playback for TB303AccurateSynth'
+      },
+      {
+        type: 'fix',
+        description: 'Integrate TB303AccurateSynth and resolve type errors'
+      },
+      {
+        type: 'fix',
+        description: 'Enable TB-303 accent and slide in tracker playback'
+      },
+      {
+        type: 'improvement',
+        description: 'Chore: update changelog for build 1.0.1+169'
+      },
+      {
+        type: 'fix',
+        description: 'Correct MOD/XM instrument and sample parsing'
+      },
+      {
+        type: 'feature',
+        description: 'Improve tracker playback engine and visual sync'
+      },
+      {
+        type: 'feature',
+        description: 'Enhance MIDI system with learn modal, grouping, and smoothing'
+      },
       {
         type: 'improvement',
         description: 'Update generated changelog'
@@ -202,46 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix Furnace instrument parsing and register mapping'
-      },
-      {
-        type: 'improvement',
-        description: 'Expand Furnace instrument types with comprehensive chip support'
-      },
-      {
-        type: 'improvement',
-        description: 'Retry WASM init on note trigger'
-      },
-      {
-        type: 'improvement',
-        description: 'Simplify Furnace WASM AudioContext detection'
-      },
-      {
-        type: 'fix',
-        description: 'Add debug logging for Furnace WASM initialization'
-      },
-      {
-        type: 'fix',
-        description: 'Fix DrumMachine Tone.Param error breaking 909 drums'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Furnace synth fallback to use actual instrument parameters'
-      },
-      {
-        type: 'feature',
-        description: 'Add Behringer TD-3 pattern presets'
-      },
-      {
-        type: 'improvement',
-        description: 'Update instrument system and engine improvements'
-      },
-      {
-        type: 'improvement',
-        description: 'Move Mute/Smooth/Groove controls to tracker header'
-      },
-      {
-        type: 'feature',
-        description: 'Implement tab-based synth editors for no-scroll UI'
       }
     ]
   }
