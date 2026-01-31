@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-30T22:50:03.471Z
+ * Generated: 2026-01-31T01:24:51.115Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,15 +20,49 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '162';
-export const BUILD_HASH = '8a4055e';
-export const BUILD_DATE = '2026-01-30';
+export const BUILD_NUMBER = '169';
+export const BUILD_HASH = '668b834';
+export const BUILD_DATE = '2026-01-31';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-01-31',
+    changes: [
+      {
+        type: 'improvement',
+        description: 'Update generated changelog'
+      },
+      {
+        type: 'improvement',
+        description: 'Simplify LogoAnimation component'
+      },
+      {
+        type: 'fix',
+        description: 'Fix loop mode and optimize playback state updates'
+      },
+      {
+        type: 'fix',
+        description: 'Reduce audio engine debug logging for performance'
+      },
+      {
+        type: 'feature',
+        description: 'Add Clear modal and functional Speed/Song Length controls'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve pattern editor smooth scrolling and performance'
+      },
+      {
+        type: 'improvement',
+        description: 'Improve grid sequencer visuals and smooth scrolling'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-30',
     changes: [
       {
@@ -162,7 +196,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-28',
     changes: [
       {
@@ -208,40 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Implement tab-based synth editors for no-scroll UI'
-      },
-      {
-        type: 'feature',
-        description: 'Add synth editing enhancements and new engine components'
-      },
-      {
-        type: 'feature',
-        description: 'Add real-time visualization components for instruments'
-      },
-      {
-        type: 'feature',
-        description: 'Add Furnace chip instrument presets'
-      },
-      {
-        type: 'improvement',
-        description: 'Move documentation files to docs/ directory'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-2',
-    date: '2026-01-27',
-    changes: [
-      {
-        type: 'feature',
-        description: 'Add .fur and .dmf to file browser accept filter'
-      },
-      {
-        type: 'feature',
-        description: 'Add MIDI CC output to TD-3-MO'
-      },
-      {
-        type: 'fix',
-        description: 'Fix TD-3 MIDI CC mappings and add debug logging'
       }
     ]
   }
