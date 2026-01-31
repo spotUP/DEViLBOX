@@ -8,12 +8,15 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import { TB303Synth } from './TB303Engine';
 import { TB303AccurateSynth } from './TB303AccurateSynth';
+import { MAMESynth } from './MAMESynth';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
+import { normalizeUrl } from '@utils/urlUtils';
+import { useSettingsStore } from '@stores/useSettingsStore';
 
 interface VoiceState {
   instrument: any;
@@ -43,7 +46,12 @@ export class ToneEngine {
   public masterInput: Tone.Gain; // Where instruments connect
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
+  // FFT for frequency visualization
   public fft: Tone.FFT;
+  
+  // High-performance WASM instance for DSP and scheduling
+  private wasmInstance: any = null;
+
   // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
   public instruments: Map<string, Tone.PolySynth | Tone.Synth | any>;
   // Track synth types for proper release handling
@@ -241,17 +249,35 @@ export class ToneEngine {
   }
 
   /**
+   * Get the global high-performance WASM instance
+   */
+  public getWasmInstance(): any {
+    return this.wasmInstance;
+  }
+
+  /**
    * Initialize audio context (must be called after user interaction)
    */
   public async init(): Promise<void> {
+    // Ensure we are using the lowest latency context possible
+    // Note: Tone.js context defaults to 'interactive' but we ensure it here
+    if (Tone.getContext().latencyHint !== 'interactive') {
+      console.log('[ToneEngine] Reconfiguring Tone.js context for interactive latency');
+      Tone.setContext(new Tone.Context({ 
+        latencyHint: 'interactive',
+        lookAhead: 0.05 // Default to 50ms, will be updated by setAudioLatency
+      }));
+    }
+
     if (Tone.getContext().state === 'suspended') {
       await Tone.start();
     }
 
     // Configure Transport for rock-solid audio scheduling
-    // Higher lookahead = more buffer against main thread blocking, but more latency
-    // 200ms is a good balance for music playback (BassoonTracker uses similar values)
-    Tone.getContext().lookAhead = 0.2; // 200ms lookahead buffer
+    // Lower lookahead = faster triggering response, but more CPU sensitive
+    // New default is balanced (50ms)
+    const initialLatency = useSettingsStore.getState().audioLatency || 'balanced';
+    this.setAudioLatency(initialLatency);
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running (Tone.start() may return before state changes)
@@ -269,15 +295,47 @@ export class ToneEngine {
       });
     }
 
-    // Pre-load TB303 AudioWorklet (prevents async loading delay for TB-303 synth)
-    // Only load once - AudioWorklet processors can only be registered once
+    // === UNIFIED WASM LOADING ===
+    let dspBinary: ArrayBuffer | null = null;
+    const fetchDSP = async () => {
+      if (dspBinary) return dspBinary;
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const res = await fetch(`${baseUrl}DevilboxDSP.wasm`);
+      if (res.ok) {
+        dspBinary = await res.arrayBuffer();
+        
+        // Initialize the WASM instance for Main Thread usage (Scheduler)
+        try {
+          const imports = { env: { abort: () => console.error('Main WASM Aborted') } };
+          const { instance } = await WebAssembly.instantiate(dspBinary, imports);
+          this.wasmInstance = instance.exports;
+          if (this.wasmInstance.init) this.wasmInstance.init();
+          console.log('[ToneEngine] Unified DevilboxDSP WASM instance ready');
+        } catch (e) {
+          console.error('[ToneEngine] Failed to init Main Thread WASM:', e);
+        }
+
+        return dspBinary;
+      }
+      return null;
+    };
+
+    // Pre-load TB303 AudioWorklet
     if (!ToneEngine.tb303WorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+        await ctx.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+        
+        const binary = await fetchDSP();
+        if (binary) {
+          const tempNode = new AudioWorkletNode(ctx, 'tb303-processor');
+          tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
+          tempNode.disconnect();
+        }
+        
         ToneEngine.tb303WorkletLoaded = true;
       } catch (error) {
-        // Non-fatal - worklet will be loaded on-demand when TB-303 synth is used
+        console.error('[ToneEngine] Failed to load TB303 worklet:', error);
       }
     }
 
@@ -285,7 +343,15 @@ export class ToneEngine {
     if (!ToneEngine.itFilterWorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        await Tone.getContext().rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+        await ctx.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+        
+        const binary = await fetchDSP();
+        if (binary) {
+          const tempNode = new AudioWorkletNode(ctx, 'it-filter-processor');
+          tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
+          tempNode.disconnect();
+        }
+        
         ToneEngine.itFilterWorkletLoaded = true;
       } catch (error) {
         console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
@@ -407,6 +473,29 @@ export class ToneEngine {
    */
   public setMasterMute(muted: boolean): void {
     this.masterChannel.mute = muted;
+  }
+
+  /**
+   * Set audio lookahead/latency mode
+   * @param latency 'interactive' (10ms), 'balanced' (50ms), or 'playback' (150ms)
+   */
+  public setAudioLatency(latency: 'interactive' | 'balanced' | 'playback'): void {
+    let lookAhead = 0.05; // Default balanced
+    
+    switch (latency) {
+      case 'interactive':
+        lookAhead = 0.01; // 10ms - Super snappy, might crackle on heavy tracks
+        break;
+      case 'balanced':
+        lookAhead = 0.05; // 50ms - Good middle ground
+        break;
+      case 'playback':
+        lookAhead = 0.15; // 150ms - Very stable, but noticeable triggering delay
+        break;
+    }
+    
+    console.log(`[ToneEngine] Setting audio lookahead to ${lookAhead}s (${latency} mode)`);
+    Tone.getContext().lookAhead = lookAhead;
   }
 
   /**
@@ -533,29 +622,44 @@ export class ToneEngine {
       return null;
     }
 
-    // Get current time from Tone.js
-    const now = Tone.now();
-    if (now === undefined || now === null || isNaN(now)) {
-      return null;
-    }
+    // Determine base time: use immediate (currentTime) for interactive triggers,
+    // or now() (currentTime + lookAhead) for scheduled triggers
+    const isInteractive = time === undefined || time === null || isNaN(time) || time <= 0;
+    const baseTime = isInteractive ? Tone.immediate() : Tone.now();
 
     // If time is provided and valid (> 0), use it as base
-    // Time of 0 means "play immediately" so we use now()
+    // Time of 0 means "play immediately"
     let targetTime: number;
     if (time !== undefined && time !== null && !isNaN(time) && time > 0) {
       targetTime = time;
     } else {
-      // Use current time with a small offset to ensure it's scheduled properly
-      targetTime = now + 0.001;
+      // Use base time with a tiny offset to ensure it's scheduled properly
+      targetTime = baseTime + 0.001;
     }
 
     // Ensure this time is strictly greater than the last trigger time
     // This prevents "Start time must be strictly greater than previous start time" errors
-    // especially for rapid MIDI input or drum machines
     if (targetTime <= this.lastTriggerTime) {
-      targetTime = this.lastTriggerTime + 0.001;
+      targetTime = this.lastTriggerTime + 0.0005;
     }
 
+    this.lastTriggerTime = targetTime;
+    return targetTime;
+  }
+
+  /**
+   * Get an immediate time value for user interactions (keyboard/MIDI)
+   * Bypasses the lookAhead buffer for instant response
+   */
+  private getImmediateTime(): number {
+    const immediate = Tone.immediate();
+    
+    // Still ensure strictly increasing times to avoid Web Audio API warnings
+    let targetTime = immediate;
+    if (targetTime <= this.lastTriggerTime) {
+      targetTime = this.lastTriggerTime + 0.0001; // Smaller increment for immediate triggers
+    }
+    
     this.lastTriggerTime = targetTime;
     return targetTime;
   }
@@ -822,17 +926,9 @@ export class ToneEngine {
         }
 
         // Prepend BASE_URL for relative paths (handles /DEViLBOX/ prefix in production)
-        // But skip if URL already starts with BASE_URL to avoid double prefix
-        if (sampleUrl && sampleUrl.startsWith('/') && !sampleUrl.startsWith('//')) {
-          const baseUrl = import.meta.env.BASE_URL || '/';
-          // Check if URL already has BASE_URL prefix (sample packs already include it)
-          const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-          if (normalizedBase !== '/' && !sampleUrl.startsWith(normalizedBase)) {
-            // Only prepend if not already prefixed
-            sampleUrl = baseUrl.endsWith('/') && sampleUrl.startsWith('/')
-              ? baseUrl + sampleUrl.slice(1)
-              : baseUrl + sampleUrl;
-          }
+        if (sampleUrl) {
+          sampleUrl = normalizeUrl(sampleUrl);
+          console.log(`[ToneEngine] Sampler ${instrumentId} URL normalized: ${sampleUrl}`);
         }
 
         // If we have a stored edited buffer, use that instead of URL
@@ -1089,6 +1185,30 @@ export class ToneEngine {
       case 'FurnaceT6W28':
       case 'FurnaceSUPERVISION':
       case 'FurnaceUPD1771':
+      case 'FurnaceOPN2203':
+      case 'FurnaceOPNBB':
+      case 'FurnaceAY8930':
+      case 'FurnaceNDS':
+      case 'FurnaceGBA':
+      case 'FurnacePOKEMINI':
+      case 'FurnaceNAMCO':
+      case 'FurnacePET':
+      case 'FurnacePOKEY':
+      case 'FurnaceMSM6258':
+      case 'FurnaceMSM5232':
+      case 'FurnaceMULTIPCM':
+      case 'FurnaceAMIGA':
+      case 'FurnacePCSPKR':
+      case 'FurnacePONG':
+      case 'FurnacePV1000':
+      case 'FurnaceDAVE':
+      case 'FurnaceSU':
+      case 'FurnacePOWERNOISE':
+      case 'FurnaceZXBEEPER':
+      case 'FurnaceSCVTONE':
+      case 'FurnacePCMDAC':
+      case 'DrumKit':
+      case 'ChiptuneModule':
       // Buzzmachine Generators (WASM-emulated Buzz synths)
       case 'BuzzDTMF':
       case 'BuzzFreqBomb':
@@ -1099,7 +1219,13 @@ export class ToneEngine {
       case 'Buzz4FM2F':
       case 'BuzzDynamite6':
       case 'BuzzM3':
-      case 'Buzz3o3': {
+      case 'Buzz3o3':
+      case 'DubSiren':
+      case 'Synare':
+      case 'MAMEVFX':
+      case 'MAMEDOC':
+      case 'MAMERSA':
+      case 'Buzzmachine': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
@@ -1544,7 +1670,8 @@ export class ToneEngine {
     }
 
     // Get safe time for the attack
-    const safeTime = this.getSafeTime(time);
+    // If instrument is marked as "Live", always use immediate triggering to bypass lookahead
+    const safeTime = config.isLive ? this.getImmediateTime() : this.getSafeTime(time);
     if (safeTime === null) {
       return; // Audio context not ready
     }
@@ -1708,7 +1835,8 @@ export class ToneEngine {
     }
 
     // Ensure we have a valid time - Tone.now() can return null if context isn't ready
-    const safeTime = this.getSafeTime(time);
+    // If instrument is marked as "Live", always use immediate time to bypass lookahead
+    const safeTime = config.isLive ? this.getImmediateTime() : this.getSafeTime(time);
     if (safeTime === null) {
       return; // Audio context not ready, skip release
     }
@@ -1780,16 +1908,25 @@ export class ToneEngine {
     velocity: number,
     config: InstrumentConfig
   ): void {
+    // Check if instrument is explicitly marked as monophonic
+    if (config.monophonic === true) {
+      // Force monophonic: Release any previous notes for this instrument first
+      this.releaseAllPolyNotes(instrumentId, config);
+      // Fall through to monophonic triggering logic below
+    }
+
     // For natively polyphonic synths (PolySynth-based), just use the shared instance
     // They already support multiple simultaneous notes
     // Also treat undefined synthType as polyphonic (default creates PolySynth)
     const synthType = config.synthType;
     const isNativePoly = !synthType || ToneEngine.NATIVE_POLY_TYPES.has(synthType);
-    if (isNativePoly) {
+    if (isNativePoly && config.monophonic !== true) {
       // Track active notes for release
       this.liveVoiceAllocation.set(note, -1); // -1 = using shared instance
       // Use shared instance (channelIndex undefined)
-      this.triggerNoteAttack(instrumentId, note, 0, velocity, config);
+      // Use immediate time if isLive
+      const triggerTime = config.isLive ? this.getImmediateTime() : 0;
+      this.triggerNoteAttack(instrumentId, note, triggerTime, velocity, config);
       return;
     }
 
@@ -1809,8 +1946,11 @@ export class ToneEngine {
     const channelIndex = this.liveVoicePool.shift()!;
     this.liveVoiceAllocation.set(note, channelIndex);
 
+    // Get immediate time for lowest latency triggering
+    const immediateTime = this.getImmediateTime();
+
     // Trigger the note on this channel (creates separate instance for monophonic synths)
-    this.triggerNoteAttack(instrumentId, note, 0, velocity, config, undefined, false, false, channelIndex);
+    this.triggerNoteAttack(instrumentId, note, immediateTime, velocity, config, undefined, false, false, channelIndex);
   }
 
   /**
@@ -1828,12 +1968,14 @@ export class ToneEngine {
 
     this.liveVoiceAllocation.delete(note);
 
+    const immediateTime = config.isLive ? this.getImmediateTime() : 0;
+
     if (channelIndex === -1) {
       // Native polyphonic synth - release on shared instance
-      this.triggerNoteRelease(instrumentId, note, 0, config);
+      this.triggerNoteRelease(instrumentId, note, immediateTime, config);
     } else {
       // Allocated voice channel - release on specific instance
-      this.triggerNoteRelease(instrumentId, note, 0, config, channelIndex);
+      this.triggerNoteRelease(instrumentId, note, immediateTime, config, channelIndex);
       // Return the channel to the pool
       this.liveVoicePool.push(channelIndex);
     }
@@ -2359,34 +2501,50 @@ export class ToneEngine {
   }
 
   /**
-   * Dispose of instrument and its effect chain (all channel instances)
+   * Internal helper to dispose an instrument by its internal Map key
+   */
+  private disposeInstrumentByKey(key: string): void {
+    const instrument = this.instruments.get(key);
+    if (instrument) {
+      // Release all notes on this synth before disposal
+      try {
+        if (instrument.releaseAll) instrument.releaseAll();
+        else if (instrument.triggerRelease) instrument.triggerRelease();
+      } catch (e) {
+        // Ignore release errors
+      }
+
+      // Re-route and dispose effects chain
+      this.disposeInstrumentEffectChain(key);
+
+      // Dispose the synth itself
+      try {
+        instrument.dispose();
+      } catch (e) {
+        // Already disposed
+      }
+      this.instruments.delete(key);
+      this.instrumentSynthTypes.delete(key);
+      this.instrumentLoadingPromises.delete(key);
+    }
+  }
+
+  /**
+   * Dispose instrument by ID
    */
   public disposeInstrument(instrumentId: number): void {
-    // Dispose effect chain first
-    this.disposeInstrumentEffectChain(instrumentId);
-
-    // Find and dispose all channel instances of this instrument
-    const keysToDelete: string[] = [];
-    this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`)) {
-        try {
-          instrument.disconnect();
-          instrument.dispose();
-        } catch {
-          // May already be disposed
-        }
-        keysToDelete.push(key);
+    const keysToRemove: string[] = [];
+    this.instruments.forEach((_instrument, key) => {
+      // Split key (format: "id-channel") and check exact ID match
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        keysToRemove.push(key);
       }
     });
 
-    // Delete the keys after iteration
-    keysToDelete.forEach(key => {
-      this.instruments.delete(key);
-      this.instrumentSynthTypes.delete(key);
+    keysToRemove.forEach((key) => {
+      this.disposeInstrumentByKey(key);
     });
-
-    if (keysToDelete.length > 0) {
-    }
   }
 
   /**
@@ -2491,13 +2649,13 @@ export class ToneEngine {
 
   /**
    * Update TB303 parameters in real-time without recreating the synth
-   * Updates all channel instances of this instrument
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
     // Find all channel instances of this instrument
     const synths: (TB303Synth | TB303AccurateSynth)[] = [];
     this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`) && (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth)) {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId) && (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth)) {
         synths.push(instrument);
       }
     });
@@ -2553,6 +2711,108 @@ export class ToneEngine {
       }
     }
     }); // End synths.forEach
+  }
+
+  /**
+   * Get the WASM handle for a MAME synth instance
+   */
+  public getMAMESynthHandle(instrumentId: number): number {
+    const key = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(key);
+    if (instrument instanceof MAMESynth) {
+      return (instrument as any).getHandle();
+    }
+    return 0;
+  }
+
+  /**
+   * Update MAME parameters in real-time
+   */
+  public updateMAMEParameters(instrumentId: number, _config: Partial<import('@typedefs/instrument').MAMEConfig>): void {
+    const key = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(key);
+    if (instrument instanceof MAMESynth) {
+      // MAMESynth instances are typically updated via register writes
+      // but we can apply global config changes like clock if needed
+    }
+  }
+
+  /**
+   * Update Dub Siren parameters in real-time
+   */
+  public updateDubSirenParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dubSiren']>): void {
+    let found = false;
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        // Use feature detection for more reliable check across HMR/bundling
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
+          found = true;
+        }
+      }
+    });
+    if (!found) {
+      console.warn(`[ToneEngine] No DubSiren synth found to update for instrument ${instrumentId}`);
+    }
+  }
+
+  /**
+   * Update Synare parameters in real-time
+   */
+  public updateSynareParameters(instrumentId: number, config: NonNullable<InstrumentConfig['synare']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
+        }
+      }
+    });
+  }
+
+  /**
+   * Update Furnace parameters in real-time
+   */
+  public updateFurnaceParameters(instrumentId: number, _config: NonNullable<InstrumentConfig['furnace']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).updateParameters === 'function') {
+          (instrument as any).updateParameters();
+        }
+      }
+    });
+  }
+
+  /**
+   * Generic method to update complex synths that use the applyConfig pattern
+   */
+  public updateComplexSynthParameters(instrumentId: number, config: any): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
+        }
+      }
+    });
+  }
+
+  /**
+   * Update Buzzmachine parameters in real-time
+   */
+  public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).setParameter === 'function') {
+          Object.entries(buzzmachine.parameters).forEach(([index, value]) => {
+            (instrument as any).setParameter(Number(index), value);
+          });
+        }
+      }
+    });
   }
 
   /**
@@ -2900,6 +3160,48 @@ export class ToneEngine {
 
     // Build new effect chain (await for neural effects)
     await this.buildInstrumentEffectChain(key, effects, instrument);
+  }
+
+  /**
+   * Momentarily "throw" an instrument into an effect (e.g. Dub Delay Throw)
+   * Ramps the wet level of a specific effect type in the instrument's chain
+   */
+  public throwInstrumentToEffect(
+    instrumentId: number, 
+    effectType: string, 
+    wetAmount: number = 1.0, 
+    durationMs: number = 0
+  ): void {
+    // Find the chain - for throws, we typically look at the base instrument chain (-1)
+    // or iterate all channels if it's a live instrument
+    const chains: any[] = [];
+    this.instrumentEffectChains.forEach((chain, chainKey) => {
+      const [idPart] = String(chainKey).split('-');
+      if (idPart === String(instrumentId)) {
+        chains.push(chain);
+      }
+    });
+    
+    if (chains.length === 0) return;
+
+    chains.forEach(chain => {
+      // Find the target effect node in the chain
+      const targetFx = chain.effects.find((fx: any) => fx._fxType === effectType);
+
+      if (targetFx && (targetFx as any).wet) {
+        const wetParam = (targetFx as any).wet as Tone.Param<"normalRange">;
+        const now = Tone.immediate();
+        
+        // Ramp up instantly (10ms)
+        wetParam.cancelScheduledValues(now);
+        wetParam.rampTo(wetAmount, 0.01, now);
+        
+        // If duration is provided, ramp back down after that time
+        if (durationMs > 0) {
+          wetParam.rampTo(0, 0.1, now + durationMs / 1000);
+        }
+      }
+    });
   }
 
   /**

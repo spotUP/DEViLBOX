@@ -120,10 +120,89 @@ export class PatternScheduler {
 
   /**
    * Pre-scan pattern for Fxx effects and compute accurate row timings
-   * ProTracker processes Fxx immediately, affecting all subsequent rows
-   * Returns array of { time, speed, bpm } for each row
    */
   private computeRowTimings(pattern: Pattern, initialSpeed: number, initialBPM: number): Array<{ time: number; speed: number; bpm: number; delay: number }> {
+    const engine = getToneEngine();
+    const wasm = engine.getWasmInstance();
+
+    // Use WASM if available for speed
+    if (wasm && typeof wasm.computePatternTimings === 'function') {
+      try {
+        const length = pattern.length;
+        // Allocate input buffer: header(12) + rows(length * 20)
+        const inputSize = 12 + (length * 20);
+        const inputPtr = wasm.__new(inputSize, 1);
+        
+        // Write header
+        const view = new DataView(wasm.memory.buffer);
+        view.setInt32(inputPtr, length, true);
+        view.setInt32(inputPtr + 4, initialSpeed, true);
+        view.setFloat32(inputPtr + 8, initialBPM, true);
+
+        // Pre-scan rows for Fxx/EEx
+        for (let row = 0; row < length; row++) {
+          let hasSpeed = 0;
+          let newSpeed = 0;
+          let hasBPM = 0;
+          let newBPM = 0;
+          let rowDelay = 0;
+
+          pattern.channels.forEach((channel) => {
+            const cell = channel.rows[row];
+            if (cell.effTyp === 0xF && cell.eff !== undefined) {
+              const param = cell.eff;
+              if (param > 0 && param < 0x20) {
+                hasSpeed = 1;
+                newSpeed = param;
+              } else if (param >= 0x20) {
+                hasBPM = 1;
+                newBPM = param;
+              }
+            }
+            // Check for row delay (EE1 format)
+            const effect1 = (cell.effTyp !== undefined && cell.effTyp !== 0)
+              ? xmEffectToString(cell.effTyp, cell.eff ?? 0)
+              : null;
+            if (effect1) {
+              if (effect1.toUpperCase().startsWith('EE') || effect1.toUpperCase().startsWith('SE')) {
+                rowDelay = parseInt(effect1[2], 16);
+              }
+            }
+          });
+
+          const rowOffset = inputPtr + 12 + (row * 20);
+          view.setInt32(rowOffset, hasSpeed, true);
+          view.setInt32(rowOffset + 4, newSpeed, true);
+          view.setInt32(rowOffset + 8, hasBPM, true);
+          view.setFloat32(rowOffset + 12, newBPM, true);
+          view.setInt32(rowOffset + 16, rowDelay, true);
+        }
+
+        // Allocate output buffer: length * 16 bytes
+        const outputPtr = wasm.__new(length * 16, 1);
+        
+        // EXECUTE IN WASM
+        wasm.computePatternTimings(inputPtr, outputPtr);
+
+        // Read results
+        const results: Array<{ time: number; speed: number; bpm: number; delay: number }> = [];
+        for (let row = 0; row < length; row++) {
+          const outOffset = outputPtr + (row * 16);
+          results.push({
+            time: view.getFloat32(outOffset, true),
+            speed: view.getInt32(outOffset + 4, true),
+            bpm: view.getFloat32(outOffset + 8, true),
+            delay: view.getInt32(outOffset + 12, true),
+          });
+        }
+
+        return results;
+      } catch (e) {
+        console.warn('[PatternScheduler] WASM Timing computation failed, falling back to JS:', e);
+      }
+    }
+
+    // Fallback to pure JS implementation
     const timings: Array<{ time: number; speed: number; bpm: number; delay: number }> = [];
     let currentSpeed = initialSpeed;
     let currentBPM = initialBPM;
