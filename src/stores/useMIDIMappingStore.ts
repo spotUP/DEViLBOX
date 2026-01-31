@@ -10,11 +10,21 @@ import { persist } from 'zustand/middleware';
 export type MIDIMappableParameter =
   | 'baseOctave'
   | 'velocity'
+  // TB-303 Main controls
   | 'cutoff'
   | 'resonance'
   | 'envMod'
   | 'decay'
-  | 'accent';
+  | 'accent'
+  | 'slideTime'
+  | 'overdrive'
+  // TB-303 Devil Fish controls
+  | 'normalDecay'
+  | 'accentDecay'
+  | 'softAttack'
+  | 'vegSustain'
+  | 'filterFM'
+  | 'filterTracking';
 
 export interface MIDIMapping {
   channel: number; // MIDI channel (0-15)

@@ -18,6 +18,7 @@ import { useMIDIStore } from './stores/useMIDIStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
+import { useMIDIActions } from './hooks/useMIDIActions';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
@@ -60,6 +61,9 @@ function App() {
 
   // Register MIDI button mappings for transport/navigation control
   useButtonMappings();
+
+  // Register MIDI CC mappings for TB-303 parameters and tracker actions
+  useMIDIActions();
 
   const { updateMasterEffect } = useAudioStore();
 
