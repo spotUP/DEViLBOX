@@ -1051,11 +1051,6 @@ export class InstrumentFactory {
   }
 
   private static createMonoSynth(config: InstrumentConfig): Tone.MonoSynth {
-    // MonoSynth is monophonic by default
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-
     return new Tone.MonoSynth({
       oscillator: {
         type: config.oscillator?.type || 'sawtooth',
@@ -1090,11 +1085,6 @@ export class InstrumentFactory {
   }
 
   private static createDuoSynth(config: InstrumentConfig): Tone.DuoSynth {
-    // DuoSynth is monophonic by default
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-
     return new Tone.DuoSynth({
       voice0: {
         oscillator: {
@@ -1210,12 +1200,6 @@ export class InstrumentFactory {
   private static createTB303(config: InstrumentConfig): TB303Synth | TB303AccurateSynth {
     if (!config.tb303) {
       throw new Error('TB303 config required for TB303 synth type');
-    }
-
-    // TB-303 is always monophonic and live by default
-    config.monophonic = true;
-    if (config.isLive === undefined) {
-      config.isLive = true;
     }
 
     // Choose engine based on engineType (default: accurate - uses Open303 AudioWorklet)
@@ -1595,11 +1579,6 @@ export class InstrumentFactory {
    * - Toms: Pitched body with 2x envelope, varying frequencies (100/200/300Hz)
    */
   private static createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {
-    // DrumMachine parts are usually monophonic
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-
     const dmConfig = config.drumMachine || DEFAULT_DRUM_MACHINE;
     const is808 = dmConfig.machineType === '808';
 
@@ -3388,11 +3367,6 @@ export class InstrumentFactory {
    * Features: dual oscillators, FM, Reese detuning, wobble LFO, distortion, formant growl
    */
   private static createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
-    // WobbleBass is monophonic by default
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-
     const wbConfig = config.wobbleBass || DEFAULT_WOBBLE_BASS;
     console.log('[WobbleBass] Creating with config:', {
       hasWobbleBass: !!config.wobbleBass,
@@ -3943,20 +3917,8 @@ export class InstrumentFactory {
   }
 
   private static createDubSiren(config: InstrumentConfig): Tone.ToneAudioNode {
-    if (!config.dubSiren) {
-      // Create default if missing
-      config.dubSiren = DEFAULT_DUB_SIREN;
-    }
-    
-    // Dub Siren is usually monophonic and live
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-    if (config.isLive === undefined) {
-      config.isLive = true;
-    }
-    
-    const synth = new DubSirenSynth(config.dubSiren);
+    const dubSirenConfig = config.dubSiren || DEFAULT_DUB_SIREN;
+    const synth = new DubSirenSynth(dubSirenConfig);
     
     // Apply initial volume
     if (config.volume !== undefined) {
@@ -3967,19 +3929,8 @@ export class InstrumentFactory {
   }
 
   private static createSynare(config: InstrumentConfig): Tone.ToneAudioNode {
-    if (!config.synare) {
-      config.synare = DEFAULT_SYNARE;
-    }
-    
-    // Synare is monophonic and live
-    if (config.monophonic === undefined) {
-      config.monophonic = true;
-    }
-    if (config.isLive === undefined) {
-      config.isLive = true;
-    }
-    
-    const synth = new SynareSynth(config.synare);
+    const synareConfig = config.synare || DEFAULT_SYNARE;
+    const synth = new SynareSynth(synareConfig);
     
     if (config.volume !== undefined) {
       synth.volume.value = config.volume;
