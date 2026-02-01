@@ -9,6 +9,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { TB303Synth } from './TB303Engine';
 import { TB303AccurateSynth } from './TB303AccurateSynth';
+import { JC303Synth } from './jc303/JC303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import type { TrackerCell, Pattern } from '@typedefs';
 import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';
@@ -222,7 +223,7 @@ export class AutomationPlayer {
     // Also try iterating to find any matching TB303 for this instrumentId
     if (!instrument) {
       for (const [key, inst] of engine.instruments.entries()) {
-        if (key.startsWith(`${instrumentId}-`) && (inst instanceof TB303Synth || inst instanceof TB303AccurateSynth)) {
+        if (key.startsWith(`${instrumentId}-`) && (inst instanceof TB303Synth || inst instanceof TB303AccurateSynth || inst instanceof JC303Synth)) {
           instrument = inst;
           break;
         }
@@ -232,7 +233,7 @@ export class AutomationPlayer {
 
     try {
       // Check if this is a TB303Synth - use its dedicated methods
-      const isTB303 = instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth;
+      const isTB303 = instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth;
 
       switch (parameter) {
         case 'cutoff':

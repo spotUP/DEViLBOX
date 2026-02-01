@@ -7,6 +7,7 @@
 
 import { AcidSequencer, AcidPattern, SequencerMode, type SequencerEvent } from './AcidSequencer';
 import type { TB303EngineAccurate } from './TB303EngineAccurate';
+import { getNativeContext } from '@utils/audio-context';
 
 export interface SequencerConfig {
   bpm?: number;
@@ -68,7 +69,8 @@ export class SequencerEngine {
     // Create ScriptProcessor for sample-accurate timing
     // Note: ScriptProcessor is deprecated but still works. For production,
     // should move to AudioWorklet. This is simpler for now.
-    this.scriptProcessor = this.audioContext.createScriptProcessor(256, 0, 1);
+    const nativeCtx = getNativeContext(this.audioContext);
+    this.scriptProcessor = nativeCtx.createScriptProcessor(256, 0, 1);
 
     this.scriptProcessor.onaudioprocess = (e) => {
       const numSamples = e.outputBuffer.length;
@@ -80,7 +82,7 @@ export class SequencerEngine {
     };
 
     // Connect to destination (but output silence)
-    this.scriptProcessor.connect(this.audioContext.destination);
+    this.scriptProcessor.connect(nativeCtx.destination);
 
     this.sequencer.start();
     this.isRunning = true;

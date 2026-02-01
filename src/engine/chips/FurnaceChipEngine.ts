@@ -2,6 +2,8 @@
  * FurnaceChipEngine - Centralized manager for WASM-based chip emulators
  */
 
+import { getNativeContext } from '@utils/audio-context';
+
 export const FurnaceChipType = {
   // === FM CHIPS ===
   OPN2: 0,      // YM2612 - Sega Genesis/Mega Drive
@@ -102,6 +104,8 @@ export class FurnaceChipEngine {
   private initFailedPermanently: boolean = false; // Only for permanent failures (bad context type)
   private workletNode: AudioWorkletNode | null = null;
   private lastInitAttempt: number = 0;
+  private writeCount: number = 0;
+  private nativeContext: AudioContext | null = null;
 
   public static getInstance(): FurnaceChipEngine {
     if (!FurnaceChipEngine.instance) {
@@ -138,86 +142,12 @@ export class FurnaceChipEngine {
 
   private async doInit(audioContext: unknown): Promise<void> {
     try {
-      // Cast to any for duck typing checks
-      const ctx = audioContext as any;
-
-      // Debug: log what we received
-      console.log('[FurnaceChipEngine] doInit received:', {
-        ctxType: Object.prototype.toString.call(ctx),
-        ctxConstructor: ctx?.constructor?.name,
-        hasRawContext: !!ctx?.rawContext,
-        has_context: !!ctx?._context,
-        rawContextType: ctx?.rawContext ? Object.prototype.toString.call(ctx.rawContext) : 'N/A',
-        _contextType: ctx?._context ? Object.prototype.toString.call(ctx._context) : 'N/A'
-      });
-
-      // Debug: log what we received
-      console.log('[FurnaceChipEngine] doInit received:', {
-        ctxType: Object.prototype.toString.call(ctx),
-        ctxConstructor: ctx?.constructor?.name,
-        hasRawContext: !!ctx?.rawContext,
-        has_context: !!ctx?._context,
-        rawContextType: ctx?.rawContext ? Object.prototype.toString.call(ctx.rawContext) : 'N/A',
-        _contextType: ctx?._context ? Object.prototype.toString.call(ctx._context) : 'N/A'
-      });
-
-      // FIRST: Find the native AudioContext before doing anything else
-      // This is critical because we must use the SAME context for adding the module AND creating the node
-      //
-      // The issue is that instanceof AudioContext fails across JavaScript realms, and
-      // Tone.js wraps the native context in ways that make duck typing unreliable.
-      //
-      // The ONLY reliable method: create a native AudioContext directly
-
-      let nativeCtx: AudioContext | null = null;
-
-      // Method 1: Create our own native AudioContext
-      // This guarantees we get a true native context that will work with AudioWorkletNode
-      try {
-        const NativeAudioContext = globalThis.AudioContext || (globalThis as any).webkitAudioContext;
-        if (NativeAudioContext) {
-          // Check if we already have a running context we can reuse
-          // by creating a gain node from the passed context and getting its native context
-          if (ctx && ctx.createGain) {
-            const tempGain = ctx.createGain();
-            const nodeContext = tempGain.context;
-            // Verify this works as a BaseAudioContext by checking prototype chain
-            if (Object.prototype.toString.call(nodeContext) === '[object AudioContext]') {
-              nativeCtx = nodeContext as AudioContext;
-              console.log('[FurnaceChipEngine] Got native context from GainNode.context');
-            }
-          }
-
-          // If that didn't work, try creating our own fresh context
-          if (!nativeCtx) {
-            // Try to get the existing context from Tone.js properly
-            // Access the internal _context which should be the native one
-            const toneCtx = ctx?._context;
-            const toneCtxType = Object.prototype.toString.call(toneCtx);
-            console.log('[FurnaceChipEngine] Tone._context type:', toneCtxType);
-            if (toneCtx && (toneCtxType === '[object AudioContext]' || toneCtxType === '[object BaseAudioContext]')) {
-              nativeCtx = toneCtx as AudioContext;
-              console.log('[FurnaceChipEngine] Got native context from Tone._context');
-            }
-          }
-
-          // Last resort: create a brand new AudioContext
-          if (!nativeCtx) {
-            console.log('[FurnaceChipEngine] Creating new native AudioContext');
-            nativeCtx = new NativeAudioContext();
-            // Sync state with Tone's context
-            if (ctx?.state === 'running' && nativeCtx.state !== 'running') {
-              await nativeCtx.resume();
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[FurnaceChipEngine] Failed to get native AudioContext:', e);
-      }
+      // Robustly get native context using unified utility
+      const nativeCtx = getNativeContext(audioContext);
 
       // Validate we found a native context
       if (!nativeCtx || !nativeCtx.audioWorklet) {
-        console.warn('[FurnaceChipEngine] Invalid audio context - no native audioWorklet. ctx type:', ctx?.constructor?.name);
+        console.warn('[FurnaceChipEngine] Invalid audio context - no native audioWorklet');
         this.initPromise = null; // Allow retry
         return;
       }
@@ -229,7 +159,7 @@ export class FurnaceChipEngine {
         return;
       }
 
-      console.log('[FurnaceChipEngine] Native AudioContext ready, state:', nativeCtx.state, 'type:', Object.prototype.toString.call(nativeCtx));
+      console.log('[FurnaceChipEngine] Native AudioContext ready, state:', nativeCtx.state);
 
       const baseUrl = import.meta.env.BASE_URL || '/';
 
@@ -280,10 +210,10 @@ export class FurnaceChipEngine {
 
       try {
         // Store native context reference for diagnostics
-        this.nativeContext = nativeCtx as AudioContext;
+        this.nativeContext = nativeCtx;
 
         // Cast to AudioContext for TypeScript - we've verified it has audioWorklet
-        this.workletNode = new AudioWorkletNode(nativeCtx as AudioContext, 'furnace-chips-processor', {
+        this.workletNode = new AudioWorkletNode(nativeCtx, 'furnace-chips-processor', {
           numberOfInputs: 0,
           numberOfOutputs: 1,
           outputChannelCount: [2],
@@ -350,9 +280,6 @@ export class FurnaceChipEngine {
       this.initPromise = null; // Allow retry
     }
   }
-
-  private writeCount: number = 0;
-  private nativeContext: AudioContext | null = null;
 
   /**
    * Write to a chip register

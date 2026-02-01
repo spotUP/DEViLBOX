@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { getNativeContext } from '@utils/audio-context';
 import {
   BuzzmachineEngine,
   BuzzmachineType,
@@ -68,10 +69,10 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
 
     try {
       // Safely get native context (handle both Tone.Context and native AudioContext)
-      const context = (this.context as any).rawContext || this.context;
+      const context = getNativeContext(this.context);
 
       // Initialize engine
-      await this.engine.init(context as AudioContext);
+      await this.engine.init(context);
 
       // Create worklet node for this machine
       this.workletNode = await this.engine.createMachineNode(
