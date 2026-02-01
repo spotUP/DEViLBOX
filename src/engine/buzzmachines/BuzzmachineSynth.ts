@@ -67,7 +67,7 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
     this.initInProgress = true;
 
     try {
-      const context = this.context as unknown as AudioContext;
+      const context = this.context.rawContext as AudioContext;
 
       // Initialize engine
       await this.engine.init(context);

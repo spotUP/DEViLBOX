@@ -12,6 +12,7 @@ import { FilterCurve } from '@components/ui/FilterCurve';
 import { Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import { TB303Tabs, type TB303Tab } from '../shared/SynthEditorTabs';
+import { JC303StyledKnobPanel } from './JC303StyledKnobPanel';
 
 interface TB303ControlsProps {
   config: TB303Config;
@@ -20,6 +21,10 @@ interface TB303ControlsProps {
   showFilterCurve?: boolean;
   /** Show the TB303 branding header */
   showHeader?: boolean;
+  /** Use the JC303 styled panel */
+  isJC303?: boolean;
+  volume?: number;
+  onVolumeChange?: (volume: number) => void;
 }
 
 export const TB303Controls: React.FC<TB303ControlsProps> = ({
@@ -27,7 +32,14 @@ export const TB303Controls: React.FC<TB303ControlsProps> = ({
   onChange,
   showFilterCurve = true,
   showHeader = false,
+  isJC303 = false,
+  volume,
+  onVolumeChange,
 }) => {
+  if (isJC303) {
+    return <JC303StyledKnobPanel config={config} onChange={onChange} volume={volume} onVolumeChange={onVolumeChange} />;
+  }
+
   const [activeTab, setActiveTab] = useState<TB303Tab>('main');
 
   // Theme-aware styling

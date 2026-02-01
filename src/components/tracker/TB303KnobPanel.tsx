@@ -64,7 +64,7 @@ interface TB303Params {
   accent: number;
   overdrive: number;
   tuning: number;
-  engineType: 'tonejs' | 'accurate';
+  engineType: 'tonejs' | 'accurate' | 'jc303';
   overdriveModel: number; // GuitarML model index (0-36)
   useNeuralOverdrive: boolean; // Toggle between waveshaper and GuitarML
   tempoRelative: boolean; // Tempo-relative envelope mode (slower BPM = longer sweeps)
@@ -78,7 +78,7 @@ const DEFAULT_PARAMS: TB303Params = {
   accent: 70,
   overdrive: 0,
   tuning: 0, // Cents offset from A4=440Hz
-  engineType: 'accurate', // Uses Open303 AudioWorklet for authentic sound
+  engineType: 'jc303', // WASM-compiled Open303 engine
   overdriveModel: 0, // Default to TS9
   useNeuralOverdrive: false, // Default to waveshaper
   tempoRelative: false, // Default to absolute time
@@ -728,7 +728,7 @@ const TB303KnobPanelComponent: React.FC = () => {
     });
   }, [updateAllTB303, tb303Instruments, updateInstrument]);
 
-  const handleEngineTypeChange = useCallback((engineType: 'tonejs' | 'accurate') => {
+  const handleEngineTypeChange = useCallback((engineType: 'tonejs' | 'accurate' | 'jc303') => {
     setParams(p => ({ ...p, engineType }));
 
     // Update all TB303 instruments in store - this will trigger recreation of synths
@@ -1105,11 +1105,12 @@ const TB303KnobPanelComponent: React.FC = () => {
               <span className="devilfish-label">Engine</span>
               <select
                 value={params.engineType}
-                onChange={(e) => handleEngineTypeChange(e.target.value as 'tonejs' | 'accurate')}
+                onChange={(e) => handleEngineTypeChange(e.target.value as 'tonejs' | 'accurate' | 'jc303')}
                 className="tb303-synth-select"
               >
                 <option value="tonejs">Tone.js (Classic)</option>
                 <option value="accurate">Open303 (Accurate)</option>
+                <option value="jc303">JC-303 (WASM)</option>
               </select>
             </div>
 

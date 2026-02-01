@@ -37,6 +37,7 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { DrumKitSynth } from './DrumKitSynth';
 import { DubSirenSynth } from './DubSirenSynth';
 import { SynareSynth } from './SynareSynth';
+import { JC303Synth } from './jc303/JC303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
@@ -1197,13 +1198,17 @@ export class InstrumentFactory {
     });
   }
 
-  private static createTB303(config: InstrumentConfig): TB303Synth | TB303AccurateSynth {
+  private static createTB303(config: InstrumentConfig): TB303Synth | TB303AccurateSynth | JC303Synth {
     if (!config.tb303) {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
     // Choose engine based on engineType (default: accurate - uses Open303 AudioWorklet)
     const engineType = config.tb303.engineType || 'accurate';
+
+    if (engineType === 'jc303') {
+      return this.createJC303(config.tb303, config.volume);
+    }
 
     if (engineType === 'accurate') {
       // Use Open303-based accurate engine
@@ -1216,6 +1221,31 @@ export class InstrumentFactory {
       synth.setVolume(config.volume || -12);
       return synth;
     }
+  }
+
+  private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
+    const synth = new JC303Synth();
+    
+    // Apply parameters from TB303 config
+    synth.setCutoff(tb.filter.cutoff);
+    synth.setResonance(tb.filter.resonance);
+    synth.setEnvMod(tb.filterEnvelope.envMod);
+    synth.setDecay(tb.filterEnvelope.decay);
+    synth.setAccent(tb.accent.amount);
+    synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
+    
+    if (tb.slide) {
+      synth.setSlideTime(tb.slide.time);
+    }
+    if (tb.overdrive) {
+      synth.setOverdrive(tb.overdrive.amount);
+    }
+
+    if (volume !== undefined) {
+      synth.setVolume(volume);
+    }
+
+    return synth;
   }
 
   private static createWavetable(config: InstrumentConfig): WavetableSynth {
