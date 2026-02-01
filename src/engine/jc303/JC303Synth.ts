@@ -21,7 +21,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
   constructor() {
     super();
-    this.audioContext = this.context.rawContext as AudioContext;
+    this.audioContext = ((this.context as any).rawContext || this.context) as AudioContext;
     this.output = new Tone.Gain(1);
     
     // Overdrive setup
@@ -39,7 +39,8 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      await JC303Synth.ensureInitialized(this.context.rawContext as AudioContext);
+      const context = ((this.context as any).rawContext || this.context) as AudioContext;
+      await JC303Synth.ensureInitialized(context);
       this.createNode();
     } catch (err) {
       console.error('[JC303] Initialization failed:', err);
@@ -69,7 +70,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
   private createNode(): void {
     if (!JC303Synth.wasmBinary) return;
 
-    const context = this.context.rawContext as AudioContext;
+    const context = ((this.context as any).rawContext || this.context) as AudioContext;
     
     this.workletNode = new AudioWorkletNode(context, 'jc303-processor', {
       outputChannelCount: [2],
@@ -143,7 +144,15 @@ export class JC303Synth extends Tone.ToneAudioNode {
   setAccent(val: number): void { this.setParam('accent', val); }
   setAccentAmount(val: number): void { this.setAccent(val); }
   
-  setWaveform(mix: number): void { this.setParam('waveform', mix); }
+  setWaveform(mix: number | string): void { 
+    let val = 0;
+    if (typeof mix === 'string') {
+      val = mix === 'square' ? 1.0 : 0.0;
+    } else {
+      val = mix;
+    }
+    this.setParam('waveform', val); 
+  }
   
   // Tuning expects cents (from ToneEngine automation), but Open303 expects Hz
   setTuning(cents: number): void { 
