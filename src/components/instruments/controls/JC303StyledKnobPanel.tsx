@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useLayoutEffect, useState } from 'react';
 import type { TB303Config } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
@@ -17,27 +17,57 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
   volume,
   onVolumeChange,
 }) => {
-  // Update helpers
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  
+  // Use ref for config to prevent stale closures in throttled callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
+
+  // Auto-scale to fit parent width
+  useLayoutEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current?.parentElement) {
+        const parentWidth = containerRef.current.parentElement.clientWidth;
+        const panelWidth = 930 + 32; // width + padding
+        if (parentWidth < panelWidth) {
+          setScale(parentWidth / panelWidth);
+        } else {
+          setScale(1);
+        }
+      }
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
+
+  // Update helpers using ref to ensure fresh state
   const updateFilter = (key: string, value: number) => {
+    const currentConfig = configRef.current;
     onChange({
-      filter: { ...config.filter, [key]: value },
+      filter: { ...currentConfig.filter, [key]: value },
     });
   };
 
   const updateFilterEnvelope = (key: string, value: number) => {
+    const currentConfig = configRef.current;
     onChange({
-      filterEnvelope: { ...config.filterEnvelope, [key]: value },
+      filterEnvelope: { ...currentConfig.filterEnvelope, [key]: value },
     });
   };
 
   const updateAccent = (key: string, value: number) => {
+    const currentConfig = configRef.current;
     onChange({
-      accent: { ...config.accent, [key]: value },
+      accent: { ...currentConfig.accent, [key]: value },
     });
   };
 
   const updateDevilFish = (key: string, value: any) => {
-    const currentDF = config.devilFish || {
+    const currentConfig = configRef.current;
+    const currentDF = currentConfig.devilFish || {
       enabled: false,
       normalDecay: 200,
       accentDecay: 200,
@@ -56,17 +86,35 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
     });
   };
 
-  const updateOverdrive = (key: string, value: number) => {
-    const currentOD = config.overdrive || { amount: 0, dryWet: 100 };
+  const updateOverdrive = (key: string, value: any) => {
+    const currentConfig = configRef.current;
+    const currentOD = currentConfig.overdrive || { amount: 0, dryWet: 100, modelIndex: 0 };
     onChange({
       overdrive: { ...currentOD, [key]: value },
     });
   };
 
-  // Coordinates from Gui.cpp
-  // Canvas: 930x363
-  
-  // Helper for absolute positioning
+  const updateOscillator = (type: 'sawtooth' | 'square') => {
+    const currentConfig = configRef.current;
+    onChange({ 
+      oscillator: { ...currentConfig.oscillator, type } 
+    });
+  };
+
+  const updateSlide = (time: number) => {
+    const currentConfig = configRef.current;
+    onChange({ 
+      slide: { ...currentConfig.slide, time } 
+    });
+  };
+
+  const updateTuning = (tuning: number) => {
+    // Tuning is a top-level property so we can just send it directly
+    // but using the pattern for consistency
+    onChange({ tuning });
+  };
+
+  // Coordinates from Gui.cpp (930x363)
   const style = (x: number, y: number, width: number, height: number) => ({
     left: `${x}px`,
     top: `${y}px`,
@@ -75,58 +123,89 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
     position: 'absolute' as const,
   });
 
+  const labelStyle = (x: number, y: number, width: number) => ({
+    left: `${x}px`,
+    top: `${y}px`,
+    width: `${width}px`,
+    position: 'absolute' as const,
+    textAlign: 'center' as const,
+    fontSize: '9px',
+    fontWeight: 'bold',
+    color: '#888',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  });
+
   return (
-    <div className="w-full overflow-hidden flex justify-center bg-gray-900 p-4 rounded-lg">
+    <div 
+      ref={containerRef}
+      className="w-full overflow-visible flex justify-center py-4 select-none"
+      style={{ minHeight: `${363 * scale + 32}px` }}
+    >
       <div 
-        className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border-4 border-gray-700"
-        style={{ width: '930px', height: '363px', transformOrigin: 'top left' }}
+        className="relative bg-[#1a1a1a] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-b-8 border-r-4 border-black/40 overflow-hidden"
+        style={{ 
+          width: '930px', 
+          height: '363px', 
+          transform: `scale(${scale})`,
+          transformOrigin: 'top center',
+          background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
+        }}
       >
-        {/* Background Image Placeholder / Styling */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" 
-             style={{ backgroundImage: 'linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%, #333), linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%, #333)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px' }}>
-        </div>
-        
-        {/* Logo / Easter Egg */}
-        <div style={style(484, 16, 56, 77)} className="flex items-center justify-center opacity-50">
-           <span className="text-yellow-500 text-4xl font-bold">😊</span>
+        {/* --- PANEL DECORATIONS --- */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Top groove */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-black/20"></div>
+          {/* Main section dividers */}
+          <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+          <div className="absolute top-[230px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+          
+          {/* Group Labels */}
+          <div style={labelStyle(40, 115, 100)} className="text-accent-primary opacity-80">Oscillator</div>
+          <div style={labelStyle(180, 115, 580)} className="text-accent-primary opacity-80">Filter & Envelope</div>
+          <div style={labelStyle(800, 115, 100)} className="text-accent-primary opacity-80">Output</div>
+          
+          <div style={labelStyle(40, 238, 500)} className="text-red-500/70">Devil Fish Modifications</div>
+          <div style={labelStyle(550, 238, 340)} className="text-orange-500/70">Neural Overdrive</div>
         </div>
 
-        {/* --- ROW 1: Large & Medium Knobs --- */}
+        {/* --- ROW 1: Main Controls --- */}
 
-        {/* Waveform (Knob in JC303, Switch in our config - mapped) */}
-        {/* 46, 140, 70, 70 */}
+        {/* Waveform Blend */}
         <div style={style(46, 140, 70, 70)}>
           <Knob
-            value={config.oscillator.type === 'square' ? 100 : 0}
+            value={typeof config.oscillator.type === 'string' ? (config.oscillator.type === 'square' ? 100 : 0) : 0}
             min={0}
             max={100}
-            onChange={(v) => onChange({ oscillator: { ...config.oscillator, type: v > 50 ? 'square' : 'sawtooth' } })}
+            onChange={(v) => updateOscillator(v > 50 ? 'square' : 'sawtooth')}
             label="Wave"
             size="lg"
-            color="#ffcc00"
+            color="#00ffff"
             formatValue={(v) => v > 50 ? 'SQR' : 'SAW'}
           />
         </div>
 
-        {/* Tuning: 188, 139, 60, 60 */}
+        {/* Tuning */}
         <div style={style(188, 139, 60, 60)}>
           <Knob
-            value={config.tuning ?? 440} // Default 440 if undefined
-            min={415}
-            max={466}
-            onChange={(v) => onChange({ tuning: v })}
-            label="Tuning"
+            value={config.tuning ?? 0}
+            min={-100}
+            max={100}
+            bipolar
+            onChange={updateTuning}
+            label="Tune"
             size="md"
             color="#ffcc00"
           />
         </div>
 
-        {/* Cutoff: 287, 139, 60, 60 */}
+        {/* Cutoff */}
         <div style={style(287, 139, 60, 60)}>
           <Knob
             value={config.filter.cutoff}
             min={50}
             max={18000}
+            logarithmic
             onChange={(v) => updateFilter('cutoff', v)}
             label="Cutoff"
             size="md"
@@ -134,7 +213,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Resonance: 386, 139, 60, 60 */}
+        {/* Resonance */}
         <div style={style(386, 139, 60, 60)}>
           <Knob
             value={config.filter.resonance}
@@ -147,25 +226,26 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Env Mod: 485, 139, 60, 60 */}
+        {/* Env Mod */}
         <div style={style(485, 139, 60, 60)}>
           <Knob
             value={config.filterEnvelope.envMod}
             min={0}
             max={100}
             onChange={(v) => updateFilterEnvelope('envMod', v)}
-            label="Env Mod"
+            label="EnvMod"
             size="md"
             color="#ffcc00"
           />
         </div>
 
-        {/* Decay: 584, 139, 60, 60 */}
+        {/* Decay */}
         <div style={style(584, 139, 60, 60)}>
           <Knob
             value={config.filterEnvelope.decay}
             min={30}
             max={3000}
+            logarithmic
             onChange={(v) => updateFilterEnvelope('decay', v)}
             label="Decay"
             size="md"
@@ -173,7 +253,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Accent: 683, 139, 60, 60 */}
+        {/* Accent */}
         <div style={style(683, 139, 60, 60)}>
           <Knob
             value={config.accent.amount}
@@ -186,41 +266,52 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Volume: 813, 140, 70, 70 */}
+        {/* Volume */}
         <div style={style(813, 140, 70, 70)}>
           <Knob
-            value={(volume ?? -12) + 60} // Map -60..0 to 0..60 approx
+            value={(volume ?? -12) + 60}
             min={0}
             max={100}
-            onChange={(v) => onVolumeChange && onVolumeChange(v - 60)}
-            label="Volume"
+            onChange={(v) => onVolumeChange?.(v - 60)}
+            label="Level"
             size="lg"
-            color="#ffcc00"
+            color="#00ffff"
           />
         </div>
 
 
-        {/* --- ROW 2: Mods & Overdrive --- */}
+        {/* --- ROW 2: Modifications --- */}
 
-        {/* Mod Switch: 52, 273, 50, 18 */}
-        <div style={style(52, 273, 50, 30)} className="flex flex-col items-center">
-          <label className="text-[10px] text-gray-400 mb-1 font-bold">DEVIL</label>
+        {/* Devil Fish Toggle */}
+        <div style={style(52, 273, 50, 45)} className="flex flex-col items-center">
           <Toggle
-            label="Devil Fish"
+            label=""
             value={config.devilFish?.enabled || false}
             onChange={(v) => updateDevilFish('enabled', v)}
+            color="#ff3333"
+            size="sm"
           />
+          <span className="text-[8px] font-bold text-red-500 mt-1">ENABLE</span>
         </div>
-        {/* Mod LED: 82, 243, 15, 15 */}
-        <div style={style(82, 243, 15, 15)} className={clsx("rounded-full shadow-lg border border-gray-800 transition-colors duration-200", config.devilFish?.enabled ? "bg-red-500 shadow-red-500/50" : "bg-red-900")}></div>
+        
+        {/* Status LED */}
+        <div 
+          style={style(82, 243, 12, 12)} 
+          className={clsx(
+            "rounded-full border border-black/40 transition-all duration-300", 
+            config.devilFish?.enabled 
+              ? "bg-red-500 shadow-[0_0_10px_#ef4444]" 
+              : "bg-red-950"
+          )}
+        ></div>
 
-
-        {/* Normal Decay: 147, 273, 30, 30 */}
-        <div style={{ ...style(147, 273, 30, 30), opacity: config.devilFish?.enabled ? 1 : 0.5 }}>
+        {/* Normal Decay */}
+        <div style={{ ...style(147, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
           <Knob
             value={config.devilFish?.normalDecay || 200}
             min={30}
             max={3000}
+            logarithmic
             onChange={(v) => config.devilFish?.enabled && updateDevilFish('normalDecay', v)}
             label="N.Dec"
             size="sm"
@@ -228,12 +319,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Accent Decay: 208, 273, 30, 30 */}
-        <div style={{ ...style(208, 273, 30, 30), opacity: config.devilFish?.enabled ? 1 : 0.5 }}>
+        {/* Accent Decay */}
+        <div style={{ ...style(208, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
           <Knob
             value={config.devilFish?.accentDecay || 200}
             min={30}
             max={3000}
+            logarithmic
             onChange={(v) => config.devilFish?.enabled && updateDevilFish('accentDecay', v)}
             label="A.Dec"
             size="sm"
@@ -241,8 +333,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Feedback (Filter FM): 269, 273, 30, 30 */}
-        <div style={{ ...style(269, 273, 30, 30), opacity: config.devilFish?.enabled ? 1 : 0.5 }}>
+        {/* Filter FM (Feedback) */}
+        <div style={{ ...style(269, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
           <Knob
             value={config.devilFish?.filterFM || 0}
             min={0}
@@ -254,12 +346,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Soft Attack: 330, 273, 30, 30 */}
-        <div style={{ ...style(330, 273, 30, 30), opacity: config.devilFish?.enabled ? 1 : 0.5 }}>
+        {/* Soft Attack */}
+        <div style={{ ...style(330, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
           <Knob
             value={config.devilFish?.softAttack || 0.3}
             min={0.3}
             max={30}
+            logarithmic
             onChange={(v) => config.devilFish?.enabled && updateDevilFish('softAttack', v)}
             label="S.Atk"
             size="sm"
@@ -267,21 +360,21 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Slide Time: 391, 273, 30, 30 */}
-        <div style={style(391, 273, 30, 30)}>
+        {/* Slide Time */}
+        <div style={style(391, 273, 35, 35)}>
           <Knob
             value={config.slide?.time || 60}
             min={10}
             max={500}
-            onChange={(v) => onChange({ slide: { ...config.slide, time: v } })}
+            onChange={(v) => updateSlide(v)}
             label="Slide"
             size="sm"
             color="#ff3333"
           />
         </div>
 
-        {/* Sqr Driver (Mapping to Overdrive Amount for now): 452, 273, 30, 30 */}
-        <div style={style(452, 273, 30, 30)}>
+        {/* Drive Amount / Sqr Driver */}
+        <div style={style(452, 273, 35, 35)}>
           <Knob
             value={config.overdrive?.amount || 0}
             min={0}
@@ -293,24 +386,38 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           />
         </div>
 
-        {/* Overdrive Section */}
+        {/* --- NEURAL OVERDRIVE SECTION --- */}
         
-        {/* Drive Level: 566, 273, 30, 30 */}
-        {/* Mapping to same overdrive amount for now, or maybe gain? */}
-        <div style={style(566, 273, 30, 30)}>
+        {/* Overdrive Level */}
+        <div style={style(566, 273, 35, 35)}>
           <Knob
             value={config.overdrive?.amount || 0}
             min={0}
             max={100}
             onChange={(v) => updateOverdrive('amount', v)}
-            label="Lvl"
+            label="Level"
             size="sm"
-            color="#ff3333"
+            color="#ff9900"
           />
         </div>
 
-        {/* Overdrive Dry/Wet: 749, 273, 30, 30 */}
-        <div style={style(749, 273, 30, 30)}>
+        {/* Model Selector */}
+        <div style={style(615, 275, 120, 40)} className="flex flex-col">
+          <label className="text-[8px] font-bold text-orange-500/70 mb-1 ml-1">MODEL</label>
+          <select 
+            value={config.overdrive?.modelIndex ?? 0}
+            onChange={(e) => updateOverdrive('modelIndex', parseInt(e.target.value))}
+            className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500"
+          >
+            <option value={0}>Classic TS9</option>
+            <option value={1}>Plexi Drive</option>
+            <option value={2}>Modern High</option>
+            <option value={3}>Vintage Tube</option>
+          </select>
+        </div>
+
+        {/* Dry/Wet Mix */}
+        <div style={style(749, 273, 35, 35)}>
           <Knob
             value={config.overdrive?.dryWet ?? 100}
             min={0}
@@ -318,21 +425,67 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             onChange={(v) => updateOverdrive('dryWet', v)}
             label="Mix"
             size="sm"
-            color="#ff3333"
+            color="#ff9900"
           />
         </div>
 
-        {/* Overdrive Switch: 826, 273, 50, 18 */}
-        <div style={style(826, 273, 50, 30)} className="flex flex-col items-center">
-          <label className="text-[10px] text-gray-400 mb-1 font-bold">DRIVE</label>
+        {/* Overdrive Enable Toggle */}
+        <div style={style(826, 273, 50, 45)} className="flex flex-col items-center">
           <Toggle
-            label="Overdrive"
+            label=""
             value={(config.overdrive?.amount ?? 0) > 0}
             onChange={(v) => updateOverdrive('amount', v ? 50 : 0)}
+            color="#ff9900"
+            size="sm"
           />
+          <span className="text-[8px] font-bold text-orange-500 mt-1">BYPASS</span>
         </div>
-        {/* Overdrive LED: 856, 243, 15, 15 */}
-        <div style={style(856, 243, 15, 15)} className={clsx("rounded-full shadow-lg border border-gray-800 transition-colors duration-200", (config.overdrive?.amount ?? 0) > 0 ? "bg-red-500 shadow-red-500/50" : "bg-red-900")}></div>
+
+        {/* Overdrive LED */}
+        <div 
+          style={style(856, 243, 12, 12)} 
+          className={clsx(
+            "rounded-full border border-black/40 transition-all duration-300", 
+            (config.overdrive?.amount ?? 0) > 0
+              ? "bg-orange-500 shadow-[0_0_10px_#f97316]" 
+              : "bg-orange-950"
+          )}
+        ></div>
+
+        {/* Brand/Signature & Engine Selector */}
+        <div className="absolute top-4 left-6 flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="bg-accent-primary p-1 rounded">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            </div>
+            <div className="flex flex-col -space-y-1">
+              <span className="text-white font-black italic text-xl tracking-tighter">JC-303</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Open303 WASM Engine</span>
+            </div>
+          </div>
+
+          <div className="h-8 w-px bg-gray-800"></div>
+
+          <div className="flex flex-col">
+            <label className="text-[8px] font-bold text-gray-500 mb-1">ENGINE</label>
+            <select 
+              value={config.engineType || 'jc303'}
+              onChange={(e) => onChange({ engineType: e.target.value as any })}
+              className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors"
+            >
+              <option value="jc303">JC-303 (WASM)</option>
+              <option value="accurate">Open303 (JS)</option>
+              <option value="tonejs">Tone.js (Legacy)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Version info bottom right */}
+        <div className="absolute bottom-2 right-4 text-[8px] text-gray-600 font-mono">
+          V1.0.0-WASM
+        </div>
 
       </div>
     </div>

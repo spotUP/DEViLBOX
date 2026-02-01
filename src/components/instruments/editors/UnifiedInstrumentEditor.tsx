@@ -13,7 +13,7 @@
 import React, { useState, useCallback } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { 
-  DEFAULT_FURNACE, DEFAULT_TB303, DEFAULT_DUB_SIREN, DEFAULT_SYNARE,
+  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -109,11 +109,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
   // Handle TB303 config updates
   const handleTB303Change = useCallback((updates: Partial<typeof instrument.tb303>) => {
-    const currentTB303 = instrument.tb303 || DEFAULT_TB303;
     onChange({
-      tb303: { ...currentTB303, ...updates },
+      tb303: updates as any,
     });
-  }, [instrument.tb303, onChange]);
+  }, [onChange]);
 
   // Handle Dub Siren config updates
   const handleDubSirenChange = useCallback((updates: Partial<typeof instrument.dubSiren>) => {
@@ -241,7 +240,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             onChange={handleTB303Change}
             showFilterCurve={false}
             showHeader={false}
-            isJC303={instrument.tb303?.engineType === 'jc303'}
+            isJC303={true}
             volume={instrument.volume}
             onVolumeChange={(v) => onChange({ volume: v })}
           />
