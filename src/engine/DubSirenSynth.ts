@@ -6,6 +6,8 @@ export class DubSirenSynth {
   private filter: Tone.Filter;
   private reverb: Tone.Reverb;
   private delay: Tone.FeedbackDelay;
+  private distortion: Tone.Distortion;
+  private gate: Tone.Gain;
   private output: Tone.Volume;
   private signal: Tone.Signal<"frequency">;
   private lfo: Tone.LFO;
@@ -29,8 +31,15 @@ export class DubSirenSynth {
     this.filter = new Tone.Filter({
       frequency: config.filter.frequency,
       type: config.filter.type,
-      rolloff: config.filter.rolloff
+      rolloff: config.filter.rolloff,
+      Q: 1
     });
+
+    // Saturation for that "gritty" 555 timer sound
+    this.distortion = new Tone.Distortion(0.1);
+
+    // Gate for triggering
+    this.gate = new Tone.Gain(0);
 
     // Oscillator
     this.osc = new Tone.Oscillator({
@@ -65,8 +74,51 @@ export class DubSirenSynth {
     }
 
     // Audio Chain
-    // osc -> reverb -> delay -> filter -> output
-    this.osc.chain(this.reverb, this.delay, this.filter, this.output);
+    // Authentic Dub Path: Osc -> Gate -> Filter -> Distortion -> Delay -> Reverb -> Output
+    this.osc.connect(this.gate);
+    this.gate.connect(this.filter);
+    this.filter.connect(this.distortion);
+    this.distortion.connect(this.delay);
+    this.delay.connect(this.reverb);
+    this.reverb.connect(this.output);
+
+    // Start oscillator immediately (it's gated)
+    this.osc.start();
+  }
+
+  /**
+   * Apply a full configuration to the synth
+   */
+  applyConfig(config: DubSirenConfig) {
+    console.log('[DubSirenSynth] Applying config:', config);
+    this.osc.type = config.oscillator.type;
+    this.setFrequency(config.oscillator.frequency);
+    
+    this.lfo.type = config.lfo.type;
+    this.setLFORate(config.lfo.rate);
+    this.setLFODepth(config.lfo.depth);
+    
+    // Toggle LFO connection
+    if (config.lfo.enabled) {
+      if (this.lfo.state !== 'started') {
+        this.lfo.start();
+        this.lfo.connect(this.osc.frequency);
+      }
+    } else {
+      this.lfo.stop();
+      this.lfo.disconnect();
+    }
+
+    this.setDelayTime(config.delay.time);
+    this.setDelayFeedback(config.delay.feedback);
+    this.setDelayMix(config.delay.enabled ? config.delay.wet : 0);
+
+    this.setFilterFreq(config.filter.frequency);
+    this.filter.type = config.filter.type;
+    this.filter.rolloff = config.filter.rolloff;
+
+    this.reverb.decay = config.reverb.decay;
+    this.reverb.wet.rampTo(config.reverb.enabled ? config.reverb.wet : 0, 0.1);
   }
 
   /**
@@ -75,7 +127,7 @@ export class DubSirenSynth {
    * @param time Scheduling time
    * @param velocity Volume/Velocity
    */
-  triggerAttack(note?: string | number, time?: number, velocity?: number) {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number) {
     const t = time || Tone.now();
     
     if (note) {
@@ -83,13 +135,9 @@ export class DubSirenSynth {
       this.signal.setValueAtTime(freq, t);
     }
 
-    if (velocity !== undefined) {
-      // Scale volume? 
-      // Current implementation uses output volume for master level.
-      // Velocity could modulate amplitude but siren is usually on/off.
-    }
-
-    this.osc.start(t);
+    // Open gate instantly (button press)
+    this.gate.gain.cancelScheduledValues(t);
+    this.gate.gain.setValueAtTime(1, t);
   }
 
   /**
@@ -97,7 +145,9 @@ export class DubSirenSynth {
    */
   triggerRelease(time?: number) {
     const t = time || Tone.now();
-    this.osc.stop(t);
+    // Close gate instantly (button release)
+    this.gate.gain.cancelScheduledValues(t);
+    this.gate.gain.setValueAtTime(0, t);
   }
 
   // Parameter Setters
@@ -150,7 +200,9 @@ export class DubSirenSynth {
 
   dispose() {
     this.osc.dispose();
+    this.gate.dispose();
     this.filter.dispose();
+    this.distortion.dispose();
     this.reverb.dispose();
     this.delay.dispose();
     this.output.dispose();
