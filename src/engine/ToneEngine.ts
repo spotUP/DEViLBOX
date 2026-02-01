@@ -282,7 +282,8 @@ export class ToneEngine {
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running (Tone.start() may return before state changes)
-    const ctx = Tone.getContext().rawContext;
+    const toneCtx = Tone.getContext();
+    const ctx = ((toneCtx as any).rawContext || toneCtx) as AudioContext;
     if (ctx.state !== 'running') {
       await new Promise<void>((resolve) => {
         const checkState = () => {
