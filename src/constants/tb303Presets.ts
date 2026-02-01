@@ -32,16 +32,7 @@ export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
         dryWet: 100,
       },
     },
-    effects: [
-      {
-        id: 'delay-dt303',
-        category: 'tonejs',
-        type: 'PingPongDelay',
-        enabled: true,
-        wet: 45,
-        parameters: { delayTime: 0.217, feedback: 0.45 },
-      },
-    ],
+    effects: [],
     volume: -8,
     pan: 0,
   },
