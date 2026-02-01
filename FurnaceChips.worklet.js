@@ -119,8 +119,12 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
         console.log('[FurnaceWorklet] HEAPF32 already available on module');
       }
 
-      this.furnaceModule._furnace_init_chips(sampleRate);
-      console.log('[FurnaceWorklet] Chips initialized at', sampleRate, 'Hz');
+      // Log and validate sampleRate before using
+      const safeSampleRate = (typeof sampleRate === 'number' && sampleRate > 0) ? sampleRate : 48000;
+      console.log('[FurnaceWorklet] sampleRate:', sampleRate, 'using:', safeSampleRate, 'type:', typeof sampleRate);
+
+      this.furnaceModule._furnace_init_chips(safeSampleRate);
+      console.log('[FurnaceWorklet] Chips initialized at', safeSampleRate, 'Hz');
 
       this.leftBufferPtr = this.furnaceModule._malloc(128 * 4);
       this.rightBufferPtr = this.furnaceModule._malloc(128 * 4);
@@ -202,13 +206,13 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       });
     }
 
-    // Log every 1000 process calls to show we're still running
-    if (this._processCount % 1000 === 0) {
+    // Log every 1000 process calls to show we're still running (only if chips active)
+    if (this._processCount % 1000 === 0 && this.activeChips && this.activeChips.size > 0) {
       this.port.postMessage({
         type: 'debug',
         message: 'heartbeat',
         processCount: this._processCount,
-        activeChipsSize: this.activeChips ? this.activeChips.size : -1,
+        activeChipsSize: this.activeChips.size,
         isInitialized: this.isInitialized
       });
     }
