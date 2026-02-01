@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { MAMEEngine } from './MAMEEngine';
+import { getNativeContext } from '@utils/audio-context';
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -97,7 +98,7 @@ export class MAMESynth extends Tone.ToneAudioNode {
     const bufferSize = 128;
     
     // Check if createScriptProcessor is available (it's deprecated but still needed)
-    const rawContext = context.rawContext as any;
+    const rawContext = getNativeContext(context);
     if (!rawContext.createScriptProcessor) {
       console.warn('[MAMESynth] ScriptProcessorNode not available, audio rendering disabled');
       return;
@@ -219,26 +220,8 @@ export class MAMESynth extends Tone.ToneAudioNode {
     } else if (this.config.type === 'swp30') {
       // Yamaha SWP30 (AWM2) - 64 registers per channel
       const chan_base = vIdx << 6;
-      
-      // Stop/Reset channel?
-      // Actually AWM2 uses a more complex register map. 
-      // slot 0x00: Filter 1 mode/cutoff
-      // slot 0x03: Level 2
-      // slot 0x06: Attack
-      // slot 0x07: Decay 1
-      // slot 0x08: Decay 2
-      // slot 0x09: Release
-      
-      // For now, just set pitch and trigger. 
-      // Pitch is in slot 0x0a/0x0b? No, let's check swp30.cpp
-      // Pitch base seems to be at 0x0a/0x0b relative to channel.
-      
       const pitch = Math.floor((freq * 1024) / 44100); // Very rough guess
       this.engine.write16(this.handle, chan_base | 0x0a, pitch);
-      
-      // Trigger via some register (maybe keyon mask)
-      // swp30.cpp has a keyon_mask_w at 0x2000+
-      // Actually let's use snd_w via MAMEChips direct call if possible.
     }
 
     return this;
@@ -264,8 +247,6 @@ export class MAMESynth extends Tone.ToneAudioNode {
         // Ramp envelope down
         this.engine.write(this.handle, mem_offset + 5, 0xFF); // Max speed ramp down (bit 7 set)
       }
-    } else if (this.config.type === 'swp30') {
-      // Yamaha SWP30 Release
     }
     
     return this;

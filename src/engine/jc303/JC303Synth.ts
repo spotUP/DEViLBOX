@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
 
 export class JC303Synth extends Tone.ToneAudioNode {
   readonly name = 'JC303Synth';
@@ -18,10 +19,11 @@ export class JC303Synth extends Tone.ToneAudioNode {
   // Compatibility properties
   public config: any = {};
   public audioContext: AudioContext;
+  private _disposed: boolean = false;
 
   constructor() {
     super();
-    this.audioContext = ((this.context as any).rawContext || this.context) as AudioContext;
+    this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
     
     // Overdrive setup
@@ -39,8 +41,9 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      const context = ((this.context as any).rawContext || this.context) as AudioContext;
+      const context = getNativeContext(this.context);
       await JC303Synth.ensureInitialized(context);
+      if (this._disposed) return;
       this.createNode();
     } catch (err) {
       console.error('[JC303] Initialization failed:', err);
@@ -59,7 +62,11 @@ export class JC303Synth extends Tone.ToneAudioNode {
       }
 
       if (!this.isWorkletLoaded) {
-        await context.audioWorklet.addModule('JC303.worklet.js');
+        try {
+          await context.audioWorklet.addModule('JC303.worklet.js');
+        } catch (e) {
+          // Module might already be added
+        }
         this.isWorkletLoaded = true;
       }
     })();
@@ -68,11 +75,11 @@ export class JC303Synth extends Tone.ToneAudioNode {
   }
 
   private createNode(): void {
-    if (!JC303Synth.wasmBinary) return;
+    if (!JC303Synth.wasmBinary || this._disposed) return;
 
-    const context = ((this.context as any).rawContext || this.context) as AudioContext;
+    const context = getNativeContext(this.context);
     
-    this.workletNode = new AudioWorkletNode(context, 'jc303-processor', {
+    this.workletNode = createAudioWorkletNode(context, 'jc303-processor', {
       outputChannelCount: [2],
       processorOptions: {
         sampleRate: context.sampleRate
@@ -95,7 +102,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
   }
 
   triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
-    if (!this.workletNode) return;
+    if (!this.workletNode || this._disposed) return;
     
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : Math.round(12 * Math.log2(note / 440) + 69);
     
@@ -108,7 +115,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
   }
 
   triggerRelease(_time?: number): void {
-    if (!this.workletNode) return;
+    if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
       note: 0 
@@ -120,16 +127,19 @@ export class JC303Synth extends Tone.ToneAudioNode {
   }
 
   triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number): void {
+    if (this._disposed) return;
     this.triggerAttack(note, time, velocity);
     
     const d = Tone.Time(duration).toSeconds();
     setTimeout(() => {
-        this.triggerRelease();
+        if (!this._disposed) {
+            this.triggerRelease();
+        }
     }, d * 1000);
   }
 
   setParam(param: string, value: number): void {
-    if (!this.workletNode) return;
+    if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'param',
       param,
@@ -154,7 +164,6 @@ export class JC303Synth extends Tone.ToneAudioNode {
     this.setParam('waveform', val); 
   }
   
-  // Tuning expects cents (from ToneEngine automation), but Open303 expects Hz
   setTuning(cents: number): void { 
     const hz = 440 * Math.pow(2, cents / 1200);
     this.setParam('tuning', hz); 
@@ -163,9 +172,9 @@ export class JC303Synth extends Tone.ToneAudioNode {
   setSlideTime(ms: number): void { this.setParam('slide_time', ms); }
 
   setOverdrive(amount: number): void {
+    if (this._disposed) return;
     this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
     
-    // Update waveshaper curve
     const curve = new Float32Array(4096);
     const drive = 1 + this.overdriveAmount * 8;
     for (let i = 0; i < 4096; i++) {
@@ -173,25 +182,18 @@ export class JC303Synth extends Tone.ToneAudioNode {
         curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
     }
     this.overdrive.curve = curve;
-
-    // Boost input gain
     this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, 0.03);
   }
 
   setVolume(volumeDb: number): void {
-    // Open303 setVolume uses dB, but my wrapper passes it directly
-    // Also update output gain
-    // this.setParam('volume', volumeDb); // Open303 volume
-    // But let's use Tone.js gain for consistency
+    if (this._disposed) return;
     this.output.gain.value = Tone.dbToGain(volumeDb);
   }
 
-  // GuitarML stubs
   async loadGuitarMLModel(_index: number): Promise<void> {}
   async setGuitarMLEnabled(_enabled: boolean): Promise<void> {}
   setGuitarMLMix(_mix: number): void {}
 
-  // Stubs for Devil Fish compatibility (JC303 doesn't support them yet)
   enableDevilFish(_enabled: boolean, _config?: any): void {}
   setNormalDecay(_decayMs: number): void {}
   setAccentDecay(_decayMs: number): void {}
@@ -203,18 +205,20 @@ export class JC303Synth extends Tone.ToneAudioNode {
   setSweepSpeed(_mode: string): void {}
   setAccentSweepEnabled(_enabled: boolean): void {}
   setHighResonance(_enabled: boolean): void {}
+  setHighResonanceEnabled(_enabled: boolean): void { this.setHighResonance(_enabled); }
   setMuffler(_mode: string): void {}
   
-  // Quality stub
   setQuality(_quality: string): void {}
 
   dispose(): this {
+    this._disposed = true;
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
     this.overdriveGain.dispose();
     this.overdrive.dispose();
+    this.output.dispose();
     super.dispose();
     return this;
   }

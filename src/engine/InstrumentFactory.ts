@@ -1203,15 +1203,15 @@ export class InstrumentFactory {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
-    // Choose engine based on engineType (default: accurate - uses Open303 AudioWorklet)
-    const engineType = config.tb303.engineType || 'accurate';
+    // Choose engine based on engineType (default: jc303 - WASM engine)
+    const engineType = config.tb303.engineType || 'jc303';
 
     if (engineType === 'jc303') {
       return this.createJC303(config.tb303, config.volume);
     }
 
     if (engineType === 'accurate') {
-      // Use Open303-based accurate engine
+      // Use Open303-based accurate engine (JS-based worklet)
       const synth = new TB303AccurateSynth(config.tb303);
       synth.setVolume(config.volume || -12);
       return synth;

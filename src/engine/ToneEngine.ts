@@ -18,6 +18,7 @@ import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
 import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
 
 interface VoiceState {
   instrument: any;
@@ -281,9 +282,8 @@ export class ToneEngine {
     this.setAudioLatency(initialLatency);
     Tone.getTransport().bpm.value = 125; // Default BPM
 
-    // Wait for context to actually be running (Tone.start() may return before state changes)
-    const toneCtx = Tone.getContext();
-    const ctx = ((toneCtx as any).rawContext || toneCtx) as AudioContext;
+    // Wait for context to actually be running
+    const ctx = getNativeContext(Tone.getContext());
     if (ctx.state !== 'running') {
       await new Promise<void>((resolve) => {
         const checkState = () => {
@@ -330,7 +330,7 @@ export class ToneEngine {
         
         const binary = await fetchDSP();
         if (binary) {
-          const tempNode = new AudioWorkletNode(ctx, 'tb303-processor');
+          const tempNode = createAudioWorkletNode(ctx, 'tb303-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
@@ -349,7 +349,7 @@ export class ToneEngine {
         
         const binary = await fetchDSP();
         if (binary) {
-          const tempNode = new AudioWorkletNode(ctx, 'it-filter-processor');
+          const tempNode = createAudioWorkletNode(ctx, 'it-filter-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
@@ -2528,10 +2528,17 @@ export class ToneEngine {
   private disposeInstrumentByKey(key: string): void {
     const instrument = this.instruments.get(key);
     if (instrument) {
+      // Remove from maps IMMEDIATELY so future triggers don't find it
+      this.instruments.delete(key);
+      this.instrumentSynthTypes.delete(key);
+      this.instrumentLoadingPromises.delete(key);
+
       // Release all notes on this synth before disposal
       try {
-        if (instrument.releaseAll) instrument.releaseAll();
-        else if (instrument.triggerRelease) instrument.triggerRelease();
+        if (!instrument.disposed) {
+          if (instrument.releaseAll) instrument.releaseAll();
+          else if (instrument.triggerRelease) instrument.triggerRelease();
+        }
       } catch (e) {
         // Ignore release errors
       }
@@ -2541,13 +2548,12 @@ export class ToneEngine {
 
       // Dispose the synth itself
       try {
-        instrument.dispose();
+        if (!instrument.disposed) {
+          instrument.dispose();
+        }
       } catch (e) {
         // Already disposed
       }
-      this.instruments.delete(key);
-      this.instrumentSynthTypes.delete(key);
-      this.instrumentLoadingPromises.delete(key);
     }
   }
 
@@ -3511,7 +3517,7 @@ export class ToneEngine {
     const isIT = config.metadata?.importedFrom === 'IT';
     
     if (isIT && ToneEngine.itFilterWorkletLoaded) {
-      filter = new AudioWorkletNode(Tone.getContext().rawContext, 'it-filter-processor');
+      filter = createAudioWorkletNode(Tone.getContext(), 'it-filter-processor');
     } else {
       filter = new Tone.Filter({
         type: 'lowpass',
