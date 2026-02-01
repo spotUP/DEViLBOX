@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-31T18:56:34.327Z
+ * Generated: 2026-01-31T22:48:19.373Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '179';
-export const BUILD_HASH = '97feb56';
+export const BUILD_NUMBER = '183';
+export const BUILD_HASH = '5502f1f';
 export const BUILD_DATE = '2026-01-31';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
@@ -31,6 +31,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-01-31',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add new utility libraries for audio parsing and MIDI knob banks'
+      },
+      {
+        type: 'improvement',
+        description: 'Enhance UI components, update project configurations, and generate changelog'
+      },
+      {
+        type: 'feature',
+        description: 'Introduce MAME, Dub Siren, and Synare instruments with WASM modules'
+      },
+      {
+        type: 'feature',
+        description: 'Implement core engine enhancements and assembly updates'
+      },
       {
         type: 'feature',
         description: 'Add Dub Siren synth'
@@ -220,28 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add visualization components for instrument editors'
-      },
-      {
-        type: 'feature',
-        description: 'Add Buzzmachines WASM effect plugins'
-      },
-      {
-        type: 'improvement',
-        description: 'Reorganize instrument components into subdirectories'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Furnace chip emulators: 8 broken chips, ESFM, minor issues'
-      }
-    ]
-  },
-  {
-    version: '1.0.1-2',
-    date: '2026-01-28',
-    changes: [
-      {
-        type: 'fix',
-        description: 'Fix Furnace instrument parsing and register mapping'
       }
     ]
   }

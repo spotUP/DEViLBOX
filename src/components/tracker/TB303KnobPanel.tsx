@@ -15,6 +15,7 @@ import { Switch3Way } from '@components/controls/Switch3Way';
 import { useInstrumentStore, useTrackerStore, useTransportStore, useAutomationStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useMIDIStore } from '@stores/useMIDIStore';
+import { useNKSInstrumentSync } from '@hooks/useNKSIntegration';
 import { getToneEngine } from '@engine/ToneEngine';
 import { TB303Synth } from '@engine/TB303Engine';
 import { TB303AccurateSynth } from '@engine/TB303AccurateSynth';
@@ -138,6 +139,13 @@ const TB303KnobPanelComponent: React.FC = () => {
   );
   // MIDI store for CC handlers, synth selection, and output to external hardware
   const { registerCCHandler, unregisterCCHandler, controlledInstrumentId, setControlledInstrument, sendCC } = useMIDIStore();
+
+  // NKS Hardware Integration - sync with Komplete Kontrol devices
+  // Only sync the controlled instrument (or first TB303 if none selected)
+  const nksTargetInstrument = controlledInstrumentId 
+    ? instruments.find(i => i.id === controlledInstrumentId)
+    : instruments.find(i => i.type === 'synth');
+  useNKSInstrumentSync(nksTargetInstrument?.id ? String(nksTargetInstrument.id) : '');
 
   const [params, setParams] = useState<TB303Params>(DEFAULT_PARAMS);
   // Keep a ref to always have the latest params (avoids stale closure issues)

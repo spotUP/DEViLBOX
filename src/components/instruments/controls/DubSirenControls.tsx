@@ -49,6 +49,10 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   };
 
   const updateDelay = (updates: Partial<typeof config.delay>) => {
+    // Clamp time to valid range [0, 1] to prevent Tone.js warnings
+    if (updates.time !== undefined) {
+      updates.time = Math.max(0, Math.min(1, updates.time));
+    }
     onChange({ delay: { ...config.delay, ...updates } });
   };
 
