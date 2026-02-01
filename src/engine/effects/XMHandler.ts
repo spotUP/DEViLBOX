@@ -14,9 +14,8 @@ import {
   periodToFrequency,
   xmLinearPeriodToFrequency,
   noteStringToXMLinearPeriod,
+  periodToNoteString,
 } from './PeriodTables';
-
-declare var require: any;
 
 // XM Effect constants (same as MOD, plus extensions)
 const XM_EFFECTS = {
@@ -191,7 +190,6 @@ export class XMHandler extends BaseFormatHandler {
       // If no note is present, re-calculate period if finetune changed
       if (!note || note === '...' || note === '---') {
         if (state.period > 0 && oldFinetune !== defaultFinetune) {
-          const { periodToNoteString } = require('./PeriodTables');
           // Use format-aware conversion to maintain correct octave mapping
           const noteStr = periodToNoteString(state.period, oldFinetune, this.format);
           // Use instance method to respect format-specific period calculation
@@ -815,3 +813,5 @@ export class XMHandler extends BaseFormatHandler {
     }
   }
 }
+
+export {};

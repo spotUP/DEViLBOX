@@ -32,7 +32,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
-import { renderSpecialParameters } from './VisualSynthEditorContent';
+import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
 // Types
 type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'synare' | 'mame';
@@ -452,7 +452,6 @@ const GenericTabContent: React.FC<GenericTabContentProps> = ({
 }) => {
   // We import the tab content rendering from a separate module
   // to avoid duplicating ~700 lines of tab content code
-  const { renderGenericTabContent } = require('./VisualSynthEditorContent');
   return renderGenericTabContent(instrument, onChange, activeTab);
 };
 

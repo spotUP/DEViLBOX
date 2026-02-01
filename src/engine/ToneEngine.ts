@@ -957,8 +957,9 @@ export class ToneEngine {
             if (hasLoop || usePeriodPlayback) {
               instrument = new Tone.Player({
                 loop: hasLoop,
-                loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
-                loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
+                // Don't set loop points yet - wait for buffer to load
+                loopStart: 0,
+                loopEnd: 0,
                 volume: config.volume || 0,
               });
               // Store as 'Player' type for proper handling in other methods
@@ -971,9 +972,18 @@ export class ToneEngine {
                 try {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   playerRef.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+                  
+                  // CRITICAL: Set loop points AFTER buffer is loaded
+                  // Convert from sample units to seconds at the ORIGINAL sample rate
+                  if (hasLoop) {
+                    const originalSampleRate = config.sample?.sampleRate || 8363;
+                    playerRef.loopStart = loopStart / originalSampleRate;
+                    playerRef.loopEnd = loopEnd / originalSampleRate;
+                  }
+                  
                   // Store decoded buffer for TrackerReplayer
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
-                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
+                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer with loop: ${loopStart}-${loopEnd} samples`);
                 } catch (err) {
                   console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
                 }
@@ -1016,10 +1026,18 @@ export class ToneEngine {
             const playerRef = new Tone.Player({
               url: sampleUrl,
               loop: hasLoop,
-              loopStart: hasLoop ? loopStart / (config.sample?.sampleRate || 8363) : 0,
-              loopEnd: hasLoop ? loopEnd / (config.sample?.sampleRate || 8363) : 0,
+              loopStart: 0,  // Set after load
+              loopEnd: 0,    // Set after load
               volume: config.volume || 0, // Use unity gain - volume controlled via velocity
               onload: () => {
+                // Set loop points AFTER buffer is loaded
+                if (hasLoop) {
+                  const originalSampleRate = config.sample?.sampleRate || 8363;
+                  playerRef.loopStart = loopStart / originalSampleRate;
+                  playerRef.loopEnd = loopEnd / originalSampleRate;
+                  console.log(`[ToneEngine] Player ${instrumentId} set loop: ${playerRef.loopStart}s - ${playerRef.loopEnd}s`);
+                }
+                
                 // Store decoded buffer for TrackerReplayer
                 const audioBuffer = playerRef.buffer.get();
                 if (audioBuffer) {
@@ -1867,6 +1885,8 @@ export class ToneEngine {
         config.synthType === 'MetalSynth' ||
         config.synthType === 'MembraneSynth' ||
         config.synthType === 'TB303' ||
+        config.synthType === 'DubSiren' ||
+        config.synthType === 'Synare' ||
         config.synthType === 'Furnace' ||
         // Buzzmachine generators (monophonic, no note parameter)
         config.synthType === 'BuzzKick' ||

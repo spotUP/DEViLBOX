@@ -57,8 +57,8 @@ export class DubSirenSynth {
     this.lfo = new Tone.LFO({
       type: config.lfo.type,
       frequency: config.lfo.rate,
-      amplitude: config.lfo.depth,
-      min: -config.lfo.depth, // Symmetric modulation
+      amplitude: 1, // Always 1, we control range via min/max
+      min: -config.lfo.depth, // Depth in Hz for frequency modulation
       max: config.lfo.depth
     });
 
@@ -168,13 +168,15 @@ export class DubSirenSynth {
   }
 
   setLFODepth(depth: number) {
-    this.lfo.amplitude.rampTo(depth, 0.1);
+    // Depth is in Hz for frequency modulation, min/max control the range
     this.lfo.min = -depth;
     this.lfo.max = depth;
   }
 
   setDelayTime(time: number) {
-    this.delay.delayTime.rampTo(time, 0.1);
+    // Clamp delay time to valid range [0, 1] to prevent console warnings
+    const clampedTime = Math.max(0, Math.min(1, time));
+    this.delay.delayTime.rampTo(clampedTime, 0.1);
   }
 
   setDelayFeedback(feedback: number) {

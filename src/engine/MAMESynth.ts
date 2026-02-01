@@ -96,10 +96,17 @@ export class MAMESynth extends Tone.ToneAudioNode {
     const context = Tone.getContext();
     const bufferSize = 128;
     
-    // Create a ScriptProcessorNode (deprecated but easiest for this hack)
-    const processor = context.rawContext.createScriptProcessor(bufferSize, 0, 2);
+    // Check if createScriptProcessor is available (it's deprecated but still needed)
+    const rawContext = context.rawContext as any;
+    if (!rawContext.createScriptProcessor) {
+      console.warn('[MAMESynth] ScriptProcessorNode not available, audio rendering disabled');
+      return;
+    }
     
-    processor.onaudioprocess = (e) => {
+    // Create a ScriptProcessorNode (deprecated but easiest for this hack)
+    const processor = rawContext.createScriptProcessor(bufferSize, 0, 2);
+    
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
       if (!this.isInitialized || this.handle === 0) return;
       
       const outL = e.outputBuffer.getChannelData(0);
