@@ -1481,9 +1481,15 @@ export class TB303Synth {
   /**
    * Set oscillator waveform
    */
-  public setWaveform(type: 'sawtooth' | 'square'): void {
-    this.config.oscillator.type = type;
-    this.oscillator.type = type;
+  public setWaveform(type: 'sawtooth' | 'square' | number): void {
+    if (typeof type === 'number') {
+      // Map 0-1 blend to discrete types
+      this.config.oscillator.type = type >= 0.5 ? 'square' : 'sawtooth';
+      this.oscillator.type = this.config.oscillator.type;
+    } else {
+      this.config.oscillator.type = type;
+      this.oscillator.type = type;
+    }
   }
 
   /**

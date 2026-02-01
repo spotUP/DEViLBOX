@@ -225,7 +225,7 @@ export interface DevilFishConfig {
 
 export interface TB303Config {
   // Engine selection - 'accurate' uses Open303 AudioWorklet for authentic TB-303 sound
-  engineType?: 'tonejs' | 'accurate'; // Default: 'accurate'
+  engineType?: 'tonejs' | 'accurate' | 'jc303'; // Default: 'accurate'
 
   // Tuning
   tuning?: number; // Master tuning in Hz (default: 440)
@@ -2243,6 +2243,7 @@ export const DEFAULT_FILTER: FilterConfig = {
 };
 
 export const DEFAULT_TB303: TB303Config = {
+  engineType: 'jc303',
   oscillator: {
     type: 'sawtooth',
   },

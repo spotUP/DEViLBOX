@@ -241,6 +241,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             onChange={handleTB303Change}
             showFilterCurve={false}
             showHeader={false}
+            isJC303={instrument.tb303?.engineType === 'jc303'}
+            volume={instrument.volume}
+            onVolumeChange={(v) => onChange({ volume: v })}
           />
         </div>
       </div>

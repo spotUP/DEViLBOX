@@ -151,8 +151,13 @@ export class TB303AccurateSynth {
     this.engine.setParameter('slideTime', time);
   }
 
-  setWaveform(type: 'sawtooth' | 'square') {
-    const value = type === 'sawtooth' ? 0 : 1;
+  setWaveform(type: 'sawtooth' | 'square' | number) {
+    let value = 0;
+    if (typeof type === 'number') {
+      value = type;
+    } else {
+      value = type === 'sawtooth' ? 0 : 1;
+    }
     this.engine.setParameter('waveform', value);
   }
 
