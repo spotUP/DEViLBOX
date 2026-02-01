@@ -2691,6 +2691,9 @@ export class ToneEngine {
     synths.forEach((synth) => {
 
     // Update core TB303 parameters
+    if (tb303Config.tuning !== undefined && (synth instanceof JC303Synth)) {
+      synth.setTuning(tb303Config.tuning);
+    }
     if (tb303Config.filter) {
       synth.setCutoff(tb303Config.filter.cutoff);
       synth.setResonance(tb303Config.filter.resonance);
