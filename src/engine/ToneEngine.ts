@@ -951,9 +951,8 @@ export class ToneEngine {
 
           if (bufferToUse) {
             const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
-            const isSingleSample = !config.sample?.multiMap;
 
-            if (hasLoop || usePeriodPlayback || isSingleSample) {
+            if (usePeriodPlayback || hasLoop) {
               instrument = new Tone.Player({
                 loop: hasLoop,
                 volume: config.volume || 0,
@@ -980,12 +979,12 @@ export class ToneEngine {
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
             } else {
-              // Only use Tone.Sampler for multi-map/pro-baked instruments
+              // Standard style: Use Tone.Sampler for polyphonic keyboard/MIDI play
               instrument = new Tone.Sampler({
                 volume: config.volume || -12,
               });
+              this.instrumentSynthTypes.set(key, 'Sampler');
 
-              // Load the stored buffer asynchronously and track the promise
               const bufferForDecode = bufferToUse;
               const samplerRef = instrument as Tone.Sampler;
               const loadPromise = (async () => {
@@ -993,9 +992,7 @@ export class ToneEngine {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
                   samplerRef.add(baseNote as Tone.Unit.Note, toneBuffer);
-                  // Store decoded buffer for TrackerReplayer
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
-                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer`);
                 } catch (err) {
                   console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
                 }
@@ -1008,9 +1005,8 @@ export class ToneEngine {
         // If no instrument created from stored buffer, try URL
         if (!instrument && sampleUrl) {
           const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
-          const isSingleSample = !config.sample?.multiMap;
 
-          if (hasLoop || usePeriodPlayback || isSingleSample) {
+          if (usePeriodPlayback || hasLoop) {
             const playerRef = new Tone.Player({
               url: sampleUrl,
               loop: hasLoop,
@@ -1034,11 +1030,10 @@ export class ToneEngine {
             instrument = playerRef;
             this.instrumentSynthTypes.set(key, 'Player');
           } else {
-            // Only use Tone.Sampler for multi-map
+            // Use multi-map if available, otherwise single sample
             const urls = config.sample?.multiMap || {};
             if (!config.sample?.multiMap) {
-              const baseNote = config.sample?.baseNote || 'C4';
-              (urls as any)[baseNote] = sampleUrl;
+              urls[baseNote] = sampleUrl;
             }
 
             instrument = new Tone.Sampler({
@@ -1048,6 +1043,7 @@ export class ToneEngine {
                 console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
               },
             });
+            this.instrumentSynthTypes.set(key, 'Sampler');
           }
         }
 
