@@ -35,8 +35,10 @@ export const useSamplePackStore = create<SamplePackStore>()(
 
     // Actions
     uploadZip: async (file: File) => {
+      console.log(`[SamplePackStore] uploadZip starting: ${file.name}`);
       try {
         const pack = await loadSamplePackFromZip(file);
+        console.log(`[SamplePackStore] ZIP loaded, adding pack: ${pack.name} (${pack.sampleCount} samples)`);
         set((state) => {
           state.userPacks.push(pack);
         });
@@ -48,8 +50,10 @@ export const useSamplePackStore = create<SamplePackStore>()(
     },
 
     uploadDirectory: async (files: FileList) => {
+      console.log(`[SamplePackStore] uploadDirectory starting: ${files.length} files`);
       try {
         const pack = await loadSamplePackFromDirectory(files);
+        console.log(`[SamplePackStore] Directory loaded, adding pack: ${pack.name} (${pack.sampleCount} samples)`);
         set((state) => {
           state.userPacks.push(pack);
         });
