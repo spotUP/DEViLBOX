@@ -112,8 +112,16 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = Math.max(200, length * 6);
+    const logicalHeight = height;
+    
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = logicalWidth;
+    const h = logicalHeight;
 
     // Clear
     ctx.fillStyle = '#1a1a2e';

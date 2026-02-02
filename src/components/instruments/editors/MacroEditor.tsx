@@ -92,8 +92,13 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasWidth * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = canvasWidth;
+    const h = height;
     const range = maxValue - minValue;
 
     // Clear

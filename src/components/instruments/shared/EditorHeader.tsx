@@ -236,7 +236,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 title="Switch synth type"
               >
                 {SYNTH_CATEGORIES
-                  .filter((cat) => cat.id !== 'all-furnace')
                   .map((category) => (
                     <optgroup key={category.id} label={category.name}>
                       {category.synths

@@ -11,9 +11,21 @@ import {
   BuzzmachineType,
   BUZZMACHINE_INFO,
   type BuzzmachineParameter,
-  type BuzzmachineInfo,
 } from '@engine/buzzmachines/BuzzmachineEngine';
 import { BUZZMACHINE_PRESETS, getBuzzmachinePresetNames } from '@constants/buzzmachinePresets';
+import { Knob } from '@components/controls/Knob';
+
+/**
+ * Section header component for consistency
+ */
+function SectionHeader({ color, title }: { color: string; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className={`w-1 h-4 rounded-full`} style={{ backgroundColor: color }} />
+      <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+    </div>
+  );
+}
 
 interface BuzzmachineEditorProps {
   config: InstrumentConfig;
@@ -30,33 +42,6 @@ function getMachineTypeFromString(typeStr: string): BuzzmachineType {
   return found || BuzzmachineType.ARGURU_DISTORTION;
 }
 
-/**
- * Get category label for machine type
- */
-function getMachineCategory(info: BuzzmachineInfo): string {
-  if (info.type === 'generator') return 'Generator';
-  if (info.type === 'master') return 'Master';
-
-  // Categorize effects by name patterns
-  const name = info.name.toLowerCase();
-  if (name.includes('distort') || name.includes('sat') || name.includes('overdrive')) {
-    return 'Distortion';
-  }
-  if (name.includes('filter') || name.includes('svf') || name.includes('notch') || name.includes('philta')) {
-    return 'Filter';
-  }
-  if (name.includes('delay') || name.includes('reverb') || name.includes('freeverb')) {
-    return 'Delay/Reverb';
-  }
-  if (name.includes('chorus') || name.includes('shift')) {
-    return 'Modulation';
-  }
-  if (name.includes('compress') || name.includes('limit') || name.includes('exciter') || name.includes('master') || name.includes('gain')) {
-    return 'Dynamics';
-  }
-  return 'Effect';
-}
-
 export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
   config,
   onChange,
@@ -65,7 +50,6 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
   const machineTypeStr = config.buzzmachine?.machineType || BuzzmachineType.ARGURU_DISTORTION;
   const machineType = getMachineTypeFromString(machineTypeStr);
   const machineInfo = BUZZMACHINE_INFO[machineType];
-  const category = getMachineCategory(machineInfo);
 
   // Get current parameter values
   const parameters = config.buzzmachine?.parameters || {};
@@ -185,39 +169,14 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Machine Info */}
-      <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold text-white">
-            {machineInfo.name}
-          </h3>
-          <span className={`
-            px-2 py-0.5 rounded text-xs font-medium
-            ${machineInfo.type === 'generator'
-              ? 'bg-green-600/30 text-green-300'
-              : machineInfo.type === 'master'
-                ? 'bg-purple-600/30 text-purple-300'
-                : 'bg-blue-600/30 text-blue-300'}
-          `}>
-            {category}
-          </span>
-        </div>
-        <p className="text-sm text-zinc-400">
-          by {machineInfo.author}
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Preset Selector (if available) */}
       {hasPresets && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
-            Presets
-          </h4>
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <SectionHeader color="#06b6d4" title="Presets" />
           <select
             onChange={(e) => handlePresetChange(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-sm text-white
-              focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
           >
             <option value="">Select preset...</option>
             {presetNames.map((name) => (
@@ -226,102 +185,70 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
               </option>
             ))}
           </select>
-        </div>
+        </section>
       )}
 
       {/* Parameters */}
-      {machineInfo.parameters.length > 0 ? (
-        <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
-            Parameters
-          </h4>
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#8b5cf6" title={`${machineInfo.name} Parameters`} />
+        
+        {machineInfo.parameters.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {machineInfo.parameters.map((param) => {
+              const currentValue = parameters[param.index] ?? param.defaultValue;
+              const isSwitch = param.type === 'byte' && param.maxValue === 1;
 
-          {machineInfo.parameters.map((param) => {
-            const currentValue = parameters[param.index] ?? param.defaultValue;
-            const isSwitch = param.type === 'byte' && param.maxValue === 1;
-
-            return (
-              <div key={param.index} className="space-y-2">
-                {/* Parameter Label */}
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-zinc-200">
-                    {param.name}
-                  </label>
-                  <span className="text-sm font-mono text-zinc-400">
-                    {formatValue(param, currentValue)}
-                  </span>
-                </div>
-
-                {/* Parameter Control */}
-                {isSwitch ? (
-                  // Switch/Toggle for byte parameters with max=1
-                  <button
-                    onClick={() => handleParameterChange(param.index, currentValue === 0 ? 1 : 0)}
-                    className={`
-                      w-full py-2 px-4 rounded-md font-medium transition-colors
-                      ${currentValue === 1
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-                      }
-                    `}
-                  >
-                    {currentValue === 1 ? 'ON' : 'OFF'}
-                  </button>
-                ) : (
-                  // Slider for numeric parameters
-                  <div className="relative">
-                    <input
-                      type="range"
-                      min={param.minValue}
-                      max={param.maxValue}
-                      value={currentValue}
-                      onChange={(e) => handleParameterChange(param.index, parseInt(e.target.value, 10))}
-                      className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-cyan-500
-                        [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-webkit-slider-thumb]:hover:bg-cyan-400
-                        [&::-webkit-slider-thumb]:transition-colors
-                        [&::-moz-range-thumb]:w-4
-                        [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full
-                        [&::-moz-range-thumb]:bg-cyan-500
-                        [&::-moz-range-thumb]:cursor-pointer
-                        [&::-moz-range-thumb]:hover:bg-cyan-400
-                        [&::-moz-range-thumb]:border-0
-                        [&::-moz-range-thumb]:transition-colors"
-                    />
+              if (isSwitch) {
+                return (
+                  <div key={param.index} className="flex flex-col items-center justify-center space-y-2 p-2 bg-gray-900/50 rounded-lg border border-gray-800">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center h-8 flex items-center">
+                      {param.name}
+                    </span>
+                    <button
+                      onClick={() => handleParameterChange(param.index, currentValue === 0 ? 1 : 0)}
+                      className={`
+                        w-full py-2 px-2 rounded font-bold text-[10px] transition-all
+                        ${currentValue === 1
+                          ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500'
+                          : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+                        }
+                      `}
+                    >
+                      {currentValue === 1 ? 'ON' : 'OFF'}
+                    </button>
                   </div>
-                )}
+                );
+              }
 
-                {/* Parameter Description */}
-                {param.description && param.description !== param.name && (
-                  <p className="text-xs text-zinc-500">
-                    {param.description}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        // No parameters message
-        <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
-          <p className="text-sm text-zinc-400">
-            {machineInfo.type === 'generator'
-              ? 'This generator uses WASM-defined parameters. Play notes to trigger sounds.'
-              : 'This effect uses WASM-defined parameters that are set internally.'}
-          </p>
-        </div>
-      )}
+              return (
+                <div key={param.index} className="flex justify-center">
+                  <Knob
+                    value={currentValue}
+                    min={param.minValue}
+                    max={param.maxValue}
+                    onChange={(v) => handleParameterChange(param.index, Math.round(v))}
+                    label={param.name}
+                    size="sm"
+                    color="#8b5cf6"
+                    formatValue={(v) => formatValue(param, v)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-gray-500 text-sm italic">
+              No parameters available for this machine.
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* Help Text */}
-      <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
-        <p className="text-xs text-zinc-400 leading-relaxed">
-          <span className="text-zinc-300 font-medium">Tip:</span> {getHelpText()}
+      <div className="bg-blue-900/10 rounded-xl p-4 border border-blue-900/30">
+        <p className="text-xs text-blue-300/80 leading-relaxed italic">
+          <span className="text-blue-400 font-bold not-italic">TIP:</span> {getHelpText()}
         </p>
       </div>
     </div>

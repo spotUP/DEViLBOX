@@ -8,7 +8,7 @@
  * Research reference: /Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/gui/insEdit.cpp
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, Plus, Library, ChevronDown, ChevronRight } from 'lucide-react';
@@ -200,8 +200,13 @@ const FMEnvelopeVisualization: React.FC<FMEnvelopeProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = width;
+    const h = height;
     const padding = 2;
 
     // Clear
@@ -481,10 +486,10 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         </div>
 
         {/* Live Oscilloscope */}
-        <div className="flex-1 mx-4 max-w-[200px]">
+        <div className="flex-1 mx-4">
           <InstrumentOscilloscope
             instrumentId={instrumentId}
-            width={200}
+            width="auto"
             height={40}
             color="#a78bfa"
             backgroundColor="transparent"
@@ -1048,6 +1053,8 @@ const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
 
 const WavetableVisualizer: React.FC<{ data: number[]; index: number; onRemove?: () => void }> = ({ data, index, onRemove }) => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const width = 120;
+  const height = 48;
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -1055,8 +1062,13 @@ const WavetableVisualizer: React.FC<{ data: number[]; index: number; onRemove?: 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = width;
+    const h = height;
     ctx.clearRect(0, 0, w, h);
 
     ctx.fillStyle = '#020617';
@@ -1195,16 +1207,47 @@ const WavetablePresetSelector: React.FC<{
 };
 
 const MiniWaveform: React.FC<{ data: number[]; max: number }> = ({ data, max }) => {
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * 32;
-    const y = 16 - (v / max) * 14;
-    return `${x},${y}`;
-  }).join(' ');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const width = 32;
+  const height = 16;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const points = data.map((v, i) => {
+      const x = (i / (data.length - 1)) * width;
+      const y = height - (v / max) * (height - 2) - 1;
+      return { x, y };
+    });
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 1;
+    
+    points.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+  }, [data, max]);
 
   return (
-    <svg width="32" height="16" className="flex-shrink-0">
-      <polyline points={points} fill="none" stroke="#22d3ee" strokeWidth="1" />
-    </svg>
+    <canvas 
+      ref={canvasRef} 
+      width={width} 
+      height={height} 
+      className="flex-shrink-0"
+      style={{ width, height }}
+    />
   );
 };
 

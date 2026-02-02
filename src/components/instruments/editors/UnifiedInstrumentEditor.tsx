@@ -10,14 +10,14 @@
  * that imports specialized controls as needed.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
-import { 
+import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
-import { SynthEditorTabs, type SynthEditorTab, TB303Tabs, type TB303Tab } from '../shared/SynthEditorTabs';
+import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { TB303Controls } from '../controls/TB303Controls';
 import { FurnaceControls } from '../controls/FurnaceControls';
 import { BuzzmachineControls } from '../controls/BuzzmachineControls';
@@ -25,8 +25,6 @@ import { SampleControls } from '../controls/SampleControls';
 import { DubSirenControls } from '../controls/DubSirenControls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
-import { FilterCurve } from '@components/ui/FilterCurve';
-import { Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -78,7 +76,7 @@ function isSynareType(synthType: SynthType): boolean {
 
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
-  if (synthType === 'TB303') return 'tb303';
+  if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
   if (isFurnaceType(synthType)) return 'furnace';
   if (isBuzzmachineType(synthType)) return 'buzzmachine';
   if (isSampleType(synthType)) return 'sample';
@@ -99,9 +97,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [vizMode, setVizMode] = useState<VizMode>('oscilloscope');
   const [showHelp, setShowHelp] = useState(false);
   const [genericTab, setGenericTab] = useState<SynthEditorTab>('oscillator');
-  const [tb303Tab, setTB303Tab] = useState<TB303Tab>('main');
 
   const editorMode = getEditorMode(instrument.synthType);
+
+  // Auto-switch tabs when synth type changes
+  useEffect(() => {
+    if (instrument.synthType === 'DrumMachine') {
+      setGenericTab('special');
+    } else if (isSampleType(instrument.synthType)) {
+      setGenericTab('envelope');
+    } else if (genericTab === 'special' && !renderSpecialParameters(instrument, onChange)) {
+      setGenericTab('oscillator');
+    }
+  }, [instrument.synthType]);
 
   // Theme for TB303 custom header
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -110,9 +118,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // Handle TB303 config updates
   const handleTB303Change = useCallback((updates: Partial<typeof instrument.tb303>) => {
     onChange({
-      tb303: updates as any,
+      tb303: { ...instrument.tb303, ...updates } as any,
     });
-  }, [onChange]);
+  }, [instrument.tb303, onChange]);
 
   // Handle Dub Siren config updates
   const handleDubSirenChange = useCallback((updates: Partial<typeof instrument.dubSiren>) => {
@@ -162,12 +170,23 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // Determine which tabs to hide based on synth type for generic editor
   const getHiddenTabs = (): SynthEditorTab[] => {
     const hidden: SynthEditorTab[] = [];
-    if (isSampleType(instrument.synthType)) {
+    
+    // DrumMachine hides standard tabs as it uses per-voice controls in Special tab
+    if (instrument.synthType === 'DrumMachine') {
       hidden.push('oscillator');
+      hidden.push('envelope');
+      hidden.push('filter');
+      hidden.push('modulation');
+      // Keep 'output' and 'special'
+    } else {
+      if (isSampleType(instrument.synthType)) {
+        hidden.push('oscillator');
+      }
+      if (!instrument.oscillator && !isSampleType(instrument.synthType)) {
+        hidden.push('oscillator');
+      }
     }
-    if (!instrument.oscillator && !isSampleType(instrument.synthType)) {
-      hidden.push('oscillator');
-    }
+
     // Hide special tab if no special parameters for this synth type
     const hasSpecialParams = renderSpecialParameters(instrument, onChange) !== null;
     if (!hasSpecialParams) {
@@ -175,66 +194,18 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     }
     return hidden;
   };
-
   // ============================================================================
   // TB-303 EDITOR
   // ============================================================================
   if (editorMode === 'tb303' && instrument.tb303) {
-    const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
-    const filterColor = isCyanTheme ? '#00ffff' : '#ff6600';
-    const headerBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
-      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';
     const mainBg = isCyanTheme
       ? 'bg-[#030808]'
       : 'bg-gradient-to-b from-[#1e1e1e] to-[#151515]';
 
-    // Custom TB303 header
-    const tb303Header = (
-      <div className={`synth-editor-header px-4 py-2 ${headerBg}`}>
-        <div className="flex items-center gap-3">
-          <div className="p-1.5 rounded-lg" style={{ background: isCyanTheme ? 'linear-gradient(135deg, #00ffff, #008888)' : 'linear-gradient(135deg, #ffcc00, #ff9900)' }}>
-            <Zap size={18} className="text-black" />
-          </div>
-          <div>
-            <h2 className="text-lg font-black tracking-tight" style={{ color: accentColor }}>TB-303</h2>
-            <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Bass Line</p>
-          </div>
-        </div>
-      </div>
-    );
-
-    // Custom filter curve visualization instead of generic viz
-    const tb303Viz = (
-      <div className="synth-editor-viz-header">
-        <div className="flex-1 bg-[#1a1a1a] rounded-lg overflow-hidden">
-          <FilterCurve
-            cutoff={instrument.tb303.filter.cutoff}
-            resonance={instrument.tb303.filter.resonance / 3.3}
-            type="lowpass"
-            onCutoffChange={(v) => handleTB303Change({ filter: { ...instrument.tb303!.filter, cutoff: v } })}
-            onResonanceChange={(v) => handleTB303Change({ filter: { ...instrument.tb303!.filter, resonance: v * 3.3 } })}
-            height={70}
-            color={filterColor}
-          />
-        </div>
-      </div>
-    );
-
     return (
       <div className={`synth-editor-container ${mainBg}`}>
-        {tb303Header}
-        {tb303Viz}
-
-        {/* Tab Bar */}
-        <TB303Tabs
-          activeTab={tb303Tab}
-          onTabChange={setTB303Tab}
-          devilFishEnabled={instrument.tb303.devilFish?.enabled || false}
-        />
-
-        {/* Tab Content - Use TB303Controls but skip header/filter viz */}
-        <div className="synth-editor-content">
+        {/* Tab Content - Use TB303Controls (Full JC303 Panel) */}
+        <div className="synth-editor-content p-4 flex items-center justify-center">
           <TB303Controls
             config={instrument.tb303}
             onChange={handleTB303Change}
@@ -243,6 +214,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             isJC303={true}
             volume={instrument.volume}
             onVolumeChange={(v) => onChange({ volume: v })}
+            isBuzz3o3={instrument.synthType === 'Buzz3o3'}
           />
         </div>
       </div>

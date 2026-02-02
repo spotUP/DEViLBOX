@@ -14,12 +14,12 @@ interface TabDefinition {
 }
 
 const SYNTH_TABS: TabDefinition[] = [
-  { id: 'oscillator', label: 'Oscillator', shortLabel: 'OSC' },
-  { id: 'envelope', label: 'Envelope', shortLabel: 'ENV' },
-  { id: 'filter', label: 'Filter', shortLabel: 'FLT' },
-  { id: 'modulation', label: 'Modulation', shortLabel: 'MOD' },
-  { id: 'output', label: 'Output', shortLabel: 'OUT' },
-  { id: 'special', label: 'Special', shortLabel: 'EXT' },
+  { id: 'oscillator', label: 'Oscillator', shortLabel: 'OSCILLATOR' },
+  { id: 'envelope', label: 'Envelope', shortLabel: 'ENVELOPE' },
+  { id: 'filter', label: 'Filter', shortLabel: 'FILTER' },
+  { id: 'modulation', label: 'Modulation', shortLabel: 'MODULATION' },
+  { id: 'output', label: 'Output', shortLabel: 'OUTPUT' },
+  { id: 'special', label: 'Parameters', shortLabel: 'PARAMETERS' },
 ];
 
 interface SynthEditorTabsProps {
