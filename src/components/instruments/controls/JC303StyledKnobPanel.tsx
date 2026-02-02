@@ -4,6 +4,7 @@ import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { clsx } from 'clsx';
+import { CURRENT_VERSION } from '@generated/changelog';
 
 interface JC303StyledKnobPanelProps {
   config: TB303Config;
@@ -538,7 +539,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
 
         {/* Version info bottom right */}
         <div className="absolute bottom-2 right-4 text-[8px] text-gray-600 font-mono">
-          V1.0.0-WASM
+          V{CURRENT_VERSION}-WASM
         </div>
 
       </div>

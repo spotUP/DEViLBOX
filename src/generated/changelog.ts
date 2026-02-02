@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T19:04:56.029Z
+ * Generated: 2026-02-02T20:01:38.934Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,15 +20,55 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '191';
-export const BUILD_HASH = 'fe0af07';
+export const BUILD_NUMBER = '199';
+export const BUILD_HASH = 'f8d0e7b';
 export const BUILD_DATE = '2026-02-02';
-export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
+
+// Full semantic version with build number
+export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-02',
+    changes: [
+      {
+        type: 'fix',
+        description: 'Resolve require is not defined ReferenceError in toolbar'
+      },
+      {
+        type: 'fix',
+        description: 'Ensure all instruments have presets dropdown using FACTORY_PRESETS'
+      },
+      {
+        type: 'fix',
+        description: 'Refactor high-DPI scaling to prevent React attribute conflicts and cumulative scaling'
+      },
+      {
+        type: 'feature',
+        description: 'Expand factory presets, quicktips, and update changelog'
+      },
+      {
+        type: 'fix',
+        description: 'Implement high-DPI scaling and resolve oscilloscope frame clearing'
+      },
+      {
+        type: 'fix',
+        description: 'Synchronize visuals with audio clock and improve transport stability'
+      },
+      {
+        type: 'improvement',
+        description: 'Unify instrument editors and delete legacy standalone editors'
+      },
+      {
+        type: 'feature',
+        description: 'Resolve audio drift, enhance JC303/Buzzmachine worklets and implement absolute tick timing'
+      }
+    ]
+  },
+  {
+    version: '2026-02-01',
     date: '2026-02-01',
     changes: [
       {
@@ -66,7 +106,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '2026-01-31',
     date: '2026-01-31',
     changes: [
       {
@@ -156,7 +196,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-2',
+    version: '2026-01-30',
     date: '2026-01-30',
     changes: [
       {
@@ -210,45 +250,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Update FurnaceChips WASM build with improved chip emulation'
-      },
-      {
-        type: 'improvement',
-        description: 'Unify instrument editor architecture with common template'
-      },
-      {
-        type: 'improvement',
-        description: 'Make TestKeyboard and InstrumentList collapsible, collapsed by default'
-      },
-      {
-        type: 'improvement',
-        description: 'Scroll to selected synth when opening instrument selector'
-      },
-      {
-        type: 'improvement',
-        description: 'Remember instrument selector filter and scroll position'
-      },
-      {
-        type: 'fix',
-        description: 'Fix Buzzmachine paths for GitHub Pages deployment'
-      },
-      {
-        type: 'fix',
-        description: 'Add All Furnace Chips category and fix Buzzmachine null time error'
-      },
-      {
-        type: 'fix',
-        description: 'Fix unused variable TypeScript errors'
-      },
-      {
-        type: 'improvement',
-        description: 'Update instrument editors'
       }
     ]
   }
 ];
 
-// Get the latest version
-export const CURRENT_VERSION = CHANGELOG[0]?.version || BUILD_VERSION;
+// Current display version
+export const CURRENT_VERSION = FULL_VERSION;
 
 // Get all changes from the last N entries
 export function getRecentChanges(count: number = 10): ChangelogEntry[] {

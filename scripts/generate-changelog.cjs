@@ -180,13 +180,15 @@ export const BUILD_VERSION = '${version}';
 export const BUILD_NUMBER = '${buildNumber}';
 export const BUILD_HASH = '${gitHash}';
 export const BUILD_DATE = '${new Date().toISOString().split('T')[0]}';
-export const FULL_VERSION = \`\${BUILD_VERSION}+\${BUILD_NUMBER}\`;
+
+// Full semantic version with build number
+export const FULL_VERSION = \`\${BUILD_VERSION}.\${BUILD_NUMBER}\`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = ${entriesJson};
 
-// Get the latest version
-export const CURRENT_VERSION = CHANGELOG[0]?.version || BUILD_VERSION;
+// Current display version
+export const CURRENT_VERSION = FULL_VERSION;
 
 // Get all changes from the last N entries
 export function getRecentChanges(count: number = 10): ChangelogEntry[] {
@@ -226,8 +228,10 @@ function main() {
     });
 
     if (uniqueChanges.length > 0) {
+      // Use date as version identifier if we're grouping by date
+      // but keeping the semantic version for the first one
       entries.push({
-        version: entryCount === 0 ? version : `${version}-${entryCount}`,
+        version: entryCount === 0 ? version : date,
         date,
         changes: uniqueChanges.map(c => ({
           type: c.type,

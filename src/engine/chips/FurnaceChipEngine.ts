@@ -212,10 +212,9 @@ export class FurnaceChipEngine {
         // Store native context reference for diagnostics
         this.nativeContext = nativeCtx;
 
-        // Use unified helper to create node (handles wrappers correctly)
-        // Pass the ORIGINAL audioContext (wrapper) to the helper
-        this.workletNode = createAudioWorkletNode(audioContext, 'furnace-chips-processor', {
-          numberOfInputs: 0,
+        // Use native context directly for node creation
+        // Explicitly set output configuration for stereo
+        this.workletNode = createAudioWorkletNode(nativeCtx, 'furnace-chips-processor', {
           numberOfOutputs: 1,
           outputChannelCount: [2],
         });
