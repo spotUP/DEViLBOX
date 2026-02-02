@@ -1340,14 +1340,23 @@ export class TrackerReplayer {
     player.buffer = toneBuffer;
 
     // Set playback parameters
-    // Use the decoded buffer's sample rate for time-based calculations (loop points, offsets)
-    const bufferSampleRate = decodedBuffer.sampleRate;
+    // CRITICAL: Use the ORIGINAL sample rate (usually 8363 Hz for MOD) for time-based loop calculations
+    // to ensure loop points align exactly with sample positions. 
+    // Using buffer.sampleRate (44100+) would be wrong if the WAV header metadata was different.
+    const originalSampleRate = sample?.sampleRate || 8363;
+    const duration = decodedBuffer.duration;
+    
     const hasLoop = sample?.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
     if (hasLoop) {
       player.loop = true;
-      // Loop points are in samples, convert to seconds using buffer's sample rate
-      player.loopStart = (sample.loopStart ?? 0) / bufferSampleRate;
-      player.loopEnd = (sample.loopEnd ?? 0) / bufferSampleRate;
+      // Loop points are in samples, convert to seconds using original sample rate
+      // Clamp to duration to avoid Tone.js RangeError
+      player.loopStart = Math.min((sample.loopStart ?? 0) / originalSampleRate, duration - 0.0001);
+      player.loopEnd = Math.min((sample.loopEnd ?? 0) / originalSampleRate, duration);
+      
+      if (player.loopEnd <= player.loopStart) {
+        player.loopEnd = duration;
+      }
     }
     player.playbackRate = playbackRate;
 
@@ -1356,8 +1365,8 @@ export class TrackerReplayer {
 
     // Start playback immediately - buffer is already loaded
     try {
-      const startOffset = offset > 0 ? offset / bufferSampleRate : 0;
-      player.start(safeTime, startOffset);
+      const startOffset = offset > 0 ? offset / originalSampleRate : 0;
+      player.start(safeTime, Math.min(startOffset, duration - 0.0001));
     } catch (e) {
       console.log('[TrackerReplayer] Playback start failed:', e);
     }
