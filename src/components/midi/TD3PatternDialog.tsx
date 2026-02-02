@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Upload, Download, AlertTriangle, Check, Loader2 } from 'lucide-react';
+import { X, Upload, Download, AlertTriangle, Check, Loader2, FileUp, FileDown } from 'lucide-react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getMIDIManager } from '../../midi/MIDIManager';
@@ -15,8 +15,10 @@ import {
   validatePatternForTD3Export,
   suggestBaseOctave,
 } from '../../midi/sysex/TD3PatternTranslator';
+import { parseTD3File } from '../../lib/import/TD3PatternLoader';
 import type { TD3PatternData, MIDIMessage } from '../../midi/types';
 import type { TrackerCell } from '@typedefs/tracker';
+import { saveAs } from 'file-saver';
 
 interface TD3PatternDialogProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
   const [receivedPattern, setReceivedPattern] = useState<TD3PatternData | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const requestTimeoutRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { selectedOutputId, selectedInputId } = useMIDIStore();
   const { patterns, currentPatternIndex, cursor, setCell } = useTrackerStore();
@@ -108,7 +111,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
   // Validate export
   const validation = validatePatternForTD3Export(getExportCells(), baseOctave);
 
-  // Handle export
+  // Handle export via SysEx
   const handleExport = async () => {
     if (!selectedOutputId) return;
 
@@ -142,6 +145,106 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleExportFile = () => {
+    const cells = getExportCells();
+    const { steps } = trackerPatternToTD3Steps(cells, baseOctave);
+    
+    const patternData = {
+      name: `Pattern ${formatPatternLocation(selectedGroup, selectedPattern)}`,
+      steps: steps.map(s => ({
+        note: s.note ? s.note.value : null,
+        octave: s.note ? s.note.octave : 0,
+        upperC: s.note ? s.note.upperC : false,
+        accent: s.accent,
+        slide: s.slide,
+        tie: s.tie
+      })),
+      activeSteps: Math.min(16, cells.length)
+    };
+
+    const blob = new Blob([JSON.stringify(patternData, null, 2)], { type: 'application/json' });
+    saveAs(blob, `td3-pattern-${formatPatternLocation(selectedGroup, selectedPattern).replace(' ', '')}.json`);
+    
+    setSendResult({
+      success: true,
+      message: 'Pattern exported to JSON file',
+    });
+  };
+
+  // Handle file import
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      
+      if (file.name.toLowerCase().endsWith('.sqs')) {
+        const td3File = await parseTD3File(buffer);
+        if (td3File.patterns.length > 0) {
+          // Take the first pattern from the .sqs file
+          const firstPatt = td3File.patterns[0];
+          
+          // Map TD3Step from loader to TD3Step from types (they differ slightly in structure but represent same data)
+          const mappedSteps: any[] = firstPatt.steps.map(s => ({
+            note: s.rest ? null : { value: s.note, octave: s.octave, upperC: false },
+            accent: s.accent,
+            slide: s.slide,
+            tie: s.tie
+          }));
+
+          setReceivedPattern({
+            group: 0,
+            pattern: 0,
+            steps: mappedSteps,
+            triplet: false,
+            activeSteps: firstPatt.length
+          });
+          
+          setSendResult({
+            success: true,
+            message: `Loaded pattern "${firstPatt.name}" from .sqs file`,
+          });
+        }
+      } else {
+        // Assume JSON
+        const text = new TextDecoder().decode(buffer);
+        const data = JSON.parse(text);
+        
+        // Map notes if they are in the flat format
+        const mappedSteps = data.steps.map((s: any) => ({
+          note: s.note === null ? null : { value: s.note, octave: s.octave, upperC: s.upperC || false },
+          accent: s.accent,
+          slide: s.slide,
+          tie: s.tie
+        }));
+
+        setReceivedPattern({
+          group: data.group || 0,
+          pattern: data.pattern || 0,
+          steps: mappedSteps,
+          triplet: data.triplet || false,
+          activeSteps: data.activeSteps || 16
+        });
+
+        setSendResult({
+          success: true,
+          message: 'Loaded pattern from JSON file',
+        });
+      }
+    } catch (error) {
+      setSendResult({
+        success: false,
+        message: 'Failed to parse pattern file',
+      });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -235,7 +338,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
               }`}
           >
             <Upload size={14} />
-            Export to TD-3
+            Export
           </button>
           <button
             onClick={() => setActiveTab('import')}
@@ -246,7 +349,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
               }`}
           >
             <Download size={14} />
-            Import from TD-3
+            Import
           </button>
         </div>
 
@@ -257,16 +360,16 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
             <div className="flex items-center gap-2 p-3 bg-accent-warning/10 border border-accent-warning/30 rounded-md">
               <AlertTriangle size={16} className="text-accent-warning flex-shrink-0" />
               <span className="text-sm text-text-secondary">
-                No MIDI output device selected. Select a device in MIDI settings.
+                No MIDI output selected. You can still export to file.
               </span>
             </div>
           )}
 
-          {(!selectedOutputId || !selectedInputId) && activeTab === 'import' && (
-            <div className="flex items-center gap-2 p-3 bg-accent-warning/10 border border-accent-warning/30 rounded-md">
-              <AlertTriangle size={16} className="text-accent-warning flex-shrink-0" />
-              <span className="text-sm text-text-secondary">
-                Both MIDI input and output devices are required for pattern import.
+          {(!selectedOutputId || !selectedInputId) && activeTab === 'import' && !receivedPattern && (
+            <div className="flex items-center gap-2 p-3 bg-dark-bgTertiary border border-dark-border rounded-md">
+              <AlertTriangle size={16} className="text-text-muted flex-shrink-0" />
+              <span className="text-sm text-text-muted">
+                MIDI transfer requires hardware. Use "Load File" for .sqs or .json patterns.
               </span>
             </div>
           )}
@@ -380,13 +483,13 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
 
           {/* Import-specific content */}
           {activeTab === 'import' && receivedPattern && (
-            <div className="p-3 bg-dark-bgTertiary rounded-md">
-              <h4 className="text-sm font-medium text-text-primary mb-2">
-                Received Pattern: {formatPatternLocation(receivedPattern.group, receivedPattern.pattern)}
+            <div className="p-3 bg-dark-bgTertiary rounded-md border border-accent-primary/20">
+              <h4 className="text-sm font-medium text-text-primary mb-2 flex items-center gap-2">
+                <Check size={14} className="text-accent-success" />
+                Pattern Loaded
               </h4>
               <p className="text-xs text-text-muted">
-                {receivedPattern.activeSteps} active steps
-                {receivedPattern.triplet ? ' (triplet mode)' : ''}
+                {receivedPattern.activeSteps} active steps detected.
               </p>
 
               <div className="mt-3">
@@ -428,63 +531,95 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border bg-dark-bgTertiary">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-          >
-            Close
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-dark-border bg-dark-bgTertiary">
+          <div className="flex gap-2">
+            {activeTab === 'import' && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,.sqs"
+                  className="hidden"
+                  onChange={handleFileImport}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-2 text-xs font-bold bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-2"
+                >
+                  <FileUp size={14} />
+                  LOAD FILE
+                </button>
+              </>
+            )}
+            {activeTab === 'export' && (
+              <button
+                onClick={handleExportFile}
+                className="px-3 py-2 text-xs font-bold bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-2"
+              >
+                <FileDown size={14} />
+                SAVE AS JSON
+              </button>
+            )}
+          </div>
 
-          {activeTab === 'export' && (
+          <div className="flex gap-2">
             <button
-              onClick={handleExport}
-              disabled={!selectedOutputId || isSending || !validation.valid}
-              className="px-4 py-2 text-sm font-medium bg-accent-primary text-text-inverse rounded hover:bg-accent-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
             >
-              {isSending ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Upload size={14} />
-                  Send to TD-3
-                </>
-              )}
+              Close
             </button>
-          )}
 
-          {activeTab === 'import' && !receivedPattern && (
-            <button
-              onClick={handleRequestPattern}
-              disabled={!selectedOutputId || !selectedInputId || isRequesting}
-              className="px-4 py-2 text-sm font-medium bg-accent-primary text-text-inverse rounded hover:bg-accent-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isRequesting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Requesting...
-                </>
-              ) : (
-                <>
-                  <Download size={14} />
-                  Request from TD-3
-                </>
-              )}
-            </button>
-          )}
+            {activeTab === 'export' && (
+              <button
+                onClick={handleExport}
+                disabled={!selectedOutputId || isSending || !validation.valid}
+                className="px-4 py-2 text-sm font-medium bg-accent-primary text-text-inverse rounded hover:bg-accent-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-glow-sm"
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    Send to TD-3
+                  </>
+                )}
+              </button>
+            )}
 
-          {activeTab === 'import' && receivedPattern && (
-            <button
-              onClick={handleImportIntoPattern}
-              className="px-4 py-2 text-sm font-medium bg-accent-success text-text-inverse rounded hover:bg-accent-success/90 transition-colors flex items-center gap-2"
-            >
-              <Check size={14} />
-              Insert into Pattern
-            </button>
-          )}
+            {activeTab === 'import' && !receivedPattern && (
+              <button
+                onClick={handleRequestPattern}
+                disabled={!selectedOutputId || !selectedInputId || isRequesting}
+                className="px-4 py-2 text-sm font-medium bg-accent-primary text-text-inverse rounded hover:bg-accent-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isRequesting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Requesting...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} />
+                    Request from TD-3
+                  </>
+                )}
+              </button>
+            )}
+
+            {activeTab === 'import' && receivedPattern && (
+              <button
+                onClick={handleImportIntoPattern}
+                className="px-4 py-2 text-sm font-medium bg-accent-success text-text-inverse rounded hover:bg-accent-success/90 transition-colors flex items-center gap-2 shadow-glow-sm"
+              >
+                <Check size={14} />
+                Insert into Pattern
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

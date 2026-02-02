@@ -36,6 +36,7 @@ const TD3PatternDialog = lazy(() => import('@components/midi/TD3PatternDialog').
 const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal })));
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
 const PatternManagement = lazy(() => import('@components/pattern/PatternManagement').then(m => ({ default: m.PatternManagement })));
+const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
 
 function App() {
   // Check for application updates
@@ -53,6 +54,7 @@ function App() {
       setFFTNode: state.setFFTNode,
     }))
   );
+  const { showSamplePackModal, setShowSamplePackModal, applyAutoCompact } = useUIStore();
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -67,7 +69,6 @@ function App() {
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
-  const { applyAutoCompact } = useUIStore();
 
   // Unified startup logic: Show Tips or What's New
   useEffect(() => {
@@ -504,6 +505,7 @@ function App() {
         {showInstrumentFX && <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />}
         {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
         {showDrumpads && <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />}
+        {showSamplePackModal && <SamplePackBrowser onClose={() => setShowSamplePackModal(false)} />}
         {showTips && (
           <TipOfTheDay 
             isOpen={showTips} 

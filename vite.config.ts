@@ -71,7 +71,10 @@ export default defineConfig({
         drop_debugger: true,
         pure_funcs: ['console.log', 'console.info', 'console.debug'],
       },
-    },
+      format: {
+        comments: false,
+      },
+    } as any,
     rollupOptions: {
       // Ensure worklet files are copied to output
       external: (id) => id.includes('chiptune3.worklet') || id.includes('libopenmpt.worklet'),

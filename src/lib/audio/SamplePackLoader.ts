@@ -53,6 +53,8 @@ const CATEGORY_MAPPINGS: Record<string, SampleCategory> = {
 
 // Audio file extensions
 const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif'];
+// Image file extensions
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 
 /**
  * Check if a file is an audio file
@@ -60,6 +62,25 @@ const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif'];
 function isAudioFile(filename: string): boolean {
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   return AUDIO_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Check if a file is an image file
+ */
+function isImageFile(filename: string): boolean {
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Check if an image filename is likely a cover art
+ */
+function isLikelyCover(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.includes('cover') || 
+         lower.includes('folder') || 
+         lower.includes('front') || 
+         lower.includes('artwork');
 }
 
 /**
@@ -94,6 +115,7 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
 
   let packName = 'Uploaded Pack';
   let coverImage: string | undefined;
+  let potentialCovers: { file: File, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
 
   // Process each file
@@ -107,9 +129,10 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
       packName = parts[0];
     }
 
-    // Handle cover image
-    if (file.name.toLowerCase() === 'cover.png' || file.name.toLowerCase() === 'cover.jpg') {
-      coverImage = URL.createObjectURL(file);
+    // Handle potential cover image
+    if (isImageFile(file.name)) {
+      const priority = isLikelyCover(file.name) ? 2 : (parts.length <= 2 ? 1 : 0);
+      potentialCovers.push({ file, priority });
       continue;
     }
 
@@ -136,6 +159,12 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
 
     samples[category].push(sampleInfo);
     categories.add(category);
+  }
+
+  // Select best cover image
+  if (potentialCovers.length > 0) {
+    potentialCovers.sort((a, b) => b.priority - a.priority);
+    coverImage = URL.createObjectURL(potentialCovers[0].file);
   }
 
   // Calculate total count
@@ -166,6 +195,7 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
 
   const packName = file.name.replace(/\.zip$/i, '');
   let coverImage: string | undefined;
+  let potentialCovers: { path: string, filename: string, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
 
   // Load and parse ZIP
@@ -179,10 +209,10 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
     const parts = path.split('/').filter(p => p.length > 0);
     const filename = parts[parts.length - 1];
 
-    // Handle cover image
-    if (filename.toLowerCase() === 'cover.png' || filename.toLowerCase() === 'cover.jpg') {
-      const blob = await zipEntry.async('blob');
-      coverImage = URL.createObjectURL(blob);
+    // Handle potential cover image
+    if (isImageFile(filename)) {
+      const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
+      potentialCovers.push({ path, filename, priority });
       continue;
     }
 
@@ -209,6 +239,15 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
 
     samples[category].push(sampleInfo);
     categories.add(category);
+  }
+
+  // Select best cover image
+  if (potentialCovers.length > 0) {
+    potentialCovers.sort((a, b) => b.priority - a.priority);
+    const bestCover = potentialCovers[0];
+    const zipEntry = zip.files[bestCover.path];
+    const blob = await zipEntry.async('blob');
+    coverImage = URL.createObjectURL(blob);
   }
 
   // Calculate total count
