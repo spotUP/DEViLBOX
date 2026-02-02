@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
-import { useInstrumentStore, useSamplePackStore } from '@stores';
+import { useInstrumentStore, useSamplePackStore, useAllSamplePacks } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap } from 'lucide-react';
@@ -17,7 +17,9 @@ interface SamplePackBrowserProps {
 
 export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose }) => {
   const { currentInstrumentId, updateInstrument, setPreviewInstrument } = useInstrumentStore();
-  const { allPacks, uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
+  const { uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
+  const allPacks = useAllSamplePacks();
+  
   const [selectedPack, setSelectedPack] = useState<SamplePack | null>(allPacks[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,10 +154,13 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
   // Update selected pack if it was deleted or if first pack changes
   useEffect(() => {
+    // If current selected pack is gone, fall back
     if (selectedPack && !allPacks.find(p => p.id === selectedPack.id)) {
       setSelectedPack(allPacks[0] || null);
       setSelectedSamples(new Set());
-    } else if (!selectedPack && allPacks.length > 0) {
+    } 
+    // If no pack is selected but we have packs, select the first one
+    else if (!selectedPack && allPacks.length > 0) {
       setSelectedPack(allPacks[0]);
     }
   }, [allPacks, selectedPack]);

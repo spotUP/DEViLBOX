@@ -12,9 +12,6 @@ interface SamplePackStore {
   // State
   userPacks: SamplePack[];
   
-  // Computed (via getter)
-  allPacks: SamplePack[];
-
   // Actions
   uploadZip: (file: File) => Promise<SamplePack>;
   uploadDirectory: (files: FileList) => Promise<SamplePack>;
@@ -23,15 +20,9 @@ interface SamplePackStore {
 }
 
 export const useSamplePackStore = create<SamplePackStore>()(
-  immer((set, get) => ({
+  immer((set, _get) => ({
     // Initial state
     userPacks: [],
-
-    // Getter for all packs
-    get allPacks() {
-      const state = get();
-      return [...FACTORY_PACKS, ...state.userPacks];
-    },
 
     // Actions
     uploadZip: async (file: File) => {
@@ -39,6 +30,7 @@ export const useSamplePackStore = create<SamplePackStore>()(
       try {
         const pack = await loadSamplePackFromZip(file);
         console.log(`[SamplePackStore] ZIP loaded, adding pack: ${pack.name} (${pack.sampleCount} samples)`);
+        
         set((state) => {
           state.userPacks.push(pack);
         });
@@ -54,6 +46,7 @@ export const useSamplePackStore = create<SamplePackStore>()(
       try {
         const pack = await loadSamplePackFromDirectory(files);
         console.log(`[SamplePackStore] Directory loaded, adding pack: ${pack.name} (${pack.sampleCount} samples)`);
+        
         set((state) => {
           state.userPacks.push(pack);
         });
@@ -77,3 +70,12 @@ export const useSamplePackStore = create<SamplePackStore>()(
     },
   }))
 );
+
+/**
+ * Derived selector for all sample packs (Factory + User)
+ * Use this in components to get the combined list
+ */
+export const useAllSamplePacks = () => {
+  const userPacks = useSamplePackStore((state) => state.userPacks);
+  return [...FACTORY_PACKS, ...userPacks];
+};
