@@ -17,6 +17,7 @@ import {
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
+import { PresetDropdown } from '../presets/PresetDropdown';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { TB303Controls } from '../controls/TB303Controls';
 import { FurnaceControls } from '../controls/FurnaceControls';
@@ -29,7 +30,7 @@ import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-import { Box, Drum, Megaphone, Zap } from 'lucide-react';
+import { Box, Drum, Megaphone, Zap, Radio } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
