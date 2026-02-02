@@ -8,6 +8,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
   private workletNode: AudioWorkletNode | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
+  private static jsCode: string | null = null;
   private static isWorkletLoaded: boolean = false;
   private static initializationPromise: Promise<void> | null = null;
 
@@ -26,7 +27,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
     
-    // Overdrive setup
+    // Overdrive setup (Tone.js fallback/booster)
     this.overdriveGain = new Tone.Gain(1);
     this.overdrive = new Tone.WaveShaper((x) => {
       const drive = 1 + this.overdriveAmount * 8;
@@ -51,16 +52,12 @@ export class JC303Synth extends Tone.ToneAudioNode {
   }
 
   private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded && this.wasmBinary) return;
+    if (this.isWorkletLoaded && this.wasmBinary && this.jsCode) return;
     
     if (this.initializationPromise) return this.initializationPromise;
 
     this.initializationPromise = (async () => {
-      if (!this.wasmBinary) {
-        const response = await fetch('jc303/JC303.wasm');
-        this.wasmBinary = await response.arrayBuffer();
-      }
-
+      // Pre-load worklet module
       if (!this.isWorkletLoaded) {
         try {
           await context.audioWorklet.addModule('JC303.worklet.js');
@@ -69,20 +66,38 @@ export class JC303Synth extends Tone.ToneAudioNode {
         }
         this.isWorkletLoaded = true;
       }
+
+      // Fetch assets
+      const [wasmRes, jsRes] = await Promise.all([
+        fetch('jc303/JC303.wasm'),
+        fetch('jc303/JC303.js')
+      ]);
+
+      if (!wasmRes.ok || !jsRes.ok) {
+        throw new Error('Failed to load JC303 assets');
+      }
+
+      const [wasmBinary, jsCode] = await Promise.all([
+        wasmRes.arrayBuffer(),
+        jsRes.text()
+      ]);
+
+      this.wasmBinary = wasmBinary;
+      this.jsCode = jsCode;
     })();
 
     return this.initializationPromise;
   }
 
   private createNode(): void {
-    if (!JC303Synth.wasmBinary || this._disposed) return;
+    if (!JC303Synth.wasmBinary || !JC303Synth.jsCode || this._disposed) return;
 
-    const context = getNativeContext(this.context);
-    
-    this.workletNode = createAudioWorkletNode(context, 'jc303-processor', {
+    // Use the wrapped context (this.context) for createAudioWorkletNode
+    // This allows the helper to use context.createAudioWorkletNode if it exists (for polyfills)
+    this.workletNode = createAudioWorkletNode(this.context, 'jc303-processor', {
       outputChannelCount: [2],
       processorOptions: {
-        sampleRate: context.sampleRate
+        sampleRate: getNativeContext(this.context).sampleRate
       }
     });
 
@@ -94,23 +109,30 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
     this.workletNode.port.postMessage({
       type: 'init',
-      wasmBinary: JC303Synth.wasmBinary
+      wasmBinary: JC303Synth.wasmBinary,
+      jsCode: JC303Synth.jsCode
     });
 
     // Connect to overdrive input instead of direct output
     Tone.connect(this.workletNode, this.overdriveGain);
   }
 
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false): void {
     if (!this.workletNode || this._disposed) return;
     
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : Math.round(12 * Math.log2(note / 440) + 69);
     
+    // Map accent flag to velocity (Open303 uses vel >= 100 for accent)
+    let finalVelocity = Math.floor(velocity * 127);
+    if (accent && finalVelocity < 100) finalVelocity = 100;
+    if (!accent && finalVelocity >= 100) finalVelocity = 99;
+
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note: midiNote,
-      velocity: Math.floor(velocity * 127),
-      detune: 0
+      velocity: finalVelocity,
+      detune: 0,
+      slide: slide // Note: slide is handled by overlap in Open303 core
     });
   }
 
@@ -126,9 +148,9 @@ export class JC303Synth extends Tone.ToneAudioNode {
     this.triggerRelease();
   }
 
-  triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number): void {
+  triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false): void {
     if (this._disposed) return;
-    this.triggerAttack(note, time, velocity);
+    this.triggerAttack(note, time, velocity || 1, accent, slide);
     
     const d = Tone.Time(duration).toSeconds();
     setTimeout(() => {
@@ -140,6 +162,7 @@ export class JC303Synth extends Tone.ToneAudioNode {
 
   setParam(param: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
+    // console.log(`[JC303 Synth] setParam: ${param}=${value}`);
     this.workletNode.port.postMessage({
       type: 'param',
       param,
@@ -147,12 +170,15 @@ export class JC303Synth extends Tone.ToneAudioNode {
     });
   }
 
+  // --- Core Setters ---
   setCutoff(hz: number): void { this.setParam('cutoff', hz); }
   setResonance(val: number): void { this.setParam('resonance', val); }
   setEnvMod(val: number): void { this.setParam('env_mod', val); }
   setDecay(ms: number): void { this.setParam('decay', ms); }
   setAccent(val: number): void { this.setParam('accent', val); }
   setAccentAmount(val: number): void { this.setAccent(val); }
+  setSlideTime(ms: number): void { this.setParam('slide_time', ms); }
+  setVolume(volumeDb: number): void { this.setParam('volume', volumeDb); }
   
   setWaveform(mix: number | string): void { 
     let val = 0;
@@ -168,8 +194,42 @@ export class JC303Synth extends Tone.ToneAudioNode {
     const hz = 440 * Math.pow(2, cents / 1200);
     this.setParam('tuning', hz); 
   }
+
+  // --- Advanced / Devil Fish Setters ---
+  enableDevilFish(_enabled: boolean, _config?: any): void {
+    // Open303 advanced params are always "enabled" in C++, 
+    // we just control whether we use them from JS.
+  }
+
+  setNormalDecay(ms: number): void { this.setParam('decay', ms); }
+  setAccentDecay(ms: number): void { this.setParam('accent_decay', ms); }
+  setVegDecay(ms: number): void { this.setParam('amp_decay', ms); }
+  setVegSustain(percent: number): void { 
+    // Convert 0..100% to -100..0 dB sustain
+    const db = Tone.gainToDb(percent / 100);
+    this.setParam('amp_sustain', db); 
+  }
+  setSoftAttack(ms: number): void { this.setParam('normal_attack', ms); }
   
-  setSlideTime(ms: number): void { this.setParam('slide_time', ms); }
+  setFilterTracking(percent: number): void { this.setParam('filter_tracking', percent / 100); }
+  setFilterFM(percent: number): void { this.setParam('filter_fm', percent / 100); }
+  
+  setMuffler(mode: string): void { 
+    let val = 0;
+    if (mode === 'soft') val = 1;
+    if (mode === 'hard') val = 2;
+    this.setParam('muffler', val); 
+  }
+
+  setSweepSpeed(_mode: string): void {}
+  setAccentSweepEnabled(_enabled: boolean): void {}
+  setQuality(_quality: string): void {}
+
+  // High Resonance mapping (Open303 doesn't have a direct toggle, but we can boost reso)
+  setHighResonance(_enabled: boolean): void {
+    // If enabled, we could potentially scale resonance range in wrapper
+  }
+  setHighResonanceEnabled(enabled: boolean): void { this.setHighResonance(enabled); }
 
   setOverdrive(amount: number): void {
     if (this._disposed) return;
@@ -185,30 +245,9 @@ export class JC303Synth extends Tone.ToneAudioNode {
     this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, 0.03);
   }
 
-  setVolume(volumeDb: number): void {
-    if (this._disposed) return;
-    this.output.gain.value = Tone.dbToGain(volumeDb);
-  }
-
   async loadGuitarMLModel(_index: number): Promise<void> {}
   async setGuitarMLEnabled(_enabled: boolean): Promise<void> {}
   setGuitarMLMix(_mix: number): void {}
-
-  enableDevilFish(_enabled: boolean, _config?: any): void {}
-  setNormalDecay(_decayMs: number): void {}
-  setAccentDecay(_decayMs: number): void {}
-  setVegDecay(_decayMs: number): void {}
-  setVegSustain(_percent: number): void {}
-  setSoftAttack(_timeMs: number): void {}
-  setFilterTracking(_percent: number): void {}
-  setFilterFM(_percent: number): void {}
-  setSweepSpeed(_mode: string): void {}
-  setAccentSweepEnabled(_enabled: boolean): void {}
-  setHighResonance(_enabled: boolean): void {}
-  setHighResonanceEnabled(_enabled: boolean): void { this.setHighResonance(_enabled); }
-  setMuffler(_mode: string): void {}
-  
-  setQuality(_quality: string): void {}
 
   dispose(): this {
     this._disposed = true;

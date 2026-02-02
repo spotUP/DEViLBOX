@@ -7,6 +7,8 @@
  * Similar architecture to FurnaceChipEngine.ts
  */
 
+import { createAudioWorkletNode } from '@utils/audio-context';
+
 export const BuzzmachineType = {
   // Distortion/Saturation
   ARGURU_DISTORTION: 'ArguruDistortion',
@@ -459,8 +461,8 @@ export class BuzzmachineEngine {
       await this.init(context);
     }
 
-    // Create worklet node
-    const workletNode = new AudioWorkletNode(context, 'buzzmachine-processor', {
+    // Use unified helper to create node (handles wrappers correctly)
+    const workletNode = createAudioWorkletNode(context, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [2],

@@ -5,9 +5,6 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
-import { DEFAULT_TB303 } from '@typedefs/instrument';
-import { TB303Synth } from './TB303Engine';
-import { TB303AccurateSynth } from './TB303AccurateSynth';
 import { JC303Synth } from './jc303/JC303Synth';
 import { MAMESynth } from './MAMESynth';
 import { InstrumentFactory } from './InstrumentFactory';
@@ -283,11 +280,13 @@ export class ToneEngine {
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running
-    const ctx = getNativeContext(Tone.getContext());
-    if (ctx.state !== 'running') {
+    const toneCtx = Tone.getContext();
+    const nativeCtx = getNativeContext(toneCtx);
+    
+    if (nativeCtx.state !== 'running') {
       await new Promise<void>((resolve) => {
         const checkState = () => {
-          if (ctx.state === 'running') {
+          if (nativeCtx.state === 'running') {
             resolve();
           } else {
             setTimeout(checkState, 10);
@@ -326,11 +325,13 @@ export class ToneEngine {
     if (!ToneEngine.tb303WorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        await ctx.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+        // Add module to NATIVE context
+        await nativeCtx.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
         
         const binary = await fetchDSP();
         if (binary) {
-          const tempNode = createAudioWorkletNode(ctx, 'tb303-processor');
+          // Use WRAPPED context for node creation (handles polyfills)
+          const tempNode = createAudioWorkletNode(toneCtx, 'tb303-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
@@ -345,11 +346,13 @@ export class ToneEngine {
     if (!ToneEngine.itFilterWorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        await ctx.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+        // Add module to NATIVE context
+        await nativeCtx.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
         
         const binary = await fetchDSP();
         if (binary) {
-          const tempNode = createAudioWorkletNode(ctx, 'it-filter-processor');
+          // Use WRAPPED context for node creation
+          const tempNode = createAudioWorkletNode(toneCtx, 'it-filter-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
@@ -895,15 +898,8 @@ export class ToneEngine {
       }
 
       case 'TB303':
-        // Authentic TB-303 acid bass synthesizer
-        if (config.tb303) {
-          instrument = new TB303Synth(config.tb303);
-          instrument.setVolume(config.volume || -12);
-        } else {
-          // Fallback if no TB-303 config
-          instrument = new TB303Synth(DEFAULT_TB303);
-          instrument.setVolume(config.volume || -12);
-        }
+        // Always use InstrumentFactory which now uses JC303 WASM engine
+        instrument = InstrumentFactory.createInstrument(config);
         break;
 
       case 'Sampler': {
@@ -1299,56 +1295,35 @@ export class ToneEngine {
       return analyser;
     }
 
-    // Find the instrument - try shared key first (Samplers/Players)
-    const sharedKey = this.getInstrumentKey(instrumentId, -1);
-    let instrument = this.instruments.get(sharedKey);
-
-    // If not found, try to find any instance of this instrument
-    if (!instrument) {
-      for (const [key, inst] of this.instruments) {
-        if (key.startsWith(`${instrumentId}-`)) {
-          instrument = inst;
-          break;
-        }
-      }
-    }
-
-    if (!instrument) {
-      return null;
-    }
-
     // Create new analyser
     analyser = new InstrumentAnalyser();
+    
+    // Ensure analyser output is connected to master input
+    // (This is where the summed audio from all matching chains will go)
+    analyser.output.connect(this.masterInput);
 
-    // Get the effect chain output for this instrument
-    const effectChain = this.instrumentEffectChains.get(sharedKey);
-
-    if (effectChain) {
-      // Disconnect instrument from current destination
-      try {
-        instrument.disconnect();
-      } catch {
-        // May not be connected
+    // Redirect ALL existing effect chains for this instrument to the analyser
+    let foundChains = 0;
+    this.instrumentEffectChains.forEach((chain, key) => {
+      const [idPart] = String(key).split('-');
+      if (idPart === String(instrumentId)) {
+        // Disconnect from master input and connect to analyser instead
+        try {
+          chain.output.disconnect(this.masterInput);
+          chain.output.connect(analyser.input);
+          foundChains++;
+        } catch (e) {
+          // May not be connected to masterInput
+        }
       }
+    });
 
-      // Re-route: instrument → analyser.input → analyser.output → effect chain
-      instrument.connect(analyser.input);
-
-      // Reconnect effects
-      if (effectChain.effects.length > 0) {
-        analyser.output.connect(effectChain.effects[0]);
-      } else {
-        analyser.output.connect(effectChain.output);
-      }
+    if (foundChains === 0) {
+      // No active chains found, but we still store the analyser 
+      // so future chains (from buildInstrumentEffectChain) will connect to it
+      console.log(`[ToneEngine] Lazy-created analyser for instrument ${instrumentId} (waiting for notes)`);
     } else {
-      // No effect chain - connect directly through analyser
-      try {
-        instrument.disconnect();
-      } catch {
-        // May not be connected
-      }
-      instrument.connect(analyser.input);
-      analyser.output.connect(this.masterInput);
+      console.log(`[ToneEngine] Lazy-created analyser for instrument ${instrumentId} and connected ${foundChains} active chains`);
     }
 
     this.instrumentAnalysers.set(instrumentId, analyser);
@@ -1448,7 +1423,7 @@ export class ToneEngine {
       switch (parameter) {
         case 'cutoff':
           // Map 0-1 to 200-20000 Hz (logarithmic)
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const cutoffHz = 200 * Math.pow(100, value); // 200 to 20000 Hz
             instrument.setCutoff(cutoffHz);
           } else if (instrument.filter) {
@@ -1459,7 +1434,7 @@ export class ToneEngine {
 
         case 'resonance':
           // Map 0-1 to 0-100%
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setResonance(value * 100);
           } else if (instrument.filter) {
             instrument.filter.Q.setValueAtTime(value * 10, now);
@@ -1468,7 +1443,7 @@ export class ToneEngine {
 
         case 'envMod':
           // Map 0-1 to 0-100% envelope modulation
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setEnvMod(value * 100);
           }
           break;
@@ -1489,7 +1464,7 @@ export class ToneEngine {
 
         case 'decay':
           // Map 0-1 to 30-3000ms decay time
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const decayMs = 30 + value * 2970; // 30 to 3000ms
             instrument.setDecay(decayMs);
           }
@@ -1497,14 +1472,14 @@ export class ToneEngine {
 
         case 'accent':
           // Map 0-1 to 0-100% accent amount
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setAccentAmount(value * 100);
           }
           break;
 
         case 'tuning':
           // Map 0-1 to -100 to +100 cents
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const cents = (value - 0.5) * 200; // -100 to +100
             instrument.setTuning(cents);
           }
@@ -1512,7 +1487,7 @@ export class ToneEngine {
 
         case 'overdrive':
           // Map 0-1 to 0-100% overdrive
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setOverdrive(value * 100);
           }
           break;
@@ -1520,7 +1495,7 @@ export class ToneEngine {
         // Devil Fish parameters
         case 'normalDecay':
           // Map 0-1 to 30-3000ms decay time for normal notes
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const decayMs = 30 + value * 2970; // 30 to 3000ms
             instrument.setNormalDecay(decayMs);
           }
@@ -1528,7 +1503,7 @@ export class ToneEngine {
 
         case 'accentDecay':
           // Map 0-1 to 30-3000ms decay time for accented notes
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const decayMs = 30 + value * 2970; // 30 to 3000ms
             instrument.setAccentDecay(decayMs);
           }
@@ -1536,7 +1511,7 @@ export class ToneEngine {
 
         case 'vegDecay':
           // Map 0-1 to 16-3000ms VEG decay time
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const decayMs = 16 + value * 2984; // 16 to 3000ms
             instrument.setVegDecay(decayMs);
           }
@@ -1544,14 +1519,14 @@ export class ToneEngine {
 
         case 'vegSustain':
           // Map 0-1 to 0-100% VEG sustain level
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setVegSustain(value * 100);
           }
           break;
 
         case 'softAttack':
           // Map 0-1 to 0.3-30ms soft attack time (logarithmic)
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             const attackMs = 0.3 * Math.pow(100, value); // 0.3 to 30ms
             instrument.setSoftAttack(attackMs);
           }
@@ -1559,14 +1534,14 @@ export class ToneEngine {
 
         case 'filterTracking':
           // Map 0-1 to 0-200% filter tracking
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setFilterTracking(value * 200);
           }
           break;
 
         case 'filterFM':
           // Map 0-1 to 0-100% filter FM amount
-          if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+          if (instrument instanceof JC303Synth) {
             instrument.setFilterFM(value * 100);
           }
           break;
@@ -1697,8 +1672,8 @@ export class ToneEngine {
     }
 
     try {
-      // Handle TB-303 with accent/slide support
-      if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+      // Handle TB-303 with JC303 engine (now supports accent/slide)
+      if (instrument instanceof JC303Synth) {
         instrument.triggerAttack(note, safeTime, velocity, accent, slide);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
@@ -1824,6 +1799,9 @@ export class ToneEngine {
         const membraneSynth = instrument as Tone.MembraneSynth;
         const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
         membraneSynth.triggerAttack(note, safeTime, finalVelocity);
+      } else if (instrument.constructor.name === 'BuzzmachineGenerator') {
+        // Buzzmachine generators support accent/slide for 303 behavior
+        (instrument as any).triggerAttack(note, safeTime, velocity, accent, slide);
       } else {
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = Tone.Frequency(note).toFrequency();
@@ -2205,8 +2183,8 @@ export class ToneEngine {
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
             const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
             voiceNode.triggerAttack(safeTime, finalVelocity);
-          } else if (voiceNode instanceof TB303Synth || voiceNode instanceof TB303AccurateSynth) {
-            // TB-303 has built-in accent/slide support
+          } else if (voiceNode instanceof JC303Synth) {
+            // JC303 WASM engine (now supports accent/slide)
             voiceNode.triggerAttack(note, safeTime, velocity, accent, slide);
           } else {
             // Standard synths - apply slide/accent for 303-style effects
@@ -2226,8 +2204,7 @@ export class ToneEngine {
 
     try {
       // Fallback for non-channel triggers (like pre-listening)
-      if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
-        // TB-303 has accent/slide support
+      if (instrument instanceof JC303Synth) {
         instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
@@ -2488,7 +2465,7 @@ export class ToneEngine {
           if (instrument.state === 'started') {
             instrument.stop(now);
           }
-        } else if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+        } else if (instrument instanceof JC303Synth) {
           // TB303 has its own release method
           instrument.releaseAll();
         } else if (instrument.releaseAll) {
@@ -2680,10 +2657,10 @@ export class ToneEngine {
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
     // Find all channel instances of this instrument
-    const synths: (TB303Synth | TB303AccurateSynth | JC303Synth)[] = [];
+    const synths: JC303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth)) {
+      if (idPart === String(instrumentId) && (instrument instanceof JC303Synth)) {
         synths.push(instrument);
       }
     });
@@ -2696,29 +2673,37 @@ export class ToneEngine {
 
     // Update all instances
     synths.forEach((synth) => {
+      console.log(`[ToneEngine] Updating TB303 parameters for instrument ${instrumentId}`);
 
     // Update core TB303 parameters
     if (tb303Config.tuning !== undefined && (synth instanceof JC303Synth)) {
+      console.log(`[ToneEngine] Set tuning: ${tb303Config.tuning}`);
       synth.setTuning(tb303Config.tuning);
     }
     if (tb303Config.filter) {
+      console.log(`[ToneEngine] Set filter: cutoff=${tb303Config.filter.cutoff}, resonance=${tb303Config.filter.resonance}`);
       synth.setCutoff(tb303Config.filter.cutoff);
       synth.setResonance(tb303Config.filter.resonance);
     }
     if (tb303Config.filterEnvelope) {
+      console.log(`[ToneEngine] Set filterEnv: envMod=${tb303Config.filterEnvelope.envMod}, decay=${tb303Config.filterEnvelope.decay}`);
       synth.setEnvMod(tb303Config.filterEnvelope.envMod);
       synth.setDecay(tb303Config.filterEnvelope.decay);
     }
     if (tb303Config.accent) {
+      console.log(`[ToneEngine] Set accent: ${tb303Config.accent.amount}`);
       synth.setAccentAmount(tb303Config.accent.amount);
     }
     if (tb303Config.slide) {
+      console.log(`[ToneEngine] Set slide: ${tb303Config.slide.time}`);
       synth.setSlideTime(tb303Config.slide.time);
     }
     if (tb303Config.overdrive) {
+      console.log(`[ToneEngine] Set overdrive: ${tb303Config.overdrive.amount}`);
       synth.setOverdrive(tb303Config.overdrive.amount);
     }
     if (tb303Config.oscillator) {
+      console.log(`[ToneEngine] Set waveform: ${tb303Config.oscillator.type}`);
       // @ts-ignore - TS struggles with the union type parameter inference here despite all classes accepting the string union
       synth.setWaveform(tb303Config.oscillator.type);
     }
@@ -2855,9 +2840,9 @@ export class ToneEngine {
     if (!pedalboard) return;
 
     // Find all channel instances of this instrument
-    const synths: (TB303Synth | TB303AccurateSynth | JC303Synth)[] = [];
+    const synths: JC303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`) && (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth)) {
+      if (key.startsWith(`${instrumentId}-`) && (instrument instanceof JC303Synth)) {
         synths.push(instrument);
       }
     });
@@ -3149,7 +3134,18 @@ export class ToneEngine {
     if (enabledEffects.length === 0) {
       // No effects - direct connection
       instrument.connect(output);
-      output.connect(this.masterInput);
+      
+      // Determine destination: use instrument analyser if active, otherwise master input
+      const [idPart] = String(key).split('-');
+      const instrumentId = parseInt(idPart);
+      const activeAnalyser = this.instrumentAnalysers.get(instrumentId);
+
+      if (activeAnalyser) {
+        output.connect(activeAnalyser.input);
+      } else {
+        output.connect(this.masterInput);
+      }
+
       this.instrumentEffectChains.set(key, { effects: [], output });
       return;
     }
@@ -3159,15 +3155,23 @@ export class ToneEngine {
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
     );
 
-    // Connect: instrument → effects[0] → effects[n] → output → masterInput
-    instrument.connect(effectNodes[0]);
-
-    for (let i = 0; i < effectNodes.length - 1; i++) {
-      effectNodes[i].connect(effectNodes[i + 1]);
+    // Final connection: effects → output → destination (analyser or master)
+    if (effectNodes.length > 0) {
+      effectNodes[effectNodes.length - 1].connect(output);
+    } else {
+      instrument.connect(output);
     }
 
-    effectNodes[effectNodes.length - 1].connect(output);
-    output.connect(this.masterInput);
+    // Determine destination: use instrument analyser if active, otherwise master input
+    const [idPart] = String(key).split('-');
+    const instrumentId = parseInt(idPart);
+    const activeAnalyser = this.instrumentAnalysers.get(instrumentId);
+
+    if (activeAnalyser) {
+      output.connect(activeAnalyser.input);
+    } else {
+      output.connect(this.masterInput);
+    }
 
     this.instrumentEffectChains.set(key, { effects: effectNodes, output });
   }
@@ -4009,7 +4013,7 @@ export class ToneEngine {
     // Update all TB-303 synths (can reconfigure dynamically)
     let tb303Count = 0;
     this.instruments.forEach((instrument, _key) => {
-      if (instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth) {
+      if (instrument instanceof JC303Synth) {
         instrument.setQuality(quality);
         tb303Count++;
       }
