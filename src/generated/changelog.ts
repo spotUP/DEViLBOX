@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:14:23.932Z
+ * Generated: 2026-02-02T21:17:21.530Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '206';
-export const BUILD_HASH = 'd00e779';
+export const BUILD_NUMBER = '207';
+export const BUILD_HASH = 'b1175d5';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve TypeScript errors in SpaceLaser and LoadPresetModal'
+      },
       {
         type: 'feature',
         description: 'Add 20 factory presets for Space Laser synth'
@@ -246,10 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Enhance audio engine and synth handling'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve module and instrument import handling'
       }
     ]
   }

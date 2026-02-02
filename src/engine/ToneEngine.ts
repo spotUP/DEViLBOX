@@ -2654,6 +2654,31 @@ export class ToneEngine {
   }
 
   /**
+   * Bake an instrument configuration into an AudioBuffer (Precalc)
+   * Renders the synth sound at C-4 for a fixed duration
+   */
+  public async bakeInstrument(config: InstrumentConfig, duration: number = 2): Promise<AudioBuffer> {
+    // We use Tone.Offline to render the sound
+    // Note: We create a fresh factory instance inside the offline context
+    return Tone.Offline(async () => {
+      // Create the instrument in the offline context
+      const instrument = InstrumentFactory.createInstrument(config);
+      instrument.toDestination();
+
+      // Trigger the note at C-4
+      if (instrument.triggerAttack) {
+        instrument.triggerAttack("C4", 0);
+        // Release after 1 second to allow for decay/release
+        if (instrument.triggerRelease) {
+          instrument.triggerRelease(1);
+        }
+      }
+
+      // Wait for the duration
+    }, duration);
+  }
+
+  /**
    * Update TB303 parameters in real-time without recreating the synth
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {

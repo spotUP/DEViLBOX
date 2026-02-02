@@ -1839,6 +1839,10 @@ export interface InstrumentMetadata {
     pitchEnvelope?: any;
     fadeout?: number;
   }>;
+  preservedSynth?: {
+    synthType: SynthType;
+    config: Partial<InstrumentConfig>;
+  };
 }
 
 // Import beat slicer types

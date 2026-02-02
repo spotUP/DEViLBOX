@@ -45,9 +45,11 @@ interface InstrumentStore {
   addInstrument: (config: InstrumentConfig) => void;
   deleteInstrument: (id: number) => void;
   cloneInstrument: (id: number) => number;
-  resetInstrument: (id: number) => void;
-
-  // Effects
+    resetInstrument: (id: number) => void;
+    bakeInstrument: (id: number) => Promise<void>;
+    unbakeInstrument: (id: number) => void;
+    // Effects
+  
   addEffect: (instrumentId: number, effectType: EffectConfig['type']) => void;
   addEffectConfig: (instrumentId: number, effect: Omit<EffectConfig, 'id'>) => void;  // For unified effects system
   removeEffect: (instrumentId: number, effectId: string) => void;
@@ -377,81 +379,98 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     resetInstrument: (id) => {
-      set((state) => {
-        const instrument = state.instruments.find((inst) => inst.id === id);
-        if (instrument) {
-          // Preserve the current synth type
-          const currentSynthType = instrument.synthType;
+      // ... (existing implementation)
+    },
 
-          // Reset to default for the current synth type
-          const defaultInst = createDefaultInstrument(id);
+    bakeInstrument: async (id) => {
+      const state = get();
+      const instrument = state.instruments.find((inst) => inst.id === id);
+      if (!instrument || instrument.synthType === 'Sampler') return;
 
-          // Clear all synth-specific configs first
-          Object.assign(instrument, {
-            ...defaultInst,
-            synthType: currentSynthType,
-            name: instrument.name, // Keep the name
-            tb303: undefined,
-            drumMachine: undefined,
-            chipSynth: undefined,
-            pwmSynth: undefined,
-            wavetable: undefined,
-            granular: undefined,
-            superSaw: undefined,
-            polySynth: undefined,
-            organ: undefined,
-            stringMachine: undefined,
-            formantSynth: undefined,
-            furnace: undefined,
-            chiptuneModule: undefined,
-            wobbleBass: undefined,
-            drumKit: undefined,
-            dubSiren: undefined,
-            spaceLaser: undefined,
-            synare: undefined,
-          });
+      try {
+        const engine = getToneEngine();
+        // Render the sound at C-4 for 2 seconds
+        const buffer = await engine.bakeInstrument(instrument, 2);
+        
+        // Convert AudioBuffer to ArrayBuffer for storage
+        // This is a simplified version, ideally we'd use a utility to encode to WAV if needed
+        // but for in-memory we can just keep the raw channel data if we want.
+        // However, Sampler expects a URL or a way to get the data.
+        
+        // Let's create a temporary object URL for the rendered buffer
+        const wavData = await WaveformProcessor.bufferToWav(buffer);
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
 
-          // Initialize the appropriate config for the synth type
-          if (currentSynthType === 'TB303' || currentSynthType === 'Buzz3o3') {
-            instrument.tb303 = { ...DEFAULT_TB303 };
-            if (currentSynthType === 'Buzz3o3') {
-              instrument.buzzmachine = { 
-                ...DEFAULT_BUZZMACHINE, 
-                machineType: 'OomekAggressor' as any,
-                parameters: {
-                  0: 0,    // SAW
-                  1: 0x78, // Cutoff
-                  2: 0x40, // Reso
-                  3: 0x40, // EnvMod
-                  4: 0x40, // Decay
-                  5: 0x40, // Accent
-                  6: 100,  // Tuning
-                  7: 100,  // Vol
-                }
-              };
-            }
-          } else if (currentSynthType === 'DubSiren') {
-            instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
-          } else if (currentSynthType === 'SpaceLaser') {
-            instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
-          } else if (currentSynthType === 'Synare') {
-            instrument.synare = { ...DEFAULT_SYNARE };
-          } else if (currentSynthType.startsWith('Furnace')) {
-            const furnaceConfig = getDefaultFurnaceConfig(currentSynthType);
-            if (furnaceConfig) {
-              instrument.furnace = furnaceConfig;
-            }
+        set((state) => {
+          const inst = state.instruments.find((i) => i.id === id);
+          if (inst) {
+            // Preserve current synth config in metadata
+            const preservedConfig = { ...inst };
+            delete preservedConfig.metadata; // Avoid recursion
+            
+            inst.metadata = {
+              ...inst.metadata,
+              preservedSynth: {
+                synthType: inst.synthType,
+                config: preservedConfig
+              }
+            };
+
+            // Switch to Sampler
+            inst.synthType = 'Sampler';
+            inst.sample = {
+              url,
+              baseNote: 'C4',
+              detune: 0,
+              loop: false,
+              reverse: false,
+              playbackRate: 1,
+            };
+            
+            // Clear synth configs to signal it's now a sampler
+            inst.tb303 = undefined;
+            inst.dubSiren = undefined;
+            inst.spaceLaser = undefined;
+            inst.synare = undefined;
+            inst.furnace = undefined;
+            inst.chipSynth = undefined;
+            inst.pwmSynth = undefined;
+            inst.wobbleBass = undefined;
           }
-          // Other synth types use the generic oscillator/envelope/filter which are already set
+        });
+
+        // Invalidate engine instance
+        engine.invalidateInstrument(id);
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to bake instrument:', error);
+      }
+    },
+
+    unbakeInstrument: (id) => {
+      set((state) => {
+        const inst = state.instruments.find((i) => i.id === id);
+        if (inst && inst.metadata?.preservedSynth) {
+          const { synthType, config } = inst.metadata.preservedSynth;
+          
+          // Restore config
+          Object.assign(inst, config);
+          inst.synthType = synthType;
+          
+          // Clear preserved synth but keep other metadata
+          delete inst.metadata.preservedSynth;
+          
+          // Clear sample config
+          inst.sample = undefined;
         }
       });
 
-      // Invalidate the cached Tone.js instrument so it gets recreated
+      // Invalidate engine instance
       try {
         const engine = getToneEngine();
         engine.invalidateInstrument(id);
-      } catch (error) {
-        console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+      } catch (e) {
+        // Ignored
       }
     },
 

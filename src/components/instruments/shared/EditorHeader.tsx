@@ -11,7 +11,7 @@
 
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Activity, BarChart2, HelpCircle, Layers, User, Radio } from 'lucide-react';
+import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2 } from 'lucide-react';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -62,6 +62,11 @@ export interface EditorHeaderProps {
   customHeader?: React.ReactNode;
   /** Compact mode for specialized editors */
   compact?: boolean;
+  /** Precalc/Bake functionality */
+  onBake?: () => void;
+  onUnbake?: () => void;
+  isBaked?: boolean;
+  isBaking?: boolean;
 }
 
 /**
@@ -70,6 +75,11 @@ export interface EditorHeaderProps {
 function getIcon(iconName: string) {
   const Icon = (LucideIcons as any)[iconName];
   return Icon || LucideIcons.Music2;
+}
+
+/** Check if synth type uses Sample editor */
+function isSampleType(synthType: SynthType): boolean {
+  return ['Sampler', 'Player', 'GranularSynth', 'DrumKit', 'ChiptuneModule'].includes(synthType);
 }
 
 /**
@@ -288,6 +298,33 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 {instrument.monophonic ? 'Mono' : 'Poly'}
               </span>
             </button>
+
+            {/* Precalc/Bake Button */}
+            {(onBake || onUnbake) && !isSampleType(instrument.synthType) && (
+              <button
+                onClick={isBaked ? onUnbake : onBake}
+                disabled={isBaking}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  isBaked
+                    ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50 hover:bg-amber-500/30'
+                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700'
+                } ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isBaked 
+                  ? 'Unbake: Revert to live synth engine' 
+                  : 'Precalc/Bake: Render to sample for better performance'}
+              >
+                {isBaking ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : isBaked ? (
+                  <History size={14} />
+                ) : (
+                  <Flame size={14} />
+                )}
+                <span className="text-[10px] font-bold uppercase tracking-tight">
+                  {isBaking ? 'BAKING' : isBaked ? 'UNBAKE' : 'BAKE'}
+                </span>
+              </button>
+            )}
 
             <PresetDropdown
               synthType={instrument.synthType}
