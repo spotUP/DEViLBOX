@@ -6,26 +6,19 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig, PitchEnvelopeConfig } from '@typedefs/instrument';
-import {
-  DEFAULT_WAVETABLE,
-  DEFAULT_SUPERSAW,
-  DEFAULT_POLYSYNTH,
-  DEFAULT_ORGAN,
-  DEFAULT_DRUM_MACHINE,
-  DEFAULT_CHIP_SYNTH,
-  DEFAULT_PWM_SYNTH,
-  DEFAULT_STRING_MACHINE,
+import { 
+  DEFAULT_SYNARE,
+  VOWEL_FORMANTS,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
-  DEFAULT_DRUMKIT,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_ORGAN,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_SUPERSAW,
+  DEFAULT_WAVETABLE,
   DEFAULT_FURNACE,
-  DEFAULT_DUB_SIREN,
-  DEFAULT_SYNARE,
 } from '@/types/instrument';
-import { TB303Synth } from './TB303Engine';
-import { TB303AccurateSynth } from './TB303AccurateSynth';
 import { TapeSaturation } from './effects/TapeSaturation';
-import { SidechainCompressor } from './effects/SidechainCompressor';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
@@ -1198,29 +1191,13 @@ export class InstrumentFactory {
     });
   }
 
-  private static createTB303(config: InstrumentConfig): TB303Synth | TB303AccurateSynth | JC303Synth {
+  private static createTB303(config: InstrumentConfig): JC303Synth {
     if (!config.tb303) {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
-    // Choose engine based on engineType (default: jc303 - WASM engine)
-    const engineType = config.tb303.engineType || 'jc303';
-
-    if (engineType === 'jc303') {
-      return this.createJC303(config.tb303, config.volume);
-    }
-
-    if (engineType === 'accurate') {
-      // Use Open303-based accurate engine (JS-based worklet)
-      const synth = new TB303AccurateSynth(config.tb303);
-      synth.setVolume(config.volume || -12);
-      return synth;
-    } else {
-      // Use Tone.js-based classic engine
-      const synth = new TB303Synth(config.tb303);
-      synth.setVolume(config.volume || -12);
-      return synth;
-    }
+    // Always use jc303 WASM engine for high quality
+    return this.createJC303(config.tb303, config.volume);
   }
 
   private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
@@ -1530,12 +1507,23 @@ export class InstrumentFactory {
       maxPolyphony: 8,
       oscillator: {
         type: 'sine',
+        partials: [
+          orgConfig.drawbars[0] / 8, // sub
+          orgConfig.drawbars[1] / 8, // fundamental
+          orgConfig.drawbars[2] / 8, // 3rd
+          orgConfig.drawbars[3] / 8, // 4th
+          orgConfig.drawbars[4] / 8, // 5th
+          orgConfig.drawbars[5] / 8, // 6th
+          orgConfig.drawbars[6] / 8, // 7th
+          orgConfig.drawbars[7] / 8, // 8th
+          orgConfig.drawbars[8] / 8, // 9th
+        ]
       },
       envelope: {
-        attack: 0.01,
+        attack: 0.005, // Fast attack for organ click
         decay: 0.1,
-        sustain: 0.9,
-        release: 0.3,
+        sustain: 1.0,  // Organ sustains fully
+        release: 0.1,
       },
       volume: config.volume || -12,
     });
@@ -1578,15 +1566,15 @@ export class InstrumentFactory {
         synth.set({
           oscillator: {
             partials: [
-              oc.drawbars.sub / 100,
-              oc.drawbars.fundamental / 100,
-              oc.drawbars.third / 100,
-              oc.drawbars.fourth / 100,
-              oc.drawbars.fifth / 100,
-              oc.drawbars.sixth / 100,
-              oc.drawbars.seventh / 100,
-              oc.drawbars.eighth / 100,
-              oc.drawbars.ninth / 100,
+              (oc.drawbars[0] || 0) / 8,
+              (oc.drawbars[1] || 0) / 8,
+              (oc.drawbars[2] || 0) / 8,
+              (oc.drawbars[3] || 0) / 8,
+              (oc.drawbars[4] || 0) / 8,
+              (oc.drawbars[5] || 0) / 8,
+              (oc.drawbars[6] || 0) / 8,
+              (oc.drawbars[7] || 0) / 8,
+              (oc.drawbars[8] || 0) / 8,
             ]
           }
         });

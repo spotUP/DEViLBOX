@@ -464,11 +464,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     let currentRow: number;
     let smoothOffset = 0;
 
-    if (isPlaying && smoothScrolling) {
+    if (isPlaying) {
       const replayer = getTrackerReplayer();
 
       // Get current Web Audio time with 10ms lookahead for latency compensation
-      // This is the KEY insight from BassoonTracker - sync to audio time, not wall clock
       const audioTime = Tone.now() + 0.01;
       const audioState = replayer.getStateAtTime(audioTime);
 
@@ -476,14 +475,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         lastAudioStateRef.current = audioState;
         currentRow = audioState.row;
 
-        // Calculate smooth offset based on time elapsed within current row
-        // Time since this row started = audioTime - audioState.time
-        const timeSinceRowStart = audioTime - audioState.time;
-        const secondsPerRow = (2.5 / bpm) * speed;
+        if (smoothScrolling) {
+          // Calculate smooth offset based on time elapsed within current row
+          const timeSinceRowStart = audioTime - audioState.time;
+          const secondsPerRow = (2.5 / bpm) * speed;
 
-        // Progress through current row (0 to 1)
-        const progress = Math.min(Math.max(timeSinceRowStart / secondsPerRow, 0), 1);
-        smoothOffset = progress * ROW_HEIGHT;
+          // Progress through current row (0 to 1)
+          const progress = Math.min(Math.max(timeSinceRowStart / secondsPerRow, 0), 1);
+          smoothOffset = progress * ROW_HEIGHT;
+        } else {
+          smoothOffset = 0;
+        }
 
         // Store for fallback
         lastRowValueRef.current = currentRow;
@@ -492,11 +494,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         // Fallback to store state if no audio state available yet
         currentRow = transportState.currentRow;
       }
-    } else if (isPlaying) {
-      // Playing but not smooth scrolling - use store state directly
-      currentRow = transportState.currentRow;
-      // Reset audio state tracking
-      lastAudioStateRef.current = null;
     } else {
       // Not playing - use cursor position
       currentRow = cursor.rowIndex;

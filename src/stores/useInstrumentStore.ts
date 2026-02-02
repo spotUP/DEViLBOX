@@ -18,6 +18,7 @@ import {
   DEFAULT_TB303,
   DEFAULT_DUB_SIREN,
   DEFAULT_SYNARE,
+  DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -191,9 +192,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
 
           // Auto-initialize furnace config when synthType changes to a Furnace type
-          if (synthTypeChanging && updates.synthType?.startsWith('Furnace') && !instrument.furnace) {
+          if (synthTypeChanging && updates.synthType?.startsWith('Furnace')) {
             const furnaceConfig = getDefaultFurnaceConfig(updates.synthType);
             if (furnaceConfig) {
+              // Always update/reset furnace config when changing Furnace synth type
+              // This ensures chipType matches the selected synthType (e.g. OPN -> OPL)
               instrument.furnace = furnaceConfig;
             }
           }
@@ -232,6 +235,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            if (updatedInstrument.synthType === 'Buzz3o3' && updatedInstrument.tb303 && updates.tb303) {
+              // Sync TB303 config back to Buzz parameters
+              const tb303 = updatedInstrument.tb303;
+              const currentBuzz = updatedInstrument.buzzmachine || { machineType: 'OomekAggressor' as any, parameters: {} };
+              const newParams = { ...currentBuzz.parameters };
+              
+              // Mapping (same as UnifiedInstrumentEditor)
+              newParams[0] = tb303.oscillator.type === 'square' ? 1 : 0;
+              newParams[1] = Math.round((Math.log2(tb303.filter.cutoff / 50) / Math.log2(18000 / 50)) * 240);
+              newParams[2] = Math.round((tb303.filter.resonance / 100) * 128);
+              newParams[3] = Math.round((tb303.filterEnvelope.envMod / 100) * 128);
+              newParams[4] = Math.round((Math.log2(tb303.filterEnvelope.decay / 30) / Math.log2(3000 / 30)) * 128);
+              newParams[5] = Math.round((tb303.accent.amount / 100) * 128);
+              newParams[6] = Math.round((tb303.tuning || 0) + 100);
+
+              // Update store with synced parameters
+              set((state) => {
+                const inst = state.instruments.find(i => i.id === id);
+                if (inst) inst.buzzmachine = { ...currentBuzz, parameters: newParams };
+              });
+
+              // Apply to engine
+              engine.updateBuzzmachineParameters(id, { ...currentBuzz, parameters: newParams });
+              return; // Handled
+            }
+
             if (updatedInstrument.synthType.startsWith('Buzz') && updatedInstrument.buzzmachine && updates.buzzmachine) {
               engine.updateBuzzmachineParameters(id, updatedInstrument.buzzmachine);
               return; // Handled
@@ -243,7 +272,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             // Handle complex synths with applyConfig pattern
-            const complexSynthTypes = ['SuperSaw', 'WobbleBass', 'Organ', 'DrumMachine', 'ChipSynth', 'PWMSynth', 'StringMachine', 'FormantSynth'];
+            const complexSynthTypes = ['SuperSaw', 'WobbleBass', 'Organ', 'ChipSynth', 'PWMSynth', 'StringMachine', 'FormantSynth'];
             if (complexSynthTypes.includes(updatedInstrument.synthType)) {
               // Find the config key for this synth type (e.g. 'superSaw' for 'SuperSaw')
               const configKey = updatedInstrument.synthType.charAt(0).toLowerCase() + updatedInstrument.synthType.slice(1);
@@ -255,7 +284,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
           }
         } catch (error) {
-          console.warn('[InstrumentStore] Could not update synth parameters:', error);
+          // Fall through to full invalidation if update failed or was skipped
+          if (process.env.NODE_ENV === 'development') {
+             // console.log('[InstrumentStore] Skipping optimized update:', error);
+          }
         }
       }
 
@@ -368,8 +400,24 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
 
           // Initialize the appropriate config for the synth type
-          if (currentSynthType === 'TB303') {
+          if (currentSynthType === 'TB303' || currentSynthType === 'Buzz3o3') {
             instrument.tb303 = { ...DEFAULT_TB303 };
+            if (currentSynthType === 'Buzz3o3') {
+              instrument.buzzmachine = { 
+                ...DEFAULT_BUZZMACHINE, 
+                machineType: 'OomekAggressor' as any,
+                parameters: {
+                  0: 0,    // SAW
+                  1: 0x78, // Cutoff
+                  2: 0x40, // Reso
+                  3: 0x40, // EnvMod
+                  4: 0x40, // Decay
+                  5: 0x40, // Accent
+                  6: 100,  // Tuning
+                  7: 100,  // Vol
+                }
+              };
+            }
           } else if (currentSynthType === 'DubSiren') {
             instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
           } else if (currentSynthType === 'Synare') {

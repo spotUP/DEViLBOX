@@ -95,7 +95,7 @@ export class MAMESynth extends Tone.ToneAudioNode {
 
   private startRendering(): void {
     const context = Tone.getContext();
-    const bufferSize = 128;
+    const bufferSize = 512; // Minimum 256 for ScriptProcessor
     
     // Check if createScriptProcessor is available (it's deprecated but still needed)
     const rawContext = getNativeContext(context);

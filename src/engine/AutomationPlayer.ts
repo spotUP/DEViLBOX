@@ -7,8 +7,6 @@
 
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
-import { TB303Synth } from './TB303Engine';
-import { TB303AccurateSynth } from './TB303AccurateSynth';
 import { JC303Synth } from './jc303/JC303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import type { TrackerCell, Pattern } from '@typedefs';
@@ -223,7 +221,7 @@ export class AutomationPlayer {
     // Also try iterating to find any matching TB303 for this instrumentId
     if (!instrument) {
       for (const [key, inst] of engine.instruments.entries()) {
-        if (key.startsWith(`${instrumentId}-`) && (inst instanceof TB303Synth || inst instanceof TB303AccurateSynth || inst instanceof JC303Synth)) {
+        if (key.startsWith(`${instrumentId}-`) && (inst instanceof JC303Synth)) {
           instrument = inst;
           break;
         }
@@ -233,7 +231,7 @@ export class AutomationPlayer {
 
     try {
       // Check if this is a TB303Synth - use its dedicated methods
-      const isTB303 = instrument instanceof TB303Synth || instrument instanceof TB303AccurateSynth || instrument instanceof JC303Synth;
+      const isTB303 = instrument instanceof JC303Synth;
 
       switch (parameter) {
         case 'cutoff':
@@ -241,7 +239,7 @@ export class AutomationPlayer {
           const cutoffHz = 50 * Math.pow(360, value); // 50 to ~18000 Hz
           if (isTB303) {
             console.log(`[AutomationPlayer] Applying cutoff: value=${value.toFixed(3)} -> ${cutoffHz.toFixed(0)}Hz`);
-            (instrument as TB303Synth).setCutoff(cutoffHz);
+            (instrument as JC303Synth).setCutoff(cutoffHz);
           } else if (instrument.filter?.frequency) {
             instrument.filter.frequency.setValueAtTime(cutoffHz, Tone.now());
           }
@@ -251,7 +249,7 @@ export class AutomationPlayer {
           // Map 0-1 to 0-100 percent
           const resoPercent = value * 100;
           if (isTB303) {
-            (instrument as TB303Synth).setResonance(resoPercent);
+            (instrument as JC303Synth).setResonance(resoPercent);
           } else if (instrument.filter?.Q) {
             // For non-TB303, map to Q factor
             const qValue = value * 30;
@@ -262,7 +260,7 @@ export class AutomationPlayer {
         case 'envMod':
           // Envelope modulation (TB-303 specific)
           if (isTB303) {
-            (instrument as TB303Synth).setEnvMod(value * 100);
+            (instrument as JC303Synth).setEnvMod(value * 100);
           } else if (typeof (instrument as any).setEnvMod === 'function') {
             (instrument as any).setEnvMod(value * 100);
           }
@@ -273,7 +271,7 @@ export class AutomationPlayer {
           // Must match the Knob's logarithmic scaling
           if (isTB303) {
             const decayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as TB303Synth).setDecay(decayMs);
+            (instrument as JC303Synth).setDecay(decayMs);
           }
           break;
 
@@ -281,7 +279,7 @@ export class AutomationPlayer {
           // Accent amount (TB-303 specific) - Map 0-1 to 0-100%
           if (isTB303) {
             console.log(`[AutomationPlayer] Applying accent: value=${value.toFixed(3)} -> ${(value * 100).toFixed(1)}%`);
-            (instrument as TB303Synth).setAccentAmount(value * 100);
+            (instrument as JC303Synth).setAccentAmount(value * 100);
           }
           break;
 
@@ -290,14 +288,14 @@ export class AutomationPlayer {
           // 0.5 = no detune, 0 = -1200 cents, 1 = +1200 cents
           if (isTB303) {
             const cents = (value - 0.5) * 2400; // -1200 to +1200 cents
-            (instrument as TB303Synth).setTuning(cents);
+            (instrument as JC303Synth).setTuning(cents);
           }
           break;
 
         case 'overdrive':
           // Overdrive amount (TB-303 specific) - Map 0-1 to 0-100%
           if (isTB303) {
-            (instrument as TB303Synth).setOverdrive(value * 100);
+            (instrument as JC303Synth).setOverdrive(value * 100);
           }
           break;
 
@@ -307,7 +305,7 @@ export class AutomationPlayer {
           // Must match the Knob's logarithmic scaling
           if (isTB303) {
             const normalDecayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as TB303Synth).setNormalDecay(normalDecayMs);
+            (instrument as JC303Synth).setNormalDecay(normalDecayMs);
           }
           break;
 
@@ -316,7 +314,7 @@ export class AutomationPlayer {
           // Must match the Knob's logarithmic scaling
           if (isTB303) {
             const accentDecayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as TB303Synth).setAccentDecay(accentDecayMs);
+            (instrument as JC303Synth).setAccentDecay(accentDecayMs);
           }
           break;
 
@@ -325,14 +323,14 @@ export class AutomationPlayer {
           // Must match the Knob's logarithmic scaling (16 * (3000/16)^value = 16 * 187.5^value)
           if (isTB303) {
             const vegDecayMs = 16 * Math.pow(187.5, value); // 16ms to 3000ms (log scale)
-            (instrument as TB303Synth).setVegDecay(vegDecayMs);
+            (instrument as JC303Synth).setVegDecay(vegDecayMs);
           }
           break;
 
         case 'vegSustain':
           // VEG sustain level (Devil Fish) - Map 0-1 to 0-100%
           if (isTB303) {
-            (instrument as TB303Synth).setVegSustain(value * 100);
+            (instrument as JC303Synth).setVegSustain(value * 100);
           }
           break;
 
@@ -340,21 +338,21 @@ export class AutomationPlayer {
           // Soft attack time (Devil Fish) - Map 0-1 to 0.3-30ms (logarithmic)
           if (isTB303) {
             const softAttackMs = 0.3 * Math.pow(100, value); // 0.3 to 30ms
-            (instrument as TB303Synth).setSoftAttack(softAttackMs);
+            (instrument as JC303Synth).setSoftAttack(softAttackMs);
           }
           break;
 
         case 'filterTracking':
           // Filter tracking amount (Devil Fish) - Map 0-1 to 0-200%
           if (isTB303) {
-            (instrument as TB303Synth).setFilterTracking(value * 200);
+            (instrument as JC303Synth).setFilterTracking(value * 200);
           }
           break;
 
         case 'filterFM':
           // Filter FM amount (Devil Fish) - Map 0-1 to 0-100%
           if (isTB303) {
-            (instrument as TB303Synth).setFilterFM(value * 100);
+            (instrument as JC303Synth).setFilterFM(value * 100);
           }
           break;
 
