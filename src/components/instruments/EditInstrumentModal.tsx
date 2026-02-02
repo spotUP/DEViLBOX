@@ -39,6 +39,7 @@ import {
   DEFAULT_BUZZMACHINE,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DUB_SIREN,
+  DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
   DEFAULT_DRUMKIT,
 } from '@typedefs/instrument';
@@ -818,6 +819,9 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       break;
     case 'DubSiren':
       base.dubSiren = { ...DEFAULT_DUB_SIREN };
+      break;
+    case 'SpaceLaser':
+      base.spaceLaser = { ...DEFAULT_SPACE_LASER };
       break;
     case 'Synare':
       base.synare = { ...DEFAULT_SYNARE };

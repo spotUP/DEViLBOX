@@ -62,8 +62,12 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
         return 'text-green-400 border-green-500';
       case 'DubSiren':
         return 'text-red-500 border-red-500';
+      case 'SpaceLaser':
+        return 'text-green-500 border-green-500';
       case 'Synare':
         return 'text-yellow-500 border-yellow-500';
+      case 'Dub':
+        return 'text-green-400 border-green-400';
       default:
         return 'text-ft2-highlight border-ft2-highlight';
     }
@@ -72,6 +76,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
   const getSynthTypeColor = (synthType: string): string => {
     if (synthType === 'TB303') return 'text-cyan-400';
     if (synthType === 'DubSiren') return 'text-red-500';
+    if (synthType === 'SpaceLaser') return 'text-green-500';
     if (synthType === 'Synare') return 'text-yellow-500';
     if (synthType.includes('Synth')) return 'text-yellow-300';
     if (synthType.includes('Metal') || synthType.includes('Membrane')) return 'text-red-300';

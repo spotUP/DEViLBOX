@@ -40,8 +40,9 @@ import {
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUMKIT,
   DEFAULT_DUB_SIREN,
+  DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
-} from '@typedefs/instrument';
+} from '@/types/instrument';
 
 export type VizMode = 'oscilloscope' | 'spectrum';
 
@@ -104,6 +105,7 @@ function handleSynthTypeChange(
     drumKit: undefined,
     buzzmachine: undefined,
     dubSiren: undefined,
+    spaceLaser: undefined,
     synare: undefined,
     effects: [],
   };
@@ -154,6 +156,9 @@ function handleSynthTypeChange(
           }
         }
       ];
+      break;
+    case 'SpaceLaser':
+      updates.spaceLaser = { ...DEFAULT_SPACE_LASER };
       break;
     case 'Synare':
       updates.synare = { ...DEFAULT_SYNARE };

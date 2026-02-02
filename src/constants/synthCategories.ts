@@ -1051,6 +1051,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Megaphone',
     color: 'text-red-500',
   },
+  SpaceLaser: {
+    type: 'SpaceLaser',
+    name: 'Space Laser',
+    shortName: 'Laser',
+    description: 'FM-based cosmic zap generator for classic reggae and anime effects',
+    bestFor: ['Laser shots', 'Anime FX', 'Reggae dubs', 'Sci-fi'],
+    icon: 'Zap',
+    color: 'text-green-500',
+  },
   Synare: {
     type: 'Synare',
     name: 'Synare 3',
@@ -1099,7 +1108,13 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     synths: [SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth, SYNTH_INFO.PolySynth, SYNTH_INFO.StringMachine],
   },
   {
-    id: 'keys',
+    id: 'dub',
+    name: 'Dub & FX',
+    description: 'Classic sound system and special effects',
+    synths: [SYNTH_INFO.DubSiren, SYNTH_INFO.SpaceLaser, SYNTH_INFO.Synare],
+  },
+  {
+    id: 'vintage',
     name: 'Keys',
     description: 'Keyboard instruments',
     synths: [SYNTH_INFO.Organ],

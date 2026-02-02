@@ -15,6 +15,7 @@ import type {
   StringMachineConfig,
   FormantSynthConfig,
   DubSirenConfig,
+  SpaceLaserConfig,
   WavetableConfig as _WavetableConfig,
   GranularConfig as _GranularConfig,
 } from '@typedefs/instrument';
@@ -2287,6 +2288,57 @@ export const DUB_SIREN_PRESETS: SynthPreset[] = [
 ];
 
 // ============================================
+// SPACE LASER PRESETS
+// ============================================
+export const SPACE_LASER_PRESETS: SynthPreset[] = [
+  {
+    id: 'laser-standard',
+    name: 'Standard Zap',
+    description: 'Classic electronic laser zap',
+    category: 'fx',
+    config: {
+      laser: { startFreq: 4000, endFreq: 150, sweepTime: 150, sweepCurve: 'exponential' },
+      fm: { amount: 30, ratio: 2.0 },
+      filter: { type: 'bandpass', cutoff: 2000, resonance: 30 },
+    } as Partial<SpaceLaserConfig>,
+  },
+  {
+    id: 'laser-cosmic',
+    name: 'Cosmic Burst',
+    description: 'Deep space energy blast',
+    category: 'fx',
+    config: {
+      laser: { startFreq: 8000, endFreq: 400, sweepTime: 300, sweepCurve: 'exponential' },
+      fm: { amount: 60, ratio: 4.5 },
+      delay: { enabled: true, time: 0.4, feedback: 0.7, wet: 0.5 },
+    } as Partial<SpaceLaserConfig>,
+  },
+  {
+    id: 'laser-anime',
+    name: 'Anime Pew',
+    description: 'Sharp vintage anime laser beam',
+    category: 'fx',
+    config: {
+      laser: { startFreq: 6000, endFreq: 2000, sweepTime: 80, sweepCurve: 'exponential' },
+      fm: { amount: 80, ratio: 8.0 },
+      filter: { type: 'bandpass', cutoff: 4000, resonance: 60 },
+    } as Partial<SpaceLaserConfig>,
+  },
+  {
+    id: 'laser-dub',
+    name: 'Dub Blaster',
+    description: 'Heavy bassy dub sound system laser',
+    category: 'fx',
+    config: {
+      laser: { startFreq: 1500, endFreq: 40, sweepTime: 500, sweepCurve: 'linear' },
+      fm: { amount: 20, ratio: 1.5 },
+      filter: { type: 'lowpass', cutoff: 800, resonance: 40 },
+      delay: { enabled: true, time: 0.33, feedback: 0.6, wet: 0.6 },
+    } as Partial<SpaceLaserConfig>,
+  },
+];
+
+// ============================================
 // POLYSYNTH PRESETS
 // ============================================
 export const POLYSYNTH_PRESETS: SynthPreset[] = [
@@ -2597,6 +2649,8 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return POLYSYNTH_PRESETS;
     case 'DubSiren':
       return DUB_SIREN_PRESETS;
+    case 'SpaceLaser':
+      return SPACE_LASER_PRESETS;
     default:
       return [];
   }
@@ -2614,4 +2668,5 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   FormantSynth: FORMANT_SYNTH_PRESETS,
   PolySynth: POLYSYNTH_PRESETS,
   DubSiren: DUB_SIREN_PRESETS,
+  SpaceLaser: SPACE_LASER_PRESETS,
 };

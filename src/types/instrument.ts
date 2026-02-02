@@ -131,6 +131,7 @@ export type SynthType =
   | 'MAMERSA'          // Roland SA (MKS-20/RD-1000)
   | 'MAMESWP30'        // Yamaha SWP30 (AWM2)
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
+  | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'Synare';          // Synare 3 (Electronic Percussion)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
@@ -2111,6 +2112,76 @@ export interface SynareConfig {
   };
 }
 
+/**
+ * Space Laser Configuration
+ * FM-based synth for classic reggae and anime laser effects
+ */
+export interface SpaceLaserConfig {
+  laser: {
+    startFreq: number;    // Hz (typically high, e.g. 5000)
+    endFreq: number;      // Hz (typically low, e.g. 100)
+    sweepTime: number;    // ms
+    sweepCurve: 'exponential' | 'linear';
+  };
+  fm: {
+    amount: number;       // Modulation index (0-100)
+    ratio: number;        // Multiplier (0.5 - 16)
+  };
+  noise: {
+    amount: number;       // 0-100%
+    type: 'white' | 'pink' | 'brown';
+  };
+  filter: {
+    type: FilterType;
+    cutoff: number;       // 20-20000 Hz
+    resonance: number;    // 0-100%
+  };
+  delay: {
+    enabled: boolean;
+    time: number;         // seconds
+    feedback: number;     // 0-1
+    wet: number;          // 0-1
+  };
+  reverb: {
+    enabled: boolean;
+    decay: number;        // seconds
+    wet: number;          // 0-1
+  };
+}
+
+export const DEFAULT_SPACE_LASER: SpaceLaserConfig = {
+  laser: {
+    startFreq: 4000,
+    endFreq: 150,
+    sweepTime: 150,
+    sweepCurve: 'exponential',
+  },
+  fm: {
+    amount: 40,
+    ratio: 2.5,
+  },
+  noise: {
+    amount: 10,
+    type: 'white',
+  },
+  filter: {
+    type: 'bandpass',
+    cutoff: 2000,
+    resonance: 40,
+  },
+  delay: {
+    enabled: true,
+    time: 0.3,
+    feedback: 0.5,
+    wet: 0.4,
+  },
+  reverb: {
+    enabled: true,
+    decay: 2.0,
+    wet: 0.2,
+  },
+};
+
 export const DEFAULT_SYNARE: SynareConfig = {
   oscillator: {
     type: 'square',
@@ -2185,6 +2256,8 @@ export interface InstrumentConfig {
   wobbleBass?: WobbleBassConfig;
   // Dub Siren
   dubSiren?: DubSirenConfig;
+  // Space Laser
+  spaceLaser?: SpaceLaserConfig;
   // Synare 3
   synare?: SynareConfig;
   // MAME synths
