@@ -26,8 +26,9 @@ import { DubSirenControls } from '../controls/DubSirenControls';
 import { SpaceLaserControls } from '../controls/SpaceLaserControls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
-import { useThemeStore } from '@stores';
+import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { Flame, History } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
@@ -104,6 +105,24 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [vizMode, setVizMode] = useState<VizMode>('oscilloscope');
   const [showHelp, setShowHelp] = useState(false);
   const [genericTab, setGenericTab] = useState<SynthEditorTab>('oscillator');
+  const [isBaking, setIsBaking] = useState(false);
+
+  const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
+
+  const isBaked = !!instrument.metadata?.preservedSynth;
+
+  const handleBake = async () => {
+    setIsBaking(true);
+    try {
+      await bakeInstrument(instrument.id);
+    } finally {
+      setIsBaking(false);
+    }
+  };
+
+  const handleUnbake = () => {
+    unbakeInstrument(instrument.id);
+  };
 
   const editorMode = getEditorMode(instrument.synthType);
 
@@ -408,9 +427,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
-        showHelpButton={true}
+        showHelpButton
         showHelp={showHelp}
         onHelpToggle={() => setShowHelp(!showHelp)}
+        onBake={handleBake}
+        onUnbake={handleUnbake}
+        isBaked={isBaked}
+        isBaking={isBaking}
       />
 
       {/* Tab Bar */}
