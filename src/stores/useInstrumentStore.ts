@@ -410,7 +410,80 @@ export const useInstrumentStore = create<InstrumentStore>()(
     resetInstrument: (_id) => {
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === _id);
+        if (instrument) {
+          const currentSynthType = instrument.synthType;
+          const defaultInst = getInitialConfig(currentSynthType);
+          
+          Object.assign(instrument, {
+            ...defaultInst,
+            synthType: currentSynthType,
+            name: instrument.name, // Keep the name
+            tb303: undefined,
+            drumMachine: undefined,
+            chipSynth: undefined,
+            pwmSynth: undefined,
+            wavetable: undefined,
+            granular: undefined,
+            superSaw: undefined,
+            polySynth: undefined,
+            organ: undefined,
+            stringMachine: undefined,
+            formantSynth: undefined,
+            furnace: undefined,
+            chiptuneModule: undefined,
+            wobbleBass: undefined,
+            drumKit: undefined,
+            dubSiren: undefined,
+            spaceLaser: undefined,
+            synare: undefined,
+            v2: undefined,
+          });
 
+          // Initialize the appropriate config for the synth type
+          if (currentSynthType === 'TB303' || currentSynthType === 'Buzz3o3') {
+            instrument.tb303 = { ...DEFAULT_TB303 };
+            if (currentSynthType === 'Buzz3o3') {
+              instrument.buzzmachine = { 
+                ...DEFAULT_BUZZMACHINE, 
+                machineType: 'OomekAggressor' as any,
+                parameters: {
+                  0: 0,    // SAW
+                  1: 0x78, // Cutoff
+                  2: 0x40, // Reso
+                  3: 0x40, // EnvMod
+                  4: 0x40, // Decay
+                  5: 0x40, // Accent
+                  6: 100,  // Tuning
+                  7: 100,  // Vol
+                }
+              };
+            }
+          } else if (currentSynthType === 'DubSiren') {
+            instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
+          } else if (currentSynthType === 'SpaceLaser') {
+            instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
+          } else if (currentSynthType === 'V2') {
+            instrument.v2 = { ...DEFAULT_V2 };
+          } else if (currentSynthType === 'Synare') {
+            instrument.synare = { ...DEFAULT_SYNARE };
+          } else if (currentSynthType.startsWith('Furnace')) {
+            const furnaceConfig = getDefaultFurnaceConfig(currentSynthType);
+            if (furnaceConfig) {
+              instrument.furnace = furnaceConfig;
+            }
+          }
+          // Other synth types use the generic oscillator/envelope/filter which are already set
+        }
+      });
+
+      // Invalidate the cached Tone.js instrument so it gets recreated
+      try {
+        const engine = getToneEngine();
+        engine.invalidateInstrument(_id);
+      } catch (error) {
+        console.warn('[InstrumentStore] Could not invalidate instrument:', error);
+      }
+    },
 
     bakeInstrument: async (id, bakeType = 'lite') => {
       const state = get();
