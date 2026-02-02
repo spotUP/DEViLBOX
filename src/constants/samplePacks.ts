@@ -10,7 +10,7 @@ import { normalizeUrl } from '@utils/urlUtils';
  */
 function createSampleInfo(filename: string, category: SampleCategory, basePath: string): SampleInfo {
   // Clean up filename for display name
-  const nameWithoutExt = filename.replace(/\.(wav|aif|aiff)$/i, '');
+  const nameWithoutExt = filename.replace(/\.wav$/i, '');
   // Remove prefix patterns like "BD_", "SD_", etc.
   const cleanName = nameWithoutExt
     .replace(/^(BD|SD|CH|OH|CYM|BB|FX|TOM|CLAP|CLAVE|CONGA|COW|BELL|BONGO|RIM|SHAKE|SNAP|TABLA|TAMB|LAZ)_?/i, '')
@@ -309,29 +309,29 @@ export const DRUMNIBUS_PACK: SamplePack = {
 const CASIO_MT40_BASE_PATH = 'data/samples/packs/casio-mt40';
 
 const CASIO_MT40_LEADS: string[] = [
-  'accordion.aif',
-  'banjo.aif',
-  'bass.aif',
-  'brass.aif',
-  'celesta.aif',
-  'cello.aif',
-  'clarinet.aif',
-  'elec piano.aif',
-  'flute.aif',
-  'folk flute.aif',
-  'funny fuzz.aif',
-  'glocken.aif',
-  'guitar.aif',
-  'harpsichord.aif',
-  'organ.aif',
-  'oriental.aif',
-  'pipe-organ.aif',
-  'recorder.aif',
-  'st ensemble.aif',
-  'synth fuzz.aif',
-  'trumpet.aif',
-  'violin.aif',
-  'xylophone.aif',
+  'accordion.wav',
+  'banjo.wav',
+  'bass.wav',
+  'brass.wav',
+  'celesta.wav',
+  'cello.wav',
+  'clarinet.wav',
+  'elec piano.wav',
+  'flute.wav',
+  'folk flute.wav',
+  'funny fuzz.wav',
+  'glocken.wav',
+  'guitar.wav',
+  'harpsichord.wav',
+  'organ.wav',
+  'oriental.wav',
+  'pipe-organ.wav',
+  'recorder.wav',
+  'st ensemble.wav',
+  'synth fuzz.wav',
+  'trumpet.wav',
+  'violin.wav',
+  'xylophone.wav',
 ];
 
 export const CASIO_MT40_PACK: SamplePack = {
