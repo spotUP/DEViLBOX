@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
+import { useInstrumentStore } from './useInstrumentStore';
 
 interface TransportStore extends TransportState {
   // State
@@ -106,13 +107,17 @@ export const useTransportStore = create<TransportStore>()(
         state.position = position;
       }),
 
-    play: () =>
+    play: () => {
+      // Auto-bake any instruments that need it before starting playback
+      useInstrumentStore.getState().autoBakeInstruments();
+      
       set((state) => {
         state.isPlaying = true;
         state.isPaused = false;
         // Initialize continuousRow from current position for smooth scrolling
         state.continuousRow = state.currentRow;
-      }),
+      });
+    },
 
     pause: () =>
       set((state) => {
@@ -129,7 +134,13 @@ export const useTransportStore = create<TransportStore>()(
         state.position = '0:0:0';
       }),
 
-    togglePlayPause: () =>
+    togglePlayPause: () => {
+      const isPlaying = _get().isPlaying;
+      if (!isPlaying) {
+        // Auto-bake before starting
+        useInstrumentStore.getState().autoBakeInstruments();
+      }
+
       set((state) => {
         if (state.isPlaying) {
           state.isPlaying = false;
@@ -140,7 +151,8 @@ export const useTransportStore = create<TransportStore>()(
           // Initialize continuousRow for smooth scrolling when starting playback
           state.continuousRow = state.currentRow;
         }
-      }),
+      });
+    },
 
     setIsLooping: (looping) =>
       set((state) => {

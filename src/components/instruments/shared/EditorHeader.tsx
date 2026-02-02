@@ -11,7 +11,7 @@
 
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2 } from 'lucide-react';
+import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download } from 'lucide-react';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -323,6 +323,25 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-tight">
                   {isBaking ? 'BAKING' : isBaked ? 'UNBAKE' : 'BAKE'}
                 </span>
+              </button>
+            )}
+
+            {/* Download Baked Sample Button */}
+            {isBaked && instrument.sample?.url && (
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = instrument.sample!.url;
+                  link.download = `${instrument.name || 'baked-sample'}.wav`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="p-1.5 rounded bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700 transition-all flex items-center gap-1.5 px-2"
+                title="Download baked sample as WAV"
+              >
+                <Download size={14} />
+                <span className="text-[10px] font-bold uppercase tracking-tight">WAV</span>
               </button>
             )}
 
