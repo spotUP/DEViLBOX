@@ -78,16 +78,24 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     };
   }, [previewConfig, setPreviewInstrument]);
 
-  // Keyboard support for previewing
+  // Keyboard support for previewing (2 Octaves, Standard Tracker Layout)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if typing in search
       if (document.activeElement?.tagName === 'INPUT') return;
       
-      // Basic keyboard-to-note mapping (Piano Roll style)
+      // Standard Tracker Layout:
+      // Bottom Row: Z=C-4, S=C#4, X=D-4, D=D#4, C=E-4, V=F-4, G=F#4, B=G-4, H=G#4, N=A-4, J=A#4, M=B-4, ,=C-5
+      // Top Row: Q=C-5, 2=C#5, W=D-5, 3=D#5, E=E-5, R=F-5, 5=F#5, T=G-5, 6=G#5, Y=A-5, 7=A#5, U=B-5, I=C-6
       const keyMap: Record<string, string> = {
-        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4', 
-        't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4', 'k': 'C5'
+        // Lower Octave
+        'z': 'C4', 's': 'C#4', 'x': 'D4', 'd': 'D#4', 'c': 'E4', 'v': 'F4', 
+        'g': 'F#4', 'b': 'G4', 'h': 'G#4', 'n': 'A4', 'j': 'A#4', 'm': 'B4',
+        ',': 'C5',
+        // Upper Octave
+        'q': 'C5', '2': 'C#5', 'w': 'D5', '3': 'D#5', 'e': 'E5', 'r': 'F5',
+        '5': 'F#5', 't': 'G5', '6': 'G#5', 'y': 'A5', '7': 'A#5', 'u': 'B5',
+        'i': 'C6'
       };
 
       const note = keyMap[e.key.toLowerCase()];
@@ -101,8 +109,14 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       if (document.activeElement?.tagName === 'INPUT') return;
       
       const keyMap: Record<string, string> = {
-        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4', 
-        't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4', 'k': 'C5'
+        // Lower Octave
+        'z': 'C4', 's': 'C#4', 'x': 'D4', 'd': 'D#4', 'c': 'E4', 'v': 'F4', 
+        'g': 'F#4', 'b': 'G4', 'h': 'G#4', 'n': 'A4', 'j': 'A#4', 'm': 'B4',
+        ',': 'C5',
+        // Upper Octave
+        'q': 'C5', '2': 'C#5', 'w': 'D5', '3': 'D#5', 'e': 'E5', 'r': 'F5',
+        '5': 'F#5', 't': 'G5', '6': 'G#5', 'y': 'A5', '7': 'A#5', 'u': 'B5',
+        'i': 'C6'
       };
 
       const note = keyMap[e.key.toLowerCase()];
@@ -710,17 +724,27 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-t-2 border-ft2-border">
-          <div className="text-ft2-textDim text-xs">
-            {selectedPack && (
-              <>
-                {filteredSamples.length} sample{filteredSamples.length !== 1 ? 's' : ''} in{' '}
-                {SAMPLE_CATEGORY_LABELS[activeCategory]}
-                {selectedSamples.size > 0 && (
-                  <span className="ml-2 text-ft2-text">
-                    • {selectedSamples.size} selected. Double-click or click Load to use.
-                  </span>
-                )}
-              </>
+          <div className="flex items-center gap-4">
+            <div className="text-ft2-textDim text-xs">
+              {selectedPack && (
+                <>
+                  {filteredSamples.length} sample{filteredSamples.length !== 1 ? 's' : ''} in{' '}
+                  {SAMPLE_CATEGORY_LABELS[activeCategory]}
+                  {selectedSamples.size > 0 && (
+                    <span className="ml-2 text-ft2-text">
+                      • {selectedSamples.size} selected. Double-click or click Load to use.
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {/* Jam Indicator */}
+            {primarySample && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded animate-pulse-glow">
+                <Zap size={12} className="text-amber-400 fill-amber-400" />
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">JAM ACTIVE</span>
+              </div>
             )}
           </div>
           <div className="flex gap-2">
