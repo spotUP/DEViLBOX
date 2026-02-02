@@ -2211,11 +2211,29 @@ export interface V2Config {
     sustain: number;
     release: number;
   };
-  lfo1: {
-    rate: number;
-    depth: number;
+  modulation: {
+    lfo1Rate: number;
+    lfo1Depth: number;
+    lfo1Target: 'cutoff' | 'pitch' | 'none';
   };
 }
+
+/**
+ * V2 Speech Configuration (Ronan/Lisa)
+ */
+export interface V2SpeechConfig {
+  text: string;
+  speed: number;
+  pitch: number;
+  formantShift: number;
+}
+
+export const DEFAULT_V2_SPEECH: V2SpeechConfig = {
+  text: '!kwIH_k !fAA_ks',
+  speed: 64,
+  pitch: 64,
+  formantShift: 64,
+};
 
 export const DEFAULT_V2: V2Config = {
   osc1: { mode: 1, transpose: 0, detune: 0, color: 64, level: 127 },
@@ -2338,10 +2356,9 @@ export interface InstrumentConfig {
   dubSiren?: DubSirenConfig;
   // Space Laser
   spaceLaser?: SpaceLaserConfig;
-  // Synare 3
-  synare?: SynareConfig;
-  // V2 Synth
   v2?: V2Config;
+  v2Speech?: V2SpeechConfig;
+  synare?: SynareConfig;
   // MAME synths
   mame?: MAMEConfig;
   // Buzzmachines

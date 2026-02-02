@@ -31,10 +31,11 @@ import {
   type ChipExportFormat,
   type RegisterWrite,
 } from './ChipExporter';
+import { NanoExporter } from './NanoExporter';
 import type { AutomationCurve } from '@typedefs/automation';
 import { Cpu } from 'lucide-react';
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip' | 'nano';
 type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
@@ -413,6 +414,31 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           onClose();
           break;
         }
+
+        case 'nano': {
+          const sequence = patterns.map((p) => p.id);
+          const nanoData = NanoExporter.export(
+            instruments,
+            patterns,
+            sequence,
+            bpm,
+            6 // Speed default
+          );
+
+          const blob = new Blob([nanoData], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${metadata.name || 'song'}.dbn`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          notify.success(`Nano binary "${metadata.name || 'song'}.dbn" exported successfully! (${nanoData.length} bytes)`);
+          onClose();
+          break;
+        }
       }
 
       // Only close if no warnings (warnings will show in dialog)
@@ -689,6 +715,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   >
                     <Cpu size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold">Chip</div>
+                  </button>
+                  <button
+                    onClick={() => setExportMode('nano')}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all text-center
+                      ${exportMode === 'nano'
+                        ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                        : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                      }
+                    `}
+                  >
+                    <Zap size={24} className="mx-auto mb-2" />
+                    <div className="font-mono text-sm font-semibold">Nano</div>
                   </button>
                 </div>
               </div>
@@ -1294,6 +1333,41 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {exportMode === 'nano' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Nano Binary Export (.dbn)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                      <p className="text-xs font-mono text-text-primary leading-relaxed">
+                        Extreme binary compression for demoscene 4k intros.
+                        Exports a strictly optimized <span className="text-accent-secondary">Uint8Array</span> containing only used instruments and bit-masked pattern data.
+                      </p>
+                    </div>
+
+                    <div className="text-sm font-mono text-text-secondary space-y-1">
+                      <div>Target Size: <span className="text-accent-primary">&lt; 4KB</span></div>
+                      <div>Format: <span className="text-accent-primary">DBXN Binary</span></div>
+                      <div>Used Instruments: <span className="text-accent-primary">
+                        {(() => {
+                          const sequence = patterns.map(p => p.id);
+                          const used = new Set<number>();
+                          sequence.forEach(pIdx => {
+                            patterns[pIdx]?.channels.forEach(ch => {
+                              ch.rows.forEach(cell => {
+                                if (cell.instrument > 0) used.add(cell.instrument);
+                              });
+                            });
+                          });
+                          return used.size;
+                        })()}
+                      </span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Export Options */}
               <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4">
                 <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -1393,6 +1467,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : exportMode === 'xm' ? '.xm'
                   : exportMode === 'mod' ? '.mod'
                   : exportMode === 'chip' ? `.${FORMAT_INFO[chipFormat].extension}`
+                  : exportMode === 'nano' ? '.dbn'
                   : `.${exportMode}.json`
                 }`
               : 'Select a file to import'}
