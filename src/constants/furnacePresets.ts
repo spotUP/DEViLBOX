@@ -168,6 +168,26 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       macros: [], opMacros: [], wavetables: []
     }
   },
+  {
+    name: 'OPM Metallic Drum',
+    type: 'synth',
+    synthType: 'FurnaceOPM',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 33,
+      algorithm: 4,
+      feedback: 7,
+      operators: [
+        op({ mult: 1, tl: 20, ar: 31, dr: 15, sl: 0, rr: 15 }),
+        op({ mult: 5, tl: 30, ar: 31, dr: 12, sl: 0, rr: 15, dt: 2 }),
+        op({ mult: 9, tl: 40, ar: 31, dr: 10, sl: 0, rr: 15, dt: -2 }),
+        op({ mult: 2, tl: 50, ar: 31, dr: 8, sl: 0, rr: 15 }),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
 
   // ============================================
   // PC ADLIB / SOUND BLASTER (OPL3)
@@ -206,6 +226,46 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       operators: [
         op({ mult: 4, tl: 35, ar: 15, dr: 6, sl: 3, rr: 4, ws: 0 }),
         op({ mult: 1, tl: 0, ar: 15, dr: 3, sl: 2, rr: 6, ws: 0 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'OPL3 Bass Drum',
+    type: 'synth',
+    synthType: 'FurnaceOPL',
+    volume: -4,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 14,
+      algorithm: 0,
+      feedback: 4,
+      operators: [
+        op({ mult: 1, tl: 10, ar: 31, dr: 6, sl: 2, rr: 6, ws: 0 }),
+        op({ mult: 0, tl: 0, ar: 31, dr: 8, sl: 0, rr: 8, ws: 0 }),
+        disabledOp(),
+        disabledOp(),
+      ],
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: 'OPL3 Snare',
+    type: 'synth',
+    synthType: 'FurnaceOPL',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 14,
+      algorithm: 0,
+      feedback: 0,
+      operators: [
+        op({ mult: 1, tl: 5, ar: 31, dr: 10, sl: 0, rr: 10, ws: 3 }),
+        op({ mult: 4, tl: 20, ar: 31, dr: 8, sl: 0, rr: 8, ws: 0 }),
         disabledOp(),
         disabledOp(),
       ],
