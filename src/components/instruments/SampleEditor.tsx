@@ -147,8 +147,18 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = 1120;
+    const logicalHeight = 300;
+    
+    if (canvas.width !== logicalWidth * dpr) {
+      canvas.width = logicalWidth * dpr;
+      canvas.height = logicalHeight * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    const width = logicalWidth;
+    const height = logicalHeight;
     const midY = height / 2;
 
     // Clear canvas with dark background

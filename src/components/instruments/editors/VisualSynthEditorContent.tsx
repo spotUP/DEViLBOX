@@ -650,16 +650,28 @@ export function renderSpecialParameters(
     // ORGAN
     case 'Organ': {
       const orgConfig = instrument.organ || DEFAULT_ORGAN;
-      const drawbarLabels = ["16'", "5 1/3'", "8'", "4'", "2 2/3'", "2'", "1 3/5'", "1 1/3'", "1'"];
+      const drawbarLabels = ["16'", "5⅓'", "8'", "4'", "2⅔'", "2'", "1⅗'", "1⅓'", "1'"];
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#84cc16" title="Drawbars" />
           <div className="flex justify-between gap-1 mb-3">
             {orgConfig.drawbars.map((value, i) => (
               <div key={i} className="flex flex-col items-center">
-                <input type="range" min={0} max={8} value={value} onChange={(e) => { const newDrawbars = [...orgConfig.drawbars] as typeof orgConfig.drawbars; newDrawbars[i] = parseInt(e.target.value); onChange({ organ: { ...orgConfig, drawbars: newDrawbars } }); }} className="h-16 w-5 appearance-none bg-gray-700 rounded cursor-pointer" style={{ writingMode: 'vertical-lr', direction: 'rtl' }} />
-                <span className="text-[8px] text-gray-500 mt-1">{drawbarLabels[i]}</span>
-                <span className="text-xs text-lime-400 font-mono">{value}</span>
+                <Knob
+                  value={value}
+                  min={0}
+                  max={8}
+                  step={1}
+                  size="sm"
+                  onChange={(v) => { 
+                    const newDrawbars = [...orgConfig.drawbars] as typeof orgConfig.drawbars; 
+                    newDrawbars[i] = Math.round(v); 
+                    onChange({ organ: { ...orgConfig, drawbars: newDrawbars } }); 
+                  }}
+                  label={drawbarLabels[i]}
+                  color="#84cc16"
+                  formatValue={(v) => `${Math.round(v)}`}
+                />
               </div>
             ))}
           </div>

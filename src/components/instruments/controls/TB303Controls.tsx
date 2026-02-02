@@ -20,6 +20,7 @@ interface TB303ControlsProps {
   isJC303?: boolean;
   volume?: number;
   onVolumeChange?: (volume: number) => void;
+  isBuzz3o3?: boolean;
 }
 
 export const TB303Controls: React.FC<TB303ControlsProps> = ({
@@ -27,6 +28,7 @@ export const TB303Controls: React.FC<TB303ControlsProps> = ({
   onChange,
   volume,
   onVolumeChange,
+  isBuzz3o3 = false,
 }) => {
   return (
     <JC303StyledKnobPanel 
@@ -34,6 +36,7 @@ export const TB303Controls: React.FC<TB303ControlsProps> = ({
       onChange={onChange} 
       volume={volume} 
       onVolumeChange={onVolumeChange} 
+      isBuzz3o3={isBuzz3o3}
     />
   );
 };

@@ -40,6 +40,7 @@ import {
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DUB_SIREN,
   DEFAULT_SYNARE,
+  DEFAULT_DRUMKIT,
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 
@@ -686,8 +687,24 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
   };
 
   // TB-303
-  if (synthType === 'TB303') {
+  if (synthType === 'TB303' || synthType === 'Buzz3o3') {
     base.tb303 = { ...DEFAULT_TB303 };
+    if (synthType === 'Buzz3o3') {
+      base.buzzmachine = { 
+        ...DEFAULT_BUZZMACHINE, 
+        machineType: 'OomekAggressor' as any,
+        parameters: {
+          0: 0,    // SAW
+          1: 0x78, // Cutoff
+          2: 0x40, // Reso
+          3: 0x40, // EnvMod
+          4: 0x40, // Decay
+          5: 0x40, // Accent
+          6: 100,  // Tuning
+          7: 100,  // Vol
+        }
+      };
+    }
     return base;
   }
 
@@ -759,7 +776,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
     return base;
   }
   if (synthType === 'DrumKit') {
-    // DrumKit - keymap-based, needs sample mapping
+    base.drumKit = { ...DEFAULT_DRUMKIT };
     return base;
   }
   if (synthType === 'ChiptuneModule') {
