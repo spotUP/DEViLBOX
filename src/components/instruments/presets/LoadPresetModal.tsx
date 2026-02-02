@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useInstrumentStore, useMIDIStore } from '@stores';
+import { useInstrumentStore } from '@stores';
 import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
 import { getSynthInfo } from '@constants/synthCategories';
 import { getToneEngine } from '@engine/ToneEngine';

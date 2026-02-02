@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T23:26:37.298Z
+ * Generated: 2026-02-02T23:38:18.518Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '237';
-export const BUILD_HASH = '392d1c5';
+export const BUILD_NUMBER = '240';
+export const BUILD_HASH = '6f90210';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve off-key chip loops and RangeErrors by using original sample rate for loop points and robust clamping'
+      },
+      {
+        type: 'feature',
+        description: 'Add preview/jam to LoadPresetModal and fix missing presets in specialized synth editors'
+      },
+      {
+        type: 'feature',
+        description: 'Add SpaceLaser and V2 presets to factory list and unify editor headers'
+      },
       {
         type: 'fix',
         description: 'Resolve TypeScript errors in usePadTriggers hook'
@@ -224,18 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Robust native context retrieval for all worklets and fix synth disposal race conditions'
-      },
-      {
-        type: 'fix',
-        description: 'Use JC303StyledKnobPanel in tracker view and fix ToneEngine context init'
-      },
-      {
-        type: 'fix',
-        description: 'Fix AudioWorklet context errors and enable real-time tuning/waveform updates for JC303'
-      },
-      {
-        type: 'fix',
-        description: 'Fix knob value loss due to stale closures and remove default delay from DT303 preset'
       }
     ]
   }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { DubSirenConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Megaphone, Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
+import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 
