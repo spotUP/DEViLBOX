@@ -133,7 +133,8 @@ export class SpaceLaserSynth {
    * Manual release
    */
   triggerRelease(time?: number) {
-    const t = time || Tone.now();
+    // If time is null or undefined, use immediate time to prevent Tone.js ReferenceError/AssertionError
+    const t = time === null || time === undefined ? Tone.now() : time;
     this.synth.triggerRelease(t);
   }
 
