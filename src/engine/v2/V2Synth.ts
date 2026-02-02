@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
 
 export class V2Synth extends Tone.ToneAudioNode {
   public readonly name: string = 'V2Synth';
@@ -16,11 +17,11 @@ export class V2Synth extends Tone.ToneAudioNode {
   }
 
   private async _initialize() {
-    const context = Tone.getContext().rawContext;
+    const nativeCtx = getNativeContext(this.context);
     
     // Add worklet if not already added
     try {
-      await context.audioWorklet.addModule('V2Synth.worklet.js');
+      await nativeCtx.audioWorklet.addModule('V2Synth.worklet.js');
     } catch (e) {
       // Worklet might already be added
     }
@@ -29,7 +30,7 @@ export class V2Synth extends Tone.ToneAudioNode {
     const response = await fetch('V2Synth.wasm');
     const wasmBinary = await response.arrayBuffer();
 
-    this._worklet = new AudioWorkletNode(context, 'v2-synth-processor', {
+    this._worklet = createAudioWorkletNode(this.context, 'v2-synth-processor', {
       outputChannelCount: [2]
     });
 
@@ -45,8 +46,8 @@ export class V2Synth extends Tone.ToneAudioNode {
       wasmBinary
     });
 
-    // Use any cast for connection to raw AudioNode
-    (this._worklet as any).connect(this.output);
+    // Use Tone.connect for reliable connection between wrappers and nodes
+    Tone.connect(this._worklet, this.output);
   }
 
   public async ready() {
