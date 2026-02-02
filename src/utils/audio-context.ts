@@ -1,3 +1,8 @@
+// Cache native constructor for performance
+const NativeBaseAudioContext = (globalThis as any).BaseAudioContext || 
+                               (globalThis as any).AudioContext || 
+                               (globalThis as any).webkitAudioContext;
+
 /**
  * Robustly retrieve the native BaseAudioContext/AudioContext from any wrapper.
  * CRITICAL: This must return the browser's true native context object.
@@ -5,21 +10,10 @@
 export function getNativeContext(context: any): AudioContext {
   if (!context) return null as any;
 
-  // The true native BaseAudioContext constructor
-  const NativeBaseAudioContext = (globalThis as any).BaseAudioContext || 
-                                 (globalThis as any).AudioContext || 
-                                 (globalThis as any).webkitAudioContext;
-
-  // Helper to check if an object is a true native context
-  const isNative = (obj: any) => {
-    try {
-      return NativeBaseAudioContext && (obj instanceof NativeBaseAudioContext);
-    } catch (e) {
-      return false;
-    }
-  };
-
-  if (isNative(context)) return context;
+  // Faster direct check
+  if (NativeBaseAudioContext && (context instanceof NativeBaseAudioContext)) {
+    return context;
+  }
 
   // BFS/DFS search for the hidden native context
   let queue = [context];
@@ -35,31 +29,19 @@ export function getNativeContext(context: any): AudioContext {
     iterations++;
 
     // Check if THIS is the native context
-    if (isNative(current)) return current;
+    if (NativeBaseAudioContext && (current instanceof NativeBaseAudioContext)) {
+      return current;
+    }
 
     // Check known properties
-    const candidates = [
-      current.rawContext,
-      current._nativeAudioContext,
-      current._nativeContext,
-      current.nativeContext,
-      current.baseAudioContext,
-      current.context, // standardized-audio-context nodes
-      current._context // Tone.js nodes sometimes
-    ];
-
-    for (const candidate of candidates) {
-      if (candidate) {
-        if (isNative(candidate)) return candidate;
-        queue.push(candidate);
-      }
-    }
+    if (current.rawContext) queue.push(current.rawContext);
+    if (current._nativeAudioContext) queue.push(current._nativeAudioContext);
+    if (current.nativeContext) queue.push(current.nativeContext);
+    if (current.baseAudioContext) queue.push(current.baseAudioContext);
+    if (current.context) queue.push(current.context);
+    if (current._context) queue.push(current._context);
   }
 
-  // If we couldn't find a native context, we might be in a weird environment.
-  // Fallback: assume the passed context IS the native one (e.g. if instanceof check failed across frames)
-  // BUT: The error says "parameter 1 is not of type BaseAudioContext", so this assumption is likely wrong.
-  console.warn('[audio-context] Could not find native BaseAudioContext inside wrapper', context);
   return context;
 }
 

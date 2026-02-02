@@ -128,6 +128,10 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
 
       this.leftBufferPtr = this.furnaceModule._malloc(128 * 4);
       this.rightBufferPtr = this.furnaceModule._malloc(128 * 4);
+      
+      // Pre-cache views
+      this.lView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.leftBufferPtr, 128);
+      this.rView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.rightBufferPtr, 128);
 
       this.isInitialized = true;
       this.port.postMessage({ type: 'initialized' });
@@ -246,12 +250,15 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
     for (const chipType of this.activeChips) {
       this.furnaceModule._furnace_chip_render(chipType, this.leftBufferPtr, this.rightBufferPtr, length);
 
-      const lSrc = this.furnaceModule.HEAPF32.subarray(this.leftBufferPtr >> 2, (this.leftBufferPtr >> 2) + length);
-      const rSrc = this.furnaceModule.HEAPF32.subarray(this.rightBufferPtr >> 2, (this.rightBufferPtr >> 2) + length);
+      // Check if memory grew
+      if (this.lView.buffer !== this.furnaceModule.HEAPF32.buffer) {
+        this.lView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.leftBufferPtr, length);
+        this.rView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.rightBufferPtr, length);
+      }
 
       for (let i = 0; i < length; i++) {
-        left[i] += lSrc[i];
-        right[i] += rSrc[i];
+        left[i] += this.lView[i];
+        right[i] += this.rView[i];
       }
     }
 

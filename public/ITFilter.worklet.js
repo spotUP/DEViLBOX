@@ -37,6 +37,9 @@ class ITFilterProcessor extends AudioWorkletProcessor {
       this.inputPtr = this.wasmInstance.__new(this.bufferSize * 4, 1);
       this.outputPtr = this.wasmInstance.__new(this.bufferSize * 4, 1);
       
+      this.wasmInputView = new Float32Array(this.wasmInstance.memory.buffer, this.inputPtr, this.bufferSize);
+      this.wasmOutputView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
+
       this.wasmLoaded = true;
       console.log('🎹 ITFilter: WASM Engine Active');
     } catch (err) {
@@ -69,16 +72,20 @@ class ITFilterProcessor extends AudioWorkletProcessor {
     const r = resonances[0];
     this.wasmInstance.updateCoefficients(c, r, sampleRate);
 
-    // 2. Copy input to WASM memory
-    const wasmInput = new Float32Array(this.wasmInstance.memory.buffer, this.inputPtr, numSamples);
-    wasmInput.set(inputChannel);
+    // 2. Check if memory grew
+    if (this.wasmInputView.buffer !== this.wasmInstance.memory.buffer) {
+      this.wasmInputView = new Float32Array(this.wasmInstance.memory.buffer, this.inputPtr, this.bufferSize);
+      this.wasmOutputView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
+    }
 
-    // 3. Process in WASM
+    // 3. Copy input to WASM memory
+    this.wasmInputView.set(inputChannel);
+
+    // 4. Process in WASM
     this.wasmInstance.processRaw(this.inputPtr, this.outputPtr, numSamples);
 
-    // 4. Copy output from WASM memory
-    const wasmOutput = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, numSamples);
-    outputChannel.set(wasmOutput);
+    // 5. Copy output from WASM memory
+    outputChannel.set(this.wasmOutputView);
 
     return true;
   }

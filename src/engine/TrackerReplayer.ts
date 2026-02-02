@@ -469,27 +469,25 @@ export class TrackerReplayer {
     }
 
     // --- Groove & Swing Support ---
-    // Calculate timing offset for this row based on groove template or swing amount
+    // PERFORMANCE: Use cached values where possible
     const transportState = useTransportStore.getState();
-    const tickInterval = 2.5 / this.bpm;
-    const rowDuration = tickInterval * this.speed;
+    const bpm = this.bpm;
+    const speed = this.speed;
+    const tickInterval = 2.5 / bpm;
+    const rowDuration = tickInterval * speed;
     
     let grooveOffset = 0;
-    const grooveTemplate = transportState.getGrooveTemplate();
+    const grooveTemplate = transportState.grooveTemplateId !== 'straight' ? 
+      transportState.getGrooveTemplate() : null;
     
-    if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      // Use groove template
+    if (grooveTemplate) {
       grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration);
     } else {
-      // Fall back to legacy swing behavior (affects every other row)
       const swingAmount = transportState.swing;
-      if (swingAmount !== 0 && swingAmount !== 50) {
-        const isSwungRow = (this.pattPos % 2) === 1;
-        if (isSwungRow) {
-          const maxSwingOffset = rowDuration * 0.5;
-          const normalizedSwing = (swingAmount - 50) / 50;
-          grooveOffset = normalizedSwing * maxSwingOffset;
-        }
+      if (swingAmount !== 0 && swingAmount !== 50 && (this.pattPos % 2) === 1) {
+        const maxSwingOffset = rowDuration * 0.5;
+        const normalizedSwing = (swingAmount - 50) / 50;
+        grooveOffset = normalizedSwing * maxSwingOffset;
       }
     }
 

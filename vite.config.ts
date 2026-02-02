@@ -64,11 +64,28 @@ export default defineConfig({
     },
   },
   build: {
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+    },
     rollupOptions: {
       // Ensure worklet files are copied to output
       external: (id) => id.includes('chiptune3.worklet') || id.includes('libopenmpt.worklet'),
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-tone': ['tone'],
+          'vendor-utils': ['jszip', 'file-saver', 'immer', 'zustand'],
+          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+        },
+      },
     },
     // Reduce memory during build
     chunkSizeWarningLimit: 1000,
+    reportCompressedSize: false, // Speed up build
   },
 })
