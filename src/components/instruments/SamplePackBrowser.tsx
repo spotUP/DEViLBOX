@@ -7,7 +7,7 @@ import * as Tone from 'tone';
 import { useInstrumentStore, useSamplePackStore } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
-import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2 } from 'lucide-react';
+import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getToneEngine } from '@engine/ToneEngine';
 
