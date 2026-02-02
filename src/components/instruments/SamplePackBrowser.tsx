@@ -155,7 +155,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   // Update selected pack if it was deleted or if first pack changes
   useEffect(() => {
     // If current selected pack is gone, fall back
-    if (selectedPack && !allPacks.find(p => p.id === selectedPack.id)) {
+    if (selectedPack && !allPacks.find((p: SamplePack) => p.id === selectedPack.id)) {
       setSelectedPack(allPacks[0] || null);
       setSelectedSamples(new Set());
     } 
@@ -478,7 +478,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               <h3 className="text-ft2-text font-bold text-xs mb-2">AVAILABLE PACKS</h3>
             </div>
             <div className="flex-1 overflow-y-auto p-2 scrollbar-ft2">
-              {allPacks.map((pack) => (
+              {allPacks.map((pack: SamplePack) => (
                 <button
                   key={pack.id}
                   onClick={() => {

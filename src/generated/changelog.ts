@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T22:41:41.325Z
+ * Generated: 2026-02-02T22:48:05.066Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '228';
-export const BUILD_HASH = 'eaae6dc';
+export const BUILD_NUMBER = '230';
+export const BUILD_HASH = 'd17f8f8';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Improve SamplePackStore reactivity to ensure uploaded packs appear in UI'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve sample jamming beeps by restoring Sampler for standard play and adding load guards'
+      },
       {
         type: 'fix',
         description: 'Resolve beeps during sample jamming by favoring Tone.Player for single samples'
@@ -232,14 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Introduce MAME, Dub Siren, and Synare instruments with WASM modules'
-      },
-      {
-        type: 'feature',
-        description: 'Implement core engine enhancements and assembly updates'
-      },
-      {
-        type: 'feature',
-        description: 'Add Dub Siren synth'
       }
     ]
   }
