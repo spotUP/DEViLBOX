@@ -39,6 +39,7 @@ interface MIDIStore {
   // Knob Control Target
   controlledInstrumentId: number | null;  // Which instrument the knobs control (null = all TB303)
   knobBank: KnobBankMode;
+  padBank: 'A' | 'B';
 
   // MIDI Note Transpose
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
@@ -77,6 +78,8 @@ interface MIDIStore {
   // Knob control target
   setControlledInstrument: (id: number | null) => void;
   setKnobBank: (bank: KnobBankMode) => void;
+  togglePadBank: () => void;
+  setPadBank: (bank: 'A' | 'B') => void;
 
   // MIDI Output - send CC to external hardware (e.g., TD-3-MO)
   sendCC: (cc: number, value: number, channel?: number) => void;
@@ -231,8 +234,10 @@ export const useMIDIStore = create<MIDIStore>()(
       learningParameter: null,
       lastActivityTimestamp: 0,
       controlledInstrumentId: null,  // null = control all TB303 instruments
-      knobBank: '303',
-      midiOctaveOffset: 0,  // Default: no octave transpose
+            knobBank: '303',
+            padBank: 'A',
+            midiOctaveOffset: 0,
+        // Default: no octave transpose
       showPatternDialog: false,
       showKnobBar: true,
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
@@ -664,11 +669,21 @@ export const useMIDIStore = create<MIDIStore>()(
         });
       },
 
-      setKnobBank: (bank) => {
+      setKnobBank: (bank) =>
         set((state) => {
           state.knobBank = bank;
-        });
-      },
+        }),
+
+      togglePadBank: () =>
+        set((state) => {
+          state.padBank = state.padBank === 'A' ? 'B' : 'A';
+        }),
+
+      setPadBank: (bank) =>
+        set((state) => {
+          state.padBank = bank;
+        }),
+
 
       setShowKnobBar: (show) => {
         set((state) => {
