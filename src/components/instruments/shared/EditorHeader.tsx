@@ -286,7 +286,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 
             <PresetDropdown
               synthType={instrument.synthType}
-              instrument={instrument}
               onChange={onChange}
             />
             {showHelpButton && onHelpToggle && (
