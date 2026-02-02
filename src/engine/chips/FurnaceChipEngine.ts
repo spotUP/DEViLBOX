@@ -2,7 +2,7 @@
  * FurnaceChipEngine - Centralized manager for WASM-based chip emulators
  */
 
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
 
 export const FurnaceChipType = {
   // === FM CHIPS ===
@@ -212,15 +212,19 @@ export class FurnaceChipEngine {
         // Store native context reference for diagnostics
         this.nativeContext = nativeCtx;
 
-        // Cast to AudioContext for TypeScript - we've verified it has audioWorklet
-        this.workletNode = new AudioWorkletNode(nativeCtx, 'furnace-chips-processor', {
+        // Use unified helper to create node (handles wrappers correctly)
+        // Pass the ORIGINAL audioContext (wrapper) to the helper
+        this.workletNode = createAudioWorkletNode(audioContext, 'furnace-chips-processor', {
           numberOfInputs: 0,
           numberOfOutputs: 1,
           outputChannelCount: [2],
         });
-        // Connect worklet output directly to speakers (its own AudioContext destination)
-        this.workletNode.connect(nativeCtx.destination);
-        console.log('[FurnaceChipEngine] AudioWorkletNode created and connected to destination, ctx state:', this.nativeContext.state);
+        
+        if (this.workletNode) {
+          // Connect worklet output directly to speakers (its own AudioContext destination)
+          this.workletNode.connect(nativeCtx.destination);
+          console.log('[FurnaceChipEngine] AudioWorkletNode created and connected to destination, ctx state:', this.nativeContext.state);
+        }
       } catch (err) {
         console.error('[FurnaceChipEngine] AudioWorkletNode creation failed:', err);
         this.initPromise = null;
@@ -248,11 +252,13 @@ export class FurnaceChipEngine {
 
       // Send binary, JS code, and init command
       console.log('[FurnaceChipEngine] Sending WASM binary and JS to worklet...');
-      this.workletNode.port.postMessage({
-        type: 'init',
-        wasmBinary,
-        jsCode
-      });
+      if (this.workletNode) {
+        this.workletNode.port.postMessage({
+          type: 'init',
+          wasmBinary,
+          jsCode
+        });
+      }
 
       const success = await initPromise;
       if (success) {

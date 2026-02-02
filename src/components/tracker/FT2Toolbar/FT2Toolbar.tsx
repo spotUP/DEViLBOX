@@ -44,16 +44,43 @@ const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensi
 // PERFORMANCE: Separate component for row display to isolate currentRow subscription
 // This prevents the entire toolbar from re-rendering on every row change (~12x/sec during playback)
 const RowDisplay: React.FC = React.memo(() => {
-  const currentRow = useTransportStore((state) => state.currentRow);
+  const storeRow = useTransportStore((state) => state.currentRow);
+  const isPlaying = useTransportStore((state) => state.isPlaying);
   const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+  const [displayRow, setDisplayRow] = useState(storeRow);
+
+  // Sync with audio clock during playback using animation loop
+  React.useEffect(() => {
+    if (!isPlaying) {
+      setDisplayRow(storeRow);
+      return;
+    }
+
+    let rafId: number;
+    const { getTrackerReplayer } = require('@/engine/TrackerReplayer');
+    const { now } = require('tone');
+    const replayer = getTrackerReplayer();
+
+    const update = () => {
+      // Get audio-synced row with 10ms lookahead
+      const state = replayer.getStateAtTime(now() + 0.01);
+      if (state) {
+        setDisplayRow(state.row);
+      }
+      rafId = requestAnimationFrame(update);
+    };
+
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, storeRow]);
 
   return (
     <div className="ft2-section ft2-section-playback">
       <span className="ft2-row-display">
         Row: <span className="ft2-row-value">
           {useHexNumbers
-            ? currentRow.toString(16).toUpperCase().padStart(2, '0')
-            : currentRow.toString(10).padStart(2, '0')
+            ? displayRow.toString(16).toUpperCase().padStart(2, '0')
+            : displayRow.toString(10).padStart(2, '0')
           }
         </span>
       </span>

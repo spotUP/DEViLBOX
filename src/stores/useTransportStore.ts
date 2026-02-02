@@ -94,6 +94,11 @@ export const useTransportStore = create<TransportStore>()(
     setSwing: (swing) =>
       set((state) => {
         state.swing = Math.max(0, Math.min(100, swing));
+        // Clear groove template when setting manual swing
+        state.grooveTemplateId = 'straight';
+        
+        // Log timing change recognition
+        console.log('[TransportStore] Swing changed, replayer will reflect on next lookahead');
       }),
 
     setPosition: (position) =>
@@ -187,7 +192,7 @@ export const useTransportStore = create<TransportStore>()(
 
         // Clear any pending timer
         if (throttleTimer !== null) {
-          clearTimeout(throttleTimer);
+          window.clearTimeout(throttleTimer);
           throttleTimer = null;
         }
       } else if (throttleTimer === null) {
@@ -250,6 +255,8 @@ export const useTransportStore = create<TransportStore>()(
           state.grooveTemplateId = templateId;
           // Also update swing to 0 when using groove template (they're alternatives)
           state.swing = 0;
+          
+          console.log('[TransportStore] Groove template changed to:', templateId);
         }
       }),
 
