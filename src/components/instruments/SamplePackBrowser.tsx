@@ -21,7 +21,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const [selectedPack, setSelectedPack] = useState<SamplePack | null>(allPacks[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSample, setSelectedSample] = useState<SampleInfo | null>(null);
+  const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [_isPlaying, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
@@ -29,16 +30,28 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const zipInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync preview instrument with selected sample
+  // Get primary selected sample for preview instrument
+  const primarySample = React.useMemo(() => {
+    if (selectedSamples.size === 0 || !selectedPack) return null;
+    const firstUrl = Array.from(selectedSamples)[selectedSamples.size - 1]; // Use last selected
+    // Find sample info in any category
+    for (const cat of selectedPack.categories) {
+      const found = selectedPack.samples[cat].find(s => s.url === firstUrl);
+      if (found) return found;
+    }
+    return null;
+  }, [selectedSamples, selectedPack]);
+
+  // Sync preview instrument with primary selected sample
   const previewConfig = React.useMemo(() => {
-    if (!selectedSample) return null;
+    if (!primarySample) return null;
     return {
       id: 999,
-      name: `Preview: ${selectedSample.name}`,
+      name: `Preview: ${primarySample.name}`,
       type: 'sample',
       synthType: 'Sampler',
       sample: {
-        url: selectedSample.url,
+        url: primarySample.url,
         baseNote: 'C4',
         detune: 0,
         loop: false,
@@ -51,7 +64,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       volume: -6,
       pan: 0,
     } as any;
-  }, [selectedSample]);
+  }, [primarySample]);
 
   useEffect(() => {
     if (previewConfig) {
@@ -78,7 +91,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       };
 
       const note = keyMap[e.key.toLowerCase()];
-      if (note && previewConfig) {
+      if (note && primarySample && previewConfig) {
         const engine = getToneEngine();
         engine.triggerPolyNoteAttack(999, note, 1, previewConfig);
       }
@@ -93,7 +106,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       };
 
       const note = keyMap[e.key.toLowerCase()];
-      if (note && previewConfig) {
+      if (note && primarySample && previewConfig) {
         const engine = getToneEngine();
         engine.triggerPolyNoteRelease(999, note, previewConfig);
       }
@@ -105,7 +118,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedSample]);
+  }, [primarySample, previewConfig]);
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -121,6 +134,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   useEffect(() => {
     if (selectedPack && !allPacks.find(p => p.id === selectedPack.id)) {
       setSelectedPack(allPacks[0] || null);
+      setSelectedSamples(new Set());
     } else if (!selectedPack && allPacks.length > 0) {
       setSelectedPack(allPacks[0]);
     }
@@ -140,6 +154,36 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   };
 
   const filteredSamples = getFilteredSamples();
+
+  // Selection handler
+  const handleSampleClick = (sample: SampleInfo, index: number, event: React.MouseEvent) => {
+    const newSelection = new Set(selectedSamples);
+
+    if (event.shiftKey && lastSelectedIndex !== null) {
+      // Range selection
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      for (let i = start; i <= end; i++) {
+        newSelection.add(filteredSamples[i].url);
+      }
+    } else if (event.ctrlKey || event.metaKey) {
+      // Toggle individual
+      if (newSelection.has(sample.url)) {
+        newSelection.delete(sample.url);
+      } else {
+        newSelection.add(sample.url);
+      }
+    } else {
+      // Single selection
+      newSelection.clear();
+      newSelection.add(sample.url);
+      // Auto-preview on click
+      previewSample(sample);
+    }
+
+    setSelectedSamples(newSelection);
+    setLastSelectedIndex(index);
+  };
 
   // Preview a sample
   const previewSample = async (sample: SampleInfo) => {
@@ -187,16 +231,32 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     setPlayingSample(null);
   };
 
-  // Load selected sample into current instrument
-  const handleLoadSample = (sample: SampleInfo) => {
-    if (currentInstrumentId === null) return;
+  // Load selected samples into current instrument(s)
+  const handleLoadSamples = () => {
+    if (currentInstrumentId === null || selectedSamples.size === 0 || !selectedPack) return;
 
+    const urls = Array.from(selectedSamples);
+    
+    // Find all sample objects for selected URLs
+    const samplesToLoad: SampleInfo[] = [];
+    for (const url of urls) {
+      for (const cat of selectedPack.categories) {
+        const found = selectedPack.samples[cat].find(s => s.url === url);
+        if (found) {
+          samplesToLoad.push(found);
+          break;
+        }
+      }
+    }
+
+    // Load first sample into CURRENT instrument
+    const first = samplesToLoad[0];
     updateInstrument(currentInstrumentId, {
       type: 'sample',
-      name: sample.name,
+      name: first.name,
       synthType: 'Sampler',
       sample: {
-        url: sample.url,
+        url: first.url,
         baseNote: 'C4',
         detune: 0,
         loop: false,
@@ -209,6 +269,32 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       volume: -6,
       pan: 0,
     });
+
+    // If multiple samples, create NEW instruments for the rest
+    if (samplesToLoad.length > 1) {
+      const { createInstrument } = useInstrumentStore.getState();
+      for (let i = 1; i < samplesToLoad.length; i++) {
+        const s = samplesToLoad[i];
+        createInstrument({
+          type: 'sample',
+          name: s.name,
+          synthType: 'Sampler',
+          sample: {
+            url: s.url,
+            baseNote: 'C4',
+            detune: 0,
+            loop: false,
+            loopStart: 0,
+            loopEnd: 0,
+            reverse: false,
+            playbackRate: 1,
+          },
+          effects: [],
+          volume: -6,
+          pan: 0,
+        });
+      }
+    }
 
     onClose();
   };
@@ -488,7 +574,11 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                     <input
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setSelectedSamples(new Set());
+                        setLastSelectedIndex(null);
+                      }}
                       placeholder="Search samples..."
                       className="w-full pl-10 pr-4 py-2 bg-ft2-bg border border-ft2-border text-ft2-text rounded focus:border-ft2-highlight focus:outline-none"
                     />
@@ -505,7 +595,11 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                     return (
                       <button
                         key={category}
-                        onClick={() => setActiveCategory(category)}
+                        onClick={() => {
+                          setActiveCategory(category);
+                          setSelectedSamples(new Set());
+                          setLastSelectedIndex(null);
+                        }}
                         className={`
                           flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded transition-colors whitespace-nowrap
                           ${
@@ -535,8 +629,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                      {filteredSamples.map((sample) => {
-                        const isSelected = selectedSample?.url === sample.url;
+                      {filteredSamples.map((sample, index) => {
+                        const isSelected = selectedSamples.has(sample.url);
                         const isCurrentlyPlaying = playingSample === sample.url;
 
                         return (
@@ -544,15 +638,11 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                             key={sample.url}
                             role="button"
                             tabIndex={0}
-                            onClick={() => setSelectedSample(sample)}
-                            onDoubleClick={() => handleLoadSample(sample)}
+                            onClick={(e) => handleSampleClick(sample, index, e)}
+                            onDoubleClick={() => handleLoadSamples()}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                if (e.shiftKey) {
-                                  handleLoadSample(sample);
-                                } else {
-                                  setSelectedSample(sample);
-                                }
+                                handleLoadSamples();
                               }
                             }}
                             className={`
@@ -625,9 +715,9 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               <>
                 {filteredSamples.length} sample{filteredSamples.length !== 1 ? 's' : ''} in{' '}
                 {SAMPLE_CATEGORY_LABELS[activeCategory]}
-                {selectedSample && (
+                {selectedSamples.size > 0 && (
                   <span className="ml-2 text-ft2-text">
-                    • Double-click or click Load to use "{selectedSample.name}"
+                    • {selectedSamples.size} selected. Double-click or click Load to use.
                   </span>
                 )}
               </>
@@ -641,14 +731,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               Cancel
             </button>
             <button
-              onClick={() => {
-                if (selectedSample) handleLoadSample(selectedSample);
-              }}
-              disabled={!selectedSample}
+              onClick={handleLoadSamples}
+              disabled={selectedSamples.size === 0}
               className="flex items-center gap-2 px-4 py-2 bg-ft2-cursor text-ft2-bg font-bold hover:bg-ft2-highlight rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check size={16} />
-              Load Sample
+              Load {selectedSamples.size > 1 ? `${selectedSamples.size} Samples` : 'Sample'}
             </button>
           </div>
         </div>
