@@ -169,15 +169,42 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
+        onBake={handleBake}
+        onBakePro={handleBakePro}
+        onUnbake={handleUnbake}
+        isBaked={isBaked}
+        isBaking={isBaking}
         customHeader={
           <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-700 shadow-lg">
-                <Zap size={24} className="text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-700 shadow-lg">
+                  <Zap size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SPACE LASER</h2>
+                  <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Cosmic Zap Generator</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SPACE LASER</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Cosmic Zap Generator</p>
+              
+              <div className="flex items-center gap-2">
+                {/* Live Mode Toggle */}
+                <button
+                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                    instrument.isLive
+                      ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                      : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  }`}
+                >
+                  <Radio size={14} />
+                  <span className="text-[10px] font-bold uppercase">LIVE</span>
+                </button>
+
+                <PresetDropdown
+                  synthType={instrument.synthType}
+                  onChange={onChange}
+                />
               </div>
             </div>
           </div>
@@ -198,15 +225,41 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
+        onBake={handleBake}
+        onBakePro={handleBakePro}
+        onUnbake={handleUnbake}
+        isBaked={isBaked}
+        isBaking={isBaking}
         customHeader={
           <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
-                <Box size={24} className="text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
+                  <Box size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SYNTH</h2>
+                  <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Farbrausch 4k Intro Engine</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SYNTH</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Farbrausch 4k Intro Engine</p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                    instrument.isLive
+                      ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                      : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  }`}
+                >
+                  <Radio size={14} />
+                  <span className="text-[10px] font-bold uppercase">LIVE</span>
+                </button>
+
+                <PresetDropdown
+                  synthType={instrument.synthType}
+                  onChange={onChange}
+                />
               </div>
             </div>
           </div>
@@ -227,15 +280,41 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
+        onBake={handleBake}
+        onBakePro={handleBakePro}
+        onUnbake={handleUnbake}
+        isBaked={isBaked}
+        isBaking={isBaking}
         customHeader={
           <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-red-700 shadow-lg">
-                <Megaphone size={24} className="text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-red-700 shadow-lg">
+                  <Megaphone size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DUB SIREN</h2>
+                  <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Sound System Generator</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DUB SIREN</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Sound System Generator</p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                    instrument.isLive
+                      ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                      : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  }`}
+                >
+                  <Radio size={14} />
+                  <span className="text-[10px] font-bold uppercase">LIVE</span>
+                </button>
+
+                <PresetDropdown
+                  synthType={instrument.synthType}
+                  onChange={onChange}
+                />
               </div>
             </div>
           </div>
@@ -256,15 +335,41 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
+        onBake={handleBake}
+        onBakePro={handleBakePro}
+        onUnbake={handleUnbake}
+        isBaked={isBaked}
+        isBaking={isBaking}
         customHeader={
           <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-700 shadow-lg text-black">
-                <Drum size={24} />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-700 shadow-lg text-black">
+                  <Drum size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SYNARE 3</h2>
+                  <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Electronic Percussion</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SYNARE 3</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Electronic Percussion</p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                    instrument.isLive
+                      ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                      : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  }`}
+                >
+                  <Radio size={14} />
+                  <span className="text-[10px] font-bold uppercase">LIVE</span>
+                </button>
+
+                <PresetDropdown
+                  synthType={instrument.synthType}
+                  onChange={onChange}
+                />
               </div>
             </div>
           </div>
