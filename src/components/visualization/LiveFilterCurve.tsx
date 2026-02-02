@@ -6,9 +6,10 @@
  * - Animates cutoff position based on LFO/envelope modulation
  * - Shows sweep range during filter envelope
  * - 30fps animation
+ * - High-DPI (Retina) support
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useLayoutEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useVisualizationStore } from '@stores/useVisualizationStore';
 
@@ -150,29 +151,27 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     [type, graphWidth, padding.left, dbToY]
   );
 
-  // Initialize canvas
-  useEffect(() => {
+  // Setup High-DPI canvas size and context scaling
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    
     contextRef.current = ctx;
-  }, []);
+  }, [width, height]);
 
   // Animation frame callback
   const onFrame = useCallback((): boolean => {
-    const canvas = canvasRef.current;
     const ctx = contextRef.current;
-    if (!canvas || !ctx) return false;
-
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== width * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.scale(dpr, dpr);
-    }
+    if (!ctx) return false;
 
     // Calculate modulated cutoff
     let modCutoff = cutoff;
@@ -212,7 +211,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
 
     // Clear canvas
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
 
     // Draw grid
     ctx.strokeStyle = '#333';
@@ -334,6 +333,8 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     graphWidth,
     graphHeight,
     padding,
+    width,
+    height
   ]);
 
   // Start animation
@@ -345,10 +346,13 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height}
       className={`rounded ${className}`}
-      style={{ backgroundColor }}
+      style={{ 
+        backgroundColor,
+        width: `${width}px`,
+        height: `${height}px`,
+        display: 'block'
+      }}
     />
   );
 };

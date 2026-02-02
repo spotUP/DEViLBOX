@@ -1,24 +1,24 @@
 /**
- * LiveADSRVisualizer - Animated ADSR envelope display
+ * LiveADSRVisualizer - Real-time ADSR envelope visualization
  *
  * Features:
- * - Shows ADSR envelope shape
- * - Animated playhead during note playback
- * - Highlights current stage (A/D/S/R) with color
- * - Reads from visualization store for stage tracking
+ * - Shows ADSR curve with attack, decay, sustain, and release segments
+ * - Animates current position marker during playback
+ * - Configurable size and colors
  * - 30fps animation
+ * - High-DPI (Retina) support
  */
 
-import React, { useRef, useCallback, useEffect, useState as _useState } from 'react';
+import React, { useRef, useCallback, useLayoutEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useVisualizationStore } from '@stores/useVisualizationStore';
 
 interface LiveADSRVisualizerProps {
   instrumentId: number;
-  attack: number; // ms
-  decay: number; // ms
-  sustain: number; // 0-100
-  release: number; // ms
+  attack: number;  // 0-1 (seconds)
+  decay: number;   // 0-1
+  sustain: number; // 0-1
+  release: number; // 0-1
   width?: number;
   height?: number;
   color?: string;
@@ -26,8 +26,6 @@ interface LiveADSRVisualizerProps {
   backgroundColor?: string;
   className?: string;
 }
-
-type ADSRStage = 'attack' | 'decay' | 'sustain' | 'release' | 'idle';
 
 export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   instrumentId,
@@ -37,262 +35,159 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   release,
   width = 200,
   height = 80,
-  color = '#00ff88',
-  activeColor = '#ffffff',
+  color = '#4ade80',
+  activeColor = '#fbbf24',
   backgroundColor = '#1a1a1a',
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
-  const playheadPosRef = useRef(0);
-  const lastStageRef = useRef<ADSRStage>('idle');
-  void playheadPosRef; // Reserved for playhead animation
-  void lastStageRef; // Reserved for stage change detection
 
-  // Subscribe to visualization store
+  // Subscribe to visualization store for active stage and progress
   const adsrStages = useVisualizationStore((state) => state.adsrStages);
   const adsrProgress = useVisualizationStore((state) => state.adsrProgress);
 
-  const currentStage = adsrStages.get(instrumentId) || 'idle';
+  const activeStage = adsrStages.get(instrumentId) || 'idle';
   const stageProgress = adsrProgress.get(instrumentId) || 0;
 
-  // Padding and dimensions
-  const padding = { top: 8, right: 8, bottom: 8, left: 8 };
-  const graphWidth = width - padding.left - padding.right;
-  const graphHeight = height - padding.top - padding.bottom;
-
-  // Calculate stage widths (proportional)
-  const totalTime = attack + decay + release;
-  const sustainProportion = 0.15;
-  const timeProportion = 1 - sustainProportion;
-
-  const attackWidth = totalTime > 0 ? (attack / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
-  const decayWidth = totalTime > 0 ? (decay / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
-  const sustainWidth = graphWidth * sustainProportion;
-  const releaseWidth = totalTime > 0 ? (release / totalTime) * graphWidth * timeProportion : graphWidth * 0.25;
-
-  // Initialize canvas
-  useEffect(() => {
+  // Setup High-DPI canvas size and context scaling
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    
     contextRef.current = ctx;
-  }, []);
+  }, [width, height]);
 
   // Animation frame callback
   const onFrame = useCallback((): boolean => {
-    const canvas = canvasRef.current;
     const ctx = contextRef.current;
-    if (!canvas || !ctx) return false;
+    if (!ctx) return false;
 
-    const dpr = window.devicePixelRatio || 1;
-    const canvasHeight = height + 16;
-    if (canvas.width !== width * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = canvasHeight * dpr;
-      ctx.scale(dpr, dpr);
-    }
-
-    // Clear canvas
+    // Clear canvas using logical units
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, canvasHeight);
+    ctx.fillRect(0, 0, width, height);
 
-    // Calculate envelope points
-    const startX = padding.left;
-    const startY = padding.top + graphHeight;
+    // Padding and dimensions
+    const padding = { top: 10, right: 10, bottom: 10, left: 10 };
+    const innerWidth = width - padding.left - padding.right;
+    const innerHeight = height - padding.top - padding.bottom;
 
-    const attackEndX = startX + attackWidth;
-    const attackEndY = padding.top;
+    // Calculate segments (fixed ratios for visual balance)
+    const segmentWidth = innerWidth / 4;
+    
+    // Coordinates
+    const x0 = padding.left;
+    const x1 = x0 + segmentWidth;
+    const x2 = x1 + segmentWidth;
+    const x3 = x2 + segmentWidth;
+    const x4 = x3 + segmentWidth;
 
-    const decayEndX = attackEndX + decayWidth;
-    const decayEndY = padding.top + graphHeight * (1 - sustain / 100);
+    const yBottom = padding.top + innerHeight;
+    const yTop = padding.top;
+    const ySustain = yBottom - (innerHeight * sustain);
 
-    const sustainEndX = decayEndX + sustainWidth;
-    const sustainEndY = decayEndY;
-
-    const releaseEndX = padding.left + graphWidth;
-    const releaseEndY = padding.top + graphHeight;
-
-    // Draw stage separators
+    // Draw grid
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-
-    // Attack/Decay boundary
+    ctx.setLineDash([2, 2]);
     ctx.beginPath();
-    ctx.moveTo(attackEndX, padding.top);
-    ctx.lineTo(attackEndX, padding.top + graphHeight);
+    ctx.moveTo(x0, ySustain);
+    ctx.lineTo(x4, ySustain);
     ctx.stroke();
-
-    // Decay/Sustain boundary
-    ctx.beginPath();
-    ctx.moveTo(decayEndX, padding.top);
-    ctx.lineTo(decayEndX, padding.top + graphHeight);
-    ctx.stroke();
-
-    // Sustain/Release boundary
-    ctx.beginPath();
-    ctx.moveTo(sustainEndX, padding.top);
-    ctx.lineTo(sustainEndX, padding.top + graphHeight);
-    ctx.stroke();
-
     ctx.setLineDash([]);
 
-    // Draw filled envelope area
+    // Draw curve
     ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(attackEndX, attackEndY);
-    ctx.lineTo(decayEndX, decayEndY);
-    ctx.lineTo(sustainEndX, sustainEndY);
-    ctx.lineTo(releaseEndX, releaseEndY);
-    ctx.lineTo(releaseEndX, padding.top + graphHeight);
-    ctx.lineTo(startX, padding.top + graphHeight);
-    ctx.closePath();
+    ctx.moveTo(x0, yBottom);
+    ctx.lineTo(x1, yTop);      // Attack
+    ctx.lineTo(x2, ySustain);  // Decay
+    ctx.lineTo(x3, ySustain);  // Sustain
+    ctx.lineTo(x4, yBottom);   // Release
 
-    // Fill with gradient
-    const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + graphHeight);
-    gradient.addColorStop(0, `${color}33`);
-    gradient.addColorStop(1, `${color}11`);
-    ctx.fillStyle = gradient;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.lineTo(x4, yBottom);
+    ctx.lineTo(x0, yBottom);
+    ctx.fillStyle = `${color}22`;
     ctx.fill();
 
-    // Draw envelope line with stage highlighting
-    const drawStageSegment = (
-      x1: number,
-      y1: number,
-      x2: number,
-      y2: number,
-      stage: ADSRStage
-    ) => {
-      const isActive = currentStage === stage;
-      ctx.strokeStyle = isActive ? activeColor : color;
-      ctx.lineWidth = isActive ? 3 : 2;
-      ctx.lineCap = 'round';
+    // Draw active position marker
+    if (activeStage !== 'idle') {
+      let markerX = x0;
+      let markerY = yBottom;
 
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-
-      // Glow effect for active stage
-      if (isActive) {
-        ctx.shadowColor = activeColor;
-        ctx.shadowBlur = 8;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
-    };
-
-    // Draw each stage
-    drawStageSegment(startX, startY, attackEndX, attackEndY, 'attack');
-    drawStageSegment(attackEndX, attackEndY, decayEndX, decayEndY, 'decay');
-    drawStageSegment(decayEndX, decayEndY, sustainEndX, sustainEndY, 'sustain');
-    drawStageSegment(sustainEndX, sustainEndY, releaseEndX, releaseEndY, 'release');
-
-    // Calculate and draw playhead
-    let playheadX = startX;
-    if (currentStage !== 'idle') {
-      switch (currentStage) {
+      switch (activeStage) {
         case 'attack':
-          playheadX = startX + stageProgress * attackWidth;
+          markerX = x0 + segmentWidth * stageProgress;
+          markerY = yBottom - (innerHeight * stageProgress);
           break;
         case 'decay':
-          playheadX = attackEndX + stageProgress * decayWidth;
+          markerX = x1 + segmentWidth * stageProgress;
+          markerY = yTop + (ySustain - yTop) * stageProgress;
           break;
         case 'sustain':
-          playheadX = decayEndX + stageProgress * sustainWidth;
+          markerX = x2 + segmentWidth * stageProgress;
+          markerY = ySustain;
           break;
         case 'release':
-          playheadX = sustainEndX + stageProgress * releaseWidth;
+          markerX = x3 + segmentWidth * stageProgress;
+          markerY = ySustain + (yBottom - ySustain) * stageProgress;
           break;
       }
 
-      // Draw playhead
-      ctx.strokeStyle = activeColor;
-      ctx.lineWidth = 2;
+      // Draw glowing dot
       ctx.beginPath();
-      ctx.moveTo(playheadX, padding.top);
-      ctx.lineTo(playheadX, padding.top + graphHeight);
-      ctx.stroke();
-
-      // Playhead glow
-      ctx.shadowColor = activeColor;
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Draw playhead dot
-      let playheadY = startY;
-      if (currentStage === 'attack') {
-        playheadY = startY - stageProgress * (startY - attackEndY);
-      } else if (currentStage === 'decay') {
-        playheadY = attackEndY + stageProgress * (decayEndY - attackEndY);
-      } else if (currentStage === 'sustain') {
-        playheadY = decayEndY;
-      } else if (currentStage === 'release') {
-        playheadY = sustainEndY + stageProgress * (releaseEndY - sustainEndY);
-      }
-
+      ctx.arc(markerX, markerY, 4, 0, Math.PI * 2);
       ctx.fillStyle = activeColor;
-      ctx.beginPath();
-      ctx.arc(playheadX, playheadY, 4, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.shadowColor = activeColor;
       ctx.shadowBlur = 8;
       ctx.fill();
       ctx.shadowBlur = 0;
     }
 
-    // Draw stage labels
-    ctx.fillStyle = '#666';
-    ctx.font = '9px monospace';
-    ctx.textAlign = 'center';
-
-    const labelY = padding.top + graphHeight + 12;
-    ctx.fillText('A', startX + attackWidth / 2, labelY);
-    ctx.fillText('D', attackEndX + decayWidth / 2, labelY);
-    ctx.fillText('S', decayEndX + sustainWidth / 2, labelY);
-    ctx.fillText('R', sustainEndX + releaseWidth / 2, labelY);
-
-    return currentStage !== 'idle';
+    return activeStage !== 'idle';
   }, [
-    instrumentId,
+    activeStage,
+    stageProgress,
     attack,
     decay,
     sustain,
     release,
-    currentStage,
-    stageProgress,
+    width,
+    height,
     color,
     activeColor,
     backgroundColor,
-    graphWidth,
-    graphHeight,
-    attackWidth,
-    decayWidth,
-    sustainWidth,
-    releaseWidth,
-    padding,
   ]);
 
   // Start animation
   useVisualizationAnimation({
     onFrame,
     enabled: true,
-    fps: currentStage !== 'idle' ? 30 : 10, // Lower FPS when idle
   });
 
   return (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height + 16} // Extra space for labels
       className={`rounded ${className}`}
-      style={{ backgroundColor }}
+      style={{ 
+        backgroundColor,
+        width: `${width}px`,
+        height: `${height}px`,
+        display: 'block'
+      }}
     />
   );
 };
