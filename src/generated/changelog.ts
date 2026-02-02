@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:53:31.203Z
+ * Generated: 2026-02-02T21:57:52.959Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '218';
-export const BUILD_HASH = '12593b5';
+export const BUILD_NUMBER = '220';
+export const BUILD_HASH = 'b1013bf';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add keyboard and MIDI support for sample preview in SamplePackBrowser'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve BaseAudioContext error in V2Synth initialization'
+      },
       {
         type: 'fix',
         description: 'Resolve missing default config imports in useInstrumentStore'
@@ -236,14 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Improve tracker playback engine and visual sync'
-      },
-      {
-        type: 'feature',
-        description: 'Enhance MIDI system with learn modal, grouping, and smoothing'
-      },
-      {
-        type: 'improvement',
-        description: 'Update generated changelog'
       }
     ]
   }
