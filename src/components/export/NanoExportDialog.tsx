@@ -32,10 +32,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
     return {
       bytes: binaryData.length,
       kb: (binaryData.length / 1024).toFixed(2),
-      instr: instruments.filter(i => {
-        // Simple check if used
-        return true; // Exporter filters anyway
-      }).length
+      instr: instruments.length
     };
   }, [binaryData, instruments]);
 
@@ -46,7 +43,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
   };
 
   const handleDownload = () => {
-    const blob = new Blob([binaryData], { type: 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(binaryData)], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

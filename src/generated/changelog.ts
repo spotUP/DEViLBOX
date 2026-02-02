@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:36:00.995Z
+ * Generated: 2026-02-02T21:46:23.764Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '213';
-export const BUILD_HASH = 'fe75d3e';
+export const BUILD_NUMBER = '214';
+export const BUILD_HASH = '1cd33c9';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Expand Farbrausch V2 synth with drum presets and demoscene zaps'
+      },
       {
         type: 'feature',
         description: 'Add Nano-Exporter for demoscene-grade 4k intro binary packing'
@@ -240,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add Clear modal and functional Speed/Song Length controls'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve pattern editor smooth scrolling and performance'
       }
     ]
   }

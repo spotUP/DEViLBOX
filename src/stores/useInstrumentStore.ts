@@ -18,6 +18,7 @@ import {
   DEFAULT_TB303,
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
+  DEFAULT_V2,
   DEFAULT_SYNARE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
@@ -406,9 +407,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
       return newId;
     },
 
-    resetInstrument: (id) => {
-      // ... (existing implementation)
-    },
+    resetInstrument: (_id) => {
+      set((state) => {
+        const instrument = state.instruments.find((inst) => inst.id === _id);
+
 
     bakeInstrument: async (id, bakeType = 'lite') => {
       const state = get();

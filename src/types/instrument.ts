@@ -135,7 +135,7 @@ export type SynthType =
   | 'V2'               // Farbrausch V2 Synth
   | 'Synare';          // Synare 3 (Electronic Percussion)
 
-export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
+export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
 // Extended waveform types for vibrato/tremolo effects (tracker formats)
 export type VibratoWaveformType = 'sine' | 'rampDown' | 'rampUp' | 'square' | 'random';
