@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
-import { useInstrumentStore, useSamplePackStore, useMIDIStore } from '@stores';
+import { useInstrumentStore, useSamplePackStore } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2 } from 'lucide-react';
@@ -30,28 +30,31 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const dirInputRef = useRef<HTMLInputElement>(null);
 
   // Sync preview instrument with selected sample
+  const previewConfig = React.useMemo(() => {
+    if (!selectedSample) return null;
+    return {
+      id: 999,
+      name: `Preview: ${selectedSample.name}`,
+      type: 'sample',
+      synthType: 'Sampler',
+      sample: {
+        url: selectedSample.url,
+        baseNote: 'C4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: 0,
+        reverse: false,
+        playbackRate: 1,
+      },
+      effects: [],
+      volume: -6,
+      pan: 0,
+    } as any;
+  }, [selectedSample]);
+
   useEffect(() => {
-    if (selectedSample) {
-      // Create a temporary instrument config for the preview
-      const previewConfig: any = {
-        id: 999, // Special ID for preview
-        name: `Preview: ${selectedSample.name}`,
-        type: 'sample',
-        synthType: 'Sampler',
-        sample: {
-          url: selectedSample.url,
-          baseNote: 'C4',
-          detune: 0,
-          loop: false,
-          loopStart: 0,
-          loopEnd: 0,
-          reverse: false,
-          playbackRate: 1,
-        },
-        effects: [],
-        volume: -6,
-        pan: 0,
-      };
+    if (previewConfig) {
       setPreviewInstrument(previewConfig);
     } else {
       setPreviewInstrument(null);
@@ -60,7 +63,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     return () => {
       setPreviewInstrument(null);
     };
-  }, [selectedSample, setPreviewInstrument]);
+  }, [previewConfig, setPreviewInstrument]);
 
   // Keyboard support for previewing
   useEffect(() => {
@@ -75,9 +78,9 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       };
 
       const note = keyMap[e.key.toLowerCase()];
-      if (note && selectedSample) {
+      if (note && previewConfig) {
         const engine = getToneEngine();
-        engine.triggerPolyNoteAttack(999, note, 1);
+        engine.triggerPolyNoteAttack(999, note, 1, previewConfig);
       }
     };
 
@@ -90,9 +93,9 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       };
 
       const note = keyMap[e.key.toLowerCase()];
-      if (note) {
+      if (note && previewConfig) {
         const engine = getToneEngine();
-        engine.triggerPolyNoteRelease(999, note);
+        engine.triggerPolyNoteRelease(999, note, previewConfig);
       }
     };
 
