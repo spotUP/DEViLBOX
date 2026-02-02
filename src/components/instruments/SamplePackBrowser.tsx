@@ -22,6 +22,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSample, setSelectedSample] = useState<SampleInfo | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [_isPlaying, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
@@ -213,6 +214,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsUploading(true);
     try {
       const pack = await uploadZip(file);
       setSelectedPack(pack);
@@ -221,6 +223,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       }
     } catch (error) {
       alert('Failed to load ZIP pack. Ensure it contains audio files.');
+    } finally {
+      setIsUploading(false);
     }
     
     // Reset input
@@ -231,6 +235,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    setIsUploading(true);
     try {
       const pack = await uploadDirectory(files);
       setSelectedPack(pack);
@@ -239,6 +244,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       }
     } catch (error) {
       alert('Failed to load directory. Ensure it contains audio files.');
+    } finally {
+      setIsUploading(false);
     }
 
     // Reset input
@@ -285,7 +292,20 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 pt-16">
-      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border">
+      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border relative">
+        {/* Loading Overlay */}
+        {isUploading && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="p-6 bg-ft2-header border-2 border-ft2-highlight rounded-xl shadow-2xl flex flex-col items-center gap-4">
+              <Package size={48} className="text-ft2-highlight animate-bounce" />
+              <div className="text-center">
+                <h3 className="text-ft2-highlight font-black text-xl tracking-tighter">PACKING...</h3>
+                <p className="text-ft2-textDim text-xs font-bold uppercase">Processing audio files</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
           <div className="flex items-center gap-3">

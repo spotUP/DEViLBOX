@@ -84,6 +84,20 @@ function isLikelyCover(filename: string): boolean {
 }
 
 /**
+ * Check if a file is a system or hidden file
+ */
+function isSystemFile(filename: string, path: string): boolean {
+  const lower = filename.toLowerCase();
+  return (
+    lower === '.ds_store' || 
+    lower === 'thumbs.db' || 
+    lower.startsWith('._') || 
+    path.includes('__MACOSX') ||
+    filename.startsWith('.')
+  );
+}
+
+/**
  * Map folder name to category
  */
 function folderToCategory(folderName: string): SampleCategory {
@@ -113,7 +127,7 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     fx: [], bass: [], leads: [], pads: [], loops: [], vocals: [], other: [],
   };
 
-  let packName = 'Uploaded Pack';
+  let packName = '';
   let coverImage: string | undefined;
   let potentialCovers: { file: File, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
@@ -122,22 +136,26 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const path = file.webkitRelativePath || file.name;
-    const parts = path.split('/');
+    
+    if (isSystemFile(file.name, path)) continue;
 
-    // Get pack name from root folder
-    if (parts.length > 0 && packName === 'Uploaded Pack') {
+    const parts = path.split('/').filter(p => p.length > 0);
+    const filename = parts[parts.length - 1];
+
+    // Get pack name from root folder if possible
+    if (parts.length > 1 && !packName) {
       packName = parts[0];
     }
 
     // Handle potential cover image
-    if (isImageFile(file.name)) {
-      const priority = isLikelyCover(file.name) ? 2 : (parts.length <= 2 ? 1 : 0);
+    if (isImageFile(filename)) {
+      const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
       potentialCovers.push({ file, priority });
       continue;
     }
 
     // Skip non-audio files
-    if (!isAudioFile(file.name)) continue;
+    if (!isAudioFile(filename)) continue;
 
     // Determine category from folder structure
     let category: SampleCategory = 'other';
@@ -151,8 +169,8 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     const url = URL.createObjectURL(file);
 
     const sampleInfo: SampleInfo = {
-      filename: file.name,
-      name: cleanSampleName(file.name),
+      filename,
+      name: cleanSampleName(filename),
       category,
       url,
     };
@@ -160,6 +178,9 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     samples[category].push(sampleInfo);
     categories.add(category);
   }
+
+  // Fallback pack name
+  if (!packName) packName = 'Uploaded Pack';
 
   // Select best cover image
   if (potentialCovers.length > 0) {
@@ -169,6 +190,10 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
 
   // Calculate total count
   const sampleCount = Object.values(samples).reduce((sum, arr) => sum + arr.length, 0);
+
+  if (sampleCount === 0) {
+    throw new Error('No audio files found in the directory.');
+  }
 
   return {
     id: `user-${Date.now()}`,
@@ -188,81 +213,100 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
  * Load sample pack from a ZIP file
  */
 export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
+  console.log('[SamplePackLoader] Loading ZIP:', file.name, file.size, 'bytes');
+  
   const samples: Record<SampleCategory, SampleInfo[]> = {
     kicks: [], snares: [], hihats: [], claps: [], percussion: [],
     fx: [], bass: [], leads: [], pads: [], loops: [], vocals: [], other: [],
   };
 
-  const packName = file.name.replace(/\.zip$/i, '');
+  let packName = file.name.replace(/\.zip$/i, '');
   let coverImage: string | undefined;
   let potentialCovers: { path: string, filename: string, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
 
-  // Load and parse ZIP
-  const zip = await JSZip.loadAsync(file);
+  try {
+    // Load and parse ZIP
+    const zip = await JSZip.loadAsync(file);
 
-  // Process each file in the ZIP
-  const entries = Object.entries(zip.files);
-  for (const [path, zipEntry] of entries) {
-    if (zipEntry.dir) continue;
+    // Process each file in the ZIP
+    const entries = Object.entries(zip.files);
+    console.log('[SamplePackLoader] ZIP contains', entries.length, 'entries');
 
-    const parts = path.split('/').filter(p => p.length > 0);
-    const filename = parts[parts.length - 1];
+    for (const [path, zipEntry] of entries) {
+      if (zipEntry.dir) continue;
 
-    // Handle potential cover image
-    if (isImageFile(filename)) {
-      const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
-      potentialCovers.push({ path, filename, priority });
-      continue;
+      const parts = path.split('/').filter(p => p.length > 0);
+      if (parts.length === 0) continue;
+      
+      const filename = parts[parts.length - 1];
+
+      if (isSystemFile(filename, path)) continue;
+
+      // Handle potential cover image
+      if (isImageFile(filename)) {
+        const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
+        potentialCovers.push({ path, filename, priority });
+        continue;
+      }
+
+      // Skip non-audio files
+      if (!isAudioFile(filename)) continue;
+
+      // Determine category from folder structure
+      let category: SampleCategory = 'other';
+      if (parts.length >= 2) {
+        const categoryFolder = parts[parts.length - 2];
+        category = folderToCategory(categoryFolder);
+      }
+
+      // Extract file and create blob URL
+      const blob = await zipEntry.async('blob');
+      const url = URL.createObjectURL(blob);
+
+      const sampleInfo: SampleInfo = {
+        filename,
+        name: cleanSampleName(filename),
+        category,
+        url,
+      };
+
+      samples[category].push(sampleInfo);
+      categories.add(category);
     }
 
-    // Skip non-audio files
-    if (!isAudioFile(filename)) continue;
-
-    // Determine category from folder structure
-    let category: SampleCategory = 'other';
-    if (parts.length >= 2) {
-      const categoryFolder = parts[parts.length - 2];
-      category = folderToCategory(categoryFolder);
+    // Select best cover image
+    if (potentialCovers.length > 0) {
+      potentialCovers.sort((a, b) => b.priority - a.priority);
+      const bestCover = potentialCovers[0];
+      const zipEntry = zip.files[bestCover.path];
+      if (zipEntry) {
+        const blob = await zipEntry.async('blob');
+        coverImage = URL.createObjectURL(blob);
+      }
     }
 
-    // Extract file and create blob URL
-    const blob = await zipEntry.async('blob');
-    const url = URL.createObjectURL(blob);
+    // Calculate total count
+    const sampleCount = Object.values(samples).reduce((sum, arr) => sum + arr.length, 0);
 
-    const sampleInfo: SampleInfo = {
-      filename,
-      name: cleanSampleName(filename),
-      category,
-      url,
+    if (sampleCount === 0) {
+      throw new Error('No audio files found in the ZIP.');
+    }
+
+    return {
+      id: `user-${Date.now()}`,
+      name: packName,
+      author: 'User Upload',
+      description: `User-uploaded sample pack with ${sampleCount} samples`,
+      coverImage,
+      basePath: '',
+      categories: Array.from(categories).filter(cat => samples[cat].length > 0),
+      samples,
+      sampleCount,
+      isUserUploaded: true,
     };
-
-    samples[category].push(sampleInfo);
-    categories.add(category);
+  } catch (error) {
+    console.error('[SamplePackLoader] ZIP load error:', error);
+    throw error;
   }
-
-  // Select best cover image
-  if (potentialCovers.length > 0) {
-    potentialCovers.sort((a, b) => b.priority - a.priority);
-    const bestCover = potentialCovers[0];
-    const zipEntry = zip.files[bestCover.path];
-    const blob = await zipEntry.async('blob');
-    coverImage = URL.createObjectURL(blob);
-  }
-
-  // Calculate total count
-  const sampleCount = Object.values(samples).reduce((sum, arr) => sum + arr.length, 0);
-
-  return {
-    id: `user-${Date.now()}`,
-    name: packName,
-    author: 'User Upload',
-    description: `User-uploaded sample pack with ${sampleCount} samples`,
-    coverImage,
-    basePath: '',
-    categories: Array.from(categories).filter(cat => samples[cat].length > 0),
-    samples,
-    sampleCount,
-    isUserUploaded: true,
-  };
 }
