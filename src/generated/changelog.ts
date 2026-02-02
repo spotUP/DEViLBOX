@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T22:00:32.657Z
+ * Generated: 2026-02-02T22:37:45.365Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '222';
-export const BUILD_HASH = 'a3477e6';
+export const BUILD_NUMBER = '225';
+export const BUILD_HASH = 'a2e9f14';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Enhance SamplePackBrowser jamming with 2-octave tracker layout and JAM indicator'
+      },
+      {
+        type: 'feature',
+        description: 'Implement multi-selection and fixed sample preview in SamplePackBrowser'
+      },
+      {
+        type: 'fix',
+        description: 'Rename sample files to remove spaces and fix Drumaxia template loading'
+      },
       {
         type: 'fix',
         description: 'Resolve TypeScript errors in SamplePackBrowser preview logic'
@@ -228,18 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Implement scheduled playback for TB303AccurateSynth'
-      },
-      {
-        type: 'fix',
-        description: 'Integrate TB303AccurateSynth and resolve type errors'
-      },
-      {
-        type: 'fix',
-        description: 'Enable TB-303 accent and slide in tracker playback'
-      },
-      {
-        type: 'improvement',
-        description: 'Chore: update changelog for build 1.0.1+169'
       }
     ]
   }
