@@ -508,22 +508,28 @@ export const useInstrumentStore = create<InstrumentStore>()(
         if (inst && inst.metadata?.preservedSynth) {
           const { synthType, config } = inst.metadata.preservedSynth;
           
-          // Restore config
+          // Preserve other metadata but remove the synth restoration flag
+          const otherMetadata = { ...inst.metadata };
+          delete otherMetadata.preservedSynth;
+
+          // Restore original synth configuration and effects
           Object.assign(inst, config);
           inst.synthType = synthType;
-          
-          // Clear preserved synth but keep other metadata
-          delete inst.metadata.preservedSynth;
+          inst.metadata = otherMetadata;
           
           // Clear sample config
           inst.sample = undefined;
         }
       });
 
-      // Invalidate engine instance
+      // Invalidate engine instance and rebuild effects
       try {
         const engine = getToneEngine();
         engine.invalidateInstrument(id);
+        const inst = get().instruments.find(i => i.id === id);
+        if (inst) {
+          engine.rebuildInstrumentEffects(id, inst.effects);
+        }
       } catch (e) {
         // Ignored
       }

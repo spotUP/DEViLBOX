@@ -2653,17 +2653,26 @@ export class ToneEngine {
     }
   }
 
-  /**
-   * Bake an instrument configuration into an AudioBuffer (Precalc)
-   * Renders the synth sound at a specific note for a fixed duration
-   */
   public async bakeInstrument(config: InstrumentConfig, duration: number = 2, note: string = "C4"): Promise<AudioBuffer> {
     // We use Tone.Offline to render the sound
     // Note: We create a fresh factory instance inside the offline context
     return Tone.Offline(async () => {
       // Create the instrument in the offline context
       const instrument = InstrumentFactory.createInstrument(config);
-      instrument.toDestination();
+      
+      // Create effects chain if present
+      if (config.effects && config.effects.length > 0) {
+        const effects = await InstrumentFactory.createEffectChain(config.effects);
+        // Connect instrument -> effect1 -> effect2 ... -> destination
+        let lastNode: Tone.ToneAudioNode = instrument;
+        for (const effect of effects) {
+          lastNode.connect(effect);
+          lastNode = effect;
+        }
+        lastNode.toDestination();
+      } else {
+        instrument.toDestination();
+      }
 
       // Trigger the specific note
       if (instrument.triggerAttack) {
