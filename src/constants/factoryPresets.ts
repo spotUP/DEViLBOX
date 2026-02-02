@@ -5,15 +5,117 @@
  */
 
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { VOWEL_FORMANTS } from '@typedefs/instrument';
 import { TB303_PRESETS } from './tb303Presets';
 import { FURNACE_PRESETS } from './furnacePresets';
 import { DUB_SIREN_PRESETS } from './dubSirenPresets';
 import { SYNARE_PRESETS } from './synarePresets';
+import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from './drumnibusPresets';
 
-// BASS PRESETS (12)
+// BASS PRESETS (18)
 
 
 export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  // Wobble Bass
+  {
+    type: 'synth' as const,
+    name: 'Classic Wobble',
+    synthType: 'WobbleBass',
+    wobbleBass: {
+      mode: 'classic',
+      osc1: { type: 'sawtooth', octave: -1, detune: 0, level: 100 },
+      osc2: { type: 'sawtooth', octave: -1, detune: 7, level: 80 },
+      sub: { enabled: true, octave: -2, level: 60 },
+      fm: { enabled: false, amount: 30, ratio: 2, envelope: 50 },
+      unison: { voices: 4, detune: 15, stereoSpread: 50 },
+      filter: { type: 'lowpass', cutoff: 800, resonance: 60, rolloff: -24, drive: 30, keyTracking: 0 },
+      filterEnvelope: { amount: 70, attack: 5, decay: 300, sustain: 20, release: 200 },
+      wobbleLFO: { enabled: true, sync: '1/4', rate: 4, shape: 'sine', amount: 80, pitchAmount: 0, fmAmount: 0, phase: 0, retrigger: true },
+      envelope: { attack: 5, decay: 200, sustain: 80, release: 300 },
+      distortion: { enabled: true, type: 'soft', drive: 40, tone: 70 },
+      formant: { enabled: false, vowel: 'A', morph: 0, lfoAmount: 0 },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Growl Bass',
+    synthType: 'WobbleBass',
+    wobbleBass: {
+      mode: 'growl',
+      osc1: { type: 'sawtooth', octave: -2, detune: 0, level: 100 },
+      osc2: { type: 'square', octave: -2, detune: 5, level: 70 },
+      sub: { enabled: true, octave: -2, level: 80 },
+      fm: { enabled: true, amount: 40, ratio: 1, envelope: 60 },
+      unison: { voices: 2, detune: 10, stereoSpread: 30 },
+      filter: { type: 'bandpass', cutoff: 600, resonance: 40, rolloff: -12, drive: 50, keyTracking: 20 },
+      filterEnvelope: { amount: 50, attack: 10, decay: 400, sustain: 40, release: 200 },
+      wobbleLFO: { enabled: true, sync: '1/8', rate: 4, shape: 'saw', amount: 60, pitchAmount: 0, fmAmount: 30, phase: 0, retrigger: true },
+      envelope: { attack: 5, decay: 300, sustain: 60, release: 200 },
+      distortion: { enabled: true, type: 'hard', drive: 60, tone: 50 },
+      formant: { enabled: true, vowel: 'O', morph: 50, lfoAmount: 40 },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Reese Wobble',
+    synthType: 'WobbleBass',
+    wobbleBass: {
+      mode: 'reese',
+      osc1: { type: 'sawtooth', octave: -1, detune: -10, level: 90 },
+      osc2: { type: 'sawtooth', octave: -1, detune: 10, level: 90 },
+      sub: { enabled: true, octave: -2, level: 70 },
+      fm: { enabled: false, amount: 0, ratio: 1, envelope: 0 },
+      unison: { voices: 6, detune: 25, stereoSpread: 80 },
+      filter: { type: 'lowpass', cutoff: 1200, resonance: 30, rolloff: -24, drive: 20, keyTracking: 0 },
+      filterEnvelope: { amount: 0, attack: 0, decay: 0, sustain: 0, release: 0 },
+      wobbleLFO: { enabled: true, sync: '1/2', rate: 1, shape: 'triangle', amount: 50, pitchAmount: 0, fmAmount: 0, phase: 0, retrigger: false },
+      envelope: { attack: 20, decay: 500, sustain: 100, release: 800 },
+      distortion: { enabled: true, type: 'soft', drive: 30, tone: 60 },
+      formant: { enabled: false, vowel: 'A', morph: 0, lfoAmount: 0 },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  // FM Bass
+  {
+    type: 'synth' as const,
+    name: 'FM Pluck Bass',
+    synthType: 'FMSynth',
+    oscillator: { type: 'sine', detune: 0, octave: -1 },
+    envelope: { attack: 1, decay: 300, sustain: 0, release: 100 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  // Duo Bass
+  {
+    type: 'synth' as const,
+    name: 'Duo Fat Bass',
+    synthType: 'DuoSynth',
+    oscillator: { type: 'sawtooth', detune: 5, octave: -1 },
+    envelope: { attack: 10, decay: 400, sustain: 0.4, release: 200 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  // Basic Bass
+  {
+    type: 'synth' as const,
+    name: 'Sine Sub',
+    synthType: 'Synth',
+    oscillator: { type: 'sine', detune: 0, octave: -1 },
+    envelope: { attack: 5, decay: 500, sustain: 0, release: 100 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
   // TB-303 Acid Bass (8 presets)
   {
     type: 'synth' as const,
@@ -642,6 +744,24 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     volume: -10,
     pan: 0,
   },
+  {
+    type: 'synth' as const,
+    name: 'Duo Sub Bass',
+    synthType: 'DuoSynth',
+    oscillator: { type: 'triangle', detune: 0, octave: -1 },
+    envelope: { attack: 5, decay: 200, sustain: 1, release: 100 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'ESQ-1 Bass',
+    synthType: 'MAMEDOC',
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
 
   // === TB-303 PRESETS (from tb303Presets.ts) ===
   // All comprehensive TB-303 presets including acidbox, dittytoy references, etc.
@@ -652,10 +772,98 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 ];
 
 // ============================================================================
-// LEAD PRESETS (8)
+// LEAD PRESETS (15)
 // ============================================================================
 
 export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  // Pluck Synth
+  {
+    type: 'synth' as const,
+    name: 'Trance Pluck',
+    synthType: 'PluckSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 300, sustain: 0, release: 300 },
+    filter: { type: 'lowpass', frequency: 4000, Q: 2, rolloff: -24 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Pluck Keys',
+    synthType: 'PluckSynth',
+    oscillator: { type: 'square', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 500, sustain: 0, release: 500 },
+    filter: { type: 'lowpass', frequency: 2500, Q: 1, rolloff: -12 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Guitar Pluck',
+    synthType: 'PluckSynth',
+    oscillator: { type: 'sawtooth', detune: 0, octave: -1 },
+    envelope: { attack: 5, decay: 200, sustain: 0, release: 100 },
+    filter: { type: 'highpass', frequency: 200, Q: 1, rolloff: -12 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  // AM Synth
+  {
+    type: 'synth' as const,
+    name: 'AM Bell',
+    synthType: 'AMSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 300, sustain: 0, release: 500 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'AM Sci-Fi',
+    synthType: 'AMSynth',
+    oscillator: { type: 'square', detune: 0, octave: 0 },
+    envelope: { attack: 50, decay: 500, sustain: 0.5, release: 1000 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  // FM Synth
+  {
+    type: 'synth' as const,
+    name: 'FM Electric Piano',
+    synthType: 'FMSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 500, sustain: 0.2, release: 500 },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  // Duo Synth
+  {
+    type: 'synth' as const,
+    name: 'Duo Saw Lead',
+    synthType: 'DuoSynth',
+    oscillator: { type: 'sawtooth', detune: 10, octave: 0 },
+    envelope: { attack: 10, decay: 200, sustain: 0.5, release: 200 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  // Basic Synth
+  {
+    type: 'synth' as const,
+    name: 'Square Lead',
+    synthType: 'Synth',
+    oscillator: { type: 'square', detune: 0, octave: 0 },
+    envelope: { attack: 5, decay: 100, sustain: 0.8, release: 100 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
   {
     type: 'synth' as const,
     name: 'Supersaw Lead',
@@ -744,6 +952,115 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     volume: -10,
     pan: 0,
   },
+  {
+    type: 'synth' as const,
+    name: 'AM Tremolo Lead',
+    synthType: 'AMSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 0 },
+    envelope: { attack: 10, decay: 300, sustain: 0.5, release: 200 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'FM Bell Lead',
+    synthType: 'FMSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 1 },
+    envelope: { attack: 1, decay: 1000, sustain: 0, release: 800 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Harp Pluck',
+    synthType: 'PluckSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 1 },
+    envelope: { attack: 1, decay: 800, sustain: 0, release: 500 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Nylon Guitar',
+    synthType: 'PluckSynth',
+    oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 1200, sustain: 0, release: 1000 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'PWM Solo Lead',
+    synthType: 'PWMSynth',
+    pwmSynth: {
+      pulseWidth: 20,
+      pwmDepth: 40,
+      pwmRate: 1.5,
+      pwmWaveform: 'sine',
+      oscillators: 2,
+      detune: 5,
+      envelope: { attack: 10, decay: 300, sustain: 0.6, release: 200 },
+      filter: { type: 'lowpass', cutoff: 3000, resonance: 30, envelopeAmount: 20, keyTracking: 50 },
+      filterEnvelope: { attack: 5, decay: 400, sustain: 0.2, release: 100 },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Poly Brass',
+    synthType: 'PolySynth',
+    polySynth: {
+      voiceCount: 6,
+      voiceType: 'Synth',
+      stealMode: 'oldest',
+      oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
+      envelope: { attack: 50, decay: 400, sustain: 0.7, release: 200 },
+      filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -12 },
+      portamento: 0,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'SuperSaw Lead',
+    synthType: 'SuperSaw',
+    superSaw: {
+      voices: 7,
+      detune: 40,
+      mix: 70,
+      stereoSpread: 80,
+      envelope: { attack: 10, decay: 300, sustain: 50, release: 200 },
+      filter: { type: 'lowpass', cutoff: 5000, resonance: 20, envelopeAmount: 50 },
+      filterEnvelope: { attack: 5, decay: 400, sustain: 0, release: 100 },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Robot Talk',
+    synthType: 'FormantSynth',
+    formantSynth: {
+      vowel: 'E',
+      vowelMorph: { target: 'U', amount: 80, rate: 2, mode: 'manual' },
+      oscillator: { type: 'square' },
+      formants: { ...VOWEL_FORMANTS.E, bandwidth: 120 },
+      envelope: { attack: 5, decay: 200, sustain: 0.5, release: 100 },
+      brightness: 80,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
 ];
 
 // ============================================================================
@@ -793,6 +1110,171 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     filter: { type: 'bandpass', frequency: 1000, Q: 5, rolloff: -24 },
     effects: [],
     volume: -18,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'AM Atmospheric',
+    synthType: 'AMSynth',
+    oscillator: { type: 'sine', detune: 5, octave: 0 },
+    envelope: { attack: 1500, decay: 3000, sustain: 0.8, release: 2000 },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Wavetable Evolving Pad',
+    synthType: 'Wavetable',
+    wavetable: {
+      wavetableId: 'evolve-1',
+      morphPosition: 0,
+      morphModSource: 'lfo',
+      morphModAmount: 80,
+      morphLFORate: 0.1,
+      unison: { voices: 4, detune: 12, stereoSpread: 60 },
+      envelope: { attack: 1000, decay: 2000, sustain: 0.7, release: 1500 },
+      filter: { type: 'lowpass', cutoff: 1500, resonance: 20, envelopeAmount: 30 },
+      filterEnvelope: { attack: 2000, decay: 1000, sustain: 0.5, release: 1000 },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Poly Soft Strings',
+    synthType: 'PolySynth',
+    polySynth: {
+      voiceCount: 8,
+      voiceType: 'Synth',
+      stealMode: 'oldest',
+      oscillator: { type: 'sawtooth', detune: 10, octave: 0 },
+      envelope: { attack: 500, decay: 1000, sustain: 0.8, release: 1200 },
+      filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -12 },
+      portamento: 0,
+    },
+    effects: [],
+    volume: -14,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'PWM Strings',
+    synthType: 'PWMSynth',
+    pwmSynth: {
+      pulseWidth: 50,
+      pwmDepth: 30,
+      pwmRate: 0.5,
+      pwmWaveform: 'sine',
+      oscillators: 3,
+      detune: 12,
+      envelope: { attack: 800, decay: 1500, sustain: 0.9, release: 1500 },
+      filter: { type: 'lowpass', cutoff: 1200, resonance: 15, envelopeAmount: 0, keyTracking: 30 },
+      filterEnvelope: { attack: 10, decay: 500, sustain: 1, release: 100 },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Solina Ensemble',
+    synthType: 'StringMachine',
+    stringMachine: {
+      sections: { violin: 100, viola: 80, cello: 60, bass: 40 },
+      ensemble: { depth: 70, rate: 2.5, voices: 4 },
+      attack: 300,
+      release: 1500,
+      brightness: 50,
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Ethereal Choir',
+    synthType: 'FormantSynth',
+    formantSynth: {
+      vowel: 'A',
+      vowelMorph: { target: 'O', amount: 50, rate: 0.2, mode: 'lfo' },
+      oscillator: { type: 'sawtooth' },
+      formants: { ...VOWEL_FORMANTS.A, bandwidth: 80 },
+      envelope: { attack: 1000, decay: 2000, sustain: 0.8, release: 2000 },
+      brightness: 60,
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'VFX Digital Pad',
+    synthType: 'MAMEVFX',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Wavetable Morph Pad',
+    synthType: 'Wavetable',
+    wavetable: {
+      wavetableId: 'morph-2',
+      morphPosition: 50,
+      morphModSource: 'lfo',
+      morphModAmount: 40,
+      morphLFORate: 0.2,
+      unison: { voices: 6, detune: 20, stereoSpread: 90 },
+      envelope: { attack: 1200, decay: 2500, sustain: 0.8, release: 2000 },
+      filter: { type: 'lowpass', cutoff: 2000, resonance: 10, envelopeAmount: 0 },
+      filterEnvelope: { attack: 10, decay: 500, sustain: 1, release: 100 },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'PWM Soft Pad',
+    synthType: 'PWMSynth',
+    pwmSynth: {
+      pulseWidth: 50,
+      pwmDepth: 20,
+      pwmRate: 0.3,
+      pwmWaveform: 'sine',
+      oscillators: 2,
+      detune: 8,
+      envelope: { attack: 1500, decay: 2000, sustain: 0.9, release: 2000 },
+      filter: { type: 'lowpass', cutoff: 800, resonance: 5, envelopeAmount: 0, keyTracking: 20 },
+      filterEnvelope: { attack: 10, decay: 500, sustain: 1, release: 100 },
+    },
+    effects: [],
+    volume: -14,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Granular Cloud',
+    synthType: 'GranularSynth',
+    granular: {
+      sampleUrl: '', // To be loaded by user
+      grainSize: 0.1,
+      grainOverlap: 0.05,
+      detune: 5,
+      playbackRate: 1,
+      randomPitch: 0,
+      randomPosition: 0,
+      scanPosition: 0,
+      scanSpeed: 0,
+      density: 1,
+      reverse: false,
+      envelope: { attack: 10, release: 100 },
+      filter: { type: 'lowpass', cutoff: 2000, resonance: 1 },
+    },
+    effects: [],
+    volume: -10,
     pan: 0,
   },
 ];
@@ -889,6 +1371,36 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     effects: [],
     volume: -14,
     pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Synth Low Tom',
+    synthType: 'MembraneSynth',
+    oscillator: { type: 'sine', detune: 0, octave: -1 },
+    envelope: { attack: 1, decay: 400, sustain: 0, release: 100 },
+    effects: [],
+    volume: -8,
+    pan: -20,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Synth Mid Tom',
+    synthType: 'MembraneSynth',
+    oscillator: { type: 'sine', detune: 0, octave: -1 },
+    envelope: { attack: 1, decay: 350, sustain: 0, release: 80 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Synth Hi Tom',
+    synthType: 'MembraneSynth',
+    oscillator: { type: 'sine', detune: 0, octave: 0 },
+    envelope: { attack: 1, decay: 300, sustain: 0, release: 60 },
+    effects: [],
+    volume: -8,
+    pan: 20,
   },
   
   // === SYNARE PRESETS ===
@@ -2600,6 +3112,159 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 ];
 
 // ============================================================================
+// MAME CLASSIC PRESETS (8) - Hardware-accurate classic synths
+// ============================================================================
+
+export const MAME_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: 'VFX Digital Pad',
+    synthType: 'MAMEVFX',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'VFX Evolving',
+    synthType: 'MAMEVFX',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'ESQ-1 Bass',
+    synthType: 'MAMEDOC',
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'ESQ-1 Gritty Keys',
+    synthType: 'MAMEDOC',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'MKS-20 E.Piano 1',
+    synthType: 'MAMERSA',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'RD-1000 Grand',
+    synthType: 'MAMERSA',
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'AWM2 Grand Piano',
+    synthType: 'MAMESWP30',
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'AWM2 Synth Brass',
+    synthType: 'MAMESWP30',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// ORGAN PRESETS (4) - Drawbar organ settings
+// ============================================================================
+
+export const ORGAN_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: 'Jazz Organ',
+    synthType: 'Organ',
+    organ: {
+      drawbars: [8, 8, 8, 0, 0, 0, 0, 0, 0],
+      percussion: { enabled: true, volume: 60, decay: 'fast', harmonic: 'third' },
+      keyClick: 40,
+      vibrato: { type: 'C3', depth: 60 },
+      rotary: { enabled: true, speed: 'fast' },
+    },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Gospel Organ',
+    synthType: 'Organ',
+    organ: {
+      drawbars: [8, 8, 8, 8, 8, 8, 8, 8, 8],
+      percussion: { enabled: false, volume: 50, decay: 'slow', harmonic: 'second' },
+      keyClick: 20,
+      vibrato: { type: 'V3', depth: 40 },
+      rotary: { enabled: true, speed: 'slow' },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Church Organ',
+    synthType: 'Organ',
+    organ: {
+      drawbars: [8, 0, 8, 0, 8, 0, 0, 8, 8],
+      percussion: { enabled: false, volume: 0, decay: 'fast', harmonic: 'third' },
+      keyClick: 0,
+      vibrato: { type: 'V1', depth: 20 },
+      rotary: { enabled: false, speed: 'slow' },
+    },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Rock Organ',
+    synthType: 'Organ',
+    organ: {
+      drawbars: [8, 8, 8, 0, 0, 0, 0, 0, 0],
+      percussion: { enabled: false, volume: 0, decay: 'fast', harmonic: 'third' },
+      keyClick: 80,
+      vibrato: { type: 'C3', depth: 80 },
+      rotary: { enabled: true, speed: 'fast' },
+    },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+];
+
+// ============================================================================
+// TRACKER MODULE PRESETS (1)
+// ============================================================================
+
+export const MODULE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  {
+    type: 'synth' as const,
+    name: 'Generic Module',
+    synthType: 'ChiptuneModule',
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+];
+
+// ============================================================================
 // COMBINED FACTORY PRESETS
 // ============================================================================
 
@@ -2608,6 +3273,9 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...LEAD_PRESETS,
   ...PAD_PRESETS,
   ...DRUM_PRESETS,
+  ...MAME_PRESETS,
+  ...ORGAN_PRESETS,
+  ...MODULE_PRESETS,
   ...TR808_PRESETS,
   ...TR909_PRESETS,
   ...TR707_PRESETS,
@@ -2616,6 +3284,7 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...FURNACE_PRESETS,
   ...FX_PRESETS,
   ...DRUMNIBUS_PRESETS,
+  ...DRUMNIBUS_KIT_PRESETS,
 ];
 
 // Preset categories for browsing
@@ -2624,6 +3293,9 @@ export const PRESET_CATEGORIES = {
   Leads: LEAD_PRESETS,
   Pads: PAD_PRESETS,
   Drums: DRUM_PRESETS,
+  MAME: MAME_PRESETS,
+  Keys: ORGAN_PRESETS,
+  Module: MODULE_PRESETS,
   'TR-808': TR808_PRESETS,
   'TR-909': TR909_PRESETS,
   'TR-707': TR707_PRESETS,
@@ -2633,7 +3305,7 @@ export const PRESET_CATEGORIES = {
   FX: FX_PRESETS,
   DubSiren: DUB_SIREN_PRESETS,
   Synare: SYNARE_PRESETS,
-  Drumnibus: DRUMNIBUS_PRESETS,
+  Drumnibus: [...DRUMNIBUS_KIT_PRESETS, ...DRUMNIBUS_PRESETS],
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;

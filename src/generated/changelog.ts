@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-01-31T22:48:19.373Z
+ * Generated: 2026-02-02T19:04:56.029Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,15 +20,53 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '183';
-export const BUILD_HASH = '5502f1f';
-export const BUILD_DATE = '2026-01-31';
+export const BUILD_NUMBER = '191';
+export const BUILD_HASH = 'fe0af07';
+export const BUILD_DATE = '2026-02-02';
 export const FULL_VERSION = `${BUILD_VERSION}+${BUILD_NUMBER}`;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-01',
+    changes: [
+      {
+        type: 'fix',
+        description: 'Robust native context retrieval for all worklets and fix synth disposal race conditions'
+      },
+      {
+        type: 'fix',
+        description: 'Use JC303StyledKnobPanel in tracker view and fix ToneEngine context init'
+      },
+      {
+        type: 'fix',
+        description: 'Fix AudioWorklet context errors and enable real-time tuning/waveform updates for JC303'
+      },
+      {
+        type: 'fix',
+        description: 'Fix knob value loss due to stale closures and remove default delay from DT303 preset'
+      },
+      {
+        type: 'feature',
+        description: 'Add JC303 engine (Open303 WASM) with custom UI, set as default TB-303 engine, and fix AudioWorklet context issues'
+      },
+      {
+        type: 'feature',
+        description: 'Update MIDI toolbar, DubSiren controls, and app integration'
+      },
+      {
+        type: 'improvement',
+        description: 'Update InstrumentFactory, ToneEngine, and synth implementations'
+      },
+      {
+        type: 'feature',
+        description: 'Implement NKS (Native Kontrol Standard) integration with Akai hardware support'
+      }
+    ]
+  },
+  {
+    version: '1.0.1-1',
     date: '2026-01-31',
     changes: [
       {
@@ -118,7 +156,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   },
   {
-    version: '1.0.1-1',
+    version: '1.0.1-2',
     date: '2026-01-30',
     changes: [
       {
@@ -204,38 +242,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Update instrument editors'
-      },
-      {
-        type: 'feature',
-        description: 'Add project documentation and handover guides'
-      },
-      {
-        type: 'improvement',
-        description: 'Update AudioWorklets and project configuration'
-      },
-      {
-        type: 'feature',
-        description: 'Update hooks, types, and stores for new features'
-      },
-      {
-        type: 'improvement',
-        description: 'Update UI components for improved editing experience'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve import/export with format handlers and tests'
-      },
-      {
-        type: 'feature',
-        description: 'Expand synth presets and add Furnace wavetable support'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve audio engine with Furnace synth enhancements'
-      },
-      {
-        type: 'feature',
-        description: 'Add visualization components for instrument editors'
       }
     ]
   }

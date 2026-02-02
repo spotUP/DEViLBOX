@@ -87,6 +87,9 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       DubSiren: 'text-red-500',
       Synare: 'text-yellow-500',
       Drumnibus: 'text-emerald-400',
+      Keys: 'text-amber-600',
+      MAME: 'text-pink-400',
+      Module: 'text-lime-400',
     };
     return colors[category] || 'text-ft2-highlight';
   };
