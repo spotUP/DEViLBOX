@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import type { SpaceLaserConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Zap, FastForward, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
+import { Zap, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
 import { useThemeStore } from '@stores';
 
 interface SpaceLaserControlsProps {
   config: SpaceLaserConfig;
-  instrumentId: number;
   onChange: (updates: Partial<SpaceLaserConfig>) => void;
 }
 
@@ -14,7 +13,6 @@ type SpaceLaserTab = 'laser' | 'fm' | 'fx';
 
 export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   config,
-  instrumentId,
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<SpaceLaserTab>('laser');

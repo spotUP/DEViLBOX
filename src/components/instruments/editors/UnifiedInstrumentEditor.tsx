@@ -341,7 +341,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <SpaceLaserControls
           config={instrument.spaceLaser}
-          instrumentId={instrument.id}
           onChange={handleSpaceLaserChange}
         />
       </div>
