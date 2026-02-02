@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T20:36:07.208Z
+ * Generated: 2026-02-02T21:14:23.932Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '201';
-export const BUILD_HASH = '141819f';
+export const BUILD_NUMBER = '206';
+export const BUILD_HASH = 'd00e779';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,26 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add 20 factory presets for Space Laser synth'
+      },
+      {
+        type: 'feature',
+        description: 'Add Space Laser synth for classic reggae and anime effects'
+      },
+      {
+        type: 'fix',
+        description: 'Convert Casio MT-40 samples to standard WAV for browser compatibility'
+      },
+      {
+        type: 'feature',
+        description: 'Add Casio MT-40 default sample pack'
+      },
+      {
+        type: 'feature',
+        description: 'Enhance TD-3 pattern transfer with file support and improve sample pack cover detection'
+      },
       {
         type: 'improvement',
         description: 'Comprehensive optimization of audio engine, worklets, build, and UI'
@@ -230,26 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Improve module and instrument import handling'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve file browser and file system access'
-      },
-      {
-        type: 'improvement',
-        description: 'Enhance tracker input handling and FT2 toolbar'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve MIDI handling and settings management'
-      },
-      {
-        type: 'improvement',
-        description: 'Enhance instrument visualization components'
-      },
-      {
-        type: 'improvement',
-        description: 'Refactor Furnace and synth editors for unified architecture'
       }
     ]
   }
