@@ -1238,6 +1238,7 @@ export class ToneEngine {
       case 'Buzz3o3':
       case 'DubSiren':
       case 'SpaceLaser':
+      case 'V2':
       case 'Synare':
       case 'MAMEVFX':
       case 'MAMEDOC':
@@ -2820,6 +2821,31 @@ export class ToneEngine {
       if (idPart === String(instrumentId)) {
         if (instrument && typeof (instrument as any).applyConfig === 'function') {
           (instrument as any).applyConfig(config);
+        }
+      }
+    });
+  }
+
+  /**
+   * Update V2 parameters in real-time
+   */
+  public updateV2Parameters(instrumentId: number, config: NonNullable<InstrumentConfig['v2']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && (instrument as any).name === 'V2Synth') {
+          const v2 = instrument as any;
+          // Flatten config and send to WASM
+          // This is a simplified mapping for now
+          if (config.osc1) {
+            v2.setParameter(2, config.osc1.transpose + 64);
+            v2.setParameter(3, config.osc1.detune + 64);
+          }
+          if (config.filter) {
+            v2.setParameter(14, config.filter.cutoff);
+            v2.setParameter(15, config.filter.resonance);
+          }
+          // ... more mapping as needed
         }
       }
     });

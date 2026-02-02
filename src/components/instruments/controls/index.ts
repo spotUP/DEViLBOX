@@ -11,4 +11,5 @@ export { BuzzmachineControls } from './BuzzmachineControls';
 export { SampleControls } from './SampleControls';
 export { DubSirenControls } from './DubSirenControls';
 export { SpaceLaserControls } from './SpaceLaserControls';
+export { V2Controls } from './V2Controls';
 export { SynareControls } from './SynareControls';

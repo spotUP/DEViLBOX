@@ -15,7 +15,7 @@ import type { Pattern, PatternCell } from '@/types';
 const SYNTH_TYPE_TO_ID: Record<string, number> = {
   'Synth': 1, 'MonoSynth': 2, 'DuoSynth': 3, 'FMSynth': 4, 'AMSynth': 5,
   'TB303': 10, 'Sampler': 11, 'WobbleBass': 12, 'DubSiren': 13,
-  'SpaceLaser': 14, 'Synare': 15, 'DrumMachine': 16, 'ChipSynth': 17
+  'SpaceLaser': 14, 'V2': 20, 'Synare': 15, 'DrumMachine': 16, 'ChipSynth': 17
 };
 
 export class NanoExporter {

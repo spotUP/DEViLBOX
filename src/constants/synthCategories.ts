@@ -1060,6 +1060,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Zap',
     color: 'text-green-500',
   },
+  V2: {
+    type: 'V2',
+    name: 'Farbrausch V2',
+    shortName: 'V2',
+    description: 'The legendary demoscene 4k intro synth engine (WASM)',
+    bestFor: ['4k intros', 'Trance leads', 'Soft pads', 'Demoscene sounds'],
+    icon: 'Box',
+    color: 'text-amber-500',
+  },
   Synare: {
     type: 'Synare',
     name: 'Synare 3',
@@ -1093,6 +1102,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.ChipSynth,
       SYNTH_INFO.PWMSynth,
       SYNTH_INFO.FormantSynth,
+      SYNTH_INFO.V2,
     ],
   },
   {
@@ -1105,13 +1115,13 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'pads',
     name: 'Pads',
     description: 'Evolving textures and pads',
-    synths: [SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth, SYNTH_INFO.PolySynth, SYNTH_INFO.StringMachine],
+    synths: [SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth, SYNTH_INFO.PolySynth, SYNTH_INFO.StringMachine, SYNTH_INFO.V2],
   },
   {
     id: 'dub',
     name: 'Dub & FX',
     description: 'Classic sound system and special effects',
-    synths: [SYNTH_INFO.DubSiren, SYNTH_INFO.SpaceLaser, SYNTH_INFO.Synare],
+    synths: [SYNTH_INFO.DubSiren, SYNTH_INFO.SpaceLaser, SYNTH_INFO.V2, SYNTH_INFO.Synare],
   },
   {
     id: 'vintage',

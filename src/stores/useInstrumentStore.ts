@@ -232,6 +232,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
           }
 
+          // Auto-initialize V2 config when synthType changes to 'V2'
+          if (synthTypeChanging && updates.synthType === 'V2' && !instrument.v2) {
+            instrument.v2 = { ...DEFAULT_V2 };
+          }
+
           // Auto-initialize Synare config when synthType changes to 'Synare'
           if (synthTypeChanging && updates.synthType === 'Synare' && !instrument.synare) {
             instrument.synare = { ...DEFAULT_SYNARE };
@@ -258,6 +263,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             if (updatedInstrument.synthType === 'SpaceLaser' && updatedInstrument.spaceLaser && updates.spaceLaser) {
               engine.updateSpaceLaserParameters(id, updatedInstrument.spaceLaser);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'V2' && updatedInstrument.v2 && updates.v2) {
+              engine.updateV2Parameters(id, updatedInstrument.v2);
               return; // Handled
             }
             
