@@ -2829,17 +2829,79 @@ export class ToneEngine {
       if (idPart === String(instrumentId)) {
         if (instrument && (instrument as any).name === 'V2Synth') {
           const v2 = instrument as any;
-          // Flatten config and send to WASM
-          // This is a simplified mapping for now
+          
+          // Ground Truth Mapping from V2 v2defs.cpp / Params[]
+          
+          // Osc 1 (indices 2-7)
           if (config.osc1) {
-            v2.setParameter(2, config.osc1.transpose + 64);
-            v2.setParameter(3, config.osc1.detune + 64);
+            v2.setParameter(2, config.osc1.mode);
+            v2.setParameter(4, config.osc1.transpose + 64);
+            v2.setParameter(5, config.osc1.detune + 64);
+            v2.setParameter(6, config.osc1.color);
+            v2.setParameter(7, config.osc1.level);
           }
-          if (config.filter) {
-            v2.setParameter(14, config.filter.cutoff);
-            v2.setParameter(15, config.filter.resonance);
+          
+          // Osc 2 (indices 8-13)
+          if (config.osc2) {
+            v2.setParameter(8, config.osc2.mode);
+            v2.setParameter(9, config.osc2.ringMod ? 1 : 0);
+            v2.setParameter(10, config.osc2.transpose + 64);
+            v2.setParameter(11, config.osc2.detune + 64);
+            v2.setParameter(12, config.osc2.color);
+            v2.setParameter(13, config.osc2.level);
           }
-          // ... more mapping as needed
+
+          // Osc 3 (indices 14-19)
+          if (config.osc3) {
+            v2.setParameter(14, config.osc3.mode);
+            v2.setParameter(15, config.osc3.ringMod ? 1 : 0);
+            v2.setParameter(16, config.osc3.transpose + 64);
+            v2.setParameter(17, config.osc3.detune + 64);
+            v2.setParameter(18, config.osc3.color);
+            v2.setParameter(19, config.osc3.level);
+          }
+
+          // Filter 1 (indices 20-22)
+          if (config.filter1) {
+            v2.setParameter(20, config.filter1.mode);
+            v2.setParameter(21, config.filter1.cutoff);
+            v2.setParameter(22, config.filter1.resonance);
+          }
+
+          // Filter 2 (indices 23-25)
+          if (config.filter2) {
+            v2.setParameter(23, config.filter2.mode);
+            v2.setParameter(24, config.filter2.cutoff);
+            v2.setParameter(25, config.filter2.resonance);
+          }
+
+          // Routing (indices 26-27)
+          if (config.routing) {
+            v2.setParameter(26, config.routing.mode);
+            v2.setParameter(27, config.routing.balance);
+          }
+
+          // Amp Envelope (indices 32-37)
+          if (config.envelope) {
+            v2.setParameter(32, config.envelope.attack);
+            v2.setParameter(33, config.envelope.decay);
+            v2.setParameter(34, config.envelope.sustain);
+            v2.setParameter(35, config.envelope.release);
+          }
+
+          // Envelope 2 (indices 38-43)
+          if (config.envelope2) {
+            v2.setParameter(38, config.envelope2.attack);
+            v2.setParameter(39, config.envelope2.decay);
+            v2.setParameter(40, config.envelope2.sustain);
+            v2.setParameter(41, config.envelope2.release);
+          }
+
+          // LFO 1 (indices 44-50)
+          if (config.lfo1) {
+            v2.setParameter(44, config.lfo1.rate);
+            v2.setParameter(45, config.lfo1.depth);
+          }
         }
       }
     });

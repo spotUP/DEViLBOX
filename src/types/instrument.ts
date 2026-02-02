@@ -2159,50 +2159,74 @@ export interface SpaceLaserConfig {
 /**
  * Farbrausch V2 Synth Configuration
  * Advanced multi-voice subtractive synth common in 4k/64k intros
+ * Ground truth from V2 source code (v2defs.cpp)
  */
 export interface V2Config {
   osc1: {
-    type: WaveformType;
-    detune: number;
-    transpose: number; // -24 to +24
-    level: number;
+    mode: number; // Off, Saw/Tri, Pulse, Sin, Noise, XX, AuxA, AuxB
+    transpose: number; // -64 to +63 (maps to 0-127)
+    detune: number;    // -64 to +63 (maps to 0-127)
+    color: number;     // 0-127
+    level: number;     // 0-127
   };
   osc2: {
-    type: WaveformType;
-    detune: number;
+    mode: number; // !Off, Tri, Pul, Sin, Noi, FM, AuxA, AuxB
+    ringMod: boolean;
     transpose: number;
+    detune: number;
+    color: number;
     level: number;
   };
   osc3: {
-    type: 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
+    mode: number; // !Off, Tri, Pul, Sin, Noi, FM, AuxA, AuxB
+    ringMod: boolean;
+    transpose: number;
+    detune: number;
+    color: number;
     level: number;
   };
-  filter: {
-    type: FilterType;
-    cutoff: number;
-    resonance: number;
-    envMod: number;
+  filter1: {
+    mode: number; // Off, Low, Band, High, Notch, All, MoogL, MoogH
+    cutoff: number; // 0-127
+    resonance: number; // 0-127
+  };
+  filter2: {
+    mode: number; // Off, Low, Band, High, Notch, All, MoogL, MoogH
+    cutoff: number; // 0-127
+    resonance: number; // 0-127
+  };
+  routing: {
+    mode: number; // single, serial, parallel
+    balance: number; // 0-127 (Filter 1 vs Filter 2)
   };
   envelope: {
+    attack: number; // 0-127
+    decay: number;  // 0-127
+    sustain: number; // 0-127
+    release: number; // 0-127
+  };
+  envelope2: {
     attack: number;
     decay: number;
     sustain: number;
     release: number;
   };
-  modulation: {
-    lfo1Rate: number;
-    lfo1Depth: number;
-    lfo1Target: 'cutoff' | 'pitch' | 'none';
+  lfo1: {
+    rate: number;
+    depth: number;
   };
 }
 
 export const DEFAULT_V2: V2Config = {
-  osc1: { type: 'sawtooth', detune: 0, transpose: 0, level: 100 },
-  osc2: { type: 'sawtooth', detune: 10, transpose: 0, level: 80 },
-  osc3: { type: 'noise', level: 10 },
-  filter: { type: 'lowpass', cutoff: 2000, resonance: 20, envMod: 50 },
-  envelope: { attack: 10, decay: 500, sustain: 0.3, release: 300 },
-  modulation: { lfo1Rate: 5, lfo1Depth: 0, lfo1Target: 'none' },
+  osc1: { mode: 1, transpose: 0, detune: 0, color: 64, level: 127 },
+  osc2: { mode: 0, ringMod: false, transpose: 0, detune: 10, color: 64, level: 0 },
+  osc3: { mode: 0, ringMod: false, transpose: 0, detune: -10, color: 64, level: 0 },
+  filter1: { mode: 1, cutoff: 127, resonance: 0 },
+  filter2: { mode: 0, cutoff: 127, resonance: 0 },
+  routing: { mode: 0, balance: 64 },
+  envelope: { attack: 0, decay: 64, sustain: 127, release: 32 },
+  envelope2: { attack: 0, decay: 64, sustain: 127, release: 32 },
+  lfo1: { rate: 64, depth: 0 },
 };
 
 export const DEFAULT_SPACE_LASER: SpaceLaserConfig = {
