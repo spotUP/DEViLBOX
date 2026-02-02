@@ -23,6 +23,7 @@ interface UIStore {
   oscilloscopeVisible: boolean;
   compactToolbar: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
+  showSamplePackModal: boolean;
   uiVersion: number; // Track UI migrations
 
   // Performance settings
@@ -46,6 +47,7 @@ interface UIStore {
   toggleCompactToolbar: () => void;
   setCompactToolbar: (compact: boolean) => void;
   applyAutoCompact: () => void; // Auto-collapse panels on small screens
+  setShowSamplePackModal: (show: boolean) => void;
 
   // Performance actions
   setPerformanceQuality: (quality: PerformanceQuality) => void;
@@ -67,6 +69,7 @@ export const useUIStore = create<UIStore>()(
       oscilloscopeVisible: true,
       compactToolbar: false, // FT2 toolbar expanded by default
       autoCompactApplied: false,
+      showSamplePackModal: false,
       uiVersion: 0,
 
       // Performance settings (default to high quality)
@@ -173,6 +176,11 @@ export const useUIStore = create<UIStore>()(
           if (screenHeight < 800) {
             state.oscilloscopeVisible = false;
           }
+        }),
+
+      setShowSamplePackModal: (show) =>
+        set((state) => {
+          state.showSamplePackModal = show;
         }),
 
       // Performance actions

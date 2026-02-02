@@ -208,8 +208,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 pt-16">
+      <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-b-2 border-ft2-border">
           <div className="flex items-center gap-3">

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T20:01:38.934Z
+ * Generated: 2026-02-02T20:36:07.208Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '199';
-export const BUILD_HASH = 'f8d0e7b';
+export const BUILD_NUMBER = '201';
+export const BUILD_HASH = '141819f';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'improvement',
+        description: 'Comprehensive optimization of audio engine, worklets, build, and UI'
+      },
+      {
+        type: 'feature',
+        description: 'Restore sample pack upload functionality and improve version display'
+      },
       {
         type: 'fix',
         description: 'Resolve require is not defined ReferenceError in toolbar'
@@ -242,14 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Refactor Furnace and synth editors for unified architecture'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve TestKeyboard and InstrumentList collapsible behavior'
-      },
-      {
-        type: 'improvement',
-        description: 'Update FurnaceChips WASM build with improved chip emulation'
       }
     ]
   }

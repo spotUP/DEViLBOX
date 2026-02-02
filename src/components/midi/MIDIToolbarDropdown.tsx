@@ -179,8 +179,7 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
                     setIsOpen(false);
                     openPatternDialog();
                   }}
-                  disabled={!selectedOutputId}
-                  className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 text-sm font-medium bg-dark-bgActive rounded flex items-center justify-center gap-2 hover:bg-dark-bgHover transition-colors"
                 >
                   <ArrowUpDown size={14} />
                   TD-3 Patterns...

@@ -13,7 +13,6 @@ import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 import { LoadPresetModal } from './presets';
-import { SamplePackBrowser } from './SamplePackBrowser';
 import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
@@ -67,14 +66,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
     updateInstrument,
   } = useInstrumentStore();
 
-  const { useHexNumbers } = useUIStore();
+  const { useHexNumbers, setShowSamplePackModal } = useUIStore();
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const [showLoadModal, setShowLoadModal] = useState(false);
-  const [showSamplePackModal, setShowSamplePackModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -456,9 +454,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
       {/* Modals (FT2 variant) */}
       {showLoadModal && (
         <LoadPresetModal onClose={() => setShowLoadModal(false)} />
-      )}
-      {showSamplePackModal && (
-        <SamplePackBrowser onClose={() => setShowSamplePackModal(false)} />
       )}
     </div>
   );
