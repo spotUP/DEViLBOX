@@ -29,6 +29,7 @@ import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { Box, Drum, Megaphone, Zap } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
@@ -152,9 +153,125 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     }
   }, [instrument.synthType]);
 
-  // Theme for TB303 custom header
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
+
+  // Custom Header Renderers
+  const renderSpaceLaserHeader = () => {
+    const accentColor = isCyanTheme ? '#00ffff' : '#00ff00';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#00ff00]';
+
+    return (
+      <EditorHeader
+        instrument={instrument}
+        onChange={onChange}
+        vizMode={vizMode}
+        onVizModeChange={setVizMode}
+        customHeader={
+          <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-700 shadow-lg">
+                <Zap size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SPACE LASER</h2>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Cosmic Zap Generator</p>
+              </div>
+            </div>
+          </div>
+        }
+      />
+    );
+  };
+
+  const renderV2Header = () => {
+    const accentColor = isCyanTheme ? '#00ffff' : '#ffaa00';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
+
+    return (
+      <EditorHeader
+        instrument={instrument}
+        onChange={onChange}
+        vizMode={vizMode}
+        onVizModeChange={setVizMode}
+        customHeader={
+          <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
+                <Box size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SYNTH</h2>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Farbrausch 4k Intro Engine</p>
+              </div>
+            </div>
+          </div>
+        }
+      />
+    );
+  };
+
+  const renderDubSirenHeader = () => {
+    const accentColor = isCyanTheme ? '#00ffff' : '#ff4444';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff4444]';
+
+    return (
+      <EditorHeader
+        instrument={instrument}
+        onChange={onChange}
+        vizMode={vizMode}
+        onVizModeChange={setVizMode}
+        customHeader={
+          <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-red-700 shadow-lg">
+                <Megaphone size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DUB SIREN</h2>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Sound System Generator</p>
+              </div>
+            </div>
+          </div>
+        }
+      />
+    );
+  };
+
+  const renderSynareHeader = () => {
+    const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';
+
+    return (
+      <EditorHeader
+        instrument={instrument}
+        onChange={onChange}
+        vizMode={vizMode}
+        onVizModeChange={setVizMode}
+        customHeader={
+          <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-700 shadow-lg text-black">
+                <Drum size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SYNARE 3</h2>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Electronic Percussion</p>
+              </div>
+            </div>
+          </div>
+        }
+      />
+    );
+  };
 
   // Handle TB303 config updates
   const handleTB303Change = useCallback((updates: Partial<typeof instrument.tb303>) => {
@@ -366,6 +483,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'dubsiren' && instrument.dubSiren) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {renderDubSirenHeader()}
         <DubSirenControls
           config={instrument.dubSiren}
           instrumentId={instrument.id}
@@ -381,6 +499,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'spacelaser' && instrument.spaceLaser) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {renderSpaceLaserHeader()}
         <SpaceLaserControls
           config={instrument.spaceLaser}
           onChange={handleSpaceLaserChange}
@@ -395,6 +514,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'v2' && instrument.v2) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {renderV2Header()}
         <V2Controls
           config={instrument.v2}
           onChange={handleV2Change}
@@ -409,6 +529,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'synare' && instrument.synare) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {renderSynareHeader()}
         <SynareControls
           config={instrument.synare}
           instrumentId={instrument.id}

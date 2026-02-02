@@ -3289,6 +3289,9 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...CHIP_PRESETS,
   ...FURNACE_PRESETS,
   ...FX_PRESETS,
+  ...DUB_SIREN_PRESETS,
+  ...SPACE_LASER_PRESETS,
+  ...V2_PRESETS,
   ...DRUMNIBUS_PRESETS,
   ...DRUMNIBUS_KIT_PRESETS,
 ];

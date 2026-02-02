@@ -29,15 +29,9 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   const knobColor = isCyanTheme ? '#00ffff' : '#ff8888';
   
   // Background styles
-  const mainBg = isCyanTheme
-    ? 'bg-[#030808]'
-    : 'bg-gradient-to-b from-[#1e1e1e] to-[#151515]';
   const panelBg = isCyanTheme
     ? 'bg-[#051515] border-cyan-900/50'
     : 'bg-[#1a1a1a] border-gray-800';
-  const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
-    : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff4444]';
 
   // Helper to update nested configs
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {
@@ -343,20 +337,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   );
 
   return (
-    <div className={`synth-editor-container ${mainBg} flex flex-col h-full`}>
-      {/* Header */}
-      <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-red-700 shadow-lg">
-            <Megaphone size={24} className="text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DUB SIREN</h2>
-            <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Sound System Generator</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Tabs */}
       <div className="flex border-b border-gray-800 bg-[#151515]">
         <button

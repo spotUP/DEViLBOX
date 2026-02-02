@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T23:07:12.347Z
+ * Generated: 2026-02-02T23:26:37.298Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '236';
-export const BUILD_HASH = 'fb60271';
+export const BUILD_NUMBER = '237';
+export const BUILD_HASH = '392d1c5';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve TypeScript errors in usePadTriggers hook'
+      },
       {
         type: 'fix',
         description: 'Resolve SpaceLaser release error and refine Numpad drum triggers'
@@ -232,10 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix knob value loss due to stale closures and remove default delay from DT303 preset'
-      },
-      {
-        type: 'feature',
-        description: 'Add JC303 engine (Open303 WASM) with custom UI, set as default TB-303 engine, and fix AudioWorklet context issues'
       }
     ]
   }
