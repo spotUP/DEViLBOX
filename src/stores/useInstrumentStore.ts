@@ -21,6 +21,17 @@ import {
   DEFAULT_V2,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_WAVETABLE,
+  DEFAULT_GRANULAR,
+  DEFAULT_SUPERSAW,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_ORGAN,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_FORMANT_SYNTH,
+  DEFAULT_WOBBLE_BASS,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
