@@ -19,7 +19,6 @@ import {
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
-  DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -453,6 +452,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 baseNote: 'C4',
                 detune: 0,
                 loop: false,
+                loopStart: 0,
+                loopEnd: 0,
                 reverse: false,
                 playbackRate: 1,
               };
@@ -486,6 +487,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 baseNote: 'C4',
                 detune: 0,
                 loop: false,
+                loopStart: 0,
+                loopEnd: 0,
                 reverse: false,
                 playbackRate: 1,
               };

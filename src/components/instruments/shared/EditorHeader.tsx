@@ -11,7 +11,7 @@
 
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download } from 'lucide-react';
+import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download, Zap } from 'lucide-react';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -212,6 +212,11 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onHelpToggle,
   customHeader,
   compact = false,
+  onBake,
+  onBakePro,
+  onUnbake,
+  isBaked,
+  isBaking,
 }) => {
   const synthInfo = getSynthInfo(instrument.synthType);
   const synthHelp = getSynthHelp(instrument.synthType);

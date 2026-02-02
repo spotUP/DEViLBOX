@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:17:21.530Z
+ * Generated: 2026-02-02T21:26:56.280Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '207';
-export const BUILD_HASH = 'b1175d5';
+export const BUILD_NUMBER = '211';
+export const BUILD_HASH = '73798a9';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Bake instrument effects into samples and restore them on unbake'
+      },
+      {
+        type: 'feature',
+        description: 'Implement Pro Bake (multi-sample rendering) for maximum accuracy'
+      },
+      {
+        type: 'feature',
+        description: 'Download baked samples and optimize song storage with auto-baking'
+      },
+      {
+        type: 'feature',
+        description: 'Add Precalc/Bake functionality to instrument editors'
+      },
       {
         type: 'fix',
         description: 'Resolve TypeScript errors in SpaceLaser and LoadPresetModal'
@@ -234,22 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add CRITICAL git safety rules to CLAUDE.md'
-      },
-      {
-        type: 'feature',
-        description: 'Add deploy.sh script for quick commit/push/deploy'
-      },
-      {
-        type: 'improvement',
-        description: 'Update generated changelog'
-      },
-      {
-        type: 'improvement',
-        description: 'Update synth categories and organization'
-      },
-      {
-        type: 'improvement',
-        description: 'Enhance audio engine and synth handling'
       }
     ]
   }

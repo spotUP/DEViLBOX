@@ -2656,9 +2656,9 @@ export class ToneEngine {
   public async bakeInstrument(config: InstrumentConfig, duration: number = 2, note: string = "C4"): Promise<AudioBuffer> {
     // We use Tone.Offline to render the sound
     // Note: We create a fresh factory instance inside the offline context
-    return Tone.Offline(async () => {
+    const result = await Tone.Offline(async () => {
       // Create the instrument in the offline context
-      const instrument = InstrumentFactory.createInstrument(config);
+      const instrument = InstrumentFactory.createInstrument(config) as any;
       
       // Create effects chain if present
       if (config.effects && config.effects.length > 0) {
@@ -2685,6 +2685,8 @@ export class ToneEngine {
 
       // Wait for the duration
     }, duration);
+
+    return result as unknown as AudioBuffer;
   }
 
   /**

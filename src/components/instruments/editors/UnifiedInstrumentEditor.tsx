@@ -28,7 +28,6 @@ import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-import { Flame, History } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
