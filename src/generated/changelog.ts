@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T22:49:01.457Z
+ * Generated: 2026-02-02T23:07:12.347Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '231';
-export const BUILD_HASH = '44f79af';
+export const BUILD_NUMBER = '236';
+export const BUILD_HASH = 'fb60271';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -31,8 +31,34 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-03',
+    changes: [
+      {
+        type: 'fix',
+        description: 'Resolve SpaceLaser release error and refine Numpad drum triggers'
+      },
+      {
+        type: 'feature',
+        description: 'Restrict drum triggers to Numpad 1-9 and implement NumpadEnter bank swap'
+      }
+    ]
+  },
+  {
+    version: '2026-02-02',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Map drumpad triggers to numeric keyboard (1-9)'
+      },
+      {
+        type: 'feature',
+        description: 'Implement quantized drumpad recording in record mode'
+      },
+      {
+        type: 'feature',
+        description: 'Add instrument preview to DrumpadEditorModal'
+      },
       {
         type: 'fix',
         description: 'Resolve TypeScript errors in SamplePackStore export and browser component'
@@ -210,32 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add JC303 engine (Open303 WASM) with custom UI, set as default TB-303 engine, and fix AudioWorklet context issues'
-      },
-      {
-        type: 'feature',
-        description: 'Update MIDI toolbar, DubSiren controls, and app integration'
-      },
-      {
-        type: 'improvement',
-        description: 'Update InstrumentFactory, ToneEngine, and synth implementations'
-      },
-      {
-        type: 'feature',
-        description: 'Implement NKS (Native Kontrol Standard) integration with Akai hardware support'
-      }
-    ]
-  },
-  {
-    version: '2026-01-31',
-    date: '2026-01-31',
-    changes: [
-      {
-        type: 'feature',
-        description: 'Add new utility libraries for audio parsing and MIDI knob banks'
-      },
-      {
-        type: 'improvement',
-        description: 'Enhance UI components, update project configurations, and generate changelog'
       }
     ]
   }

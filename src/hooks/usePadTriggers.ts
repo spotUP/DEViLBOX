@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import * as Tone from 'tone';
 import { getPadMappingManager, type PadMapping } from '../midi/PadMappingManager';
 import { ToneEngine } from '../engine/ToneEngine';
-import { useInstrumentStore, useTrackerStore, useTransportStore, useSettingsStore } from '../stores';
+import { useInstrumentStore, useTrackerStore, useTransportStore, useMIDIStore } from '../stores';
 import { stringNoteToXM } from '../lib/xmConversions';
 
 export function usePadTriggers() {
@@ -70,7 +70,7 @@ export function usePadTriggers() {
 
           // Advance cursor if not playing (standard tracker behavior)
           if (!transStore.isPlaying && tStore.editStep > 0) {
-            const currentPattern = tStore.patterns.find(p => p.id === tStore.currentPatternId);
+            const currentPattern = tStore.patterns[tStore.currentPatternIndex];
             if (currentPattern) {
               const nextRow = (targetRow + tStore.editStep) % currentPattern.length;
               tStore.moveCursorToRow(nextRow);
@@ -88,9 +88,8 @@ export function usePadTriggers() {
         // RECORD RELEASE (optional, usually not for drums but good for consistency)
         const tStore = useTrackerStore.getState();
         const transStore = useTransportStore.getState();
-        const settings = useSettingsStore.getState();
 
-        if (tStore.recordMode && transStore.isPlaying && settings.recReleaseEnabled) {
+        if (tStore.recordMode && transStore.isPlaying && tStore.recReleaseEnabled) {
           // Find where the note was recorded and place a key-off (97)
           // For simplicity, we just use the current playback row
           // In a real tracker, we'd track WHICH channel this specific pad hit was recorded into
