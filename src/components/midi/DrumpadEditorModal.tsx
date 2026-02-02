@@ -3,7 +3,8 @@ import { getPadMappingManager, type PadMapping } from '../../midi/PadMappingMana
 import { useInstrumentStore } from '../../stores';
 import { detectControllerProfile } from '../../midi/controllerProfiles';
 import { useMIDI } from '../../hooks/useMIDI';
-import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano } from 'lucide-react';
+import { getToneEngine } from '../../engine/ToneEngine';
+import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano, Play } from 'lucide-react';
 
 interface DrumpadEditorModalProps {
   isOpen: boolean;
@@ -138,6 +139,18 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
     setSelectedPadIndex(index);
   };
 
+  const previewInstrument = useCallback((id: number) => {
+    const inst = instruments.find(i => i.id === id);
+    if (inst) {
+      const engine = getToneEngine();
+      engine.triggerPolyNoteAttack(inst.id, 'C4', 1, inst);
+      // Auto-release after 500ms
+      setTimeout(() => {
+        engine.triggerPolyNoteRelease(inst.id, 'C4', inst);
+      }, 500);
+    }
+  }, [instruments]);
+
   const handleInstrumentChange = (instrumentId: number) => {
     if (selectedPadIndex === null) return;
     
@@ -156,6 +169,9 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
     
     padManager.setMapping(newMapping);
     refreshMappings();
+
+    // Auto-preview on change
+    previewInstrument(instrumentId);
   };
 
   const handleNoteChange = (note: number) => {
@@ -354,18 +370,28 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                 {/* Target Instrument */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-text-secondary">Target Instrument</label>
-                  <select
-                    value={currentPadMapping?.targetInstrumentId || ''}
-                    onChange={(e) => handleInstrumentChange(parseInt(e.target.value))}
-                    className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-text-primary"
-                  >
-                    <option value="" disabled>Select Instrument...</option>
-                    {instruments.map(inst => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.id.toString(16).toUpperCase().padStart(2, '0')} - {inst.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={currentPadMapping?.targetInstrumentId || ''}
+                      onChange={(e) => handleInstrumentChange(parseInt(e.target.value))}
+                      className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-2 text-text-primary"
+                    >
+                      <option value="" disabled>Select Instrument...</option>
+                      {instruments.map(inst => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.id.toString(16).toUpperCase().padStart(2, '0')} - {inst.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => currentPadMapping?.targetInstrumentId && previewInstrument(currentPadMapping.targetInstrumentId)}
+                      disabled={!currentPadMapping?.targetInstrumentId}
+                      className="p-2 bg-dark-bg border border-dark-border rounded text-text-secondary hover:text-accent-success hover:border-accent-success/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Preview Instrument"
+                    >
+                      <Play size={18} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Target Note */}
