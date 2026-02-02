@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T22:48:05.066Z
+ * Generated: 2026-02-02T22:49:01.457Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '230';
-export const BUILD_HASH = 'd17f8f8';
+export const BUILD_NUMBER = '231';
+export const BUILD_HASH = '44f79af';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve TypeScript errors in SamplePackStore export and browser component'
+      },
       {
         type: 'fix',
         description: 'Improve SamplePackStore reactivity to ensure uploaded packs appear in UI'
@@ -64,10 +68,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Rename sample files to remove spaces and fix Drumaxia template loading'
-      },
-      {
-        type: 'fix',
-        description: 'Resolve TypeScript errors in SamplePackBrowser preview logic'
       },
       {
         type: 'fix',
@@ -236,10 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Enhance UI components, update project configurations, and generate changelog'
-      },
-      {
-        type: 'feature',
-        description: 'Introduce MAME, Dub Siren, and Synare instruments with WASM modules'
       }
     ]
   }
