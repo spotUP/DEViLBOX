@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Activity, Filter, Waves, Wind, Box, Zap } from 'lucide-react';
+import { Activity, Filter, Box, Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
 
 interface V2ControlsProps {

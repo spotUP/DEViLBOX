@@ -9,7 +9,7 @@ export class V2Synth extends Tone.ToneAudioNode {
   private _initialized: boolean = false;
   private _initPromise: Promise<void>;
 
-  constructor(options?: any) {
+  constructor() {
     super();
     this.output = new Tone.Gain();
     this._initPromise = this._initialize();
@@ -45,14 +45,15 @@ export class V2Synth extends Tone.ToneAudioNode {
       wasmBinary
     });
 
-    this._worklet.connect(this.output);
+    // Use any cast for connection to raw AudioNode
+    (this._worklet as any).connect(this.output);
   }
 
   public async ready() {
     return this._initPromise;
   }
 
-  public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
+  public triggerAttack(note: string | number, _time?: number, velocity: number = 1) {
     if (!this._initialized) return;
     
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
@@ -62,15 +63,15 @@ export class V2Synth extends Tone.ToneAudioNode {
     this._sendMIDI([0x90, midiNote, vel]);
   }
 
-  public triggerRelease(time?: number) {
+  public triggerRelease(_time?: number) {
     if (!this._initialized) return;
     // We don't have the current note here, but V2 handles polyphony.
     // Standard trackers send Note Off for the note on that channel.
     // For now, we'll send All Notes Off if needed or handle via explicit note.
   }
 
-  public triggerAttackRelease(note: string | number, duration: Tone.Unit.Time, time?: number, velocity: number = 1) {
-    this.triggerAttack(note, time, velocity);
+  public triggerAttackRelease(note: string | number, duration: Tone.Unit.Time, _time?: number, velocity: number = 1) {
+    this.triggerAttack(note, undefined, velocity);
     // V2 is polyphonic and stateful, better to send Note Off
     const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
     const d = this.toSeconds(duration);

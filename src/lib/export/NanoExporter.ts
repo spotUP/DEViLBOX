@@ -8,8 +8,8 @@
  * - 0-255 normalized parameters for synths
  */
 
-import type { InstrumentConfig, SynthType } from '@/types/instrument';
-import type { Pattern, PatternCell } from '@/types';
+import type { InstrumentConfig } from '@/types/instrument';
+import type { Pattern, TrackerCell } from '@/types/tracker';
 
 // Map synth types to tiny IDs
 const SYNTH_TYPE_TO_ID: Record<string, number> = {
@@ -45,14 +45,12 @@ export class NanoExporter {
     buffer.push(patternOrder.length); // Song Length
 
     // 2. INSTRUMENTS SECTION
-    // For each instrument: ID (1), Type (1), Vol (1), Pan (1), 8 Generic Params (8) = 12 bytes
     usedInstrConfigs.forEach(inst => {
       buffer.push(inst.id);
       buffer.push(SYNTH_TYPE_TO_ID[inst.synthType] || 0);
-      buffer.push(Math.round(((inst.volume + 60) / 60) * 255)); // -60..0 -> 0..255
-      buffer.push(Math.round(((inst.pan + 100) / 200) * 255)); // -100..100 -> 0..255
+      buffer.push(Math.round(((inst.volume + 60) / 60) * 255));
+      buffer.push(Math.round(((inst.pan + 100) / 200) * 255));
       
-      // Pack the most important params based on type
       const params = this.packSynthParams(inst);
       params.forEach(p => buffer.push(p));
     });
@@ -61,7 +59,6 @@ export class NanoExporter {
     patternOrder.forEach(pIdx => buffer.push(pIdx));
 
     // 4. PATTERNS DATA
-    // We only export the patterns present in the patternOrder
     const uniquePatterns = Array.from(new Set(patternOrder));
     buffer.push(uniquePatterns.length);
 
@@ -69,40 +66,45 @@ export class NanoExporter {
       const pattern = patterns[pIdx];
       if (!pattern) return;
 
-      buffer.push(pIdx); // Pattern Index
-      buffer.push(pattern.rows.length); // Rows (usually 64)
+      buffer.push(pIdx);
+      buffer.push(pattern.length);
 
-      pattern.rows.forEach((row, rIdx) => {
-        // Find cells with data
-        const activeCells = row.cells.map((c, cIdx) => ({ cell: c, channel: cIdx })).filter(item => this.isCellActive(item.cell));
+      // Iterate through rows (0 to pattern.length)
+      for (let rIdx = 0; rIdx < pattern.length; rIdx++) {
+        // Find active cells in this row across all channels
+        const activeCells: { cell: TrackerCell, channel: number }[] = [];
         
+        pattern.channels.forEach((channel, cIdx) => {
+          const cell = channel.rows[rIdx];
+          if (cell && this.isCellActive(cell)) {
+            activeCells.push({ cell, channel: cIdx });
+          }
+        });
+
         if (activeCells.length === 0) {
-          buffer.push(0); // 0 active cells signals empty row
-          return;
+          buffer.push(0);
+          continue;
         }
 
         buffer.push(activeCells.length);
         activeCells.forEach(({ cell, channel }) => {
-          // PACKED CELL: 
-          // Byte 1: [Channel Index (4 bits) | Mask (4 bits: Note, Instr, Vol, FX)]
           let mask = 0;
-          if (cell.note) mask |= 0x08;
-          if (cell.instrument !== null) mask |= 0x04;
-          if (cell.volume !== undefined && cell.volume !== 64) mask |= 0x02;
-          if (cell.effectType) mask |= 0x01;
+          if (cell.note > 0) mask |= 0x08;
+          if (cell.instrument > 0) mask |= 0x04;
+          if (cell.volume > 0) mask |= 0x02;
+          if (cell.effTyp > 0) mask |= 0x01;
 
           buffer.push((channel << 4) | mask);
 
-          // Data bytes based on mask
-          if (mask & 0x08) buffer.push(this.noteToByte(cell.note!));
-          if (mask & 0x04) buffer.push(cell.instrument!);
-          if (mask & 0x02) buffer.push(cell.volume!);
+          if (mask & 0x08) buffer.push(cell.note);
+          if (mask & 0x04) buffer.push(cell.instrument);
+          if (mask & 0x02) buffer.push(cell.volume);
           if (mask & 0x01) {
-            buffer.push(cell.effectType!.charCodeAt(0));
-            buffer.push(cell.effectParam || 0);
+            buffer.push(cell.effTyp);
+            buffer.push(cell.eff);
           }
         });
-      });
+      }
     });
 
     return new Uint8Array(buffer);
@@ -111,33 +113,25 @@ export class NanoExporter {
   private static getUsedInstrumentIds(patterns: Pattern[], order: number[]): Set<number> {
     const used = new Set<number>();
     order.forEach(pIdx => {
-      patterns[pIdx]?.rows.forEach(row => {
-        row.cells.forEach(cell => {
-          if (cell.instrument !== null) used.add(cell.instrument);
+      const pattern = patterns[pIdx];
+      if (!pattern) return;
+      pattern.channels.forEach(channel => {
+        channel.rows.forEach(cell => {
+          if (cell.instrument > 0) used.add(cell.instrument);
         });
       });
     });
     return used;
   }
 
-  private static isCellActive(cell: PatternCell): boolean {
-    return !!(cell.note || cell.instrument !== null || (cell.volume !== undefined && cell.volume !== 64) || cell.effectType);
-  }
-
-  private static noteToByte(note: string): number {
-    // Basic mapping for 4k: C-0 = 0, etc.
-    const notes = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-    const name = note.substring(0, 2);
-    const octave = parseInt(note.substring(2));
-    const idx = notes.indexOf(name);
-    return octave * 12 + idx;
+  private static isCellActive(cell: TrackerCell): boolean {
+    return cell.note > 0 || cell.instrument > 0 || cell.volume > 0 || cell.effTyp > 0;
   }
 
   private static packSynthParams(inst: InstrumentConfig): number[] {
     const res = new Array(8).fill(0);
-    // Extract 8 most vital params for each type to keep it tiny
     if (inst.synthType === 'TB303' && inst.tb303) {
-      res[0] = inst.tb303.filter.cutoff; // already 0-100ish
+      res[0] = inst.tb303.filter.cutoff;
       res[1] = inst.tb303.filter.resonance;
       res[2] = inst.tb303.filterEnvelope.envMod;
       res[3] = inst.tb303.filterEnvelope.decay;
@@ -146,8 +140,12 @@ export class NanoExporter {
       res[1] = inst.spaceLaser.fm.amount;
       res[2] = inst.spaceLaser.fm.ratio * 10;
       res[3] = inst.spaceLaser.filter.cutoff / 100;
+    } else if (inst.synthType === 'V2' && inst.v2) {
+      res[0] = inst.v2.osc1.transpose + 64;
+      res[1] = inst.v2.osc1.detune + 64;
+      res[2] = inst.v2.filter.cutoff;
+      res[3] = inst.v2.filter.resonance;
     }
-    // ... etc for other types
     return res.map(v => Math.floor(Math.min(255, Math.max(0, v))));
   }
 }
