@@ -20,6 +20,7 @@ import {
   DEFAULT_SPACE_LASER,
   DEFAULT_V2,
   DEFAULT_SYNARE,
+  DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -27,6 +28,71 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
+
+/**
+ * Get initial configuration for a synth type
+ */
+function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
+  const base: Partial<InstrumentConfig> = {
+    synthType: synthType as any,
+    effects: [],
+    volume: -12,
+    pan: 0,
+  };
+
+  switch (synthType) {
+    case 'TB303':
+      base.tb303 = { ...DEFAULT_TB303 };
+      break;
+    case 'DrumMachine':
+      base.drumMachine = { ...DEFAULT_DRUM_MACHINE };
+      break;
+    case 'ChipSynth':
+      base.chipSynth = { ...DEFAULT_CHIP_SYNTH };
+      break;
+    case 'PWMSynth':
+      base.pwmSynth = { ...DEFAULT_PWM_SYNTH };
+      break;
+    case 'Wavetable':
+      base.wavetable = { ...DEFAULT_WAVETABLE };
+      break;
+    case 'GranularSynth':
+      base.granular = { ...DEFAULT_GRANULAR };
+      break;
+    case 'SuperSaw':
+      base.superSaw = { ...DEFAULT_SUPERSAW };
+      break;
+    case 'PolySynth':
+      base.polySynth = { ...DEFAULT_POLYSYNTH };
+      break;
+    case 'Organ':
+      base.organ = { ...DEFAULT_ORGAN };
+      break;
+    case 'StringMachine':
+      base.stringMachine = { ...DEFAULT_STRING_MACHINE };
+      break;
+    case 'FormantSynth':
+      base.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
+      break;
+    case 'WobbleBass':
+      base.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
+      break;
+    case 'DubSiren':
+      base.dubSiren = { ...DEFAULT_DUB_SIREN };
+      break;
+    case 'SpaceLaser':
+      base.spaceLaser = { ...DEFAULT_SPACE_LASER };
+      break;
+    case 'V2':
+      base.v2 = { ...DEFAULT_V2 };
+      break;
+    case 'Synare':
+      base.synare = { ...DEFAULT_SYNARE };
+      break;
+  }
+
+  return base;
+}
 
 interface InstrumentStore {
   // State
