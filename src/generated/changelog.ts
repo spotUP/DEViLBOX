@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T22:38:37.029Z
+ * Generated: 2026-02-02T22:41:41.325Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '226';
-export const BUILD_HASH = 'c2e702c';
+export const BUILD_NUMBER = '228';
+export const BUILD_HASH = 'eaae6dc';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve beeps during sample jamming by favoring Tone.Player for single samples'
+      },
+      {
+        type: 'fix',
+        description: 'Debug: add extensive logging to sample pack upload process'
+      },
       {
         type: 'fix',
         description: 'Resolve missing Zap icon import in SamplePackBrowser'
@@ -232,14 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add Dub Siren synth'
-      },
-      {
-        type: 'feature',
-        description: 'Add Drumpad Editor for custom pad mapping'
-      },
-      {
-        type: 'fix',
-        description: 'Resolve integration issues from MIDI and engine updates'
       }
     ]
   }
