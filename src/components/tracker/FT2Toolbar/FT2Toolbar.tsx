@@ -10,6 +10,7 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
+import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
@@ -17,6 +18,7 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
@@ -57,13 +59,11 @@ const RowDisplay: React.FC = React.memo(() => {
     }
 
     let rafId: number;
-    const { getTrackerReplayer } = require('@/engine/TrackerReplayer');
-    const { now } = require('tone');
     const replayer = getTrackerReplayer();
 
     const update = () => {
       // Get audio-synced row with 10ms lookahead
-      const state = replayer.getStateAtTime(now() + 0.01);
+      const state = replayer.getStateAtTime(Tone.now() + 0.01);
       if (state) {
         setDisplayRow(state.row);
       }
