@@ -43,7 +43,16 @@ export function saveProjectToStorage(): boolean {
       bpm: transportState.bpm,
       patterns: trackerState.patterns,
       patternOrder: trackerState.patternOrder,
-      instruments: instrumentState.instruments,
+      instruments: instrumentState.instruments.map(inst => {
+        // Optimization: Don't save blob URLs for baked instruments
+        // They will be re-calculated on load
+        if (inst.metadata?.preservedSynth && inst.sample?.url?.startsWith('blob:')) {
+          const cleanedInst = { ...inst };
+          cleanedInst.sample = { ...inst.sample, url: '' };
+          return cleanedInst;
+        }
+        return inst;
+      }),
       automation: automationState.curves,
       masterEffects: audioState.masterEffects,
       // Only save groove template if not the default
@@ -147,6 +156,9 @@ export function loadProjectFromStorage(): boolean {
     if (project.grooveTemplateId) {
       transportStore.setGrooveTemplate(project.grooveTemplateId);
     }
+
+    // Auto-bake any instruments that need it (async)
+    instrumentStore.autoBakeInstruments();
 
     projectStore.markAsSaved();
     return true;

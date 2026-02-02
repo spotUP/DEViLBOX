@@ -48,6 +48,7 @@ interface InstrumentStore {
     resetInstrument: (id: number) => void;
     bakeInstrument: (id: number) => Promise<void>;
     unbakeInstrument: (id: number) => void;
+    autoBakeInstruments: () => Promise<void>;
     // Effects
   
   addEffect: (instrumentId: number, effectType: EffectConfig['type']) => void;
@@ -471,6 +472,44 @@ export const useInstrumentStore = create<InstrumentStore>()(
         engine.invalidateInstrument(id);
       } catch (e) {
         // Ignored
+      }
+    },
+
+    autoBakeInstruments: async () => {
+      const state = get();
+      const instrumentsToBake = state.instruments.filter(
+        (inst) => inst.metadata?.preservedSynth && !inst.sample?.url
+      );
+
+      if (instrumentsToBake.length === 0) return;
+
+      console.log(`[InstrumentStore] Auto-baking ${instrumentsToBake.length} instruments...`);
+
+      // Bake them sequentially to avoid overloading the CPU/AudioContext
+      for (const inst of instrumentsToBake) {
+        // We need to bake the PRESERVED synth config, not the current Sampler state
+        const preserved = inst.metadata!.preservedSynth!;
+        const tempConfig = { ...inst, ...preserved.config, synthType: preserved.synthType };
+        
+        try {
+          const engine = getToneEngine();
+          const buffer = await engine.bakeInstrument(tempConfig as InstrumentConfig, 2);
+          const wavData = await WaveformProcessor.bufferToWav(buffer);
+          const blob = new Blob([wavData], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+
+          set((state) => {
+            const currentInst = state.instruments.find((i) => i.id === inst.id);
+            if (currentInst && currentInst.sample) {
+              currentInst.sample.url = url;
+            }
+          });
+          
+          // Invalidate engine instance
+          engine.invalidateInstrument(inst.id);
+        } catch (error) {
+          console.error(`[InstrumentStore] Failed to auto-bake instrument ${inst.id}:`, error);
+        }
       }
     },
 
