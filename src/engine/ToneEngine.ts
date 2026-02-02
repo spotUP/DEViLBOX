@@ -968,8 +968,14 @@ export class ToneEngine {
                   
                   if (hasLoop) {
                     const originalSampleRate = config.sample?.sampleRate || 8363;
-                    playerRef.loopStart = loopStart / originalSampleRate;
-                    playerRef.loopEnd = loopEnd / originalSampleRate;
+                    const duration = audioBuffer.duration;
+                    // Clamp loop points to buffer duration to avoid RangeError
+                    playerRef.loopStart = Math.min(loopStart / originalSampleRate, duration - 0.0001);
+                    playerRef.loopEnd = Math.min(loopEnd / originalSampleRate, duration);
+                    
+                    if (playerRef.loopEnd <= playerRef.loopStart) {
+                      playerRef.loopEnd = duration;
+                    }
                   }
                   
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
@@ -1014,8 +1020,17 @@ export class ToneEngine {
               onload: () => {
                 if (hasLoop) {
                   const originalSampleRate = config.sample?.sampleRate || 8363;
-                  playerRef.loopStart = loopStart / originalSampleRate;
-                  playerRef.loopEnd = loopEnd / originalSampleRate;
+                  const audioBuffer = playerRef.buffer.get();
+                  const duration = audioBuffer ? audioBuffer.duration : 0;
+                  
+                  if (duration > 0) {
+                    playerRef.loopStart = Math.min(loopStart / originalSampleRate, duration - 0.0001);
+                    playerRef.loopEnd = Math.min(loopEnd / originalSampleRate, duration);
+                    
+                    if (playerRef.loopEnd <= playerRef.loopStart) {
+                      playerRef.loopEnd = duration;
+                    }
+                  }
                 }
                 
                 const audioBuffer = playerRef.buffer.get();
