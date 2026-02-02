@@ -106,23 +106,30 @@ export function usePadTriggers() {
       // Ignore if typing in input fields
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
-      // Map Numpad 1-9 to Pad Indices 0-8 (Bank A)
+      const midiStore = useMIDIStore.getState();
+
+      // Enter on Numpad swaps banks (Standard Enter is location 0, Numpad Enter is location 3)
+      if (e.code === 'NumpadEnter' || (e.key === 'Enter' && e.location === 3)) {
+        e.preventDefault();
+        midiStore.togglePadBank();
+        return;
+      }
+
+      // Map Numpad 1-9 to Pad Indices (offset by bank)
+      // We ONLY want Numpad codes to avoid clashing with the standard number row
       const numpadMap: Record<string, number> = {
-        '1': 0, '2': 1, '3': 2,
-        '4': 3, '5': 4, '6': 5,
-        '7': 6, '8': 7, '9': 8,
-        // Also support standard number keys
-        'Digit1': 0, 'Digit2': 1, 'Digit3': 2,
-        'Digit4': 3, 'Digit5': 4, 'Digit6': 5,
-        'Digit7': 6, 'Digit8': 7, 'Digit9': 8,
-        // Also support explicit Numpad codes
         'Numpad1': 0, 'Numpad2': 1, 'Numpad3': 2,
         'Numpad4': 3, 'Numpad5': 4, 'Numpad6': 5,
         'Numpad7': 6, 'Numpad8': 7, 'Numpad9': 8
       };
 
-      const padIndex = numpadMap[e.code] || numpadMap[e.key];
+      let padIndex = numpadMap[e.code];
       if (padIndex !== undefined) {
+        // Apply bank offset (8 pads per bank)
+        if (midiStore.padBank === 'B') {
+          padIndex += 8;
+        }
+
         // Find mapping for this pad index (Standard mapping: Ch 10, Note 36 + i)
         const inputNote = 36 + padIndex;
         const mapping = padManager.getMapping(9, inputNote);
@@ -135,20 +142,20 @@ export function usePadTriggers() {
     const handleKeyUp = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
+      const midiStore = useMIDIStore.getState();
+
       const numpadMap: Record<string, number> = {
-        '1': 0, '2': 1, '3': 2,
-        '4': 3, '5': 4, '6': 5,
-        '7': 6, '8': 7, '9': 8,
-        'Digit1': 0, 'Digit2': 1, 'Digit3': 2,
-        'Digit4': 3, 'Digit5': 4, 'Digit6': 5,
-        'Digit7': 6, 'Digit8': 7, 'Digit9': 8,
         'Numpad1': 0, 'Numpad2': 1, 'Numpad3': 2,
         'Numpad4': 3, 'Numpad5': 4, 'Numpad6': 5,
         'Numpad7': 6, 'Numpad8': 7, 'Numpad9': 8
       };
 
-      const padIndex = numpadMap[e.code] || numpadMap[e.key];
+      let padIndex = numpadMap[e.code];
       if (padIndex !== undefined) {
+        if (midiStore.padBank === 'B') {
+          padIndex += 8;
+        }
+        
         const inputNote = 36 + padIndex;
         const mapping = padManager.getMapping(9, inputNote);
         if (mapping) {

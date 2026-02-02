@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getPadMappingManager, type PadMapping } from '../../midi/PadMappingManager';
-import { useInstrumentStore } from '../../stores';
+import { useInstrumentStore, useMIDIStore } from '../../stores';
 import { detectControllerProfile } from '../../midi/controllerProfiles';
 import { useMIDI } from '../../hooks/useMIDI';
 import { getToneEngine } from '../../engine/ToneEngine';
@@ -15,11 +15,11 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   const padManager = getPadMappingManager();
   const { instruments } = useInstrumentStore();
   const { devices, isEnabled } = useMIDI();
+  const { padBank: activeBank, setPadBank: setActiveBank } = useMIDIStore();
 
   const [mappings, setMappings] = useState<PadMapping[]>([]);
   const [selectedPadIndex, setSelectedPadIndex] = useState<number | null>(null);
   const [isLearning, setIsLearning] = useState(false);
-  const [activeBank, setActiveBank] = useState<'A' | 'B'>('A');
 
   // Load General Preset
   const handleLoadPreset = (_type: 'auto' | '808' | '909' | 'drumnibus') => {
