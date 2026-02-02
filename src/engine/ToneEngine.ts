@@ -951,19 +951,15 @@ export class ToneEngine {
 
           if (bufferToUse) {
             const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
+            const isSingleSample = !config.sample?.multiMap;
 
-            if (hasLoop || usePeriodPlayback) {
+            if (hasLoop || usePeriodPlayback || isSingleSample) {
               instrument = new Tone.Player({
                 loop: hasLoop,
-                // Don't set loop points yet - wait for buffer to load
-                loopStart: 0,
-                loopEnd: 0,
                 volume: config.volume || 0,
               });
-              // Store as 'Player' type for proper handling in other methods
               this.instrumentSynthTypes.set(key, 'Player');
 
-              // Load the stored buffer asynchronously and track the promise
               const bufferForDecode = bufferToUse;
               const playerRef = instrument as Tone.Player;
               const loadPromise = (async () => {
@@ -971,24 +967,20 @@ export class ToneEngine {
                   const audioBuffer = await this.decodeAudioData(bufferForDecode);
                   playerRef.buffer = new Tone.ToneAudioBuffer(audioBuffer);
                   
-                  // CRITICAL: Set loop points AFTER buffer is loaded
-                  // Convert from sample units to seconds at the ORIGINAL sample rate
                   if (hasLoop) {
                     const originalSampleRate = config.sample?.sampleRate || 8363;
                     playerRef.loopStart = loopStart / originalSampleRate;
                     playerRef.loopEnd = loopEnd / originalSampleRate;
                   }
                   
-                  // Store decoded buffer for TrackerReplayer
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
-                  console.log(`[ToneEngine] Sampler ${instrumentId} loaded edited buffer with loop: ${loopStart}-${loopEnd} samples`);
                 } catch (err) {
                   console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
             } else {
-              // Non-looping: Use Tone.Sampler
+              // Only use Tone.Sampler for multi-map/pro-baked instruments
               instrument = new Tone.Sampler({
                 volume: config.volume || -12,
               });
@@ -1015,28 +1007,21 @@ export class ToneEngine {
 
         // If no instrument created from stored buffer, try URL
         if (!instrument && sampleUrl) {
-          // CRITICAL: For MOD/XM samples or looping samples, use Tone.Player
-          // Tone.Player allows direct playbackRate control for accurate pitch
-          // Tone.Sampler rounds to nearest semitone, losing precision
           const usePeriodPlayback = config.metadata?.modPlayback?.usePeriodPlayback;
+          const isSingleSample = !config.sample?.multiMap;
 
-          if (hasLoop || usePeriodPlayback) {
+          if (hasLoop || usePeriodPlayback || isSingleSample) {
             const playerRef = new Tone.Player({
               url: sampleUrl,
               loop: hasLoop,
-              loopStart: 0,  // Set after load
-              loopEnd: 0,    // Set after load
-              volume: config.volume || 0, // Use unity gain - volume controlled via velocity
+              volume: config.volume || 0,
               onload: () => {
-                // Set loop points AFTER buffer is loaded
                 if (hasLoop) {
                   const originalSampleRate = config.sample?.sampleRate || 8363;
                   playerRef.loopStart = loopStart / originalSampleRate;
                   playerRef.loopEnd = loopEnd / originalSampleRate;
-                  console.log(`[ToneEngine] Player ${instrumentId} set loop: ${playerRef.loopStart}s - ${playerRef.loopEnd}s`);
                 }
                 
-                // Store decoded buffer for TrackerReplayer
                 const audioBuffer = playerRef.buffer.get();
                 if (audioBuffer) {
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
@@ -1047,20 +1032,18 @@ export class ToneEngine {
               },
             });
             instrument = playerRef;
-            // Store as 'Player' type for proper handling in other methods
             this.instrumentSynthTypes.set(key, 'Player');
           } else {
-            // Non-MOD, non-looping: Use Tone.Sampler for note-based playback
-            const urls: { [note: string]: string } = {};
-            urls[baseNote] = sampleUrl;
+            // Only use Tone.Sampler for multi-map
+            const urls = config.sample?.multiMap || {};
+            if (!config.sample?.multiMap) {
+              const baseNote = config.sample?.baseNote || 'C4';
+              (urls as any)[baseNote] = sampleUrl;
+            }
 
             instrument = new Tone.Sampler({
               urls,
               volume: config.volume || -12,
-              onload: () => {
-                // For Sampler, we'd need to get the buffer differently
-                // TrackerReplayer primarily uses Player for MOD playback
-              },
               onerror: (err: Error) => {
                 console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
               },
