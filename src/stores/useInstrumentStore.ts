@@ -46,7 +46,7 @@ interface InstrumentStore {
   deleteInstrument: (id: number) => void;
   cloneInstrument: (id: number) => number;
     resetInstrument: (id: number) => void;
-    bakeInstrument: (id: number) => Promise<void>;
+    bakeInstrument: (id: number, bakeType?: 'lite' | 'pro') => Promise<void>;
     unbakeInstrument: (id: number) => void;
     autoBakeInstruments: () => Promise<void>;
     // Effects
@@ -106,10 +106,28 @@ const createDefaultInstrument = (id: number): InstrumentConfig => ({
 });
 
 /**
- * Find next available instrument ID (1-128, XM-compatible range)
- * IDs are 1-indexed: 1-128 for valid instruments, 0 = no instrument
+ * Scan patterns for unique notes used by a specific instrument
  */
-const findNextId = (existingIds: number[]): number => {
+function getUniqueNotesForInstrument(patterns: any[], instrumentId: number): string[] {
+  const notes = new Set<string>();
+  patterns.forEach(pattern => {
+    pattern.rows.forEach((row: any) => {
+      row.cells.forEach((cell: any) => {
+        if (cell.instrument === instrumentId && cell.note) {
+          notes.add(cell.note);
+        }
+      });
+    });
+  });
+  return Array.from(notes).sort();
+}
+
+/**
+ * Helper to find next available instrument ID (1-128)
+ */
+function findNextId(existingIds: number[]): number {
+
+
   for (let id = 1; id <= 128; id++) {
     if (!existingIds.includes(id)) {
       return id;
@@ -383,65 +401,101 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // ... (existing implementation)
     },
 
-    bakeInstrument: async (id) => {
+    bakeInstrument: async (id, bakeType = 'lite') => {
       const state = get();
       const instrument = state.instruments.find((inst) => inst.id === id);
       if (!instrument || instrument.synthType === 'Sampler') return;
 
       try {
         const engine = getToneEngine();
-        // Render the sound at C-4 for 2 seconds
-        const buffer = await engine.bakeInstrument(instrument, 2);
         
-        // Convert AudioBuffer to ArrayBuffer for storage
-        // This is a simplified version, ideally we'd use a utility to encode to WAV if needed
-        // but for in-memory we can just keep the raw channel data if we want.
-        // However, Sampler expects a URL or a way to get the data.
-        
-        // Let's create a temporary object URL for the rendered buffer
-        const wavData = await WaveformProcessor.bufferToWav(buffer);
-        const blob = new Blob([wavData], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
+        // Preservation: Capture current config BEFORE switching to Sampler
+        const preservedConfig = { ...instrument };
+        delete preservedConfig.metadata; // Avoid recursion
 
-        set((state) => {
-          const inst = state.instruments.find((i) => i.id === id);
-          if (inst) {
-            // Preserve current synth config in metadata
-            const preservedConfig = { ...inst };
-            delete preservedConfig.metadata; // Avoid recursion
-            
-            inst.metadata = {
-              ...inst.metadata,
-              preservedSynth: {
-                synthType: inst.synthType,
-                config: preservedConfig
-              }
-            };
-
-            // Switch to Sampler
-            inst.synthType = 'Sampler';
-            inst.sample = {
-              url,
-              baseNote: 'C4',
-              detune: 0,
-              loop: false,
-              reverse: false,
-              playbackRate: 1,
-            };
-            
-            // Clear synth configs to signal it's now a sampler
-            inst.tb303 = undefined;
-            inst.dubSiren = undefined;
-            inst.spaceLaser = undefined;
-            inst.synare = undefined;
-            inst.furnace = undefined;
-            inst.chipSynth = undefined;
-            inst.pwmSynth = undefined;
-            inst.wobbleBass = undefined;
+        if (bakeType === 'pro') {
+          // PRO BAKE: Scan patterns for used notes and bake each one
+          const trackerState = (await import('./useTrackerStore')).useTrackerStore.getState();
+          const usedNotes = getUniqueNotesForInstrument(trackerState.patterns, id);
+          
+          if (usedNotes.length === 0) {
+            console.warn(`[InstrumentStore] No notes found for instrument ${id}, falling back to Lite bake.`);
+            return get().bakeInstrument(id, 'lite');
           }
-        });
 
-        // Invalidate engine instance
+          console.log(`[InstrumentStore] Pro-baking ${usedNotes.length} unique notes...`);
+          const multiMap: Record<string, string> = {};
+
+          for (const note of usedNotes) {
+            // Create a config that forces this specific note for baking
+            // (Note: triggerAttack in bakeInstrument will use this frequency)
+            const buffer = await engine.bakeInstrument(instrument, 2, note);
+            const wavData = await WaveformProcessor.bufferToWav(buffer);
+            const blob = new Blob([wavData], { type: 'audio/wav' });
+            multiMap[note] = URL.createObjectURL(blob);
+          }
+
+          set((state) => {
+            const inst = state.instruments.find((i) => i.id === id);
+            if (inst) {
+              inst.metadata = {
+                ...inst.metadata,
+                preservedSynth: {
+                  synthType: inst.synthType,
+                  config: preservedConfig,
+                  bakeType: 'pro'
+                }
+              };
+              inst.synthType = 'Sampler';
+              inst.sample = {
+                url: '', // Not used in multiMap mode
+                multiMap,
+                baseNote: 'C4',
+                detune: 0,
+                loop: false,
+                reverse: false,
+                playbackRate: 1,
+              };
+              // Clear configs
+              inst.tb303 = undefined; inst.dubSiren = undefined; inst.spaceLaser = undefined;
+              inst.synare = undefined; inst.furnace = undefined; inst.chipSynth = undefined;
+              inst.pwmSynth = undefined; inst.wobbleBass = undefined;
+            }
+          });
+        } else {
+          // LITE BAKE: Standard C-4 render
+          const buffer = await engine.bakeInstrument(instrument, 2, "C4");
+          const wavData = await WaveformProcessor.bufferToWav(buffer);
+          const blob = new Blob([wavData], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+
+          set((state) => {
+            const inst = state.instruments.find((i) => i.id === id);
+            if (inst) {
+              inst.metadata = {
+                ...inst.metadata,
+                preservedSynth: {
+                  synthType: inst.synthType,
+                  config: preservedConfig,
+                  bakeType: 'lite'
+                }
+              };
+              inst.synthType = 'Sampler';
+              inst.sample = {
+                url,
+                baseNote: 'C4',
+                detune: 0,
+                loop: false,
+                reverse: false,
+                playbackRate: 1,
+              };
+              inst.tb303 = undefined; inst.dubSiren = undefined; inst.spaceLaser = undefined;
+              inst.synare = undefined; inst.furnace = undefined; inst.chipSynth = undefined;
+              inst.pwmSynth = undefined; inst.wobbleBass = undefined;
+            }
+          });
+        }
+
         engine.invalidateInstrument(id);
       } catch (error) {
         console.error('[InstrumentStore] Failed to bake instrument:', error);
@@ -478,34 +532,53 @@ export const useInstrumentStore = create<InstrumentStore>()(
     autoBakeInstruments: async () => {
       const state = get();
       const instrumentsToBake = state.instruments.filter(
-        (inst) => inst.metadata?.preservedSynth && !inst.sample?.url
+        (inst) => inst.metadata?.preservedSynth && (!inst.sample?.url && !inst.sample?.multiMap)
       );
 
       if (instrumentsToBake.length === 0) return;
 
       console.log(`[InstrumentStore] Auto-baking ${instrumentsToBake.length} instruments...`);
 
-      // Bake them sequentially to avoid overloading the CPU/AudioContext
       for (const inst of instrumentsToBake) {
-        // We need to bake the PRESERVED synth config, not the current Sampler state
         const preserved = inst.metadata!.preservedSynth!;
         const tempConfig = { ...inst, ...preserved.config, synthType: preserved.synthType };
+        const bakeType = preserved.bakeType || 'lite';
         
         try {
           const engine = getToneEngine();
-          const buffer = await engine.bakeInstrument(tempConfig as InstrumentConfig, 2);
-          const wavData = await WaveformProcessor.bufferToWav(buffer);
-          const blob = new Blob([wavData], { type: 'audio/wav' });
-          const url = URL.createObjectURL(blob);
-
-          set((state) => {
-            const currentInst = state.instruments.find((i) => i.id === inst.id);
-            if (currentInst && currentInst.sample) {
-              currentInst.sample.url = url;
-            }
-          });
           
-          // Invalidate engine instance
+          if (bakeType === 'pro') {
+            const trackerState = (await import('./useTrackerStore')).useTrackerStore.getState();
+            const usedNotes = getUniqueNotesForInstrument(trackerState.patterns, inst.id);
+            const multiMap: Record<string, string> = {};
+
+            for (const note of usedNotes) {
+              const buffer = await engine.bakeInstrument(tempConfig as InstrumentConfig, 2, note);
+              const wavData = await WaveformProcessor.bufferToWav(buffer);
+              const blob = new Blob([wavData], { type: 'audio/wav' });
+              multiMap[note] = URL.createObjectURL(blob);
+            }
+
+            set((state) => {
+              const currentInst = state.instruments.find((i) => i.id === inst.id);
+              if (currentInst && currentInst.sample) {
+                currentInst.sample.multiMap = multiMap;
+              }
+            });
+          } else {
+            const buffer = await engine.bakeInstrument(tempConfig as InstrumentConfig, 2, "C4");
+            const wavData = await WaveformProcessor.bufferToWav(buffer);
+            const blob = new Blob([wavData], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+
+            set((state) => {
+              const currentInst = state.instruments.find((i) => i.id === inst.id);
+              if (currentInst && currentInst.sample) {
+                currentInst.sample.url = url;
+              }
+            });
+          }
+          
           engine.invalidateInstrument(inst.id);
         } catch (error) {
           console.error(`[InstrumentStore] Failed to auto-bake instrument ${inst.id}:`, error);

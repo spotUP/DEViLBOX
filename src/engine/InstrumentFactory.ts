@@ -1237,10 +1237,17 @@ export class InstrumentFactory {
   }
 
   private static createSampler(config: InstrumentConfig): Tone.Sampler {
-    // Get sample URL from parameters (base64 data URL from user upload)
-    const sampleUrl = config.parameters?.sampleUrl;
+    // Priority 1: Check for multi-sample map (Pro Bake)
+    if (config.sample?.multiMap && Object.keys(config.sample.multiMap).length > 0) {
+      console.log(`[InstrumentFactory] Creating Multi-Sampler for ${config.name} with ${Object.keys(config.sample.multiMap).length} samples`);
+      return new Tone.Sampler({
+        urls: config.sample.multiMap,
+        volume: config.volume || -12,
+      });
+    }
 
-    // Get base note from sample config (for MOD/XM imports)
+    // Priority 2: Check for sample URL from parameters (Legacy/Upload)
+    const sampleUrl = config.parameters?.sampleUrl || config.sample?.url;
     const baseNote = config.sample?.baseNote || 'C4';
 
     // CRITICAL: Check if this is a MOD/XM instrument loaded from localStorage
