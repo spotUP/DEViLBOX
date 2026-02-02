@@ -132,6 +132,7 @@ export type SynthType =
   | 'MAMESWP30'        // Yamaha SWP30 (AWM2)
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
+  | 'V2'               // Farbrausch V2 Synth
   | 'Synare';          // Synare 3 (Electronic Percussion)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
@@ -2155,6 +2156,55 @@ export interface SpaceLaserConfig {
   };
 }
 
+/**
+ * Farbrausch V2 Synth Configuration
+ * Advanced multi-voice subtractive synth common in 4k/64k intros
+ */
+export interface V2Config {
+  osc1: {
+    type: WaveformType;
+    detune: number;
+    transpose: number; // -24 to +24
+    level: number;
+  };
+  osc2: {
+    type: WaveformType;
+    detune: number;
+    transpose: number;
+    level: number;
+  };
+  osc3: {
+    type: 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
+    level: number;
+  };
+  filter: {
+    type: FilterType;
+    cutoff: number;
+    resonance: number;
+    envMod: number;
+  };
+  envelope: {
+    attack: number;
+    decay: number;
+    sustain: number;
+    release: number;
+  };
+  modulation: {
+    lfo1Rate: number;
+    lfo1Depth: number;
+    lfo1Target: 'cutoff' | 'pitch' | 'none';
+  };
+}
+
+export const DEFAULT_V2: V2Config = {
+  osc1: { type: 'sawtooth', detune: 0, transpose: 0, level: 100 },
+  osc2: { type: 'sawtooth', detune: 10, transpose: 0, level: 80 },
+  osc3: { type: 'noise', level: 10 },
+  filter: { type: 'lowpass', cutoff: 2000, resonance: 20, envMod: 50 },
+  envelope: { attack: 10, decay: 500, sustain: 0.3, release: 300 },
+  modulation: { lfo1Rate: 5, lfo1Depth: 0, lfo1Target: 'none' },
+};
+
 export const DEFAULT_SPACE_LASER: SpaceLaserConfig = {
   laser: {
     startFreq: 4000,
@@ -2266,6 +2316,8 @@ export interface InstrumentConfig {
   spaceLaser?: SpaceLaserConfig;
   // Synare 3
   synare?: SynareConfig;
+  // V2 Synth
+  v2?: V2Config;
   // MAME synths
   mame?: MAMEConfig;
   // Buzzmachines

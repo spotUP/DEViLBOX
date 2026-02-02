@@ -32,6 +32,7 @@ import { DrumKitSynth } from './DrumKitSynth';
 import { DubSirenSynth } from './DubSirenSynth';
 import { SpaceLaserSynth } from './SpaceLaserSynth';
 import { SynareSynth } from './SynareSynth';
+import { V2Synth } from './v2/V2Synth';
 import { JC303Synth } from './jc303/JC303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
@@ -314,6 +315,10 @@ export class InstrumentFactory {
 
       case 'SpaceLaser':
         instrument = this.createSpaceLaser(config);
+        break;
+
+      case 'V2':
+        instrument = this.createV2(config);
         break;
 
       case 'Synare':
@@ -3965,6 +3970,16 @@ export class InstrumentFactory {
     
     if (config.volume !== undefined) {
       synth.volume.value = config.volume;
+    }
+    
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createV2(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new V2Synth();
+    
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
     }
     
     return synth as unknown as Tone.ToneAudioNode;

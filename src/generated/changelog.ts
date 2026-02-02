@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:26:56.280Z
+ * Generated: 2026-02-02T21:36:00.995Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '211';
-export const BUILD_HASH = '73798a9';
+export const BUILD_NUMBER = '213';
+export const BUILD_HASH = 'fe75d3e';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add Nano-Exporter for demoscene-grade 4k intro binary packing'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve TypeScript errors in baking system'
+      },
       {
         type: 'feature',
         description: 'Bake instrument effects into samples and restore them on unbake'
@@ -236,20 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Improve pattern editor smooth scrolling and performance'
-      },
-      {
-        type: 'improvement',
-        description: 'Improve grid sequencer visuals and smooth scrolling'
-      }
-    ]
-  },
-  {
-    version: '2026-01-30',
-    date: '2026-01-30',
-    changes: [
-      {
-        type: 'feature',
-        description: 'Add CRITICAL git safety rules to CLAUDE.md'
       }
     ]
   }

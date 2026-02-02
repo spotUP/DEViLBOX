@@ -468,6 +468,29 @@ zapping textures common in classic reggae dubs and vintage anime sci-fi effects.
     trackerUsage: 'Each note trigger starts a new laser sweep. Higher notes start at higher frequencies.',
   },
 
+  V2: {
+    overview: `The legendary demoscene synth engine by Farbrausch (kb/fr), 
+compiled to WASM for high-performance demoscene-grade audio.
+V2 is a multi-voice subtractive synth with multiple oscillators, 
+advanced routing, and a unique character that defined the sound of 
+countless 4k and 64k intros from the 2000s.`,
+    keyParameters: [
+      { name: 'Osc 1 Transpose', description: 'Coarse tuning for the primary oscillator.' },
+      { name: 'Osc 1 Detune', description: 'Fine tuning for thick, detuned sounds.' },
+      { name: 'VCF Cutoff', description: 'Resonant filter frequency control.' },
+      { name: 'VCF Resonance', description: 'Emphasizes the cutoff frequency for squelchy or piercing sounds.' },
+      { name: 'Amp Envelope', description: 'Attack, Decay, Sustain, and Release controls for the volume.' },
+    ],
+    tips: [
+      'The V2 sound is known for its "plastic" but powerful trance leads.',
+      'Stack detuned sawtooth oscillators for that classic demoscene supersaw.',
+      'Use fast decay on the filter envelope for punchy basslines.',
+      'V2 was designed to fit in 4kb - its efficiency is unmatched.',
+      'Try the "V2 Trance Lead" preset for an instant fr-08 vibe.',
+    ],
+    trackerUsage: 'Standard note triggering. Use MIDI CCs or the Special tab for real-time parameter modulation.',
+  },
+
   Synare: {
     overview: `The Synare 3 is a classic analog electronic percussion synthesizer from the 1970s.
 It is famous for the "disco tom" sound—a resonant, descending pitch sweep—and is a staple of

@@ -13,7 +13,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
-  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_SYNARE,
+  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -24,6 +24,7 @@ import { BuzzmachineControls } from '../controls/BuzzmachineControls';
 import { SampleControls } from '../controls/SampleControls';
 import { DubSirenControls } from '../controls/DubSirenControls';
 import { SpaceLaserControls } from '../controls/SpaceLaserControls';
+import { V2Controls } from '../controls/V2Controls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
@@ -34,7 +35,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'synare' | 'mame';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'synare' | 'mame';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -75,6 +76,11 @@ function isSpaceLaserType(synthType: SynthType): boolean {
   return synthType === 'SpaceLaser';
 }
 
+/** Check if synth type is V2 */
+function isV2Type(synthType: SynthType): boolean {
+  return synthType === 'V2';
+}
+
 /** Check if synth type is Synare */
 function isSynareType(synthType: SynthType): boolean {
   return synthType === 'Synare';
@@ -88,6 +94,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSampleType(synthType)) return 'sample';
   if (isDubSirenType(synthType)) return 'dubsiren';
   if (isSpaceLaserType(synthType)) return 'spacelaser';
+  if (isV2Type(synthType)) return 'v2';
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEType(synthType)) return 'mame';
   return 'generic';
@@ -171,6 +178,14 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       spaceLaser: { ...currentSpaceLaser, ...updates },
     });
   }, [instrument.spaceLaser, onChange]);
+
+  // Handle V2 config updates
+  const handleV2Change = useCallback((updates: Partial<typeof instrument.v2>) => {
+    const currentV2 = instrument.v2 || DEFAULT_V2;
+    onChange({
+      v2: { ...currentV2, ...updates },
+    });
+  }, [instrument.v2, onChange]);
 
   // Handle Synare config updates
   const handleSynareChange = useCallback((updates: Partial<typeof instrument.synare>) => {
@@ -369,6 +384,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <SpaceLaserControls
           config={instrument.spaceLaser}
           onChange={handleSpaceLaserChange}
+        />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // V2 SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'v2' && instrument.v2) {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <V2Controls
+          config={instrument.v2}
+          onChange={handleV2Change}
         />
       </div>
     );
