@@ -116,12 +116,26 @@ export const InstrumentSpectrum: React.FC<InstrumentSpectrumProps> = ({
     const ctx = contextRef.current;
     if (!canvas || !ctx) return false;
 
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== canvasWidth * dpr) {
+      canvas.width = canvasWidth * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+      
+      // Re-create gradient if size changed
+      const gradient = ctx.createLinearGradient(0, height, 0, 0);
+      gradient.addColorStop(0, colorEnd);
+      gradient.addColorStop(0.5, color);
+      gradient.addColorStop(1, color);
+      gradientRef.current = gradient;
+    }
+
     const engine = getToneEngine();
     const analyser = engine.getInstrumentAnalyser(instrumentId);
 
     // Clear canvas
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvasWidth, height);
 
     if (!analyser) {
       return false;
@@ -138,7 +152,7 @@ export const InstrumentSpectrum: React.FC<InstrumentSpectrumProps> = ({
 
     // Calculate bar dimensions
     const gap = 2;
-    const barWidth = (canvas.width - (barCount - 1) * gap) / barCount;
+    const barWidth = (canvasWidth - (barCount - 1) * gap) / barCount;
 
     ctx.fillStyle = gradientRef.current || color;
 
@@ -149,11 +163,11 @@ export const InstrumentSpectrum: React.FC<InstrumentSpectrumProps> = ({
 
       // Convert dB to height (normalize from -100..0 to 0..1)
       const normalizedValue = Math.max(0, (dbValue + 100) / 100);
-      const barHeight = normalizedValue * canvas.height;
+      const barHeight = normalizedValue * height;
 
       if (barHeight > 0) {
         const x = i * (barWidth + gap);
-        const y = canvas.height - barHeight;
+        const y = height - barHeight;
 
         // Draw rounded bar
         const radius = Math.min(barWidth / 2, 2);

@@ -88,9 +88,17 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
     const ctx = contextRef.current;
     if (!canvas || !ctx) return false;
 
+    const dpr = window.devicePixelRatio || 1;
+    const canvasHeight = height + 16;
+    if (canvas.width !== width * dpr) {
+      canvas.width = width * dpr;
+      canvas.height = canvasHeight * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
     // Clear canvas
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, canvasHeight);
 
     // Calculate envelope points
     const startX = padding.left;

@@ -71,7 +71,8 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d', { alpha: false });
+    // Use alpha: true to support transparent clearing
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     contextRef.current = ctx;
@@ -86,19 +87,30 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     const ctx = contextRef.current;
     if (!canvas || !ctx) return false;
 
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== canvasWidth * dpr) {
+      canvas.width = canvasWidth * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
     const engine = getToneEngine();
     const analyser = engine.getInstrumentAnalyser(instrumentId);
 
-    // Clear canvas
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas - use clearRect if transparent, fillRect otherwise
+    if (backgroundColor === 'transparent' || backgroundColor === 'rgba(0,0,0,0)') {
+      ctx.clearRect(0, 0, canvasWidth, height);
+    } else {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, canvasWidth, height);
+    }
 
     // Draw center line
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(canvasWidth, height / 2);
     ctx.stroke();
 
     if (!analyser) {
@@ -113,10 +125,10 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     }
 
     // Get or create gradient
-    const gradientKey = `${color}-${canvas.height}`;
+    const gradientKey = `${color}-${height}`;
     let gradient = gradientCache.get(gradientKey);
     if (!gradient) {
-      gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, color);
       gradient.addColorStop(0.5, color);
       gradient.addColorStop(1, color);
@@ -130,12 +142,12 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     ctx.lineJoin = 'round';
     ctx.beginPath();
 
-    const sliceWidth = canvas.width / waveform.length;
+    const sliceWidth = canvasWidth / waveform.length;
     let x = 0;
 
     for (let i = 0; i < waveform.length; i++) {
       const v = waveform[i];
-      const y = ((v + 1) / 2) * canvas.height;
+      const y = ((v + 1) / 2) * height;
 
       if (i === 0) {
         ctx.moveTo(x, y);

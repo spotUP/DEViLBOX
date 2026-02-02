@@ -167,6 +167,13 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     const ctx = contextRef.current;
     if (!canvas || !ctx) return false;
 
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== width * dpr) {
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
     // Calculate modulated cutoff
     let modCutoff = cutoff;
 
