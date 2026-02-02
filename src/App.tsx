@@ -2,16 +2,10 @@
  * App - Main application component
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
-import { EditInstrumentModal } from '@components/instruments/EditInstrumentModal';
-import { HelpModal } from '@components/help/HelpModal';
-import { ExportDialog } from '@lib/export/ExportDialog';
-import { PatternManagement } from '@components/pattern/PatternManagement';
-import { MasterEffectsModal, InstrumentEffectsModal, EffectParameterEditor } from '@components/effects';
-import { TD3PatternDialog } from '@components/midi/TD3PatternDialog';
 import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
@@ -30,8 +24,18 @@ import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { ToastContainer } from '@components/common/ToastContainer';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
-import { DrumpadEditorModal } from '@components/midi/DrumpadEditorModal';
-import { TipOfTheDay } from '@components/dialogs/TipOfTheDay';
+
+// Lazy-loaded components for better startup performance
+const HelpModal = lazy(() => import('@components/help/HelpModal').then(m => ({ default: m.HelpModal })));
+const ExportDialog = lazy(() => import('@lib/export/ExportDialog').then(m => ({ default: m.ExportDialog })));
+const EditInstrumentModal = lazy(() => import('@components/instruments/EditInstrumentModal').then(m => ({ default: m.EditInstrumentModal })));
+const MasterEffectsModal = lazy(() => import('@components/effects').then(m => ({ default: m.MasterEffectsModal })));
+const InstrumentEffectsModal = lazy(() => import('@components/effects').then(m => ({ default: m.InstrumentEffectsModal })));
+const EffectParameterEditor = lazy(() => import('@components/effects').then(m => ({ default: m.EffectParameterEditor })));
+const TD3PatternDialog = lazy(() => import('@components/midi/TD3PatternDialog').then(m => ({ default: m.TD3PatternDialog })));
+const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal })));
+const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
+const PatternManagement = lazy(() => import('@components/pattern/PatternManagement').then(m => ({ default: m.PatternManagement })));
 
 function App() {
   // Check for application updates
@@ -463,7 +467,9 @@ function App() {
             {/* Pattern Management (optional) */}
             {showPatterns && (
               <div className="h-48 border-b border-dark-border animate-fade-in">
-                <PatternManagement />
+                <Suspense fallback={<div className="h-full flex items-center justify-center text-text-muted">Loading patterns...</div>}>
+                  <PatternManagement />
+                </Suspense>
               </div>
             )}
             {/* Pattern Editor */}
@@ -490,32 +496,36 @@ function App() {
       </div>
 
       {/* Modals */}
-      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
-      <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />
-      <EditInstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />
-      <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
-      <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />
-      <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />
-      <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />
-      <TipOfTheDay 
-        isOpen={showTips} 
-        onClose={() => setShowTips(false)} 
-        initialTab={tipsInitialTab}
-      />
+      <Suspense fallback={null}>
+        {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+        {showExport && <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />}
+        {showInstrumentModal && <EditInstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />}
+        {showMasterFX && <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />}
+        {showInstrumentFX && <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />}
+        {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
+        {showDrumpads && <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />}
+        {showTips && (
+          <TipOfTheDay 
+            isOpen={showTips} 
+            onClose={() => setShowTips(false)} 
+            initialTab={tipsInitialTab}
+          />
+        )}
 
-      {/* Effect Parameter Editor Modal */}
-      {editingEffect && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
-          <div className="max-w-md w-full mx-4 animate-slide-in-up">
-            <EffectParameterEditor
-              effect={editingEffect.effect}
-              onUpdateParameter={handleUpdateEffectParameter}
-              onUpdateWet={handleUpdateEffectWet}
-              onClose={() => setEditingEffect(null)}
-            />
+        {/* Effect Parameter Editor Modal */}
+        {editingEffect && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+            <div className="max-w-md w-full mx-4 animate-slide-in-up">
+              <EffectParameterEditor
+                effect={editingEffect.effect}
+                onUpdateParameter={handleUpdateEffectParameter}
+                onUpdateWet={handleUpdateEffectWet}
+                onClose={() => setEditingEffect(null)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Suspense>
 
       {/* Toast Notifications */}
       <ToastNotification />

@@ -292,9 +292,12 @@ export const useTrackerStore = create<TrackerStore>()(
         const numChannels = pattern.channels.length;
         const numRows = pattern.length;
 
-        // Map column types to their digit count (0 means not editable on digit level or handles separately)
-        // effTyp = 1 digit (effect type: 0-9, A-Z)
-        // effParam = 2 digits (effect parameter: 00-FF)
+        const prevRow = state.cursor.rowIndex;
+        const prevChannel = state.cursor.channelIndex;
+        const prevColumn = state.cursor.columnType;
+        const prevDigit = state.cursor.digitIndex;
+
+        // Map column types to their digit count
         const DIGIT_COUNTS: Record<string, number> = {
           instrument: 2,
           volume: 2,
@@ -314,7 +317,7 @@ export const useTrackerStore = create<TrackerStore>()(
             if (state.cursor.rowIndex > 0) {
               state.cursor.rowIndex--;
             } else {
-              state.cursor.rowIndex = numRows - 1; // Wrap to bottom
+              state.cursor.rowIndex = numRows - 1;
             }
             break;
 
@@ -322,25 +325,18 @@ export const useTrackerStore = create<TrackerStore>()(
             if (state.cursor.rowIndex < numRows - 1) {
               state.cursor.rowIndex++;
             } else {
-              state.cursor.rowIndex = 0; // Wrap to top
+              state.cursor.rowIndex = 0;
             }
             break;
 
           case 'left': {
             if (currentDigits > 0 && state.cursor.digitIndex > 0) {
               state.cursor.digitIndex--;
-              return;
+              break;
             }
 
             const columnOrder: CursorPosition['columnType'][] = [
-              'note',
-              'instrument',
-              'volume',
-              'effTyp',
-              'effParam',
-              'effect2',
-              'accent',
-              'slide',
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'
             ];
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
             if (currentColumnIndex > 0) {
@@ -359,18 +355,11 @@ export const useTrackerStore = create<TrackerStore>()(
           case 'right': {
             if (currentDigits > 0 && state.cursor.digitIndex < currentDigits - 1) {
               state.cursor.digitIndex++;
-              return;
+              break;
             }
 
             const columnOrder2: CursorPosition['columnType'][] = [
-              'note',
-              'instrument',
-              'volume',
-              'effTyp',
-              'effParam',
-              'effect2',
-              'accent',
-              'slide',
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'
             ];
             const currentColumnIndex2 = columnOrder2.indexOf(state.cursor.columnType);
             if (currentColumnIndex2 < columnOrder2.length - 1) {
@@ -383,6 +372,16 @@ export const useTrackerStore = create<TrackerStore>()(
             }
             break;
           }
+        }
+
+        // PERF: Abort update if nothing changed
+        if (
+          state.cursor.rowIndex === prevRow &&
+          state.cursor.channelIndex === prevChannel &&
+          state.cursor.columnType === prevColumn &&
+          state.cursor.digitIndex === prevDigit
+        ) {
+          return state;
         }
       }),
 

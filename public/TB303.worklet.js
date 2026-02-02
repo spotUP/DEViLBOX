@@ -46,11 +46,9 @@ class TB303Processor extends AudioWorkletProcessor {
       // Initialize this specific voice
       this.wasmInstance.initVoice(this.voiceIndex, sampleRate);
       
-      this.wasmLoaded = true;
-      console.log(`🎹 TB303 Voice ${this.voiceIndex}: WASM Engine Active`);
-    } catch (err) {
-      console.error(`🎹 TB303 Voice ${this.voiceIndex}: WASM Init Failed:`, err);
-    }
+    this.wasmLoaded = true;
+    this.wasmView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
+    console.log(`🎹 TB303 Voice ${this.voiceIndex}: WASM Engine Active`);
   }
 
   handleMessage(data) {
@@ -64,7 +62,8 @@ class TB303Processor extends AudioWorkletProcessor {
       this.accent = data.accent;
       this.slide = data.slide;
       this.noteOn = true;
-      this.freq = 440.0 * Math.pow(2, (this.noteNumber - 69) / 12);
+      // Faster frequency conversion
+      this.freq = 440.0 * (2 ** ((this.noteNumber - 69) / 12));
     } else if (type === 'noteOff') {
       this.noteOn = false;
     } else if (type === 'setParameter' && this.wasmLoaded) {
@@ -98,9 +97,12 @@ class TB303Processor extends AudioWorkletProcessor {
       sampleRate
     );
 
-    // Copy output from WASM memory
-    const wasmOutput = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
-    outputChannel.set(wasmOutput);
+    // Use cached view (might need update if memory grew)
+    if (this.wasmView.buffer !== this.wasmInstance.memory.buffer) {
+      this.wasmView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
+    }
+    
+    outputChannel.set(this.wasmView);
 
     return true;
   }

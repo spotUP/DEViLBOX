@@ -116,19 +116,33 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
 
   // Get pattern and actions
-  const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
-  const addChannel = useTrackerStore((state) => state.addChannel);
-  const removeChannel = useTrackerStore((state) => state.removeChannel);
-  const toggleChannelMute = useTrackerStore((state) => state.toggleChannelMute);
-  const toggleChannelSolo = useTrackerStore((state) => state.toggleChannelSolo);
-  const setChannelColor = useTrackerStore((state) => state.setChannelColor);
-  const setCell = useTrackerStore((state) => state.setCell);
-  const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
-  const copyTrack = useTrackerStore((state) => state.copyTrack);
-  const cutTrack = useTrackerStore((state) => state.cutTrack);
-  const pasteTrack = useTrackerStore((state) => state.pasteTrack);
-
-  const mobileChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
+  const { 
+    pattern, 
+    addChannel, 
+    removeChannel, 
+    toggleChannelMute, 
+    toggleChannelSolo, 
+    setChannelColor, 
+    setCell, 
+    moveCursorToChannel, 
+    copyTrack, 
+    cutTrack, 
+    pasteTrack,
+    mobileChannelIndex
+  } = useTrackerStore(useShallow((state) => ({
+    pattern: state.patterns[state.currentPatternIndex],
+    addChannel: state.addChannel,
+    removeChannel: state.removeChannel,
+    toggleChannelMute: state.toggleChannelMute,
+    toggleChannelSolo: state.toggleChannelSolo,
+    setChannelColor: state.setChannelColor,
+    setCell: state.setCell,
+    moveCursorToChannel: state.moveCursorToChannel,
+    copyTrack: state.copyTrack,
+    cutTrack: state.cutTrack,
+    pasteTrack: state.pasteTrack,
+    mobileChannelIndex: state.cursor.channelIndex,
+  })));
 
   // Audio-synced display state ref (BassoonTracker pattern)
   // This stores the last state retrieved from TrackerReplayer.getStateAtTime()

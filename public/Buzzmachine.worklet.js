@@ -239,6 +239,13 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       }
 
       this.isInitialized = true;
+      
+      // Pre-cache views for WASM memory
+      const wasmMemory = this.getWasmMemory();
+      if (wasmMemory) {
+        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize);
+      }
+
       this.port.postMessage({ type: 'initialized' });
       console.log('[BuzzmachineWorklet] ✓ Ready:', machineType);
 
@@ -1058,23 +1065,20 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         return true;
       }
 
+      // Check if memory grew
+      if (this.wasmAudioView.buffer !== wasmMemory) {
+        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize);
+      }
+
       // Copy input to WASM buffer if present
       // Note: Buzz machines use MONO buffers - mix stereo to mono
       if (hasInput && this.audioBufferPtr) {
         const leftIn = input[0];
         const rightIn = input[1] || leftIn;
 
-        let audioBuffer;
-        const floatIndex = this.audioBufferPtr >> 2;
-        if (this.buzzModule.HEAPF32) {
-          audioBuffer = this.buzzModule.HEAPF32.subarray(floatIndex, floatIndex + numSamples);
-        } else {
-          audioBuffer = new Float32Array(wasmMemory, this.audioBufferPtr, numSamples);
-        }
-
         // Mix stereo to mono
         for (let i = 0; i < numSamples; i++) {
-          audioBuffer[i] = (leftIn[i] + rightIn[i]) * 0.5;
+          this.wasmAudioView[i] = (leftIn[i] + rightIn[i]) * 0.5;
         }
       }
 
@@ -1089,58 +1093,15 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Reset error count on successful processing
       this.errorCount = 0;
 
-      // Track process count for debugging
-      this.processCount = (this.processCount || 0) + 1;
-
-      // Debug: Log when isActive status changes (only first few times)
-      if (isActive !== this.lastIsActive) {
-        this.isActiveChangeCount = (this.isActiveChangeCount || 0) + 1;
-        if (this.isActiveChangeCount <= 10) {
-          console.log('[BuzzmachineWorklet] isActive changed:', this.lastIsActive, '->', isActive, 'for', this.machineTypeName, 'at process', this.processCount);
-        }
-        this.lastIsActive = isActive;
-      }
-
       // Copy output from WASM buffer (unless muted)
-      // Some machines (FrequencyBomb, Aggressor303) don't respond to stop signals
-      // so we have to mute them in the worklet
       if (isActive && this.audioBufferPtr && !this.muted) {
-        // Use HEAPF32 directly if available (it's a Float32Array view of WASM memory)
-        // audioBufferPtr is a byte offset, but HEAPF32 uses float indices (divide by 4)
-        const floatIndex = this.audioBufferPtr >> 2; // Divide by 4 for float index
-
-        // IMPORTANT: Buzz machines output MONO samples, not stereo interleaved!
-        // The buffer contains numSamples floats, not numSamples * 2
-        let audioBuffer;
-        if (this.buzzModule.HEAPF32) {
-          // HEAPF32 is already a Float32Array view - use subarray for efficiency
-          audioBuffer = this.buzzModule.HEAPF32.subarray(floatIndex, floatIndex + numSamples);
-        } else {
-          // Fallback to creating view from memory buffer
-          audioBuffer = new Float32Array(wasmMemory, this.audioBufferPtr, numSamples);
-        }
-
-        // Debug: Check audio output once when first audio is detected
-        if (!this.audioDetected && this.processCount % 100 === 0) {
-          let maxVal = 0;
-          for (let i = 0; i < Math.min(10, numSamples); i++) {
-            if (Math.abs(audioBuffer[i]) > maxVal) maxVal = Math.abs(audioBuffer[i]);
-          }
-          if (maxVal > 0.001) {
-            console.log('[BuzzmachineWorklet] ✓ Audio detected! max:', maxVal.toFixed(4));
-            this.audioDetected = true;
-          }
-        }
-
         const leftOut = output[0];
         const rightOut = output[1] || leftOut;
 
         // Copy mono to both channels with normalization
-        // Buzz machines output values in short range (-32768 to 32767) not normalized floats
-        // We need to normalize to -1.0 to 1.0 for Web Audio
+        // Buzz machines output values in short range (-32768 to 32767)
         for (let i = 0; i < numSamples; i++) {
-          // Normalize from short range to float range
-          const sample = audioBuffer[i] / 32768.0;
+          const sample = this.wasmAudioView[i] / 32768.0;
           // Clamp to prevent clipping artifacts
           const clamped = Math.max(-1.0, Math.min(1.0, sample));
           leftOut[i] = clamped;
