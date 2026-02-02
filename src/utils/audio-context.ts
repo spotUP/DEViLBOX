@@ -72,40 +72,39 @@ export function createAudioWorkletNode(
   options?: AudioWorkletNodeOptions
 ): AudioWorkletNode {
   const nativeCtx = getNativeContext(context);
+  const NativeNode = (globalThis as any).AudioWorkletNode;
+
+  // 1. Try the browser's NATIVE constructor first. 
+  // This is the most reliable way when we've added the module to the native context.
+  if (NativeNode && nativeCtx) {
+    try {
+      return new NativeNode(nativeCtx, name, options);
+    } catch (err) {
+      // Fall through to other methods if native constructor fails
+      console.warn(`[audio-context] Native construction failed for "${name}", trying fallbacks:`, err);
+    }
+  }
   
-  // 1. Try the passed context's own factory method
+  // 2. Try the passed context's own factory method (might be a wrapper)
   if (context && typeof context.createAudioWorkletNode === 'function') {
     try {
       return context.createAudioWorkletNode(name, options);
     } catch (e) { /* Fall through */ }
   }
 
-  // 2. Try the Tone.js rawContext's factory method
+  // 3. Try the Tone.js rawContext's factory method
   if (context && context.rawContext && typeof context.rawContext.createAudioWorkletNode === 'function') {
     try {
       return context.rawContext.createAudioWorkletNode(name, options);
     } catch (e) { /* Fall through */ }
   }
 
-  // 3. Try the unwrapped context's factory method
+  // 4. Try the unwrapped context's factory method
   if (nativeCtx && typeof (nativeCtx as any).createAudioWorkletNode === 'function') {
     try {
       return (nativeCtx as any).createAudioWorkletNode(name, options);
     } catch (e) { /* Fall through */ }
   }
 
-  // 4. Use the browser's NATIVE constructor. 
-  // We explicitly use globalThis to avoid any local overrides.
-  const NativeNode = (globalThis as any).AudioWorkletNode;
-  
-  if (!NativeNode) {
-    throw new Error('AudioWorkletNode not supported in this browser');
-  }
-
-  try {
-    return new NativeNode(nativeCtx, name, options);
-  } catch (err) {
-    console.error(`[audio-context] Native construction failed for "${name}":`, err);
-    throw err;
-  }
+  throw new Error(`AudioWorkletNode "${name}" could not be created in any context`);
 }

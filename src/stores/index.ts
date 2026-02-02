@@ -3,6 +3,7 @@
  * Central export for all Zustand stores
  */
 
+export { useSamplePackStore } from './useSamplePackStore';
 export { useTrackerStore } from './useTrackerStore';
 export { useTransportStore } from './useTransportStore';
 export { useInstrumentStore } from './useInstrumentStore';

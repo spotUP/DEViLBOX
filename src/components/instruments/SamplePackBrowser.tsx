@@ -4,11 +4,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { SAMPLE_PACKS } from '@constants/samplePacks';
+import { useInstrumentStore, useSamplePackStore } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
-import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square } from 'lucide-react';
+import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2 } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
 
 interface SamplePackBrowserProps {
@@ -17,13 +16,16 @@ interface SamplePackBrowserProps {
 
 export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose }) => {
   const { currentInstrumentId, updateInstrument } = useInstrumentStore();
-  const [selectedPack, setSelectedPack] = useState<SamplePack | null>(SAMPLE_PACKS[0] || null);
+  const { allPacks, uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
+  const [selectedPack, setSelectedPack] = useState<SamplePack | null>(allPacks[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSample, setSelectedSample] = useState<SampleInfo | null>(null);
   const [_isPlaying, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const dirInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -34,6 +36,15 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       }
     };
   }, []);
+
+  // Update selected pack if it was deleted or if first pack changes
+  useEffect(() => {
+    if (selectedPack && !allPacks.find(p => p.id === selectedPack.id)) {
+      setSelectedPack(allPacks[0] || null);
+    } else if (!selectedPack && allPacks.length > 0) {
+      setSelectedPack(allPacks[0]);
+    }
+  }, [allPacks, selectedPack]);
 
   // Get filtered samples
   const getFilteredSamples = (): SampleInfo[] => {
@@ -78,12 +89,6 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       }).toDestination();
 
       playerRef.current = player;
-
-      // Auto-stop after playback
-      player.onstop = () => {
-        setIsPlaying(false);
-        setPlayingSample(null);
-      };
     } catch (error) {
       console.error('Error previewing sample:', error);
       setIsPlaying(false);
@@ -107,7 +112,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     if (currentInstrumentId === null) return;
 
     updateInstrument(currentInstrumentId, {
-      type: 'synth',
+      type: 'sample',
       name: sample.name,
       synthType: 'Sampler',
       sample: {
@@ -126,6 +131,49 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     });
 
     onClose();
+  };
+
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const pack = await uploadZip(file);
+      setSelectedPack(pack);
+      if (pack.categories.length > 0) {
+        setActiveCategory(pack.categories[0]);
+      }
+    } catch (error) {
+      alert('Failed to load ZIP pack. Ensure it contains audio files.');
+    }
+    
+    // Reset input
+    if (zipInputRef.current) zipInputRef.current.value = '';
+  };
+
+  const handleDirUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      const pack = await uploadDirectory(files);
+      setSelectedPack(pack);
+      if (pack.categories.length > 0) {
+        setActiveCategory(pack.categories[0]);
+      }
+    } catch (error) {
+      alert('Failed to load directory. Ensure it contains audio files.');
+    }
+
+    // Reset input
+    if (dirInputRef.current) dirInputRef.current.value = '';
+  };
+
+  const handleDeletePack = (e: React.MouseEvent, packId: string) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to remove this sample pack?')) {
+      removeUserPack(packId);
+    }
   };
 
   // Get category icon
@@ -171,12 +219,46 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               <p className="text-ft2-textDim text-xs">Browse and load samples</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => zipInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              title="Upload ZIP pack"
+            >
+              <Upload size={14} />
+              ZIP
+            </button>
+            <button
+              onClick={() => dirInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              title="Upload Folder"
+            >
+              <Folder size={14} />
+              FOLDER
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-ft2-textDim hover:text-ft2-text hover:bg-ft2-border rounded transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          {/* Hidden inputs */}
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={handleZipUpload}
+          />
+          <input
+            ref={dirInputRef}
+            type="file"
+            {...({ webkitdirectory: '', directory: '' } as any)}
+            className="hidden"
+            onChange={handleDirUpload}
+          />
         </div>
 
         <div className="flex-1 flex overflow-hidden">
@@ -186,7 +268,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               <h3 className="text-ft2-text font-bold text-xs mb-2">AVAILABLE PACKS</h3>
             </div>
             <div className="flex-1 overflow-y-auto p-2 scrollbar-ft2">
-              {SAMPLE_PACKS.map((pack) => (
+              {allPacks.map((pack) => (
                 <button
                   key={pack.id}
                   onClick={() => {
@@ -196,7 +278,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                       setActiveCategory(pack.categories[0]);
                     }
                   }}
-                  className={`w-full p-3 rounded mb-2 text-left transition-all ${
+                  className={`w-full p-3 rounded mb-2 text-left transition-all group ${
                     selectedPack?.id === pack.id
                       ? 'bg-ft2-cursor text-ft2-bg'
                       : 'bg-ft2-bg border border-ft2-border hover:border-ft2-highlight'
@@ -207,20 +289,36 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                       <img
                         src={normalizeUrl(pack.coverImage)}
                         alt={pack.name}
-                        className="w-12 h-12 rounded object-cover"
+                        className="w-12 h-12 rounded object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded bg-ft2-border flex items-center justify-center">
+                      <div className={`w-12 h-12 rounded shrink-0 flex items-center justify-center border ${
+                        selectedPack?.id === pack.id 
+                          ? 'bg-ft2-bg/20 border-ft2-bg/30 text-ft2-bg' 
+                          : 'bg-ft2-bg border-ft2-border text-ft2-highlight'
+                      }`}>
                         <Package size={20} />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div
-                        className={`font-bold text-sm truncate ${
-                          selectedPack?.id === pack.id ? 'text-ft2-bg' : 'text-ft2-text'
-                        }`}
-                      >
-                        {pack.name}
+                      <div className="flex items-center justify-between gap-1">
+                        <div
+                          className={`font-bold text-sm truncate ${
+                            selectedPack?.id === pack.id ? 'text-ft2-bg' : 'text-ft2-text'
+                          }`}
+                        >
+                          {pack.name}
+                        </div>
+                        {pack.isUserUploaded && (
+                          <button
+                            onClick={(e) => handleDeletePack(e, pack.id)}
+                            className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                              selectedPack?.id === pack.id ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-red-400'
+                            }`}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                       <div
                         className={`text-xs truncate ${
@@ -248,17 +346,41 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
             {selectedPack ? (
               <>
                 {/* Pack Header */}
-                <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border">
-                  <div className="flex items-center justify-between">
+                <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border shrink-0">
+                  <div className="flex items-center gap-4">
+                    {selectedPack.coverImage ? (
+                      <img
+                        src={normalizeUrl(selectedPack.coverImage)}
+                        alt={selectedPack.name}
+                        className="w-16 h-16 rounded object-cover border border-ft2-border"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded bg-ft2-bg border border-ft2-border flex items-center justify-center text-ft2-highlight">
+                        <Package size={32} />
+                      </div>
+                    )}
                     <div>
-                      <h3 className="text-ft2-text font-bold">{selectedPack.name}</h3>
-                      <p className="text-ft2-textDim text-xs mt-1">{selectedPack.description}</p>
+                      <h3 className="text-ft2-text font-bold text-lg">{selectedPack.name}</h3>
+                      <p className="text-ft2-textDim text-xs mt-1 max-w-2xl">{selectedPack.description}</p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-ft2-bg border border-ft2-border text-ft2-textDim rounded">
+                          {selectedPack.author}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-ft2-bg border border-ft2-border text-ft2-textDim rounded">
+                          {selectedPack.sampleCount} SAMPLES
+                        </span>
+                        {selectedPack.isUserUploaded && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-accent-primary/20 text-accent-primary rounded font-bold">
+                            USER UPLOAD
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Search Bar */}
-                <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border">
+                <div className="px-4 py-3 bg-ft2-header border-b border-ft2-border shrink-0">
                   <div className="relative">
                     <Search
                       size={16}
@@ -275,7 +397,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                 </div>
 
                 {/* Category Tabs */}
-                <div className="flex gap-1 px-4 py-2 bg-ft2-header border-b border-ft2-border overflow-x-auto">
+                <div className="flex gap-1 px-4 py-2 bg-ft2-header border-b border-ft2-border overflow-x-auto shrink-0">
                   {selectedPack.categories.map((category) => {
                     const isActive = activeCategory === category;
                     const sampleCount = selectedPack.samples[category]?.length || 0;
@@ -435,3 +557,4 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     </div>
   );
 };
+

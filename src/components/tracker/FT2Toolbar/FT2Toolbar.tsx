@@ -39,6 +39,7 @@ import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/
 import type { Pattern } from '@typedefs';
 import { MASTER_PRESETS, type MasterPreset } from '@constants/masterPresets';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
+import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
@@ -837,10 +838,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer" onClick={() => {
+        <div className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group" onClick={() => {
           const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
           setVizMode(modes[(modes.indexOf(vizMode as any) + 1) % modes.length]);
         }}>
+          {/* Version Number */}
+          <div className="absolute bottom-1 right-2 text-[9px] font-mono text-text-muted opacity-40 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+            v{CURRENT_VERSION}
+          </div>
+
           {oscilloscopeVisible && (
             <>
               {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />}
