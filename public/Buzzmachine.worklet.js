@@ -111,6 +111,8 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
     this.isGenerator = false;
     this.triggerPending = false;
     this.triggerVelocity = 127;
+    this.triggerAccent = false;
+    this.triggerSlide = false;
     this.noteFrequency = 440;
     this.isNoteOn = false;
 
@@ -278,8 +280,15 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         if (this.isInitialized && this.isGenerator) {
           this.triggerPending = true;
           this.triggerVelocity = velocity || 127;
+          this.triggerAccent = accent || false;
+          this.triggerSlide = slide || false;
           this.noteFrequency = frequency || 440;
           this.isNoteOn = true;
+          
+          if (this.triggerAccent || this.triggerSlide) {
+            console.log('[BuzzmachineWorklet] noteOn with extras:', { accent: this.triggerAccent, slide: this.triggerSlide });
+          }
+          
           // Trigger the generator immediately
           this.triggerGenerator();
         }
@@ -588,11 +597,26 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
         // Set note (offset 0)
         this.writeByte(trackValsPtr, Math.max(1, Math.min(0x79, buzzNote)));
+        
+        // Handle Accent
+        let finalVelocity = this.triggerVelocity;
+        if (this.triggerAccent) {
+          // Boost velocity for accent (up to max 127)
+          finalVelocity = Math.min(127, this.triggerVelocity + 32);
+        }
+        
         // Try setting volume at offset 1 (common pattern for synths)
-        const vol = Math.min(0xFE, Math.round(this.triggerVelocity * 2));
+        const vol = Math.min(0xFE, Math.round(finalVelocity * 2));
         this.writeByte(trackValsPtr + 1, vol);
 
-        console.log('[BuzzmachineWorklet] OomekAggressor triggered:', { midiNote, buzzNote, volume: vol });
+        // Handle Slide
+        this.isSliding = this.triggerSlide;
+
+        if (this.triggerAccent || this.triggerSlide) {
+          console.log('[BuzzmachineWorklet] OomekAggressor triggered with extras:', { midiNote, buzzNote, volume: vol, accent: this.triggerAccent, slide: this.triggerSlide });
+        } else {
+          console.log('[BuzzmachineWorklet] OomekAggressor triggered:', { midiNote, buzzNote, volume: vol });
+        }
 
         // Store for clearing (synths hold note until release)
         this.pendingSynthNotePtr = trackValsPtr;
@@ -910,8 +934,15 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Aggressor303: DOES NOT respond to NOTE_OFF - it just ignores it!
       // The machine continues playing until its envelope naturally decays (vcaphase reaches 1600)
       // This can take a very long time. Muting is the only reliable way to stop it.
-      this.muted = true;
-      console.log('[BuzzmachineWorklet] OomekAggressor muted (ignores NOTE_OFF)');
+      
+      // If sliding, don't mute - let the next note trigger take over
+      if (this.isSliding) {
+        console.log('[BuzzmachineWorklet] OomekAggressor slide active, skipping mute');
+        this.isSliding = false; // Reset for next note
+      } else {
+        this.muted = true;
+        console.log('[BuzzmachineWorklet] OomekAggressor muted (ignores NOTE_OFF)');
+      }
     } else if (machineType.includes('MakkM3') || machineType.includes('MadBrain')) {
       // These synths properly respond to NOTE_OFF
       // In Buzz: NOTE_NO=0 (no change), NOTE_OFF=255 (turn off), NOTE_MIN=1, NOTE_MAX=156

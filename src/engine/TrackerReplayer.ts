@@ -18,6 +18,8 @@ import type { Pattern } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { getGrooveOffset } from '@/types/audio';
 
 // ============================================================================
 // CONSTANTS
@@ -321,6 +323,10 @@ export class TrackerReplayer {
   private scheduleAheadTime = 1.0; // Schedule 1 SECOND ahead (like BassoonTracker)
   private schedulerInterval = 0.025; // Check every 25ms (BassoonTracker uses 10ms)
   private nextScheduleTime = 0;
+  
+  // Drift-free timing state
+  private startTime = 0;
+  private totalTicksScheduled = 0;
 
   // Raw interval timer ID (more reliable than Tone.Loop for scheduling)
   private schedulerTimerId: ReturnType<typeof setInterval> | null = null;
@@ -332,7 +338,9 @@ export class TrackerReplayer {
     this.playing = true;
 
     // Initialize schedule position - start 100ms from now to build initial buffer
-    this.nextScheduleTime = Tone.now() + 0.1;
+    this.startTime = Tone.now() + 0.1;
+    this.nextScheduleTime = this.startTime;
+    this.totalTicksScheduled = 0;
 
     // Use raw setInterval instead of Tone.Loop for more reliable scheduling
     // Tone.Loop uses Transport which can be affected by main thread blocking
@@ -347,7 +355,9 @@ export class TrackerReplayer {
       // Fill the buffer - schedule all ticks up to 1 second ahead
       while (this.nextScheduleTime < scheduleUntil && this.playing) {
         this.processTick(this.nextScheduleTime);
-        this.nextScheduleTime += tickInterval;
+        this.totalTicksScheduled++;
+        // Calculate NEXT time based on total ticks since START to avoid cumulative drift
+        this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
       }
 
       // Cleanup old players that have finished playing
@@ -394,6 +404,7 @@ export class TrackerReplayer {
     this.songPos = 0;
     this.pattPos = 0;
     this.currentTick = 0;
+    this.totalTicksScheduled = 0;
 
     // Clear audio-synced state queue
     this.clearStateQueue();
@@ -417,16 +428,20 @@ export class TrackerReplayer {
     if (this.song && !this.playing) {
       this.playing = true;
       // Resume scheduling from current audio time
-      this.nextScheduleTime = Tone.now() + 0.1;
+      const currentTime = Tone.now();
+      this.startTime = currentTime + 0.1;
+      this.nextScheduleTime = this.startTime;
+      this.totalTicksScheduled = 0;
 
       const scheduler = () => {
         if (!this.playing) return;
-        const currentTime = Tone.now();
-        const scheduleUntil = currentTime + this.scheduleAheadTime;
+        const now = Tone.now();
+        const scheduleUntil = now + this.scheduleAheadTime;
         const tickInterval = 2.5 / this.bpm;
         while (this.nextScheduleTime < scheduleUntil && this.playing) {
           this.processTick(this.nextScheduleTime);
-          this.nextScheduleTime += tickInterval;
+          this.totalTicksScheduled++;
+          this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
         }
       };
 
@@ -447,14 +462,39 @@ export class TrackerReplayer {
   private processTick(time: number): void {
     if (!this.song || !this.playing) return;
 
-    // Ensure time is always valid
-    const safeTime = time ?? Tone.now();
-
     // Handle pattern delay
     if (this.patternDelay > 0) {
       this.patternDelay--;
       return;
     }
+
+    // --- Groove & Swing Support ---
+    // Calculate timing offset for this row based on groove template or swing amount
+    const transportState = useTransportStore.getState();
+    const tickInterval = 2.5 / this.bpm;
+    const rowDuration = tickInterval * this.speed;
+    
+    let grooveOffset = 0;
+    const grooveTemplate = transportState.getGrooveTemplate();
+    
+    if (grooveTemplate && grooveTemplate.id !== 'straight') {
+      // Use groove template
+      grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration);
+    } else {
+      // Fall back to legacy swing behavior (affects every other row)
+      const swingAmount = transportState.swing;
+      if (swingAmount !== 0 && swingAmount !== 50) {
+        const isSwungRow = (this.pattPos % 2) === 1;
+        if (isSwungRow) {
+          const maxSwingOffset = rowDuration * 0.5;
+          const normalizedSwing = (swingAmount - 50) / 50;
+          grooveOffset = normalizedSwing * maxSwingOffset;
+        }
+      }
+    }
+
+    // Apply offset to safeTime
+    const safeTime = (time ?? Tone.now()) + grooveOffset;
 
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
@@ -462,6 +502,7 @@ export class TrackerReplayer {
     if (!pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
+    // Use shifted time so cursor follows the groove
     if (this.currentTick === 0) {
       this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
     }

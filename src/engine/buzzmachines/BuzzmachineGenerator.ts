@@ -1,5 +1,4 @@
 import * as Tone from 'tone';
-import { getNativeContext } from '@utils/audio-context';
 import {
   BuzzmachineEngine,
   BuzzmachineType,
@@ -68,15 +67,16 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     this.initInProgress = true;
 
     try {
-      // Safely get native context (handle both Tone.Context and native AudioContext)
-      const context = getNativeContext(this.context);
+      // Use the wrapped context (this.context)
+      // The engines will extract the native context using getNativeContext where needed
+      const context = this.context;
 
       // Initialize engine
-      await this.engine.init(context);
+      await this.engine.init(context as any);
 
       // Create worklet node for this machine
       this.workletNode = await this.engine.createMachineNode(
-        context,
+        context as any,
         this.machineType
       );
 
@@ -164,7 +164,9 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   public triggerAttack(
     note: Tone.Unit.Frequency,
     time?: Tone.Unit.Time,
-    velocity: number = 1
+    velocity: number = 1,
+    accent?: boolean,
+    slide?: boolean
   ): this {
     // Normalize null to undefined for Tone.js compatibility
     const normalizedTime = time ?? undefined;
@@ -177,6 +179,8 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
         frequency: freq,
         velocity: Math.round(velocity * 127),
         time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
+        accent,
+        slide,
       });
     } else if (this.fallbackSynth) {
       if (this.fallbackSynth instanceof Tone.NoiseSynth) {
@@ -219,14 +223,16 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     note: Tone.Unit.Frequency,
     duration: Tone.Unit.Time,
     time?: Tone.Unit.Time,
-    velocity: number = 1
+    velocity: number = 1,
+    accent?: boolean,
+    slide?: boolean
   ): this {
     // Normalize null to undefined for Tone.js compatibility
     const normalizedTime = time ?? undefined;
     const computedTime = normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : Tone.now();
     const computedDuration = Tone.Time(duration).toSeconds();
 
-    this.triggerAttack(note, computedTime, velocity);
+    this.triggerAttack(note, computedTime, velocity, accent, slide);
     this.triggerRelease(computedTime + computedDuration);
     return this;
   }

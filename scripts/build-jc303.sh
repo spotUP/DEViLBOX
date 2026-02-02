@@ -35,7 +35,7 @@ SOURCES=(
 
 # Exported functions
 EXPORTED_FUNCTIONS="[
-    '_jc303_init',
+    '_jc303_create',
     '_jc303_set_buffer_size',
     '_jc303_get_buffer_pointer',
     '_jc303_note_on',
@@ -49,6 +49,18 @@ EXPORTED_FUNCTIONS="[
     '_jc303_set_accent',
     '_jc303_set_volume',
     '_jc303_set_slide_time',
+    '_jc303_set_amp_sustain',
+    '_jc303_set_normal_attack',
+    '_jc303_set_accent_attack',
+    '_jc303_set_accent_decay',
+    '_jc303_set_amp_decay',
+    '_jc303_set_amp_release',
+    '_jc303_set_pre_filter_hp',
+    '_jc303_set_feedback_hp',
+    '_jc303_set_post_filter_hp',
+    '_jc303_set_filter_tracking',
+    '_jc303_set_filter_fm',
+    '_jc303_set_muffler',
     '_jc303_process',
     '_jc303_destroy',
     '_malloc',
