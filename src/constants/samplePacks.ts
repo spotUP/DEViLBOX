@@ -10,7 +10,7 @@ import { normalizeUrl } from '@utils/urlUtils';
  */
 function createSampleInfo(filename: string, category: SampleCategory, basePath: string): SampleInfo {
   // Clean up filename for display name
-  const nameWithoutExt = filename.replace(/\.wav$/i, '');
+  const nameWithoutExt = filename.replace(/\.(wav|aif|aiff)$/i, '');
   // Remove prefix patterns like "BD_", "SD_", etc.
   const cleanName = nameWithoutExt
     .replace(/^(BD|SD|CH|OH|CYM|BB|FX|TOM|CLAP|CLAVE|CONGA|COW|BELL|BONGO|RIM|SHAKE|SNAP|TABLA|TAMB|LAZ)_?/i, '')
@@ -303,11 +303,69 @@ export const DRUMNIBUS_PACK: SamplePack = {
 };
 
 // ============================================================================
+// CASIO MT40 SAMPLE PACK
+// ============================================================================
+
+const CASIO_MT40_BASE_PATH = 'data/samples/packs/casio-mt40';
+
+const CASIO_MT40_LEADS: string[] = [
+  'accordion.aif',
+  'banjo.aif',
+  'bass.aif',
+  'brass.aif',
+  'celesta.aif',
+  'cello.aif',
+  'clarinet.aif',
+  'elec piano.aif',
+  'flute.aif',
+  'folk flute.aif',
+  'funny fuzz.aif',
+  'glocken.aif',
+  'guitar.aif',
+  'harpsichord.aif',
+  'organ.aif',
+  'oriental.aif',
+  'pipe-organ.aif',
+  'recorder.aif',
+  'st ensemble.aif',
+  'synth fuzz.aif',
+  'trumpet.aif',
+  'violin.aif',
+  'xylophone.aif',
+];
+
+export const CASIO_MT40_PACK: SamplePack = {
+  id: 'casio-mt40',
+  name: 'Casio MT-40',
+  author: 'Casio',
+  description: 'Classic 8-bit instrument sounds from the legendary Casio MT-40 keyboard. Home of the Sleng Teng riddim.',
+  coverImage: normalizeUrl('data/samples/packs/casio-mt40/cover.jpg'),
+  basePath: CASIO_MT40_BASE_PATH,
+  categories: ['leads'],
+  samples: {
+    kicks: [],
+    snares: [],
+    hihats: [],
+    claps: [],
+    percussion: [],
+    fx: [],
+    bass: [],
+    leads: CASIO_MT40_LEADS.map(f => createSampleInfo(f, 'leads', CASIO_MT40_BASE_PATH)),
+    pads: [],
+    loops: [],
+    vocals: [],
+    other: [],
+  },
+  sampleCount: 23,
+};
+
+// ============================================================================
 // SAMPLE PACK REGISTRY
 // ============================================================================
 
 export const SAMPLE_PACKS: SamplePack[] = [
   DRUMNIBUS_PACK,
+  CASIO_MT40_PACK,
 ];
 
 export const getSamplePackById = (id: string): SamplePack | undefined => {
