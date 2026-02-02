@@ -114,7 +114,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleBake = async () => {
     setIsBaking(true);
     try {
-      await bakeInstrument(instrument.id);
+      await bakeInstrument(instrument.id, 'lite');
+    } finally {
+      setIsBaking(false);
+    }
+  };
+
+  const handleBakePro = async () => {
+    setIsBaking(true);
+    try {
+      await bakeInstrument(instrument.id, 'pro');
     } finally {
       setIsBaking(false);
     }
@@ -431,6 +440,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         showHelp={showHelp}
         onHelpToggle={() => setShowHelp(!showHelp)}
         onBake={handleBake}
+        onBakePro={handleBakePro}
         onUnbake={handleUnbake}
         isBaked={isBaked}
         isBaking={isBaking}

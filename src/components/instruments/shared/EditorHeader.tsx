@@ -64,6 +64,7 @@ export interface EditorHeaderProps {
   compact?: boolean;
   /** Precalc/Bake functionality */
   onBake?: () => void;
+  onBakePro?: () => void;
   onUnbake?: () => void;
   isBaked?: boolean;
   isBaking?: boolean;
@@ -311,7 +312,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 } ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title={isBaked 
                   ? 'Unbake: Revert to live synth engine' 
-                  : 'Precalc/Bake: Render to sample for better performance'}
+                  : 'Lite Bake: Render single C-4 sample (fast & small)'}
               >
                 {isBaking ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -323,6 +324,19 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-tight">
                   {isBaking ? 'BAKING' : isBaked ? 'UNBAKE' : 'BAKE'}
                 </span>
+              </button>
+            )}
+
+            {/* Pro Bake Button */}
+            {!isBaked && onBakePro && !isSampleType(instrument.synthType) && (
+              <button
+                onClick={onBakePro}
+                disabled={isBaking}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700 ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Pro Bake: Render every unique note used in the song for maximum accuracy"
+              >
+                {isBaking ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-amber-400" />}
+                <span className="text-[10px] font-bold uppercase tracking-tight">PRO</span>
               </button>
             )}
 

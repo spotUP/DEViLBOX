@@ -1842,6 +1842,7 @@ export interface InstrumentMetadata {
   preservedSynth?: {
     synthType: SynthType;
     config: Partial<InstrumentConfig>;
+    bakeType?: 'lite' | 'pro';
   };
 }
 
@@ -1851,6 +1852,7 @@ import type { BeatSlice, BeatSliceConfig } from './beatSlicer';
 export interface SampleConfig {
   audioBuffer?: ArrayBuffer;
   url: string;
+  multiMap?: Record<string, string>; // Note (e.g. "C4") -> URL map for multi-sampling
   baseNote: string; // "C-4"
   detune: number; // -100 to +100 cents
   loop: boolean;
