@@ -709,7 +709,7 @@ export class ToneEngine {
           maxPolyphony: synthPolyphony,
           options: {
             oscillator: {
-              type: config.oscillator?.type || 'sawtooth',
+              type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any,
             },
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
@@ -725,7 +725,7 @@ export class ToneEngine {
       case 'MonoSynth':
         instrument = new Tone.MonoSynth({
           oscillator: {
-            type: config.oscillator?.type || 'sawtooth',
+            type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any,
           },
           envelope: {
             attack: (config.envelope?.attack ?? 10) / 1000,
@@ -740,7 +740,7 @@ export class ToneEngine {
       case 'DuoSynth':
         instrument = new Tone.DuoSynth({
           voice0: {
-            oscillator: { type: config.oscillator?.type || 'sawtooth' },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any },
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -749,7 +749,7 @@ export class ToneEngine {
             },
           },
           voice1: {
-            oscillator: { type: config.oscillator?.type || 'sawtooth' },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any },
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -771,7 +771,7 @@ export class ToneEngine {
           voice: Tone.FMSynth,
           maxPolyphony: fmPolyphony,
           options: {
-            oscillator: { type: config.oscillator?.type || 'sine' },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as any },
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -792,7 +792,7 @@ export class ToneEngine {
           voice: Tone.AMSynth,
           maxPolyphony: amPolyphony,
           options: {
-            oscillator: { type: config.oscillator?.type || 'sine' },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as any },
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,

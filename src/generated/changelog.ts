@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:49:07.435Z
+ * Generated: 2026-02-02T21:50:29.614Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '215';
-export const BUILD_HASH = 'a6fcfd3';
+export const BUILD_NUMBER = '216';
+export const BUILD_HASH = '7c97420';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve critical syntax errors in useInstrumentStore'
+      },
       {
         type: 'fix',
         description: 'Resolve multiple TypeScript errors in V2 synth and Nano-Exporter'
@@ -240,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Fix loop mode and optimize playback state updates'
-      },
-      {
-        type: 'fix',
-        description: 'Reduce audio engine debug logging for performance'
       }
     ]
   }
