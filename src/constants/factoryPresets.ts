@@ -9,6 +9,7 @@ import { VOWEL_FORMANTS } from '@typedefs/instrument';
 import { TB303_PRESETS } from './tb303Presets';
 import { FURNACE_PRESETS } from './furnacePresets';
 import { DUB_SIREN_PRESETS } from './dubSirenPresets';
+import { SPACE_LASER_PRESETS } from './spaceLaserPresets';
 import { SYNARE_PRESETS } from './synarePresets';
 import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from './drumnibusPresets';
 
@@ -3303,7 +3304,9 @@ export const PRESET_CATEGORIES = {
   Chip: CHIP_PRESETS,
   Furnace: FURNACE_PRESETS,
   FX: FX_PRESETS,
+  Dub: [...DUB_SIREN_PRESETS, ...SPACE_LASER_PRESETS, ...SYNARE_PRESETS],
   DubSiren: DUB_SIREN_PRESETS,
+  SpaceLaser: SPACE_LASER_PRESETS,
   Synare: SYNARE_PRESETS,
   Drumnibus: [...DRUMNIBUS_KIT_PRESETS, ...DRUMNIBUS_PRESETS],
 };

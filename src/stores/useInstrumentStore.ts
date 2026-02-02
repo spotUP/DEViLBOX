@@ -17,6 +17,7 @@ import {
   DEFAULT_FILTER,
   DEFAULT_TB303,
   DEFAULT_DUB_SIREN,
+  DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
@@ -206,6 +207,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
           }
 
+          // Auto-initialize Space Laser config when synthType changes to 'SpaceLaser'
+          if (synthTypeChanging && updates.synthType === 'SpaceLaser' && !instrument.spaceLaser) {
+            instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
+          }
+
           // Auto-initialize Synare config when synthType changes to 'Synare'
           if (synthTypeChanging && updates.synthType === 'Synare' && !instrument.synare) {
             instrument.synare = { ...DEFAULT_SYNARE };
@@ -227,6 +233,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             
             if (updatedInstrument.synthType === 'DubSiren' && updatedInstrument.dubSiren && updates.dubSiren) {
               engine.updateDubSirenParameters(id, updatedInstrument.dubSiren);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'SpaceLaser' && updatedInstrument.spaceLaser && updates.spaceLaser) {
+              engine.updateSpaceLaserParameters(id, updatedInstrument.spaceLaser);
               return; // Handled
             }
             
@@ -396,6 +407,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             wobbleBass: undefined,
             drumKit: undefined,
             dubSiren: undefined,
+            spaceLaser: undefined,
             synare: undefined,
           });
 
@@ -420,6 +432,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
           } else if (currentSynthType === 'DubSiren') {
             instrument.dubSiren = { ...DEFAULT_DUB_SIREN };
+          } else if (currentSynthType === 'SpaceLaser') {
+            instrument.spaceLaser = { ...DEFAULT_SPACE_LASER };
           } else if (currentSynthType === 'Synare') {
             instrument.synare = { ...DEFAULT_SYNARE };
           } else if (currentSynthType.startsWith('Furnace')) {

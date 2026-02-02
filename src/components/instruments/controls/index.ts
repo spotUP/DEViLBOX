@@ -10,4 +10,5 @@ export { FurnaceControls } from './FurnaceControls';
 export { BuzzmachineControls } from './BuzzmachineControls';
 export { SampleControls } from './SampleControls';
 export { DubSirenControls } from './DubSirenControls';
+export { SpaceLaserControls } from './SpaceLaserControls';
 export { SynareControls } from './SynareControls';

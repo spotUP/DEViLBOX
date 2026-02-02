@@ -66,6 +66,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
       { keywords: ['Tom', 'Hi'], synthType: 'DrumMachine', note: 43 },
       { keywords: ['Synare', 'Disco'], synthType: 'Synare', note: 40 },
       { keywords: ['Siren', 'Dub'], synthType: 'DubSiren', note: 48 }, // Pad 13 (Bank B start)
+      { keywords: ['Laser', 'Zap'], synthType: 'SpaceLaser', note: 49 }, // Pad 14
     ];
 
     slots.forEach(slot => {

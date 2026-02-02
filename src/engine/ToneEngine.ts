@@ -1237,6 +1237,7 @@ export class ToneEngine {
       case 'BuzzM3':
       case 'Buzz3o3':
       case 'DubSiren':
+      case 'SpaceLaser':
       case 'Synare':
       case 'MAMEVFX':
       case 'MAMEDOC':
@@ -2772,6 +2773,20 @@ export class ToneEngine {
     if (!found) {
       console.warn(`[ToneEngine] No DubSiren synth found to update for instrument ${instrumentId}`);
     }
+  }
+
+  /**
+   * Update Space Laser parameters in real-time
+   */
+  public updateSpaceLaserParameters(instrumentId: number, config: NonNullable<InstrumentConfig['spaceLaser']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
+        }
+      }
+    });
   }
 
   /**

@@ -17,6 +17,7 @@ import {
   DEFAULT_SUPERSAW,
   DEFAULT_WAVETABLE,
   DEFAULT_FURNACE,
+  DEFAULT_SPACE_LASER,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
@@ -29,6 +30,7 @@ import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { DrumKitSynth } from './DrumKitSynth';
 import { DubSirenSynth } from './DubSirenSynth';
+import { SpaceLaserSynth } from './SpaceLaserSynth';
 import { SynareSynth } from './SynareSynth';
 import { JC303Synth } from './jc303/JC303Synth';
 import { MAMESynth } from './MAMESynth';
@@ -308,6 +310,10 @@ export class InstrumentFactory {
 
       case 'DubSiren':
         instrument = this.createDubSiren(config);
+        break;
+
+      case 'SpaceLaser':
+        instrument = this.createSpaceLaser(config);
         break;
 
       case 'Synare':
@@ -3939,6 +3945,17 @@ export class InstrumentFactory {
     const synth = new DubSirenSynth(dubSirenConfig);
     
     // Apply initial volume
+    if (config.volume !== undefined) {
+      synth.volume.value = config.volume;
+    }
+    
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createSpaceLaser(config: InstrumentConfig): Tone.ToneAudioNode {
+    const spaceLaserConfig = config.spaceLaser || DEFAULT_SPACE_LASER;
+    const synth = new SpaceLaserSynth(spaceLaserConfig);
+    
     if (config.volume !== undefined) {
       synth.volume.value = config.volume;
     }

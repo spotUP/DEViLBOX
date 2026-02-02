@@ -447,6 +447,27 @@ delay and reverb for that signature "space" echo effect.`,
     trackerUsage: 'Trigger notes to start the siren. Use pitch bend or vibrato commands for extra modulation.',
   },
 
+  SpaceLaser: {
+    overview: `A specialized FM-based synthesizer designed for classic "pew pew" laser sounds.
+It combines a fast exponential pitch sweep with Frequency Modulation to create metallic, 
+zapping textures common in classic reggae dubs and vintage anime sci-fi effects.`,
+    keyParameters: [
+      { name: 'Start/End Freq', description: 'The range of the pitch sweep. Lasers typically start high and end low.' },
+      { name: 'Sweep Time', description: 'The duration of the "zap". Shorter = sharper, longer = sci-fi blast.' },
+      { name: 'FM Index', description: 'Amount of frequency modulation - higher creates more metallic "grit".' },
+      { name: 'FM Ratio', description: 'Harmonic relationship of the modulator - higher values create more complex textures.' },
+      { name: 'Noise Amount', description: 'Adds "dust" or "grit" to the laser blast, like vintage arcade sound chips.' },
+    ],
+    tips: [
+      'Exponential sweeps sound more "natural" for lasers than linear ones.',
+      'High FM Ratio + High FM Index creates that distinctive anime "beam" sound.',
+      'Add a small amount of Noise for a lo-fi vintage arcade character.',
+      'Use the Bandpass filter to focus the energy of the zap.',
+      'Medium delay (300ms) with high feedback is the classic reggae "Space Laser" sound.',
+    ],
+    trackerUsage: 'Each note trigger starts a new laser sweep. Higher notes start at higher frequencies.',
+  },
+
   Synare: {
     overview: `The Synare 3 is a classic analog electronic percussion synthesizer from the 1970s.
 It is famous for the "disco tom" sound—a resonant, descending pitch sweep—and is a staple of
