@@ -122,6 +122,9 @@ function cleanSampleName(filename: string): string {
  * Load sample pack from a directory (File[] from webkitdirectory input)
  */
 export async function loadSamplePackFromDirectory(files: FileList): Promise<SamplePack> {
+  console.group('[SamplePackLoader] Loading directory...');
+  console.log(`[SamplePackLoader] Total files received: ${files.length}`);
+  
   const samples: Record<SampleCategory, SampleInfo[]> = {
     kicks: [], snares: [], hihats: [], claps: [], percussion: [],
     fx: [], bass: [], leads: [], pads: [], loops: [], vocals: [], other: [],
@@ -137,7 +140,10 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     const file = files[i];
     const path = file.webkitRelativePath || file.name;
     
-    if (isSystemFile(file.name, path)) continue;
+    if (isSystemFile(file.name, path)) {
+      // console.log(`[SamplePackLoader] Skipping system file: ${path}`);
+      continue;
+    }
 
     const parts = path.split('/').filter(p => p.length > 0);
     const filename = parts[parts.length - 1];
@@ -145,17 +151,22 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     // Get pack name from root folder if possible
     if (parts.length > 1 && !packName) {
       packName = parts[0];
+      console.log(`[SamplePackLoader] Detected pack name: ${packName}`);
     }
 
     // Handle potential cover image
     if (isImageFile(filename)) {
       const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
+      console.log(`[SamplePackLoader] Found potential cover: ${filename} (priority ${priority})`);
       potentialCovers.push({ file, priority });
       continue;
     }
 
     // Skip non-audio files
-    if (!isAudioFile(filename)) continue;
+    if (!isAudioFile(filename)) {
+      // console.log(`[SamplePackLoader] Skipping non-audio: ${filename}`);
+      continue;
+    }
 
     // Determine category from folder structure
     let category: SampleCategory = 'other';
@@ -166,17 +177,21 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
     }
 
     // Create blob URL for the sample
-    const url = URL.createObjectURL(file);
+    try {
+      const url = URL.createObjectURL(file);
 
-    const sampleInfo: SampleInfo = {
-      filename,
-      name: cleanSampleName(filename),
-      category,
-      url,
-    };
+      const sampleInfo: SampleInfo = {
+        filename,
+        name: cleanSampleName(filename),
+        category,
+        url,
+      };
 
-    samples[category].push(sampleInfo);
-    categories.add(category);
+      samples[category].push(sampleInfo);
+      categories.add(category);
+    } catch (e) {
+      console.error(`[SamplePackLoader] Failed to create blob URL for ${filename}:`, e);
+    }
   }
 
   // Fallback pack name
@@ -185,11 +200,18 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
   // Select best cover image
   if (potentialCovers.length > 0) {
     potentialCovers.sort((a, b) => b.priority - a.priority);
-    coverImage = URL.createObjectURL(potentialCovers[0].file);
+    try {
+      coverImage = URL.createObjectURL(potentialCovers[0].file);
+      console.log(`[SamplePackLoader] Selected cover: ${potentialCovers[0].file.name}`);
+    } catch (e) {
+      console.error('[SamplePackLoader] Failed to create cover blob URL:', e);
+    }
   }
 
   // Calculate total count
   const sampleCount = Object.values(samples).reduce((sum, arr) => sum + arr.length, 0);
+  console.log(`[SamplePackLoader] Successfully processed ${sampleCount} samples.`);
+  console.groupEnd();
 
   if (sampleCount === 0) {
     throw new Error('No audio files found in the directory.');
@@ -213,7 +235,7 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
  * Load sample pack from a ZIP file
  */
 export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
-  console.log('[SamplePackLoader] Loading ZIP:', file.name, file.size, 'bytes');
+  console.group(`[SamplePackLoader] Loading ZIP: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
   
   const samples: Record<SampleCategory, SampleInfo[]> = {
     kicks: [], snares: [], hihats: [], claps: [], percussion: [],
@@ -227,12 +249,15 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
 
   try {
     // Load and parse ZIP
+    console.log('[SamplePackLoader] Starting JSZip.loadAsync...');
     const zip = await JSZip.loadAsync(file);
+    console.log('[SamplePackLoader] JSZip load complete.');
 
     // Process each file in the ZIP
     const entries = Object.entries(zip.files);
-    console.log('[SamplePackLoader] ZIP contains', entries.length, 'entries');
+    console.log(`[SamplePackLoader] ZIP contains ${entries.length} entries.`);
 
+    let entryCount = 0;
     for (const [path, zipEntry] of entries) {
       if (zipEntry.dir) continue;
 
@@ -246,6 +271,7 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
       // Handle potential cover image
       if (isImageFile(filename)) {
         const priority = isLikelyCover(filename) ? 2 : (parts.length <= 2 ? 1 : 0);
+        console.log(`[SamplePackLoader] Found ZIP cover candidate: ${path} (priority ${priority})`);
         potentialCovers.push({ path, filename, priority });
         continue;
       }
@@ -261,18 +287,27 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
       }
 
       // Extract file and create blob URL
-      const blob = await zipEntry.async('blob');
-      const url = URL.createObjectURL(blob);
+      try {
+        const blob = await zipEntry.async('blob');
+        const url = URL.createObjectURL(blob);
 
-      const sampleInfo: SampleInfo = {
-        filename,
-        name: cleanSampleName(filename),
-        category,
-        url,
-      };
+        const sampleInfo: SampleInfo = {
+          filename,
+          name: cleanSampleName(filename),
+          category,
+          url,
+        };
 
-      samples[category].push(sampleInfo);
-      categories.add(category);
+        samples[category].push(sampleInfo);
+        categories.add(category);
+        entryCount++;
+        
+        if (entryCount % 50 === 0) {
+          console.log(`[SamplePackLoader] Processed ${entryCount} audio files...`);
+        }
+      } catch (err) {
+        console.error(`[SamplePackLoader] Failed to extract ${path}:`, err);
+      }
     }
 
     // Select best cover image
@@ -281,13 +316,20 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
       const bestCover = potentialCovers[0];
       const zipEntry = zip.files[bestCover.path];
       if (zipEntry) {
-        const blob = await zipEntry.async('blob');
-        coverImage = URL.createObjectURL(blob);
+        try {
+          const blob = await zipEntry.async('blob');
+          coverImage = URL.createObjectURL(blob);
+          console.log(`[SamplePackLoader] Extracted cover from ZIP: ${bestCover.path}`);
+        } catch (e) {
+          console.error('[SamplePackLoader] Failed to extract cover from ZIP:', e);
+        }
       }
     }
 
     // Calculate total count
     const sampleCount = Object.values(samples).reduce((sum, arr) => sum + arr.length, 0);
+    console.log(`[SamplePackLoader] ZIP processing complete. Total samples: ${sampleCount}`);
+    console.groupEnd();
 
     if (sampleCount === 0) {
       throw new Error('No audio files found in the ZIP.');
@@ -307,6 +349,7 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
     };
   } catch (error) {
     console.error('[SamplePackLoader] ZIP load error:', error);
+    console.groupEnd();
     throw error;
   }
 }
