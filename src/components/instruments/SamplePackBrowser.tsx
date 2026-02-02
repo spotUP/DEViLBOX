@@ -4,18 +4,19 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
-import { useInstrumentStore, useSamplePackStore } from '@stores';
+import { useInstrumentStore, useSamplePackStore, useMIDIStore } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2 } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
+import { getToneEngine } from '@engine/ToneEngine';
 
 interface SamplePackBrowserProps {
   onClose: () => void;
 }
 
 export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose }) => {
-  const { currentInstrumentId, updateInstrument } = useInstrumentStore();
+  const { currentInstrumentId, updateInstrument, setPreviewInstrument } = useInstrumentStore();
   const { allPacks, uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
   const [selectedPack, setSelectedPack] = useState<SamplePack | null>(allPacks[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
@@ -26,6 +27,81 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const playerRef = useRef<Tone.Player | null>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync preview instrument with selected sample
+  useEffect(() => {
+    if (selectedSample) {
+      // Create a temporary instrument config for the preview
+      const previewConfig: any = {
+        id: 999, // Special ID for preview
+        name: `Preview: ${selectedSample.name}`,
+        type: 'sample',
+        synthType: 'Sampler',
+        sample: {
+          url: selectedSample.url,
+          baseNote: 'C4',
+          detune: 0,
+          loop: false,
+          loopStart: 0,
+          loopEnd: 0,
+          reverse: false,
+          playbackRate: 1,
+        },
+        effects: [],
+        volume: -6,
+        pan: 0,
+      };
+      setPreviewInstrument(previewConfig);
+    } else {
+      setPreviewInstrument(null);
+    }
+
+    return () => {
+      setPreviewInstrument(null);
+    };
+  }, [selectedSample, setPreviewInstrument]);
+
+  // Keyboard support for previewing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in search
+      if (document.activeElement?.tagName === 'INPUT') return;
+      
+      // Basic keyboard-to-note mapping (Piano Roll style)
+      const keyMap: Record<string, string> = {
+        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4', 
+        't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4', 'k': 'C5'
+      };
+
+      const note = keyMap[e.key.toLowerCase()];
+      if (note && selectedSample) {
+        const engine = getToneEngine();
+        engine.triggerPolyNoteAttack(999, note, 1);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT') return;
+      
+      const keyMap: Record<string, string> = {
+        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4', 
+        't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4', 'k': 'C5'
+      };
+
+      const note = keyMap[e.key.toLowerCase()];
+      if (note) {
+        const engine = getToneEngine();
+        engine.triggerPolyNoteRelease(999, note);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedSample]);
 
   // Cleanup player on unmount
   useEffect(() => {
