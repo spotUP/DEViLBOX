@@ -2865,7 +2865,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'DN Analog Noise',
     synthType: 'Sampler',
     sample: {
-      url: 'data/samples/packs/drumnibus/snares/SD_Analog%20Noise1.wav',
+      url: 'data/samples/packs/drumnibus/snares/SD_Analog_Noise1.wav',
       baseNote: 'C4',
       detune: 0,
       loop: false,
