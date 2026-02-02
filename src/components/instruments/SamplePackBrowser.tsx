@@ -69,6 +69,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   useEffect(() => {
     if (previewConfig) {
       setPreviewInstrument(previewConfig);
+      // Force engine to reload the new sample for the preview ID
+      try {
+        getToneEngine().invalidateInstrument(999);
+      } catch (e) {
+        // Ignored
+      }
     } else {
       setPreviewInstrument(null);
     }
