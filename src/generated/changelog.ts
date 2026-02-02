@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T21:50:29.614Z
+ * Generated: 2026-02-02T21:52:42.147Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '216';
-export const BUILD_HASH = '7c97420';
+export const BUILD_NUMBER = '217';
+export const BUILD_HASH = 'e23367c';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-02',
     changes: [
+      {
+        type: 'fix',
+        description: 'Resolve final TypeScript errors in ToneEngine and useInstrumentStore'
+      },
       {
         type: 'fix',
         description: 'Resolve critical syntax errors in useInstrumentStore'
@@ -240,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         description: 'Simplify LogoAnimation component'
-      },
-      {
-        type: 'fix',
-        description: 'Fix loop mode and optimize playback state updates'
       }
     ]
   }
