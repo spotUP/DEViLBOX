@@ -14,6 +14,8 @@ export class SAMSynth extends Tone.ToneAudioNode {
   private _buffer: AudioBuffer | null = null;
   private _isRendering: boolean = false;
 
+  private _renderTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(config: SamConfig) {
     super();
     this.output = new Tone.Gain();
@@ -45,7 +47,13 @@ export class SAMSynth extends Tone.ToneAudioNode {
         const audioBuf = Tone.getContext().createBuffer(1, buf32.length, 22050);
         audioBuf.getChannelData(0).set(buf32);
         this._buffer = audioBuf;
+        
+        // Preserve current playback state if possible
+        const wasPlaying = this._player.state === 'started';
         this._player.buffer = new Tone.ToneAudioBuffer(audioBuf);
+        if (wasPlaying && this._config.singmode) {
+          this._player.start();
+        }
       }
     } catch (e) {
       console.error('[SAM] Render failed:', e);
@@ -66,28 +74,36 @@ export class SAMSynth extends Tone.ToneAudioNode {
 
     this._config = { ...this._config, ...config };
 
-    if (hasParamsChanged) {
-      this._sam = new SamJs({
-        pitch: this._config.pitch,
-        speed: this._config.speed,
-        mouth: this._config.mouth,
-        throat: this._config.throat,
-        singmode: this._config.singmode,
-        phonetic: this._config.phonetic
-      });
-    }
-
-    if (hasTextChanged || hasParamsChanged) {
-      this._render();
+    if (hasParamsChanged || hasTextChanged) {
+      // Throttled re-render to prevent UI/Audio lag during knob moves
+      if (this._renderTimer) clearTimeout(this._renderTimer);
+      this._renderTimer = setTimeout(() => {
+        this._sam = new SamJs({
+          pitch: this._config.pitch,
+          speed: this._config.speed,
+          mouth: this._config.mouth,
+          throat: this._config.throat,
+          singmode: this._config.singmode,
+          phonetic: this._config.phonetic
+        });
+        this._render();
+      }, 50);
     }
   }
 
-  public triggerAttack(_note: string | number, time?: number, velocity: number = 1) {
+  public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
     if (!this._buffer) return;
     
-    // SAM is usually played at a fixed pitch (the one in config)
-    // but we can potentially shift it with playbackRate if needed.
-    // For authentic SAM, we just play the rendered buffer.
+    // Note tracking: If we are in "Sing Mode", we can adjust playbackRate based on the note
+    // MIDI 60 (C4) is our "base" pitch.
+    if (note && note !== 'C4') {
+      const midi = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+      const ratio = Math.pow(2, (midi - 60) / 12);
+      this._player.playbackRate = ratio;
+    } else {
+      this._player.playbackRate = 1.0;
+    }
+
     this._player.start(time, 0);
     this._player.volume.value = Tone.gainToDb(velocity);
   }
