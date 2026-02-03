@@ -149,11 +149,16 @@ function groupByDate(commits) {
 // Generate TypeScript file
 function generateTypeScript(entries, version, buildNumber, gitHash) {
   const entriesJson = JSON.stringify(entries, null, 2)
+    // Convert type values to single quotes
     .replace(/"type": "feature"/g, "type: 'feature'")
     .replace(/"type": "fix"/g, "type: 'fix'")
     .replace(/"type": "improvement"/g, "type: 'improvement'")
-    .replace(/"(\w+)":/g, '$1:')
-    .replace(/"/g, "'");
+    // Convert property names to unquoted (but NOT description values)
+    .replace(/"(version|date|changes|type)":/g, '$1:')
+    // Keep description in double quotes to avoid escaping issues with apostrophes
+    // Only convert non-description string values (version, date) to single quotes
+    .replace(/"(\d{4}-\d{2}-\d{2})"/g, "'$1'")  // dates
+    .replace(/"(\d+\.\d+\.\d+)"/g, "'$1'");     // versions
 
   return `/**
  * Auto-generated changelog from git commits
