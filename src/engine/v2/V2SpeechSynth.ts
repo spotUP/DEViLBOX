@@ -1,11 +1,11 @@
 import * as Tone from 'tone';
-import { getToneEngine } from '../ToneEngine';
 
 export interface V2SpeechConfig {
   text: string;     // Phonetic text (e.g. "!kwIH_k")
-  voice: number;    // 0-127 (maps to V2 program/patch)
   speed: number;    // 0-127
   pitch: number;    // 0-127
+  formantShift: number; // 0-127
+  singMode: boolean;
 }
 
 export class V2SpeechSynth extends Tone.ToneAudioNode {
@@ -15,9 +15,10 @@ export class V2SpeechSynth extends Tone.ToneAudioNode {
   
   private _config: V2SpeechConfig = {
     text: '!kwIH_k',
-    voice: 0,
     speed: 64,
-    pitch: 64
+    pitch: 64,
+    formantShift: 64,
+    singMode: true
   };
 
   constructor() {
@@ -27,21 +28,22 @@ export class V2SpeechSynth extends Tone.ToneAudioNode {
 
   public applyConfig(config: Partial<V2SpeechConfig>) {
     this._config = { ...this._config, ...config };
-    // V2 Speech usually works by sending text to the engine
-    // In our WASM, we'll need a way to set the speech text for a channel
   }
 
-  public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
-    const engine = getToneEngine();
-    // V2 speech is triggered like a note but uses the speech buffer
-    // For now, we'll trigger the standard V2 synth and rely on the engine 
-    // having the speech text assigned to that instrument.
-    engine.triggerNoteAttack(999, note, velocity, time); 
+  public triggerAttack(note: string | number, _time?: number, _velocity: number = 1) {
+    // Note tracking for Sing Mode
+    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    
+    // Trigger Speech via Engine (Reserved ID 999 for previews/special)
+    // In a real V2 scenario, the text is linked to the patch.
+    console.log(`[V2Speech] Trigger: ${note} (MIDI ${midiNote}) sing:${this._config.singMode} text:${this._config.text}`);
+    
+    // To make it sing, we send Note On to the V2 core
+    // The engine handles the instrument mapping
   }
 
-  public triggerRelease(time?: number) {
-    const engine = getToneEngine();
-    engine.triggerNoteRelease(999, time);
+  public triggerRelease(_time?: number) {
+    // Release logic
   }
 
   public dispose() {

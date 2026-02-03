@@ -133,6 +133,7 @@ export type SynthType =
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'V2'               // Farbrausch V2 Synth
+  | 'Sam'              // Commodore SAM Speech Synth
   | 'Synare';          // Synare 3 (Electronic Percussion)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
@@ -2228,10 +2229,9 @@ export interface V2Config {
     sustain: number;
     release: number;
   };
-  modulation: {
-    lfo1Rate: number;
-    lfo1Depth: number;
-    lfo1Target: 'cutoff' | 'pitch' | 'none';
+  lfo1: {
+    rate: number;
+    depth: number;
   };
 }
 
@@ -2243,6 +2243,7 @@ export interface V2SpeechConfig {
   speed: number;
   pitch: number;
   formantShift: number;
+  singMode: boolean; // Enables MIDI note-to-pitch tracking
 }
 
 export const DEFAULT_V2_SPEECH: V2SpeechConfig = {
@@ -2250,6 +2251,7 @@ export const DEFAULT_V2_SPEECH: V2SpeechConfig = {
   speed: 64,
   pitch: 64,
   formantShift: 64,
+  singMode: true,
 };
 
 export const DEFAULT_V2: V2Config = {

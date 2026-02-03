@@ -1,6 +1,9 @@
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_V2 } from '@typedefs/instrument';
 
+// Modes: 0:Off, 1:Saw/Tri, 2:Pulse, 3:Sin, 4:Noise, 5:XX, 6:AuxA, 7:AuxB
+// Filters: 0:Off, 1:Low, 2:Band, 3:High, 4:Notch, 5:All, 6:MoogL, 7:MoogH
+
 // Classic Trance Lead
 export const V2_PRESET_TRANCE: Omit<InstrumentConfig, 'id'> = {
   type: 'synth',
@@ -8,9 +11,9 @@ export const V2_PRESET_TRANCE: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'sawtooth', detune: 0, transpose: 0, level: 100 },
-    osc2: { type: 'sawtooth', detune: 15, transpose: 0, level: 80 },
-    filter: { type: 'lowpass', cutoff: 80, resonance: 40, envMod: 60 },
+    osc1: { mode: 1, detune: 0, transpose: 0, color: 64, level: 100 },
+    osc2: { mode: 1, ringMod: false, detune: 15, transpose: 0, color: 64, level: 80 },
+    filter1: { mode: 1, cutoff: 80, resonance: 40 },
     envelope: { attack: 5, decay: 60, sustain: 40, release: 40 },
   },
   effects: [],
@@ -25,9 +28,9 @@ export const V2_PRESET_PAD: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'sawtooth', detune: 5, transpose: 0, level: 60 },
-    osc2: { type: 'sine', detune: 0, transpose: 12, level: 40 },
-    filter: { type: 'lowpass', cutoff: 40, resonance: 20, envMod: 30 },
+    osc1: { mode: 1, detune: 5, transpose: 0, color: 64, level: 60 },
+    osc2: { mode: 3, ringMod: false, detune: 0, transpose: 12, color: 64, level: 40 },
+    filter1: { mode: 1, cutoff: 40, resonance: 20 },
     envelope: { attack: 80, decay: 100, sustain: 100, release: 100 },
   },
   effects: [],
@@ -42,9 +45,9 @@ export const V2_PRESET_BASS: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'sawtooth', detune: 0, transpose: -12, level: 100 },
-    osc2: { type: 'square', detune: 0, transpose: -12, level: 60 },
-    filter: { type: 'lowpass', cutoff: 30, resonance: 60, envMod: 80 },
+    osc1: { mode: 1, detune: 0, transpose: -12, color: 64, level: 100 },
+    osc2: { mode: 2, ringMod: false, detune: 0, transpose: -12, color: 64, level: 60 },
+    filter1: { mode: 1, cutoff: 30, resonance: 60 },
     envelope: { attack: 0, decay: 40, sustain: 0, release: 10 },
   },
   effects: [],
@@ -59,8 +62,8 @@ export const V2_PRESET_KICK: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'sine', detune: 0, transpose: -24, level: 120 },
-    filter: { type: 'lowpass', cutoff: 20, resonance: 40, envMod: 100 },
+    osc1: { mode: 3, detune: 0, transpose: -24, color: 64, level: 120 },
+    filter1: { mode: 1, cutoff: 20, resonance: 40 },
     envelope: { attack: 0, decay: 30, sustain: 0, release: 10 },
   },
   effects: [],
@@ -75,8 +78,8 @@ export const V2_PRESET_SNARE: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'noise', detune: 0, transpose: 0, level: 100 },
-    filter: { type: 'bandpass', cutoff: 60, resonance: 20, envMod: 0 },
+    osc1: { mode: 4, detune: 0, transpose: 0, color: 64, level: 100 },
+    filter1: { mode: 2, cutoff: 60, resonance: 20 },
     envelope: { attack: 0, decay: 45, sustain: 0, release: 20 },
   },
   effects: [],
@@ -91,8 +94,8 @@ export const V2_PRESET_HAT: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'noise', detune: 0, transpose: 0, level: 80 },
-    filter: { type: 'highpass', cutoff: 100, resonance: 10, envMod: 0 },
+    osc1: { mode: 4, detune: 0, transpose: 0, color: 64, level: 80 },
+    filter1: { mode: 3, cutoff: 100, resonance: 10 },
     envelope: { attack: 0, decay: 15, sustain: 0, release: 10 },
   },
   effects: [],
@@ -107,8 +110,8 @@ export const V2_PRESET_ZAP: Omit<InstrumentConfig, 'id'> = {
   synthType: 'V2',
   v2: {
     ...DEFAULT_V2,
-    osc1: { type: 'sawtooth', detune: 0, transpose: 12, level: 100 },
-    filter: { type: 'lowpass', cutoff: 120, resonance: 80, envMod: 120 },
+    osc1: { mode: 1, detune: 0, transpose: 12, color: 64, level: 100 },
+    filter1: { mode: 1, cutoff: 120, resonance: 80 },
     envelope: { attack: 0, decay: 25, sustain: 0, release: 10 },
   },
   effects: [],

@@ -416,7 +416,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         }
 
         case 'nano': {
-          const sequence = patterns.map((p) => p.id);
+          // NanoExporter expects pattern indices (numbers)
+          const sequence = patterns.map((_, idx) => idx);
           const nanoData = NanoExporter.export(
             instruments,
             patterns,
@@ -425,7 +426,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             6 // Speed default
           );
 
-          const blob = new Blob([nanoData], { type: 'application/octet-stream' });
+          // Fresh Uint8Array to ensure standard ArrayBuffer
+          const blob = new Blob([new Uint8Array(nanoData)], { type: 'application/octet-stream' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1351,10 +1353,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div>Format: <span className="text-accent-primary">DBXN Binary</span></div>
                       <div>Used Instruments: <span className="text-accent-primary">
                         {(() => {
-                          const sequence = patterns.map(p => p.id);
                           const used = new Set<number>();
-                          sequence.forEach(pIdx => {
-                            patterns[pIdx]?.channels.forEach(ch => {
+                          patterns.forEach(pattern => {
+                            pattern.channels.forEach(ch => {
                               ch.rows.forEach(cell => {
                                 if (cell.instrument > 0) used.add(cell.instrument);
                               });

@@ -13,7 +13,8 @@ export const V2_FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       "text": "!DHAX_ !prAA_dAHkt",
       "speed": 64,
       "pitch": 40,
-      "formantShift": 64
+      "formantShift": 64,
+      "singMode": true
     },
     "effects": [],
     "volume": -10,
@@ -27,7 +28,8 @@ export const V2_FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
       "text": "!dEH_mOW_sIYn",
       "speed": 64,
       "pitch": 64,
-      "formantShift": 64
+      "formantShift": 64,
+      "singMode": true
     },
     "effects": [],
     "volume": -10,
