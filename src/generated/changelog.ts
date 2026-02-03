@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T23:38:18.518Z
+ * Generated: 2026-02-02T23:57:41.122Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '240';
-export const BUILD_HASH = '6f90210';
+export const BUILD_NUMBER = '244';
+export const BUILD_HASH = '5d7775f';
 export const BUILD_DATE = '2026-02-02';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'feature',
+        description: 'Implement V2 Speech synth UI and wire Nano binary export to UI'
+      },
+      {
+        type: 'feature',
+        description: 'Integrate 128 authentic Farbrausch V2 factory presets extracted from presets.v2b'
+      },
+      {
+        type: 'feature',
+        description: 'Implement full V2 synth controls with multi-oscillator, dual filter, and modulation support'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve TypeScript errors related to missing imports and unused variables'
+      },
       {
         type: 'fix',
         description: 'Resolve off-key chip loops and RangeErrors by using original sample rate for loop points and robust clamping'
@@ -214,28 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Implement high-DPI scaling and resolve oscilloscope frame clearing'
-      },
-      {
-        type: 'fix',
-        description: 'Synchronize visuals with audio clock and improve transport stability'
-      },
-      {
-        type: 'improvement',
-        description: 'Unify instrument editors and delete legacy standalone editors'
-      },
-      {
-        type: 'feature',
-        description: 'Resolve audio drift, enhance JC303/Buzzmachine worklets and implement absolute tick timing'
-      }
-    ]
-  },
-  {
-    version: '2026-02-01',
-    date: '2026-02-01',
-    changes: [
-      {
-        type: 'fix',
-        description: 'Robust native context retrieval for all worklets and fix synth disposal race conditions'
       }
     ]
   }

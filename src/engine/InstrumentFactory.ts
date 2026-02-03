@@ -32,6 +32,7 @@ import { DrumKitSynth } from './DrumKitSynth';
 import { DubSirenSynth } from './DubSirenSynth';
 import { SpaceLaserSynth } from './SpaceLaserSynth';
 import { SynareSynth } from './SynareSynth';
+import { SAMSynth } from './sam/SAMSynth';
 import { V2Synth } from './v2/V2Synth';
 import { JC303Synth } from './jc303/JC303Synth';
 import { MAMESynth } from './MAMESynth';
@@ -319,6 +320,10 @@ export class InstrumentFactory {
 
       case 'V2':
         instrument = this.createV2(config);
+        break;
+
+      case 'Sam':
+        instrument = this.createSam(config);
         break;
 
       case 'Synare':
@@ -3977,6 +3982,18 @@ export class InstrumentFactory {
 
   private static createV2(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new V2Synth();
+    
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+    
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createSam(config: InstrumentConfig): Tone.ToneAudioNode {
+    const { DEFAULT_SAM } = require('@/types/instrument');
+    const samConfig = config.sam || DEFAULT_SAM;
+    const synth = new SAMSynth(samConfig);
     
     if (config.volume !== undefined) {
       synth.output.gain.value = Tone.dbToGain(config.volume);
