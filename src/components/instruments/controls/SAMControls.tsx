@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import type { SamConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
+// @ts-ignore
+import SamJs from '@engine/sam/samjs';
 
 interface SAMControlsProps {
   config: SamConfig;
@@ -24,6 +26,20 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
     ? 'bg-[#051515] border-cyan-900/50'
     : 'bg-[#1a1a1a] border-gray-800';
 
+  const handleConvertToPhonemes = () => {
+    try {
+      const phonetic = SamJs.convert(config.text);
+      if (phonetic) {
+        onChange({ 
+          text: phonetic,
+          phonetic: true 
+        });
+      }
+    } catch (e) {
+      console.error('[SAM] Phonetic conversion failed:', e);
+    }
+  };
+
   const PHONEMES = [
     { code: 'IY', example: 'beet' }, { code: 'IH', example: 'bit' },
     { code: 'EH', example: 'bet' }, { code: 'AE', example: 'bat' },
@@ -33,6 +49,12 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
     { code: 'RR', example: 'bird' }, { code: 'LL', example: 'lull' },
     { code: 'WW', example: 'we' }, { code: 'YY', example: 'yes' },
   ];
+
+  const handleTextChange = (text: string) => {
+    // If we're not in phonetic mode, we just update the text
+    // We don't auto-convert while typing as it's destructive/confusing
+    onChange({ text });
+  };
 
   return (
     <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
@@ -65,13 +87,23 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
           </div>
         </div>
         
-        <input
-          type="text"
-          value={config.text}
-          onChange={(e) => onChange({ text: e.target.value })}
-          className="w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
-          placeholder="COMMODORE SIXTY FOUR"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={config.text}
+            onChange={(e) => handleTextChange(e.target.value)}
+            className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
+            placeholder="COMMODORE SIXTY FOUR"
+          />
+          <button
+            onClick={handleConvertToPhonemes}
+            className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 transition-all flex flex-col items-center justify-center min-w-[80px]"
+            title="Convert plain text to SAM phonemes"
+          >
+            <Wand2 size={16} className="mb-1" />
+            <span className="text-[8px] font-black uppercase tracking-tighter">Convert</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Parameters Grid */}
