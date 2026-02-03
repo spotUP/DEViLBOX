@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-02T23:57:41.122Z
+ * Generated: 2026-02-03T00:00:50.914Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '244';
-export const BUILD_HASH = '5d7775f';
-export const BUILD_DATE = '2026-02-02';
+export const BUILD_NUMBER = '245';
+export const BUILD_HASH = '957ccf6';
+export const BUILD_DATE = '2026-02-03';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'feature',
+        description: 'Implement Commodore SAM speech synth with dedicated UI and presets'
+      },
       {
         type: 'feature',
         description: 'Implement V2 Speech synth UI and wire Nano binary export to UI'
@@ -226,10 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Expand factory presets, quicktips, and update changelog'
-      },
-      {
-        type: 'fix',
-        description: 'Implement high-DPI scaling and resolve oscilloscope frame clearing'
       }
     ]
   }
