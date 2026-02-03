@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-03T00:12:22.938Z
+ * Generated: 2026-02-03T00:14:04.315Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '248';
-export const BUILD_HASH = '85182ac';
+export const BUILD_NUMBER = '249';
+export const BUILD_HASH = '8c97638';
 export const BUILD_DATE = '2026-02-03';
 
 // Full semantic version with build number
@@ -34,8 +34,12 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-02-03',
     changes: [
       {
+        type: 'fix',
+        description: 'Escape nested single quotes in auto-generated changelog'
+      },
+      {
         type: 'feature',
-        description: 'Add \'Convert to Phonemes\' button to SAM synth UI using authentic reciter algorithm'
+        description: 'Add 'Convert to Phonemes' button to SAM synth UI using authentic reciter algorithm'
       },
       {
         type: 'fix',
@@ -226,10 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Restore sample pack upload functionality and improve version display'
-      },
-      {
-        type: 'fix',
-        description: 'Resolve require is not defined ReferenceError in toolbar'
       }
     ]
   }
