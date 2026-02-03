@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-03T00:15:28.148Z
+ * Generated: 2026-02-03T00:26:59.202Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '251';
-export const BUILD_HASH = '7df708e';
+export const BUILD_NUMBER = '252';
+export const BUILD_HASH = '5d844e8';
 export const BUILD_DATE = '2026-02-03';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'fix',
+        description: 'Remove problematic single quotes from changelog entry'
+      },
       {
         type: 'fix',
         description: 'Resolve nested quote syntax error in changelog'
@@ -47,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         type: 'feature',
-        description: "Add Convert to Phonemes button to SAM synth UI using authentic reciter algorithm"
+        description: "Add 'Convert to Phonemes' button to SAM synth UI using authentic reciter algorithm"
       },
       {
         type: 'fix',
@@ -226,10 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Add Casio MT-40 default sample pack'
-      },
-      {
-        type: 'feature',
-        description: 'Enhance TD-3 pattern transfer with file support and improve sample pack cover detection'
       }
     ]
   }
