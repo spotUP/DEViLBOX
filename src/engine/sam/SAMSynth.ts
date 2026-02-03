@@ -47,11 +47,21 @@ export class SAMSynth extends Tone.ToneAudioNode {
         const audioBuf = Tone.getContext().createBuffer(1, buf32.length, 22050);
         audioBuf.getChannelData(0).set(buf32);
         this._buffer = audioBuf;
-        
+
         // Preserve current playback state if possible
         const wasPlaying = this._player.state === 'started';
+
+        // Dispose previous buffer before creating new one to prevent memory leak
+        if (this._player.buffer) {
+          this._player.buffer.dispose();
+        }
+
         this._player.buffer = new Tone.ToneAudioBuffer(audioBuf);
         if (wasPlaying && this._config.singmode) {
+          // Stop before starting to prevent double-start error
+          if (this._player.state === 'started') {
+            this._player.stop();
+          }
           this._player.start();
         }
       }
@@ -115,6 +125,12 @@ export class SAMSynth extends Tone.ToneAudioNode {
   }
 
   public dispose() {
+    // Clear pending render timer to prevent callback on disposed synth
+    if (this._renderTimer) {
+      clearTimeout(this._renderTimer);
+      this._renderTimer = null;
+    }
+
     super.dispose();
     this._player.dispose();
     this.output.dispose();

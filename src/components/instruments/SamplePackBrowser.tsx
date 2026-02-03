@@ -29,6 +29,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const [_isPlaying, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
+  const previewVersionRef = useRef(0); // Track preview version to prevent stale callbacks
+  const isMountedRef = useRef(true); // Track mount state to prevent state updates after unmount
   const zipInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,9 +144,11 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     };
   }, [primarySample, previewConfig]);
 
-  // Cleanup player on unmount
+  // Cleanup player on unmount and track mount state
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (playerRef.current) {
         playerRef.current.stop();
         playerRef.current.dispose();
@@ -212,11 +216,15 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
   // Preview a sample
   const previewSample = async (sample: SampleInfo) => {
+    // Increment version to invalidate any pending callbacks
+    const currentVersion = ++previewVersionRef.current;
+
     try {
       // Stop any currently playing sample
       if (playerRef.current) {
         playerRef.current.stop();
         playerRef.current.dispose();
+        playerRef.current = null;
       }
 
       // Start audio context if needed
@@ -229,19 +237,28 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       const player = new Tone.Player({
         url: normalizeUrl(sample.url),
         onload: () => {
-          player.start();
+          // Only start if this is still the current preview
+          if (previewVersionRef.current === currentVersion) {
+            player.start();
+          }
         },
         onstop: () => {
-          setIsPlaying(false);
-          setPlayingSample(null);
+          // Only update state if this is still the current preview
+          if (previewVersionRef.current === currentVersion) {
+            setIsPlaying(false);
+            setPlayingSample(null);
+          }
         },
       }).toDestination();
 
       playerRef.current = player;
     } catch (error) {
       console.error('Error previewing sample:', error);
-      setIsPlaying(false);
-      setPlayingSample(null);
+      // Only update state if this is still the current preview
+      if (previewVersionRef.current === currentVersion) {
+        setIsPlaying(false);
+        setPlayingSample(null);
+      }
     }
   };
 
@@ -331,16 +348,23 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     setIsUploading(true);
     try {
       const pack = await uploadZip(file);
-      setSelectedPack(pack);
-      if (pack.categories.length > 0) {
-        setActiveCategory(pack.categories[0]);
+      // Only update state if still mounted
+      if (isMountedRef.current) {
+        setSelectedPack(pack);
+        if (pack.categories.length > 0) {
+          setActiveCategory(pack.categories[0]);
+        }
       }
     } catch (error) {
-      alert('Failed to load ZIP pack. Ensure it contains audio files.');
+      if (isMountedRef.current) {
+        alert('Failed to load ZIP pack. Ensure it contains audio files.');
+      }
     } finally {
-      setIsUploading(false);
+      if (isMountedRef.current) {
+        setIsUploading(false);
+      }
     }
-    
+
     // Reset input
     if (zipInputRef.current) zipInputRef.current.value = '';
   };
@@ -352,14 +376,21 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     setIsUploading(true);
     try {
       const pack = await uploadDirectory(files);
-      setSelectedPack(pack);
-      if (pack.categories.length > 0) {
-        setActiveCategory(pack.categories[0]);
+      // Only update state if still mounted
+      if (isMountedRef.current) {
+        setSelectedPack(pack);
+        if (pack.categories.length > 0) {
+          setActiveCategory(pack.categories[0]);
+        }
       }
     } catch (error) {
-      alert('Failed to load directory. Ensure it contains audio files.');
+      if (isMountedRef.current) {
+        alert('Failed to load directory. Ensure it contains audio files.');
+      }
     } finally {
-      setIsUploading(false);
+      if (isMountedRef.current) {
+        setIsUploading(false);
+      }
     }
 
     // Reset input
