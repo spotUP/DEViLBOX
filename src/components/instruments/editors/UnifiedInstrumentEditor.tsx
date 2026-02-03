@@ -27,6 +27,7 @@ import { DubSirenControls } from '../controls/DubSirenControls';
 import { SpaceLaserControls } from '../controls/SpaceLaserControls';
 import { V2Controls } from '../controls/V2Controls';
 import { V2SpeechControls } from '../controls/V2SpeechControls';
+import { SAMControls } from '../controls/SAMControls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
@@ -38,7 +39,7 @@ import { Box, Drum, Megaphone, Zap, Radio } from 'lucide-react';
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'synare' | 'mame';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -98,6 +99,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDubSirenType(synthType)) return 'dubsiren';
   if (isSpaceLaserType(synthType)) return 'spacelaser';
   if (isV2Type(synthType)) return 'v2';
+  if (synthType === 'Sam') return 'sam';
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEType(synthType)) return 'mame';
   return 'generic';
@@ -692,8 +694,68 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }
 
   // ============================================================================
-  // SYNARE EDITOR
+  // SAM SPEECH EDITOR
   // ============================================================================
+  if (editorMode === 'sam' && instrument.sam) {
+    const accentColor = isCyanTheme ? '#00ffff' : '#ffcc33';
+    const headerBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc33]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg text-white">
+                    <MessageSquare size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SAM</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Software Automatic Mouth</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={onChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <SAMControls
+          config={instrument.sam}
+          onChange={(updates) => onChange({ sam: { ...instrument.sam!, ...updates } })}
+        />
+      </div>
+    );
+  }
   if (editorMode === 'synare' && instrument.synare) {
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">

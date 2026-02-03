@@ -2157,10 +2157,27 @@ export interface SpaceLaserConfig {
 }
 
 /**
- * Farbrausch V2 Synth Configuration
- * Advanced multi-voice subtractive synth common in 4k/64k intros
- * Ground truth from V2 source code (v2defs.cpp)
+ * Commodore SAM Speech Configuration
  */
+export interface SamConfig {
+  text: string;
+  pitch: number;    // 0-255 (default 64)
+  speed: number;    // 0-255 (default 72)
+  mouth: number;    // 0-255 (default 128)
+  throat: number;   // 0-255 (default 128)
+  singmode: boolean;
+  phonetic: boolean;
+}
+
+export const DEFAULT_SAM: SamConfig = {
+  text: 'COMMODORE SIXTY FOUR',
+  pitch: 64,
+  speed: 72,
+  mouth: 128,
+  throat: 128,
+  singmode: false,
+  phonetic: false,
+};
 export interface V2Config {
   osc1: {
     mode: number; // Off, Saw/Tri, Pulse, Sin, Noise, XX, AuxA, AuxB
@@ -2358,6 +2375,7 @@ export interface InstrumentConfig {
   spaceLaser?: SpaceLaserConfig;
   v2?: V2Config;
   v2Speech?: V2SpeechConfig;
+  sam?: SamConfig;
   synare?: SynareConfig;
   // MAME synths
   mame?: MAMEConfig;

@@ -14,6 +14,7 @@ import { V2_PRESETS, V2_PRESET_KICK, V2_PRESET_SNARE, V2_PRESET_HAT } from './v2
 import { SYNARE_PRESETS } from './synarePresets';
 import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from './drumnibusPresets';
 import { V2_FACTORY_PRESETS } from './v2FactoryPresets';
+import { SAM_PRESETS } from './samPresets';
 
 // BASS PRESETS (18)
 
@@ -3294,6 +3295,7 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...SPACE_LASER_PRESETS,
   ...V2_PRESETS,
   ...V2_FACTORY_PRESETS,
+  ...SAM_PRESETS,
   ...DRUMNIBUS_PRESETS,
   ...DRUMNIBUS_KIT_PRESETS,
 ];
@@ -3318,6 +3320,7 @@ export const PRESET_CATEGORIES = {
   DubSiren: DUB_SIREN_PRESETS,
   SpaceLaser: SPACE_LASER_PRESETS,
   V2: [...V2_PRESETS, ...V2_FACTORY_PRESETS],
+  Sam: SAM_PRESETS,
   Synare: SYNARE_PRESETS,
   Drumnibus: [...DRUMNIBUS_KIT_PRESETS, ...DRUMNIBUS_PRESETS],
 };
