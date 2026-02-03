@@ -39,7 +39,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         type: 'feature',
-        description: 'Add 'Convert to Phonemes' button to SAM synth UI using authentic reciter algorithm'
+        description: "Add 'Convert to Phonemes' button to SAM synth UI using authentic reciter algorithm"
       },
       {
         type: 'fix',
