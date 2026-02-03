@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-03T00:14:04.315Z
+ * Generated: 2026-02-03T00:15:28.148Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '249';
-export const BUILD_HASH = '8c97638';
+export const BUILD_NUMBER = '251';
+export const BUILD_HASH = '7df708e';
 export const BUILD_DATE = '2026-02-03';
 
 // Full semantic version with build number
@@ -35,11 +35,19 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       {
         type: 'fix',
+        description: 'Resolve nested quote syntax error in changelog'
+      },
+      {
+        type: 'fix',
+        description: 'Correctly handle nested quotes in changelog'
+      },
+      {
+        type: 'fix',
         description: 'Escape nested single quotes in auto-generated changelog'
       },
       {
         type: 'feature',
-        description: "Add 'Convert to Phonemes' button to SAM synth UI using authentic reciter algorithm"
+        description: "Add Convert to Phonemes button to SAM synth UI using authentic reciter algorithm"
       },
       {
         type: 'fix',
@@ -222,14 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         description: 'Enhance TD-3 pattern transfer with file support and improve sample pack cover detection'
-      },
-      {
-        type: 'improvement',
-        description: 'Comprehensive optimization of audio engine, worklets, build, and UI'
-      },
-      {
-        type: 'feature',
-        description: 'Restore sample pack upload functionality and improve version display'
       }
     ]
   }
