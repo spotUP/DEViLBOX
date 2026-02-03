@@ -9,8 +9,6 @@ interface V2ControlsProps {
   onChange: (updates: Partial<V2Config>) => void;
 }
 
-type V2Tab = 'osc' | 'filter' | 'env';
-
 type V2Tab = 'osc' | 'filter' | 'env' | 'mod';
 
 export const V2Controls: React.FC<V2ControlsProps> = ({
@@ -533,41 +531,6 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
          activeTab === 'filter' ? renderFilterTab() : 
          activeTab === 'env' ? renderEnvTab() :
          renderModTab()}
-      </div>
-    </div>
-  );
-};
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-[#151515]">
-        {[
-          { id: 'osc' as V2Tab, label: 'Oscillators', icon: Activity },
-          { id: 'filter' as V2Tab, label: 'Filters', icon: Filter },
-          { id: 'env' as V2Tab, label: 'Envelopes', icon: Zap },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`
-              flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2
-              ${activeTab === tab.id 
-                ? `bg-[#252525] border-b-2` 
-                : 'text-gray-500 hover:text-gray-300'
-              }
-            `}
-            style={activeTab === tab.id ? { color: accentColor, borderColor: accentColor } : undefined}
-          >
-            <tab.icon size={12} />
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'osc' ? renderOscTab() : activeTab === 'filter' ? renderFilterTab() : renderEnvTab()}
       </div>
     </div>
   );

@@ -180,6 +180,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       DubSiren: 'text-red-500',
       SpaceLaser: 'text-green-500',
       V2: 'text-amber-500',
+      Sam: 'text-amber-500',
       Synare: 'text-yellow-500',
       Drumnibus: 'text-emerald-400',
       Keys: 'text-amber-600',

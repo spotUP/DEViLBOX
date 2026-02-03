@@ -143,8 +143,8 @@ export class NanoExporter {
     } else if (inst.synthType === 'V2' && inst.v2) {
       res[0] = inst.v2.osc1.transpose + 64;
       res[1] = inst.v2.osc1.detune + 64;
-      res[2] = inst.v2.filter.cutoff;
-      res[3] = inst.v2.filter.resonance;
+      res[2] = inst.v2.filter1.cutoff;
+      res[3] = inst.v2.filter1.resonance;
     }
     return res.map(v => Math.floor(Math.min(255, Math.max(0, v))));
   }

@@ -26,9 +26,20 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
     <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
       {/* Speech Text Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare size={16} className="text-amber-500" />
-          <h3 className="font-bold text-amber-400 uppercase tracking-tight">V2 PHONETIC TEXT</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <MessageSquare size={16} className="text-amber-500" />
+            <h3 className="font-bold text-amber-400 uppercase tracking-tight">V2 PHONETIC TEXT</h3>
+          </div>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.singMode}
+              onChange={(e) => onChange({ singMode: e.target.checked })}
+              className="w-3 h-3 rounded border-gray-700 bg-transparent"
+            />
+            <span className="text-[10px] text-gray-500 uppercase font-bold" title="Enables MIDI note-to-pitch tracking">Sing Mode</span>
+          </label>
         </div>
         
         <input
