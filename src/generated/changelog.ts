@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-03T00:00:50.914Z
+ * Generated: 2026-02-03T00:12:22.938Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '245';
-export const BUILD_HASH = '957ccf6';
+export const BUILD_NUMBER = '248';
+export const BUILD_HASH = '85182ac';
 export const BUILD_DATE = '2026-02-03';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'feature',
+        description: 'Add \'Convert to Phonemes\' button to SAM synth UI using authentic reciter algorithm'
+      },
+      {
+        type: 'fix',
+        description: 'Resolve all TypeScript errors and finalize SAM/V2 Speech integration with UI improvements'
+      },
+      {
+        type: 'feature',
+        description: 'Improve SAM synth with XY pad, phoneme guide, and melodic note tracking'
+      },
       {
         type: 'feature',
         description: 'Implement Commodore SAM speech synth with dedicated UI and presets'
@@ -218,18 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         description: 'Resolve require is not defined ReferenceError in toolbar'
-      },
-      {
-        type: 'fix',
-        description: 'Ensure all instruments have presets dropdown using FACTORY_PRESETS'
-      },
-      {
-        type: 'fix',
-        description: 'Refactor high-DPI scaling to prevent React attribute conflicts and cumulative scaling'
-      },
-      {
-        type: 'feature',
-        description: 'Expand factory presets, quicktips, and update changelog'
       }
     ]
   }
