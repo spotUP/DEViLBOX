@@ -112,19 +112,18 @@ export class SpaceLaserSynth {
     const startFreq = note ? Tone.Frequency(note).toFrequency() : this.config.laser.startFreq;
     const endFreq = this.config.laser.endFreq;
 
+    // Trigger envelope and set initial frequency (triggerAttack sets frequency internally)
+    this.synth.triggerAttack(startFreq, t, velocity);
+
     // PITCH SWEEP - The "Pew Pew"
-    this.synth.frequency.cancelScheduledValues(t);
-    this.synth.frequency.setValueAtTime(startFreq, t);
-    
+    // Schedule the frequency ramp AFTER triggerAttack sets the initial frequency
+    this.synth.frequency.cancelScheduledValues(t + 0.001);
     if (this.config.laser.sweepCurve === 'exponential') {
       this.synth.frequency.exponentialRampToValueAtTime(endFreq, t + duration);
     } else {
       this.synth.frequency.linearRampToValueAtTime(endFreq, t + duration);
     }
 
-    // Trigger envelopes
-    this.synth.triggerAttack(startFreq, t, velocity);
-    
     // Auto-release after duration
     this.synth.triggerRelease(t + duration);
   }
@@ -148,6 +147,9 @@ export class SpaceLaserSynth {
   }
 
   dispose() {
+    // Stop noise before disposing to ensure clean shutdown
+    this.noise.stop();
+
     this.synth.dispose();
     this.filter.dispose();
     this.noise.dispose();

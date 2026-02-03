@@ -41,6 +41,25 @@ import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
 /**
+ * Revoke blob URLs from an instrument's sample to prevent memory leaks.
+ * Must be called before deleting, unbaking, or re-baking an instrument.
+ */
+function revokeInstrumentSampleUrls(sample: InstrumentConfig['sample']) {
+  if (!sample) return;
+  if (sample.url) {
+    URL.revokeObjectURL(sample.url);
+  }
+  if (sample.multiMap) {
+    Object.values(sample.multiMap).forEach(url => URL.revokeObjectURL(url));
+  }
+}
+
+/**
+ * Track instruments currently being baked to prevent concurrent bakes.
+ */
+const bakingInstruments = new Set<number>();
+
+/**
  * Get initial configuration for a synth type
  */
 function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
@@ -459,6 +478,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const index = state.instruments.findIndex((inst) => inst.id === id);
         if (index !== -1 && state.instruments.length > 1) {
+          // Revoke any blob URLs before deleting to prevent memory leaks
+          revokeInstrumentSampleUrls(state.instruments[index].sample);
           state.instruments.splice(index, 1);
           if (state.currentInstrumentId === id) {
             state.currentInstrumentId = state.instruments[0].id;
@@ -567,11 +588,24 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const instrument = state.instruments.find((inst) => inst.id === id);
       if (!instrument || instrument.synthType === 'Sampler') return;
 
+      // Prevent concurrent bakes on the same instrument
+      if (bakingInstruments.has(id)) {
+        console.warn(`[InstrumentStore] Instrument ${id} is already being baked, skipping.`);
+        return;
+      }
+      bakingInstruments.add(id);
+
       try {
         const engine = getToneEngine();
-        
-        // Preservation: Capture current config BEFORE switching to Sampler
-        const preservedConfig = { ...instrument };
+
+        // Revoke any existing sample URLs before creating new ones (re-baking case)
+        if (instrument.sample) {
+          revokeInstrumentSampleUrls(instrument.sample);
+        }
+
+        // Preservation: Deep clone current config BEFORE switching to Sampler
+        // Must use deep clone to avoid nested objects being mutated
+        const preservedConfig = JSON.parse(JSON.stringify(instrument));
         delete preservedConfig.metadata; // Avoid recursion
 
         if (bakeType === 'pro') {
@@ -664,6 +698,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         engine.invalidateInstrument(id);
       } catch (error) {
         console.error('[InstrumentStore] Failed to bake instrument:', error);
+      } finally {
+        // Release the baking lock
+        bakingInstruments.delete(id);
       }
     },
 
@@ -672,7 +709,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const inst = state.instruments.find((i) => i.id === id);
         if (inst && inst.metadata?.preservedSynth) {
           const { synthType, config } = inst.metadata.preservedSynth;
-          
+
+          // Revoke blob URLs before clearing sample to prevent memory leaks
+          revokeInstrumentSampleUrls(inst.sample);
+
           // Preserve other metadata but remove the synth restoration flag
           const otherMetadata = { ...inst.metadata };
           delete otherMetadata.preservedSynth;
@@ -681,7 +721,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           Object.assign(inst, config);
           inst.synthType = synthType;
           inst.metadata = otherMetadata;
-          
+
           // Clear sample config
           inst.sample = undefined;
         }
