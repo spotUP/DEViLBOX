@@ -54,6 +54,8 @@ const AVAILABLE_EFFECTS: EffectType[] = [
   'SpaceEcho',
   'BiPhase',
   'DubFilter',
+  'SpaceyDelayer',
+  'RETapeEcho',
 ];
 
 interface SortableEffectProps {

@@ -242,6 +242,25 @@ const EFFECT_PARAMETERS: Record<string, EffectParameter[]> = {
   StereoWidener: [
     { name: 'Width', key: 'width', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
   ],
+  SpaceyDelayer: [
+    { name: 'First Tap', key: 'firstTap', min: 10, max: 2000, step: 1, unit: 'ms', defaultValue: 250 },
+    { name: 'Tap Size', key: 'tapSize', min: 10, max: 1000, step: 1, unit: 'ms', defaultValue: 150 },
+    { name: 'Feedback', key: 'feedback', min: 0, max: 95, step: 1, unit: '%', defaultValue: 40 },
+    { name: 'Multi-Tap', key: 'multiTap', min: 0, max: 1, step: 1, unit: '0=Off/1=On', defaultValue: 1 },
+    { name: 'Tape Filter', key: 'tapeFilter', min: 0, max: 1, step: 1, unit: '0=Off/1=On', defaultValue: 0 },
+  ],
+  RETapeEcho: [
+    { name: 'Mode', key: 'mode', min: 0, max: 5, step: 1, unit: '', defaultValue: 3 },
+    { name: 'Repeat Rate', key: 'repeatRate', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
+    { name: 'Intensity', key: 'intensity', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.5 },
+    { name: 'Echo Volume', key: 'echoVolume', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0.8 },
+    { name: 'Wow', key: 'wow', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0 },
+    { name: 'Flutter', key: 'flutter', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0 },
+    { name: 'Dirt', key: 'dirt', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0 },
+    { name: 'Input Bleed', key: 'inputBleed', min: 0, max: 1, step: 1, unit: '0=Off/1=On', defaultValue: 0 },
+    { name: 'Loop Amount', key: 'loopAmount', min: 0, max: 1, step: 0.01, unit: '', defaultValue: 0 },
+    { name: 'Playhead Filter', key: 'playheadFilter', min: 0, max: 1, step: 1, unit: '0=Off/1=On', defaultValue: 1 },
+  ],
 };
 
 export const EffectPanel: React.FC<EffectPanelProps> = ({ instrumentId, effect, onClose }) => {
