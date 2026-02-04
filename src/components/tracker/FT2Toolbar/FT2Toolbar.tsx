@@ -245,7 +245,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
   
   const [showModulesMenu, setShowModulesMenu] = useState(false);
-  const [showPresetsMenu, setShowPresetsMenu] = useState(false);
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
   const [showGrooveMenu, setShowGrooveMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -282,15 +281,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   
   const modulesMenuRef = useRef<HTMLDivElement>(null);
   const modulesButtonRef = useRef<HTMLDivElement>(null);
-  const presetsMenuRef = useRef<HTMLDivElement>(null);
-  const presetsButtonRef = useRef<HTMLDivElement>(null);
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
   const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
   const grooveMenuRef = useRef<HTMLDivElement>(null);
   const grooveButtonRef = useRef<HTMLDivElement>(null);
 
   const [modulesMenuPosition, setModulesMenuPosition] = useState({ top: 0, left: 0 });
-  const [presetsMenuPosition, setPresetsMenuPosition] = useState({ top: 0, left: 0 });
   const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
   const [grooveMenuPosition, setGrooveMenuPosition] = useState({ top: 0, left: 0 });
 
@@ -358,7 +354,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handleLoadMasterPreset = async (preset: MasterPreset) => {
-    setShowPresetsMenu(false);
+    setShowModulesMenu(false);
     if (isPlaying) {
       stop();
       engine.releaseAll();
@@ -392,13 +388,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showModulesMenu]);
 
   React.useEffect(() => {
-    if (showPresetsMenu && presetsButtonRef.current) {
-      const rect = presetsButtonRef.current.getBoundingClientRect();
-      setPresetsMenuPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [showPresetsMenu]);
-
-  React.useEffect(() => {
     if (showFxPresetsMenu && fxPresetsButtonRef.current) {
       const rect = fxPresetsButtonRef.current.getBoundingClientRect();
       setFxPresetsMenuPosition({ top: rect.bottom + 4, left: rect.left });
@@ -413,13 +402,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showGrooveMenu]);
 
   React.useEffect(() => {
-    if (!showModulesMenu && !showPresetsMenu && !showFxPresetsMenu && !showGrooveMenu) return;
+    if (!showModulesMenu && !showFxPresetsMenu && !showGrooveMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (showModulesMenu && modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
         setShowModulesMenu(false);
-      }
-      if (showPresetsMenu && presetsMenuRef.current && !presetsMenuRef.current.contains(e.target as Node)) {
-        setShowPresetsMenu(false);
       }
       if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
         setShowFxPresetsMenu(false);
@@ -432,7 +418,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showModulesMenu, showPresetsMenu, showFxPresetsMenu, showGrooveMenu]);
+  }, [showModulesMenu, showFxPresetsMenu, showGrooveMenu]);
 
   const handleSave = () => {
     try {
@@ -835,30 +821,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
 
-              <div ref={presetsButtonRef}>
-                <Button variant={showPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowPresetsMenu(!showPresetsMenu)} disabled={isLoading}>Presets</Button>
+              <div ref={modulesButtonRef}>
+                <Button variant={showModulesMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowModulesMenu(!showModulesMenu)} disabled={isLoading}>Modules</Button>
               </div>
-              {showPresetsMenu && (
-                <div ref={presetsMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${presetsMenuPosition.top}px`, left: `${presetsMenuPosition.left}px` }}>
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Master Presets</div>
+              {showModulesMenu && (
+                <div ref={modulesMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${modulesMenuPosition.top}px`, left: `${modulesMenuPosition.left}px` }}>
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Presets</div>
                   {MASTER_PRESETS.map((preset) => (
                     <button key={preset.id} onClick={() => handleLoadMasterPreset(preset)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex flex-col">
                       <span className="font-bold">{preset.name}</span>
                       <span className="text-[10px] opacity-60">{preset.description}</span>
                     </button>
                   ))}
-                </div>
-              )}
-
-              <div ref={modulesButtonRef}>
-                <Button variant={showModulesMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowModulesMenu(!showModulesMenu)} disabled={isLoading}>Modules</Button>
-              </div>
-              {showModulesMenu && (
-                <div ref={modulesMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${modulesMenuPosition.top}px`, left: `${modulesMenuPosition.left}px` }}>
                   {!bundledModules ? (
                     <div className="px-3 py-2 text-sm text-text-muted">Loading...</div>
                   ) : (<>
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Acid / 303</div>
+                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">Acid / 303</div>
                   {bundledModules.acid.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
                   <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">TB-303 Patterns</div>
                   {bundledModules.tb303.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
