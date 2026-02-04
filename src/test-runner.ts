@@ -1919,8 +1919,7 @@ async function testEffectCreation() {
         try { (effect as any).dispose(); } catch { /* may fail */ }
       }
     } catch (e: any) {
-      const errMsg = e?.message || e?.name || e?.toString?.() || JSON.stringify(e) || 'unknown error';
-      console.error(`[EffectTest] ${name} FAILED:`, e);
+      const errMsg = e?.message || e?.name || e?.toString?.() || 'unknown error';
       logHtml(`<tr><td>${name}</td><td>${category}</td><td>-</td><td class="fail">Error: ${errMsg}</td></tr>`);
       testResults.failed++;
       testResults.errors.push({ name: `Effect: ${name}`, error: errMsg });
