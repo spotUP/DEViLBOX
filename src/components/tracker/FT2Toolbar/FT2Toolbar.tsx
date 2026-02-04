@@ -17,9 +17,10 @@ import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { useProjectPersistence } from '@hooks/useProjectPersistence';
+import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
-import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { StereoField } from '@components/visualization/StereoField';
@@ -37,6 +38,7 @@ import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/imp
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
+import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { MASTER_PRESETS, type MasterPreset } from '@constants/masterPresets';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { CURRENT_VERSION } from '@generated/changelog';
@@ -238,10 +240,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'>('logo');
+
+  // Tap Tempo
+  const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
   
   const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showPresetsMenu, setShowPresetsMenu] = useState(false);
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
+  const [showGrooveMenu, setShowGrooveMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -409,7 +415,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showFxPresetsMenu]);
 
   React.useEffect(() => {
-    if (!showModulesMenu && !showPresetsMenu && !showFxPresetsMenu) return;
+    if (!showModulesMenu && !showPresetsMenu && !showFxPresetsMenu && !showGrooveMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (showModulesMenu && modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
         setShowModulesMenu(false);
@@ -420,10 +426,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
         setShowFxPresetsMenu(false);
       }
+      // Close groove menu when clicking outside
+      if (showGrooveMenu) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.relative')) {
+          setShowGrooveMenu(false);
+        }
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showModulesMenu, showPresetsMenu, showFxPresetsMenu]);
+  }, [showModulesMenu, showPresetsMenu, showFxPresetsMenu, showGrooveMenu]);
 
   const handleSave = () => {
     try {
@@ -706,6 +719,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 <span className="ft2-numeric-label">BPM:</span>
                 <span className="ft2-numeric-value">{bpm.toString().padStart(3, '0')}</span>
               </div>
+              <Button
+                variant={tapActive ? 'primary' : 'default'}
+                size="sm"
+                onClick={handleTapTempo}
+                title={`Tap Tempo (${tapCount} taps)`}
+                className="min-w-[40px]"
+              >
+                <MousePointerClick size={14} />
+              </Button>
             </div>
             <div className="ft2-section ft2-section-pattern">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
@@ -725,6 +747,51 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               </div>
               <div className="ft2-section ft2-section-tempo">
                 <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
+                <div className="relative">
+                  <Button
+                    variant={showGrooveMenu ? 'primary' : 'default'}
+                    size="sm"
+                    onClick={() => setShowGrooveMenu(!showGrooveMenu)}
+                    title="Groove Template"
+                    className="min-w-[60px] text-xs"
+                  >
+                    {GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name?.slice(0, 8) || 'Groove'}
+                  </Button>
+                  {showGrooveMenu && (
+                    <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[200px] max-h-[300px] overflow-y-auto">
+                      {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
+                        const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
+                        if (grooves.length === 0) return null;
+                        return (
+                          <div key={category}>
+                            <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase">
+                              {category}
+                            </div>
+                            {grooves.map(groove => (
+                              <button
+                                key={groove.id}
+                                onClick={() => {
+                                  setGrooveTemplate(groove.id);
+                                  setShowGrooveMenu(false);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
+                                  groove.id === grooveTemplateId
+                                    ? 'bg-accent-primary/20 text-accent-primary'
+                                    : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+                                }`}
+                              >
+                                <span className="font-bold">{groove.name}</span>
+                                {groove.description && (
+                                  <span className="block text-[10px] opacity-60">{groove.description}</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="ft2-section ft2-section-pattern">
                 <FT2NumericInput

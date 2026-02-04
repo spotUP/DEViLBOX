@@ -2,8 +2,10 @@ import * as Tone from 'tone';
 import {
   BuzzmachineEngine,
   BuzzmachineType,
+  BUZZMACHINE_INFO,
   type BuzzmachineParameter,
 } from './BuzzmachineEngine';
+import { reportSynthError } from '../../stores/useSynthErrorStore';
 
 /**
  * BuzzmachineSynth - Tone.js wrapper for buzzmachine WASM effects
@@ -22,8 +24,9 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
   private initInProgress = false;
   private useWasmEngine = false;
 
-  // Fallback effect when WASM isn't available
-  private fallbackEffect: Tone.ToneAudioNode | null = null;
+  // Error tracking - no fallback effects, report errors instead
+  private initError: Error | null = null;
+  private errorReported: boolean = false;
 
   constructor(machineType: BuzzmachineType) {
     super();
@@ -33,8 +36,8 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // Create fallback effect
-    this.createFallbackEffect();
+    // Connect input directly to output (pass-through until WASM loads)
+    this.input.connect(this.output);
 
     // Initialize WASM engine asynchronously
     this.initEngine();
@@ -80,91 +83,53 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
         this.machineType
       );
 
+      // Disconnect pass-through
+      this.input.disconnect(this.output);
+
       // Connect worklet
       this.input.connect(this.workletNode as unknown as Tone.ToneAudioNode);
       (this.workletNode as unknown as Tone.ToneAudioNode).connect(this.output);
 
-      // Disconnect fallback
-      if (this.fallbackEffect) {
-        this.input.disconnect(this.fallbackEffect);
-        this.fallbackEffect.disconnect(this.output);
-      }
-
       this.useWasmEngine = true;
       console.log(`[BuzzmachineSynth] ${this.machineType} WASM engine active`);
     } catch (err) {
-      console.warn(`[BuzzmachineSynth] WASM init failed, using fallback:`, err);
+      this.initError = err instanceof Error ? err : new Error(String(err));
       this.useWasmEngine = false;
+      this.reportInitError();
     } finally {
       this.initInProgress = false;
     }
   }
 
+
   /**
-   * Create a fallback effect when WASM isn't available
+   * Report initialization error to the error store
    */
-  private createFallbackEffect(): void {
-    switch (this.machineType) {
-      case BuzzmachineType.ARGURU_DISTORTION:
-        // Fallback: Tone.js Distortion
-        this.fallbackEffect = new Tone.Distortion(0.5);
-        break;
+  private reportInitError(): void {
+    if (this.errorReported || !this.initError) return;
 
-      case BuzzmachineType.ELAK_SVF:
-        // Fallback: Tone.js Filter
-        this.fallbackEffect = new Tone.Filter(1000, 'lowpass', -12);
-        break;
+    this.errorReported = true;
+    const info = BUZZMACHINE_INFO[this.machineType];
 
-      default:
-        // Generic pass-through
-        this.fallbackEffect = new Tone.Gain(1);
-    }
-
-    // Connect fallback
-    this.input.connect(this.fallbackEffect);
-    this.fallbackEffect.connect(this.output);
+    reportSynthError('BuzzmachineSynth', this.initError.message, {
+      synthName: info?.name ?? this.machineType,
+      errorType: 'wasm',
+      error: this.initError,
+      debugData: {
+        machineType: this.machineType,
+        machineKind: info?.type,
+        wasmSupported: typeof WebAssembly !== 'undefined',
+      },
+    });
   }
 
   /**
    * Set a parameter value
    */
   public setParameter(paramIndex: number, value: number): void {
+    // If WASM not available, error was already reported at init
     if (this.useWasmEngine && this.workletNode) {
       this.engine.setParameter(this.workletNode, paramIndex, value);
-    } else {
-      // Map to fallback effect parameters
-      this.setFallbackParameter(paramIndex, value);
-    }
-  }
-
-  /**
-   * Set parameter on fallback effect
-   */
-  private setFallbackParameter(paramIndex: number, value: number): void {
-    if (!this.fallbackEffect) return;
-
-    switch (this.machineType) {
-      case BuzzmachineType.ARGURU_DISTORTION:
-        if (paramIndex === 3 && this.fallbackEffect instanceof Tone.Distortion) {
-          // Map output gain (index 3) to distortion amount
-          const normalizedValue = value / 0x0800;
-          this.fallbackEffect.distortion = normalizedValue;
-        }
-        break;
-
-      case BuzzmachineType.ELAK_SVF:
-        if (this.fallbackEffect instanceof Tone.Filter) {
-          if (paramIndex === 0) {
-            // Cutoff frequency (0-1000 range)
-            const freqHz = 20 + (value / 1000) * 20000;
-            this.fallbackEffect.frequency.value = freqHz;
-          } else if (paramIndex === 1) {
-            // Resonance (0-0xFFFE range)
-            const q = 1 + (value / 0xFFFE) * 30;
-            this.fallbackEffect.Q.value = q;
-          }
-        }
-        break;
     }
   }
 
@@ -192,10 +157,6 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
     super.dispose();
     this.input.dispose();
     this.output.dispose();
-
-    if (this.fallbackEffect) {
-      this.fallbackEffect.dispose();
-    }
 
     if (this.workletNode) {
       this.workletNode.disconnect();

@@ -1,29 +1,43 @@
 /**
  * NKS Settings Panel Component
- * 
+ *
  * UI for configuring NKS hardware and presets
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNKSStore } from '@/midi/nks/NKSManager';
 import { getNKSHardwareController, isNKSHardwareAvailable } from '@/midi/nks/NKSHardwareController';
+import { formatNKSValue } from '@/midi/nks/synthParameterMaps';
 import type { NKSControllerInfo } from '@/midi/nks/types';
-import { 
-  sendMPKLCDDisplay, 
-  setMPKRainbowPattern, 
+import {
+  sendMPKLCDDisplay,
+  setMPKRainbowPattern,
   clearMPKPadLEDs,
   sendMPKOLEDBitmap,
   sendMPKTestPattern,
-  canvasToBitmap
+  canvasToBitmap,
 } from '@/midi/nks/AkaiMIDIProtocol';
+import { useNKSCurrentInstrumentSync } from '@hooks/useNKSIntegration';
+import { Knob } from '@components/controls/Knob';
 
 export const NKSSettingsPanel: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<NKSControllerInfo | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const { currentPreset, currentPage, totalPages } = useNKSStore();
+
+  // Enable bidirectional sync with current instrument
+  useNKSCurrentInstrumentSync();
+
+  const {
+    currentPreset,
+    currentPage,
+    totalPages,
+    currentSynthType,
+    pages,
+    parameterValues,
+    setParameterValue,
+  } = useNKSStore();
   
   const controller = getNKSHardwareController();
   
@@ -134,9 +148,10 @@ export const NKSSettingsPanel: React.FC = () => {
     <div className="nks-settings-panel p-4 bg-gray-800 rounded-lg space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">
-          Native Kontrol Standard
-        </h3>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Native Kontrol Standard</h3>
+          <div className="text-xs text-cyan-400 mt-0.5">{currentSynthType}</div>
+        </div>
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${deviceInfo ? 'bg-green-500' : 'bg-gray-500'}`} />
           <span className="text-xs text-gray-400">
@@ -210,7 +225,9 @@ export const NKSSettingsPanel: React.FC = () => {
       
       {/* Page Navigation */}
       <div className="space-y-2">
-        <div className="text-xs font-medium text-gray-400 uppercase">Parameter Pages</div>
+        <div className="text-xs font-medium text-gray-400 uppercase">
+          Parameter Pages - {pages[currentPage]?.name || 'Page'}
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handlePreviousPage}
@@ -231,6 +248,42 @@ export const NKSSettingsPanel: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Current Page Parameters */}
+      {pages[currentPage] && (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-gray-400 uppercase">Parameters</div>
+          <div className="bg-gray-700/50 rounded-lg p-3">
+            <div className="grid grid-cols-4 gap-3">
+              {pages[currentPage].parameters.slice(0, 8).map((param) => {
+                const value = parameterValues[param.id] ?? param.defaultValue;
+                const displayValue = formatNKSValue(param, value);
+
+                return (
+                  <div key={param.id} className="flex flex-col items-center">
+                    <Knob
+                      value={value * (param.max - param.min) + param.min}
+                      min={param.min}
+                      max={param.max}
+                      onChange={(v) => {
+                        // Normalize to 0-1 range for NKS
+                        const normalized = (v - param.min) / (param.max - param.min);
+                        setParameterValue(param.id, normalized);
+                      }}
+                      label={param.name}
+                      color="#00ffff"
+                      size="sm"
+                    />
+                    <div className="text-[10px] text-gray-400 mt-1 text-center truncate w-full">
+                      {displayValue}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Light Guide Controls */}
       {deviceInfo?.hasLightGuide && (

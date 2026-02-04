@@ -152,13 +152,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
     <div 
       ref={containerRef}
       className="w-full overflow-visible flex justify-center py-4 select-none"
-      style={{ minHeight: `${(isBuzz3o3 ? 235 : 363) * scale + 32}px` }}
+      style={{ minHeight: `${(isBuzz3o3 ? 340 : 363) * scale + 32}px` }}
     >
-      <div 
+      <div
         className="relative bg-[#1a1a1a] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-b-8 border-r-4 border-black/40 overflow-hidden"
-        style={{ 
-          width: '930px', 
-          height: isBuzz3o3 ? '235px' : '363px', 
+        style={{
+          width: '930px',
+          height: isBuzz3o3 ? '340px' : '363px', 
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
           background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
@@ -170,7 +170,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           <div className="absolute top-0 left-0 right-0 h-1 bg-black/20"></div>
           {/* Main section dividers */}
           <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
-          {!isBuzz3o3 && <div className="absolute top-[230px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>}
+          {/* Section divider for second row */}
+          <div className="absolute top-[230px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           
           {/* Group Labels */}
           <div style={labelStyle(40, 115, 100)} className="text-accent-primary opacity-80">Oscillator</div>
@@ -476,6 +477,96 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
                   : "bg-orange-950"
               )}
             ></div>
+          </>
+        )}
+
+        {/* --- ROW 2: BUZZ3O3 EFFECTS (External Effects Chain) --- */}
+        {isBuzz3o3 && (
+          <>
+            {/* Section Label */}
+            <div style={labelStyle(40, 238, 500)} className="text-cyan-500/70">External Effects Chain</div>
+
+            {/* Overdrive Enable Toggle */}
+            <div style={style(52, 273, 50, 45)} className="flex flex-col items-center">
+              <Toggle
+                label=""
+                value={(config.overdrive?.amount ?? 0) > 0}
+                onChange={(v) => updateOverdrive('amount', v ? 50 : 0)}
+                color="#00ffff"
+                size="sm"
+              />
+              <span className="text-[8px] font-bold text-cyan-500 mt-1">DRIVE</span>
+            </div>
+
+            {/* Overdrive LED */}
+            <div
+              style={style(82, 243, 12, 12)}
+              className={clsx(
+                "rounded-full border border-black/40 transition-all duration-300",
+                (config.overdrive?.amount ?? 0) > 0
+                  ? "bg-cyan-500 shadow-[0_0_10px_#06b6d4]"
+                  : "bg-cyan-950"
+              )}
+            ></div>
+
+            {/* Overdrive Amount */}
+            <div style={{ ...style(147, 273, 35, 35), opacity: (config.overdrive?.amount ?? 0) > 0 ? 1 : 0.3 }}>
+              <Knob
+                value={config.overdrive?.amount || 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateOverdrive('amount', v)}
+                label="Amount"
+                size="sm"
+                color="#00ffff"
+              />
+            </div>
+
+            {/* Muffler Mode */}
+            <div style={style(220, 268, 100, 50)} className="flex flex-col">
+              <label className="text-[8px] font-bold text-cyan-500/70 mb-1 ml-1">MUFFLER</label>
+              <select
+                value={config.devilFish?.muffler ?? 'off'}
+                onChange={(e) => updateDevilFish('muffler', e.target.value)}
+                className="bg-[#111] text-[10px] text-cyan-400 border border-cyan-900/30 rounded px-1 py-1 outline-none focus:border-cyan-500"
+              >
+                <option value="off">Off</option>
+                <option value="dark">Dark</option>
+                <option value="mid">Mid</option>
+                <option value="bright">Bright</option>
+              </select>
+            </div>
+
+            {/* High Resonance Toggle */}
+            <div style={style(340, 273, 50, 45)} className="flex flex-col items-center">
+              <Toggle
+                label=""
+                value={config.devilFish?.highResonance ?? false}
+                onChange={(v) => updateDevilFish('highResonance', v)}
+                color="#00ffff"
+                size="sm"
+              />
+              <span className="text-[8px] font-bold text-cyan-500 mt-1">HI-Q</span>
+            </div>
+
+            {/* Filter Tracking */}
+            <div style={style(420, 273, 35, 35)}>
+              <Knob
+                value={config.devilFish?.filterTracking ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateDevilFish('filterTracking', v)}
+                label="F.Trk"
+                size="sm"
+                color="#00ffff"
+              />
+            </div>
+
+            {/* Info Label */}
+            <div style={style(500, 268, 200, 50)} className="flex flex-col justify-center text-[9px] text-gray-500">
+              <span>Oomek Aggressor WASM</span>
+              <span className="text-cyan-600">+ Tone.js Effects Chain</span>
+            </div>
           </>
         )}
 

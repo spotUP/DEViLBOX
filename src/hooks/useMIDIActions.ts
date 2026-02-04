@@ -144,11 +144,13 @@ export function useMIDIActions() {
       const engine = getToneEngine();
       const ccManager = getCCMapManager();
 
-      // Get the controlled instrument ID (null means all TB-303s)
+      // Get the controlled instrument ID (null means all TB-303s/Buzz3o3s)
       const controlledId = ccManager.getControlledInstrument();
 
-      // Find target instruments
-      let targetInstruments = instruments.filter(i => i.synthType === 'TB303' && i.tb303);
+      // Find target instruments (TB303 or Buzz3o3 with tb303 config)
+      let targetInstruments = instruments.filter(i =>
+        (i.synthType === 'TB303' || i.synthType === 'Buzz3o3') && i.tb303
+      );
 
       // If a specific instrument is selected, filter to just that one
       if (controlledId !== null) {
@@ -156,7 +158,7 @@ export function useMIDIActions() {
         if (specificInst && specificInst.tb303) {
           targetInstruments = [specificInst];
         } else if (specificInst) {
-          // Selected instrument is not a TB-303, skip
+          // Selected instrument is not a TB-303/Buzz3o3, skip
           return;
         }
       }

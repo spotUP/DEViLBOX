@@ -3,10 +3,13 @@
  * Supports multiple instances via handles.
  */
 export const MAMESynthType = {
-  VFX: 'vfx',
-  DOC: 'doc',
-  RSA: 'rsa',
-  SWP30: 'swp30',
+  VFX: 'vfx',           // ES5506 (Ensoniq VFX/TS-10)
+  DOC: 'doc',           // ES5503 (Ensoniq DOC/Mirage)
+  RSA: 'rsa',           // Roland SA (D-50/D-550)
+  SWP30: 'swp30',       // Yamaha SWP30 (MU-2000)
+  SEGAPCM: 'segapcm',   // Sega PCM (Out Run, After Burner)
+  GA20: 'ga20',         // Irem GA20 (R-Type Leo, In The Hunt)
+  UPD933: 'upd933',     // Casio CZ Phase Distortion (CZ-101/1000)
 } as const;
 
 export type MAMESynthType = typeof MAMESynthType[keyof typeof MAMESynthType];
@@ -15,7 +18,10 @@ const TYPE_MAP: Record<MAMESynthType, number> = {
   'vfx': 0,
   'doc': 1,
   'rsa': 2,
-  'swp30': 3
+  'swp30': 3,
+  'segapcm': 4,
+  'ga20': 5,
+  'upd933': 6
 };
 
 export class MAMEEngine {
@@ -38,20 +44,31 @@ export class MAMEEngine {
   public async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    return new Promise((resolve, reject) => {
-      // @ts-ignore
-      if (typeof window !== 'undefined' && (window as any).MAMEChips) {
-        // @ts-ignore
-        (window as any).MAMEChips().then((mod: any) => {
-          this.module = mod;
-          this.isInitialized = true;
-          console.log('🎹 MAMEEngine: WASM Module Loaded (Multi-Instance)');
-          resolve();
-        }).catch(reject);
-      } else {
-        reject(new Error('MAMEChips script not found in window'));
-      }
-    });
+    const baseUrl = import.meta.env?.BASE_URL || '/';
+
+    try {
+      // Load the Emscripten module JS code
+      const response = await fetch(`${baseUrl}mame/MAMEChips.js`);
+      const jsCode = await response.text();
+
+      // Evaluate the IIFE and extract the MAMEChips factory function
+      // The Emscripten-generated code is an IIFE that assigns to var MAMEChips
+      // We wrap it to capture and return the function
+      const wrappedCode = `${jsCode}; return MAMEChips;`;
+      const moduleFactory = new Function(wrappedCode)();
+
+      // Fetch WASM binary
+      const wasmResponse = await fetch(`${baseUrl}mame/MAMEChips.wasm`);
+      const wasmBinary = await wasmResponse.arrayBuffer();
+
+      // Initialize the module
+      this.module = await moduleFactory({ wasmBinary });
+      this.isInitialized = true;
+      console.log('🎹 MAMEEngine: WASM Module Loaded (Multi-Instance)');
+    } catch (err) {
+      console.error('MAMEEngine init failed:', err);
+      throw new Error(`MAMEChips WASM failed to load: ${err}`);
+    }
   }
 
   /**

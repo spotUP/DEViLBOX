@@ -14,6 +14,7 @@ import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
+import { ParameterEditor } from './ParameterEditor';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
@@ -116,19 +117,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
 
   // Get pattern and actions
-  const { 
-    pattern, 
-    addChannel, 
-    removeChannel, 
-    toggleChannelMute, 
-    toggleChannelSolo, 
-    setChannelColor, 
-    setCell, 
-    moveCursorToChannel, 
-    copyTrack, 
-    cutTrack, 
+  const {
+    pattern,
+    addChannel,
+    removeChannel,
+    toggleChannelMute,
+    toggleChannelSolo,
+    setChannelColor,
+    setCell,
+    moveCursorToChannel,
+    copyTrack,
+    cutTrack,
     pasteTrack,
-    mobileChannelIndex
+    mobileChannelIndex,
+    cursor,
+    selection
   } = useTrackerStore(useShallow((state) => ({
     pattern: state.patterns[state.currentPatternIndex],
     addChannel: state.addChannel,
@@ -142,6 +145,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     cutTrack: state.cutTrack,
     pasteTrack: state.pasteTrack,
     mobileChannelIndex: state.cursor.channelIndex,
+    cursor: state.cursor,
+    selection: state.selection,
   })));
 
   // Audio-synced display state ref (BassoonTracker pattern)
@@ -158,6 +163,32 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
   // Cell context menu
   const cellContextMenu = useCellContextMenu();
+
+  // Visual Parameter Editor state
+  const [parameterEditorState, setParameterEditorState] = useState<{
+    isOpen: boolean;
+    field: 'volume' | 'effect' | 'effectParam';
+    channelIndex: number;
+    startRow: number;
+    endRow: number;
+  } | null>(null);
+
+  // Handler for opening parameter editor from context menu
+  const handleOpenParameterEditor = useCallback((field: 'volume' | 'effect' | 'effectParam') => {
+    const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cursor.channelIndex;
+    // Use selection if available, otherwise use 16 rows from current position
+    const start = selection?.startRow ?? cursor.rowIndex;
+    const end = selection?.endRow ?? Math.min(cursor.rowIndex + 15, pattern.length - 1);
+
+    setParameterEditorState({
+      isOpen: true,
+      field,
+      channelIndex: channelIdx,
+      startRow: start,
+      endRow: end,
+    });
+    cellContextMenu.closeMenu();
+  }, [cellContextMenu, cursor, selection, pattern.length]);
 
   // Clear caches when theme changes
   useEffect(() => {
@@ -959,8 +990,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       >
         {/* VU Meters overlay */}
         <div
-          className="absolute left-0 right-0 pointer-events-none z-20"
-          style={{ top: 0, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
+          className="absolute right-0 pointer-events-none z-20 overflow-hidden"
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
         >
           <ChannelVUMeters />
         </div>
@@ -981,7 +1012,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           onClose={cellContextMenu.closeMenu}
           channelIndex={cellContextMenu.cellInfo?.channelIndex ?? 0}
           rowIndex={cellContextMenu.cellInfo?.rowIndex ?? 0}
+          onOpenParameterEditor={handleOpenParameterEditor}
         />
+
+        {/* Visual Parameter Editor */}
+        {parameterEditorState?.isOpen && (
+          <ParameterEditor
+            onClose={() => setParameterEditorState(null)}
+            channelIndex={parameterEditorState.channelIndex}
+            startRow={parameterEditorState.startRow}
+            endRow={parameterEditorState.endRow}
+            field={parameterEditorState.field}
+          />
+        )}
       </div>
 
       {/* Status Bar */}

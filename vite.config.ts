@@ -52,12 +52,14 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['chiptune3'],
+    // Don't scan Reference Code folder for dependencies
+    entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },
   server: {
     // Reduce resource usage for better performance when running multiple servers
     watch: {
       usePolling: false, // Disable polling to reduce CPU usage
-      ignored: ['**/node_modules/**', '**/dist/**'],
+      ignored: ['**/node_modules/**', '**/dist/**', '**/Reference Code/**'],
     },
     hmr: {
       overlay: false, // Reduce DOM operations

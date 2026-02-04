@@ -218,10 +218,11 @@ export class AutomationPlayer {
     if (!instrument) {
       instrument = engine.instruments.get(`${instrumentId}-${-1}`);
     }
-    // Also try iterating to find any matching TB303 for this instrumentId
+    // Also try iterating to find any matching TB303/Buzz3o3 for this instrumentId
     if (!instrument) {
       for (const [key, inst] of engine.instruments.entries()) {
-        if (key.startsWith(`${instrumentId}-`) && (inst instanceof JC303Synth)) {
+        if (key.startsWith(`${instrumentId}-`) &&
+            (inst instanceof JC303Synth || inst.constructor.name === 'BuzzmachineGenerator')) {
           instrument = inst;
           break;
         }
@@ -230,8 +231,8 @@ export class AutomationPlayer {
     if (!instrument) return;
 
     try {
-      // Check if this is a TB303Synth - use its dedicated methods
-      const isTB303 = instrument instanceof JC303Synth;
+      // Check if this is a TB303-style synth (JC303Synth or Buzz3o3) - use its dedicated methods
+      const isTB303 = instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator';
 
       switch (parameter) {
         case 'cutoff':

@@ -2,7 +2,8 @@
  * FurnaceChipEngine - Centralized manager for WASM-based chip emulators
  */
 
-import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
+import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import { getNativeContext } from '@utils/audio-context';
 
 export const FurnaceChipType = {
   // === FM CHIPS ===
@@ -142,32 +143,35 @@ export class FurnaceChipEngine {
 
   private async doInit(audioContext: unknown): Promise<void> {
     try {
-      // Robustly get native context using unified utility
+      // Get rawContext from Tone.js context (standardized-audio-context)
+      const toneCtx = audioContext as any;
+      const rawContext = toneCtx.rawContext || toneCtx._context || audioContext;
+      // Also get native context for compatibility checks
       const nativeCtx = getNativeContext(audioContext);
 
-      // Validate we found a native context
-      if (!nativeCtx || !nativeCtx.audioWorklet) {
-        console.warn('[FurnaceChipEngine] Invalid audio context - no native audioWorklet');
+      // Validate we found a valid context
+      if (!rawContext || !rawContext.audioWorklet) {
+        console.warn('[FurnaceChipEngine] Invalid audio context - no audioWorklet');
         this.initPromise = null; // Allow retry
         return;
       }
 
       // Ensure context is running
-      if (nativeCtx.state !== 'running') {
-        console.log('[FurnaceChipEngine] AudioContext state:', nativeCtx.state, '- will retry later');
+      if (rawContext.state !== 'running') {
+        console.log('[FurnaceChipEngine] AudioContext state:', rawContext.state, '- will retry later');
         this.initPromise = null;
         return;
       }
 
-      console.log('[FurnaceChipEngine] Native AudioContext ready, state:', nativeCtx.state);
+      console.log('[FurnaceChipEngine] AudioContext ready, state:', rawContext.state);
 
       const baseUrl = import.meta.env.BASE_URL || '/';
 
-      // Add worklet module to the NATIVE context (not the wrapper!)
+      // Add worklet module to the rawContext (standardized-audio-context)
       const workletUrl = `${baseUrl}FurnaceChips.worklet.js`;
       try {
-        await nativeCtx.audioWorklet.addModule(workletUrl);
-        console.log('[FurnaceChipEngine] Worklet module loaded to native context');
+        await rawContext.audioWorklet.addModule(workletUrl);
+        console.log('[FurnaceChipEngine] Worklet module loaded');
       } catch (err: any) {
         // Check if it's "already registered" vs actual error
         if (err?.message?.includes('already') || err?.name === 'InvalidStateError') {
@@ -212,17 +216,17 @@ export class FurnaceChipEngine {
         // Store native context reference for diagnostics
         this.nativeContext = nativeCtx;
 
-        // Use native context directly for node creation
+        // Use Tone.js's createAudioWorkletNode with rawContext (standardized-audio-context)
         // Explicitly set output configuration for stereo
-        this.workletNode = createAudioWorkletNode(nativeCtx, 'furnace-chips-processor', {
+        this.workletNode = toneCreateAudioWorkletNode(rawContext, 'furnace-chips-processor', {
           numberOfOutputs: 1,
           outputChannelCount: [2],
         });
-        
+
         if (this.workletNode) {
-          // Connect worklet output directly to speakers (its own AudioContext destination)
-          this.workletNode.connect(nativeCtx.destination);
-          console.log('[FurnaceChipEngine] AudioWorkletNode created and connected to destination, ctx state:', this.nativeContext.state);
+          // Connect worklet output directly to destination
+          this.workletNode.connect(rawContext.destination);
+          console.log('[FurnaceChipEngine] AudioWorkletNode created and connected to destination, ctx state:', rawContext.state);
         }
       } catch (err) {
         console.error('[FurnaceChipEngine] AudioWorkletNode creation failed:', err);
@@ -264,11 +268,12 @@ export class FurnaceChipEngine {
         this.isLoaded = true;
         console.log('[FurnaceChipEngine] ✓ WASM chips initialized successfully');
 
-        // Message handler for status only (debug/heartbeat logging disabled for performance)
+        // Message handler for debug and status messages from worklet
         this.workletNode!.port.addEventListener('message', (event: MessageEvent) => {
-          // Debug and heartbeat messages silenced for performance
-          if (event.data.type === 'status') {
-            // Status logging disabled for performance
+          if (event.data.type === 'debug') {
+            console.log('[FurnaceWorklet]', event.data.message, event.data);
+          } else if (event.data.type === 'status') {
+            console.log('[FurnaceWorklet] Status:', event.data);
           }
         });
 

@@ -7,7 +7,8 @@
  * Similar architecture to FurnaceChipEngine.ts
  */
 
-import { createAudioWorkletNode } from '@utils/audio-context';
+import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import { getNativeContext } from '@utils/audio-context';
 
 export const BuzzmachineType = {
   // Distortion/Saturation
@@ -49,6 +50,7 @@ export const BuzzmachineType = {
   JESKOLA_TRILOK: 'JeskolaTrilok',
   JESKOLA_NOISE: 'JeskolaNoise',
   OOMEK_AGGRESSOR: 'OomekAggressor',
+  OOMEK_AGGRESSOR_DF: 'OomekAggressorDF', // Devil Fish enhanced 303
   MADBRAIN_4FM2F: 'MadBrain4FM2F',
   MADBRAIN_DYNAMITE6: 'MadBrainDynamite6',
   MAKK_M3: 'MakkM3',
@@ -199,7 +201,244 @@ export const BUZZMACHINE_INFO: Record<BuzzmachineType, BuzzmachineInfo> = {
     shortName: 'Aggressor',
     author: 'Oomek',
     type: 'generator',
-    parameters: [],
+    parameters: [
+      // Global parameters (TB-303 style controls)
+      {
+        index: 0,
+        name: 'Osc Type',
+        description: 'Oscillator type (0 = Saw, 1 = Square)',
+        minValue: 0,
+        maxValue: 1,
+        defaultValue: 0,
+        type: 'byte',
+      },
+      {
+        index: 1,
+        name: 'Cutoff',
+        description: 'Filter cutoff frequency',
+        minValue: 0x00,
+        maxValue: 0xF0,
+        defaultValue: 0x78,
+        type: 'byte',
+      },
+      {
+        index: 2,
+        name: 'Resonance',
+        description: 'Filter resonance',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 3,
+        name: 'Env Mod',
+        description: 'Envelope modulation depth',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 4,
+        name: 'Decay',
+        description: 'Envelope decay time',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 5,
+        name: 'Accent Level',
+        description: 'Accent level boost',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 6,
+        name: 'Finetune',
+        description: 'Fine tuning in cents (-100 to +100)',
+        minValue: 0x00,
+        maxValue: 0xC8,
+        defaultValue: 0x64, // 100 = center (0 cents)
+        type: 'byte',
+      },
+      {
+        index: 7,
+        name: 'Volume',
+        description: 'Output volume',
+        minValue: 0x00,
+        maxValue: 0xC8,
+        defaultValue: 0x64, // 100%
+        type: 'byte',
+      },
+    ],
+  },
+  [BuzzmachineType.OOMEK_AGGRESSOR_DF]: {
+    name: 'Oomek Aggressor Devil Fish',
+    shortName: 'AggressorDF',
+    author: 'Oomek + Devil Fish Mods',
+    type: 'generator',
+    parameters: [
+      // Original global parameters (0-7)
+      {
+        index: 0,
+        name: 'Osc Type',
+        description: 'Oscillator type (0 = Saw, 1 = Square)',
+        minValue: 0,
+        maxValue: 1,
+        defaultValue: 0,
+        type: 'byte',
+      },
+      {
+        index: 1,
+        name: 'Cutoff',
+        description: 'Filter cutoff frequency',
+        minValue: 0x00,
+        maxValue: 0xF0,
+        defaultValue: 0x78,
+        type: 'byte',
+      },
+      {
+        index: 2,
+        name: 'Resonance',
+        description: 'Filter resonance',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 3,
+        name: 'Env Mod',
+        description: 'Envelope modulation depth',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 4,
+        name: 'Decay',
+        description: 'Normal envelope decay time',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 5,
+        name: 'Accent Level',
+        description: 'Accent level boost',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 6,
+        name: 'Finetune',
+        description: 'Fine tuning in cents (-100 to +100)',
+        minValue: 0x00,
+        maxValue: 0xC8,
+        defaultValue: 0x64, // 100 = center (0 cents)
+        type: 'byte',
+      },
+      {
+        index: 7,
+        name: 'Volume',
+        description: 'Output volume',
+        minValue: 0x00,
+        maxValue: 0xC8,
+        defaultValue: 0x64, // 100%
+        type: 'byte',
+      },
+      // Devil Fish parameters (8-16)
+      {
+        index: 8,
+        name: 'Accent Decay',
+        description: 'Accent envelope decay time (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x40,
+        type: 'byte',
+      },
+      {
+        index: 9,
+        name: 'VEG Decay',
+        description: 'Volume envelope decay (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x80,
+        defaultValue: 0x60,
+        type: 'byte',
+      },
+      {
+        index: 10,
+        name: 'VEG Sustain',
+        description: 'Volume envelope sustain 0-100% (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x64,
+        defaultValue: 0x00,
+        type: 'byte',
+      },
+      {
+        index: 11,
+        name: 'Soft Attack',
+        description: 'Soft attack time 0.3-30ms (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x64,
+        defaultValue: 0x00,
+        type: 'byte',
+      },
+      {
+        index: 12,
+        name: 'Filter Tracking',
+        description: 'Filter tracking 0-200% (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0xC8,
+        defaultValue: 0x00,
+        type: 'byte',
+      },
+      {
+        index: 13,
+        name: 'High Resonance',
+        description: 'High resonance mode - self oscillation (Devil Fish)',
+        minValue: 0,
+        maxValue: 1,
+        defaultValue: 0,
+        type: 'byte',
+      },
+      {
+        index: 14,
+        name: 'Slide Time',
+        description: 'Slide/glide time 10-500ms (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x64,
+        defaultValue: 0x1E, // ~60ms (original 303)
+        type: 'byte',
+      },
+      {
+        index: 15,
+        name: 'Muffler',
+        description: 'Output soft clipping 0=off, 1=soft, 2=hard (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x02,
+        defaultValue: 0x00,
+        type: 'byte',
+      },
+      {
+        index: 16,
+        name: 'Sweep Speed',
+        description: 'Accent sweep speed 0=fast, 1=normal, 2=slow (Devil Fish)',
+        minValue: 0x00,
+        maxValue: 0x02,
+        defaultValue: 0x01,
+        type: 'byte',
+      },
+    ],
   },
   [BuzzmachineType.MADBRAIN_4FM2F]: {
     name: 'MadBrain 4FM2F',
@@ -424,16 +663,18 @@ export class BuzzmachineEngine {
 
   private async doInit(context: AudioContext): Promise<void> {
     try {
-      this.nativeContext = context;
+      // Extract native context from Tone.js wrapper if needed
+      const nativeCtx = getNativeContext(context);
+      this.nativeContext = nativeCtx;
 
       // Check if AudioWorklet is available
-      if (!context.audioWorklet) {
+      if (!nativeCtx.audioWorklet) {
         throw new Error('AudioWorklet not supported in this context');
       }
 
       // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
       const baseUrl = import.meta.env.BASE_URL || '/';
-      await context.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js`);
+      await nativeCtx.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js`);
       console.log('[BuzzmachineEngine] AudioWorklet registered');
 
       this.isLoaded = true;
@@ -461,8 +702,9 @@ export class BuzzmachineEngine {
       await this.init(context);
     }
 
-    // Use unified helper to create node (handles wrappers correctly)
-    const workletNode = createAudioWorkletNode(context, 'buzzmachine-processor', {
+    // Use Tone.js's createAudioWorkletNode for standardized-audio-context compatibility
+    const nativeCtx = getNativeContext(context);
+    const workletNode = toneCreateAudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [2],
@@ -562,6 +804,7 @@ export class BuzzmachineEngine {
       [BuzzmachineType.JESKOLA_TRILOK]: 'Jeskola_Trilok',
       [BuzzmachineType.JESKOLA_NOISE]: 'Jeskola_Noise',
       [BuzzmachineType.OOMEK_AGGRESSOR]: 'Oomek_Aggressor',
+      [BuzzmachineType.OOMEK_AGGRESSOR_DF]: 'Oomek_Aggressor_DF',
       [BuzzmachineType.MADBRAIN_4FM2F]: 'MadBrain_4FM2F',
       [BuzzmachineType.MADBRAIN_DYNAMITE6]: 'MadBrain_Dynamite6',
       [BuzzmachineType.MAKK_M3]: 'Makk_M3',

@@ -1,19 +1,28 @@
 /**
  * NKS (Native Kontrol Standard) Integration
- * 
+ *
  * Complete implementation of Native Instruments' NKS specification
  */
 
 export * from './types';
 export * from './NKSFileFormat';
-export * from './parameterMap';
+export * from './synthParameterMaps';
 export * from './NKSManager';
 export * from './NKSHIDProtocol';
 export * from './NKSHardwareController';
+export * from './presetIntegration';
 
 // Convenience exports
 export { useNKSStore, getNKSManager } from './NKSManager';
-export { TB303_NKS_PARAMETERS, TB303_NKS_PAGES } from './parameterMap';
+export {
+  getNKSParametersForSynth,
+  buildNKSPages,
+  formatNKSValue,
+  SYNTH_PARAMETER_MAPS,
+  TB303_NKS_PARAMETERS,
+  DEXED_NKS_PARAMETERS,
+  OBXD_NKS_PARAMETERS,
+} from './synthParameterMaps';
 export { parseNKSF, writeNKSF, loadNKSF, downloadNKSF } from './NKSFileFormat';
 export { getNKSHardwareController, isNKSHardwareAvailable } from './NKSHardwareController';
 export { 

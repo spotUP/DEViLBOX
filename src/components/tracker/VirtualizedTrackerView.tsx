@@ -265,13 +265,23 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
                 </div>
               </div>
               <div className="h-1/2 w-full relative bg-dark-bg/20 overflow-hidden">
-                <div className="absolute inset-0 px-1 py-0.5 opacity-50">
-                  <ChannelVUMeters />
-                </div>
+                {/* VU meters rendered once as overlay outside this loop */}
               </div>
             </div>
           );
         })}
+        {/* VU Meters Overlay - positioned over channel headers */}
+        <div
+          className="absolute pointer-events-none z-40 overflow-hidden"
+          style={{
+            top: HEADER_HEIGHT / 2,
+            left: ROW_NUMBER_WIDTH,
+            right: 0,
+            height: HEADER_HEIGHT / 2,
+          }}
+        >
+          <ChannelVUMeters channelWidth={COLUMN_WIDTH_BASE} />
+        </div>
       </div>
 
       {/* 2. VIRTUALIZED AREA */}

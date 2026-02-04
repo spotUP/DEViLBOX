@@ -107,6 +107,7 @@ export interface ChannelData {
   pan: number; // -100 to 100
   instrumentId: number | null;
   color: string | null; // Channel background color (CSS color value)
+  recordGroup?: 0 | 1 | 2; // OpenMPT-style record group (0 = none, 1 = group 1, 2 = group 2)
   channelMeta?: {
     importedFromMOD: boolean;
     originalIndex?: number; // Original position in MOD/XM

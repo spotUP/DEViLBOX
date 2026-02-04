@@ -1,15 +1,20 @@
 /**
  * SavePresetDialog - Modal dialog for saving user presets
+ *
+ * Features:
+ * - Save to local preset library
+ * - Export as NKS (.nksf) for Native Instruments hardware
  */
 
 import React, { useState } from 'react';
 import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { X, Save, Tag } from 'lucide-react';
+import { X, Save, Tag, Download } from 'lucide-react';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
+import { downloadAsNKSF } from '@/midi/nks/presetIntegration';
 
 interface SavePresetDialogProps {
   instrument: InstrumentConfig;
@@ -33,12 +38,38 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
   const [category, setCategory] = useState<PresetCategory>('User');
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
+  const [exportAsNKS, setExportAsNKS] = useState(false);
 
   const handleSave = () => {
     if (!name.trim()) return;
 
+    // Save to local preset library
     savePreset(instrument, name.trim(), category, tags);
+
+    // Also export as .nksf if requested
+    if (exportAsNKS) {
+      downloadAsNKSF(instrument, {
+        name: name.trim(),
+        category,
+        tags,
+        author: 'DEViLBOX User',
+        comment: `${instrument.synthType} preset`,
+      });
+    }
+
     onClose();
+  };
+
+  const handleExportOnlyNKS = () => {
+    if (!name.trim()) return;
+
+    downloadAsNKSF(instrument, {
+      name: name.trim(),
+      category,
+      tags,
+      author: 'DEViLBOX User',
+      comment: `${instrument.synthType} preset`,
+    });
   };
 
   const handleAddTag = (tag: string) => {
@@ -186,6 +217,26 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
             </div>
           </div>
 
+          {/* NKS Export Option */}
+          <div className="border-t border-dark-border pt-4">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={exportAsNKS}
+                onChange={(e) => setExportAsNKS(e.target.checked)}
+                className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary/50"
+              />
+              <div>
+                <div className="text-sm text-text-primary group-hover:text-accent-primary transition-colors">
+                  Also export as .nksf file
+                </div>
+                <div className="text-xs text-text-muted">
+                  For Native Instruments Komplete Kontrol hardware
+                </div>
+              </div>
+            </label>
+          </div>
+
           {/* Synth Info */}
           <div className="text-xs text-text-muted bg-dark-bg/50 rounded-lg p-3">
             <p>
@@ -202,10 +253,20 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
           Cancel
         </Button>
         <Button
+          variant="default"
+          onClick={handleExportOnlyNKS}
+          disabled={!name.trim()}
+          title="Download as .nksf file only (won't save to library)"
+        >
+          <Download size={14} className="mr-1" />
+          Export NKS
+        </Button>
+        <Button
           variant="primary"
           onClick={handleSave}
           disabled={!name.trim()}
         >
+          <Save size={14} className="mr-1" />
           Save Preset
         </Button>
       </ModalFooter>

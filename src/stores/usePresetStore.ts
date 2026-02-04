@@ -1,11 +1,22 @@
 /**
  * Preset Store - User Preset Management with LocalStorage persistence
+ *
+ * Supports:
+ * - User preset save/load with LocalStorage
+ * - NKS (.nksf) format import/export for NI hardware
+ * - Batch operations for preset management
  */
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+import {
+  userPresetToNKSPreset,
+  batchExportToNKS,
+  batchImportNKSF,
+} from '@/midi/nks/presetIntegration';
+import { writeNKSF } from '@/midi/nks/NKSFileFormat';
 
 export type PresetCategory = 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX' | 'User';
 
@@ -44,6 +55,11 @@ interface PresetStore {
   clearRecent: () => void;
   importPresets: (presets: UserPreset[]) => void;
   exportPresets: () => UserPreset[];
+
+  // NKS Integration
+  exportPresetAsNKSF: (presetId: string) => void;
+  exportAllPresetsAsNKSF: (author?: string) => void;
+  importNKSFFiles: (files: File[]) => Promise<string[]>;
 }
 
 export const usePresetStore = create<PresetStore>()(
@@ -168,6 +184,96 @@ export const usePresetStore = create<PresetStore>()(
       // Export all user presets
       exportPresets: () => {
         return get().userPresets;
+      },
+
+      // NKS Integration: Export single preset as .nksf
+      exportPresetAsNKSF: (presetId: string) => {
+        const preset = get().getPreset(presetId);
+        if (!preset) {
+          console.warn('[Preset] Preset not found:', presetId);
+          return;
+        }
+
+        try {
+          const nksPreset = userPresetToNKSPreset(preset);
+          const buffer = writeNKSF(nksPreset);
+
+          const blob = new Blob([buffer], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${preset.name}.nksf`;
+          a.click();
+
+          URL.revokeObjectURL(url);
+          console.log('[Preset] Exported as NKSF:', preset.name);
+        } catch (error) {
+          console.error('[Preset] Failed to export as NKSF:', error);
+        }
+      },
+
+      // NKS Integration: Batch export all presets as .nksf
+      exportAllPresetsAsNKSF: (author?: string) => {
+        const presets = get().userPresets;
+        if (presets.length === 0) {
+          console.warn('[Preset] No presets to export');
+          return;
+        }
+
+        try {
+          const exports = batchExportToNKS(presets, author);
+
+          // Download each file with a small delay to avoid browser blocking
+          exports.forEach((exp, index) => {
+            setTimeout(() => {
+              const blob = new Blob([exp.buffer], { type: 'application/octet-stream' });
+              const url = URL.createObjectURL(blob);
+
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = exp.filename;
+              a.click();
+
+              URL.revokeObjectURL(url);
+            }, index * 100);
+          });
+
+          console.log('[Preset] Exported', exports.length, 'presets as NKSF');
+        } catch (error) {
+          console.error('[Preset] Failed to batch export NKSF:', error);
+        }
+      },
+
+      // NKS Integration: Import .nksf files as user presets
+      importNKSFFiles: async (files: File[]): Promise<string[]> => {
+        const importedIds: string[] = [];
+
+        try {
+          const importedPresets = await batchImportNKSF(files);
+
+          for (const presetData of importedPresets) {
+            const presetId = `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            set((state) => {
+              const newPreset: UserPreset = {
+                id: presetId,
+                ...presetData,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              };
+              state.userPresets.push(newPreset);
+            });
+
+            importedIds.push(presetId);
+          }
+
+          console.log('[Preset] Imported', importedIds.length, 'presets from NKSF files');
+        } catch (error) {
+          console.error('[Preset] Failed to import NKSF files:', error);
+        }
+
+        return importedIds;
       },
     })),
     {

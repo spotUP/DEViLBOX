@@ -312,7 +312,7 @@ export const useMIDIStore = create<MIDIStore>()(
                   // AUTO-SWITCH BANK: If it's a Dub Siren, switch to Siren bank
                   if (targetInstrument.synthType === 'DubSiren' && store.knobBank !== 'Siren') {
                     store.setKnobBank('Siren');
-                  } else if (targetInstrument.synthType === 'TB303' && store.knobBank !== '303') {
+                  } else if ((targetInstrument.synthType === 'TB303' || targetInstrument.synthType === 'Buzz3o3') && store.knobBank !== '303') {
                     store.setKnobBank('303');
                   }
 

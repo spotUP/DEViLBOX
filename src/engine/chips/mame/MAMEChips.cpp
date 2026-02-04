@@ -5,12 +5,18 @@
 #include "es5503.h"
 #include "roland_sa.h"
 #include "swp30.h"
+#include "segapcm.h"
+#include "iremga20.h"
+#include "upd933.h"
 
 // Implementation of the device code
 #include "es5506.cpp"
 #include "es5503.cpp"
 #include "roland_sa.cpp"
 #include "swp30.cpp"
+#include "segapcm.cpp"
+#include "iremga20.cpp"
+#include "upd933.cpp"
 
 // Global banks for stubs to access
 uint8_t* g_rom_banks[4] = { nullptr, nullptr, nullptr, nullptr };
@@ -54,8 +60,43 @@ public:
     void update(sound_stream &stream) { sound_stream_update(stream); }
 };
 
+class segapcm_device_proxy : public segapcm_device {
+public:
+    segapcm_device_proxy(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
+        : segapcm_device(mconfig, tag, owner, clock) {}
+    void start() { device_start(); }
+    void reset() { device_reset(); }
+    void update(sound_stream &stream) { sound_stream_update(stream); }
+};
+
+class iremga20_device_proxy : public iremga20_device {
+public:
+    iremga20_device_proxy(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
+        : iremga20_device(mconfig, tag, owner, clock) {}
+    void start() { device_start(); }
+    void reset() { device_reset(); }
+    void update(sound_stream &stream) { sound_stream_update(stream); }
+};
+
+class upd933_device_proxy : public upd933_device {
+public:
+    upd933_device_proxy(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
+        : upd933_device(mconfig, tag, owner, clock) {}
+    void start() { device_start(); }
+    void reset() { device_reset(); }
+    void update(sound_stream &stream) { sound_stream_update(stream); }
+};
+
 // Instance tracking
-enum SynthType { TYPE_VFX, TYPE_DOC, TYPE_RSA, TYPE_SWP30 };
+enum SynthType {
+    TYPE_VFX,      // ES5506 (Ensoniq VFX)
+    TYPE_DOC,      // ES5503 (Ensoniq DOC)
+    TYPE_RSA,      // Roland SA
+    TYPE_SWP30,    // Yamaha SWP30 (MU-2000)
+    TYPE_SEGAPCM,  // Sega PCM (arcade)
+    TYPE_GA20,     // Irem GA20 (arcade)
+    TYPE_UPD933    // Casio CZ Phase Distortion
+};
 
 struct SynthInstance {
     SynthType type;
@@ -103,8 +144,26 @@ int mame_create_instance(int type, uint32_t clock) {
         dev->reset();
         inst->device = dev;
         inst->stream.m_views.resize(2);
+    } else if (type == TYPE_SEGAPCM) {
+        auto* dev = new segapcm_device_proxy(*(machine_config*)g_mconfig_dummy, "segapcm", nullptr, clock);
+        dev->start();
+        dev->reset();
+        inst->device = dev;
+        inst->stream.m_views.resize(2);
+    } else if (type == TYPE_GA20) {
+        auto* dev = new iremga20_device_proxy(*(machine_config*)g_mconfig_dummy, "ga20", nullptr, clock);
+        dev->start();
+        dev->reset();
+        inst->device = dev;
+        inst->stream.m_views.resize(2);
+    } else if (type == TYPE_UPD933) {
+        auto* dev = new upd933_device_proxy(*(machine_config*)g_mconfig_dummy, "upd933", nullptr, clock);
+        dev->start();
+        dev->reset();
+        inst->device = dev;
+        inst->stream.m_views.resize(1); // UPD933 is mono
     }
-    
+
     int handle = g_next_handle++;
     g_instances[handle] = inst;
     return handle;
@@ -127,6 +186,9 @@ void mame_write(int handle, uint32_t offset, uint8_t data) {
         else if (inst->type == TYPE_DOC) ((es5503_device*)inst->device)->write(offset, data);
         else if (inst->type == TYPE_RSA) ((roland_sa_device*)inst->device)->write(offset, data);
         else if (inst->type == TYPE_SWP30) ((swp30_device*)inst->device)->snd_w(offset, data);
+        else if (inst->type == TYPE_SEGAPCM) ((segapcm_device*)inst->device)->write(offset, data);
+        else if (inst->type == TYPE_GA20) ((iremga20_device*)inst->device)->write(offset, data);
+        else if (inst->type == TYPE_UPD933) ((upd933_device*)inst->device)->write(data); // UPD933 uses serial writes
     }
 }
 
@@ -151,6 +213,9 @@ uint8_t mame_read(int handle, uint32_t offset) {
         if (inst->type == TYPE_VFX) return ((es5506_device*)inst->device)->read(offset);
         else if (inst->type == TYPE_DOC) return ((es5503_device*)inst->device)->read(offset);
         else if (inst->type == TYPE_SWP30) return ((swp30_device*)inst->device)->snd_r(offset);
+        else if (inst->type == TYPE_SEGAPCM) return ((segapcm_device*)inst->device)->read(offset);
+        else if (inst->type == TYPE_GA20) return ((iremga20_device*)inst->device)->read(offset);
+        else if (inst->type == TYPE_UPD933) return ((upd933_device*)inst->device)->read();
     }
     return 0;
 }
@@ -162,13 +227,22 @@ void mame_render(int handle, float* outL, float* outR, uint32_t numSamples) {
         inst->stream.m_samples = numSamples;
         inst->stream.m_views[0].m_buffer = outL;
         inst->stream.m_views[0].m_samples = numSamples;
-        inst->stream.m_views[1].m_buffer = outR;
-        inst->stream.m_views[1].m_samples = numSamples;
-        
+        if (inst->stream.m_views.size() > 1) {
+            inst->stream.m_views[1].m_buffer = outR;
+            inst->stream.m_views[1].m_samples = numSamples;
+        }
+
         if (inst->type == TYPE_VFX) ((es5506_device_proxy*)inst->device)->update(inst->stream);
         else if (inst->type == TYPE_DOC) ((es5503_device_proxy*)inst->device)->update(inst->stream);
         else if (inst->type == TYPE_RSA) ((roland_sa_device_proxy*)inst->device)->update(inst->stream);
         else if (inst->type == TYPE_SWP30) ((swp30_device_proxy*)inst->device)->update(inst->stream);
+        else if (inst->type == TYPE_SEGAPCM) ((segapcm_device_proxy*)inst->device)->update(inst->stream);
+        else if (inst->type == TYPE_GA20) ((iremga20_device_proxy*)inst->device)->update(inst->stream);
+        else if (inst->type == TYPE_UPD933) {
+            ((upd933_device_proxy*)inst->device)->update(inst->stream);
+            // Copy mono to stereo
+            for (uint32_t i = 0; i < numSamples; i++) outR[i] = outL[i];
+        }
     }
 }
 

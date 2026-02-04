@@ -256,7 +256,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   }
 
   handleMessage(event) {
-    const { type, wasmBinary, jsCode, machineType, paramIndex, paramValue, frequency, velocity } = event.data;
+    const { type, wasmBinary, jsCode, machineType, paramIndex, paramValue, frequency, velocity, accent, slide } = event.data;
 
     switch (type) {
       case 'ping':
@@ -592,40 +592,97 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         console.warn('[BuzzmachineWorklet] CyanPhaseDTMF has no globalValsPtr!');
       }
     } else if (machineType.includes('OomekAggressor')) {
-      // Oomek Aggressor (303-style synth)
-      // Track params likely: note (byte), and possibly more
+      // Oomek Aggressor (TB-303 style synth)
+      //
+      // From 303.cpp source code:
+      // Global params (gvals at globalValsPtr):
+      //   offset 0: osctype (switch) - 0=saw, 1=square
+      //   offset 1: cutoff (byte 0x00-0xF0)
+      //   offset 2: resonance (byte 0x00-0x80)
+      //   offset 3: envmod (byte 0x00-0x80)
+      //   offset 4: decay (byte 0x00-0x80)
+      //   offset 5: acclevel (byte 0x00-0x80)
+      //   offset 6: finetune (byte 0x00-0xC8, center=0x64)
+      //   offset 7: volume (byte 0x00-0xC8)
+      //
+      // Track params (tvals at trackValsPtr):
+      //   offset 0: note (pt_note)
+      //   offset 1: slide (switch) - 0xFF=no value, 0=off, 1=on
+      //   offset 2: accent (switch) - 0xFF=no value, 0=off, 1=on
+
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
+
       if (trackValsPtr) {
+        // Initialize global params on first trigger (if not already initialized)
+        if (!this.aggressorInitialized && this.globalValsPtr) {
+          // Set default global params (matching 303.cpp defaults)
+          this.writeByte(this.globalValsPtr + 0, 0xFF);   // osctype = no value (keep current)
+          this.writeByte(this.globalValsPtr + 1, 0x78);   // cutoff default
+          this.writeByte(this.globalValsPtr + 2, 0x40);   // resonance default
+          this.writeByte(this.globalValsPtr + 3, 0x40);   // envmod default
+          this.writeByte(this.globalValsPtr + 4, 0x40);   // decay default
+          this.writeByte(this.globalValsPtr + 5, 0x40);   // acclevel default
+          this.writeByte(this.globalValsPtr + 6, 0x64);   // finetune = 100 (center, 0 cents)
+          this.writeByte(this.globalValsPtr + 7, 0x64);   // volume = 100%
+          this.aggressorInitialized = true;
+          console.log('[BuzzmachineWorklet] OomekAggressor global params initialized');
+        }
+
+        // Convert frequency to Buzz note format
         const midiNote = Math.round(12 * Math.log2(this.noteFrequency / 440) + 69);
         const octave = Math.floor(midiNote / 12);
-        const note = midiNote % 12;
-        const buzzNote = ((octave) << 4) | note;
+        const noteInOctave = midiNote % 12;
+        // Buzz note format: (octave << 4) | (note + 1), where note is 1-12 not 0-11
+        // NOTE_MIN = 0x01, NOTE_MAX = 0x79
+        const buzzNote = ((octave) << 4) | (noteInOctave + 1);
 
-        // Set note (offset 0)
-        this.writeByte(trackValsPtr, Math.max(1, Math.min(0x79, buzzNote)));
-        
-        // Handle Accent
-        let finalVelocity = this.triggerVelocity;
-        if (this.triggerAccent) {
-          // Boost velocity for accent (up to max 127)
-          finalVelocity = Math.min(127, this.triggerVelocity + 32);
+        // TB-303 SLIDE SEMANTICS:
+        // "Slide is ON on a step if the PREVIOUSLY played step had Slide AND the current step is a valid Note"
+        // The worklet receives the slide flag which was computed by the tracker/sequencer
+        // If slide=true, we should NOT retrigger envelopes - just glide pitch
+        const slideActive = this.triggerSlide && this.aggressorPreviousNote !== null && this.aggressorGateHigh;
+
+        if (slideActive) {
+          // Slide mode: Set slide flag ON, don't reset envelope state
+          // Aggressor will glide from previous note to new note without retriggering
+          this.writeByte(trackValsPtr + 1, 1);  // slide = ON
+        } else {
+          // Normal note: Set slide flag OFF
+          this.writeByte(trackValsPtr + 1, 0);  // slide = OFF
         }
-        
-        // Try setting volume at offset 1 (common pattern for synths)
-        const vol = Math.min(0xFE, Math.round(finalVelocity * 2));
-        this.writeByte(trackValsPtr + 1, vol);
 
-        // Handle Slide
-        this.isSliding = this.triggerSlide;
+        // Handle Accent - set per-note accent flag
+        if (this.triggerAccent) {
+          this.writeByte(trackValsPtr + 2, 1);  // accent = ON
+        } else {
+          this.writeByte(trackValsPtr + 2, 0);  // accent = OFF
+        }
+
+        // Set note LAST to trigger (offset 0)
+        this.writeByte(trackValsPtr + 0, Math.max(1, Math.min(0x79, buzzNote)));
+
+        // Track state for proper 303 slide handling
+        this.aggressorPreviousNote = buzzNote;
+        this.aggressorGateHigh = true;
+
+        // Store the current slide flag for next note's slide decision
+        // (The tracker should handle this, but we track it here too for safety)
+        this.aggressorPreviousSlideFlag = this.triggerSlide;
 
         if (this.triggerAccent || this.triggerSlide) {
-          console.log('[BuzzmachineWorklet] OomekAggressor triggered with extras:', { midiNote, buzzNote, volume: vol, accent: this.triggerAccent, slide: this.triggerSlide });
+          console.log('[BuzzmachineWorklet] OomekAggressor triggered with 303 params:', {
+            midiNote,
+            buzzNote: buzzNote.toString(16),
+            slide: slideActive,
+            accent: this.triggerAccent,
+            freq: this.noteFrequency
+          });
         } else {
-          console.log('[BuzzmachineWorklet] OomekAggressor triggered:', { midiNote, buzzNote, volume: vol });
+          console.log('[BuzzmachineWorklet] OomekAggressor triggered:', { midiNote, buzzNote: buzzNote.toString(16) });
         }
 
-        // Store for clearing (synths hold note until release)
+        // Store for clearing - Aggressor holds note until gate drops
         this.pendingSynthNotePtr = trackValsPtr;
         this.pendingSynthType = 'OomekAggressor';
       }
@@ -938,17 +995,42 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       }
       // Don't call buzz_stop - let envelope finish naturally
     } else if (machineType.includes('OomekAggressor')) {
-      // Aggressor303: DOES NOT respond to NOTE_OFF - it just ignores it!
-      // The machine continues playing until its envelope naturally decays (vcaphase reaches 1600)
-      // This can take a very long time. Muting is the only reliable way to stop it.
-      
-      // If sliding, don't mute - let the next note trigger take over
-      if (this.isSliding) {
-        console.log('[BuzzmachineWorklet] OomekAggressor slide active, skipping mute');
-        this.isSliding = false; // Reset for next note
-      } else {
-        this.muted = true;
-        console.log('[BuzzmachineWorklet] OomekAggressor muted (ignores NOTE_OFF)');
+      // Oomek Aggressor TB-303 gate handling:
+      //
+      // The Aggressor has mid-step gate timing built-in (see 303.cpp line 798):
+      //   if ((pMasterInfo->PosInTick > pMasterInfo->SamplesPerTick / 2) &&
+      //       (vcaphase < 1600) && (slidestate == false)) vcaphase++;
+      //
+      // This means:
+      // - Gate drops at midpoint of step if NOT sliding
+      // - If sliding (slidestate=true), gate stays HIGH through the step
+      //
+      // For note-off handling:
+      // - Set gate LOW (aggressorGateHigh = false)
+      // - The Aggressor's internal VCA will handle the release naturally
+      // - Don't mute - let the envelope decay naturally
+
+      // Track gate state
+      this.aggressorGateHigh = false;
+
+      // If we were sliding, the next note should NOT slide (previous slide flag resets)
+      this.aggressorPreviousSlideFlag = false;
+
+      // Send NOTE_OFF to the Aggressor
+      // In Buzz format: NOTE_OFF is typically handled by the machine's internal state
+      // The Aggressor checks slidestate to determine if gate should drop
+      const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
+        this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
+      if (trackValsPtr) {
+        // Set slide to OFF so the gate will drop on next tick
+        this.writeByte(trackValsPtr + 1, 0);  // slide = OFF
+        // Don't send NOTE_OFF - Aggressor doesn't have one, it uses the VCA envelope
+        console.log('[BuzzmachineWorklet] OomekAggressor gate LOW, slide cleared');
+      }
+
+      // Call Tick to process the gate change
+      if (this.buzzModule._buzz_tick) {
+        this.buzzModule._buzz_tick(this.machinePtr);
       }
     } else if (machineType.includes('MakkM3') || machineType.includes('MadBrain')) {
       // These synths properly respond to NOTE_OFF
@@ -1002,14 +1084,22 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   setParameter(paramIndex, value) {
     if (!this.buzzModule || !this.globalValsPtr) return;
 
-    // GlobalVals structure varies by machine, but parameters are sequential
-    // Most parameters are word (16-bit) or byte (8-bit)
-    // For simplicity, we'll write as 16-bit values (word)
-    // Offset = paramIndex * 2 bytes (word size)
-    const offset = this.globalValsPtr + (paramIndex * 2);
+    // GlobalVals structure varies by machine - handle each type appropriately
+    const machineType = this.machineTypeName || '';
 
-    // Use writeWord helper which handles memory access properly
-    this.writeWord(offset, value);
+    if (machineType.includes('OomekAggressor')) {
+      // Oomek Aggressor uses BYTE (8-bit) parameters for all global vals:
+      // osctype(0), cutoff(1), resonance(2), envmod(3), decay(4), acclevel(5), finetune(6), volume(7)
+      // Each is 1 byte, sequential from offset 0
+      const offset = this.globalValsPtr + paramIndex;
+      this.writeByte(offset, Math.min(0xFF, Math.max(0, Math.round(value))));
+      console.log('[BuzzmachineWorklet] OomekAggressor setParameter:', { paramIndex, value, offset });
+    } else {
+      // Default: Most parameters are word (16-bit)
+      // Offset = paramIndex * 2 bytes (word size)
+      const offset = this.globalValsPtr + (paramIndex * 2);
+      this.writeWord(offset, value);
+    }
   }
 
   process(inputs, outputs, parameters) {

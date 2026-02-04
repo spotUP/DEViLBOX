@@ -7,12 +7,15 @@ export class SAMSynth extends Tone.ToneAudioNode {
   public readonly name: string = 'SAMSynth';
   public readonly input: undefined = undefined;
   public readonly output: Tone.Gain;
-  
+
   private _player: Tone.Player;
   private _sam: any;
   private _config: SamConfig;
   private _buffer: AudioBuffer | null = null;
   private _isRendering: boolean = false;
+  private _ready: boolean = false;
+  private _readyPromise: Promise<void>;
+  private _readyResolve!: () => void;
 
   private _renderTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -21,7 +24,12 @@ export class SAMSynth extends Tone.ToneAudioNode {
     this.output = new Tone.Gain();
     this._config = { ...config };
     this._player = new Tone.Player().connect(this.output);
-    
+
+    // Create ready promise for async initialization
+    this._readyPromise = new Promise<void>((resolve) => {
+      this._readyResolve = resolve;
+    });
+
     // Initialize SAM with current config
     this._sam = new SamJs({
       pitch: this._config.pitch,
@@ -34,6 +42,13 @@ export class SAMSynth extends Tone.ToneAudioNode {
 
     // Initial render
     this._render();
+  }
+
+  /**
+   * Wait for the synth to be ready (initial render complete)
+   */
+  public async ready(): Promise<void> {
+    return this._readyPromise;
   }
 
   private async _render() {
@@ -63,6 +78,12 @@ export class SAMSynth extends Tone.ToneAudioNode {
             this._player.stop();
           }
           this._player.start();
+        }
+
+        // Mark as ready on first successful render
+        if (!this._ready) {
+          this._ready = true;
+          this._readyResolve();
         }
       }
     } catch (e) {
@@ -102,8 +123,11 @@ export class SAMSynth extends Tone.ToneAudioNode {
   }
 
   public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
-    if (!this._buffer) return;
-    
+    if (!this._buffer) {
+      console.warn('[SAM] triggerAttack called before buffer ready');
+      return;
+    }
+
     // Note tracking: If we are in "Sing Mode", we can adjust playbackRate based on the note
     // MIDI 60 (C4) is our "base" pitch.
     if (note && note !== 'C4') {
@@ -112,6 +136,11 @@ export class SAMSynth extends Tone.ToneAudioNode {
       this._player.playbackRate = ratio;
     } else {
       this._player.playbackRate = 1.0;
+    }
+
+    // Stop any current playback before starting new
+    if (this._player.state === 'started') {
+      this._player.stop();
     }
 
     this._player.start(time, 0);

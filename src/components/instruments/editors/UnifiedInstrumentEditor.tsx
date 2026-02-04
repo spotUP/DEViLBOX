@@ -13,8 +13,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
-  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_SYNARE,
-  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA
+  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA, DEFAULT_DEXED, DEFAULT_OBXD
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { PresetDropdown } from '../presets/PresetDropdown';
@@ -30,16 +30,18 @@ import { V2SpeechControls } from '../controls/V2SpeechControls';
 import { SAMControls } from '../controls/SAMControls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
+import { DexedControls } from '../controls/DexedControls';
+import { OBXdControls } from '../controls/OBXdControls';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-import { Box, Drum, Megaphone, Zap, Radio, MessageSquare } from 'lucide-react';
+import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'dexed' | 'obxd';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -90,6 +92,16 @@ function isSynareType(synthType: SynthType): boolean {
   return synthType === 'Synare';
 }
 
+/** Check if synth type is Dexed (DX7) */
+function isDexedType(synthType: SynthType): boolean {
+  return synthType === 'Dexed';
+}
+
+/** Check if synth type is OBXd (Oberheim) */
+function isOBXdType(synthType: SynthType): boolean {
+  return synthType === 'OBXd';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
@@ -102,6 +114,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'Sam') return 'sam';
   if (isSynareType(synthType)) return 'synare';
   if (isMAMEType(synthType)) return 'mame';
+  if (isDexedType(synthType)) return 'dexed';
+  if (isOBXdType(synthType)) return 'obxd';
   return 'generic';
 }
 
@@ -223,6 +237,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       ? 'bg-[#041010] border-b-2 border-cyan-500'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
+    const handleEnableSpeech = () => {
+      onChange({ v2Speech: { ...DEFAULT_V2_SPEECH } });
+    };
+
     return (
       <EditorHeader
         instrument={instrument}
@@ -248,6 +266,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Mode Toggle: Switch to Speech */}
+                <button
+                  onClick={handleEnableSpeech}
+                  className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-gray-700"
+                  title="Switch to Speech Mode"
+                >
+                  <Mic size={14} />
+                  <span className="text-[10px] font-bold uppercase">Speech</span>
+                </button>
+
                 <button
                   onClick={() => onChange({ isLive: !instrument.isLive })}
                   className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
@@ -450,6 +478,40 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     }
   }, [instrument.mame, instrument.synthType, instrument.id, onChange]);
 
+  // Handle Dexed (DX7) config updates
+  const handleDexedChange = useCallback((updates: Partial<typeof instrument.dexed>) => {
+    const currentDexed = instrument.dexed || DEFAULT_DEXED;
+    const newConfig = { ...currentDexed, ...updates };
+    onChange({
+      dexed: newConfig,
+    });
+
+    // Real-time update
+    try {
+      const engine = getToneEngine();
+      engine.updateDexedParameters(instrument.id, newConfig);
+    } catch (e) {
+      // Ignored
+    }
+  }, [instrument.dexed, instrument.id, onChange]);
+
+  // Handle OBXd (Oberheim) config updates
+  const handleOBXdChange = useCallback((updates: Partial<typeof instrument.obxd>) => {
+    const currentOBXd = instrument.obxd || DEFAULT_OBXD;
+    const newConfig = { ...currentOBXd, ...updates };
+    onChange({
+      obxd: newConfig,
+    });
+
+    // Real-time update
+    try {
+      const engine = getToneEngine();
+      engine.updateOBXdParameters(instrument.id, newConfig);
+    } catch (e) {
+      // Ignored
+    }
+  }, [instrument.obxd, instrument.id, onChange]);
+
   // Determine which tabs to hide based on synth type for generic editor
   const getHiddenTabs = (): SynthEditorTab[] => {
     const hidden: SynthEditorTab[] = [];
@@ -627,6 +689,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         ? 'bg-[#041010] border-b-2 border-cyan-500'
         : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
+      const handleDisableSpeech = () => {
+        onChange({ v2Speech: undefined });
+      };
+
       return (
         <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
           <EditorHeader
@@ -644,7 +710,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
-                      <Radio size={24} className="text-white" />
+                      <Mic size={24} className="text-white" />
                     </div>
                     <div>
                       <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SPEECH</h2>
@@ -653,6 +719,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Mode Toggle: Switch to Synth */}
+                    <button
+                      onClick={handleDisableSpeech}
+                      className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-gray-700"
+                      title="Switch to Synth Mode"
+                    >
+                      <Music size={14} />
+                      <span className="text-[10px] font-bold uppercase">Synth</span>
+                    </button>
+
                     <button
                       onClick={() => onChange({ isLive: !instrument.isLive })}
                       className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
@@ -798,6 +874,72 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             config={mameConfig}
             handle={mameHandle}
             onChange={handleMAMEChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // DEXED (DX7) EDITOR
+  // ============================================================================
+  if (editorMode === 'dexed') {
+    const dexedConfig = instrument.dexed || DEFAULT_DEXED;
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {/* Use common header with visualization */}
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        {/* Dexed Controls */}
+        <div className="synth-editor-content overflow-y-auto">
+          <DexedControls
+            config={dexedConfig}
+            onChange={handleDexedChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // OBXd (OBERHEIM) EDITOR
+  // ============================================================================
+  if (editorMode === 'obxd') {
+    const obxdConfig = instrument.obxd || DEFAULT_OBXD;
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        {/* Use common header with visualization */}
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+
+        {/* OBXd Controls */}
+        <div className="synth-editor-content overflow-y-auto">
+          <OBXdControls
+            config={obxdConfig}
+            onChange={handleOBXdChange}
           />
         </div>
       </div>

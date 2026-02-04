@@ -6,18 +6,22 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig, PitchEnvelopeConfig } from '@typedefs/instrument';
-import { 
+import {
   DEFAULT_SYNARE,
+  DEFAULT_SAM,
   VOWEL_FORMANTS,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
   DEFAULT_DRUM_MACHINE,
+  DEFAULT_DRUMKIT,
   DEFAULT_ORGAN,
   DEFAULT_POLYSYNTH,
   DEFAULT_SUPERSAW,
   DEFAULT_WAVETABLE,
   DEFAULT_FURNACE,
   DEFAULT_SPACE_LASER,
+  DEFAULT_DEXED,
+  DEFAULT_OBXD,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
@@ -34,12 +38,87 @@ import { SpaceLaserSynth } from './SpaceLaserSynth';
 import { SynareSynth } from './SynareSynth';
 import { SAMSynth } from './sam/SAMSynth';
 import { V2Synth } from './v2/V2Synth';
-import { JC303Synth } from './jc303/JC303Synth';
+import { V2SpeechSynth } from './v2/V2SpeechSynth';
+import { JC303Synth } from './open303/Open303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
+import { DexedSynth } from './dexed/DexedSynth';
+import { OBXdSynth } from './obxd/OBXdSynth';
+import { CZ101Synth } from './cz101/CZ101Synth';
+import { CEM3394Synth } from './cem3394/CEM3394Synth';
+import { SCSPSynth } from './scsp/SCSPSynth';
+import { VFXSynth } from './vfx/VFXSynth';
+import { D50Synth } from './d50/D50Synth';
+import { MU2000Synth } from './mu2000/MU2000Synth';
 
 export class InstrumentFactory {
+  /**
+   * Volume normalization offsets in dB
+   * Measured empirically to achieve consistent ~-10dB peak output at volume=-12dB
+   * Positive values boost quiet synths, negative values reduce loud synths
+   * Measured 2026-02-03 using browser AudioContext + Tone.Meter
+   */
+  private static readonly VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
+    // Tone.js built-in synths (naturally quiet due to synthesis design)
+    'Synth': 14,           // Measured: -11.4dB after +12 → target +14 for -10dB
+    'MonoSynth': 12,       // Similar to Synth
+    'DuoSynth': 12,        // Similar to Synth
+    'FMSynth': 17,         // Measured: -13.4dB after +14 → boost +3 more
+    'AMSynth': 19,         // Measured: -15.3dB after +16 → boost +3 more
+    'PluckSynth': 21,      // Measured: -17.2dB after +18 → boost +3 more
+    'MetalSynth': 23,      // Measured: -19.2dB after +20 → boost +3 more
+    'MembraneSynth': 20,   // Measured: -13.5dB after +20 → OK
+    'NoiseSynth': 14,      // Similar to Synth
+    'PolySynth': 12,       // Similar to Synth
+    // Custom synths (WASM and specialized engines)
+    'TB303': 25,           // Measured: -15.5dB after +22 → boost +3 more
+    'JC303': 25,           // Same as TB303
+    'Buzz3o3': 5,          // Measured: -15.3dB after +3 → boost +2 more
+    'Furnace': 7,          // Measured: -17.2dB after +5 → boost +2 more
+    'FurnaceGB': 7,        // Same as Furnace
+    'FurnaceNES': 7,       // Same as Furnace
+    'FurnaceOPN': 7,       // Same as Furnace
+    'FurnaceOPM': 7,       // Same as Furnace
+    'FurnaceC64': 7,       // Same as Furnace
+    'FurnaceAY': 7,        // Same as Furnace
+    'BuzzKick': 9,         // Measured: -19.1dB → boost +2 more
+    'BuzzNoise': 0,        // Measured: -10.6dB → already at target
+    'Synare': 3,           // Measured: -12.5dB after +0 → boost +3
+    'DubSiren': 10,        // Estimated based on similar synths
+    'SpaceLaser': 10,      // Estimated based on similar synths
+    'V2': 5,               // Measured: -14.5dB after +3 → boost +2 more
+    'Sam': 7,              // Measured: -16.4dB after +5 → boost +2 more
+    'SuperSaw': 8,         // Measured: -16.3dB after +6 → boost +2 more
+    'WobbleBass': 10,      // Measured: -18.2dB after +8 → boost +2 more
+    'FormantSynth': 12,    // Measured: -20.1dB after +10 → boost +2 more
+    'StringMachine': 10,   // Estimated based on similar synths
+    'PWMSynth': 8,         // Estimated based on similar synths
+    'ChipSynth': 10,       // Estimated based on similar synths
+    'Wavetable': 12,       // Estimated based on similar synths
+    'Organ': 10,           // Estimated based on similar synths
+    'Sampler': 0,          // Sample-based - no normalization needed
+    'Player': 0,           // Sample-based - no normalization needed
+    'GranularSynth': 8,    // Estimated based on similar synths
+    'DrumMachine': 0,      // Has internal balancing for drum components
+    // MAME synths
+    'MAMEVFX': 8,          // Estimated based on similar synths
+    'MAMEDOC': 8,          // Estimated based on similar synths
+    'MAMERSA': 8,          // Estimated based on similar synths
+    'MAMESWP30': 8,        // Estimated based on similar synths
+    'CZ101': 10,           // Estimated - Phase Distortion can be quiet
+  };
+
+  /**
+   * Get the normalized volume for a synth type
+   * Applies synth-specific offset to achieve consistent output levels
+   */
+  private static getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
+    const baseVolume = configVolume ?? -12;
+    const offset = this.VOLUME_NORMALIZATION_OFFSETS[synthType] ?? 0;
+    return baseVolume + offset;
+  }
+
   /**
    * Create a synth instance based on InstrumentConfig
    */
@@ -238,6 +317,79 @@ export class InstrumentFactory {
         instrument = this.createFurnaceWithChip(config, 50); // UPD1771
         break;
 
+      // === Additional Furnace Chips ===
+      case 'FurnaceAMIGA':
+        instrument = this.createFurnaceWithChip(config, 61); // Paula 4-channel
+        break;
+      case 'FurnaceAY8930':
+        instrument = this.createFurnaceWithChip(config, 50); // Enhanced AY-3-8910
+        break;
+      case 'FurnaceDAVE':
+        instrument = this.createFurnaceWithChip(config, 65); // Enterprise DAVE
+        break;
+      case 'FurnaceGBA':
+        instrument = this.createFurnaceWithChip(config, 52); // GBA DMA sound
+        break;
+      case 'FurnaceMSM5232':
+        instrument = this.createFurnaceWithChip(config, 59); // 8-voice wavetable
+        break;
+      case 'FurnaceMSM6258':
+        instrument = this.createFurnaceWithChip(config, 58); // OKI ADPCM
+        break;
+      case 'FurnaceMULTIPCM':
+        instrument = this.createFurnaceWithChip(config, 60); // Sega Model 1/2
+        break;
+      case 'FurnaceNAMCO':
+        instrument = this.createFurnaceWithChip(config, 55); // Namco WSG
+        break;
+      case 'FurnaceNDS':
+        instrument = this.createFurnaceWithChip(config, 51); // Nintendo DS
+        break;
+      case 'FurnaceOPN2203':
+        instrument = this.createFurnaceWithChip(config, 47); // YM2203
+        break;
+      case 'FurnaceOPNBB':
+        instrument = this.createFurnaceWithChip(config, 48); // YM2610B Extended
+        break;
+      case 'FurnacePCMDAC':
+        instrument = this.createFurnaceWithChip(config, 72); // Generic PCM DAC
+        break;
+      case 'FurnacePCSPKR':
+        instrument = this.createFurnaceWithChip(config, 62); // PC Speaker
+        break;
+      case 'FurnacePET':
+        instrument = this.createFurnaceWithChip(config, 56); // PET piezo
+        break;
+      case 'FurnacePOKEMINI':
+        instrument = this.createFurnaceWithChip(config, 54); // Pokemon Mini
+        break;
+      case 'FurnacePOKEY':
+        instrument = this.createFurnaceWithChip(config, 57); // Atari POKEY
+        break;
+      case 'FurnacePONG':
+        instrument = this.createFurnaceWithChip(config, 63); // Pong discrete
+        break;
+      case 'FurnacePOWERNOISE':
+        instrument = this.createFurnaceWithChip(config, 68); // Power Noise
+        break;
+      case 'FurnacePV1000':
+        instrument = this.createFurnaceWithChip(config, 64); // Casio PV-1000
+        break;
+      case 'FurnaceSCVTONE':
+        instrument = this.createFurnaceWithChip(config, 71); // Epoch SCV
+        break;
+      case 'FurnaceSID6581':
+        instrument = this.createFurnaceWithChip(config, 45); // MOS 6581
+        break;
+      case 'FurnaceSID8580':
+        instrument = this.createFurnaceWithChip(config, 46); // MOS 8580
+        break;
+      case 'FurnaceSU':
+        instrument = this.createFurnaceWithChip(config, 66); // Sound Unit
+        break;
+      case 'FurnaceZXBEEPER':
+        instrument = this.createFurnaceWithChip(config, 69); // ZX Spectrum beeper
+        break;
 
       case 'Sampler':
         // Check if this is a MOD/XM sample that needs period-based playback
@@ -330,8 +482,17 @@ export class InstrumentFactory {
         instrument = this.createSynare(config);
         break;
 
+      // JUCE WASM Synths
+      case 'Dexed':
+        instrument = this.createDexed(config);
+        break;
+
+      case 'OBXd':
+        instrument = this.createOBXd(config);
+        break;
+
       case 'MAMEVFX':
-        instrument = new MAMESynth({ type: 'vfx' });
+        instrument = this.createVFX(config);
         break;
 
       case 'MAMEDOC':
@@ -339,7 +500,23 @@ export class InstrumentFactory {
         break;
 
       case 'MAMERSA':
-        instrument = new MAMESynth({ type: 'rsa' });
+        instrument = this.createD50(config);
+        break;
+
+      case 'MAMESWP30':
+        instrument = this.createMU2000(config);
+        break;
+
+      case 'CZ101':
+        instrument = this.createCZ101(config);
+        break;
+
+      case 'CEM3394':
+        instrument = this.createCEM3394(config);
+        break;
+
+      case 'SCSP':
+        instrument = this.createSCSP(config);
         break;
 
       // Buzzmachine Generators (WASM-emulated Buzz synths)
@@ -373,7 +550,14 @@ export class InstrumentFactory {
         instrument = new BuzzmachineGenerator(BuzzmachineType.MAKK_M3);
         break;
       case 'Buzz3o3':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.OOMEK_AGGRESSOR);
+        instrument = this.createBuzz3o3(config);
+        break;
+
+      case 'ChiptuneModule':
+        // ChiptuneModule requires module data - without it, fall back to basic synth
+        // In a full implementation, this would use libopenmpt WASM
+        console.log('[InstrumentFactory] ChiptuneModule - using fallback synth (requires module data)');
+        instrument = this.createSynth(config);
         break;
 
       default:
@@ -1020,7 +1204,7 @@ export class InstrumentFactory {
         sustain: (config.envelope?.sustain ?? 50) / 100,
         release: (config.envelope?.release ?? 1000) / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('Synth', config.volume),
     });
 
     // Setup pitch envelope if enabled
@@ -1061,7 +1245,8 @@ export class InstrumentFactory {
   }
 
   private static createMonoSynth(config: InstrumentConfig): Tone.MonoSynth {
-    return new Tone.MonoSynth({
+    // Build base config first
+    const monoConfig: Tone.MonoSynthOptions = {
       oscillator: {
         type: config.oscillator?.type || 'sawtooth',
         detune: config.oscillator?.detune || 0,
@@ -1072,26 +1257,34 @@ export class InstrumentFactory {
         sustain: (config.envelope?.sustain ?? 50) / 100,
         release: (config.envelope?.release ?? 1000) / 1000,
       },
-      filter: config.filter
-        ? {
-            type: config.filter.type,
-            frequency: config.filter.frequency,
-            Q: config.filter.Q,
-            rolloff: config.filter.rolloff,
-          }
-        : undefined,
-      filterEnvelope: config.filterEnvelope
-        ? {
-            baseFrequency: config.filterEnvelope.baseFrequency,
-            octaves: config.filterEnvelope.octaves,
-            attack: config.filterEnvelope.attack / 1000,
-            decay: config.filterEnvelope.decay / 1000,
-            sustain: config.filterEnvelope.sustain / 100,
-            release: config.filterEnvelope.release / 1000,
-          }
-        : undefined,
-      volume: config.volume || -12,
-    });
+      volume: this.getNormalizedVolume('MonoSynth', config.volume),
+    };
+
+    // Only add filter if all required properties exist (don't pass undefined)
+    if (config.filter && config.filter.type && config.filter.frequency) {
+      monoConfig.filter = {
+        type: config.filter.type,
+        frequency: config.filter.frequency,
+        Q: config.filter.Q ?? 1,
+        rolloff: config.filter.rolloff ?? -12,
+      };
+    }
+
+    // Only add filterEnvelope if all required properties exist (don't pass undefined)
+    if (config.filterEnvelope &&
+        config.filterEnvelope.baseFrequency !== undefined &&
+        config.filterEnvelope.attack !== undefined) {
+      monoConfig.filterEnvelope = {
+        baseFrequency: config.filterEnvelope.baseFrequency,
+        octaves: config.filterEnvelope.octaves ?? 3,
+        attack: config.filterEnvelope.attack / 1000,
+        decay: (config.filterEnvelope.decay ?? 200) / 1000,
+        sustain: (config.filterEnvelope.sustain ?? 50) / 100,
+        release: (config.filterEnvelope.release ?? 1000) / 1000,
+      };
+    }
+
+    return new Tone.MonoSynth(monoConfig);
   }
 
   private static createDuoSynth(config: InstrumentConfig): Tone.DuoSynth {
@@ -1120,7 +1313,7 @@ export class InstrumentFactory {
       },
       vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
       vibratoRate: 5,
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('DuoSynth', config.volume),
     });
   }
 
@@ -1136,7 +1329,7 @@ export class InstrumentFactory {
         release: (config.envelope?.release ?? 1000) / 1000,
       },
       modulationIndex: 10,
-      volume: config.volume ?? -6, // Boost FM synth volume
+      volume: this.getNormalizedVolume('FMSynth', config.volume),
     });
   }
 
@@ -1151,7 +1344,7 @@ export class InstrumentFactory {
         sustain: (config.envelope?.sustain ?? 50) / 100,
         release: (config.envelope?.release ?? 1000) / 1000,
       },
-      volume: config.volume ?? -6, // Boost AM synth volume
+      volume: this.getNormalizedVolume('AMSynth', config.volume),
     });
   }
 
@@ -1160,7 +1353,7 @@ export class InstrumentFactory {
       attackNoise: 1,
       dampening: 4000,
       resonance: 0.7,
-      volume: config.volume ?? 0, // Boost Pluck synth volume (very quiet)
+      volume: this.getNormalizedVolume('PluckSynth', config.volume),
     });
   }
 
@@ -1171,7 +1364,7 @@ export class InstrumentFactory {
         decay: (config.envelope?.decay ?? 100) / 1000,
         release: (config.envelope?.release ?? 100) / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('MetalSynth', config.volume),
     });
   }
 
@@ -1188,7 +1381,7 @@ export class InstrumentFactory {
         sustain: 0.01,
         release: (config.envelope?.release ?? 100) / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('MembraneSynth', config.volume),
     });
   }
 
@@ -1203,7 +1396,7 @@ export class InstrumentFactory {
         sustain: (config.envelope?.sustain ?? 50) / 100,
         release: (config.envelope?.release ?? 1000) / 1000,
       },
-      volume: config.volume ?? -12,
+      volume: this.getNormalizedVolume('NoiseSynth', config.volume),
     });
   }
 
@@ -1212,8 +1405,10 @@ export class InstrumentFactory {
       throw new Error('TB303 config required for TB303 synth type');
     }
 
-    // Always use jc303 WASM engine for high quality
-    return this.createJC303(config.tb303, config.volume);
+    // Use Open303 WASM engine for authentic TB-303 sound
+    // Apply normalized volume boost for TB303
+    const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
+    return this.createJC303(config.tb303, normalizedVolume);
   }
 
   private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
@@ -1241,6 +1436,85 @@ export class InstrumentFactory {
     return synth;
   }
 
+  /**
+   * Create a Buzz3o3 (Oomek Aggressor Devil Fish) with tb303 config applied
+   * Uses the Devil Fish enhanced WASM for native Devil Fish parameters
+   */
+  private static createBuzz3o3(config: InstrumentConfig): BuzzmachineGenerator {
+    // Use Devil Fish WASM for full Devil Fish feature support
+    const synth = new BuzzmachineGenerator(BuzzmachineType.OOMEK_AGGRESSOR_DF);
+
+    // Apply TB303 config if present
+    if (config.tb303) {
+      const tb = config.tb303;
+
+      // Core 303 parameters
+      synth.setCutoff(tb.filter.cutoff);
+      synth.setResonance(tb.filter.resonance);
+      synth.setEnvMod(tb.filterEnvelope.envMod);
+      synth.setDecay(tb.filterEnvelope.decay);
+      synth.setAccentAmount(tb.accent.amount);
+      synth.setWaveform(tb.oscillator.type);
+
+      if (tb.tuning !== undefined) {
+        synth.setTuning(tb.tuning);
+      }
+
+      // External effects (overdrive via effects chain)
+      if (tb.overdrive) {
+        synth.setOverdrive(tb.overdrive.amount);
+      }
+
+      // Devil Fish mods (now native in WASM for Buzz3o3)
+      if (tb.devilFish) {
+        const df = tb.devilFish;
+        if (df.enabled) {
+          synth.enableDevilFish(true, {
+            overdrive: tb.overdrive?.amount,
+            muffler: df.muffler as any,
+          });
+        }
+        if (df.muffler) {
+          synth.setMuffler(df.muffler);
+        }
+        if (df.highResonance) {
+          synth.setHighResonanceEnabled(df.highResonance);
+        }
+        if (df.filterTracking !== undefined) {
+          synth.setFilterTracking(df.filterTracking);
+        }
+        // New Devil Fish WASM parameters
+        if (df.normalDecay !== undefined) {
+          synth.setNormalDecay(df.normalDecay);
+        }
+        if (df.accentDecay !== undefined) {
+          synth.setAccentDecay(df.accentDecay);
+        }
+        if (df.vegDecay !== undefined) {
+          synth.setVegDecay(df.vegDecay);
+        }
+        if (df.vegSustain !== undefined) {
+          synth.setVegSustain(df.vegSustain);
+        }
+        if (df.softAttack !== undefined) {
+          synth.setSoftAttack(df.softAttack);
+        }
+        if (df.slideTime !== undefined) {
+          synth.setSlideTime(df.slideTime);
+        }
+        if (df.sweepSpeed !== undefined) {
+          synth.setSweepSpeed(df.sweepSpeed);
+        }
+      }
+
+      // Apply normalized volume
+      const normalizedVolume = this.getNormalizedVolume('Buzz3o3', config.volume);
+      synth.setVolume(normalizedVolume);
+    }
+
+    return synth;
+  }
+
   private static createWavetable(config: InstrumentConfig): WavetableSynth {
     const wavetableConfig = config.wavetable || DEFAULT_WAVETABLE;
     return new WavetableSynth(wavetableConfig);
@@ -1252,7 +1526,7 @@ export class InstrumentFactory {
       console.log(`[InstrumentFactory] Creating Multi-Sampler for ${config.name} with ${Object.keys(config.sample.multiMap).length} samples`);
       return new Tone.Sampler({
         urls: config.sample.multiMap,
-        volume: config.volume || -12,
+        volume: this.getNormalizedVolume('Sampler', config.volume),
       });
     }
 
@@ -1284,14 +1558,14 @@ export class InstrumentFactory {
 
       return new Tone.Sampler({
         urls,
-        volume: config.volume || -12,
+        volume: this.getNormalizedVolume('Sampler', config.volume),
       });
     }
 
     // No sample loaded - create empty sampler
     console.warn(`[InstrumentFactory] Creating empty Sampler (no sample URL provided)`);
     return new Tone.Sampler({
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('Sampler', config.volume),
     });
   }
 
@@ -1303,7 +1577,7 @@ export class InstrumentFactory {
     if (sampleUrl) {
       const player = new Tone.Player({
         url: sampleUrl,
-        volume: config.volume || -12,
+        volume: this.getNormalizedVolume('Player', config.volume),
         reverse: reverseMode === 'reverse',
       });
       return player;
@@ -1311,7 +1585,7 @@ export class InstrumentFactory {
 
     // No sample loaded - create empty player
     return new Tone.Player({
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('Player', config.volume),
     });
   }
 
@@ -1331,7 +1605,7 @@ export class InstrumentFactory {
         loop: true,
         loopStart: 0,
         loopEnd: 0, // 0 = end of buffer
-        volume: config.volume || -12,
+        volume: this.getNormalizedVolume('GranularSynth', config.volume),
       });
       return grainPlayer;
     }
@@ -1342,7 +1616,7 @@ export class InstrumentFactory {
       overlap: 0.5,
       playbackRate: 1,
       loop: true,
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('GranularSynth', config.volume),
     });
   }
 
@@ -1369,7 +1643,7 @@ export class InstrumentFactory {
         sustain: (ssConfig.envelope.sustain || 80) / 100,
         release: (ssConfig.envelope.release || 300) / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('SuperSaw', config.volume),
     });
 
     // Apply filter
@@ -1476,7 +1750,7 @@ export class InstrumentFactory {
         sustain: (psConfig.envelope.sustain || 70) / 100,
         release: (psConfig.envelope.release || 500) / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('PolySynth', config.volume),
     });
 
     // Setup pitch envelope if enabled
@@ -1548,7 +1822,7 @@ export class InstrumentFactory {
         sustain: 1.0,  // Organ sustains fully
         release: 0.1,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('Organ', config.volume),
     });
 
     // Add Leslie/rotary effect
@@ -2826,7 +3100,7 @@ export class InstrumentFactory {
         sustain: chipConfig.envelope.sustain / 100,
         release: chipConfig.envelope.release / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('ChipSynth', config.volume),
     });
 
     // Add bit crusher for 8-bit character
@@ -3172,7 +3446,7 @@ export class InstrumentFactory {
         sustain: pwmConfig.envelope.sustain / 100,
         release: pwmConfig.envelope.release / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('PWMSynth', config.volume),
     });
 
     // Add filter
@@ -3255,7 +3529,7 @@ export class InstrumentFactory {
         sustain: 0.9,
         release: strConfig.release / 1000,
       },
-      volume: config.volume || -12,
+      volume: this.getNormalizedVolume('StringMachine', config.volume),
     });
 
     // Rich chorus effect for ensemble character
@@ -3333,7 +3607,7 @@ export class InstrumentFactory {
         sustain: fmtConfig.envelope.sustain / 100,
         release: fmtConfig.envelope.release / 1000,
       },
-      volume: config.volume ?? 0, // Boost - formants cut a lot of signal
+      volume: this.getNormalizedVolume('FormantSynth', config.volume),
     });
 
     // Create 3 parallel bandpass filters for formants with lower Q for more output
@@ -3981,17 +4255,28 @@ export class InstrumentFactory {
   }
 
   private static createV2(config: InstrumentConfig): Tone.ToneAudioNode {
+    // Check if V2 Speech mode is enabled - use V2SpeechSynth for singing/talking
+    if (config.v2Speech) {
+      const synth = new V2SpeechSynth(config.v2Speech);
+
+      if (config.volume !== undefined) {
+        synth.output.gain.value = Tone.dbToGain(config.volume);
+      }
+
+      return synth as unknown as Tone.ToneAudioNode;
+    }
+
+    // Regular V2 synth mode
     const synth = new V2Synth();
-    
+
     if (config.volume !== undefined) {
       synth.output.gain.value = Tone.dbToGain(config.volume);
     }
-    
+
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createSam(config: InstrumentConfig): Tone.ToneAudioNode {
-    const { DEFAULT_SAM } = require('@/types/instrument');
     const samConfig = config.sam || DEFAULT_SAM;
     const synth = new SAMSynth(samConfig);
     
@@ -4005,11 +4290,125 @@ export class InstrumentFactory {
   private static createSynare(config: InstrumentConfig): Tone.ToneAudioNode {
     const synareConfig = config.synare || DEFAULT_SYNARE;
     const synth = new SynareSynth(synareConfig);
-    
+
     if (config.volume !== undefined) {
       synth.volume.value = config.volume;
     }
-    
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Dexed (DX7) FM Synthesizer
+   * 16-voice polyphonic FM synthesis with full DX7 compatibility
+   */
+  private static createDexed(config: InstrumentConfig): Tone.ToneAudioNode {
+    const dexedConfig = config.dexed || {};
+    const synth = new DexedSynth(dexedConfig);
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create OB-Xd (Oberheim) Analog Synthesizer
+   * 8-voice polyphonic analog-modeled synthesis
+   */
+  private static createOBXd(config: InstrumentConfig): Tone.ToneAudioNode {
+    const obxdConfig = config.obxd || {};
+    const synth = new OBXdSynth(obxdConfig);
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create CZ-101 Phase Distortion Synthesizer
+   * 8-voice Phase Distortion synthesis with DCO/DCW/DCA envelopes
+   */
+  private static createCZ101(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new CZ101Synth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create CEM3394 Analog Synthesizer Voice
+   * 8-voice analog synthesis with VCO, VCF, VCA (Prophet VS, Matrix-6, ESQ-1)
+   */
+  private static createCEM3394(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new CEM3394Synth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Sega Saturn SCSP (YMF292-F) Sound Processor
+   * 32-voice synthesis with ADSR, LFO, and FM capabilities
+   */
+  private static createSCSP(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new SCSPSynth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Ensoniq VFX (ES5506) Wavetable Synthesizer
+   * 32-voice wavetable synthesis with resonant filters
+   */
+  private static createVFX(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new VFXSynth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Roland D-50 Linear Arithmetic Synthesizer
+   * 16-voice LA synthesis (PCM attacks + digital sustain)
+   */
+  private static createD50(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new D50Synth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Yamaha MU-2000 (SWP30) Wavetable Synthesizer
+   * 64-voice GM2/XG compatible wavetable synthesis
+   */
+  private static createMU2000(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new MU2000Synth();
+
+    if (config.volume !== undefined) {
+      synth.output.gain.value = Tone.dbToGain(config.volume);
+    }
+
     return synth as unknown as Tone.ToneAudioNode;
   }
 

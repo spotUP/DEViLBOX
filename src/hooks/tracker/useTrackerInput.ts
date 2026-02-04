@@ -146,6 +146,9 @@ export const useTrackerInput = () => {
   const copySelection = useTrackerStore((state) => state.copySelection);
   const cutSelection = useTrackerStore((state) => state.cutSelection);
   const paste = useTrackerStore((state) => state.paste);
+  const pasteMix = useTrackerStore((state) => state.pasteMix);
+  const pasteFlood = useTrackerStore((state) => state.pasteFlood);
+  const pastePushForward = useTrackerStore((state) => state.pastePushForward);
   const setCurrentOctave = useTrackerStore((state) => state.setCurrentOctave);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
@@ -220,6 +223,19 @@ export const useTrackerInput = () => {
         return; // Already playing this key
       }
 
+      // TB-303 LEGATO DETECTION:
+      // If any other notes are currently held when we press a new key,
+      // this is a legato transition - the 303 should SLIDE to the new note
+      // without retriggering envelopes
+      const hasHeldNotes = heldNotesRef.current.size > 0;
+      const is303Synth = instrument.synthType === 'TB303' ||
+                         instrument.synthType === 'Buzz3o3';
+      const slideActive = hasHeldNotes && is303Synth;
+
+      // For accent, we could use velocity threshold but keyboard doesn't have velocity
+      // In the future, we could use a modifier key (e.g., Shift+key = accent)
+      const accent = false; // TODO: Add Shift+key for accent
+
       // FT2: Get target channel for multi-channel recording
       const targetChannel = getTargetChannel();
 
@@ -228,10 +244,11 @@ export const useTrackerInput = () => {
       const { midiPolyphonic } = useSettingsStore.getState();
       if (midiPolyphonic) {
         // Polyphonic mode: use voice allocation for proper chord support
-        engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument);
+        // Pass accent and slide for 303 legato behavior
+        engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument, accent, slideActive);
       } else {
-        // Monophonic mode: use legacy direct attack
-        engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument);
+        // Monophonic mode: use legacy direct attack with accent/slide
+        engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument, undefined, accent, slideActive);
       }
 
       // Track the held note with channel info (ref update, no re-render)
@@ -717,7 +734,24 @@ export const useTrackerInput = () => {
       }
       if ((e.ctrlKey || e.metaKey) && keyLower === 'v' && !e.altKey) {
         e.preventDefault();
-        paste();
+        if (e.shiftKey) {
+          // Ctrl+Shift+V: Mix Paste (only fill empty cells)
+          pasteMix();
+        } else {
+          paste();
+        }
+        return;
+      }
+      // Ctrl+Shift+F: Flood Paste (paste until pattern end)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'f') {
+        e.preventDefault();
+        pasteFlood();
+        return;
+      }
+      // Ctrl+Shift+I: Push-Forward Paste (insert and shift down)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'i') {
+        e.preventDefault();
+        pastePushForward();
         return;
       }
 
@@ -1121,6 +1155,9 @@ export const useTrackerInput = () => {
       copySelection,
       cutSelection,
       paste,
+      pasteMix,
+      pasteFlood,
+      pastePushForward,
       previewNote,
       enterNote,
       handleInsertRow,
