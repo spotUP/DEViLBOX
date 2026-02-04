@@ -86,41 +86,25 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
    * Load neural model (must be called after construction)
    */
   async loadModel(): Promise<void> {
-    try {
-      await this.guitarML.initialize();
-    } catch (e: any) {
-      throw new Error(`[Neural] init failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    await this.guitarML.initialize();
+
+    // Connect guitarML into the signal path now that the worklet node exists.
+    // Tone.js uses standardized-audio-context which wraps native AudioNodes.
+    // GuitarML uses truly native AudioNodes. To connect across these worlds,
+    // we must extract the browser-native node via _nativeAudioNode.
+    const inputNode = getNativeAudioNode(this.input) as any;
+    const nativeInput = inputNode?._nativeAudioNode || inputNode;
+    if (nativeInput) {
+      nativeInput.connect(this.guitarML.getInput());
     }
 
-    try {
-      const nativeInput = getNativeAudioNode(this.input);
-      console.log('[Neural] nativeInput:', nativeInput, nativeInput?.constructor?.name);
-      if (nativeInput) {
-        nativeInput.connect(this.guitarML.getInput());
-      } else {
-        console.warn('[Neural] Could not get native input node');
-      }
-    } catch (e: any) {
-      throw new Error(`[Neural] input connect failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    const targetNode = getNativeAudioNode(this.neuralOutputGain) as any;
+    const nativeTarget = targetNode?._nativeAudioNode || targetNode;
+    if (nativeTarget) {
+      this.guitarML.getOutput().connect(nativeTarget);
     }
 
-    try {
-      const nativeTarget = getNativeAudioNode(this.neuralOutputGain);
-      console.log('[Neural] nativeTarget:', nativeTarget, nativeTarget?.constructor?.name);
-      if (nativeTarget) {
-        this.guitarML.getOutput().connect(nativeTarget);
-      } else {
-        console.warn('[Neural] Could not get native output target');
-      }
-    } catch (e: any) {
-      throw new Error(`[Neural] output connect failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
-    }
-
-    try {
-      await this.guitarML.loadModel(this.modelIndex);
-    } catch (e: any) {
-      throw new Error(`[Neural] model load failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
-    }
+    await this.guitarML.loadModel(this.modelIndex);
   }
 
   /**

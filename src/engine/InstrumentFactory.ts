@@ -743,10 +743,8 @@ export class InstrumentFactory {
         throw new Error('Neural effect requires neuralModelIndex');
       }
 
-      const context = audioContext || Tone.getContext().rawContext;
       const wrapper = new NeuralEffectWrapper({
         modelIndex: config.neuralModelIndex,
-        audioContext: context,
         wet: wetValue,
       });
 
