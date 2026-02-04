@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-04T01:16:59.384Z
+ * Generated: 2026-02-04T06:16:30.357Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '256';
-export const BUILD_HASH = '5b71565';
+export const BUILD_NUMBER = '261';
+export const BUILD_HASH = 'cccbe5d';
 export const BUILD_DATE = '2026-02-04';
 
 // Full semantic version with build number
@@ -31,6 +31,32 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-04',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: remove unused K051649Synth.ts"
+      },
+      {
+        type: 'fix',
+        "description": "Align VU meters to channels and improve sync"
+      },
+      {
+        type: 'improvement',
+        "description": "Clean up TrackerReplayer types, dead code, and duplication"
+      },
+      {
+        type: 'improvement',
+        "description": "Refactor TrackerReplayer to use player-pool instead of per-note allocation"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve AudioWorkletNode context mismatch across all synth engines"
+      }
+    ]
+  },
+  {
+    version: '2026-02-03',
     date: '2026-02-03',
     changes: [
       {
@@ -206,22 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve TypeScript errors in baking system"
-      },
-      {
-        type: 'feature',
-        "description": "Bake instrument effects into samples and restore them on unbake"
-      },
-      {
-        type: 'feature',
-        "description": "Implement Pro Bake (multi-sample rendering) for maximum accuracy"
-      },
-      {
-        type: 'feature',
-        "description": "Download baked samples and optimize song storage with auto-baking"
-      },
-      {
-        type: 'feature',
-        "description": "Add Precalc/Bake functionality to instrument editors"
       }
     ]
   }

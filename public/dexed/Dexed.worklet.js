@@ -1,0 +1,233 @@
+/**
+ * Dexed.worklet.js - DX7 FM Synthesizer AudioWorklet Processor
+ * Loads and runs the Dexed WASM module
+ *
+ * WASM binary and JS code are received via postMessage to avoid
+ * dynamic import which is not allowed in WorkletGlobalScope.
+ */
+
+// Track processor registration
+let processorRegistered = false;
+
+class DexedProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+
+    this.synth = null;
+    this.isInitialized = false;
+    this.pendingMessages = [];
+    this.outputBufferL = null;
+    this.outputBufferR = null;
+
+    this.port.onmessage = this.handleMessage.bind(this);
+  }
+
+  async handleMessage(event) {
+    const { type, ...data } = event.data;
+
+    switch (type) {
+      case 'init':
+        await this.initialize(data);
+        break;
+
+      case 'noteOn':
+        if (this.synth && this.isInitialized) {
+          this.synth.noteOn(data.note, data.velocity || 100);
+        } else {
+          this.pendingMessages.push(event.data);
+        }
+        break;
+
+      case 'noteOff':
+        if (this.synth && this.isInitialized) {
+          this.synth.noteOff(data.note);
+        }
+        break;
+
+      case 'allNotesOff':
+        if (this.synth && this.isInitialized) {
+          this.synth.allNotesOff();
+        }
+        break;
+
+      case 'parameter':
+        if (this.synth && this.isInitialized) {
+          this.synth.setParameter(data.paramId, data.value);
+        }
+        break;
+
+      case 'controlChange':
+        if (this.synth && this.isInitialized) {
+          this.synth.controlChange(data.cc, data.value);
+        }
+        break;
+
+      case 'pitchBend':
+        if (this.synth && this.isInitialized) {
+          this.synth.pitchBend(data.value);
+        }
+        break;
+
+      case 'loadSysEx':
+        if (this.synth && this.isInitialized) {
+          this.synth.loadSysEx(data.sysexData);
+        }
+        break;
+
+      case 'loadPatch':
+        if (this.synth && this.isInitialized && data.patchData) {
+          try {
+            const patchArray = new Uint8Array(data.patchData);
+            if (patchArray.length >= 156) {  // Validate minimum patch size
+              this.synth.loadSysEx(patchArray);
+            }
+          } catch (e) {
+            console.error('Invalid patch data:', e);
+          }
+        }
+        break;
+
+      case 'setAlgorithm':
+        if (this.synth && this.isInitialized) {
+          this.synth.setParameter(134, data.algorithm);
+        }
+        break;
+
+      case 'dispose':
+        this.cleanup();
+        break;
+    }
+  }
+
+  cleanup() {
+    if (this.Module && this.outputPtrL) {
+      this.Module._free(this.outputPtrL);
+      this.outputPtrL = 0;
+    }
+    if (this.Module && this.outputPtrR) {
+      this.Module._free(this.outputPtrR);
+      this.outputPtrR = 0;
+    }
+    this.outputBufferL = null;
+    this.outputBufferR = null;
+    this.synth = null;
+    this.isInitialized = false;
+  }
+
+  async initialize(data) {
+    try {
+      const { wasmBinary, jsCode } = data;
+
+      if (!wasmBinary || !jsCode) {
+        throw new Error('Missing wasmBinary or jsCode in init message');
+      }
+
+      // Evaluate the JS code to get the module factory
+      // The Emscripten output is an IIFE that defines createDexedModule
+      // We wrap it to extract the function
+      let createModule;
+      try {
+        // Try to evaluate as a module that returns a factory
+        const wrappedCode = `${jsCode}; return typeof createDexedModule !== 'undefined' ? createDexedModule : (typeof Module !== 'undefined' ? Module : null);`;
+        createModule = new Function(wrappedCode)();
+      } catch (evalErr) {
+        console.error('Failed to evaluate Dexed JS:', evalErr);
+        throw new Error('Could not evaluate Dexed module factory');
+      }
+
+      if (!createModule) {
+        throw new Error('Could not load Dexed module factory');
+      }
+
+      // Initialize the WASM module with the provided binary
+      const Module = await createModule({
+        wasmBinary: wasmBinary,
+        // No locateFile needed since we're providing the binary directly
+      });
+
+      // Create synth instance
+      this.synth = new Module.DexedSynth();
+      this.synth.initialize(sampleRate);
+
+      // Allocate output buffers in WASM memory
+      const bufferSize = 128 * 4; // 128 samples * 4 bytes per float
+      this.outputPtrL = Module._malloc(bufferSize);
+      this.outputPtrR = Module._malloc(bufferSize);
+
+      // Create typed array views into WASM memory
+      this.outputBufferL = new Float32Array(
+        Module.HEAPF32.buffer,
+        this.outputPtrL,
+        128
+      );
+      this.outputBufferR = new Float32Array(
+        Module.HEAPF32.buffer,
+        this.outputPtrR,
+        128
+      );
+
+      this.Module = Module;
+      this.isInitialized = true;
+
+      // Process any pending messages
+      for (const msg of this.pendingMessages) {
+        this.handleMessage({ data: msg });
+      }
+      this.pendingMessages = [];
+
+      // Notify main thread
+      this.port.postMessage({ type: 'ready' });
+
+    } catch (error) {
+      console.error('Dexed initialization error:', error);
+      this.port.postMessage({
+        type: 'error',
+        error: error.message
+      });
+    }
+  }
+
+  process(inputs, outputs, parameters) {
+    if (!this.synth || !this.isInitialized) {
+      return true;
+    }
+
+    const outputL = outputs[0][0];
+    const outputR = outputs[0][1] || outputs[0][0];
+    const numSamples = outputL.length;
+
+    try {
+      // Process audio through WASM
+      this.synth.process(this.outputPtrL, this.outputPtrR, numSamples);
+
+      // Copy from WASM memory to output
+      // Need to recreate views if WASM memory was resized
+      if (this.outputBufferL.buffer !== this.Module.HEAPF32.buffer) {
+        this.outputBufferL = new Float32Array(
+          this.Module.HEAPF32.buffer,
+          this.outputPtrL,
+          128
+        );
+        this.outputBufferR = new Float32Array(
+          this.Module.HEAPF32.buffer,
+          this.outputPtrR,
+          128
+        );
+      }
+
+      outputL.set(this.outputBufferL.subarray(0, numSamples));
+      outputR.set(this.outputBufferR.subarray(0, numSamples));
+
+    } catch (error) {
+      console.error('Dexed process error:', error);
+    }
+
+    return true;
+  }
+}
+
+// Register processor only once
+if (!processorRegistered) {
+  registerProcessor('dexed-processor', DexedProcessor);
+  processorRegistered = true;
+}
