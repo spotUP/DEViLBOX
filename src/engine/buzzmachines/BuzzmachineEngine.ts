@@ -663,8 +663,11 @@ export class BuzzmachineEngine {
 
   private async doInit(context: AudioContext): Promise<void> {
     try {
-      // Extract native context from Tone.js wrapper if needed
-      const nativeCtx = getNativeContext(context);
+      // Extract native context from Tone.js wrapper
+      // Try direct property access first (matches Open303Synth pattern),
+      // then fall back to BFS search via getNativeContext
+      const ctx = context as any;
+      const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
       this.nativeContext = nativeCtx;
 
       // Check if AudioWorklet is available
@@ -703,7 +706,8 @@ export class BuzzmachineEngine {
     }
 
     // Use Tone.js's createAudioWorkletNode for standardized-audio-context compatibility
-    const nativeCtx = getNativeContext(context);
+    const ctx = context as any;
+    const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
     const workletNode = toneCreateAudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
