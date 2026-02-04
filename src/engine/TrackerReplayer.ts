@@ -14,7 +14,7 @@
  */
 
 import * as Tone from 'tone';
-import type { Pattern } from '@/types';
+import type { Pattern, TrackerCell } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
@@ -95,6 +95,22 @@ const PERIOD_TABLE = [
   431, 407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228,
   216, 203, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114,
 ];
+
+// Note names for period-to-note conversion
+const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+/** Convert Amiga period to note name (e.g. "C4") */
+function periodToNoteName(period: number): string {
+  for (let oct = 0; oct < 8; oct++) {
+    for (let note = 0; note < 12; note++) {
+      const idx = oct * 12 + note;
+      if (idx < 36 && PERIOD_TABLE[idx] <= period) {
+        return `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`;
+      }
+    }
+  }
+  return 'C4';
+}
 
 // Vibrato/Tremolo sine table
 const VIBRATO_TABLE = [
@@ -366,37 +382,7 @@ export class TrackerReplayer {
 
     await Tone.start();
     this.playing = true;
-
-    // Start nearly immediately - minimal buffer for first note
-    this.startTime = Tone.now() + 0.02;
-    this.nextScheduleTime = this.startTime;
-    this.totalTicksScheduled = 0;
-
-    // Use raw setInterval instead of Tone.Loop for more reliable scheduling
-    // Tone.Loop uses Transport which can be affected by main thread blocking
-    // setInterval + Tone.now() gives us independent timing
-    const scheduler = () => {
-      if (!this.playing) return;
-
-      const currentTime = Tone.now();
-      const scheduleUntil = currentTime + this.scheduleAheadTime;
-      const tickInterval = 2.5 / this.bpm;
-
-      // Fill the buffer - schedule all ticks within look-ahead window
-      while (this.nextScheduleTime < scheduleUntil && this.playing) {
-        this.processTick(this.nextScheduleTime);
-        this.totalTicksScheduled++;
-        // Calculate NEXT time based on total ticks since START to avoid cumulative drift
-        this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
-      }
-
-    };
-
-    // Initial fill of the buffer
-    scheduler();
-
-    // Then keep filling every 15ms
-    this.schedulerTimerId = setInterval(scheduler, this.schedulerInterval * 1000);
+    this.startScheduler();
 
     console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed} (lookahead=${this.scheduleAheadTime}s)`);
   }
@@ -449,32 +435,38 @@ export class TrackerReplayer {
   resume(): void {
     if (this.song && !this.playing) {
       this.playing = true;
-      // Resume scheduling from current audio time
-      const currentTime = Tone.now();
-      this.startTime = currentTime + 0.02;
-      this.nextScheduleTime = this.startTime;
-      this.totalTicksScheduled = 0;
-
-      const scheduler = () => {
-        if (!this.playing) return;
-        const now = Tone.now();
-        const scheduleUntil = now + this.scheduleAheadTime;
-        const tickInterval = 2.5 / this.bpm;
-        while (this.nextScheduleTime < scheduleUntil && this.playing) {
-          this.processTick(this.nextScheduleTime);
-          this.totalTicksScheduled++;
-          this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
-        }
-      };
-
-      scheduler();
-      this.schedulerTimerId = setInterval(scheduler, this.schedulerInterval * 1000);
+      this.startScheduler();
     }
   }
 
-  private updateTickInterval(): void {
-    // With lookahead scheduling, tick interval is recalculated each scheduler run
-    // No need to update anything here - the scheduler reads this.bpm directly
+  /**
+   * Start the lookahead scheduler. Used by both play() and resume().
+   * Uses raw setInterval instead of Tone.Loop for more reliable scheduling.
+   */
+  private startScheduler(): void {
+    this.startTime = Tone.now() + 0.02;
+    this.nextScheduleTime = this.startTime;
+    this.totalTicksScheduled = 0;
+
+    const schedulerTick = () => {
+      if (!this.playing) return;
+
+      const currentTime = Tone.now();
+      const scheduleUntil = currentTime + this.scheduleAheadTime;
+      const tickInterval = 2.5 / this.bpm;
+
+      // Fill the buffer - schedule all ticks within look-ahead window
+      while (this.nextScheduleTime < scheduleUntil && this.playing) {
+        this.processTick(this.nextScheduleTime);
+        this.totalTicksScheduled++;
+        // Calculate NEXT time based on total ticks since START to avoid cumulative drift
+        this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
+      }
+    };
+
+    // Initial fill, then keep filling every 15ms
+    schedulerTick();
+    this.schedulerTimerId = setInterval(schedulerTick, this.schedulerInterval * 1000);
   }
 
   // ==========================================================================
@@ -611,7 +603,7 @@ export class TrackerReplayer {
   // ROW PROCESSING (TICK 0)
   // ==========================================================================
 
-  private processRow(chIndex: number, ch: ChannelState, row: any, time: number): void {
+  private processRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     if (!this.song) return;
 
     // Get effect info
@@ -640,7 +632,7 @@ export class TrackerReplayer {
 
     // Handle note
     const noteValue = row.note;
-    const rawPeriod = (row as any).period;
+    const rawPeriod = row.period;
 
     if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
       // For MOD files, use the raw period stored in the row (if available)
@@ -783,7 +775,6 @@ export class TrackerReplayer {
           this.speed = param;
         } else {
           this.bpm = param;
-          this.updateTickInterval();
         }
         break;
 
@@ -873,7 +864,7 @@ export class TrackerReplayer {
   // EFFECT PROCESSING (TICKS 1+)
   // ==========================================================================
 
-  private processEffectTick(chIndex: number, ch: ChannelState, row: any, time: number): void {
+  private processEffectTick(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
     const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
     const x = (param >> 4) & 0x0F;
@@ -1281,24 +1272,7 @@ export class TrackerReplayer {
     }
 
     const engine = getToneEngine();
-
-    // Convert period to note name for synth playback
-    const noteNames = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-    const periodToNote = (period: number): string => {
-      // Find closest period in table
-      for (let oct = 0; oct < 8; oct++) {
-        for (let note = 0; note < 12; note++) {
-          const idx = oct * 12 + note;
-          if (idx < 36 && PERIOD_TABLE[idx] <= period) {
-            const noteName = noteNames[note];
-            return `${noteName.replace('-', '')}${oct + 1}`;
-          }
-        }
-      }
-      return 'C4'; // Default
-    };
-
-    const noteName = periodToNote(ch.period);
+    const noteName = periodToNoteName(ch.period);
     const velocity = ch.volume / 64;
 
     // Schedule VU meter trigger at the correct audio time (not scheduling time)
@@ -1481,7 +1455,7 @@ export class TrackerReplayer {
   // HELPERS
   // ==========================================================================
 
-  private noteToPeriod(note: any, finetune: number): number {
+  private noteToPeriod(note: number | string, finetune: number): number {
     if (typeof note === 'number' && note > 0) {
       // MOD files use period values directly (113-856), XM uses note numbers (1-96)
       if (note >= 113 && note <= 856) {
