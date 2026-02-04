@@ -2371,7 +2371,7 @@ describe('Fallback Detection Tests', () => {
     'MonoSynth': ['MonoSynth'],
     'FMSynth': ['PolySynth', 'FMSynth'], // Can be wrapped in PolySynth
     'AMSynth': ['PolySynth', 'AMSynth'],
-    'TB303': ['JC303Synth', 'TB303Synth', 'Open303Synth', 'Object'], // Multiple engines
+    'TB303': ['JC303Synth', 'Open303Synth', 'Object'],
     'Furnace': ['FurnaceSynth', 'Object'],
     'FurnaceGB': ['FurnaceSynth', 'Object'],
     'FurnaceNES': ['FurnaceSynth', 'Object'],

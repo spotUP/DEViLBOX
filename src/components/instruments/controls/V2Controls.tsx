@@ -92,7 +92,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.osc1.transpose}
             min={-64}
@@ -159,7 +159,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.osc2.transpose}
             min={-64}
@@ -226,7 +226,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.osc3.transpose}
             min={-64}
@@ -286,7 +286,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="grid grid-cols-2 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 gap-6 items-center gap-6">
           <Knob
             value={config.filter1.cutoff}
             min={0}
@@ -324,7 +324,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="grid grid-cols-2 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 gap-6 items-center gap-6">
           <Knob
             value={config.filter2.cutoff}
             min={0}
@@ -362,7 +362,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </select>
         </div>
         
-        <div className="flex justify-around items-center">
+        <div className="flex gap-6 items-center">
           <Knob
             value={config.routing.balance}
             min={0}
@@ -386,7 +386,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">AMP ENVELOPE (EG 1)</h3>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.envelope.attack}
             min={0}
@@ -429,7 +429,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">MOD ENVELOPE (EG 2)</h3>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.envelope2.attack}
             min={0}
@@ -475,7 +475,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 1</h3>
         </div>
         
-        <div className="grid grid-cols-2 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 gap-6 items-center gap-6">
           <Knob
             value={config.lfo1.rate}
             min={0}

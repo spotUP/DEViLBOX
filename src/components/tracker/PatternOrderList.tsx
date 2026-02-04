@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
-import { useToastStore } from '@stores/useToastStore';
+import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, List, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const PatternOrderList: React.FC = React.memo(() => {
@@ -20,7 +20,6 @@ export const PatternOrderList: React.FC = React.memo(() => {
   const reorderPositions = useTrackerStore((state) => state.reorderPositions);
   const setCurrentPosition = useTrackerStore((state) => state.setCurrentPosition);
 
-  const { showToast } = useToastStore();
   const [isExpanded, setIsExpanded] = useState(true);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -53,7 +52,7 @@ export const PatternOrderList: React.FC = React.memo(() => {
 
     reorderPositions(draggedIndex, targetIndex);
     setDraggedIndex(null);
-    showToast('Position reordered', 'success', 2000);
+    notify.success('Position reordered', 2000);
   };
 
   // Handle drag end
@@ -68,30 +67,30 @@ export const PatternOrderList: React.FC = React.memo(() => {
   // Handle adding current pattern to order
   const handleAddCurrent = () => {
     addToOrder(currentPatternIndex);
-    showToast(`Added Pattern ${currentPatternIndex.toString(16).padStart(2, '0').toUpperCase()}`, 'success', 2000);
+    notify.success(`Added Pattern ${currentPatternIndex.toString(16).padStart(2, '0').toUpperCase()}`, 2000);
   };
 
   // Handle removing position
   const handleRemove = (index: number) => {
     if (patternOrder.length > 1) {
       removeFromOrder(index);
-      showToast('Position removed', 'info', 2000);
+      notify.info('Position removed', 2000);
     } else {
-      showToast('Cannot remove last position', 'warning', 2000);
+      notify.warning('Cannot remove last position', 2000);
     }
   };
 
   // Handle duplicating position
   const handleDuplicate = (index: number) => {
     duplicatePosition(index);
-    showToast('Position duplicated', 'success', 2000);
+    notify.success('Position duplicated', 2000);
   };
 
   // Handle clear all
   const handleClearAll = () => {
     if (confirm('Clear all positions? This will reset to just the first pattern.')) {
       clearOrder();
-      showToast('Pattern order cleared', 'info', 2000);
+      notify.info('Pattern order cleared', 2000);
     }
   };
 

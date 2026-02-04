@@ -9,6 +9,8 @@
  * Used in: Roland HP-3000S, HP-2000, KR-33
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class RolandSAProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -78,7 +80,7 @@ class RolandSAProcessor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./RolandSA.js');
+      const moduleFactory = await import(`${BASE_URL}mame/RolandSA.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.RolandSASynth();

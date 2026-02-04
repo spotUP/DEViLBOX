@@ -11,6 +11,8 @@
  * - Linear interpolation
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class ICS2115Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -78,7 +80,7 @@ class ICS2115Processor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./ICS2115.js');
+      const moduleFactory = await import(`${BASE_URL}mame/ICS2115.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.ICS2115Synth();

@@ -86,6 +86,5 @@ export function calculateRowDuration(bpm: f32, speed: i32, delay: i32): f32 {
   return secondsPerTick * <f32>speed * (1.0 + <f32>delay);
 }
 
-export * from './TB303';
 export * from './Scheduler';
 export * from './Periods';

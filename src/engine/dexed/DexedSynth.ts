@@ -198,9 +198,9 @@ export class DexedSynth extends Tone.ToneAudioNode {
    */
   private async initialize(): Promise<void> {
     try {
-      // Get the rawContext from Tone.js (standardized-audio-context)
+      // Get native AudioContext from Tone.js context
       const toneContext = this.context as any;
-      const rawContext = toneContext.rawContext || toneContext._context;
+    const rawContext = toneContext.rawContext || toneContext._context;
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       // Load worklet module (once per session)

@@ -136,7 +136,7 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
         {/* Output */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#3b82f6" title="Output" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={length}
               min={1}
@@ -209,7 +209,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
         {/* Frequency Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#f97316" title="Frequency Sweep" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={startFreq}
               min={0}
@@ -278,7 +278,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
               </button>
             ))}
           </div>
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={wavePower}
               min={1}
@@ -339,7 +339,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#ef4444" title="Pitch" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={startFreq}
               min={1}
@@ -364,7 +364,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#f97316" title="Envelope" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={toneDecTime}
               min={1}
@@ -442,7 +442,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#ef4444" title="Pitch" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={startFreq}
               min={1}
@@ -489,7 +489,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Character Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#f97316" title="Character" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={buzz}
               min={0}
@@ -546,7 +546,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Amplitude Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#eab308" title="Amplitude" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={ampDecSlope}
               min={1}
@@ -614,7 +614,7 @@ export const JeskolaTrilokEditor: React.FC<GeneratorEditorProps> = ({ config, on
         {/* Bass Drum Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#ef4444" title="Bass Drum" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={bdTone}
               min={0}
@@ -692,7 +692,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#6b7280" title="Envelope" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={attack}
               min={1}
@@ -726,7 +726,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         {/* Tone Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#a855f7" title="Tone" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={color}
               min={0}
@@ -820,7 +820,7 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
               ))}
             </select>
           </div>
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={osc4Freq}
               min={0}
@@ -895,7 +895,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#eab308" title="Pitch" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={coarse}
               min={1}
@@ -922,7 +922,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#f97316" title="Envelope" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={attack}
               min={0}
@@ -1089,7 +1089,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               </button>
             ))}
           </div>
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={pw2}
               min={0}
@@ -1145,7 +1145,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               </button>
             ))}
           </div>
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={mix}
               min={0}
@@ -1276,7 +1276,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         {/* Filter */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#f97316" title="Filter" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={cutoff}
               min={0}
@@ -1310,7 +1310,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         {/* Envelope & Accent */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#eab308" title="Envelope & Output" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob
               value={decay}
               min={0}
@@ -1385,7 +1385,7 @@ export const JeskolaDelayEditor: React.FC<GeneratorEditorProps> = ({ config, onC
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#3b82f6" title="Time" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={length} min={1} max={65535} onChange={(v) => updateWord(1, 2, Math.round(v))} label="Length" size="lg" color="#3b82f6" formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex justify-center mt-4 gap-1">
@@ -1396,7 +1396,7 @@ export const JeskolaDelayEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#06b6d4" title="Mix" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <div className="flex flex-col items-center gap-2">
               <span className="text-xs text-gray-400">Dry Thru</span>
               <button onClick={() => updateParam(0, dryThru === 1 ? 0 : 1)} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${dryThru === 1 ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}>{dryThru === 1 ? 'ON' : 'OFF'}</button>
@@ -1447,7 +1447,7 @@ export const JeskolaCrossDelayEditor: React.FC<GeneratorEditorProps> = ({ config
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#ec4899" title="Stereo Time" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={leftLength} min={1} max={65535} onChange={(v) => updateWord(1, 2, Math.round(v))} label="Left" color="#ec4899" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={rightLength} min={1} max={65535} onChange={(v) => updateWord(3, 4, Math.round(v))} label="Right" color="#a855f7" formatValue={(v) => Math.round(v).toString()} />
           </div>
@@ -1459,7 +1459,7 @@ export const JeskolaCrossDelayEditor: React.FC<GeneratorEditorProps> = ({ config
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#8b5cf6" title="Mix" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <div className="flex flex-col items-center gap-2">
               <span className="text-xs text-gray-400">Dry Thru</span>
               <button onClick={() => updateParam(0, dryThru === 1 ? 0 : 1)} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${dryThru === 1 ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}>{dryThru === 1 ? 'ON' : 'OFF'}</button>
@@ -1502,7 +1502,7 @@ export const JeskolaFreeverbEditor: React.FC<GeneratorEditorProps> = ({ config, 
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#6366f1" title="Reverb Character" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={revTime} min={0} max={255} onChange={(v) => updateParam(0, Math.round(v))} label="Room Size" color="#6366f1" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={hiDamp} min={0} max={255} onChange={(v) => updateParam(1, Math.round(v))} label="Hi Damp" color="#6366f1" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={preDelay} min={0} max={255} onChange={(v) => updateParam(2, Math.round(v))} label="Pre-Delay" color="#6366f1" formatValue={(v) => `${Math.round(v)}ms`} />
@@ -1510,14 +1510,14 @@ export const JeskolaFreeverbEditor: React.FC<GeneratorEditorProps> = ({ config, 
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#8b5cf6" title="Filter" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={lowCut} min={0} max={255} onChange={(v) => updateParam(3, Math.round(v))} label="Low Cut" color="#8b5cf6" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={hiCut} min={0} max={255} onChange={(v) => updateParam(4, Math.round(v))} label="Hi Cut" color="#8b5cf6" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
           </div>
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#a855f7" title="Output" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={dryOut} min={0} max={255} onChange={(v) => updateParam(6, Math.round(v))} label="Dry" color="#a855f7" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={revOut} min={0} max={255} onChange={(v) => updateParam(5, Math.round(v))} label="Reverb" color="#a855f7" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
           </div>
@@ -1561,14 +1561,14 @@ export const JeskolaDistortionEditor: React.FC<GeneratorEditorProps> = ({ config
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#22c55e" title="Positive (+)" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={posThreshold} min={0} max={65535} onChange={(v) => updateWord(0, 1, Math.round(v))} label="Threshold" color="#22c55e" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
             <Knob value={posClamp} min={0} max={65535} onChange={(v) => updateWord(2, 3, Math.round(v))} label="Clamp" color="#22c55e" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
           </div>
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
           <SectionHeader color="#ef4444" title="Negative (-)" />
-          <div className="flex justify-around items-end">
+          <div className="flex flex-wrap gap-6 items-end">
             <Knob value={negThreshold} min={0} max={65535} onChange={(v) => updateWord(4, 5, Math.round(v))} label="Threshold" color="#ef4444" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
             <Knob value={negClamp} min={0} max={65535} onChange={(v) => updateWord(6, 7, Math.round(v))} label="Clamp" color="#ef4444" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
           </div>

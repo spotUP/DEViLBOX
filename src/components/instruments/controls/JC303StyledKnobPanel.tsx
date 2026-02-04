@@ -49,7 +49,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
 
   // Update helpers using ref to ensure fresh state
   const updateFilter = (key: string, value: number) => {
-    console.log(`[JC303 UI] Filter update: ${key}=${value}`);
     const currentConfig = configRef.current;
     onChange({
       filter: { ...currentConfig.filter, [key]: value },
@@ -57,7 +56,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
   };
 
   const updateFilterEnvelope = (key: string, value: number) => {
-    console.log(`[JC303 UI] FilterEnv update: ${key}=${value}`);
     const currentConfig = configRef.current;
     onChange({
       filterEnvelope: { ...currentConfig.filterEnvelope, [key]: value },
@@ -328,7 +326,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             ></div>
 
             {/* Normal Decay */}
-            <div style={{ ...style(147, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(125, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.normalDecay || 200}
                 min={30}
@@ -342,7 +340,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             </div>
 
             {/* Accent Decay */}
-            <div style={{ ...style(208, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(172, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.accentDecay || 200}
                 min={30}
@@ -355,21 +353,22 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
               />
             </div>
 
-            {/* Filter FM (Feedback) */}
-            <div style={{ ...style(269, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            {/* Accent Attack */}
+            <div style={{ ...style(219, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
-                value={config.devilFish?.filterFM || 0}
-                min={0}
-                max={100}
-                onChange={(v) => config.devilFish?.enabled && updateDevilFish('filterFM', v)}
-                label="F.FM"
+                value={config.devilFish?.accentAttack ?? 3.0}
+                min={0.3}
+                max={30}
+                logarithmic
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('accentAttack', v)}
+                label="A.Atk"
                 size="sm"
                 color="#ff3333"
               />
             </div>
 
             {/* Soft Attack */}
-            <div style={{ ...style(330, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(266, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.softAttack || 0.3}
                 min={0.3}
@@ -382,8 +381,35 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
               />
             </div>
 
+            {/* VEG Decay */}
+            <div style={{ ...style(313, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.vegDecay ?? 3000}
+                min={16}
+                max={3000}
+                logarithmic
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('vegDecay', v)}
+                label="V.Dec"
+                size="sm"
+                color="#ff3333"
+              />
+            </div>
+
+            {/* VEG Sustain */}
+            <div style={{ ...style(360, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.vegSustain ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('vegSustain', v)}
+                label="V.Sus"
+                size="sm"
+                color="#ff3333"
+              />
+            </div>
+
             {/* Slide Time */}
-            <div style={style(391, 273, 35, 35)}>
+            <div style={style(410, 273, 35, 35)}>
               <Knob
                 value={config.slide?.time || 60}
                 min={10}
@@ -396,7 +422,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             </div>
 
             {/* Drive Amount / Sqr Driver */}
-            <div style={style(452, 273, 35, 35)}>
+            <div style={style(460, 273, 35, 35)}>
               <Knob
                 value={config.overdrive?.amount || 0}
                 min={0}
@@ -610,21 +636,9 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
 
           <div className="h-8 w-px bg-gray-800"></div>
 
-          <div className="flex flex-col">
-            <label className="text-[8px] font-bold text-gray-500 mb-1">ENGINE</label>
-            <select 
-              value={config.engineType || 'jc303'}
-              onChange={(e) => {
-                const val = e.target.value as any;
-                console.log(`[JC303 UI] Engine change: ${val}`);
-                onChange({ engineType: val });
-              }}
-              className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors"
-            >
-              <option value="jc303">JC-303 (WASM)</option>
-              <option value="accurate">Open303 (JS)</option>
-              <option value="tonejs">Tone.js (Legacy)</option>
-            </select>
+          <div className="flex flex-col justify-center">
+            <span className="text-[8px] font-bold text-gray-500">ENGINE</span>
+            <span className="text-[10px] text-accent-primary font-mono">Open303 WASM</span>
           </div>
         </div>
 

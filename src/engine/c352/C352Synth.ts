@@ -68,12 +68,19 @@ export class C352Synth extends Tone.ToneAudioNode {
   public config: Record<string, unknown> = {};
   public audioContext: AudioContext;
   private _disposed: boolean = false;
+  private _initPromise!: Promise<void>;
+  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
+  private _isReady = false;
 
   constructor() {
     super();
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
-    this.initialize();
+    this._initPromise = this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initialize(): Promise<void> {
@@ -123,6 +130,11 @@ export class C352Synth extends Tone.ToneAudioNode {
     this.workletNode.port.onmessage = (event) => {
       if (event.data.type === 'ready') {
         console.log('[C352] WASM node ready');
+        this._isReady = true;
+        for (const call of this._pendingCalls) {
+          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
+        }
+        this._pendingCalls = [];
       }
     };
 
@@ -271,6 +283,10 @@ export class C352Synth extends Tone.ToneAudioNode {
   }
 
   setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
     const paramMap: Record<string, number> = {
       'master_volume': C352Param.MASTER_VOLUME,
       'volume': C352Param.MASTER_VOLUME

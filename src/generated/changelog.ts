@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-04T13:08:42.658Z
+ * Generated: 2026-02-04T21:38:30.547Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '263';
-export const BUILD_HASH = 'fc6af3b';
+export const BUILD_NUMBER = '264';
+export const BUILD_HASH = '8a685bc';
 export const BUILD_DATE = '2026-02-04';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Wire 26 new synths to UI, rebuild buzzmachines with MDK fix, add Makk M4"
+      },
       {
         type: 'feature',
         "description": "Add WASM synth engines, MAME chip ports, new controls, and test infrastructure"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve multiple TypeScript errors in V2 synth and Nano-Exporter"
-      },
-      {
-        type: 'feature',
-        "description": "Expand Farbrausch V2 synth with drum presets and demoscene zaps"
       }
     ]
   }

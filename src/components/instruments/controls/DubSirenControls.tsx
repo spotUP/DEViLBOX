@@ -108,7 +108,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>OSCILLATOR</h3>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-6 items-center justify-around">
+        <div className="flex flex-col md:flex-row gap-6 items-center gap-6">
           {renderWaveSelector(config.oscillator.type, (t) => updateOsc({ type: t }), "Waveform")}
           
           <Knob
@@ -142,7 +142,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         </div>
 
         <div className={`transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-          <div className="flex flex-col md:flex-row gap-6 items-center justify-around">
+          <div className="flex flex-col md:flex-row gap-6 items-center gap-6">
             {renderWaveSelector(config.lfo.type, (t) => updateLFO({ type: t }), "LFO Shape")}
             
             <Knob
@@ -190,7 +190,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.delay.time}
             min={0.01}
@@ -312,7 +312,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.reverb.decay}
             min={0.1}

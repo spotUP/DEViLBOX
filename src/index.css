@@ -2362,9 +2362,9 @@ html[data-theme="cyan-lineart"] #root > * {
 /* Compact knob row */
 .synth-knob-row {
   display: flex;
-  justify-content: space-around;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
+  gap: 16px;
   padding: 8px 0;
 }
 

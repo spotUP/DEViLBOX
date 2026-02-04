@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
-import type { MIDIDeviceInfo, CCMapping, TB303Parameter, KnobBankMode, MappableParameter } from '../midi/types';
+import type { MIDIDeviceInfo, CCMapping, TB303Parameter, KnobBankMode, MappableParameter, GridMappableParameter, GridMIDIMapping } from '../midi/types';
 import { getMIDIManager } from '../midi/MIDIManager';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
@@ -88,6 +88,18 @@ interface MIDIStore {
 
   // MIDI Note Transpose
   setMidiOctaveOffset: (offset: number) => void;
+
+  // Grid MIDI CC Mappings (consolidated from useMIDIMappingStore)
+  gridMappings: Record<string, GridMIDIMapping>;
+  gridIsLearning: boolean;
+  gridLearningParameter: GridMappableParameter | null;
+  addGridMapping: (mapping: GridMIDIMapping) => void;
+  removeGridMapping: (channel: number, controller: number) => void;
+  getGridMapping: (channel: number, controller: number) => GridMIDIMapping | undefined;
+  clearGridMappings: () => void;
+  startGridLearning: (parameter: GridMappableParameter) => void;
+  stopGridLearning: () => void;
+  applyGridMIDIValue: (channel: number, controller: number, value: number) => number | null;
 }
 
 // Helper to update parameters from bank CC
@@ -202,6 +214,24 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       break;
   }
 };
+
+// Grid MIDI mapping helpers
+function getGridMappingKey(channel: number, controller: number): string {
+  return `${channel}:${controller}`;
+}
+
+function applyGridCurve(value: number, curve: 'linear' | 'exponential' | 'logarithmic' = 'linear'): number {
+  const normalized = Math.max(0, Math.min(127, value)) / 127;
+  switch (curve) {
+    case 'exponential': return Math.pow(normalized, 2);
+    case 'logarithmic': return Math.sqrt(normalized);
+    default: return normalized;
+  }
+}
+
+function mapGridValue(midiValue: number, min: number, max: number, curve?: 'linear' | 'exponential' | 'logarithmic'): number {
+  return min + applyGridCurve(midiValue, curve) * (max - min);
+}
 
 // Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
 const DEFAULT_CC_MAPPINGS: CCMapping[] = [
@@ -715,6 +745,60 @@ export const useMIDIStore = create<MIDIStore>()(
           state.midiOctaveOffset = Math.max(-4, Math.min(4, offset));
         });
       },
+
+      // Grid MIDI CC Mappings
+      gridMappings: {},
+      gridIsLearning: false,
+      gridLearningParameter: null,
+
+      addGridMapping: (mapping) => {
+        if (mapping.channel < 0 || mapping.channel > 15) return;
+        if (mapping.controller < 0 || mapping.controller > 127) return;
+        if (mapping.min > mapping.max) return;
+        set((state) => {
+          const key = getGridMappingKey(mapping.channel, mapping.controller);
+          state.gridMappings[key] = mapping;
+        });
+      },
+
+      removeGridMapping: (channel, controller) => {
+        set((state) => {
+          const key = getGridMappingKey(channel, controller);
+          delete state.gridMappings[key];
+        });
+      },
+
+      getGridMapping: (channel, controller) => {
+        const key = getGridMappingKey(channel, controller);
+        return get().gridMappings[key];
+      },
+
+      clearGridMappings: () => {
+        set((state) => {
+          state.gridMappings = {};
+        });
+      },
+
+      startGridLearning: (parameter) => {
+        if (get().gridIsLearning) return;
+        set((state) => {
+          state.gridIsLearning = true;
+          state.gridLearningParameter = parameter;
+        });
+      },
+
+      stopGridLearning: () => {
+        set((state) => {
+          state.gridIsLearning = false;
+          state.gridLearningParameter = null;
+        });
+      },
+
+      applyGridMIDIValue: (channel, controller, value) => {
+        const mapping = get().getGridMapping(channel, controller);
+        if (!mapping) return null;
+        return mapGridValue(value, mapping.min, mapping.max, mapping.curve);
+      },
     })),
     {
       name: 'midi-settings',
@@ -728,6 +812,7 @@ export const useMIDIStore = create<MIDIStore>()(
         showKnobBar: state.showKnobBar,
         midiOutputEnabled: state.midiOutputEnabled,
         midiOctaveOffset: state.midiOctaveOffset,
+        gridMappings: state.gridMappings,
       }),
     }
   )

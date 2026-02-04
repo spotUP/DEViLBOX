@@ -44,7 +44,6 @@ interface VoiceState {
 
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
-  private static tb303WorkletLoaded: boolean = false; // Track if TB303 worklet is loaded
   private static itFilterWorkletLoaded: boolean = false; // Track if ITFilter worklet is loaded
 
   // Master routing chain: instruments → masterInput → masterEffects → masterChannel → analyzers → destination
@@ -329,27 +328,6 @@ export class ToneEngine {
       return null;
     };
 
-    // Pre-load TB303 AudioWorklet
-    if (!ToneEngine.tb303WorkletLoaded) {
-      try {
-        const baseUrl = import.meta.env.BASE_URL || '/';
-        // Add module to rawContext (standardized-audio-context)
-        await rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
-
-        const binary = await fetchDSP();
-        if (binary) {
-          // Use rawContext for node creation with Tone.js helper
-          const tempNode = toneCreateAudioWorkletNode(rawContext, 'tb303-processor');
-          tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
-          tempNode.disconnect();
-        }
-
-        ToneEngine.tb303WorkletLoaded = true;
-      } catch (error) {
-        console.error('[ToneEngine] Failed to load TB303 worklet:', error);
-      }
-    }
-
     // Pre-load ITFilter AudioWorklet
     if (!ToneEngine.itFilterWorkletLoaded) {
       try {
@@ -519,9 +497,14 @@ export class ToneEngine {
    * Set audio lookahead/latency mode
    * @param latency 'interactive' (10ms), 'balanced' (50ms), or 'playback' (150ms)
    */
+  private _currentLatency: string = '';
+
   public setAudioLatency(latency: 'interactive' | 'balanced' | 'playback'): void {
+    if (this._currentLatency === latency) return; // Skip redundant calls
+    this._currentLatency = latency;
+
     let lookAhead = 0.05; // Default balanced
-    
+
     switch (latency) {
       case 'interactive':
         lookAhead = 0.01; // 10ms - Super snappy, might crackle on heavy tracks
@@ -533,7 +516,7 @@ export class ToneEngine {
         lookAhead = 0.15; // 150ms - Very stable, but noticeable triggering delay
         break;
     }
-    
+
     console.log(`[ToneEngine] Setting audio lookahead to ${lookAhead}s (${latency} mode)`);
     Tone.getContext().lookAhead = lookAhead;
   }
@@ -1917,7 +1900,20 @@ export class ToneEngine {
         config.synthType === 'BuzzDynamite6' ||
         config.synthType === 'BuzzM3' ||
         config.synthType === 'Buzz3o3' ||
-        config.synthType === 'SpaceLaser'
+        config.synthType === 'SpaceLaser' ||
+        // MAME chip synths and hardware WASM synths use triggerRelease(time) - no note
+        config.synthType === 'Sam' ||
+        config.synthType === 'V2' ||
+        config.synthType === 'V2Speech' ||
+        config.synthType === 'MAMEVFX' ||
+        config.synthType === 'MAMEDOC' ||
+        config.synthType === 'MAMERSA' ||
+        config.synthType === 'MAMESWP30' ||
+        config.synthType === 'CZ101' ||
+        config.synthType === 'CEM3394' ||
+        config.synthType === 'SCSP' ||
+        // MAME worklet synths (all use triggerRelease with no note)
+        config.synthType.startsWith('MAME')
       ) {
         // These synths use triggerRelease(time) - no note parameter
         instrument.triggerRelease(safeTime);
@@ -1979,7 +1975,24 @@ export class ToneEngine {
       return;
     }
 
-    // For monophonic synths (TB303, MonoSynth, etc.), allocate separate channel/instance
+    // WASM monophonic synths: Always use shared instance to avoid expensive per-note
+    // WASM instantiation. These synths handle note transitions internally
+    // (e.g., Open303 uses noteList for slide/trigger behavior per Classic-Naive MIDI).
+    // Creating separate instances per note causes: orphaned audio, parameter updates
+    // going to wrong instances, and unnecessary WASM init overhead.
+    if (synthType === 'TB303' || synthType === 'Buzz3o3') {
+      // Monophonic: release previous notes unless sliding
+      if (!slide) {
+        this.releaseAllPolyNotes(instrumentId, config);
+      }
+      // Use shared instance (channelIndex undefined → key = instrumentId--1)
+      this.liveVoiceAllocation.set(note, -1);
+      const triggerTime = config.isLive ? this.getImmediateTime() : 0;
+      this.triggerNoteAttack(instrumentId, note, triggerTime, velocity, config, undefined, accent, slide);
+      return;
+    }
+
+    // For other monophonic synths, allocate separate channel/instance
     // Check if this note is already playing
     if (this.liveVoiceAllocation.has(note)) {
       // For slide, we don't release - we glide to the new pitch
@@ -2769,45 +2782,43 @@ export class ToneEngine {
     });
 
     if (synths.length === 0) {
-      // No instances yet - this is normal if no notes have been played
-      // The synth will be created with the correct config on the next note
+      // No instances yet - instrument will be created with correct config on next note
+      // Invalidate cached instrument so it's recreated with updated params
+      console.log(`[ToneEngine] updateTB303Parameters: no synth instances for instrument ${instrumentId} (${this.instruments.size} total instruments)`);
+      this.invalidateInstrument(instrumentId);
       return;
     }
 
+    console.log(`[ToneEngine] updateTB303Parameters: cutoff=${tb303Config.filter?.cutoff} reso=${tb303Config.filter?.resonance} envMod=${tb303Config.filterEnvelope?.envMod} decay=${tb303Config.filterEnvelope?.decay} df=${tb303Config.devilFish?.enabled} (${synths.length} instances)`);
+
     // Update all instances
     synths.forEach((synth) => {
-      const isBuzz3o3 = synth.constructor.name === 'BuzzmachineGenerator';
-      console.log(`[ToneEngine] Updating TB303 parameters for instrument ${instrumentId} (${isBuzz3o3 ? 'Buzz3o3' : 'JC303'})`);
-
-    // Update core TB303 parameters
+      // Update core TB303 parameters
     if (tb303Config.tuning !== undefined) {
-      console.log(`[ToneEngine] Set tuning: ${tb303Config.tuning}`);
       synth.setTuning(tb303Config.tuning);
     }
     if (tb303Config.filter) {
-      console.log(`[ToneEngine] Set filter: cutoff=${tb303Config.filter.cutoff}, resonance=${tb303Config.filter.resonance}`);
       synth.setCutoff(tb303Config.filter.cutoff);
       synth.setResonance(tb303Config.filter.resonance);
     }
     if (tb303Config.filterEnvelope) {
-      console.log(`[ToneEngine] Set filterEnv: envMod=${tb303Config.filterEnvelope.envMod}, decay=${tb303Config.filterEnvelope.decay}`);
       synth.setEnvMod(tb303Config.filterEnvelope.envMod);
-      synth.setDecay(tb303Config.filterEnvelope.decay);
+      // Only set decay here if Devil Fish is NOT enabled - when DF is enabled,
+      // normalDecay and accentDecay are set separately and would be overwritten
+      if (!tb303Config.devilFish?.enabled) {
+        synth.setDecay(tb303Config.filterEnvelope.decay);
+      }
     }
     if (tb303Config.accent) {
-      console.log(`[ToneEngine] Set accent: ${tb303Config.accent.amount}`);
       synth.setAccentAmount(tb303Config.accent.amount);
     }
     if (tb303Config.slide) {
-      console.log(`[ToneEngine] Set slide: ${tb303Config.slide.time}`);
       synth.setSlideTime(tb303Config.slide.time);
     }
     if (tb303Config.overdrive) {
-      console.log(`[ToneEngine] Set overdrive: ${tb303Config.overdrive.amount}`);
       synth.setOverdrive(tb303Config.overdrive.amount);
     }
     if (tb303Config.oscillator) {
-      console.log(`[ToneEngine] Set waveform: ${tb303Config.oscillator.type}`);
       // @ts-ignore - TS struggles with the union type parameter inference here despite all classes accepting the string union
       synth.setWaveform(tb303Config.oscillator.type);
     }
@@ -2815,20 +2826,24 @@ export class ToneEngine {
     // Update Devil Fish parameters
     if (tb303Config.devilFish) {
       const df = tb303Config.devilFish;
-      synth.enableDevilFish(df.enabled, df);
 
       if (df.enabled) {
+        // Apply Devil Fish-specific parameters
         synth.setNormalDecay(df.normalDecay);
         synth.setAccentDecay(df.accentDecay);
+        if (df.accentAttack !== undefined) {
+          synth.setParam('accent_attack', df.accentAttack);
+        }
         synth.setVegDecay(df.vegDecay);
         synth.setVegSustain(df.vegSustain);
         synth.setSoftAttack(df.softAttack);
-        synth.setFilterTracking(df.filterTracking);
-        synth.setFilterFM(df.filterFM);
-        synth.setSweepSpeed(df.sweepSpeed);
-        synth.setAccentSweepEnabled(df.accentSweepEnabled);
-        synth.setHighResonance(df.highResonance);
-        synth.setMuffler(df.muffler);
+      } else {
+        // Reset DF-specific parameters to TB-303 hardware defaults (rosic calibration)
+        synth.setAccentDecay(200);        // rosic default: accentDecay = 200 ms
+        synth.setParam('accent_attack', 3); // rosic default: accentAttack = 3 ms
+        synth.setVegDecay(1230);           // rosic default: ampEnv.setDecay(1230)
+        synth.setVegSustain(0);            // rosic default: ampEnv.setSustainLevel(0.0)
+        synth.setSoftAttack(3);            // rosic default: normalAttack = 3 ms
       }
     }
     }); // End synths.forEach
@@ -2855,6 +2870,80 @@ export class ToneEngine {
     if (instrument instanceof MAMESynth) {
       // MAMESynth instances are typically updated via register writes
       // but we can apply global config changes like clock if needed
+    }
+  }
+
+  /**
+   * Update a parameter on a MAME chip synth instrument in real-time.
+   * @param instrumentId - The instrument ID
+   * @param key - Parameter key (e.g. 'vibrato_speed', 'algorithm')
+   * @param value - Parameter value
+   */
+  public updateMAMEChipParam(instrumentId: number, key: string, value: number): void {
+    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(instrumentKey);
+    if (!instrument) return;
+    if (typeof (instrument as any).setParam === 'function') {
+      (instrument as any).setParam(key, value);
+    }
+  }
+
+  /**
+   * Load a built-in WASM preset on a MAME chip synth instrument.
+   * @param instrumentId - The instrument ID
+   * @param program - Preset program number
+   */
+  public loadMAMEChipPreset(instrumentId: number, program: number): void {
+    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(instrumentKey);
+    if (!instrument) return;
+    if (typeof (instrument as any).loadPreset === 'function') {
+      (instrument as any).loadPreset(program);
+    }
+  }
+
+  /**
+   * Update a text parameter on a MAME chip synth instrument (e.g. speech text).
+   */
+  public updateMAMEChipTextParam(instrumentId: number, key: string, value: string): void {
+    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(instrumentKey);
+    if (!instrument) return;
+    if (typeof (instrument as any).setTextParam === 'function') {
+      (instrument as any).setTextParam(key, value);
+    } else if (typeof (instrument as any).applyConfig === 'function') {
+      (instrument as any).applyConfig({ [key]: value });
+    }
+  }
+
+  /**
+   * Load ROM data into a synth that requires external ROM files.
+   * Dispatches to the appropriate ROM loading method based on synthType.
+   */
+  public loadSynthROM(instrumentId: number, synthType: string, bank: number, data: Uint8Array): void {
+    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(instrumentKey);
+    if (!instrument) return;
+
+    const synth = instrument as any;
+
+    if (synthType === 'MAMERSA') {
+      // RdPianoSynth / D50Synth: loadROM(romId, data)
+      if (typeof synth.loadROM === 'function') {
+        synth.loadROM(bank, data);
+      }
+    } else if (synthType === 'MAMESWP30') {
+      // MU2000Synth: loadWaveROM(data) - single ROM bank
+      if (typeof synth.loadWaveROM === 'function') {
+        synth.loadWaveROM(data.buffer);
+      }
+    } else {
+      // Generic fallback: try loadROM, then setRom
+      if (typeof synth.loadROM === 'function') {
+        synth.loadROM(bank, data);
+      } else if (typeof synth.setRom === 'function') {
+        synth.setRom(bank, data);
+      }
     }
   }
 
@@ -3388,8 +3477,15 @@ export class ToneEngine {
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
     );
 
-    // Final connection: effects → output → destination (analyser or master)
+    // Build full chain: instrument → effect[0] → effect[1] → ... → effect[N-1] → output → destination
     if (effectNodes.length > 0) {
+      // Connect instrument to first effect
+      instrument.connect(effectNodes[0]);
+      // Chain effects together
+      for (let i = 0; i < effectNodes.length - 1; i++) {
+        effectNodes[i].connect(effectNodes[i + 1]);
+      }
+      // Connect last effect to output
       effectNodes[effectNodes.length - 1].connect(output);
     } else {
       instrument.connect(output);

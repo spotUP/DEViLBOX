@@ -319,7 +319,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
-      console.log(`[InstrumentStore] Updating instrument ${id}`, updates);
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Check what's changing
@@ -346,7 +345,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.dubSiren ||
         updates.synare ||
         updates.sam ||
-        updates.v2Speech
+        updates.v2Speech ||
+        updates.tb303 ||
+        updates.buzzmachine ||
+        updates.spaceLaser ||
+        updates.v2
       );
 
       set((state) => {
@@ -493,9 +496,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           }
         } catch (error) {
           // Fall through to full invalidation if update failed or was skipped
-          if (process.env.NODE_ENV === 'development') {
-             // console.log('[InstrumentStore] Skipping optimized update:', error);
-          }
+          console.warn('[InstrumentStore] Real-time update failed, falling through to invalidation:', error);
         }
       }
 

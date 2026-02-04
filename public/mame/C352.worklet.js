@@ -3,6 +3,8 @@
  * Namco 32-Voice PCM Sound Chip for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class C352Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -93,7 +95,7 @@ class C352Processor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./C352.js');
+      const moduleFactory = await import(`${BASE_URL}mame/C352.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.C352Synth();

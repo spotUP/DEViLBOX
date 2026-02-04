@@ -152,7 +152,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
             <div className="absolute top-2 left-1 text-[8px] text-gray-500 uppercase font-bold origin-left rotate-90">Throat (Y)</div>
           </div>
           
-          <div className="flex gap-4 mt-4 w-full justify-around">
+          <div className="flex flex-wrap gap-4 mt-4">
             <div className="text-center">
               <div className="text-[10px] text-gray-500 uppercase font-bold">Mouth</div>
               <div className="text-xs text-amber-500 font-mono font-bold">{config.mouth}</div>

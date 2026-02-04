@@ -19,6 +19,8 @@ class Open303Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.currentNote = -1; // Track currently held note for slide logic
+    this.pendingMessages = []; // Queue messages received before WASM init completes
+    this.initializing = false;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -26,6 +28,15 @@ class Open303Processor extends AudioWorkletProcessor {
   }
 
   async handleMessage(data) {
+    // Queue non-init messages while WASM is still loading
+    if (data.type !== 'init' && data.type !== 'dispose' && !this.synth && this.initializing) {
+      // Only queue setParameter (not notes - those are stale by the time init finishes)
+      if (data.type === 'setParameter') {
+        this.pendingMessages.push(data);
+      }
+      return;
+    }
+
     switch (data.type) {
       case 'init':
         await this.initSynth(data.sampleRate, data.wasmBinary, data.jsCode);
@@ -64,9 +75,8 @@ class Open303Processor extends AudioWorkletProcessor {
         break;
       case 'gateOff':
         if (this.synth && this.currentNote >= 0) {
-          // Gate off: release the current note's amp envelope (303 staccato)
-          // This allows the amp envelope to enter its fast release phase,
-          // creating the characteristic punchy staccato between non-slide notes.
+          // Gate off: VCA envelope enters 16ms release (matching real 303 hardware).
+          // Real TB-303: 8ms hold + 8ms linear decay when gate goes LOW.
           console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
           this.synth.noteOff(this.currentNote);
           this.currentNote = -1;
@@ -99,6 +109,36 @@ class Open303Processor extends AudioWorkletProcessor {
           this.synth.programChange(data.program);
         }
         break;
+      case 'getDiagnostics':
+        if (this.synth) {
+          try {
+            var peak = 0;
+            if (this.outputBufferL) {
+              for (var di = 0; di < this.bufferSize; di++) {
+                var abs = Math.abs(this.outputBufferL[di] || 0);
+                if (abs > peak) peak = abs;
+              }
+            }
+            this.port.postMessage({
+              type: 'diagnostics',
+              cutoff: this.synth.getParameter(2),
+              resonance: this.synth.getParameter(3),
+              envMod: this.synth.getParameter(4),
+              decay: this.synth.getParameter(5),
+              accent: this.synth.getParameter(6),
+              waveform: this.synth.getParameter(0),
+              volume: this.synth.getParameter(7),
+              peakAmplitude: peak,
+              currentNote: this.currentNote,
+              initialized: this.initialized
+            });
+          } catch (e) {
+            this.port.postMessage({ type: 'diagnostics', error: e.message });
+          }
+        } else {
+          this.port.postMessage({ type: 'diagnostics', error: 'synth not initialized', initialized: this.initialized, initializing: this.initializing });
+        }
+        break;
       case 'dispose':
         this.cleanup();
         break;
@@ -106,6 +146,7 @@ class Open303Processor extends AudioWorkletProcessor {
   }
 
   async initSynth(sampleRate, wasmBinary, jsCode) {
+    this.initializing = true;
     try {
       // Cleanup any existing allocation
       this.cleanup();
@@ -208,9 +249,26 @@ class Open303Processor extends AudioWorkletProcessor {
       this.updateBufferViews();
 
       this.initialized = true;
+      this.initializing = false;
+
+      // Replay queued parameter messages that arrived during WASM init
+      if (this.pendingMessages.length > 0) {
+        console.log('[Open303 Worklet] Replaying ' + this.pendingMessages.length + ' queued parameter messages');
+        // Deduplicate: keep only the last value for each paramId
+        const paramMap = new Map();
+        for (const msg of this.pendingMessages) {
+          paramMap.set(msg.paramId, msg.value);
+        }
+        for (const [paramId, value] of paramMap) {
+          this.synth.setParameter(paramId, value);
+        }
+        this.pendingMessages = [];
+      }
+
       this.port.postMessage({ type: 'ready' });
       console.log('[Open303 Worklet] ✓ Ready');
     } catch (error) {
+      this.initializing = false;
       console.error('[Open303 Worklet] Init error:', error);
       this.port.postMessage({ type: 'error', message: error.message });
     }

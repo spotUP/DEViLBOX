@@ -116,9 +116,7 @@ export function useWhatsNew() {
     // Check if user has seen the current version
     const seenVersion = localStorage.getItem(STORAGE_KEY);
     if (seenVersion !== CURRENT_VERSION) {
-      // Show modal after a short delay so app has time to render
-      const timer = setTimeout(() => setShowModal(true), 500);
-      return () => clearTimeout(timer);
+      setShowModal(true);
     }
   }, []);
 

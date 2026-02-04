@@ -1096,6 +1096,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Radio',
     color: 'amber',
   },
+  V2Speech: {
+    type: 'V2Speech',
+    name: 'V2 Speech',
+    shortName: 'V2Sp',
+    description: 'Farbrausch V2 speech synthesis module for robotic and vocoder-style voices.',
+    bestFor: ['Speech', 'Robotic Voices', 'Demoscene', 'FX'],
+    icon: 'Radio',
+    color: 'amber',
+  },
   Sam: {
     type: 'Sam',
     name: 'Commodore SAM',

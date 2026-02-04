@@ -192,6 +192,10 @@ export class VFXSynth extends Tone.ToneAudioNode {
     return this.initPromise;
   }
 
+  public async ensureInitialized(): Promise<void> {
+    return this.init();
+  }
+
   private async doInit(): Promise<void> {
     await this.mameEngine.init();
 

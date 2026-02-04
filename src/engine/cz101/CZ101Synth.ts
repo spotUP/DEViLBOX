@@ -153,6 +153,10 @@ export class CZ101Synth extends Tone.ToneAudioNode {
     return this.initPromise;
   }
 
+  public async ensureInitialized(): Promise<void> {
+    return this.init();
+  }
+
   private async doInit(): Promise<void> {
     const ctx = Tone.getContext().rawContext as AudioContext;
 

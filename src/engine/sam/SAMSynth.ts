@@ -51,6 +51,10 @@ export class SAMSynth extends Tone.ToneAudioNode {
     return this._readyPromise;
   }
 
+  public async ensureInitialized(): Promise<void> {
+    return this._readyPromise;
+  }
+
   private async _render() {
     if (this._isRendering) return;
     this._isRendering = true;
@@ -147,8 +151,13 @@ export class SAMSynth extends Tone.ToneAudioNode {
     this._player.volume.value = Tone.gainToDb(velocity);
   }
 
+  public triggerAttackRelease(note: string | number, _duration: Tone.Unit.Time, time?: number, velocity: number = 1) {
+    this.triggerAttack(note, time, velocity);
+    // One-shot playback: ignore duration, let buffer play to completion
+  }
+
   public triggerRelease() {
-    // One-shot playback usually doesn't need release, 
+    // One-shot playback usually doesn't need release,
     // but we could stop it if desired.
     // this._player.stop();
   }

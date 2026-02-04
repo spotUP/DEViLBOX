@@ -145,7 +145,8 @@ export class GuitarMLEngine {
 
     try {
       // Fetch model JSON
-      const response = await fetch(`/models/guitarml/${model.fileName}`);
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const response = await fetch(`${baseUrl}models/guitarml/${model.fileName}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch model: ${response.statusText}`);
       }

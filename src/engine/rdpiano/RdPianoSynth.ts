@@ -98,6 +98,7 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
   private loadedRomSets = new Set<number>();
   private currentPatch = 0;
   private romLoadError = false;
+  private _initPromise!: Promise<void>;
 
   // Static caches shared across instances
   private static romCache = new Map<string, ArrayBuffer>();
@@ -123,7 +124,11 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
       volume: 1.0,
       ...config,
     };
-    void this.initialize();
+    this._initPromise = this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initialize(): Promise<void> {

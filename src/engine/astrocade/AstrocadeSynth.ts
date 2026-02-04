@@ -63,12 +63,19 @@ export class AstrocadeSynth extends Tone.ToneAudioNode {
   public config: Record<string, unknown> = {};
   public audioContext: AudioContext;
   private _disposed: boolean = false;
+  private _initPromise!: Promise<void>;
+  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
+  private _isReady = false;
 
   constructor() {
     super();
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
-    this.initialize();
+    this._initPromise = this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initialize(): Promise<void> {
@@ -117,6 +124,12 @@ export class AstrocadeSynth extends Tone.ToneAudioNode {
     this.workletNode.port.onmessage = (event) => {
       if (event.data.type === 'ready') {
         console.log('[Astrocade] WASM node ready');
+        this._isReady = true;
+        for (const call of this._pendingCalls) {
+          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
+          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
+        }
+        this._pendingCalls = [];
       }
     };
 
@@ -193,6 +206,10 @@ export class AstrocadeSynth extends Tone.ToneAudioNode {
   }
 
   setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
     const paramMap: Record<string, number> = {
       volume: AstrocadeParam.VOLUME,
       vibrato_speed: AstrocadeParam.VIBRATO_SPEED,
@@ -260,6 +277,10 @@ export class AstrocadeSynth extends Tone.ToneAudioNode {
 
   /** Load a preset patch by program number (0-7) */
   loadPreset(program: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
+      return;
+    }
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'programChange', program });
   }

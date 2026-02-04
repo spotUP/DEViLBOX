@@ -80,7 +80,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>PITCH & TONE</h3>
         </div>
         
-        <div className="flex justify-around items-end">
+        <div className="flex flex-wrap gap-6 items-end">
           <Knob
             value={config.oscillator.tune}
             min={40}
@@ -138,7 +138,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.sweep.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex flex-wrap gap-6 transition-opacity ${config.sweep.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.sweep.amount}
             min={0}
@@ -171,7 +171,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>FILTER</h3>
         </div>
         
-        <div className="flex justify-around items-end">
+        <div className="flex flex-wrap gap-6 items-end">
           <Knob
             value={config.filter.cutoff}
             min={20}
@@ -229,7 +229,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </label>
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex flex-wrap gap-6 transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.lfo.rate}
             min={0.1}

@@ -26,8 +26,12 @@ useSettingsStore.subscribe(
 );
 
 // 2. Subscribe to transport state for Auto-Latency switching
+// Track previous isPlaying to avoid redundant setAudioLatency calls on every store mutation
+let _prevIsPlaying = useTransportStore.getState().isPlaying;
 useTransportStore.subscribe(
   (state) => {
+    if (state.isPlaying === _prevIsPlaying) return; // Only react to actual play/stop changes
+    _prevIsPlaying = state.isPlaying;
     try {
       const settings = useSettingsStore.getState();
       if (settings.autoLatency) {
