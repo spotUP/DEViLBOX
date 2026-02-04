@@ -107,11 +107,8 @@ class OBXdProcessor extends AudioWorkletProcessor {
       }
 
       // Evaluate the JS code to get the module factory
-      // The Emscripten output is an IIFE that defines createOBXdModule
-      // We wrap it to extract the function
       let createModule;
       try {
-        // Try to evaluate as a module that returns a factory
         const wrappedCode = `${jsCode}; return typeof createOBXdModule !== 'undefined' ? createOBXdModule : (typeof Module !== 'undefined' ? Module : null);`;
         createModule = new Function(wrappedCode)();
       } catch (evalErr) {
@@ -123,11 +120,31 @@ class OBXdProcessor extends AudioWorkletProcessor {
         throw new Error('Could not load OBXd module factory');
       }
 
+      // Intercept WebAssembly.instantiate to capture WASM memory
+      // (Emscripten doesn't export HEAPF32/wasmMemory on Module object)
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) {
+              capturedMemory = value;
+              break;
+            }
+          }
+        }
+        return result;
+      };
+
       // Initialize the WASM module with the provided binary
-      const Module = await createModule({
-        wasmBinary: wasmBinary,
-        // No locateFile needed since we're providing the binary directly
-      });
+      let Module;
+      try {
+        Module = await createModule({ wasmBinary });
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
 
       // Create synth instance
       this.synth = new Module.OBXdSynth();
@@ -138,17 +155,25 @@ class OBXdProcessor extends AudioWorkletProcessor {
       this.outputPtrL = Module._malloc(bufferSize);
       this.outputPtrR = Module._malloc(bufferSize);
 
+      // Get WASM memory buffer - try multiple sources:
+      // 1. Module.HEAPF32 (standard Emscripten export)
+      // 2. Module.wasmMemory (exposed via JS preprocessing)
+      // 3. capturedMemory (intercepted from WebAssembly.instantiate)
+      const wasmMem = Module.wasmMemory || capturedMemory;
+      const heapBuffer = Module.HEAPF32
+        ? Module.HEAPF32.buffer
+        : (wasmMem ? wasmMem.buffer : null);
+
+      if (!heapBuffer) {
+        throw new Error('Cannot access WASM memory buffer');
+      }
+
+      // Store the memory reference for buffer regeneration in process()
+      this._wasmMemory = wasmMem;
+
       // Create typed array views into WASM memory
-      this.outputBufferL = new Float32Array(
-        Module.HEAPF32.buffer,
-        this.outputPtrL,
-        128
-      );
-      this.outputBufferR = new Float32Array(
-        Module.HEAPF32.buffer,
-        this.outputPtrR,
-        128
-      );
+      this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, 128);
+      this.outputBufferR = new Float32Array(heapBuffer, this.outputPtrR, 128);
 
       this.Module = Module;
       this.isInitialized = true;
@@ -186,17 +211,10 @@ class OBXdProcessor extends AudioWorkletProcessor {
 
       // Copy from WASM memory to output
       // Need to recreate views if WASM memory was resized
-      if (this.outputBufferL.buffer !== this.Module.HEAPF32.buffer) {
-        this.outputBufferL = new Float32Array(
-          this.Module.HEAPF32.buffer,
-          this.outputPtrL,
-          128
-        );
-        this.outputBufferR = new Float32Array(
-          this.Module.HEAPF32.buffer,
-          this.outputPtrR,
-          128
-        );
+      const currentBuffer = this._wasmMemory ? this._wasmMemory.buffer : (this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null);
+      if (currentBuffer && this.outputBufferL.buffer !== currentBuffer) {
+        this.outputBufferL = new Float32Array(currentBuffer, this.outputPtrL, 128);
+        this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
       }
 
       outputL.set(this.outputBufferL.subarray(0, numSamples));

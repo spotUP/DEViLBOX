@@ -10,6 +10,7 @@ import { VolumeCell } from './VolumeCell';
 import { EffectCell } from './EffectCell';
 import { AccentCell } from './AccentCell';
 import { SlideCell } from './SlideCell';
+import { ProbabilityCell } from './ProbabilityCell';
 import { useTrackerStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import type { TrackerCell, CursorPosition } from '@typedefs';
@@ -32,16 +33,24 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
   ({ rowIndex, cells, channelColors, cursorColumnType, cursorChannelIndex, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, channelWidths, collapsedChannels, baseChannelIndex = 0 }) => {
     const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
+    const rowHighlightInterval = useUIStore((state) => state.rowHighlightInterval);
+    const showBeatLabels = useUIStore((state) => state.showBeatLabels);
     const rowNumber = useHexNumbers
       ? rowIndex.toString(16).toUpperCase().padStart(2, '0')
       : rowIndex.toString(10).padStart(2, '0');
+
+    // Beat label: beat.tick within measure (assumes 4 rows per beat, configurable via highlight interval)
+    const beatInterval = rowHighlightInterval || 4;
+    const beat = Math.floor(rowIndex / beatInterval) + 1;
+    const tick = (rowIndex % beatInterval) + 1;
+    const beatLabel = `${beat}.${tick}`;
     const effectiveChannelWidth = channelWidth || 260;
 
     // Row background styling - Modern dark theme
     // Only beat highlight and alternating colors - NO cursor/playback row highlighting
     // The fixed center edit bar indicates the active position
     const getRowBgClass = () => {
-      if (rowIndex % 4 === 0) {
+      if (rowHighlightInterval > 0 && rowIndex % rowHighlightInterval === 0) {
         return 'bg-tracker-row-highlight';
       }
       return rowIndex % 2 === 0 ? 'bg-tracker-row-even' : 'bg-tracker-row-odd';
@@ -52,12 +61,17 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
         {/* Row Number */}
         <div
           className={`
-            flex-shrink-0 w-12 h-full flex items-center justify-center
+            flex-shrink-0 ${showBeatLabels ? 'w-20' : 'w-12'} h-full flex items-center justify-center gap-1
             text-xs font-mono border-r border-dark-border
-            ${rowIndex % 4 === 0 ? 'text-text-secondary font-bold' : 'text-text-muted'}
+            ${rowHighlightInterval > 0 && rowIndex % rowHighlightInterval === 0 ? 'text-text-secondary font-bold' : 'text-text-muted'}
           `}
         >
           {rowNumber}
+          {showBeatLabels && (
+            <span className={`text-[9px] ${tick === 1 ? 'text-yellow-500' : 'text-text-muted/50'}`}>
+              {beatLabel}
+            </span>
+          )}
         </div>
 
         {/* Channels */}
@@ -143,6 +157,12 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                     value={cell.slide}
                     isActive={isChannelActive && cursorColumnType === 'slide'}
                     onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
+                  />
+
+                  {/* Probability */}
+                  <ProbabilityCell
+                    value={cell.probability}
+                    isActive={isChannelActive && cursorColumnType === 'probability'}
                   />
                 </>
               )}

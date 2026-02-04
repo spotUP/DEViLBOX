@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-04T06:16:30.357Z
+ * Generated: 2026-02-04T13:08:42.658Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '261';
-export const BUILD_HASH = 'cccbe5d';
+export const BUILD_NUMBER = '263';
+export const BUILD_HASH = 'fc6af3b';
 export const BUILD_DATE = '2026-02-04';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add WASM synth engines, MAME chip ports, new controls, and test infrastructure"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: gitignore juce-wasm build artifacts"
+      },
       {
         type: 'improvement',
         "description": "Chore: remove unused K051649Synth.ts"
@@ -224,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Expand Farbrausch V2 synth with drum presets and demoscene zaps"
-      },
-      {
-        type: 'feature',
-        "description": "Add Nano-Exporter for demoscene-grade 4k intro binary packing"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in baking system"
       }
     ]
   }

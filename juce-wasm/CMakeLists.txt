@@ -57,9 +57,14 @@ add_subdirectory(obxd)
 add_subdirectory(open303)
 
 # ============================================================================
+# RdPiano (Roland SA-synthesis Digital Piano) - GPL-3.0
+# ============================================================================
+add_subdirectory(rdpiano)
+
+# ============================================================================
 # Combined build target
 # ============================================================================
 add_custom_target(all_synths
-    DEPENDS DexedWASM OBXdWASM Open303WASM
+    DEPENDS DexedWASM OBXdWASM Open303WASM RdPianoWASM
     COMMENT "Building all JUCE WASM synths"
 )

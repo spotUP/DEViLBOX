@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { MacroSlotsPanel } from '../tracker/MacroSlotsPanel';
-import { Sliders, Shuffle, Download, X } from 'lucide-react';
+import { Sliders, Shuffle, Download, X, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator } from 'lucide-react';
 
 interface AdvancedEditModalProps {
   onClose: () => void;
@@ -15,6 +15,11 @@ interface AdvancedEditModalProps {
   onShowRemapInstrument?: (scope: 'block' | 'track' | 'pattern' | 'song') => void;
   onExportPattern?: () => void;
   onExportTrack?: () => void;
+  onReverse?: () => void;
+  onExpand?: () => void;
+  onShrink?: () => void;
+  onDuplicate?: () => void;
+  onMath?: (op: 'add' | 'sub' | 'mul' | 'div', value: number, column: 'volume' | 'eff') => void;
 }
 
 export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
@@ -24,9 +29,16 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
   onShowRemapInstrument,
   onExportPattern,
   onExportTrack,
+  onReverse,
+  onExpand,
+  onShrink,
+  onDuplicate,
+  onMath,
 }) => {
   const { selection } = useTrackerStore();
   const [expandedSection, setExpandedSection] = useState<string | null>('macros');
+  const [mathValue, setMathValue] = useState(1);
+  const [mathColumn, setMathColumn] = useState<'volume' | 'eff'>('volume');
 
   const hasSelection = selection !== null;
 
@@ -114,6 +126,122 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   >
                     Fade Pattern
                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Block Operations */}
+          <div className="border border-ft2-border rounded">
+            <button
+              onClick={() => toggleSection('blockops')}
+              className="w-full px-3 py-2 bg-dark-bgTertiary hover:bg-dark-bgHover text-left text-sm font-medium text-ft2-text flex items-center justify-between transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <ArrowUpDown size={14} />
+                Block Operations
+              </span>
+              <span>{expandedSection === 'blockops' ? '▼' : '▶'}</span>
+            </button>
+            {expandedSection === 'blockops' && (
+              <div className="p-3 space-y-2 bg-dark-bgSecondary">
+                <div className="text-xs text-ft2-textDim mb-2">
+                  Transform selected block content
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={onReverse}
+                    disabled={!hasSelection}
+                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  >
+                    <ArrowUpDown size={12} />
+                    Reverse
+                  </button>
+                  <button
+                    onClick={onDuplicate}
+                    disabled={!hasSelection}
+                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Copy size={12} />
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={onExpand}
+                    disabled={!hasSelection}
+                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Maximize2 size={12} />
+                    Expand 2x
+                  </button>
+                  <button
+                    onClick={onShrink}
+                    disabled={!hasSelection}
+                    className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Minimize2 size={12} />
+                    Shrink 2x
+                  </button>
+                </div>
+
+                {/* Math Operations */}
+                <div className="mt-3 pt-2 border-t border-ft2-border">
+                  <div className="text-xs text-ft2-textDim mb-2 flex items-center gap-1">
+                    <Calculator size={12} />
+                    Math Operations
+                  </div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <select
+                      value={mathColumn}
+                      onChange={(e) => setMathColumn(e.target.value as 'volume' | 'eff')}
+                      className="bg-dark-bg border border-ft2-border rounded px-2 py-1 text-xs text-ft2-text"
+                    >
+                      <option value="volume">Volume</option>
+                      <option value="eff">Effect</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={mathValue}
+                      onChange={(e) => { const v = Number(e.target.value); if (!isNaN(v)) setMathValue(Math.max(0, Math.min(255, v))); }}
+                      className="bg-dark-bg border border-ft2-border rounded px-2 py-1 text-xs text-ft2-text w-16"
+                      min={0}
+                      max={255}
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    <button
+                      onClick={() => onMath?.('add', mathValue, mathColumn)}
+                      disabled={!hasSelection}
+                      className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => onMath?.('sub', mathValue, mathColumn)}
+                      disabled={!hasSelection}
+                      className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      −
+                    </button>
+                    <button
+                      onClick={() => onMath?.('mul', mathValue, mathColumn)}
+                      disabled={!hasSelection}
+                      className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ×
+                    </button>
+                    <button
+                      onClick={() => onMath?.('div', mathValue, mathColumn)}
+                      disabled={!hasSelection}
+                      className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ÷
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-ft2-textDim mt-1">
+                  Alt+R = Reverse | Alt+D = Duplicate
                 </div>
               </div>
             )}

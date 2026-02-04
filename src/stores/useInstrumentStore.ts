@@ -38,8 +38,8 @@ import {
   DEFAULT_DRUMKIT,
   DEFAULT_MAME_VFX,
   DEFAULT_MAME_DOC,
-  DEFAULT_MAME_RSA,
   DEFAULT_MAME_SWP30,
+  DEFAULT_RDPIANO,
   DEFAULT_CHIPTUNE_MODULE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
@@ -170,7 +170,7 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       base.mame = { ...DEFAULT_MAME_DOC };
       break;
     case 'MAMERSA':
-      base.mame = { ...DEFAULT_MAME_RSA };
+      base.rdpiano = { ...DEFAULT_RDPIANO };
       break;
     case 'MAMESWP30':
       base.mame = { ...DEFAULT_MAME_SWP30 };

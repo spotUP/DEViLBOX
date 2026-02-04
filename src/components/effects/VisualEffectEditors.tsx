@@ -21,6 +21,7 @@ import {
   ArrowLeftRight,
   Wind,
   Volume2,
+  Disc,
 } from 'lucide-react';
 
 interface VisualEffectEditorProps {
@@ -1156,6 +1157,254 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
 };
 
 // ============================================================================
+// SPACEY DELAYER (WASM Multitap Delay)
+// ============================================================================
+
+export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const firstTap = getParam(effect, 'firstTap', 250);
+  const tapSize = getParam(effect, 'tapSize', 150);
+  const feedback = getParam(effect, 'feedback', 40);
+  const multiTap = getParam(effect, 'multiTap', 1);
+  const tapeFilter = getParam(effect, 'tapeFilter', 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Delay Controls */}
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#8b5cf6" title="Spacey Delayer" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={firstTap}
+            min={10}
+            max={2000}
+            onChange={(v) => onUpdateParameter('firstTap', v)}
+            label="First Tap"
+            color="#8b5cf6"
+            formatValue={(v) => `${Math.round(v)}ms`}
+          />
+          <Knob
+            value={tapSize}
+            min={10}
+            max={1000}
+            onChange={(v) => onUpdateParameter('tapSize', v)}
+            label="Tap Size"
+            color="#a78bfa"
+            formatValue={(v) => `${Math.round(v)}ms`}
+          />
+          <Knob
+            value={feedback}
+            min={0}
+            max={95}
+            onChange={(v) => onUpdateParameter('feedback', v)}
+            label="Feedback"
+            color="#7c3aed"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={effect.wet}
+            min={0}
+            max={100}
+            onChange={onUpdateWet}
+            label="Mix"
+            color="#06b6d4"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* Toggles */}
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#a78bfa" title="Options" />
+        <div className="flex gap-4">
+          <button
+            onClick={() => onUpdateParameter('multiTap', multiTap ? 0 : 1)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              multiTap
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Multi-Tap {multiTap ? 'ON' : 'OFF'}
+          </button>
+          <button
+            onClick={() => onUpdateParameter('tapeFilter', tapeFilter ? 0 : 1)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tapeFilter
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Tape Filter {tapeFilter ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ============================================================================
+// RE-TAPE-ECHO EDITOR (WASM)
+// ============================================================================
+
+export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const mode = getParam(effect, 'mode', 3);
+  const repeatRate = getParam(effect, 'repeatRate', 0.5);
+  const intensity = getParam(effect, 'intensity', 0.5);
+  const echoVolume = getParam(effect, 'echoVolume', 0.8);
+  const wow = getParam(effect, 'wow', 0);
+  const flutter = getParam(effect, 'flutter', 0);
+  const dirt = getParam(effect, 'dirt', 0);
+  const inputBleed = getParam(effect, 'inputBleed', 0);
+  const loopAmount = getParam(effect, 'loopAmount', 0);
+  const playheadFilter = getParam(effect, 'playheadFilter', 1);
+
+  const modeLabels = ['Head 1', 'Head 2', 'Both', 'H1+FB', 'H2+FB', 'Both+FB'];
+
+  return (
+    <div className="space-y-4">
+      {/* Main Controls */}
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#dc2626" title="RE Tape Echo" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={repeatRate * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('repeatRate', v / 100)}
+            label="Rate"
+            color="#dc2626"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={intensity * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('intensity', v / 100)}
+            label="Intensity"
+            color="#ef4444"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={echoVolume * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('echoVolume', v / 100)}
+            label="Echo Vol"
+            color="#f97316"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={effect.wet}
+            min={0}
+            max={100}
+            onChange={onUpdateWet}
+            label="Mix"
+            color="#06b6d4"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* Tape Imperfections */}
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#f97316" title="Tape Character" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={wow * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('wow', v / 100)}
+            label="Wow"
+            color="#f97316"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={flutter * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('flutter', v / 100)}
+            label="Flutter"
+            color="#fb923c"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={dirt * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('dirt', v / 100)}
+            label="Dirt"
+            color="#ea580c"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={loopAmount * 100}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('loopAmount', v / 100)}
+            label="Tape Loop"
+            color="#a16207"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* Mode + Toggles */}
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <SectionHeader color="#b91c1c" title="Mode & Options" />
+        <div className="mb-3">
+          <div className="text-xs text-gray-400 mb-2">Echo Mode</div>
+          <div className="grid grid-cols-6 gap-1">
+            {modeLabels.map((label, i) => (
+              <button
+                key={i}
+                onClick={() => onUpdateParameter('mode', i)}
+                className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                  mode === i
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-4">
+          <button
+            onClick={() => onUpdateParameter('playheadFilter', playheadFilter ? 0 : 1)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              playheadFilter
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Head EQ {playheadFilter ? 'ON' : 'OFF'}
+          </button>
+          <button
+            onClick={() => onUpdateParameter('inputBleed', inputBleed ? 0 : 1)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              inputBleed
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            Bleed {inputBleed ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ============================================================================
 // EFFECT EDITOR FACTORY
 // ============================================================================
 
@@ -1181,6 +1430,8 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   Filter: FilterEditor,
   JCReverb: JCReverbEditor,
   StereoWidener: StereoWidenerEditor,
+  SpaceyDelayer: SpaceyDelayerEditor,
+  RETapeEcho: RETapeEchoEditor,
 };
 
 /**
@@ -1225,6 +1476,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     EQ3: <Sliders size={20} className="text-white" />,
     Filter: <Sliders size={20} className="text-white" />,
     StereoWidener: <ArrowLeftRight size={20} className="text-white" />,
+    SpaceyDelayer: <Clock size={20} className="text-white" />,
+    RETapeEcho: <Disc size={20} className="text-white" />,
   };
 
   // Color mapping
@@ -1243,6 +1496,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     EQ3: 'from-blue-500 to-indigo-600',
     Filter: 'from-orange-500 to-red-600',
     StereoWidener: 'from-pink-500 to-fuchsia-600',
+    SpaceyDelayer: 'from-purple-500 to-violet-600',
+    RETapeEcho: 'from-red-600 to-orange-600',
   };
 
   const icon = iconMap[effect.type] || <Music size={20} className="text-white" />;

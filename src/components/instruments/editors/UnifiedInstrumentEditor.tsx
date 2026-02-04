@@ -14,7 +14,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
-  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_MAME_RSA, DEFAULT_DEXED, DEFAULT_OBXD
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD
 } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { PresetDropdown } from '../presets/PresetDropdown';
@@ -32,6 +32,7 @@ import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
 import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
+import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic } from 'lucide-react';
@@ -54,7 +55,7 @@ interface UnifiedInstrumentEditorProps {
 
 /** Check if synth type uses MAME editor */
 function isMAMEType(synthType: SynthType): boolean {
-  return ['MAMEVFX', 'MAMEDOC', 'MAMERSA'].includes(synthType);
+  return ['MAMEVFX', 'MAMEDOC'].includes(synthType);
 }
 
 /** Check if synth type uses Furnace chip emulation editor */
@@ -461,7 +462,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleMAMEChange = useCallback((updates: Partial<typeof instrument.mame>) => {
     const currentMame = instrument.mame || (
       instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC :
-      instrument.synthType === 'MAMERSA' ? DEFAULT_MAME_RSA :
       DEFAULT_MAME_VFX
     );
     const newConfig = { ...currentMame, ...updates };
@@ -572,6 +572,15 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'furnace') {
     const furnaceConfig = instrument.furnace || DEFAULT_FURNACE;
 
+    // Determine channel names for oscilloscope based on synth type
+    const isNativeDispatch = instrument.synthType === 'FurnaceGB';
+    const channelNames: Record<string, string[]> = {
+      FurnaceGB: ['PU1', 'PU2', 'WAV', 'NOI'],
+      FurnaceNES: ['PU1', 'PU2', 'TRI', 'NOI', 'DPCM'],
+      FurnacePSG: ['SQ1', 'SQ2', 'SQ3', 'NOI'],
+      FurnaceAY: ['A', 'B', 'C'],
+    };
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {/* Use common header with visualization */}
@@ -582,6 +591,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           onVizModeChange={setVizMode}
           showHelpButton={false}
         />
+
+        {/* Channel Oscilloscope for native dispatch synths */}
+        {isNativeDispatch && (
+          <div className="px-4 pt-3">
+            <ChannelOscilloscope
+              channelNames={channelNames[instrument.synthType] || []}
+              height={160}
+            />
+          </div>
+        )}
 
         {/* Furnace Controls */}
         <div className="synth-editor-content overflow-y-auto p-4">
@@ -851,7 +870,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'mame') {
     const mameConfig = instrument.mame || (
       instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC :
-      instrument.synthType === 'MAMERSA' ? DEFAULT_MAME_RSA :
       DEFAULT_MAME_VFX
     );
 

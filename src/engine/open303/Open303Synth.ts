@@ -49,23 +49,34 @@ export class Open303Synth extends Tone.ToneAudioNode {
   public config: any = {};
   public audioContext: AudioContext;
   private _disposed: boolean = false;
+  private _initPromise: Promise<void>;
+  private _resolveInit: (() => void) | null = null;
 
   constructor() {
     super();
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
 
-    // Overdrive setup (Tone.js fallback/booster)
+    // Create promise that resolves when worklet reports 'ready'
+    this._initPromise = new Promise<void>((resolve) => {
+      this._resolveInit = resolve;
+    });
+
+    // Overdrive setup - bypassed by default for clean signal path
     this.overdriveGain = new Tone.Gain(1);
     this.overdrive = new Tone.WaveShaper((x) => {
       const drive = 1 + this.overdriveAmount * 8;
       return Math.tanh(x * drive) / Math.tanh(drive);
     }, 4096);
 
-    this.overdriveGain.connect(this.overdrive);
-    this.overdrive.connect(this.output);
+    // Start with clean bypass (no waveshaper coloring at amount=0)
+    this.overdriveGain.connect(this.output);
 
     this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initialize(): Promise<void> {
@@ -127,7 +138,9 @@ export class Open303Synth extends Tone.ToneAudioNode {
           // 3. Alias the factory function to 'Open303' for the worklet
           code = code
             .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '');
+            .replace(/export\s+default\s+\w+;?/g, '')
+            .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+            .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
           code += '\nvar Open303 = createOpen303Module;';
           this.jsCode = code;
         }
@@ -157,6 +170,10 @@ export class Open303Synth extends Tone.ToneAudioNode {
     this.workletNode.port.onmessage = (event) => {
       if (event.data.type === 'ready') {
         console.log('[Open303] WASM engine ready');
+        if (this._resolveInit) {
+          this._resolveInit();
+          this._resolveInit = null;
+        }
       } else if (event.data.type === 'error') {
         console.error('[Open303] Worklet error:', event.data.message);
       }
@@ -172,6 +189,14 @@ export class Open303Synth extends Tone.ToneAudioNode {
     // Connect worklet to Tone.js output
     const targetNode = this.overdriveGain.input as AudioNode;
     this.workletNode.connect(targetNode);
+
+    // CRITICAL: Connect through silent keepalive to destination to force process() calls
+    try {
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.workletNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+    } catch (_e) { /* keepalive failed */ }
   }
 
   triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false): void {
@@ -187,23 +212,24 @@ export class Open303Synth extends Tone.ToneAudioNode {
     if (!accent && finalVelocity >= 100) finalVelocity = 99;
 
     // Pass slide flag to worklet for proper 303 slide behavior
-    // When slide=true, the worklet should:
-    // 1. NOT retrigger envelopes
-    // 2. Glide pitch from previous note to new note
-    // 3. Keep gate HIGH for legato
+    // When slide=true: worklet keeps previous note held → Open303 slideToNote (legato)
+    // When slide=false: worklet releases previous note first → Open303 triggerNote (retrigger)
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note: midiNote,
       velocity: finalVelocity,
-      slide: slide  // Pass slide flag to worklet
+      slide: slide
     });
   }
 
   triggerRelease(_time?: number): void {
     if (!this.workletNode || this._disposed) return;
+    // Send gateOff to release the amp envelope on the currently held note.
+    // This enables proper 303 staccato: the amp envelope enters its fast
+    // release phase (~1ms), creating punchy gaps between non-slide notes.
+    // The worklet clears currentNote so the next noteOn triggers a fresh note.
     this.workletNode.port.postMessage({
-      type: 'noteOff',
-      note: 0
+      type: 'gateOff'
     });
   }
 
@@ -362,16 +388,32 @@ export class Open303Synth extends Tone.ToneAudioNode {
 
   setOverdrive(amount: number): void {
     if (this._disposed) return;
+    const prevAmount = this.overdriveAmount;
     this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
 
-    const curve = new Float32Array(4096);
-    const drive = 1 + this.overdriveAmount * 8;
-    for (let i = 0; i < 4096; i++) {
-      const x = (i / 4096) * 2 - 1;
-      curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
+    if (this.overdriveAmount > 0) {
+      const curve = new Float32Array(4096);
+      const drive = 1 + this.overdriveAmount * 8;
+      for (let i = 0; i < 4096; i++) {
+        const x = (i / 4096) * 2 - 1;
+        curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
+      }
+      this.overdrive.curve = curve;
+      this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, 0.03);
+
+      // Route through waveshaper if switching from bypass
+      if (prevAmount === 0) {
+        this.overdriveGain.disconnect(this.output);
+        this.overdriveGain.connect(this.overdrive);
+        this.overdrive.connect(this.output);
+      }
+    } else if (prevAmount > 0) {
+      // Bypass waveshaper for clean signal
+      this.overdrive.disconnect(this.output);
+      this.overdriveGain.disconnect(this.overdrive);
+      this.overdriveGain.connect(this.output);
+      this.overdriveGain.gain.linearRampTo(1, 0.03);
     }
-    this.overdrive.curve = curve;
-    this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, 0.03);
   }
 
   async loadGuitarMLModel(_index: number): Promise<void> {}

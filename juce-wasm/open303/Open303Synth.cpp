@@ -77,15 +77,15 @@ public:
         sampleRate_ = sampleRate;
         synth_.setSampleRate(static_cast<double>(sampleRate));
 
-        // Set up default parameters for a classic 303 sound
+        // Use Open303's hardware-calibrated defaults (from rosic_Open303.cpp constructor)
         synth_.setWaveform(0.0);          // Saw wave
         synth_.setTuning(440.0);          // A4 = 440 Hz
-        synth_.setCutoff(500.0);          // Filter cutoff
-        synth_.setResonance(50.0);        // Medium resonance
-        synth_.setEnvMod(50.0);           // Medium env mod
-        synth_.setDecay(400.0);           // Decay time
-        synth_.setAccent(50.0);           // Medium accent
-        synth_.setVolume(-6.0);           // -6 dB
+        synth_.setCutoff(1000.0);         // Filter cutoff (hardware default)
+        synth_.setResonance(50.0);        // Resonance
+        synth_.setEnvMod(25.0);           // Env mod (hardware default)
+        synth_.setDecay(1000.0);          // Normal decay (hardware default)
+        synth_.setAccent(0.0);            // Accent off (hardware default)
+        synth_.setVolume(-12.0);          // -12 dB (hardware default)
 
         isInitialized_ = true;
     }
@@ -302,11 +302,6 @@ public:
 
         for (int i = 0; i < numSamples; i++) {
             double sample = synth_.getSample();
-
-            // Soft clip
-            if (sample > 1.0) sample = 1.0;
-            if (sample < -1.0) sample = -1.0;
-
             outputL[i] = static_cast<float>(sample);
             outputR[i] = static_cast<float>(sample);
         }

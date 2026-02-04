@@ -20,6 +20,15 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
+  refreshHeapViews() {
+    if (!this.furnaceModule || !this.furnaceModule.wasmMemory) return;
+    const buf = this.furnaceModule.wasmMemory.buffer;
+    if (!this.furnaceModule.HEAPF32 || this.furnaceModule.HEAPF32.buffer !== buf) {
+      this.furnaceModule.HEAPF32 = new Float32Array(buf);
+      this.furnaceModule.HEAPU8 = new Uint8Array(buf);
+    }
+  }
+
   async initWasm(wasmBinary, jsCode) {
     try {
       // If we received JS code, evaluate it to get FurnaceChips
@@ -70,50 +79,49 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       if (wasmBinary) {
         config.wasmBinary = wasmBinary;
       }
+      // Prevent Emscripten from using URL() to locate files (not available in WorkletGlobalScope)
+      config.locateFile = (path) => path;
+
+      // Intercept WebAssembly.instantiate to capture WASM memory
+      // (Emscripten doesn't export HEAPF32/wasmMemory on Module by default)
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) {
+              capturedMemory = value;
+              break;
+            }
+          }
+        }
+        return result;
+      };
 
       console.log('[FurnaceWorklet] Calling FurnaceChips factory with config:', Object.keys(config));
-      this.furnaceModule = await globalThis.FurnaceChips(config);
+      try {
+        this.furnaceModule = await globalThis.FurnaceChips(config);
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
       console.log('[FurnaceWorklet] WASM module loaded, exports:', Object.keys(this.furnaceModule).filter(k => k.startsWith('_')));
 
-      // Check for heap views - Emscripten may not export them on Module by default
-      // We need to find them ourselves from the WASM memory
+      // Store captured WASM memory for heap access
+      if (!this.furnaceModule.wasmMemory && capturedMemory) {
+        this.furnaceModule.wasmMemory = capturedMemory;
+      }
+
+      // Create heap views from WASM memory
       if (!this.furnaceModule.HEAPF32) {
-        console.log('[FurnaceWorklet] HEAPF32 not on module, checking for WASM memory...');
-        console.log('[FurnaceWorklet] Module keys:', Object.keys(this.furnaceModule).slice(0, 30));
-
-        // Try different ways to access the memory buffer
-        let wasmBuffer = null;
-
-        // Method 1: Check if there's a wasmMemory export
-        if (this.furnaceModule.wasmMemory) {
-          wasmBuffer = this.furnaceModule.wasmMemory.buffer;
-          console.log('[FurnaceWorklet] Found wasmMemory');
-        }
-        // Method 2: Check asm exports (older Emscripten)
-        else if (this.furnaceModule.asm && this.furnaceModule.asm.memory) {
-          wasmBuffer = this.furnaceModule.asm.memory.buffer;
-          console.log('[FurnaceWorklet] Found asm.memory');
-        }
-        // Method 3: HEAPU8 might exist (gives us access to the buffer)
-        else if (this.furnaceModule.HEAPU8) {
-          wasmBuffer = this.furnaceModule.HEAPU8.buffer;
-          console.log('[FurnaceWorklet] Found HEAPU8.buffer');
-        }
-        // Method 4: Check for buffer directly
-        else if (this.furnaceModule.buffer) {
-          wasmBuffer = this.furnaceModule.buffer;
-          console.log('[FurnaceWorklet] Found buffer');
-        }
-
-        if (wasmBuffer) {
-          // Create our own typed array views
-          this.furnaceModule.HEAPU8 = new Uint8Array(wasmBuffer);
-          this.furnaceModule.HEAPF32 = new Float32Array(wasmBuffer);
-          console.log('[FurnaceWorklet] Created HEAPF32 view, buffer size:', wasmBuffer.byteLength);
+        const wasmMem = this.furnaceModule.wasmMemory;
+        if (wasmMem) {
+          this.furnaceModule.HEAPU8 = new Uint8Array(wasmMem.buffer);
+          this.furnaceModule.HEAPF32 = new Float32Array(wasmMem.buffer);
+          console.log('[FurnaceWorklet] Created heap views from captured memory, buffer size:', wasmMem.buffer.byteLength);
         } else {
           console.error('[FurnaceWorklet] Could not find WASM memory buffer!');
-          // Last resort: try to access internal Module memory
-          // The Emscripten module should have internal heap but may need different access
         }
       } else {
         console.log('[FurnaceWorklet] HEAPF32 already available on module');
@@ -161,6 +169,7 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       }
       this.furnaceModule._furnace_chip_write(chipType, register, value);
     } else if (type === 'setWavetable' && this.isInitialized) {
+      this.refreshHeapViews();
       const ptr = this.furnaceModule._malloc(data.length);
       this.furnaceModule.HEAPU8.set(data, ptr);
       this.furnaceModule._furnace_set_wavetable(chipType, index, ptr, data.length);
@@ -168,6 +177,7 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
     } else if (type === 'setLogging' && this.isInitialized) {
       this.furnaceModule._furnace_set_logging(enabled);
     } else if (type === 'getLog' && this.isInitialized) {
+      this.refreshHeapViews();
       const size = this.furnaceModule._furnace_get_log_size();
       const ptr = this.furnaceModule._furnace_get_log_data();
       const logData = new Uint8Array(this.furnaceModule.HEAPU8.buffer, ptr, size * 16);
@@ -210,8 +220,8 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       });
     }
 
-    // Log every 1000 process calls to show we're still running (only if chips active)
-    if (this._processCount % 1000 === 0 && this.activeChips && this.activeChips.size > 0) {
+    // Log every 50000 process calls to show we're still running (only if chips active)
+    if (this._processCount % 50000 === 0 && this.activeChips && this.activeChips.size > 0) {
       this.port.postMessage({
         type: 'debug',
         message: 'heartbeat',
@@ -250,10 +260,18 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
     for (const chipType of this.activeChips) {
       this.furnaceModule._furnace_chip_render(chipType, this.leftBufferPtr, this.rightBufferPtr, length);
 
-      // Check if memory grew
-      if (this.lView.buffer !== this.furnaceModule.HEAPF32.buffer) {
-        this.lView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.leftBufferPtr, length);
-        this.rView = new Float32Array(this.furnaceModule.HEAPF32.buffer, this.rightBufferPtr, length);
+      // Check if WASM memory grew (views become detached)
+      const currentBuffer = this.furnaceModule.wasmMemory
+        ? this.furnaceModule.wasmMemory.buffer
+        : this.furnaceModule.HEAPF32.buffer;
+      if (this.lView.buffer !== currentBuffer) {
+        // Recreate heap views from current buffer
+        if (this.furnaceModule.wasmMemory) {
+          this.furnaceModule.HEAPF32 = new Float32Array(this.furnaceModule.wasmMemory.buffer);
+          this.furnaceModule.HEAPU8 = new Uint8Array(this.furnaceModule.wasmMemory.buffer);
+        }
+        this.lView = new Float32Array(currentBuffer, this.leftBufferPtr, length);
+        this.rView = new Float32Array(currentBuffer, this.rightBufferPtr, length);
       }
 
       for (let i = 0; i < length; i++) {

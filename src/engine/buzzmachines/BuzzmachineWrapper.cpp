@@ -12,6 +12,10 @@
  */
 
 #include <MachineInterface.h>
+#ifdef USE_MDK
+#include <mdk.h>
+#include <mdkimp.h>
+#endif
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
@@ -35,7 +39,7 @@ extern "C" {
 
 // Pre-computed oscillator tables (sine, saw, square, triangle, noise)
 // Each table has 2048 samples for the base level
-static short g_OscillatorTables[5][4096];  // 5 waveforms, enough for all levels
+static short g_OscillatorTables[6][4096];  // 6 waveforms: sine, saw, pulse, tri, noise, 303saw
 static bool g_TablesInitialized = false;
 
 static void InitOscillatorTables() {
@@ -141,6 +145,14 @@ public:
     virtual bool GetEnvPoint(int const wave, int const env, int const i, word &x, word &y, int &flags) override { return false; }
 
     virtual CWaveLevel const *GetNearestWaveLevel(int const i, int const note) override {
+#ifdef USE_MDK
+        // MDK hack: sentinel (-1, -1) means "allocate a CMDKImplementation"
+        // The MDK framework uses this to pass the implementation object through
+        // the CMICallbacks interface (see mdkimp.cpp CMDKMachineInterface::Init)
+        if (i == -1 && note == -1) {
+            return (CWaveLevel const *)(new CMDKImplementation());
+        }
+#endif
         return &g_WaveLevel;
     }
 

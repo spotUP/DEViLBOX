@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { xmEffectToString } from '@/lib/xmConversions';
-import { formatEffectTooltip } from '@utils/ft2EffectDescriptions';
+import { formatEffectTooltip, getEffectColorClass } from '@utils/ft2EffectDescriptions';
 
 interface EffectCellProps {
   // New XM format
@@ -32,7 +32,7 @@ export const EffectCell: React.FC<EffectCellProps> = React.memo(
     // Get tooltip for FT2 effect
     const tooltip = !isEmpty && displayValue !== '...' ? formatEffectTooltip(displayValue) : null;
 
-    const colorClass = isEmpty ? 'text-text-muted' : 'text-orange-400';
+    const colorClass = isEmpty ? 'text-text-muted' : getEffectColorClass(displayValue);
 
     const cellStyle = {
       width: '42px',

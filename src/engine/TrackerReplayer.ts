@@ -634,7 +634,11 @@ export class TrackerReplayer {
     const noteValue = row.note;
     const rawPeriod = row.period;
 
-    if (noteValue && noteValue !== 0 && noteValue !== '...' && noteValue !== '===') {
+    // Probability/maybe: skip note if random check fails
+    const prob = row.probability;
+    const probabilitySkip = prob !== undefined && prob > 0 && prob < 100 && Math.random() * 100 >= prob;
+
+    if (noteValue && noteValue !== 0 && !probabilitySkip) {
       // For MOD files, use the raw period stored in the row (if available)
       // This is more accurate than converting XM note numbers
       const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune);
@@ -680,7 +684,7 @@ export class TrackerReplayer {
     ch.previousSlideFlag = row.slide ?? false;
 
     // Handle note off
-    if (noteValue === 97 || noteValue === '===') {
+    if (noteValue === 97) {
       this.releaseMacros(ch);
       this.stopChannel(ch);
     }

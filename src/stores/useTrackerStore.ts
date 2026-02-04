@@ -166,8 +166,10 @@ interface TrackerStore {
   // Advanced editing
   transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
   remapInstrument: (oldId: number, newId: number, scope: 'block' | 'track' | 'pattern' | 'song') => void;
-  interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan', startValue: number, endValue: number) => void;
+  interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan', startValue: number, endValue: number, curve?: 'linear' | 'log' | 'exp' | 'scurve') => void;
   humanizeSelection: (volumeVariation: number) => void;
+  strumSelection: (tickDelay: number, direction: 'up' | 'down') => void;
+  legatoSelection: () => void;
   // FT2: Volume operations
   scaleVolume: (scope: 'block' | 'track' | 'pattern', factor: number) => void;
   fadeVolume: (scope: 'block' | 'track' | 'pattern', startVol: number, endVol: number) => void;
@@ -315,6 +317,7 @@ export const useTrackerStore = create<TrackerStore>()(
           resonance: 2,
           envMod: 2,
           pan: 2,
+          probability: 2,
         };
 
         const currentDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
@@ -343,7 +346,7 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'
             ];
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
             if (currentColumnIndex > 0) {
@@ -366,7 +369,7 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder2: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'
             ];
             const currentColumnIndex2 = columnOrder2.indexOf(state.cursor.columnType);
             if (currentColumnIndex2 < columnOrder2.length - 1) {
@@ -719,7 +722,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'],
         };
       }),
 
@@ -731,7 +734,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: pattern.channels.length - 1,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'],
         };
       }),
 
@@ -1214,7 +1217,7 @@ export const useTrackerStore = create<TrackerStore>()(
       }),
 
     // Advanced editing - Interpolate values in selection
-    interpolateSelection: (column, startValue, endValue) =>
+    interpolateSelection: (column, startValue, endValue, curve = 'linear') =>
       set((state) => {
         if (!state.selection) return;
 
@@ -1229,6 +1232,16 @@ export const useTrackerStore = create<TrackerStore>()(
 
         if (rowCount < 2) return; // Need at least 2 rows to interpolate
 
+        // Curve function: maps linear t (0-1) to curved t
+        const applyCurve = (t: number): number => {
+          switch (curve) {
+            case 'log': return Math.log(1 + t * 9) / Math.log(10); // fast start, slow end
+            case 'exp': return (Math.pow(10, t) - 1) / 9; // slow start, fast end
+            case 'scurve': return t * t * (3 - 2 * t); // smooth S-curve (Hermite)
+            default: return t; // linear
+          }
+        };
+
         // Apply interpolation to each channel in selection
         for (let ch = minChannel; ch <= maxChannel; ch++) {
           if (ch >= pattern.channels.length) continue;
@@ -1237,7 +1250,8 @@ export const useTrackerStore = create<TrackerStore>()(
             if (row >= pattern.length) continue;
 
             const cell = pattern.channels[ch].rows[row];
-            const t = (row - minRow) / (rowCount - 1); // 0 to 1
+            const linearT = (row - minRow) / (rowCount - 1); // 0 to 1
+            const t = applyCurve(linearT);
             const value = Math.round(startValue + (endValue - startValue) * t);
 
             // Apply to the appropriate column
@@ -1290,6 +1304,77 @@ export const useTrackerStore = create<TrackerStore>()(
 
             // Store as XM volume (0x10-0x50)
             cell.volume = 0x10 + newVolume;
+          }
+        }
+      }),
+
+    // Strum: add incremental note delays across channels (EDx effect)
+    strumSelection: (tickDelay, direction) =>
+      set((state) => {
+        if (!state.selection) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { startChannel, endChannel, startRow, endRow } = state.selection;
+
+        const minChannel = Math.min(startChannel, endChannel);
+        const maxChannel = Math.max(startChannel, endChannel);
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+
+        for (let row = minRow; row <= maxRow; row++) {
+          if (row >= pattern.length) continue;
+
+          for (let ch = minChannel; ch <= maxChannel; ch++) {
+            if (ch >= pattern.channels.length) continue;
+            const cell = pattern.channels[ch].rows[row];
+            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
+
+            // Calculate delay for this channel
+            const chIdx = direction === 'down' ? ch - minChannel : (maxChannel - ch);
+            const delay = Math.min(0xF, chIdx * tickDelay);
+
+            if (delay > 0) {
+              // Set EDx (note delay) effect: effTyp=14 (E), eff=0xD0+delay
+              cell.effTyp = 14; // E
+              cell.eff = 0xD0 + delay;
+            }
+          }
+        }
+      }),
+
+    // Legato: for each channel in selection, extend each note's duration
+    // by removing empty rows between consecutive notes (set slide flag)
+    legatoSelection: () =>
+      set((state) => {
+        if (!state.selection) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { startChannel, endChannel, startRow, endRow } = state.selection;
+
+        const minChannel = Math.min(startChannel, endChannel);
+        const maxChannel = Math.max(startChannel, endChannel);
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+
+        // For each channel, find notes and add tone portamento (3xx) to connect them
+        for (let ch = minChannel; ch <= maxChannel; ch++) {
+          if (ch >= pattern.channels.length) continue;
+
+          let lastNoteRow = -1;
+          for (let row = minRow; row <= maxRow; row++) {
+            if (row >= pattern.length) continue;
+            const cell = pattern.channels[ch].rows[row];
+
+            if (cell.note > 0 && cell.note < 97) {
+              if (lastNoteRow >= 0 && row > lastNoteRow + 1) {
+                // Only set tone portamento if effect column is empty
+                if (cell.effTyp === 0) {
+                  cell.effTyp = 3; // Tone portamento
+                  cell.eff = 0xFF; // Max speed
+                }
+              }
+              lastNoteRow = row;
+            }
           }
         }
       }),

@@ -1,9 +1,11 @@
 /**
  * NoteBlock - Individual note visualization in piano roll
+ * Supports velocity bars, slide/accent indicators, and ghost note rendering
  */
 
 import React, { useCallback } from 'react';
 import type { PianoRollNote } from '../../types/pianoRoll';
+import { getNoteNameFromMidi } from '../../types/pianoRoll';
 
 interface NoteBlockProps {
   note: PianoRollNote;
@@ -13,6 +15,7 @@ interface NoteBlockProps {
   scrollY: number;           // Vertical scroll offset (MIDI note)
   isSelected: boolean;
   showVelocity: boolean;
+  isGhost?: boolean;         // Render as ghost/preview note
   onSelect?: (noteId: string, addToSelection: boolean) => void;
   onDragStart?: (noteId: string, mode: 'move' | 'resize-end', e: React.MouseEvent) => void;
 }
@@ -25,6 +28,7 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
   scrollY,
   isSelected,
   showVelocity,
+  isGhost = false,
   onSelect,
   onDragStart,
 }) => {
@@ -33,14 +37,15 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
   const width = (note.endRow - note.startRow) * horizontalZoom;
   const y = (scrollY + 60 - note.midiNote) * verticalZoom; // 60 notes visible range center
 
-  // Don't render if off-screen
-  if (x + width < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
+  // Don't render if off-screen (use container-relative check)
+  if (x + width < -50 || x > 3000 || y < -50 || y > 2000) {
     return null;
   }
 
   // Handle mouse down for selection and drag
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      if (isGhost) return;
       e.stopPropagation();
 
       const rect = e.currentTarget.getBoundingClientRect();
@@ -57,7 +62,7 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
         onDragStart(note.id, isResizeHandle ? 'resize-end' : 'move', e);
       }
     },
-    [note.id, width, onSelect, onDragStart]
+    [note.id, width, isGhost, onSelect, onDragStart]
   );
 
   // Velocity as percentage for visual indicator
@@ -75,6 +80,26 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
     'bg-teal-500',
   ];
   const bgColor = channelColors[note.channelIndex % channelColors.length];
+
+  // Show note name when note is wide enough
+  const showNoteName = width > 30 && verticalZoom >= 10;
+  const noteName = getNoteNameFromMidi(note.midiNote);
+
+  if (isGhost) {
+    return (
+      <div
+        className={`absolute rounded-sm pointer-events-none ${bgColor}`}
+        style={{
+          left: x,
+          top: y,
+          width: Math.max(4, width - 1),
+          height: verticalZoom - 1,
+          opacity: 0.3,
+          border: '1px dashed rgba(255,255,255,0.5)',
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -94,12 +119,40 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
         opacity: 0.8 + (note.velocity / 127) * 0.2, // Velocity affects opacity
       }}
       onMouseDown={handleMouseDown}
+      title={`${noteName} vel:${note.velocity}${note.slide ? ' [SLIDE]' : ''}${note.accent ? ' [ACCENT]' : ''}`}
+      role="button"
+      aria-label={`Note ${noteName}, velocity ${note.velocity}${note.slide ? ', slide' : ''}${note.accent ? ', accent' : ''}`}
+      tabIndex={0}
     >
+      {/* Note name label */}
+      {showNoteName && (
+        <span className="absolute left-1 top-0 text-[8px] text-white/80 font-mono leading-none pointer-events-none"
+          style={{ lineHeight: `${verticalZoom - 1}px` }}
+        >
+          {noteName}
+        </span>
+      )}
+
       {/* Velocity bar */}
       {showVelocity && width > 20 && (
         <div
-          className="absolute bottom-0 left-0 right-0 bg-black/30"
+          className="absolute bottom-0 left-0 right-0 bg-black/30 pointer-events-none"
           style={{ height: `${100 - velocityPercent}%` }}
+        />
+      )}
+
+      {/* TB-303 Slide indicator */}
+      {note.slide && (
+        <div className="absolute top-0 right-3 w-1.5 h-full bg-yellow-400/60 pointer-events-none" />
+      )}
+
+      {/* TB-303 Accent indicator */}
+      {note.accent && (
+        <div className="absolute top-0 left-0 w-0 h-0 pointer-events-none"
+          style={{
+            borderLeft: '6px solid rgba(255,100,0,0.8)',
+            borderBottom: '6px solid transparent',
+          }}
         />
       )}
 

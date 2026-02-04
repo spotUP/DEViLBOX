@@ -173,6 +173,8 @@ export class DexedSynth extends Tone.ToneAudioNode {
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
 
+  private _initPromise: Promise<void>;
+
   constructor(config: Partial<DexedConfig> = {}) {
     super();
     this.output = new Tone.Gain(1);
@@ -183,8 +185,12 @@ export class DexedSynth extends Tone.ToneAudioNode {
       ...config,
     };
 
-    // Fire-and-forget initialization
-    void this.initialize();
+    // Start initialization and store promise for ensureInitialized()
+    this._initPromise = this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   /**
@@ -226,8 +232,15 @@ export class DexedSynth extends Tone.ToneAudioNode {
         jsResponse.text()
       ]);
 
-      // Preprocess JS code to replace import.meta.url which can't be used in new Function()
-      const jsCode = jsCodeRaw.replace(/import\.meta\.url/g, `"${baseUrl}dexed/"`);
+      // Preprocess JS code for AudioWorklet new Function() compatibility:
+      // 1. Replace import.meta.url (not available in Function constructor scope)
+      // 2. Remove ES module export statement (invalid syntax in Function body)
+      // 3. Strip Node.js-specific dynamic import block (fails in worklet context)
+      const jsCode = jsCodeRaw
+        .replace(/import\.meta\.url/g, `"${baseUrl}dexed/"`)
+        .replace(/export\s+default\s+\w+;?\s*$/, '')
+        .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
 
       // Create worklet node using Tone.js's createAudioWorkletNode (standardized-audio-context)
       this._worklet = toneCreateAudioWorkletNode(rawContext, 'dexed-processor');
@@ -260,6 +273,14 @@ export class DexedSynth extends Tone.ToneAudioNode {
       // Connect worklet to Tone.js output - use the input property which is the native GainNode
       const targetNode = this.output.input as AudioNode;
       this._worklet.connect(targetNode);
+
+      // CRITICAL: Connect through silent keepalive to destination to force process() calls
+      try {
+        const keepalive = rawContext.createGain();
+        keepalive.gain.value = 0;
+        this._worklet.connect(keepalive);
+        keepalive.connect(rawContext.destination);
+      } catch (_e) { /* keepalive failed */ }
 
     } catch (error) {
       console.error('Failed to initialize DexedSynth:', error);

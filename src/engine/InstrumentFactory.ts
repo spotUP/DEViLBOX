@@ -27,11 +27,15 @@ import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
+import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
+import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
 import type { InstrumentConfig, EffectConfig, SynthType } from '@/types/instrument';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
+import { FurnaceChipType } from './chips/FurnaceChipEngine';
+import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
 import { DrumKitSynth } from './DrumKitSynth';
 import { DubSirenSynth } from './DubSirenSynth';
 import { SpaceLaserSynth } from './SpaceLaserSynth';
@@ -50,7 +54,33 @@ import { CEM3394Synth } from './cem3394/CEM3394Synth';
 import { SCSPSynth } from './scsp/SCSPSynth';
 import { VFXSynth } from './vfx/VFXSynth';
 import { D50Synth } from './d50/D50Synth';
+import { RdPianoSynth } from './rdpiano/RdPianoSynth';
 import { MU2000Synth } from './mu2000/MU2000Synth';
+// MAME Hardware Synths
+import { AICASynth } from './aica/AICASynth';
+import { ASCSynth } from './asc/ASCSynth';
+import { AstrocadeSynth } from './astrocade/AstrocadeSynth';
+import { C352Synth } from './c352/C352Synth';
+import { ES5503Synth } from './es5503/ES5503Synth';
+import { ICS2115Synth } from './ics2115/ICS2115Synth';
+import { K054539Synth } from './k054539/K054539Synth';
+import { MEA8000Synth } from './mea8000/MEA8000Synth';
+import { MSM5232Synth } from './msm5232/MSM5232Synth';
+import { RF5C400Synth } from './rf5c400/RF5C400Synth';
+import { RolandSASynth } from './roland_sa/RolandSASynth';
+import { SN76477Synth } from './sn76477/SN76477Synth';
+import { SNKWaveSynth } from './snkwave/SNKWaveSynth';
+import { SP0250Synth } from './sp0250/SP0250Synth';
+import { TIASynth } from './tia/TIASynth';
+import { TMS36XXSynth } from './tms36xx/TMS36XXSynth';
+import { TMS5220Synth } from './tms5220/TMS5220Synth';
+import { TR707Synth } from './tr707/TR707Synth';
+import { UPD931Synth } from './upd931/UPD931Synth';
+import { UPD933Synth } from './upd933/UPD933Synth';
+import { VotraxSynth } from './votrax/VotraxSynth';
+import { YMF271Synth } from './ymf271/YMF271Synth';
+import { YMOPQSynth } from './ymopq/YMOPQSynth';
+import { VASynthSynth } from './vasynth/VASynthSynth';
 
 export class InstrumentFactory {
   /**
@@ -60,53 +90,59 @@ export class InstrumentFactory {
    * Measured 2026-02-03 using browser AudioContext + Tone.Meter
    */
   private static readonly VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
-    // Tone.js built-in synths (naturally quiet due to synthesis design)
-    'Synth': 14,           // Measured: -11.4dB after +12 → target +14 for -10dB
-    'MonoSynth': 12,       // Similar to Synth
-    'DuoSynth': 12,        // Similar to Synth
-    'FMSynth': 17,         // Measured: -13.4dB after +14 → boost +3 more
-    'AMSynth': 19,         // Measured: -15.3dB after +16 → boost +3 more
-    'PluckSynth': 21,      // Measured: -17.2dB after +18 → boost +3 more
-    'MetalSynth': 23,      // Measured: -19.2dB after +20 → boost +3 more
-    'MembraneSynth': 20,   // Measured: -13.5dB after +20 → OK
-    'NoiseSynth': 14,      // Similar to Synth
-    'PolySynth': 12,       // Similar to Synth
+    // Tone.js built-in synths - calibrated 2026-02-04 via browser test runner
+    'Synth': 11,           // Measured: -6.6dB → reduce 3
+    'MonoSynth': 14,       // Measured: -11.9dB → increase 2
+    'DuoSynth': 5,         // Measured: -3.2dB → reduce 7
+    'FMSynth': 16,         // Measured: -9.1dB → reduce 1
+    'AMSynth': 22,         // Measured: -13.2dB → increase 3
+    'PluckSynth': 35,      // Measured: -23.5dB → increase 14
+    'MetalSynth': 23,      // Kept (suspect: very short transient, meter may miss peak)
+    'MembraneSynth': 10,   // Measured: +0.4dB → reduce 10
+    'NoiseSynth': 7,       // Measured: -2.9dB → reduce 7
+    'PolySynth': 8,        // Measured: -5.7dB → reduce 4
     // Custom synths (WASM and specialized engines)
-    'TB303': 25,           // Measured: -15.5dB after +22 → boost +3 more
+    'TB303': 25,           // Kept (WASM init timing may affect measurement)
     'JC303': 25,           // Same as TB303
-    'Buzz3o3': 5,          // Measured: -15.3dB after +3 → boost +2 more
-    'Furnace': 7,          // Measured: -17.2dB after +5 → boost +2 more
+    'Buzz3o3': 5,          // Kept (WASM-dependent)
+    'Furnace': 7,          // Kept (WASM-dependent)
     'FurnaceGB': 7,        // Same as Furnace
     'FurnaceNES': 7,       // Same as Furnace
     'FurnaceOPN': 7,       // Same as Furnace
     'FurnaceOPM': 7,       // Same as Furnace
     'FurnaceC64': 7,       // Same as Furnace
     'FurnaceAY': 7,        // Same as Furnace
-    'BuzzKick': 9,         // Measured: -19.1dB → boost +2 more
-    'BuzzNoise': 0,        // Measured: -10.6dB → already at target
-    'Synare': 3,           // Measured: -12.5dB after +0 → boost +3
-    'DubSiren': 10,        // Estimated based on similar synths
-    'SpaceLaser': 10,      // Estimated based on similar synths
-    'V2': 5,               // Measured: -14.5dB after +3 → boost +2 more
-    'Sam': 7,              // Measured: -16.4dB after +5 → boost +2 more
-    'SuperSaw': 8,         // Measured: -16.3dB after +6 → boost +2 more
-    'WobbleBass': 10,      // Measured: -18.2dB after +8 → boost +2 more
-    'FormantSynth': 12,    // Measured: -20.1dB after +10 → boost +2 more
-    'StringMachine': 10,   // Estimated based on similar synths
-    'PWMSynth': 8,         // Estimated based on similar synths
-    'ChipSynth': 10,       // Estimated based on similar synths
-    'Wavetable': 12,       // Estimated based on similar synths
-    'Organ': 10,           // Estimated based on similar synths
-    'Sampler': 0,          // Sample-based - no normalization needed
+    'BuzzKick': 9,         // Kept (WASM-dependent)
+    'BuzzNoise': 0,        // Kept (already at target)
+    'Synare': 7,           // Measured: -7.1dB (OK)
+    'DubSiren': 13,        // Measured: -0.5dB → reduce 10 (now uses getNormalizedVolume)
+    'SpaceLaser': 29,      // Measured: +3.4dB → reduce 13 (now uses getNormalizedVolume)
+    'V2': 30,              // Measured -40.4dB, needs +30 (WASM now producing audio)
+    'Sam': 16,             // Measured: -2.5dB → reduce 7 (now uses getNormalizedVolume)
+    'SuperSaw': 9,         // Measured: -7.8dB (OK)
+    'WobbleBass': 13,      // Measured: -0.4dB → reduce 10 (now uses getNormalizedVolume)
+    'FormantSynth': 9,     // Measured: -7.3dB → reduce 3
+    'StringMachine': 11,   // Measured: -8.6dB → increase 1
+    'PWMSynth': 9,         // Measured: -9.1dB → increase 1
+    'ChipSynth': 5,        // Measured: -5.1dB → reduce 5
+    'Wavetable': -1,       // Measured: -2.3dB → reduce 8
+    'Organ': 3,            // Measured: -2.8dB → reduce 7
+    'Sampler': 10,         // Measured: -20.3dB → increase 10
     'Player': 0,           // Sample-based - no normalization needed
-    'GranularSynth': 8,    // Estimated based on similar synths
-    'DrumMachine': 0,      // Has internal balancing for drum components
-    // MAME synths
-    'MAMEVFX': 8,          // Estimated based on similar synths
-    'MAMEDOC': 8,          // Estimated based on similar synths
-    'MAMERSA': 8,          // Estimated based on similar synths
-    'MAMESWP30': 8,        // Estimated based on similar synths
-    'CZ101': 10,           // Estimated - Phase Distortion can be quiet
+    'GranularSynth': 8,    // Kept (no reliable measurement)
+    'DrumMachine': 5,      // Measured: -15.2dB → increase 5
+    'ChiptuneModule': -6,  // Measured: -3.8dB → decrease 6
+    'DrumKit': 0,          // Kept (test sample may not load)
+    // MAME synths (WASM-dependent, kept as-is)
+    'MAMEVFX': 8,
+    'MAMEDOC': 8,
+    'MAMERSA': 8,
+    'MAMESWP30': 8,
+    'CZ101': 10,           // Kept (WASM-dependent)
+    'Dexed': 41,           // Measured -50.9dB, needs +41
+    'OBXd': 9,             // Measured -19.1dB, needs +9
+    'CEM3394': 0,          // MAME WASM - no measurement yet
+    'SCSP': 0,             // MAME WASM - no measurement yet
   };
 
   /**
@@ -174,221 +210,222 @@ export class InstrumentFactory {
         instrument = this.createBuzzmachine(config);
         break;
 
-      // Furnace Chip Types - all use FurnaceSynth with different chip IDs
+      // Furnace Chip Types - using FurnaceChipType enum for correct IDs
       case 'FurnaceOPN':
-        instrument = this.createFurnaceWithChip(config, 1); // OPN2
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN2);
         break;
       case 'FurnaceOPM':
-        instrument = this.createFurnaceWithChip(config, 33); // OPM
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPM);
         break;
       case 'FurnaceOPL':
-        instrument = this.createFurnaceWithChip(config, 14); // OPL3
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPL3);
         break;
       case 'FurnaceOPLL':
-        instrument = this.createFurnaceWithChip(config, 9); // OPLL
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPLL);
         break;
       case 'FurnaceESFM':
-        instrument = this.createFurnaceWithChip(config, 48); // ESFM
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.ESFM);
         break;
       case 'FurnaceOPZ':
-        instrument = this.createFurnaceWithChip(config, 40); // OPZ
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPZ);
         break;
       case 'FurnaceOPNA':
-        instrument = this.createFurnaceWithChip(config, 6); // OPNA
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPNA);
         break;
       case 'FurnaceOPNB':
-        instrument = this.createFurnaceWithChip(config, 7); // OPNB
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPNB);
         break;
       case 'FurnaceOPL4':
-        instrument = this.createFurnaceWithChip(config, 46); // OPL4
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPL4);
         break;
       case 'FurnaceY8950':
-        instrument = this.createFurnaceWithChip(config, 15); // Y8950
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.Y8950);
         break;
       case 'FurnaceVRC7':
-        instrument = this.createFurnaceWithChip(config, 35); // VRC7
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPLL); // VRC7 uses OPLL core
         break;
       case 'FurnaceNES':
-        instrument = this.createFurnaceWithChip(config, 34); // NES
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NES);
         break;
       case 'FurnaceGB':
-        instrument = this.createFurnaceWithChip(config, 2); // GB
+        // Use native Furnace dispatch WASM for Game Boy (real chip emulation)
+        instrument = new FurnaceDispatchSynth(FurnaceDispatchPlatform.GB);
         break;
       case 'FurnaceSNES':
-        instrument = this.createFurnaceWithChip(config, 41); // SNES
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SNES);
         break;
       case 'FurnacePCE':
-        instrument = this.createFurnaceWithChip(config, 4); // PCE
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCE);
         break;
       case 'FurnacePSG':
-        instrument = this.createFurnaceWithChip(config, 8); // PSG (SN76489)
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PSG);
         break;
       case 'FurnaceVB':
-        instrument = this.createFurnaceWithChip(config, 36); // Virtual Boy
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VB);
         break;
       case 'FurnaceLynx':
-        instrument = this.createFurnaceWithChip(config, 39); // Lynx
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.LYNX);
         break;
       case 'FurnaceSWAN':
-        instrument = this.createFurnaceWithChip(config, 37); // WonderSwan
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SWAN);
         break;
       case 'FurnaceVRC6':
-        instrument = this.createFurnaceWithChip(config, 21); // VRC6
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VRC6);
         break;
       case 'FurnaceN163':
-        instrument = this.createFurnaceWithChip(config, 22); // N163
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.N163);
         break;
       case 'FurnaceFDS':
-        instrument = this.createFurnaceWithChip(config, 23); // FDS
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.FDS);
         break;
       case 'FurnaceMMC5':
-        instrument = this.createFurnaceWithChip(config, 24); // MMC5
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MMC5);
         break;
       case 'FurnaceC64':
-        instrument = this.createFurnaceWithChip(config, 3); // SID
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID);
         break;
       case 'FurnaceAY':
-        instrument = this.createFurnaceWithChip(config, 5); // AY
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AY);
         break;
       case 'FurnaceVIC':
-        instrument = this.createFurnaceWithChip(config, 32); // VIC
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VIC);
         break;
       case 'FurnaceSAA':
-        instrument = this.createFurnaceWithChip(config, 31); // SAA
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SAA);
         break;
       case 'FurnaceTED':
-        instrument = this.createFurnaceWithChip(config, 43); // TED
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.TED);
         break;
       case 'FurnaceVERA':
-        instrument = this.createFurnaceWithChip(config, 42); // VERA
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VERA);
         break;
       case 'FurnaceSCC':
-        instrument = this.createFurnaceWithChip(config, 10); // SCC
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SCC);
         break;
       case 'FurnaceTIA':
-        instrument = this.createFurnaceWithChip(config, 38); // TIA
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.TIA);
         break;
       case 'FurnaceSEGAPCM':
-        instrument = this.createFurnaceWithChip(config, 16); // SEGAPCM
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SEGAPCM);
         break;
       case 'FurnaceQSOUND':
-        instrument = this.createFurnaceWithChip(config, 19); // QSound
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.QSOUND);
         break;
       case 'FurnaceES5506':
-        instrument = this.createFurnaceWithChip(config, 18); // ES5506
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.ES5506);
         break;
       case 'FurnaceRF5C68':
-        instrument = this.createFurnaceWithChip(config, 17); // RF5C68
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.RF5C68);
         break;
       case 'FurnaceC140':
-        instrument = this.createFurnaceWithChip(config, 25); // C140
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.C140);
         break;
       case 'FurnaceK007232':
-        instrument = this.createFurnaceWithChip(config, 26); // K007232
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.K007232);
         break;
       case 'FurnaceK053260':
-        instrument = this.createFurnaceWithChip(config, 27); // K053260
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.K053260);
         break;
       case 'FurnaceGA20':
-        instrument = this.createFurnaceWithChip(config, 28); // GA20
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.GA20);
         break;
       case 'FurnaceOKI':
-        instrument = this.createFurnaceWithChip(config, 20); // OKI
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OKI);
         break;
       case 'FurnaceYMZ280B':
-        instrument = this.createFurnaceWithChip(config, 29); // YMZ280B
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.YMZ280B);
         break;
       case 'FurnaceX1_010':
-        instrument = this.createFurnaceWithChip(config, 30); // X1-010
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.X1_010);
         break;
       case 'FurnaceBUBBLE':
-        instrument = this.createFurnaceWithChip(config, 47); // Bubble System
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.BUBBLE);
         break;
       case 'FurnaceSM8521':
-        instrument = this.createFurnaceWithChip(config, 44); // SM8521
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SM8521);
         break;
       case 'FurnaceT6W28':
-        instrument = this.createFurnaceWithChip(config, 45); // T6W28
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.T6W28);
         break;
       case 'FurnaceSUPERVISION':
-        instrument = this.createFurnaceWithChip(config, 49); // Supervision
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SUPERVISION);
         break;
       case 'FurnaceUPD1771':
-        instrument = this.createFurnaceWithChip(config, 50); // UPD1771
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.UPD1771);
         break;
 
       // === Additional Furnace Chips ===
       case 'FurnaceAMIGA':
-        instrument = this.createFurnaceWithChip(config, 61); // Paula 4-channel
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AMIGA);
         break;
       case 'FurnaceAY8930':
-        instrument = this.createFurnaceWithChip(config, 50); // Enhanced AY-3-8910
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AY8930);
         break;
       case 'FurnaceDAVE':
-        instrument = this.createFurnaceWithChip(config, 65); // Enterprise DAVE
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.DAVE);
         break;
       case 'FurnaceGBA':
-        instrument = this.createFurnaceWithChip(config, 52); // GBA DMA sound
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.GBA_DMA);
         break;
       case 'FurnaceMSM5232':
-        instrument = this.createFurnaceWithChip(config, 59); // 8-voice wavetable
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MSM5232);
         break;
       case 'FurnaceMSM6258':
-        instrument = this.createFurnaceWithChip(config, 58); // OKI ADPCM
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MSM6258);
         break;
       case 'FurnaceMULTIPCM':
-        instrument = this.createFurnaceWithChip(config, 60); // Sega Model 1/2
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MULTIPCM);
         break;
       case 'FurnaceNAMCO':
-        instrument = this.createFurnaceWithChip(config, 55); // Namco WSG
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NAMCO);
         break;
       case 'FurnaceNDS':
-        instrument = this.createFurnaceWithChip(config, 51); // Nintendo DS
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NDS);
         break;
       case 'FurnaceOPN2203':
-        instrument = this.createFurnaceWithChip(config, 47); // YM2203
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN);
         break;
       case 'FurnaceOPNBB':
-        instrument = this.createFurnaceWithChip(config, 48); // YM2610B Extended
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPNB_B);
         break;
       case 'FurnacePCMDAC':
-        instrument = this.createFurnaceWithChip(config, 72); // Generic PCM DAC
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCMDAC);
         break;
       case 'FurnacePCSPKR':
-        instrument = this.createFurnaceWithChip(config, 62); // PC Speaker
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCSPKR);
         break;
       case 'FurnacePET':
-        instrument = this.createFurnaceWithChip(config, 56); // PET piezo
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PET);
         break;
       case 'FurnacePOKEMINI':
-        instrument = this.createFurnaceWithChip(config, 54); // Pokemon Mini
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POKEMINI);
         break;
       case 'FurnacePOKEY':
-        instrument = this.createFurnaceWithChip(config, 57); // Atari POKEY
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POKEY);
         break;
       case 'FurnacePONG':
-        instrument = this.createFurnaceWithChip(config, 63); // Pong discrete
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PONG);
         break;
       case 'FurnacePOWERNOISE':
-        instrument = this.createFurnaceWithChip(config, 68); // Power Noise
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POWERNOISE);
         break;
       case 'FurnacePV1000':
-        instrument = this.createFurnaceWithChip(config, 64); // Casio PV-1000
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PV1000);
         break;
       case 'FurnaceSCVTONE':
-        instrument = this.createFurnaceWithChip(config, 71); // Epoch SCV
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SCVTONE);
         break;
       case 'FurnaceSID6581':
-        instrument = this.createFurnaceWithChip(config, 45); // MOS 6581
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID_6581);
         break;
       case 'FurnaceSID8580':
-        instrument = this.createFurnaceWithChip(config, 46); // MOS 8580
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID_8580);
         break;
       case 'FurnaceSU':
-        instrument = this.createFurnaceWithChip(config, 66); // Sound Unit
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SU);
         break;
       case 'FurnaceZXBEEPER':
-        instrument = this.createFurnaceWithChip(config, 69); // ZX Spectrum beeper
+        instrument = this.createFurnaceWithChip(config, FurnaceChipType.ZXBEEPER);
         break;
 
       case 'Sampler':
@@ -500,7 +537,7 @@ export class InstrumentFactory {
         break;
 
       case 'MAMERSA':
-        instrument = this.createD50(config);
+        instrument = this.createRdPiano(config);
         break;
 
       case 'MAMESWP30':
@@ -551,6 +588,86 @@ export class InstrumentFactory {
         break;
       case 'Buzz3o3':
         instrument = this.createBuzz3o3(config);
+        break;
+      case 'Buzz3o3DF':
+        instrument = this.createBuzz3o3DF(config);
+        break;
+      case 'BuzzM4':
+        instrument = new BuzzmachineGenerator(BuzzmachineType.MAKK_M4);
+        break;
+
+      // MAME Hardware-Accurate Synths
+      case 'MAMEAICA':
+        instrument = this.createMAMEAICA(config);
+        break;
+      case 'MAMEASC':
+        instrument = this.createMAMEASC(config);
+        break;
+      case 'MAMEAstrocade':
+        instrument = this.createMAMEAstrocade(config);
+        break;
+      case 'MAMEC352':
+        instrument = this.createMAMEC352(config);
+        break;
+      case 'MAMEES5503':
+        instrument = this.createMAMEES5503(config);
+        break;
+      case 'MAMEICS2115':
+        instrument = this.createMAMEICS2115(config);
+        break;
+      case 'MAMEK054539':
+        instrument = this.createMAMEK054539(config);
+        break;
+      case 'MAMEMEA8000':
+        instrument = this.createMAMEMEA8000(config);
+        break;
+      case 'MAMEMSM5232':
+        instrument = this.createMAMEMSM5232(config);
+        break;
+      case 'MAMERF5C400':
+        instrument = this.createMAMERF5C400(config);
+        break;
+      case 'MAMERolandSA':
+        instrument = this.createMAMERolandSA(config);
+        break;
+      case 'MAMESN76477':
+        instrument = this.createMAMESN76477(config);
+        break;
+      case 'MAMESNKWave':
+        instrument = this.createMAMESNKWave(config);
+        break;
+      case 'MAMESP0250':
+        instrument = this.createMAMESP0250(config);
+        break;
+      case 'MAMETIA':
+        instrument = this.createMAMETIA(config);
+        break;
+      case 'MAMETMS36XX':
+        instrument = this.createMAMETMS36XX(config);
+        break;
+      case 'MAMETMS5220':
+        instrument = this.createMAMETMS5220(config);
+        break;
+      case 'MAMETR707':
+        instrument = this.createMAMETR707(config);
+        break;
+      case 'MAMEUPD931':
+        instrument = this.createMAMEUPD931(config);
+        break;
+      case 'MAMEUPD933':
+        instrument = this.createMAMEUPD933(config);
+        break;
+      case 'MAMEVotrax':
+        instrument = this.createMAMEVotrax(config);
+        break;
+      case 'MAMEYMF271':
+        instrument = this.createMAMEYMF271(config);
+        break;
+      case 'MAMEYMOPQ':
+        instrument = this.createMAMEYMOPQ(config);
+        break;
+      case 'MAMEVASynth':
+        instrument = this.createMAMEVASynth(config);
         break;
 
       case 'ChiptuneModule':
@@ -840,6 +957,33 @@ export class InstrumentFactory {
           reverbVolume: Number(config.parameters.reverbVolume) || 0.3,
           bass: Number(config.parameters.bass) || 0,
           treble: Number(config.parameters.treble) || 0,
+          wet: wetValue,
+        });
+        break;
+
+      case 'SpaceyDelayer':
+        node = new SpaceyDelayerEffect({
+          firstTap: Number(config.parameters.firstTap) || 250,
+          tapSize: Number(config.parameters.tapSize) || 150,
+          feedback: Number(config.parameters.feedback) || 40,
+          multiTap: config.parameters.multiTap != null ? Number(config.parameters.multiTap) : 1,
+          tapeFilter: Number(config.parameters.tapeFilter) || 0,
+          wet: wetValue,
+        });
+        break;
+
+      case 'RETapeEcho':
+        node = new RETapeEchoEffect({
+          mode: config.parameters.mode != null ? Number(config.parameters.mode) : 3,
+          repeatRate: Number(config.parameters.repeatRate) || 0.5,
+          intensity: Number(config.parameters.intensity) || 0.5,
+          echoVolume: Number(config.parameters.echoVolume) || 0.8,
+          wow: Number(config.parameters.wow) || 0,
+          flutter: Number(config.parameters.flutter) || 0,
+          dirt: Number(config.parameters.dirt) || 0,
+          inputBleed: config.parameters.inputBleed != null ? Number(config.parameters.inputBleed) : 0,
+          loopAmount: Number(config.parameters.loopAmount) || 0,
+          playheadFilter: config.parameters.playheadFilter != null ? Number(config.parameters.playheadFilter) : 1,
           wet: wetValue,
         });
         break;
@@ -3690,20 +3834,6 @@ export class InstrumentFactory {
       filter: wbConfig.filter,
       configVolume: config.volume,
     });
-    console.log('[WobbleBass] Creating with config:', {
-      hasWobbleBass: !!config.wobbleBass,
-      envelope: wbConfig.envelope,
-      osc1: wbConfig.osc1,
-      filter: wbConfig.filter,
-      configVolume: config.volume,
-    });
-    console.log('[WobbleBass] Creating with config:', {
-      hasWobbleBass: !!config.wobbleBass,
-      envelope: wbConfig.envelope,
-      osc1: wbConfig.osc1,
-      filter: wbConfig.filter,
-      configVolume: config.volume,
-    });
 
     // === OSCILLATOR SECTION ===
     // Create dual oscillators with unison
@@ -3956,7 +4086,7 @@ export class InstrumentFactory {
 
     // === OUTPUT ===
     const output = new Tone.Gain(1);
-    output.gain.value = Math.pow(10, (config.volume ?? -6) / 20);
+    output.gain.value = Math.pow(10, this.getNormalizedVolume('WobbleBass', config.volume) / 20);
 
     // === SIGNAL CHAIN ===
     // Route oscillators through mixer
@@ -4236,20 +4366,16 @@ export class InstrumentFactory {
     const synth = new DubSirenSynth(dubSirenConfig);
     
     // Apply initial volume
-    if (config.volume !== undefined) {
-      synth.volume.value = config.volume;
-    }
-    
+    synth.volume.value = this.getNormalizedVolume('DubSiren', config.volume);
+
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createSpaceLaser(config: InstrumentConfig): Tone.ToneAudioNode {
     const spaceLaserConfig = config.spaceLaser || DEFAULT_SPACE_LASER;
     const synth = new SpaceLaserSynth(spaceLaserConfig);
-    
-    if (config.volume !== undefined) {
-      synth.volume.value = config.volume;
-    }
+
+    synth.volume.value = this.getNormalizedVolume('SpaceLaser', config.volume);
     
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4259,9 +4385,7 @@ export class InstrumentFactory {
     if (config.v2Speech) {
       const synth = new V2SpeechSynth(config.v2Speech);
 
-      if (config.volume !== undefined) {
-        synth.output.gain.value = Tone.dbToGain(config.volume);
-      }
+      synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('V2', config.volume));
 
       return synth as unknown as Tone.ToneAudioNode;
     }
@@ -4269,9 +4393,7 @@ export class InstrumentFactory {
     // Regular V2 synth mode
     const synth = new V2Synth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('V2', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4279,10 +4401,8 @@ export class InstrumentFactory {
   private static createSam(config: InstrumentConfig): Tone.ToneAudioNode {
     const samConfig = config.sam || DEFAULT_SAM;
     const synth = new SAMSynth(samConfig);
-    
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('Sam', config.volume));
     
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4291,9 +4411,7 @@ export class InstrumentFactory {
     const synareConfig = config.synare || DEFAULT_SYNARE;
     const synth = new SynareSynth(synareConfig);
 
-    if (config.volume !== undefined) {
-      synth.volume.value = config.volume;
-    }
+    synth.volume.value = this.getNormalizedVolume('Synare', config.volume);
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4306,9 +4424,7 @@ export class InstrumentFactory {
     const dexedConfig = config.dexed || {};
     const synth = new DexedSynth(dexedConfig);
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('Dexed', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4321,9 +4437,7 @@ export class InstrumentFactory {
     const obxdConfig = config.obxd || {};
     const synth = new OBXdSynth(obxdConfig);
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('OBXd', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4335,9 +4449,7 @@ export class InstrumentFactory {
   private static createCZ101(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new CZ101Synth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('CZ101', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4349,9 +4461,7 @@ export class InstrumentFactory {
   private static createCEM3394(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new CEM3394Synth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('CEM3394', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4363,9 +4473,7 @@ export class InstrumentFactory {
   private static createSCSP(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new SCSPSynth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('SCSP', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4377,9 +4485,7 @@ export class InstrumentFactory {
   private static createVFX(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new VFXSynth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVFX', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4391,9 +4497,20 @@ export class InstrumentFactory {
   private static createD50(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new D50Synth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
-    }
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERSA', config.volume));
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  /**
+   * Create Roland SA-synthesis Digital Piano (RdPiano WASM)
+   * Cycle-accurate MKS-20 / MK-80 emulation with SpaceD chorus
+   */
+  private static createRdPiano(config: InstrumentConfig): Tone.ToneAudioNode {
+    const rdpianoConfig = config.rdpiano || {};
+    const synth = new RdPianoSynth(rdpianoConfig);
+
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERSA', config.volume));
 
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4405,10 +4522,197 @@ export class InstrumentFactory {
   private static createMU2000(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new MU2000Synth();
 
-    if (config.volume !== undefined) {
-      synth.output.gain.value = Tone.dbToGain(config.volume);
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESWP30', config.volume));
+
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  // ─── Buzz3o3DF (Devil Fish variant) ───────────────────────────────
+
+  private static createBuzz3o3DF(config: InstrumentConfig): BuzzmachineGenerator {
+    const synth = new BuzzmachineGenerator(BuzzmachineType.OOMEK_AGGRESSOR_DF);
+
+    if (config.tb303) {
+      const tb = config.tb303;
+      synth.setCutoff(tb.filter.cutoff);
+      synth.setResonance(tb.filter.resonance);
+      synth.setEnvMod(tb.filterEnvelope.envMod);
+      synth.setDecay(tb.filterEnvelope.decay);
+      synth.setAccentAmount(tb.accent.amount);
+      synth.setWaveform(tb.oscillator.type);
+      if (tb.tuning !== undefined) synth.setTuning(tb.tuning);
+      if (tb.overdrive) synth.setOverdrive(tb.overdrive.amount);
+
+      if (tb.devilFish) {
+        const df = tb.devilFish;
+        if (df.enabled) {
+          synth.enableDevilFish(true, {
+            overdrive: tb.overdrive?.amount,
+            muffler: df.muffler as any,
+          });
+        }
+        if (df.muffler) synth.setMuffler(df.muffler);
+        if (df.highResonance) synth.setHighResonanceEnabled(df.highResonance);
+        if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking);
+        if (df.normalDecay !== undefined) synth.setNormalDecay(df.normalDecay);
+        if (df.accentDecay !== undefined) synth.setAccentDecay(df.accentDecay);
+        if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay);
+        if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain);
+        if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack);
+        if (df.slideTime !== undefined) synth.setSlideTime(df.slideTime);
+        if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
+      }
+
+      const normalizedVolume = this.getNormalizedVolume('Buzz3o3DF', config.volume);
+      synth.setVolume(normalizedVolume);
     }
 
+    return synth;
+  }
+
+  // ─── MAME Hardware-Accurate Synths ────────────────────────────────
+
+  private static createMAMEAICA(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new AICASynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEAICA', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEASC(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new ASCSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEASC', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEAstrocade(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new AstrocadeSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEAstrocade', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEC352(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new C352Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEC352', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEES5503(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new ES5503Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEES5503', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEICS2115(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new ICS2115Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEICS2115', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEK054539(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new K054539Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEK054539', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEMEA8000(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new MEA8000Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEMEA8000', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEMSM5232(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new MSM5232Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEMSM5232', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMERF5C400(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new RF5C400Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERF5C400', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMERolandSA(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new RolandSASynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERolandSA', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMESN76477(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new SN76477Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESN76477', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMESNKWave(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new SNKWaveSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESNKWave', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMESP0250(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new SP0250Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESP0250', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMETIA(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new TIASynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETIA', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMETMS36XX(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new TMS36XXSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETMS36XX', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMETMS5220(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new TMS5220Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETMS5220', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMETR707(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new TR707Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETR707', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEUPD931(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new UPD931Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEUPD931', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEUPD933(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new UPD933Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEUPD933', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEVotrax(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new VotraxSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVotrax', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEYMF271(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new YMF271Synth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEYMF271', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEYMOPQ(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new YMOPQSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEYMOPQ', config.volume));
+    return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createMAMEVASynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new VASynthSynth();
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVASynth', config.volume));
     return synth as unknown as Tone.ToneAudioNode;
   }
 

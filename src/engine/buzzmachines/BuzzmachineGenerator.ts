@@ -118,8 +118,8 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     if (this.useWasmEngine) return;
 
     if (this.initInProgress) {
-      // Poll until init completes
-      for (let i = 0; i < 40; i++) {
+      // Poll until init completes (max 10 seconds, matches WASM worklet timeout)
+      for (let i = 0; i < 200; i++) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         if (this.useWasmEngine || !this.initInProgress) break;
       }
@@ -165,6 +165,18 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       } else {
         throw new Error('Could not find native AudioNode for connection');
       }
+
+      // CRITICAL: Connect through silent keepalive to destination to force process() calls
+      try {
+        const toneCtx = this.context as any;
+        const rawCtx = toneCtx.rawContext || toneCtx._context;
+        if (rawCtx) {
+          const keepalive = rawCtx.createGain();
+          keepalive.gain.value = 0;
+          this.workletNode.connect(keepalive);
+          keepalive.connect(rawCtx.destination);
+        }
+      } catch (_e) { /* keepalive failed */ }
 
       this.useWasmEngine = true;
       console.log(`[BuzzmachineGenerator] ${this.machineType} WASM engine active`);
@@ -397,6 +409,13 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     // Map 0-100 to 0x00-0x80, but Aggressor uses /64 internally so double the range
     const param = Math.round((percent / 100) * 0x80);
     this.setParameter(5, Math.min(0x80, Math.max(0, param)));
+  }
+
+  /**
+   * Alias for setAccentAmount (matches TB303/Open303 API)
+   */
+  public setAccent(percent: number): void {
+    this.setAccentAmount(percent);
   }
 
   /**
@@ -749,6 +768,16 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       this.setParameter(11, Math.min(100, Math.max(0, param)));
     }
     // Original Aggressor has fixed ~3ms attack
+  }
+
+  /**
+   * Set sub-oscillator level (0-100)
+   * Devil Fish mod: adds a square wave one octave below
+   * Aggressor WASM doesn't support sub-oscillator natively
+   */
+  public setSubOsc(_level: number): void {
+    if (!this.is303Style()) return;
+    // Sub-oscillator would require modifying the WASM to add an additional oscillator
   }
 
   /**

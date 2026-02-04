@@ -15,6 +15,8 @@ import {
   Columns,
   LayoutGrid,
   BarChart3,
+  Music,
+  Link,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -27,6 +29,8 @@ interface CellContextMenuProps {
   channelIndex: number;
   onInterpolate?: () => void;
   onHumanize?: () => void;
+  onStrum?: () => void;
+  onLegato?: () => void;
   onOpenParameterEditor?: (field: 'volume' | 'effect' | 'effectParam') => void;
 }
 
@@ -37,6 +41,8 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   channelIndex,
   onInterpolate,
   onHumanize,
+  onStrum,
+  onLegato,
   onOpenParameterEditor,
 }) => {
   const {
@@ -203,6 +209,18 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       shortcut: 'Ctrl+H',
       onClick: onHumanize,
     },
+    {
+      id: 'strum',
+      label: 'Strum/Arpeggiate',
+      icon: <Music size={14} />,
+      onClick: onStrum,
+    },
+    {
+      id: 'legato',
+      label: 'Legato (Connect Notes)',
+      icon: <Link size={14} />,
+      onClick: onLegato,
+    },
     { type: 'divider' },
     // Visual Parameter Editor
     {
@@ -250,6 +268,8 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     handleDeleteRow,
     onInterpolate,
     onHumanize,
+    onStrum,
+    onLegato,
     onOpenParameterEditor,
     handleSelectColumn,
     handleSelectChannel,

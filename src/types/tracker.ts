@@ -90,6 +90,9 @@ export interface TrackerCell {
 
   // MOD/XM period (for accurate Amiga playback)
   period?: number;              // Amiga period (113-856 for MOD)
+
+  // DEViLBOX: Probability/maybe (0-100, percentage chance note plays)
+  probability?: number;         // undefined/0 = always play, 1-99 = percentage
 }
 
 export interface TrackerRow {
@@ -320,7 +323,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
+  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 
@@ -350,6 +353,7 @@ export type ColumnVisibility = {
   resonance: boolean;
   envMod: boolean;
   pan: boolean;
+  probability: boolean;
 };
 
 export interface TrackerState {
@@ -376,6 +380,7 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   resonance: false,
   envMod: false,
   pan: false,
+  probability: false,
 };
 
 export const EMPTY_CELL: TrackerCell = {

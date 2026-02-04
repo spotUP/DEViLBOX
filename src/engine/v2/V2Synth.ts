@@ -27,18 +27,37 @@ export class V2Synth extends Tone.ToneAudioNode {
       throw new Error('Could not get native AudioContext from Tone.js');
     }
 
+    // Ensure context is running before loading worklet
+    if (nativeCtx.state !== 'running') {
+      try { await nativeCtx.resume(); } catch {}
+      if (nativeCtx.state !== 'running') {
+        // Wait up to 5s for context to start
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            const check = () => {
+              if (nativeCtx.state === 'running') resolve();
+              else setTimeout(check, 100);
+            };
+            setTimeout(check, 100);
+          }),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('AudioContext not running after 5s')), 5000))
+        ]);
+      }
+    }
+
     // Add worklet if not already added
     const baseUrl = import.meta.env.BASE_URL || '/';
+    const cacheBuster = `?v=${Date.now()}`;
     try {
-      await nativeCtx.audioWorklet.addModule(`${baseUrl}V2Synth.worklet.js`);
+      await nativeCtx.audioWorklet.addModule(`${baseUrl}V2Synth.worklet.js${cacheBuster}`);
     } catch (e) {
       // Worklet might already be added
     }
 
     // Fetch WASM binary and JS code in parallel
     const [wasmResponse, jsResponse] = await Promise.all([
-      fetch(`${baseUrl}V2Synth.wasm`),
-      fetch(`${baseUrl}V2Synth.js`)
+      fetch(`${baseUrl}V2Synth.wasm${cacheBuster}`, { cache: 'no-store' }),
+      fetch(`${baseUrl}V2Synth.js${cacheBuster}`, { cache: 'no-store' })
     ]);
 
     if (!wasmResponse.ok) {
@@ -48,10 +67,25 @@ export class V2Synth extends Tone.ToneAudioNode {
       throw new Error(`Failed to load V2Synth.js: ${jsResponse.status}`);
     }
 
-    const [wasmBinary, jsCode] = await Promise.all([
+    const [wasmBinary, jsCodeRaw] = await Promise.all([
       wasmResponse.arrayBuffer(),
       jsResponse.text()
     ]);
+
+    // Preprocess JS code for AudioWorklet new Function() compatibility:
+    // 1. Replace import.meta.url (not available in Function constructor scope)
+    // 2. Remove ES module export statement (invalid syntax in Function body)
+    // 3. Strip Node.js-specific dynamic import block (fails in worklet context)
+    // 4. Expose wasmMemory, _malloc, _free on Module (Emscripten keeps them internal)
+    // 5. Polyfill URL class (not available in AudioWorklet's WorkletGlobalScope)
+    const urlPolyfill = 'if(typeof URL==="undefined"){globalThis.URL=class{constructor(p,b){this.href=(b||"")+p;this.pathname=p;}};}\n';
+    const jsCode = urlPolyfill + jsCodeRaw
+      .replace(/import\.meta\.url/g, `"${baseUrl}"`)
+      .replace(/export\s+default\s+\w+;?\s*$/, '')
+      .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+      .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+      .replace(/(_malloc=wasmExports\["\w+"\])/, '$1;Module["_malloc"]=_malloc')
+      .replace(/(_free=wasmExports\["\w+"\])/, '$1;Module["_free"]=_free');
 
     // Create worklet using Tone.js's createAudioWorkletNode (standardized-audio-context)
     this._worklet = toneCreateAudioWorkletNode(nativeCtx, 'v2-synth-processor', {
@@ -61,8 +95,8 @@ export class V2Synth extends Tone.ToneAudioNode {
     // Wait for ready message with timeout
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('V2Synth initialization timeout after 5s'));
-      }, 5000);
+        reject(new Error('V2Synth initialization timeout after 10s'));
+      }, 10000);
 
       this._worklet!.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
@@ -86,9 +120,24 @@ export class V2Synth extends Tone.ToneAudioNode {
     // Connect worklet to Tone.js output - use the native GainNode
     const nativeOutput = this.output.input as AudioNode;
     this._worklet.connect(nativeOutput);
+
+    // CRITICAL: Connect worklet through a silent keepalive to destination.
+    // Without a path to destination, the browser never calls process().
+    try {
+      const keepalive = nativeCtx.createGain();
+      keepalive.gain.value = 0;
+      this._worklet.connect(keepalive);
+      keepalive.connect(nativeCtx.destination);
+    } catch (e) {
+      console.warn('[V2Synth] Keepalive connection failed:', e);
+    }
   }
 
   public async ready() {
+    return this._initPromise;
+  }
+
+  public async ensureInitialized() {
     return this._initPromise;
   }
 

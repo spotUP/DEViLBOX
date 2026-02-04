@@ -327,12 +327,10 @@ void Open303::updateNormalizer1()
 {
   n1 = LeakyIntegrator::getNormalizer(mainEnv.getDecayTimeConstant(), rc1.getTimeConstant(),
     sampleRate);
-  n1 = 1.0; // test
 }
 
 void Open303::updateNormalizer2()
 {
   n2 = LeakyIntegrator::getNormalizer(mainEnv.getDecayTimeConstant(), rc2.getTimeConstant(),
     sampleRate);
-  n2 = 1.0; // test
 }

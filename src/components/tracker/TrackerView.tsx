@@ -8,6 +8,7 @@ import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore } from '@stores';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
+import { useBlockOperations } from '@hooks/tracker/BlockOperations';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
@@ -19,7 +20,12 @@ import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
+import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
+import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
+import { EffectPicker } from './EffectPicker';
+import { UndoHistoryPanel } from './UndoHistoryPanel';
+import { PatternMatrix } from './PatternMatrix';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
@@ -193,6 +199,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showInterpolate, setShowInterpolate] = useState(false);
   const [showHumanize, setShowHumanize] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showShortcutSheet, setShowShortcutSheet] = useState(false);
+  const [showStrum, setShowStrum] = useState(false);
+  const [showEffectPicker, setShowEffectPicker] = useState(false);
+  const [showUndoHistory, setShowUndoHistory] = useState(false);
+  const [showPatternMatrix, setShowPatternMatrix] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
   // FT2 dialogs
   const [showScaleVolume, setShowScaleVolume] = useState(false);
@@ -259,6 +270,34 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       setShowImportModule(true);
       return;
     }
+
+    // ?: Keyboard shortcut cheat sheet
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setShowShortcutSheet(prev => !prev);
+      return;
+    }
+
+    // Ctrl+E: Effect picker popup
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e' && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      setShowEffectPicker(prev => !prev);
+      return;
+    }
+
+    // Ctrl+Shift+H: Undo history panel
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h' && e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      setShowUndoHistory(prev => !prev);
+      return;
+    }
+
+    // Ctrl+M: Pattern matrix
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm' && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      setShowPatternMatrix(prev => !prev);
+      return;
+    }
   }, [
     setShowImportModule,
     setShowInterpolate,
@@ -273,6 +312,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // Enable keyboard input
   useTrackerInput();
+  const blockOps = useBlockOperations();
 
   // Enable pattern playback
   usePatternPlayback();
@@ -544,6 +584,19 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
         <HumanizeDialog isOpen={showHumanize} onClose={() => setShowHumanize(false)} />
         <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
+        <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
+      <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
+      <EffectPicker
+        isOpen={showEffectPicker}
+        onSelect={(effTyp, eff) => {
+          const { cursor, setCell } = useTrackerStore.getState();
+          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp, eff });
+          setShowEffectPicker(false);
+        }}
+        onClose={() => setShowEffectPicker(false)}
+      />
+      <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
+      <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
         <ImportModuleDialog
           isOpen={showImportModule}
           onClose={() => setShowImportModule(false)}
@@ -864,6 +917,19 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
       <HumanizeDialog isOpen={showHumanize} onClose={() => setShowHumanize(false)} />
       <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
+      <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
+      <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
+      <EffectPicker
+        isOpen={showEffectPicker}
+        onSelect={(effTyp, eff) => {
+          const { cursor, setCell } = useTrackerStore.getState();
+          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp, eff });
+          setShowEffectPicker(false);
+        }}
+        onClose={() => setShowEffectPicker(false)}
+      />
+      <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
+      <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
       <ImportModuleDialog
         isOpen={showImportModule}
         onClose={() => setShowImportModule(false)}
@@ -927,6 +993,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             const pattern = patterns[currentPatternIndex];
             downloadTrack(cursor.channelIndex, pattern);
           }}
+          onReverse={blockOps.reverseBlock}
+          onExpand={blockOps.expandBlock}
+          onShrink={blockOps.shrinkBlock}
+          onDuplicate={blockOps.duplicateBlock}
+          onMath={blockOps.mathBlock}
         />
       )}
       {showAcidGenerator && (

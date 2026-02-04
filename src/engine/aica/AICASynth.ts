@@ -114,6 +114,14 @@ export class AICASynth extends Tone.ToneAudioNode {
     // Connect worklet to Tone.js output - use the input property which is the native GainNode
     const targetNode = this.output.input as AudioNode;
     this.workletNode.connect(targetNode);
+
+    // CRITICAL: Connect through silent keepalive to destination to force process() calls
+    try {
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.workletNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+    } catch (_e) { /* keepalive failed */ }
   }
 
   /**
