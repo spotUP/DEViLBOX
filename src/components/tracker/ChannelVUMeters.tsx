@@ -77,16 +77,14 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({ channelWidth: 
           if (ref) ref.style.height = `${containerHeightRef.current - 4}px`;
         });
 
-        // Find the scroll container (ancestor or sibling with scrollbar-modern class)
-        // Search upward through parents first
+        // Find the scroll container marked with data-vu-scroll
         let element: HTMLElement | null = containerRef.current.parentElement;
         while (element) {
-          if (element.classList.contains('scrollbar-modern')) {
+          if (element.hasAttribute('data-vu-scroll')) {
             scrollContainerRef.current = element;
             break;
           }
-          // Also check siblings of this element
-          const sibling = element.querySelector('.scrollbar-modern') as HTMLElement;
+          const sibling = element.querySelector('[data-vu-scroll]') as HTMLElement;
           if (sibling) {
             scrollContainerRef.current = sibling;
             break;

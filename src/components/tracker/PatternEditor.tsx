@@ -1535,6 +1535,7 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
           ref={contentScrollRef}
           onScroll={handleContentScroll}
           className="absolute overflow-y-hidden scrollbar-modern z-0"
+          data-vu-scroll
           style={{
             left: isMobile ? 0 : `${ROW_NUM_WIDTH}px`,
             right: 0,

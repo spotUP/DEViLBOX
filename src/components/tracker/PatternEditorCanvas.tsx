@@ -880,6 +880,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
               className="overflow-x-auto scrollbar-hidden flex-1"
+              data-vu-scroll
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
                 {pattern.channels.map((channel, idx) => {
@@ -993,7 +994,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           className="absolute right-0 pointer-events-none z-20 overflow-hidden"
           style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
         >
-          <ChannelVUMeters />
+          <ChannelVUMeters channelWidth={CHAR_WIDTH * 12 + 40} />
         </div>
 
         <canvas
