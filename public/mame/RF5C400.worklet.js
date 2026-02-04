@@ -10,6 +10,8 @@
  * - Sample looping
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class RF5C400Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -77,7 +79,7 @@ class RF5C400Processor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./RF5C400.js');
+      const moduleFactory = await import(`${BASE_URL}mame/RF5C400.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.RF5C400Synth();

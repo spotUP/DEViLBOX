@@ -4,10 +4,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useMIDI } from '../../hooks/useMIDI';
-import { useMIDIMappingStore, type MIDIMappableParameter } from '../../stores/useMIDIMappingStore';
+import { useMIDIStore } from '../../stores/useMIDIStore';
+import type { GridMappableParameter } from '../../midi/types';
 import { Cable, Trash2, Radio, XCircle } from 'lucide-react';
 
-const PARAMETER_LABELS: Record<MIDIMappableParameter, { label: string; min: number; max: number; group?: string }> = {
+const PARAMETER_LABELS: Record<GridMappableParameter, { label: string; min: number; max: number; group?: string }> = {
   // General
   baseOctave: { label: 'Base Octave', min: 1, max: 6, group: 'General' },
   velocity: { label: 'Velocity', min: 0, max: 127, group: 'General' },
@@ -35,15 +36,15 @@ interface MIDILearnPanelProps {
 export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
   const { devices, isSupported, isEnabled, lastMessage, enableMIDI, disableMIDI, onMessage } = useMIDI();
   const {
-    mappings,
-    isLearning,
-    learningParameter,
-    addMapping,
-    removeMapping,
-    clearAllMappings,
-    startLearning,
-    stopLearning,
-  } = useMIDIMappingStore();
+    gridMappings,
+    gridIsLearning: isLearning,
+    gridLearningParameter: learningParameter,
+    addGridMapping: addMapping,
+    removeGridMapping: removeMapping,
+    clearGridMappings: clearAllMappings,
+    startGridLearning: startLearning,
+    stopGridLearning: stopLearning,
+  } = useMIDIStore();
 
   const [error, setError] = useState<string | null>(null);
 
@@ -176,7 +177,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
           <h4 className="text-xs font-medium text-text-secondary">Map Parameters</h4>
           {/* Group parameters by category */}
           {['General', '303 Main', 'Devil Fish'].map((group) => {
-            const groupParams = (Object.keys(PARAMETER_LABELS) as MIDIMappableParameter[])
+            const groupParams = (Object.keys(PARAMETER_LABELS) as GridMappableParameter[])
               .filter((param) => PARAMETER_LABELS[param].group === group);
 
             if (groupParams.length === 0) return null;
@@ -188,7 +189,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {groupParams.map((param) => {
-                    const isMapped = Array.from(mappings.values()).some((m) => m.parameter === param);
+                    const isMapped = Object.values(gridMappings).some((m) => m.parameter === param);
                     const isCurrentlyLearning = isLearning && learningParameter === param;
 
                     return (
@@ -230,7 +231,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
       )}
 
       {/* Current Mappings */}
-      {isEnabled && mappings.size > 0 && (
+      {isEnabled && Object.keys(gridMappings).length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-medium text-text-secondary">Active Mappings</h4>
@@ -243,7 +244,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
             </button>
           </div>
           <div className="space-y-1 max-h-40 overflow-y-auto">
-            {Array.from(mappings.entries()).map(([key, mapping]) => (
+            {Object.entries(gridMappings).map(([key, mapping]) => (
               <div
                 key={key}
                 className="flex items-center justify-between bg-dark-bgTertiary rounded px-2 py-1 text-xs"

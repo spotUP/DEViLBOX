@@ -12,6 +12,7 @@
 
 import * as Tone from 'tone';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import { getNativeContext } from '@utils/audio-context';
 
 export class AmigaFilter extends Tone.ToneAudioNode {
   readonly name: string = 'AmigaFilter';
@@ -89,9 +90,8 @@ export class AmigaFilter extends Tone.ToneAudioNode {
     this._initializing = true;
 
     try {
-      // Get rawContext from Tone.js context (standardized-audio-context)
-      const toneContext = Tone.getContext() as any;
-      const rawContext = toneContext.rawContext || toneContext._context;
+      // Get native AudioContext from Tone.js context
+      const rawContext = getNativeContext(this.context);
 
       // Verify we have a valid context with audioWorklet support
       if (!rawContext || !rawContext.audioWorklet) {

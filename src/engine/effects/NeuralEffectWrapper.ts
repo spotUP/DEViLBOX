@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { GuitarMLEngine } from '../GuitarMLEngine';
+import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
 /**
  * NeuralEffectWrapper
@@ -31,13 +32,16 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
 
   constructor(options: {
     modelIndex: number;
-    audioContext: AudioContext;
+    audioContext?: AudioContext;
     wet?: number;
   }) {
     super();
 
     this.modelIndex = options.modelIndex;
     this._wet = options.wet ?? 1.0;
+
+    // Extract the TRUE native AudioContext (same as all MAME/WASM synths)
+    const nativeContext = getNativeContext(this.context);
 
     // Create signal path nodes
     this.input = new Tone.Gain(1);
@@ -46,7 +50,7 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
     this.wetGain = new Tone.Gain(this._wet);
 
     // Create GuitarML engine
-    this.guitarML = new GuitarMLEngine(options.audioContext);
+    this.guitarML = new GuitarMLEngine(nativeContext);
 
     // Create bridge gain node (native AudioNode -> Tone.js)
     this.neuralOutputGain = new Tone.Gain(1);
@@ -67,14 +71,11 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
       Q: 0.7,
     });
 
-    // Connect signal path:
-    // input -> [dry -> output, wet -> guitarML -> EQ -> presence -> wetGain -> output]
+    // Connect dry path and post-neural chain now;
+    // guitarML connections are deferred to loadModel() after initialization
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    this.input.connect(this.guitarML.getInput());
-    // Connect: guitarML (native) -> bridge gain -> EQ3 -> presence filter -> wet gain -> output
-    this.guitarML.getOutput().connect(this.neuralOutputGain.input as unknown as AudioNode);
     this.neuralOutputGain.connect(this.eq3);
     this.eq3.connect(this.presenceFilter);
     this.presenceFilter.connect(this.wetGain);
@@ -85,8 +86,41 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
    * Load neural model (must be called after construction)
    */
   async loadModel(): Promise<void> {
-    await this.guitarML.initialize();
-    await this.guitarML.loadModel(this.modelIndex);
+    try {
+      await this.guitarML.initialize();
+    } catch (e: any) {
+      throw new Error(`[Neural] init failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    }
+
+    try {
+      const nativeInput = getNativeAudioNode(this.input);
+      console.log('[Neural] nativeInput:', nativeInput, nativeInput?.constructor?.name);
+      if (nativeInput) {
+        nativeInput.connect(this.guitarML.getInput());
+      } else {
+        console.warn('[Neural] Could not get native input node');
+      }
+    } catch (e: any) {
+      throw new Error(`[Neural] input connect failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    }
+
+    try {
+      const nativeTarget = getNativeAudioNode(this.neuralOutputGain);
+      console.log('[Neural] nativeTarget:', nativeTarget, nativeTarget?.constructor?.name);
+      if (nativeTarget) {
+        this.guitarML.getOutput().connect(nativeTarget);
+      } else {
+        console.warn('[Neural] Could not get native output target');
+      }
+    } catch (e: any) {
+      throw new Error(`[Neural] output connect failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    }
+
+    try {
+      await this.guitarML.loadModel(this.modelIndex);
+    } catch (e: any) {
+      throw new Error(`[Neural] model load failed: ${e?.message || e?.toString() || JSON.stringify(e)}`);
+    }
   }
 
   /**

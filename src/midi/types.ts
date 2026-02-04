@@ -76,6 +76,33 @@ export interface CCMapping {
   channel?: number; // Optional channel filter (1-16, undefined = any)
 }
 
+// Grid sequencer MIDI CC mapping types
+export type GridMappableParameter =
+  | 'baseOctave'
+  | 'velocity'
+  | 'cutoff'
+  | 'resonance'
+  | 'envMod'
+  | 'decay'
+  | 'accent'
+  | 'slideTime'
+  | 'overdrive'
+  | 'normalDecay'
+  | 'accentDecay'
+  | 'softAttack'
+  | 'vegSustain'
+  | 'filterFM'
+  | 'filterTracking';
+
+export interface GridMIDIMapping {
+  channel: number;
+  controller: number;
+  parameter: GridMappableParameter;
+  min: number;
+  max: number;
+  curve?: 'linear' | 'exponential' | 'logarithmic';
+}
+
 // ============================================================================
 // TD-3 Pattern Types
 // ============================================================================

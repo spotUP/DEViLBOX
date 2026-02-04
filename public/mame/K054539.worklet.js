@@ -3,6 +3,8 @@
  * Konami PCM/ADPCM Sound Chip for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class K054539Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -109,7 +111,7 @@ class K054539Processor extends AudioWorkletProcessor {
       this.cleanup();
 
       // Import the WASM module
-      const moduleFactory = await import('./K054539.js');
+      const moduleFactory = await import(`${BASE_URL}mame/K054539.js`);
       this.module = await moduleFactory.default();
 
       // Create synth instance

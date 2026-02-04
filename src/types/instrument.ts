@@ -163,6 +163,7 @@ export type SynthType =
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'V2'               // Farbrausch V2 Synth
+  | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth
   | 'Synare'           // Synare 3 (Electronic Percussion)
   // JUCE WASM Synths
@@ -240,6 +241,7 @@ export interface DevilFishConfig {
   // Envelope controls
   normalDecay: number;    // 30-3000ms - MEG (Main Envelope Generator) decay for normal notes
   accentDecay: number;    // 30-3000ms - MEG decay for accented notes
+  accentAttack?: number;  // 0.3-30ms - MEG attack time for accented notes
   vegDecay: number;       // 16-3000ms - VEG (Volume Envelope Generator) decay
   vegSustain: number;     // 0-100% - VEG sustain level (100% = infinite notes)
   softAttack: number;     // 0.3-3000ms (exponential) - attack time for non-accented notes
@@ -256,12 +258,11 @@ export interface DevilFishConfig {
   highResonance: boolean; // Enable filter self-oscillation at mid/high frequencies
 
   // Output processing
-  muffler: 'off' | 'soft' | 'hard'; // Soft clipping on VCA output
+  muffler: 'off' | 'soft' | 'hard' | 'dark' | 'mid' | 'bright'; // TB303: soft/hard clipping, Buzz3o3: dark/mid/bright lowpass
 }
 
 export interface TB303Config {
-  // Engine selection - 'accurate' uses Open303 AudioWorklet for authentic TB-303 sound
-  engineType?: 'tonejs' | 'accurate' | 'jc303'; // Default: 'accurate'
+  engineType?: 'jc303';
 
   // Tuning
   tuning?: number; // Master tuning in Hz (default: 440)
@@ -2770,6 +2771,7 @@ export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
   // Envelope defaults (TB-303 compatible)
   normalDecay: 200,      // Standard MEG decay
   accentDecay: 200,      // Accented notes fixed at ~200ms in TB-303
+  accentAttack: 3.0,     // 3ms (matches TB-303 default accent attack)
   vegDecay: 3000,        // TB-303 had fixed ~3-4 second VEG decay
   vegSustain: 0,         // No sustain in TB-303
   softAttack: 0.3,       // Minimum (instant attack) - stock TB-303 had fixed ~4ms, DF makes it variable

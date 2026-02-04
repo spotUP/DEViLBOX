@@ -228,6 +228,10 @@ export class D50Synth extends Tone.ToneAudioNode {
     return this.initPromise;
   }
 
+  public async ensureInitialized(): Promise<void> {
+    return this.init();
+  }
+
   private async doInit(): Promise<void> {
     await this.mameEngine.init();
 

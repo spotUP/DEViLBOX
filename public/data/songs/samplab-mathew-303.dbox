@@ -27,8 +27,7 @@
       "filter": {
         "type": "lowpass",
         "cutoff": 800,
-        "resonance": 65,
-        "envMod": 50
+        "resonance": 65
       },
       "effects": [],
       "volume": -6,
@@ -44,10 +43,10 @@
         },
         "filter": {
           "cutoff": 400,
-          "resonance": 80,
-          "envMod": 75
+          "resonance": 80
         },
         "filterEnvelope": {
+          "envMod": 75,
           "decay": 180
         },
         "accent": {

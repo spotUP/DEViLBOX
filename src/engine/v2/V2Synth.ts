@@ -28,14 +28,14 @@ export class V2Synth extends Tone.ToneAudioNode {
     }
 
     // Ensure context is running before loading worklet
-    if (nativeCtx.state !== 'running') {
+    if ((nativeCtx.state as string) !== 'running') {
       try { await nativeCtx.resume(); } catch {}
-      if (nativeCtx.state !== 'running') {
+      if ((nativeCtx.state as string) !== 'running') {
         // Wait up to 5s for context to start
         await Promise.race([
           new Promise<void>((resolve) => {
             const check = () => {
-              if (nativeCtx.state === 'running') resolve();
+              if ((nativeCtx.state as string) === 'running') resolve();
               else setTimeout(check, 100);
             };
             setTimeout(check, 100);

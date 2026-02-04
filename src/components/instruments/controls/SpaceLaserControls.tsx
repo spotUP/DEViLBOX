@@ -64,7 +64,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>LASER SWEEP</h3>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center justify-around">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.laser.startFreq}
             min={100}
@@ -124,7 +124,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>NOISE GRIT</h3>
         </div>
         
-        <div className="flex justify-around items-center">
+        <div className="flex gap-6 items-center">
           <Knob
             value={config.noise.amount}
             min={0}
@@ -170,7 +170,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>FM MODULATION</h3>
         </div>
         
-        <div className="flex justify-around items-center">
+        <div className="flex gap-6 items-center">
           <Knob
             value={config.fm.amount}
             min={0}
@@ -219,7 +219,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             ))}
           </div>
 
-          <div className="flex justify-around w-full">
+          <div className="flex gap-6 w-full">
             <Knob
               value={config.filter.cutoff}
               min={20}
@@ -261,7 +261,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.delay.time}
             min={0.01}
@@ -307,7 +307,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
         </div>
 
-        <div className={`flex justify-around transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+        <div className={`flex gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
             value={config.reverb.decay}
             min={0.1}

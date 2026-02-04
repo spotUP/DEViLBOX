@@ -16,6 +16,7 @@ import {
   DEFAULT_ORGAN,
   DEFAULT_DRUM_MACHINE,
 } from './types/instrument';
+import type { EffectConfig } from './types/instrument';
 import { SAMPLE_PACKS } from './constants/samplePacks';
 import type { SampleCategory } from './types/samplePack';
 
@@ -191,13 +192,46 @@ const SYNTH_CONFIGS: Record<string, any> = {
   'BuzzM3': { synthType: 'BuzzM3', volume: -12 },
   'BuzzDTMF': { synthType: 'BuzzDTMF', volume: -12 },
   'BuzzFreqBomb': { synthType: 'BuzzFreqBomb', volume: -12 },
+  'Buzz3o3DF': { synthType: 'Buzz3o3DF', volume: -12 },
+  'BuzzM4': { synthType: 'BuzzM4', volume: -12 },
   'Buzzmachine': { synthType: 'Buzzmachine', volume: -12 },
 
-  // === MAME Synths ===
+  // === MAME Synths (original) ===
   'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },
   'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
   'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
   'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 },
+
+  // === MAME Hardware-Accurate Chip Synths ===
+  'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },
+  'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
+  'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
+  'MAMEC352': { synthType: 'MAMEC352', volume: -12 },
+  'MAMEES5503': { synthType: 'MAMEES5503', volume: -12 },
+  'MAMEICS2115': { synthType: 'MAMEICS2115', volume: -12 },
+  'MAMEK054539': { synthType: 'MAMEK054539', volume: -12 },
+  'MAMEMEA8000': { synthType: 'MAMEMEA8000', volume: -12 },
+  'MAMEMSM5232': { synthType: 'MAMEMSM5232', volume: -12 },
+  'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 },
+  'MAMERolandSA': { synthType: 'MAMERolandSA', volume: -12 },
+  'MAMESN76477': { synthType: 'MAMESN76477', volume: -12 },
+  'MAMESNKWave': { synthType: 'MAMESNKWave', volume: -12 },
+  'MAMESP0250': { synthType: 'MAMESP0250', volume: -12 },
+  'MAMETIA': { synthType: 'MAMETIA', volume: -12 },
+  'MAMETMS36XX': { synthType: 'MAMETMS36XX', volume: -12 },
+  'MAMETMS5220': { synthType: 'MAMETMS5220', volume: -12 },
+  'MAMETR707': { synthType: 'MAMETR707', volume: -12 },
+  'MAMEUPD931': { synthType: 'MAMEUPD931', volume: -12 },
+  'MAMEUPD933': { synthType: 'MAMEUPD933', volume: -12 },
+  'MAMEVotrax': { synthType: 'MAMEVotrax', volume: -12 },
+  'MAMEYMF271': { synthType: 'MAMEYMF271', volume: -12 },
+  'MAMEYMOPQ': { synthType: 'MAMEYMOPQ', volume: -12 },
+  'MAMEVASynth': { synthType: 'MAMEVASynth', volume: -12 },
+
+  // === Hardware WASM Synths ===
+  'CZ101': { synthType: 'CZ101', volume: -12 },
+  'CEM3394': { synthType: 'CEM3394', volume: -12 },
+  'SCSP': { synthType: 'SCSP', volume: -12 },
 
   // === JUCE/WASM Synths ===
   'Dexed': { synthType: 'Dexed', volume: -12 },
@@ -310,6 +344,9 @@ function logHtml(html: string) {
 
 function clearResults() {
   document.getElementById('results')!.innerHTML = '';
+  (window as any).SYNTH_TEST_COMPLETE = false;
+  (window as any).SYNTH_TEST_RESULTS = null;
+  document.title = 'DEViLBOX Synth Tests (Browser)';
   testResults = {
     passed: 0,
     failed: 0,
@@ -740,15 +777,21 @@ async function testVolumeLevels() {
 
   // Calculate normalization map
   if (testResults.volumeLevels.length > 0) {
-    const validLevels = testResults.volumeLevels.filter(v => v.peakDb !== -Infinity);
-    const avgPeak = validLevels.reduce((sum, v) => sum + v.peakDb, 0) / validLevels.length;
+    // Only include synths with meaningful output (> -30dB) in normalization suggestions.
+    // WASM synths that fail to init measure at -90dB or -Infinity — including those
+    // produces bogus offsets like +80dB that cause massive clipping when applied.
+    const validLevels = testResults.volumeLevels.filter(v => v.peakDb !== -Infinity && v.peakDb > -30);
+    const allMeasured = testResults.volumeLevels.filter(v => v.peakDb !== -Infinity);
+    const avgPeak = validLevels.length > 0
+      ? validLevels.reduce((sum, v) => sum + v.peakDb, 0) / validLevels.length
+      : NaN;
 
     logHtml(`<div class="info">
-      <p>Average peak level: ${avgPeak.toFixed(1)}dB</p>
-      <p>Synths tested: ${testResults.volumeLevels.length}, Errors: ${testResults.errors.length}</p>
+      <p>Average peak level: ${isNaN(avgPeak) ? 'N/A' : avgPeak.toFixed(1) + 'dB'}</p>
+      <p>Synths tested: ${testResults.volumeLevels.length}, Producing audio (> -30dB): ${validLevels.length}, Silent/near-silent: ${allMeasured.length - validLevels.length + (testResults.volumeLevels.length - allMeasured.length)}</p>
     </div>`);
 
-    // Generate normalization code suggestion
+    // Generate normalization code suggestion — only for synths with reliable measurements
     const normMap: Record<string, number> = {};
     validLevels.forEach(v => {
       const offset = Math.round(TARGET_PEAK - v.peakDb);
@@ -758,7 +801,7 @@ async function testVolumeLevels() {
     });
 
     if (Object.keys(normMap).length > 0) {
-      logHtml(`<pre>// Suggested VOLUME_NORMALIZATION_OFFSETS:\nconst VOLUME_NORMALIZATION_OFFSETS: Record&lt;string, number&gt; = ${JSON.stringify(normMap, null, 2)};</pre>`);
+      logHtml(`<pre>// Suggested VOLUME_NORMALIZATION_OFFSETS (only synths with reliable output > -30dB):\nconst VOLUME_NORMALIZATION_OFFSETS: Record&lt;string, number&gt; = ${JSON.stringify(normMap, null, 2)};</pre>`);
     }
   }
   meter.dispose();
@@ -1404,6 +1447,610 @@ function displaySamplePackSummary() {
 }
 
 // ============================================
+// EFFECT TEST CONFIGURATIONS
+// ============================================
+
+const EFFECT_CONFIGS: Record<string, EffectConfig> = {
+  // === Dynamics ===
+  'Compressor': {
+    id: 'test-compressor', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100,
+    parameters: { threshold: -24, ratio: 12, attack: 0.003, release: 0.25 },
+  },
+  'EQ3': {
+    id: 'test-eq3', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100,
+    parameters: { low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 },
+  },
+
+  // === Distortion ===
+  'Distortion': {
+    id: 'test-distortion', category: 'tonejs', type: 'Distortion', enabled: true, wet: 50,
+    parameters: { drive: 50 },
+  },
+  'BitCrusher': {
+    id: 'test-bitcrusher', category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 50,
+    parameters: { bits: 4 },
+  },
+  'Chebyshev': {
+    id: 'test-chebyshev', category: 'tonejs', type: 'Chebyshev', enabled: true, wet: 50,
+    parameters: { order: 50 },
+  },
+
+  // === Reverb & Delay ===
+  'Reverb': {
+    id: 'test-reverb', category: 'tonejs', type: 'Reverb', enabled: true, wet: 30,
+    parameters: { decay: 1.5, preDelay: 0.01 },
+  },
+  'JCReverb': {
+    id: 'test-jcreverb', category: 'tonejs', type: 'JCReverb', enabled: true, wet: 30,
+    parameters: { roomSize: 0.5 },
+  },
+  'Delay': {
+    id: 'test-delay', category: 'tonejs', type: 'Delay', enabled: true, wet: 30,
+    parameters: { time: 0.25, feedback: 0.5 },
+  },
+  'FeedbackDelay': {
+    id: 'test-feedbackdelay', category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 30,
+    parameters: { time: 0.25, feedback: 0.5 },
+  },
+  'PingPongDelay': {
+    id: 'test-pingpong', category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 30,
+    parameters: { time: 0.25, feedback: 0.5 },
+  },
+  'SpaceEcho': {
+    id: 'test-spaceecho', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30,
+    parameters: { mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0.3 },
+  },
+  'SpaceyDelayer': {
+    id: 'test-spaceydelayer', category: 'tonejs', type: 'SpaceyDelayer', enabled: true, wet: 30,
+    parameters: { firstTap: 250, tapSize: 150, feedback: 50, multiTap: 1, tapeFilter: 1 },
+  },
+  'RETapeEcho': {
+    id: 'test-retapeecho', category: 'tonejs', type: 'RETapeEcho', enabled: true, wet: 30,
+    parameters: { mode: 4, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.7, wow: 0.3, flutter: 0.3, dirt: 0.2, inputBleed: 0, loopAmount: 0, playheadFilter: 1 },
+  },
+
+  // === Modulation ===
+  'BiPhase': {
+    id: 'test-biphase', category: 'tonejs', type: 'BiPhase', enabled: true, wet: 50,
+    parameters: { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3 },
+  },
+  'Chorus': {
+    id: 'test-chorus', category: 'tonejs', type: 'Chorus', enabled: true, wet: 50,
+    parameters: { frequency: 1.5, delayTime: 3.5, depth: 0.7 },
+  },
+  'Phaser': {
+    id: 'test-phaser', category: 'tonejs', type: 'Phaser', enabled: true, wet: 50,
+    parameters: { frequency: 0.5, octaves: 3, baseFrequency: 350 },
+  },
+  'Tremolo': {
+    id: 'test-tremolo', category: 'tonejs', type: 'Tremolo', enabled: true, wet: 50,
+    parameters: { frequency: 10, depth: 0.5 },
+  },
+  'Vibrato': {
+    id: 'test-vibrato', category: 'tonejs', type: 'Vibrato', enabled: true, wet: 50,
+    parameters: { frequency: 5, depth: 0.1 },
+  },
+  'AutoPanner': {
+    id: 'test-autopanner', category: 'tonejs', type: 'AutoPanner', enabled: true, wet: 50,
+    parameters: { frequency: 1, depth: 1 },
+  },
+
+  // === Filters ===
+  'Filter': {
+    id: 'test-filter', category: 'tonejs', type: 'Filter', enabled: true, wet: 100,
+    parameters: { frequency: 350, Q: 1, gain: 0, type: 'lowpass' },
+  },
+  'DubFilter': {
+    id: 'test-dubfilter', category: 'tonejs', type: 'DubFilter', enabled: true, wet: 100,
+    parameters: { cutoff: 20, resonance: 1, gain: 1 },
+  },
+  'AutoFilter': {
+    id: 'test-autofilter', category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 50,
+    parameters: { frequency: 1, baseFrequency: 200, octaves: 2.6 },
+  },
+  'AutoWah': {
+    id: 'test-autowah', category: 'tonejs', type: 'AutoWah', enabled: true, wet: 50,
+    parameters: { baseFrequency: 100, octaves: 6, sensitivity: 0, Q: 2 },
+  },
+
+  // === Pitch ===
+  'PitchShift': {
+    id: 'test-pitchshift', category: 'tonejs', type: 'PitchShift', enabled: true, wet: 100,
+    parameters: { pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 },
+  },
+  'FrequencyShifter': {
+    id: 'test-freqshift', category: 'tonejs', type: 'FrequencyShifter', enabled: true, wet: 50,
+    parameters: { frequency: 0 },
+  },
+
+  // === Spatial ===
+  'StereoWidener': {
+    id: 'test-stereowidener', category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 100,
+    parameters: { width: 0.5 },
+  },
+
+  // === Custom ===
+  'TapeSaturation': {
+    id: 'test-tapesat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 12000 },
+  },
+  'SidechainCompressor': {
+    id: 'test-sidechain', category: 'tonejs', type: 'SidechainCompressor', enabled: true, wet: 100,
+    parameters: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, knee: 6, sidechainGain: 50 },
+  },
+
+  // === Buzzmachine Effects ===
+  'BuzzDistortion': {
+    id: 'test-buzzdist', category: 'tonejs', type: 'BuzzDistortion', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzSVF': {
+    id: 'test-buzzsvf', category: 'tonejs', type: 'BuzzSVF', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzDelay': {
+    id: 'test-buzzdelay', category: 'tonejs', type: 'BuzzDelay', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzChorus': {
+    id: 'test-buzzchorus', category: 'tonejs', type: 'BuzzChorus', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzCompressor': {
+    id: 'test-buzzcomp', category: 'tonejs', type: 'BuzzCompressor', enabled: true, wet: 100,
+    parameters: {},
+  },
+  'BuzzOverdrive': {
+    id: 'test-buzzod', category: 'tonejs', type: 'BuzzOverdrive', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzDistortion2': {
+    id: 'test-buzzdist2', category: 'tonejs', type: 'BuzzDistortion2', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzCrossDelay': {
+    id: 'test-buzzcrossdelay', category: 'tonejs', type: 'BuzzCrossDelay', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzPhilta': {
+    id: 'test-buzzphilta', category: 'tonejs', type: 'BuzzPhilta', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzDist2': {
+    id: 'test-buzzelakdist', category: 'tonejs', type: 'BuzzDist2', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzFreeverb': {
+    id: 'test-buzzfreeverb', category: 'tonejs', type: 'BuzzFreeverb', enabled: true, wet: 30,
+    parameters: {},
+  },
+  'BuzzFreqShift': {
+    id: 'test-buzzfreqshift', category: 'tonejs', type: 'BuzzFreqShift', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzNotch': {
+    id: 'test-buzznotch', category: 'tonejs', type: 'BuzzNotch', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzStereoGain': {
+    id: 'test-buzzsrgain', category: 'tonejs', type: 'BuzzStereoGain', enabled: true, wet: 100,
+    parameters: {},
+  },
+  'BuzzSoftSat': {
+    id: 'test-buzzsoftsat', category: 'tonejs', type: 'BuzzSoftSat', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzLimiter': {
+    id: 'test-buzzlimiter', category: 'tonejs', type: 'BuzzLimiter', enabled: true, wet: 100,
+    parameters: {},
+  },
+  'BuzzExciter': {
+    id: 'test-buzzexciter', category: 'tonejs', type: 'BuzzExciter', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzMasterizer': {
+    id: 'test-buzzmasterizer', category: 'tonejs', type: 'BuzzMasterizer', enabled: true, wet: 100,
+    parameters: {},
+  },
+  'BuzzStereoDist': {
+    id: 'test-buzzstereodist', category: 'tonejs', type: 'BuzzStereoDist', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzWhiteChorus': {
+    id: 'test-buzzwhitechorus', category: 'tonejs', type: 'BuzzWhiteChorus', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzZfilter': {
+    id: 'test-buzzzfilter', category: 'tonejs', type: 'BuzzZfilter', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzChorus2': {
+    id: 'test-buzzchorus2', category: 'tonejs', type: 'BuzzChorus2', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'BuzzPanzerDelay': {
+    id: 'test-buzzpanzerdelay', category: 'tonejs', type: 'BuzzPanzerDelay', enabled: true, wet: 50,
+    parameters: {},
+  },
+
+  // === Neural Effects (representative subset - 1 per category) ===
+  'Neural TS808 (Overdrive)': {
+    id: 'test-neural-0', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 0, neuralModelName: 'TS808',
+  },
+  'Neural RAT (Distortion)': {
+    id: 'test-neural-1', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 1, neuralModelName: 'ProCo RAT',
+  },
+  'Neural MT-2 (Metal Zone)': {
+    id: 'test-neural-2', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 2, neuralModelName: 'MT-2',
+  },
+  'Neural DOD 250': {
+    id: 'test-neural-3', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 3, neuralModelName: 'DOD 250',
+  },
+  'Neural Big Muff': {
+    id: 'test-neural-4', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 4, neuralModelName: 'Big Muff',
+  },
+  'Neural MXR Dist+': {
+    id: 'test-neural-5', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 5, neuralModelName: 'MXR Dist+',
+  },
+  'Neural Bluesbreaker': {
+    id: 'test-neural-6', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 6, neuralModelName: 'Bluesbreaker',
+  },
+  'Neural Klon': {
+    id: 'test-neural-7', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 7, neuralModelName: 'Klon',
+  },
+  'Neural Princeton (Amp)': {
+    id: 'test-neural-8', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 8, neuralModelName: 'Princeton',
+  },
+  'Neural Plexi (Amp)': {
+    id: 'test-neural-9', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 9, neuralModelName: 'Plexi',
+  },
+  'Neural Mesa Recto (Amp)': {
+    id: 'test-neural-10', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 10, neuralModelName: 'Mesa Recto',
+  },
+  'Neural AC30 (Amp)': {
+    id: 'test-neural-11', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 11, neuralModelName: 'AC30',
+  },
+  'Neural Bassman (Amp)': {
+    id: 'test-neural-12', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 12, neuralModelName: 'Bassman',
+  },
+  'Neural JCM800 (Amp)': {
+    id: 'test-neural-13', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 13, neuralModelName: 'JCM800',
+  },
+  'Neural SLO100 (Amp)': {
+    id: 'test-neural-14', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 14, neuralModelName: 'SLO100',
+  },
+  'Neural 5150 (Amp)': {
+    id: 'test-neural-15', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 15, neuralModelName: '5150',
+  },
+  'Neural Dumble (Amp)': {
+    id: 'test-neural-16', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 16, neuralModelName: 'Dumble ODS',
+  },
+  'Neural Matchless (Amp)': {
+    id: 'test-neural-17', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 17, neuralModelName: 'Matchless DC30',
+  },
+  'Neural Orange (Amp)': {
+    id: 'test-neural-18', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 18, neuralModelName: 'Orange Rockerverb',
+  },
+  'Neural ENGL (Amp)': {
+    id: 'test-neural-19', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 19, neuralModelName: 'ENGL Powerball',
+  },
+  'Neural Friedman (Amp)': {
+    id: 'test-neural-20', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 20, neuralModelName: 'Friedman BE-100',
+  },
+  'Neural Timmy': {
+    id: 'test-neural-21', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, treble: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 21, neuralModelName: 'Timmy',
+  },
+  'Neural Vertex': {
+    id: 'test-neural-22', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 22, neuralModelName: 'Vertex',
+  },
+  'Neural Fulltone OCD': {
+    id: 'test-neural-23', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 23, neuralModelName: 'Fulltone OCD',
+  },
+  'Neural Horizon': {
+    id: 'test-neural-24', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 24, neuralModelName: 'Horizon',
+  },
+  'Neural Suhr Riot': {
+    id: 'test-neural-25', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 25, neuralModelName: 'Suhr Riot',
+  },
+  'Neural Bogner': {
+    id: 'test-neural-26', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 26, neuralModelName: 'Bogner Ecstasy',
+  },
+  'Neural Wampler': {
+    id: 'test-neural-27', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 27, neuralModelName: 'Wampler Pinnacle',
+  },
+  'Neural Fortin 33': {
+    id: 'test-neural-28', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 28, neuralModelName: 'Fortin 33',
+  },
+  'Neural Revv G3': {
+    id: 'test-neural-29', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 29, neuralModelName: 'Revv G3',
+  },
+  'Neural Way Huge': {
+    id: 'test-neural-30', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 30, neuralModelName: 'Way Huge Pork Loin',
+  },
+  'Neural Darkglass (Bass)': {
+    id: 'test-neural-31', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 31, neuralModelName: 'Darkglass B7K',
+  },
+  'Neural SansAmp (Bass)': {
+    id: 'test-neural-32', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 32, neuralModelName: 'Tech 21 SansAmp',
+  },
+  'Neural Ampeg SVT (Bass)': {
+    id: 'test-neural-33', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 33, neuralModelName: 'Ampeg SVT',
+  },
+  'Neural Virus Distortion': {
+    id: 'test-neural-34', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, tone: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 34, neuralModelName: 'Virus Distortion',
+  },
+  'Neural Filmosound (Amp)': {
+    id: 'test-neural-35', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 35, neuralModelName: 'Filmosound',
+  },
+  'Neural Gibson EH-185 (Amp)': {
+    id: 'test-neural-36', category: 'neural', type: 'Neural', enabled: true, wet: 50,
+    parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
+    neuralModelIndex: 36, neuralModelName: 'Gibson EH-185',
+  },
+};
+
+// ============================================
+// EFFECT TEST FUNCTIONS
+// ============================================
+
+function getEffectCategory(name: string): string {
+  if (name.startsWith('Buzz')) return 'Buzzmachine';
+  if (name.startsWith('Neural')) return 'Neural';
+  if (['SpaceyDelayer', 'RETapeEcho'].includes(name)) return 'WASM';
+  return 'ToneJS';
+}
+
+async function testEffectCreation() {
+  logHtml('<h2>Effect Creation Tests</h2>');
+  logHtml(`<p class="info">Testing creation of ${Object.keys(EFFECT_CONFIGS).length} effects (Tone.js, WASM, Buzzmachine, Neural).</p>`);
+
+  logHtml('<table><tr><th>Effect</th><th>Category</th><th>Constructor</th><th>Status</th></tr>');
+
+  // Track consecutive failures per category for skip logic
+  const silentCountByCategory: Record<string, number> = {};
+  let skippedCount = 0;
+
+  for (const [name, config] of Object.entries(EFFECT_CONFIGS)) {
+    const category = getEffectCategory(name);
+    const catFails = silentCountByCategory[category] || 0;
+
+    // Skip after 5 consecutive failures in the same category
+    if (catFails >= 5) {
+      testResults.failed++;
+      testResults.errors.push({ name: `Effect: ${name}`, error: `Skipped (${category} engine failed)` });
+      logHtml(`<tr><td>${name}</td><td>${category}</td><td>-</td><td class="fail">SKIPPED (${category})</td></tr>`);
+      skippedCount++;
+      continue;
+    }
+
+    try {
+      const effect = await InstrumentFactory.createEffect(config);
+      const ctorName = (effect as any).constructor?.name || 'Unknown';
+
+      // Verify it has connect/disconnect/dispose methods
+      const hasConnect = typeof (effect as any).connect === 'function';
+      const hasDispose = typeof (effect as any).dispose === 'function';
+
+      if (!hasConnect) {
+        logHtml(`<tr><td>${name}</td><td>${category}</td><td>${ctorName}</td><td class="warn">NO connect()</td></tr>`);
+        testResults.failed++;
+        testResults.errors.push({ name: `Effect: ${name}`, error: 'Missing connect() method' });
+        silentCountByCategory[category] = (silentCountByCategory[category] || 0) + 1;
+      } else {
+        logHtml(`<tr><td>${name}</td><td>${category}</td><td>${ctorName}</td><td class="pass">OK</td></tr>`);
+        testResults.passed++;
+        silentCountByCategory[category] = 0;
+      }
+
+      // Dispose
+      if (hasDispose) {
+        try { (effect as any).dispose(); } catch { /* may fail */ }
+      }
+    } catch (e: any) {
+      const errMsg = e?.message || e?.name || e?.toString?.() || JSON.stringify(e) || 'unknown error';
+      console.error(`[EffectTest] ${name} FAILED:`, e);
+      logHtml(`<tr><td>${name}</td><td>${category}</td><td>-</td><td class="fail">Error: ${errMsg}</td></tr>`);
+      testResults.failed++;
+      testResults.errors.push({ name: `Effect: ${name}`, error: errMsg });
+      silentCountByCategory[category] = (silentCountByCategory[category] || 0) + 1;
+    }
+  }
+
+  if (skippedCount > 0) {
+    logHtml(`<tr><td colspan="4" class="info">${skippedCount} effects skipped after consecutive failures</td></tr>`);
+  }
+
+  logHtml('</table>');
+}
+
+async function testEffectSignalPath() {
+  logHtml('<h2>Effect Signal Path Tests</h2>');
+  logHtml('<p class="info">Testing that effects pass audio through (synth → effect → meter). Target: signal above -60dB.</p>');
+
+  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  meter.connect(Tone.getDestination());
+
+  // Test a subset of Tone.js effects that are fast to create (skip WASM/Neural for speed)
+  const fastEffects = [
+    'Compressor', 'EQ3', 'Distortion', 'BitCrusher', 'Chebyshev',
+    'Reverb', 'JCReverb', 'Delay', 'FeedbackDelay', 'PingPongDelay',
+    'Chorus', 'Phaser', 'Tremolo', 'Vibrato', 'AutoPanner',
+    'Filter', 'AutoFilter', 'AutoWah',
+    'PitchShift', 'FrequencyShifter', 'StereoWidener',
+    'TapeSaturation', 'BiPhase', 'DubFilter',
+  ];
+
+  logHtml('<table><tr><th>Effect</th><th>Peak (dB)</th><th>Status</th></tr>');
+
+  for (const name of fastEffects) {
+    const config = EFFECT_CONFIGS[name];
+    if (!config) continue;
+
+    try {
+      // Create a simple synth as signal source
+      const synth = new Tone.Synth({ volume: -12 });
+      const effect = await InstrumentFactory.createEffect(config);
+
+      // Chain: synth → effect → meter
+      synth.connect(effect as any);
+      (effect as any).connect(meter);
+
+      // Trigger a note and measure
+      synth.triggerAttack('C4');
+
+      let peakDb = -Infinity;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, i < 10 ? 2 : 20));
+        const level = meter.getValue() as number;
+        if (level > peakDb) peakDb = level;
+      }
+
+      synth.triggerRelease();
+      await new Promise(r => setTimeout(r, 50));
+
+      let status = 'pass';
+      let statusText = 'OK';
+      if (peakDb === -Infinity || peakDb < -60) {
+        status = 'fail';
+        statusText = peakDb === -Infinity ? 'NO SIGNAL' : 'SILENT';
+        testResults.failed++;
+        testResults.errors.push({ name: `EffectPath: ${name}`, error: `No signal through effect (${peakDb === -Infinity ? 'silent' : peakDb.toFixed(1) + 'dB'})` });
+      } else {
+        testResults.passed++;
+      }
+
+      logHtml(`<tr>
+        <td>${name}</td>
+        <td>${peakDb === -Infinity ? '-∞' : peakDb.toFixed(1)}</td>
+        <td class="${status}">${statusText}</td>
+      </tr>`);
+
+      // Cleanup
+      try { synth.dispose(); } catch {}
+      try { (effect as any).dispose(); } catch {}
+
+      // Drain meter
+      for (let drain = 0; drain < 5; drain++) {
+        await new Promise(r => setTimeout(r, 10));
+        const level = meter.getValue() as number;
+        if (level <= -100 || level === -Infinity) break;
+      }
+    } catch (e: any) {
+      logHtml(`<tr><td>${name}</td><td>-</td><td class="fail">Error: ${e.message}</td></tr>`);
+      testResults.failed++;
+      testResults.errors.push({ name: `EffectPath: ${name}`, error: e.message });
+    }
+  }
+
+  logHtml('</table>');
+  meter.dispose();
+}
+
+async function runEffectTests() {
+  clearResults();
+  logHtml('<h2>Running Effect Tests...</h2>');
+
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = true);
+
+  try {
+    await initAudio();
+    await testEffectCreation();
+    await testEffectSignalPath();
+
+    // Summary
+    const effectErrors = testResults.errors.filter(e => e.name.startsWith('Effect:') || e.name.startsWith('EffectPath:'));
+    logHtml(`
+      <div class="summary">
+        <h2>Effect Test Summary</h2>
+        <p class="pass">Passed: ${testResults.passed}</p>
+        <p class="fail">Failed: ${testResults.failed}</p>
+        ${effectErrors.length > 0 ? `<p class="fail">Errors: ${effectErrors.map(e => e.name.replace('Effect: ', '').replace('EffectPath: ', '')).join(', ')}</p>` : '<p class="pass">All effects created and passed signal!</p>'}
+      </div>
+    `);
+
+    (window as any).SYNTH_TEST_RESULTS = testResults;
+    (window as any).SYNTH_TEST_COMPLETE = true;
+  } catch (e: any) {
+    log('Test error: ' + e.message, 'fail');
+  }
+
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
+}
+
+// ============================================
 // SETUP EVENT LISTENERS
 // ============================================
 
@@ -1412,6 +2059,7 @@ document.getElementById('runFallbackTests')?.addEventListener('click', runFallba
 document.getElementById('runVolumeTests')?.addEventListener('click', runVolumeTests);
 document.getElementById('runBehaviorTests')?.addEventListener('click', runBehaviorTests);
 document.getElementById('runSamplePackTests')?.addEventListener('click', runSamplePackTests);
+document.getElementById('runEffectTests')?.addEventListener('click', runEffectTests);
 
 // Export for console access
 (window as any).runAllTests = runAllTests;
@@ -1419,3 +2067,4 @@ document.getElementById('runSamplePackTests')?.addEventListener('click', runSamp
 (window as any).runVolumeTests = runVolumeTests;
 (window as any).runBehaviorTests = runBehaviorTests;
 (window as any).runSamplePackTests = runSamplePackTests;
+(window as any).runEffectTests = runEffectTests;

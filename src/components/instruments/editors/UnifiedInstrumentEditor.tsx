@@ -30,11 +30,13 @@ import { V2SpeechControls } from '../controls/V2SpeechControls';
 import { SAMControls } from '../controls/SAMControls';
 import { SynareControls } from '../controls/SynareControls';
 import { MAMEControls } from '../controls/MAMEControls';
+import { ChipSynthControls } from '../controls/ChipSynthControls';
 import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { isMAMEChipType } from '@constants/chipParameters';
 import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
@@ -42,7 +44,7 @@ import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic } from 'luc
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'dexed' | 'obxd';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -114,6 +116,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isV2Type(synthType)) return 'v2';
   if (synthType === 'Sam') return 'sam';
   if (isSynareType(synthType)) return 'synare';
+  if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
@@ -477,6 +480,46 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       // Ignored
     }
   }, [instrument.mame, instrument.synthType, instrument.id, onChange]);
+
+  // Handle MAME chip synth parameter changes
+  const handleChipParamChange = useCallback((key: string, value: number) => {
+    const currentParams = instrument.parameters || {};
+    const newParams = { ...currentParams, [key]: value };
+    onChange({ parameters: newParams });
+    try {
+      const engine = getToneEngine();
+      engine.updateMAMEChipParam(instrument.id, key, value);
+    } catch (_e) { /* ignored */ }
+  }, [instrument.parameters, instrument.id, onChange]);
+
+  // Handle MAME chip synth text parameter changes (e.g. speech text)
+  const handleChipTextChange = useCallback((key: string, value: string) => {
+    const currentParams = instrument.parameters || {};
+    const newParams = { ...currentParams, [key]: value };
+    onChange({ parameters: newParams });
+    try {
+      const engine = getToneEngine();
+      engine.updateMAMEChipTextParam(instrument.id, key, value);
+    } catch (_e) { /* ignored */ }
+  }, [instrument.parameters, instrument.id, onChange]);
+
+  // Handle MAME chip synth preset load
+  const handleChipPresetLoad = useCallback((program: number) => {
+    const currentParams = instrument.parameters || {};
+    onChange({ parameters: { ...currentParams, _program: program } });
+    try {
+      const engine = getToneEngine();
+      engine.loadMAMEChipPreset(instrument.id, program);
+    } catch (_e) { /* ignored */ }
+  }, [instrument.parameters, instrument.id, onChange]);
+
+  // Handle ROM upload for chip synths that require ROMs
+  const handleChipRomUpload = useCallback((bank: number, data: Uint8Array) => {
+    try {
+      const engine = getToneEngine();
+      engine.loadSynthROM(instrument.id, instrument.synthType, bank, data);
+    } catch (_e) { /* ignored */ }
+  }, [instrument.id, instrument.synthType]);
 
   // Handle Dexed (DX7) config updates
   const handleDexedChange = useCallback((updates: Partial<typeof instrument.dexed>) => {
@@ -860,6 +903,34 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           instrumentId={instrument.id}
           onChange={handleSynareChange}
         />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MAME CHIP SYNTH EDITOR (data-driven controls)
+  // ============================================================================
+  if (editorMode === 'mamechip') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+        />
+        <div className="synth-editor-content overflow-y-auto p-4">
+          <ChipSynthControls
+            synthType={instrument.synthType}
+            parameters={instrument.parameters || {}}
+            instrumentId={instrument.id}
+            onParamChange={handleChipParamChange}
+            onTextChange={handleChipTextChange}
+            onLoadPreset={handleChipPresetLoad}
+            onRomUpload={handleChipRomUpload}
+          />
+        </div>
       </div>
     );
   }

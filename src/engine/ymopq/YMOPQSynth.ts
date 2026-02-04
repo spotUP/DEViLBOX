@@ -89,12 +89,19 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
   public config: Record<string, unknown> = {};
   public audioContext: AudioContext;
   private _disposed: boolean = false;
+  private _initPromise!: Promise<void>;
+  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
+  private _isReady = false;
 
   constructor() {
     super();
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
-    this.initialize();
+    this._initPromise = this.initialize();
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    return this._initPromise;
   }
 
   private async initialize(): Promise<void> {
@@ -143,6 +150,13 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
     this.workletNode.port.onmessage = (event) => {
       if (event.data.type === 'ready') {
         console.log('[YMOPQ] WASM node ready');
+        this._isReady = true;
+        for (const call of this._pendingCalls) {
+          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
+          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
+          else if (call.method === 'setOperatorParam') this.setOperatorParam(call.args[0], call.args[1], call.args[2]);
+        }
+        this._pendingCalls = [];
       }
     };
 
@@ -219,6 +233,17 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
   }
 
   setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
+    // Handle composite operator keys: op1_total_level, op2_attack_rate, etc.
+    const opMatch = param.match(/^op(\d+)_(.+)$/);
+    if (opMatch) {
+      this.setOperatorParam(parseInt(opMatch[1]), opMatch[2], value);
+      return;
+    }
+
     const paramMap: Record<string, number> = {
       algorithm: YMOPQParam.ALGORITHM,
       feedback: YMOPQParam.FEEDBACK,
@@ -242,6 +267,10 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
    * @param value - Parameter value
    */
   setOperatorParam(opIndex: number, param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setOperatorParam', args: [opIndex, param, value] });
+      return;
+    }
     const opParamMap: Record<string, number> = {
       total_level: YMOPQParam.OP_TOTAL_LEVEL,
       attack_rate: YMOPQParam.OP_ATTACK_RATE,
@@ -312,6 +341,10 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
 
   /** Load a preset patch by program number (0-7) */
   loadPreset(program: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
+      return;
+    }
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'programChange', program });
   }

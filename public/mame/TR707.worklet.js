@@ -9,6 +9,8 @@
  * ROMs: IC34+IC35 (64KB voices), IC19 (32KB crash), IC22 (32KB ride)
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class TR707Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -78,7 +80,7 @@ class TR707Processor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./TR707.js');
+      const moduleFactory = await import(`${BASE_URL}mame/TR707.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.TR707Synth();

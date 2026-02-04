@@ -22,6 +22,7 @@ import {
   DEFAULT_SPACE_LASER,
   DEFAULT_DEXED,
   DEFAULT_OBXD,
+  DEFAULT_TB303,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
@@ -31,6 +32,7 @@ import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
+import { SidechainCompressor } from './effects/SidechainCompressor';
 import type { InstrumentConfig, EffectConfig, SynthType } from '@/types/instrument';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
@@ -96,28 +98,33 @@ export class InstrumentFactory {
     'DuoSynth': 5,         // Measured: -3.2dB → reduce 7
     'FMSynth': 16,         // Measured: -9.1dB → reduce 1
     'AMSynth': 22,         // Measured: -13.2dB → increase 3
-    'PluckSynth': 35,      // Measured: -23.5dB → increase 14
+    'PluckSynth': 32,      // Calibrated: measured -18.3dB at 24, target -10dB
     'MetalSynth': 23,      // Kept (suspect: very short transient, meter may miss peak)
     'MembraneSynth': 10,   // Measured: +0.4dB → reduce 10
     'NoiseSynth': 7,       // Measured: -2.9dB → reduce 7
     'PolySynth': 8,        // Measured: -5.7dB → reduce 4
     // Custom synths (WASM and specialized engines)
-    'TB303': 25,           // Kept (WASM init timing may affect measurement)
-    'JC303': 25,           // Same as TB303
+    'TB303': 15,           // Calibrated: measured -24.9dB at offset 0. Raw peak ~-12.9dB. Target -10dB.
+    'JC303': 15,           // Same engine as TB303
     'Buzz3o3': 5,          // Kept (WASM-dependent)
-    'Furnace': 7,          // Kept (WASM-dependent)
-    'FurnaceGB': 7,        // Same as Furnace
-    'FurnaceNES': 7,       // Same as Furnace
-    'FurnaceOPN': 7,       // Same as Furnace
-    'FurnaceOPM': 7,       // Same as Furnace
-    'FurnaceC64': 7,       // Same as Furnace
-    'FurnaceAY': 7,        // Same as Furnace
-    'BuzzKick': 9,         // Kept (WASM-dependent)
-    'BuzzNoise': 0,        // Kept (already at target)
+    'Furnace': 0,          // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 7
+    'FurnaceGB': 0,        // Reset to 0 - unmeasured
+    'FurnaceNES': 0,       // Reset to 0 - unmeasured
+    'FurnaceOPN': 0,       // Reset to 0 - unmeasured
+    'FurnaceOPM': 0,       // Reset to 0 - unmeasured
+    'FurnaceC64': 0,       // Reset to 0 - unmeasured
+    'FurnaceAY': 0,        // Reset to 0 - unmeasured
+    'BuzzKick': 3,         // Calibrated with output gain: measured -13.1dB, target -10
+    'BuzzKickXP': 5,       // Calibrated with output gain: measured -21.7dB, target -10
+    'BuzzNoise': 7,        // Calibrated with output gain: measured -22.3dB, target -10
+    'BuzzTrilok': 5,       // Calibrated with output gain: measured -22.4dB, target -10
+    'Buzz4FM2F': 7,        // Calibrated with output gain: measured -21.2dB, target -10
+    'BuzzFreqBomb': 4,     // Calibrated with output gain: measured -21.3dB, target -10
+    'Buzz3o3DF': 8,        // Calibrated with output gain: measured -13.8dB, target -10
     'Synare': 7,           // Measured: -7.1dB (OK)
     'DubSiren': 13,        // Measured: -0.5dB → reduce 10 (now uses getNormalizedVolume)
-    'SpaceLaser': 29,      // Measured: +3.4dB → reduce 13 (now uses getNormalizedVolume)
-    'V2': 30,              // Measured -40.4dB, needs +30 (WASM now producing audio)
+    'SpaceLaser': 35,      // Recalibrated: measured -16.2dB, target -10
+    'V2': 0,               // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 30
     'Sam': 16,             // Measured: -2.5dB → reduce 7 (now uses getNormalizedVolume)
     'SuperSaw': 9,         // Measured: -7.8dB (OK)
     'WobbleBass': 13,      // Measured: -0.4dB → reduce 10 (now uses getNormalizedVolume)
@@ -125,24 +132,50 @@ export class InstrumentFactory {
     'StringMachine': 11,   // Measured: -8.6dB → increase 1
     'PWMSynth': 9,         // Measured: -9.1dB → increase 1
     'ChipSynth': 5,        // Measured: -5.1dB → reduce 5
-    'Wavetable': -1,       // Measured: -2.3dB → reduce 8
+    'Wavetable': 5,        // Calibrated: raw peak ~-3.4dB, gain=-12+5=-7 → target ~-10dB
     'Organ': 3,            // Measured: -2.8dB → reduce 7
     'Sampler': 10,         // Measured: -20.3dB → increase 10
     'Player': 0,           // Sample-based - no normalization needed
     'GranularSynth': 8,    // Kept (no reliable measurement)
-    'DrumMachine': 5,      // Measured: -15.2dB → increase 5
+    'DrumMachine': 10,     // Recalibrated: measured -14.6dB, target -10
     'ChiptuneModule': -6,  // Measured: -3.8dB → decrease 6
     'DrumKit': 0,          // Kept (test sample may not load)
-    // MAME synths (WASM-dependent, kept as-is)
-    'MAMEVFX': 8,
-    'MAMEDOC': 8,
-    'MAMERSA': 8,
-    'MAMESWP30': 8,
-    'CZ101': 10,           // Kept (WASM-dependent)
-    'Dexed': 41,           // Measured -50.9dB, needs +41
-    'OBXd': 9,             // Measured -19.1dB, needs +9
-    'CEM3394': 0,          // MAME WASM - no measurement yet
-    'SCSP': 0,             // MAME WASM - no measurement yet
+    // MAME/WASM synths - CAUTION: test runner can't measure these (WASM doesn't init in test)
+    // These offsets are GUESSES. Only Dexed/OBXd reliably init in test environment.
+    'MAMEVFX': 0,          // Reset to 0 - was unmeasured guess of 8
+    'MAMEDOC': 0,          // Reset to 0 - was unmeasured guess of 8
+    'MAMERSA': 0,          // Reset to 0 - was unmeasured guess of 8
+    'MAMESWP30': 0,        // Reset to 0 - was unmeasured guess of 8
+    'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
+    'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
+    'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
+    'CEM3394': 0,          // WASM - no measurement possible in test
+    'SCSP': 0,             // WASM - no measurement possible in test
+    // MAME chip synths - all reset to 0 (unmeasured, WASM doesn't init in test)
+    'MAMEAstrocade': 0,
+    'MAMESN76477': 0,
+    'MAMEASC': 0,
+    'MAMEES5503': 0,
+    'MAMEMEA8000': 0,
+    'MAMEMSM5232': 0,
+    'MAMESNKWave': 0,
+    'MAMESP0250': 0,
+    'MAMETMS36XX': 0,
+    'MAMEVotrax': 0,
+    'MAMEYMOPQ': 0,
+    'MAMETIA': 0,
+    'MAMEUPD931': 0,
+    'MAMEUPD933': 0,
+    'MAMETMS5220': 0,
+    'MAMEYMF271': 0,
+    'MAMETR707': 0,
+    'MAMEVASynth': 0,
+    'MAMEAICA': 0,
+    'MAMEICS2115': 0,
+    'MAMEK054539': 0,
+    'MAMEC352': 0,
+    'MAMERF5C400': 0,
+    'MAMERolandSA': 0,
   };
 
   /**
@@ -557,34 +590,33 @@ export class InstrumentFactory {
         break;
 
       // Buzzmachine Generators (WASM-emulated Buzz synths)
+      // Non-303 Buzz synths: apply volume via output gain (setVolume is no-op for non-303)
       case 'BuzzDTMF':
-        console.log('[InstrumentFactory] Creating BuzzDTMF generator');
-        instrument = new BuzzmachineGenerator(BuzzmachineType.CYANPHASE_DTMF);
+        instrument = this.createBuzzGenerator(BuzzmachineType.CYANPHASE_DTMF, 'BuzzDTMF', config);
         break;
       case 'BuzzFreqBomb':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.ELENZIL_FREQUENCYBOMB);
+        instrument = this.createBuzzGenerator(BuzzmachineType.ELENZIL_FREQUENCYBOMB, 'BuzzFreqBomb', config);
         break;
       case 'BuzzKick':
-        console.log('[InstrumentFactory] Creating BuzzKick generator');
-        instrument = new BuzzmachineGenerator(BuzzmachineType.FSM_KICK);
+        instrument = this.createBuzzGenerator(BuzzmachineType.FSM_KICK, 'BuzzKick', config);
         break;
       case 'BuzzKickXP':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.FSM_KICKXP);
+        instrument = this.createBuzzGenerator(BuzzmachineType.FSM_KICKXP, 'BuzzKickXP', config);
         break;
       case 'BuzzNoise':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.JESKOLA_NOISE);
+        instrument = this.createBuzzGenerator(BuzzmachineType.JESKOLA_NOISE, 'BuzzNoise', config);
         break;
       case 'BuzzTrilok':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.JESKOLA_TRILOK);
+        instrument = this.createBuzzGenerator(BuzzmachineType.JESKOLA_TRILOK, 'BuzzTrilok', config);
         break;
       case 'Buzz4FM2F':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.MADBRAIN_4FM2F);
+        instrument = this.createBuzzGenerator(BuzzmachineType.MADBRAIN_4FM2F, 'Buzz4FM2F', config);
         break;
       case 'BuzzDynamite6':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.MADBRAIN_DYNAMITE6);
+        instrument = this.createBuzzGenerator(BuzzmachineType.MADBRAIN_DYNAMITE6, 'BuzzDynamite6', config);
         break;
       case 'BuzzM3':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.MAKK_M3);
+        instrument = this.createBuzzGenerator(BuzzmachineType.MAKK_M3, 'BuzzM3', config);
         break;
       case 'Buzz3o3':
         instrument = this.createBuzz3o3(config);
@@ -593,7 +625,7 @@ export class InstrumentFactory {
         instrument = this.createBuzz3o3DF(config);
         break;
       case 'BuzzM4':
-        instrument = new BuzzmachineGenerator(BuzzmachineType.MAKK_M4);
+        instrument = this.createBuzzGenerator(BuzzmachineType.MAKK_M4, 'BuzzM4', config);
         break;
 
       // MAME Hardware-Accurate Synths
@@ -1545,19 +1577,17 @@ export class InstrumentFactory {
   }
 
   private static createTB303(config: InstrumentConfig): JC303Synth {
-    if (!config.tb303) {
-      throw new Error('TB303 config required for TB303 synth type');
-    }
+    const tb303Config = config.tb303 || { ...DEFAULT_TB303 };
 
     // Use Open303 WASM engine for authentic TB-303 sound
     // Apply normalized volume boost for TB303
     const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
-    return this.createJC303(config.tb303, normalizedVolume);
+    return this.createJC303(tb303Config, normalizedVolume);
   }
 
   private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
     const synth = new JC303Synth();
-    
+
     // Apply parameters from TB303 config
     synth.setCutoff(tb.filter.cutoff);
     synth.setResonance(tb.filter.resonance);
@@ -1565,7 +1595,12 @@ export class InstrumentFactory {
     synth.setDecay(tb.filterEnvelope.decay);
     synth.setAccent(tb.accent.amount);
     synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
-    
+
+    // Override C++ WASM VCA envelope to rosic's hardware-calibrated defaults.
+    // The baked-in WASM binary has setAmpDecay(3000)/setAmpRelease(16) which
+    // deviate from rosic's carefully tuned values (1230ms/1.0ms).
+    synth.setVegDecay(1230);  // rosic default: ampEnv.setDecay(1230)
+
     if (tb.slide) {
       synth.setSlideTime(tb.slide.time);
     }
@@ -1573,10 +1608,45 @@ export class InstrumentFactory {
       synth.setOverdrive(tb.overdrive.amount);
     }
 
+    // Devil Fish mods
+    if (tb.devilFish) {
+      const df = tb.devilFish;
+      if (df.enabled) {
+        synth.enableDevilFish(true);
+      }
+      if (df.muffler) synth.setMuffler(df.muffler);
+      if (df.highResonance) synth.setHighResonanceEnabled(df.highResonance);
+      if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking);
+      if (df.normalDecay !== undefined) synth.setNormalDecay(df.normalDecay);
+      if (df.accentDecay !== undefined) synth.setAccentDecay(df.accentDecay);
+      if (df.accentAttack !== undefined) synth.setParam('accent_attack', df.accentAttack);
+      if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay);
+      if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain);
+      if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack);
+      if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
+      if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
+      if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
+    }
+
     if (volume !== undefined) {
       synth.setVolume(volume);
     }
 
+    return synth;
+  }
+
+  /**
+   * Create a non-303 Buzzmachine generator with volume normalization applied via output gain.
+   * BuzzmachineGenerator.setVolume() is a no-op for non-303 types, so we use the output gain node.
+   */
+  private static createBuzzGenerator(
+    machineType: BuzzmachineType,
+    synthType: string,
+    config: InstrumentConfig
+  ): BuzzmachineGenerator {
+    const synth = new BuzzmachineGenerator(machineType);
+    const normalizedVolume = this.getNormalizedVolume(synthType, config.volume);
+    synth.output.gain.value = Tone.dbToGain(normalizedVolume);
     return synth;
   }
 
@@ -1649,6 +1719,15 @@ export class InstrumentFactory {
         if (df.sweepSpeed !== undefined) {
           synth.setSweepSpeed(df.sweepSpeed);
         }
+        if (df.accentAttack !== undefined) {
+          synth.setParam('accent_attack', df.accentAttack);
+        }
+        if (df.filterFM !== undefined) {
+          synth.setFilterFM(df.filterFM);
+        }
+        if (df.accentSweepEnabled !== undefined) {
+          synth.setAccentSweepEnabled(df.accentSweepEnabled);
+        }
       }
 
       // Apply normalized volume
@@ -1661,7 +1740,9 @@ export class InstrumentFactory {
 
   private static createWavetable(config: InstrumentConfig): WavetableSynth {
     const wavetableConfig = config.wavetable || DEFAULT_WAVETABLE;
-    return new WavetableSynth(wavetableConfig);
+    const synth = new WavetableSynth(wavetableConfig);
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('Wavetable', config.volume));
+    return synth;
   }
 
   private static createSampler(config: InstrumentConfig): Tone.Sampler {
@@ -3407,7 +3488,10 @@ export class InstrumentFactory {
     };
 
     const machineType = machineTypeMap[machineTypeStr] ?? BuzzmachineType.ARGURU_DISTORTION;
-    return new BuzzmachineGenerator(machineType);
+    const synth = new BuzzmachineGenerator(machineType);
+    const normalizedVolume = this.getNormalizedVolume('Buzzmachine', config.volume);
+    synth.output.gain.value = Tone.dbToGain(normalizedVolume);
+    return synth;
   }
 
 
@@ -4448,6 +4532,7 @@ export class InstrumentFactory {
    */
   private static createCZ101(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new CZ101Synth();
+    void synth.init();
 
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('CZ101', config.volume));
 
@@ -4484,6 +4569,7 @@ export class InstrumentFactory {
    */
   private static createVFX(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new VFXSynth();
+    void synth.init();
 
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVFX', config.volume));
 
@@ -4496,6 +4582,7 @@ export class InstrumentFactory {
    */
   private static createD50(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new D50Synth();
+    void synth.init();
 
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERSA', config.volume));
 
@@ -4521,6 +4608,7 @@ export class InstrumentFactory {
    */
   private static createMU2000(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new MU2000Synth();
+    void synth.init();
 
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESWP30', config.volume));
 
@@ -4561,6 +4649,9 @@ export class InstrumentFactory {
         if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack);
         if (df.slideTime !== undefined) synth.setSlideTime(df.slideTime);
         if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
+        if (df.accentAttack !== undefined) synth.setParam('accent_attack', df.accentAttack);
+        if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
+        if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
       }
 
       const normalizedVolume = this.getNormalizedVolume('Buzz3o3DF', config.volume);
@@ -4572,147 +4663,186 @@ export class InstrumentFactory {
 
   // ─── MAME Hardware-Accurate Synths ────────────────────────────────
 
+  /** Apply config.parameters to a MAME chip synth via setParam/loadPreset */
+  private static applyChipParameters(synth: any, config: InstrumentConfig): void {
+    const params = config.parameters;
+    if (!params) return;
+    // If _program is set, load built-in WASM preset first
+    if (typeof params._program === 'number') {
+      synth.loadPreset(params._program);
+    }
+    // Apply individual parameter overrides
+    for (const [key, value] of Object.entries(params)) {
+      if (key === '_program' || typeof value !== 'number') continue;
+      synth.setParam(key, value);
+    }
+  }
+
   private static createMAMEAICA(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new AICASynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEAICA', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEASC(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new ASCSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEASC', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEAstrocade(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new AstrocadeSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEAstrocade', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEC352(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new C352Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEC352', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEES5503(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new ES5503Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEES5503', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEICS2115(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new ICS2115Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEICS2115', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEK054539(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new K054539Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEK054539', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEMEA8000(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new MEA8000Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEMEA8000', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEMSM5232(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new MSM5232Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEMSM5232', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMERF5C400(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new RF5C400Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERF5C400', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMERolandSA(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new RolandSASynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERolandSA', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMESN76477(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new SN76477Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESN76477', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMESNKWave(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new SNKWaveSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESNKWave', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMESP0250(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new SP0250Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESP0250', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMETIA(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new TIASynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETIA', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMETMS36XX(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new TMS36XXSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETMS36XX', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMETMS5220(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new TMS5220Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETMS5220', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMETR707(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new TR707Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETR707', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEUPD931(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new UPD931Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEUPD931', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEUPD933(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new UPD933Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEUPD933', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEVotrax(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new VotraxSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVotrax', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEYMF271(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new YMF271Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEYMF271', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEYMOPQ(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new YMOPQSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEYMOPQ', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 
   private static createMAMEVASynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new VASynthSynth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVASynth', config.volume));
+    this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
 

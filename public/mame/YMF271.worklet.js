@@ -3,6 +3,8 @@
  * Yamaha OPX 4-Operator FM Synthesizer for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class YMF271Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -71,7 +73,7 @@ class YMF271Processor extends AudioWorkletProcessor {
       this.cleanup();
 
       // Import the WASM module
-      const moduleFactory = await import('./YMF271.js');
+      const moduleFactory = await import(`${BASE_URL}mame/YMF271.js`);
       this.module = await moduleFactory.default();
 
       // Create synth instance

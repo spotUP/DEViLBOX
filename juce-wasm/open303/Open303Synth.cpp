@@ -87,6 +87,10 @@ public:
         synth_.setAccent(0.0);            // Accent off (hardware default)
         synth_.setVolume(-12.0);          // -12 dB (hardware default)
 
+        // VCA envelope: Use rosic's hardware-calibrated defaults from the constructor
+        // (ampEnv.setDecay(1230), normalAmpRelease=1.0, accentAmpRelease=50.0)
+        // These were carefully tuned by Robin Schmidt from TB-303 circuit analysis.
+
         isInitialized_ = true;
     }
 

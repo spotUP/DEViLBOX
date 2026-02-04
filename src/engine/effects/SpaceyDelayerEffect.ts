@@ -73,8 +73,7 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      const toneContext = this.context as any;
-      const nativeCtx: AudioContext = toneContext.rawContext || toneContext._context || getNativeContext(this.context);
+      const nativeCtx = getNativeContext(this.context);
       if (!nativeCtx) throw new Error('Could not get native AudioContext');
 
       await SpaceyDelayerEffect.ensureModuleLoaded(nativeCtx);

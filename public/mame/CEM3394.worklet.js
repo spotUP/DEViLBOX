@@ -3,6 +3,8 @@
  * Curtis Electromusic Synthesizer Voice for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class CEM3394Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -72,7 +74,7 @@ class CEM3394Processor extends AudioWorkletProcessor {
       this.cleanup();
 
       // Import the WASM module
-      const moduleFactory = await import('./CEM3394.js');
+      const moduleFactory = await import(`${BASE_URL}mame/CEM3394.js`);
       this.module = await moduleFactory.default();
 
       // Create synth instance

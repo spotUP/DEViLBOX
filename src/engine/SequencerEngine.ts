@@ -2,12 +2,17 @@
  * SequencerEngine - Web Audio Integration for AcidSequencer
  *
  * Provides sample-accurate sequencing via ScriptProcessor or AudioWorklet.
- * Integrates with TB303EngineAccurate for complete acid bassline playback.
+ * Integrates with a TB-303 engine for complete acid bassline playback.
  */
 
 import { AcidSequencer, AcidPattern, SequencerMode, type SequencerEvent } from './AcidSequencer';
-import type { TB303EngineAccurate } from './TB303EngineAccurate';
 import { getNativeContext } from '@utils/audio-context';
+
+/** Minimal interface for a TB-303 engine that the sequencer can drive */
+interface TB303Engine {
+  noteOn(note: number, velocity: number, accent: boolean, slide: boolean): void;
+  noteOff(): void;
+}
 
 export interface SequencerConfig {
   bpm?: number;
@@ -23,7 +28,7 @@ export interface SequencerConfig {
 export class SequencerEngine {
   private audioContext: AudioContext;
   private sequencer: AcidSequencer;
-  private tb303Engine: TB303EngineAccurate | null = null;
+  private tb303Engine: TB303Engine | null = null;
 
   // Timing
   private scriptProcessor: ScriptProcessorNode | null = null;
@@ -55,7 +60,7 @@ export class SequencerEngine {
   /**
    * Connect to TB-303 engine for audio output
    */
-  connectToTB303(tb303: TB303EngineAccurate): void {
+  connectToTB303(tb303: TB303Engine): void {
     this.tb303Engine = tb303;
     console.log('[SequencerEngine] Connected to TB-303 engine');
   }

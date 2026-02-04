@@ -9,7 +9,7 @@
  * └─────────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
@@ -286,42 +286,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const presetsButtonRef = useRef<HTMLDivElement>(null);
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
   const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
-  
+  const grooveMenuRef = useRef<HTMLDivElement>(null);
+  const grooveButtonRef = useRef<HTMLDivElement>(null);
+
   const [modulesMenuPosition, setModulesMenuPosition] = useState({ top: 0, left: 0 });
   const [presetsMenuPosition, setPresetsMenuPosition] = useState({ top: 0, left: 0 });
   const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
+  const [grooveMenuPosition, setGrooveMenuPosition] = useState({ top: 0, left: 0 });
 
-  const BUNDLED_MODULES = {
-    acid: [
-      { file: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' },
-      { file: 'hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue' },
-      { file: 'josh-wink-higher-state.dbox', name: 'Josh Wink - Higher State' },
-      { file: 'dittytoy-303.dbox', name: 'Dittytoy 303' },
-      { file: 'fatboy-slim-everyone-needs-303_.dbox', name: 'Fatboy Slim - Everyone Needs a 303' },
-      { file: 'fast-eddie-acid-thunder.dbox', name: 'Fast Eddie - Acid Thunder' },
-      { file: 'dj-tim-misjah-access.dbox', name: 'DJ Tim & Misjah - Access' },
-      { file: 'samplab-mathew-303.dbox', name: 'Samplab Mathew 303' },
-      { file: 'samplab-mathew-full.dbox', name: 'Samplab Mathew (Full)' },
-      { file: 'slow-creaky-acid-authentic.dbox', name: 'Slow Creaky (Authentic)' },
-      { file: 'slow-creaky-acid-tempo-relative.dbox', name: 'Slow Creaky (Tempo-Relative)' },
-    ],
-    tb303: [
-      { file: 'fatboy-slim-everybody-needs-a-303.dbox', name: 'Fatboy Slim - Everybody needs a 303' },
-      { file: 'josh-wink-high-state-of-consciousness.dbox', name: 'Josh Wink - High State of Consciousness' },
-      { file: 'christophe-just-i-m-a-disco-dancer-part-1-.dbox', name: 'Christophe Just - Disco Dancer (Part 1)' },
-      { file: 'christophe-just-i-m-a-disco-dancer-part-2-.dbox', name: 'Christophe Just - Disco Dancer (Part 2)' },
-      { file: 'claustrophobic-sting-the-prodigy.dbox', name: 'Claustrophobic Sting - The Prodigy' },
-      { file: 'josh-wink-are-you-there.dbox', name: 'Josh Wink - Are You There' },
-      { file: 'cut-paste-forget-it-part-1-.dbox', name: 'Cut Paste - Forget It (Part 1)' },
-      { file: 'paste-forget-it-part-2-.dbox', name: 'Cut Paste - Forget It (Part 2)' },
-      { file: 'public-energy-three-o-three-part-1-.dbox', name: 'Public Energy - Three O Three (Part 1)' },
-      { file: 'public-energy-three-o-three-part-2-.dbox', name: 'Public Energy - Three O Three (Part 2)' },
-    ],
-    general: [
-      { file: 'new-order-confusion.dbox', name: 'New Order - Confusion' },
-      { file: 'edge-of-motion-setup-707.dbox', name: 'Edge of Motion - 707 Setup' },
-    ],
-  };
+  const [bundledModules, setBundledModules] = useState<{ acid: { file: string; name: string }[]; tb303: { file: string; name: string }[]; general: { file: string; name: string }[] } | null>(null);
+
+  // Load modules list from JSON on first menu open
+  useEffect(() => {
+    if (showModulesMenu && !bundledModules) {
+      const basePath = import.meta.env.BASE_URL || '/';
+      fetch(`${basePath}data/songs/modules.json`)
+        .then(r => r.json())
+        .then(data => setBundledModules(data.categories))
+        .catch(() => {
+          // Fallback if modules.json fails to load
+          setBundledModules({
+            acid: [{ file: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' }],
+            tb303: [],
+            general: [],
+          });
+        });
+    }
+  }, [showModulesMenu, bundledModules]);
 
   const handleLoadModule = async (filename: string) => {
     setShowModulesMenu(false);
@@ -415,6 +406,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showFxPresetsMenu]);
 
   React.useEffect(() => {
+    if (showGrooveMenu && grooveButtonRef.current) {
+      const rect = grooveButtonRef.current.getBoundingClientRect();
+      setGrooveMenuPosition({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [showGrooveMenu]);
+
+  React.useEffect(() => {
     if (!showModulesMenu && !showPresetsMenu && !showFxPresetsMenu && !showGrooveMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (showModulesMenu && modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
@@ -427,11 +425,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         setShowFxPresetsMenu(false);
       }
       // Close groove menu when clicking outside
-      if (showGrooveMenu) {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.relative')) {
-          setShowGrooveMenu(false);
-        }
+      if (showGrooveMenu && grooveMenuRef.current && !grooveMenuRef.current.contains(e.target as Node) &&
+          grooveButtonRef.current && !grooveButtonRef.current.contains(e.target as Node)) {
+        setShowGrooveMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -747,9 +743,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               </div>
               <div className="ft2-section ft2-section-tempo">
                 <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
-                <div className="relative">
+                <div ref={grooveButtonRef}>
                   <Button
-                    variant={showGrooveMenu ? 'primary' : 'default'}
+                    variant={showGrooveMenu || grooveTemplateId !== 'straight' ? 'primary' : 'default'}
                     size="sm"
                     onClick={() => setShowGrooveMenu(!showGrooveMenu)}
                     title="Groove Template"
@@ -757,41 +753,41 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   >
                     {GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name?.slice(0, 8) || 'Groove'}
                   </Button>
-                  {showGrooveMenu && (
-                    <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[200px] max-h-[300px] overflow-y-auto">
-                      {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
-                        const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
-                        if (grooves.length === 0) return null;
-                        return (
-                          <div key={category}>
-                            <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase">
-                              {category}
-                            </div>
-                            {grooves.map(groove => (
-                              <button
-                                key={groove.id}
-                                onClick={() => {
-                                  setGrooveTemplate(groove.id);
-                                  setShowGrooveMenu(false);
-                                }}
-                                className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
-                                  groove.id === grooveTemplateId
-                                    ? 'bg-accent-primary/20 text-accent-primary'
-                                    : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-                                }`}
-                              >
-                                <span className="font-bold">{groove.name}</span>
-                                {groove.description && (
-                                  <span className="block text-[10px] opacity-60">{groove.description}</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
+                {showGrooveMenu && (
+                  <div ref={grooveMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[200px] max-h-[300px] overflow-y-auto" style={{ top: `${grooveMenuPosition.top}px`, left: `${grooveMenuPosition.left}px` }}>
+                    {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
+                      const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
+                      if (grooves.length === 0) return null;
+                      return (
+                        <div key={category}>
+                          <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase">
+                            {category}
+                          </div>
+                          {grooves.map(groove => (
+                            <button
+                              key={groove.id}
+                              onClick={() => {
+                                setGrooveTemplate(groove.id);
+                                setShowGrooveMenu(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
+                                groove.id === grooveTemplateId
+                                  ? 'bg-accent-primary/20 text-accent-primary'
+                                  : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+                              }`}
+                            >
+                              <span className="font-bold">{groove.name}</span>
+                              {groove.description && (
+                                <span className="block text-[10px] opacity-60">{groove.description}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="ft2-section ft2-section-pattern">
                 <FT2NumericInput
@@ -859,12 +855,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               </div>
               {showModulesMenu && (
                 <div ref={modulesMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${modulesMenuPosition.top}px`, left: `${modulesMenuPosition.left}px` }}>
+                  {!bundledModules ? (
+                    <div className="px-3 py-2 text-sm text-text-muted">Loading...</div>
+                  ) : (<>
                   <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Acid / 303</div>
-                  {BUNDLED_MODULES.acid.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  {bundledModules.acid.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
                   <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">TB-303 Patterns</div>
-                  {BUNDLED_MODULES.tb303.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  {bundledModules.tb303.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
                   <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">General</div>
-                  {BUNDLED_MODULES.general.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  {bundledModules.general.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
+                  </>)}
                 </div>
               )}
 

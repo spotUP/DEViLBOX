@@ -15,6 +15,7 @@ import { SYNARE_PRESETS } from './synarePresets';
 import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from './drumnibusPresets';
 import { V2_FACTORY_PRESETS } from './v2FactoryPresets';
 import { SAM_PRESETS } from './samPresets';
+import { MAME_CHIP_PRESETS } from './mameChipPresets';
 
 // BASS PRESETS (18)
 
@@ -3314,6 +3315,7 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...PAD_PRESETS,
   ...DRUM_PRESETS,
   ...MAME_PRESETS,
+  ...MAME_CHIP_PRESETS,
   ...ORGAN_PRESETS,
   ...MODULE_PRESETS,
   ...TR808_PRESETS,
@@ -3338,7 +3340,7 @@ export const PRESET_CATEGORIES = {
   Leads: LEAD_PRESETS,
   Pads: PAD_PRESETS,
   Drums: DRUM_PRESETS,
-  MAME: MAME_PRESETS,
+  MAME: [...MAME_PRESETS, ...MAME_CHIP_PRESETS],
   Keys: ORGAN_PRESETS,
   Module: MODULE_PRESETS,
   'TR-808': TR808_PRESETS,

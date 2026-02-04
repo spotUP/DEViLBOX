@@ -116,26 +116,31 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           }));
         }
       } else if (viewMode === 'bundled') {
-        // Load bundled modules list
+        // Load bundled modules list from unified modules.json
         const basePath = import.meta.env.BASE_URL || '/';
         try {
-          const response = await fetch(`${basePath}modules/index.json`);
+          const response = await fetch(`${basePath}data/songs/modules.json`);
           if (response.ok) {
-            const modules = await response.json();
-            items = modules.map((m: { file: string; name: string }) => ({
+            const data = await response.json();
+            const categories = data.categories || {};
+            // Flatten all categories into a single list
+            const allModules: { file: string; name: string }[] = [];
+            for (const mods of Object.values(categories)) {
+              allModules.push(...(mods as { file: string; name: string }[]));
+            }
+            items = allModules.map((m) => ({
               id: m.file,
               name: m.name,
               isDirectory: false,
-              path: `modules/${m.file}`,
+              path: `data/songs/${m.file}`,
               source: 'bundled' as const,
             }));
           }
         } catch {
-          // Fall back to hardcoded list if index.json doesn't exist
+          // Fall back to a few known modules
           items = [
-            { id: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'modules/phuture-acid-tracks.dbox', source: 'bundled' as const },
-            { id: 'hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'modules/hardfloor-funalogue.dbox', source: 'bundled' as const },
-            { id: 'fatboy-slim-everyone-needs-303_.dbox', name: 'Fatboy Slim - Everyone Needs a 303', isDirectory: false, path: 'modules/fatboy-slim-everyone-needs-303_.dbox', source: 'bundled' as const },
+            { id: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbox', source: 'bundled' as const },
+            { id: 'hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbox', source: 'bundled' as const },
           ];
         }
       }

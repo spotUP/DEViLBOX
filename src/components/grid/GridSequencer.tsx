@@ -20,7 +20,7 @@ import { GridControls } from './GridControls';
 import { NoteGridCell } from './GridCell';
 import { SCALES, isNoteInScale } from '../../lib/scales';
 import { useMIDI } from '../../hooks/useMIDI';
-import { useMIDIMappingStore } from '../../stores/useMIDIMappingStore';
+import { useMIDIStore } from '../../stores/useMIDIStore';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
@@ -77,7 +77,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // MIDI integration
   const { onMessage } = useMIDI();
-  const { applyMIDIValue } = useMIDIMappingStore();
+  const { applyGridMIDIValue } = useMIDIStore();
 
   // Initialize focus to first cell
   useEffect(() => {
@@ -155,11 +155,11 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     const unsubscribe = onMessage((message) => {
       if (message.type !== 'cc' || message.controller === undefined || message.value === undefined) return;
 
-      const mappedValue = applyMIDIValue(message.channel, message.controller, message.value);
+      const mappedValue = applyGridMIDIValue(message.channel, message.controller, message.value);
       if (mappedValue === null) return;
 
       // Apply to baseOctave if mapped
-      const mapping = useMIDIMappingStore.getState().getMapping(message.channel, message.controller);
+      const mapping = useMIDIStore.getState().getGridMapping(message.channel, message.controller);
       if (!mapping) return;
 
       switch (mapping.parameter) {
@@ -173,7 +173,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     });
 
     return unsubscribe;
-  }, [onMessage, applyMIDIValue, setBaseOctave]);
+  }, [onMessage, applyGridMIDIValue, setBaseOctave]);
 
   // Handle note cell click - stable callback
   const handleNoteClick = useCallback(

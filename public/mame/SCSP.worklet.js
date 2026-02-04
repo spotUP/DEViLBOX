@@ -3,6 +3,8 @@
  * Sega Saturn YMF292-F Sound Processor for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class SCSPProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -86,7 +88,7 @@ class SCSPProcessor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./SCSP.js');
+      const moduleFactory = await import(`${BASE_URL}mame/SCSP.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.SCSPSynth();

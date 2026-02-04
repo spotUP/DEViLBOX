@@ -21,7 +21,6 @@ import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
-import { ToastContainer } from '@components/common/ToastContainer';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
@@ -82,13 +81,11 @@ function App() {
     if (hasNewVersion) {
       // Prioritize Changelog for new versions
       setTipsInitialTab('changelog');
-      const timer = setTimeout(() => setShowTips(true), 1000);
-      return () => clearTimeout(timer);
+      setShowTips(true);
     } else if (showTipsAtStartup) {
       // Otherwise show Tips if enabled
       setTipsInitialTab('tips');
-      const timer = setTimeout(() => setShowTips(true), 1500);
-      return () => clearTimeout(timer);
+      setShowTips(true);
     }
   }, [currentVersion.buildNumber]);
 
@@ -532,7 +529,6 @@ function App() {
 
       {/* Toast Notifications */}
       <ToastNotification />
-      <ToastContainer />
 
       {/* Synth Error Dialog - Shows when synth initialization fails */}
       <SynthErrorDialog />

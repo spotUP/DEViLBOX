@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import { MAMEEngine } from './MAMEEngine';
-// Audio context utilities no longer needed - using Tone.js rawContext directly
+import { getNativeContext } from '@utils/audio-context';
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -112,9 +112,8 @@ export class MAMESynth extends Tone.ToneAudioNode {
   private startRendering(): void {
     const bufferSize = 512; // Minimum 256 for ScriptProcessor
 
-    // Get the TRUE native context from Tone.js
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
+    // Get the TRUE native context using the robust extractor
+    const rawContext = getNativeContext(this.context);
 
     if (!rawContext || !rawContext.createScriptProcessor) {
       console.warn('[MAMESynth] ScriptProcessorNode not available, audio rendering disabled');

@@ -3,6 +3,8 @@
  * Sega Dreamcast Sound Processor for DEViLBOX
  */
 
+const BASE_URL = globalThis.BASE_URL || '/';
+
 class AICAProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -86,7 +88,7 @@ class AICAProcessor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      const moduleFactory = await import('./AICA.js');
+      const moduleFactory = await import(`${BASE_URL}mame/AICA.js`);
       this.module = await moduleFactory.default();
 
       this.synth = new this.module.AICASynth();

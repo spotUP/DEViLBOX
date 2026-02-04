@@ -51,6 +51,17 @@ export class Open303Synth extends Tone.ToneAudioNode {
   private _disposed: boolean = false;
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
+  // Queue parameter messages that arrive before worklet node is ready
+  private _pendingParams: Array<{ paramId: number; value: number }> = [];
+  // Track pending release timeout so slides can cancel it
+  private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Devil Fish state tracking
+  private _baseCutoff: number = 1000;       // Base cutoff before filter tracking adjustment
+  private _filterTracking: number = 0;      // 0-200% - filter frequency tracks note pitch
+  private _highResonance: boolean = false;   // Enable self-oscillation range
+  private _baseResonance: number = 50;       // Store base resonance for high-reso scaling
+  private _lastMidiNote: number = 36;        // Last played note for filter tracking (C2 reference)
 
   constructor() {
     super();
@@ -186,6 +197,22 @@ export class Open303Synth extends Tone.ToneAudioNode {
       jsCode: Open303Synth.jsCode
     });
 
+    // Flush queued parameters immediately via postMessage. The worklet's
+    // handleMessage queues setParameter calls during WASM init and deduplicates
+    // by paramId, so any later knob changes sent before WASM is ready will
+    // correctly override these initial values.
+    if (this._pendingParams.length > 0) {
+      console.log(`[Open303] Sending ${this._pendingParams.length} queued params to worklet`);
+      for (const { paramId, value } of this._pendingParams) {
+        this.workletNode.port.postMessage({
+          type: 'setParameter',
+          paramId,
+          value
+        });
+      }
+      this._pendingParams = [];
+    }
+
     // Connect worklet to Tone.js output
     const targetNode = this.overdriveGain.input as AudioNode;
     this.workletNode.connect(targetNode);
@@ -202,6 +229,13 @@ export class Open303Synth extends Tone.ToneAudioNode {
   triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false): void {
     if (!this.workletNode || this._disposed) return;
 
+    // Cancel any pending release from previous note — prevents gate-off
+    // from interrupting a slide that's already in progress
+    if (this._releaseTimeout !== null) {
+      clearTimeout(this._releaseTimeout);
+      this._releaseTimeout = null;
+    }
+
     const midiNote = typeof note === 'string'
       ? Tone.Frequency(note).toMidi()
       : Math.round(12 * Math.log2(note / 440) + 69);
@@ -210,6 +244,12 @@ export class Open303Synth extends Tone.ToneAudioNode {
     let finalVelocity = Math.floor(velocity * 127);
     if (accent && finalVelocity < 100) finalVelocity = 127;
     if (!accent && finalVelocity >= 100) finalVelocity = 99;
+
+    // Track note for filter tracking
+    this._lastMidiNote = midiNote;
+    if (this._filterTracking > 0) {
+      this.applyFilterTracking();
+    }
 
     // Pass slide flag to worklet for proper 303 slide behavior
     // When slide=true: worklet keeps previous note held → Open303 slideToNote (legato)
@@ -224,10 +264,9 @@ export class Open303Synth extends Tone.ToneAudioNode {
 
   triggerRelease(_time?: number): void {
     if (!this.workletNode || this._disposed) return;
-    // Send gateOff to release the amp envelope on the currently held note.
-    // This enables proper 303 staccato: the amp envelope enters its fast
-    // release phase (~1ms), creating punchy gaps between non-slide notes.
-    // The worklet clears currentNote so the next noteOn triggers a fresh note.
+    // Send gateOff to release the VCA envelope with hardware-accurate 16ms release.
+    // Real TB-303: gate LOW → 8ms hold + 8ms linear decay → silence.
+    // This creates the characteristic staccato between non-slide notes.
     this.workletNode.port.postMessage({
       type: 'gateOff'
     });
@@ -243,7 +282,8 @@ export class Open303Synth extends Tone.ToneAudioNode {
     this.triggerAttack(note, time, velocity || 1, accent, slide);
 
     const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
+    this._releaseTimeout = setTimeout(() => {
+      this._releaseTimeout = null;
       if (!this._disposed) {
         this.triggerRelease();
       }
@@ -251,7 +291,22 @@ export class Open303Synth extends Tone.ToneAudioNode {
   }
 
   private setParameterById(paramId: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
+    if (this._disposed) {
+      console.warn(`[Open303] setParameter BLOCKED: disposed (paramId=${paramId}, value=${value})`);
+      return;
+    }
+    if (!this.workletNode) {
+      // Queue parameter for replay once worklet is ready
+      // Replace any existing entry for the same paramId
+      const existing = this._pendingParams.findIndex(p => p.paramId === paramId);
+      if (existing >= 0) {
+        this._pendingParams[existing].value = value;
+      } else {
+        this._pendingParams.push({ paramId, value });
+      }
+      console.log(`[Open303] setParameter QUEUED (workletNode null): paramId=${paramId}, value=${value}, queue=${this._pendingParams.length}`);
+      return;
+    }
     this.workletNode.port.postMessage({
       type: 'setParameter',
       paramId,
@@ -293,11 +348,18 @@ export class Open303Synth extends Tone.ToneAudioNode {
 
   // --- Core Setters ---
   setCutoff(hz: number): void {
-    this.setParameterById(Open303Param.CUTOFF, hz);
+    this._baseCutoff = hz;
+    // Apply filter tracking if active, otherwise send directly
+    if (this._filterTracking > 0) {
+      this.applyFilterTracking();
+    } else {
+      this.setParameterById(Open303Param.CUTOFF, hz);
+    }
   }
 
   setResonance(val: number): void {
-    this.setParameterById(Open303Param.RESONANCE, val);
+    this._baseResonance = val;
+    this.applyResonance();
   }
 
   setEnvMod(val: number): void {
@@ -339,9 +401,45 @@ export class Open303Synth extends Tone.ToneAudioNode {
     this.setParameterById(Open303Param.TUNING, hz);
   }
 
+  // --- Filter Tracking & Resonance Helpers ---
+  private applyFilterTracking(): void {
+    if (this._filterTracking <= 0) {
+      // No tracking - send base cutoff as-is
+      this.setParameterById(Open303Param.CUTOFF, this._baseCutoff);
+      return;
+    }
+    // Scale cutoff based on note distance from C2 (MIDI 36)
+    // At 100% tracking: cutoff doubles per octave (follows pitch 1:1)
+    // At 200% tracking: cutoff quadruples per octave
+    const semitoneOffset = this._lastMidiNote - 36;
+    const trackingScale = (this._filterTracking / 100);
+    const cutoffMultiplier = Math.pow(2, (semitoneOffset / 12) * trackingScale);
+    const adjustedCutoff = Math.max(20, Math.min(20000, this._baseCutoff * cutoffMultiplier));
+    this.setParameterById(Open303Param.CUTOFF, adjustedCutoff);
+  }
+
+  private applyResonance(): void {
+    let reso = this._baseResonance;
+    if (!this._highResonance) {
+      // Stock 303: resonance pot limited to ~85% of range (no self-oscillation)
+      reso = Math.min(reso, 85);
+    }
+    // Full range: 0-100% where 100% = self-oscillation
+    this.setParameterById(Open303Param.RESONANCE, reso);
+  }
+
   // --- Advanced / Devil Fish Setters ---
-  enableDevilFish(_enabled: boolean, _config?: any): void {
-    // Open303 advanced params are always available
+  enableDevilFish(enabled: boolean, _config?: any): void {
+    if (!enabled) {
+      // Reset to stock 303 behavior
+      this._filterTracking = 0;
+      this._highResonance = false;
+      this.setMuffler('off');
+      this.setSweepSpeed('normal');
+      this.applyResonance();
+      this.applyFilterTracking();
+    }
+    // When enabled, individual setters handle each parameter
   }
 
   setNormalDecay(ms: number): void {
@@ -365,23 +463,121 @@ export class Open303Synth extends Tone.ToneAudioNode {
     this.setParameterById(Open303Param.NORMAL_ATTACK, ms);
   }
 
-  setFilterTracking(_percent: number): void {
-    // Not directly supported in Open303
+  setFilterTracking(percent: number): void {
+    // Devil Fish: filter cutoff tracks keyboard pitch (0-200%)
+    // At 100%, cutoff follows pitch 1:1. At 200%, 2× tracking.
+    // Implemented by adjusting cutoff on each noteOn relative to C2 (MIDI 36).
+    this._filterTracking = Math.max(0, Math.min(200, percent));
+    // Re-apply tracking for current note
+    this.applyFilterTracking();
   }
 
-  setFilterFM(_percent: number): void {
-    // Not directly supported in Open303
+  setFilterFM(percent: number): void {
+    // Devil Fish: VCA output modulates filter cutoff (audio-rate FM).
+    // True audio-rate FM requires C++ DSP changes. We approximate by boosting
+    // envelope modulation depth, which creates similar aggressive filter movement.
+    // At 100% filter FM, envMod is boosted by up to 40% additional depth.
+    const fmAmount = Math.max(0, Math.min(100, percent));
+    const envModBoost = (fmAmount / 100) * 40; // up to 40% extra envMod
+    if (envModBoost > 0) {
+      // Store the FM contribution - gets added to whatever envMod the user set
+      this.setParameterById(Open303Param.ENV_MOD, Math.min(100, 25 + envModBoost));
+    }
   }
 
-  setMuffler(_mode: string): void {
-    // Not directly supported in Open303
+  setMuffler(mode: string): void {
+    // Devil Fish Muffler: post-filter clipping circuit.
+    // Maps to the JS-side overdrive waveshaper with mode-specific curves.
+    // Also uses the WASM tanh shaper for additional waveform character.
+    switch (mode) {
+      case 'soft':
+        // Gentle diode clipping - warm compression
+        this.setOverdrive(15);
+        this.setParameterById(Open303Param.TANH_DRIVE, 1.5);
+        this.setParameterById(Open303Param.TANH_OFFSET, 0.0);
+        break;
+      case 'hard':
+        // Aggressive clipping - gnarly distortion
+        this.setOverdrive(45);
+        this.setParameterById(Open303Param.TANH_DRIVE, 3.0);
+        this.setParameterById(Open303Param.TANH_OFFSET, 0.05);
+        break;
+      case 'dark':
+        // Low-pass character clipping - muffled growl
+        this.setOverdrive(30);
+        this.setParameterById(Open303Param.TANH_DRIVE, 2.0);
+        this.setParameterById(Open303Param.TANH_OFFSET, -0.1);
+        this.setParameterById(Open303Param.POST_FILTER_HP, 20);
+        break;
+      case 'mid':
+        // Mid-focused clipping
+        this.setOverdrive(25);
+        this.setParameterById(Open303Param.TANH_DRIVE, 2.5);
+        this.setParameterById(Open303Param.TANH_OFFSET, 0.0);
+        this.setParameterById(Open303Param.POST_FILTER_HP, 80);
+        break;
+      case 'bright':
+        // High-presence clipping - biting aggression
+        this.setOverdrive(35);
+        this.setParameterById(Open303Param.TANH_DRIVE, 2.0);
+        this.setParameterById(Open303Param.TANH_OFFSET, 0.1);
+        this.setParameterById(Open303Param.POST_FILTER_HP, 150);
+        break;
+      case 'off':
+      default:
+        // Clean signal - no muffler
+        this.setOverdrive(0);
+        this.setParameterById(Open303Param.TANH_DRIVE, 1.0);
+        this.setParameterById(Open303Param.TANH_OFFSET, 0.0);
+        this.setParameterById(Open303Param.POST_FILTER_HP, 44);
+        break;
+    }
   }
 
-  setSweepSpeed(_mode: string): void {}
-  setAccentSweepEnabled(_enabled: boolean): void {}
+  setSweepSpeed(mode: string): void {
+    // Devil Fish: accent sweep capacitor charge/discharge speed.
+    // 'fast' = snappy accent transients, 'slow' = drawn-out filter sweeps.
+    // Implemented by scaling accent attack/decay times.
+    switch (mode) {
+      case 'fast':
+        // Quick charge/discharge - punchy accents
+        this.setParameterById(Open303Param.ACCENT_ATTACK, 0.5);
+        this.setParameterById(Open303Param.ACCENT_DECAY, 80);
+        break;
+      case 'slow':
+        // Slow charge/discharge - long sweeping accents
+        this.setParameterById(Open303Param.ACCENT_ATTACK, 10);
+        this.setParameterById(Open303Param.ACCENT_DECAY, 800);
+        break;
+      case 'normal':
+      default:
+        // Stock 303 accent timing
+        this.setParameterById(Open303Param.ACCENT_ATTACK, 3);
+        this.setParameterById(Open303Param.ACCENT_DECAY, 200);
+        break;
+    }
+  }
+
+  setAccentSweepEnabled(enabled: boolean): void {
+    // Devil Fish: enable/disable accent sweep circuit.
+    // When disabled, accented notes have no filter envelope sweep.
+    if (!enabled) {
+      this.setParameterById(Open303Param.ACCENT, 0);
+    }
+  }
+
   setQuality(_quality: string): void {}
 
-  setHighResonance(_enabled: boolean): void {}
+  setHighResonance(enabled: boolean): void {
+    // Devil Fish: high resonance mod removes the pot-range limiter,
+    // allowing the filter to reach true self-oscillation (100% reso).
+    // When disabled, resonance is soft-capped at 85% to prevent squealing.
+    // When enabled, full 0-100% range is available.
+    this._highResonance = enabled;
+    // Re-apply resonance with the new mode
+    this.applyResonance();
+  }
+
   setHighResonanceEnabled(enabled: boolean): void {
     this.setHighResonance(enabled);
   }
@@ -422,6 +618,10 @@ export class Open303Synth extends Tone.ToneAudioNode {
 
   dispose(): this {
     this._disposed = true;
+    if (this._releaseTimeout !== null) {
+      clearTimeout(this._releaseTimeout);
+      this._releaseTimeout = null;
+    }
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;

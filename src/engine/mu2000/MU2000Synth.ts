@@ -142,6 +142,10 @@ export class MU2000Synth extends Tone.ToneAudioNode {
     return this.initPromise;
   }
 
+  public async ensureInitialized(): Promise<void> {
+    return this.init();
+  }
+
   private async doInit(): Promise<void> {
     // Initialize MAME engine
     await this.mameEngine.init();

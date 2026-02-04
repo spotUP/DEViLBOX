@@ -75,7 +75,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     clipboard,
     setHorizontalZoom,
     setVerticalZoom,
-    scrollBy,
+    setScroll,
     setSnapToGrid,
     setGridDivision,
     setShowVelocity,
@@ -330,13 +330,78 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     [tool, notes, startDrag]
   );
 
-  // ============ SCROLL ============
+  // ============ SMOOTH SCROLL ============
+
+  const targetScrollX = useRef(view.scrollX);
+  const targetScrollY = useRef(view.scrollY);
+  const scrollAnimFrame = useRef<number | null>(null);
+
+  // Sync targets when scroll is set externally (e.g. playback auto-scroll)
+  const lastExternalScrollX = useRef(view.scrollX);
+  const lastExternalScrollY = useRef(view.scrollY);
+  useEffect(() => {
+    // Detect external scroll changes (not from our animation) and sync targets
+    if (view.scrollX !== lastExternalScrollX.current) {
+      targetScrollX.current = view.scrollX;
+    }
+    if (view.scrollY !== lastExternalScrollY.current) {
+      targetScrollY.current = view.scrollY;
+    }
+    lastExternalScrollX.current = view.scrollX;
+    lastExternalScrollY.current = view.scrollY;
+  }, [view.scrollX, view.scrollY]);
+
+  // Clean up animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollAnimFrame.current !== null) {
+        cancelAnimationFrame(scrollAnimFrame.current);
+      }
+    };
+  }, []);
+
+  const animateScroll = useCallback(() => {
+    const lerp = 0.25;
+    const epsilon = 0.1;
+
+    const currentX = usePianoRollStore.getState().view.scrollX;
+    const currentY = usePianoRollStore.getState().view.scrollY;
+    const tx = targetScrollX.current;
+    const ty = targetScrollY.current;
+
+    const dx = tx - currentX;
+    const dy = ty - currentY;
+
+    if (Math.abs(dx) < epsilon && Math.abs(dy) < epsilon) {
+      // Snap to target and stop animating
+      setScroll(tx, ty);
+      lastExternalScrollX.current = tx;
+      lastExternalScrollY.current = ty;
+      scrollAnimFrame.current = null;
+      return;
+    }
+
+    const newX = currentX + dx * lerp;
+    const newY = currentY + dy * lerp;
+    setScroll(newX, newY);
+    lastExternalScrollX.current = newX;
+    lastExternalScrollY.current = newY;
+
+    scrollAnimFrame.current = requestAnimationFrame(animateScroll);
+  }, [setScroll]);
 
   const handleScroll = useCallback(
     (deltaX: number, deltaY: number) => {
-      scrollBy(deltaX, deltaY);
+      // Accumulate into target position
+      targetScrollX.current = Math.max(0, targetScrollX.current + deltaX);
+      targetScrollY.current = Math.max(0, Math.min(127, targetScrollY.current + deltaY));
+
+      // Start animation loop if not already running
+      if (scrollAnimFrame.current === null) {
+        scrollAnimFrame.current = requestAnimationFrame(animateScroll);
+      }
     },
-    [scrollBy]
+    [animateScroll]
   );
 
   // ============ MOUSE MOVE/UP FOR DRAGGING ============
