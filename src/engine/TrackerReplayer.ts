@@ -26,6 +26,7 @@ import { getGrooveOffset } from '@/types/audio';
 // ============================================================================
 
 const AMIGA_PAL_FREQUENCY = 3546895;
+const PLAYERS_PER_CHANNEL = 2; // Double-buffered pool for overlap-free note transitions
 
 // Complete period table with all 16 finetune variations
 const PERIOD_TABLE = [
@@ -150,8 +151,10 @@ interface ChannelState {
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
   gateHigh: boolean;             // Current gate state for 303-style gate handling
 
-  // Audio nodes
-  player: Tone.Player | null;
+  // Audio nodes - player pool (pre-allocated, pre-connected)
+  player: Tone.Player | null;       // Active player reference (for updatePeriod compatibility)
+  playerPool: Tone.Player[];        // Pre-allocated player pool
+  activePlayerIdx: number;           // Current active player index in pool
   gainNode: Tone.Gain;
   panNode: Tone.Panner;
 
@@ -226,8 +229,9 @@ export class TrackerReplayer {
   private lastDequeuedState: DisplayState | null = null;
   private static readonly MAX_STATE_QUEUE_SIZE = 256; // ~5 seconds at 50Hz
 
-  // Queue for deferred player disposal (to avoid disposing players before they finish)
-  private playersToDispose: Array<{ player: Tone.Player; disposeAfter: number }> = [];
+  // Cache for ToneAudioBuffer wrappers (keyed by instrument ID)
+  // Avoids re-wrapping the same decoded AudioBuffer on every note trigger
+  private bufferCache: Map<number, Tone.ToneAudioBuffer> = new Map();
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -245,6 +249,16 @@ export class TrackerReplayer {
   loadSong(song: TrackerSong): void {
     this.stop();
     this.song = song;
+    this.bufferCache.clear(); // New song = new samples, invalidate cache
+
+    // Dispose old channels before creating new ones (prevent Web Audio node leaks)
+    for (const ch of this.channels) {
+      for (const p of ch.playerPool) {
+        try { p.dispose(); } catch (e) {}
+      }
+      try { ch.gainNode.dispose(); } catch (e) {}
+      try { ch.panNode.dispose(); } catch (e) {}
+    }
 
     // Initialize channels
     this.channels = [];
@@ -283,6 +297,14 @@ export class TrackerReplayer {
     gainNode.connect(panNode);
     panNode.connect(this.masterGain);
 
+    // Pre-allocate player pool and connect to gain node
+    const playerPool: Tone.Player[] = [];
+    for (let p = 0; p < PLAYERS_PER_CHANNEL; p++) {
+      const player = new Tone.Player();
+      player.connect(gainNode);
+      playerPool.push(player);
+    }
+
     return {
       note: 0,
       period: 0,
@@ -314,6 +336,8 @@ export class TrackerReplayer {
       previousSlideFlag: false,
       gateHigh: false,
       player: null,
+      playerPool,
+      activePlayerIdx: 0,
       gainNode,
       panNode,
       instrument: null,
@@ -326,8 +350,8 @@ export class TrackerReplayer {
 
   // Lookahead scheduling state (BassoonTracker pattern)
   // BassoonTracker uses: 200ms initial buffer, 1 SECOND during playback, scheduler every 10ms
-  private scheduleAheadTime = 1.0; // Schedule 1 SECOND ahead (like BassoonTracker)
-  private schedulerInterval = 0.025; // Check every 25ms (BassoonTracker uses 10ms)
+  private scheduleAheadTime = 0.05; // Schedule 50ms ahead (tight stop, glitch-free)
+  private schedulerInterval = 0.015; // Check every 15ms (must be < scheduleAheadTime)
   private nextScheduleTime = 0;
   
   // Drift-free timing state
@@ -343,8 +367,8 @@ export class TrackerReplayer {
     await Tone.start();
     this.playing = true;
 
-    // Initialize schedule position - start 100ms from now to build initial buffer
-    this.startTime = Tone.now() + 0.1;
+    // Start nearly immediately - minimal buffer for first note
+    this.startTime = Tone.now() + 0.02;
     this.nextScheduleTime = this.startTime;
     this.totalTicksScheduled = 0;
 
@@ -358,7 +382,7 @@ export class TrackerReplayer {
       const scheduleUntil = currentTime + this.scheduleAheadTime;
       const tickInterval = 2.5 / this.bpm;
 
-      // Fill the buffer - schedule all ticks up to 1 second ahead
+      // Fill the buffer - schedule all ticks within look-ahead window
       while (this.nextScheduleTime < scheduleUntil && this.playing) {
         this.processTick(this.nextScheduleTime);
         this.totalTicksScheduled++;
@@ -366,14 +390,12 @@ export class TrackerReplayer {
         this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
       }
 
-      // Cleanup old players that have finished playing
-      this.cleanupDisposedPlayers(currentTime);
     };
 
     // Initial fill of the buffer
     scheduler();
 
-    // Then keep filling every 25ms
+    // Then keep filling every 15ms
     this.schedulerTimerId = setInterval(scheduler, this.schedulerInterval * 1000);
 
     console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed} (lookahead=${this.scheduleAheadTime}s)`);
@@ -395,16 +417,10 @@ export class TrackerReplayer {
       this.tickLoop = null;
     }
 
-    // Stop all channels
+    // Stop all channels (stops pool players without disposing)
     for (const ch of this.channels) {
       this.stopChannel(ch);
     }
-
-    // Dispose any pending players immediately
-    for (const entry of this.playersToDispose) {
-      try { entry.player.dispose(); } catch (e) {}
-    }
-    this.playersToDispose = [];
 
     // Reset position
     this.songPos = 0;
@@ -435,7 +451,7 @@ export class TrackerReplayer {
       this.playing = true;
       // Resume scheduling from current audio time
       const currentTime = Tone.now();
-      this.startTime = currentTime + 0.1;
+      this.startTime = currentTime + 0.02;
       this.nextScheduleTime = this.startTime;
       this.totalTicksScheduled = 0;
 
@@ -1243,20 +1259,13 @@ export class TrackerReplayer {
   private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean, currentRowSlide?: boolean): void {
     const safeTime = time ?? Tone.now();
 
-    // CRITICAL FIX: With lookahead scheduling, we can't dispose the previous player immediately!
-    // The previous player might be scheduled to start in the future.
-    // Instead, schedule the previous player to stop at the new note's start time.
+    // Stop the current active player at the new note's start time
+    // Uses pool: old player stops, we switch to the next pooled player
     if (ch.player) {
-      const oldPlayer = ch.player;
       try {
-        // Schedule stop at the new note's time (not immediately)
-        oldPlayer.stop(safeTime);
-        // Queue for disposal after the stop time has passed
-        // Add 0.5s buffer to ensure playback has fully stopped
-        this.playersToDispose.push({ player: oldPlayer, disposeAfter: safeTime + 0.5 });
+        ch.player.stop(safeTime);
       } catch (e) {
-        // Player might already be stopped - dispose immediately
-        try { oldPlayer.dispose(); } catch (_) {}
+        // Player might already be stopped
       }
     }
 
@@ -1378,18 +1387,35 @@ export class TrackerReplayer {
     const finetuneMultiplier = Math.pow(2, finetune / (8 * 12)); // finetune in 1/8 semitones
     const playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
 
-    // Use pre-decoded AudioBuffer from ToneEngine
-    const player = new Tone.Player();
-    const toneBuffer = new Tone.ToneAudioBuffer(decodedBuffer);
+    // Get or create cached ToneAudioBuffer wrapper (avoids re-wrapping per note)
+    let toneBuffer = this.bufferCache.get(ch.instrument.id);
+    if (!toneBuffer) {
+      toneBuffer = new Tone.ToneAudioBuffer(decodedBuffer);
+      this.bufferCache.set(ch.instrument.id, toneBuffer);
+    }
+
+    // Advance to next player in the pool (round-robin double-buffer)
+    const nextIdx = (ch.activePlayerIdx + 1) % ch.playerPool.length;
+    const player = ch.playerPool[nextIdx];
+    ch.activePlayerIdx = nextIdx;
+
+    // Safety: ensure the next pool player is stopped before reuse.
+    // With fast retrigger (E91) + lookahead, the pool can cycle back to a player
+    // that's still in 'started' state from a previously scheduled note.
+    if (player.state === 'started') {
+      try { player.stop(safeTime); } catch (e) {}
+    }
+
+    // Configure the pooled player (no allocation, no connect - already done)
     player.buffer = toneBuffer;
 
     // Set playback parameters
     // CRITICAL: Use the ORIGINAL sample rate (usually 8363 Hz for MOD) for time-based loop calculations
-    // to ensure loop points align exactly with sample positions. 
+    // to ensure loop points align exactly with sample positions.
     // Using buffer.sampleRate (44100+) would be wrong if the WAV header metadata was different.
     const originalSampleRate = sample?.sampleRate || 8363;
     const duration = decodedBuffer.duration;
-    
+
     const hasLoop = sample?.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
     if (hasLoop) {
       player.loop = true;
@@ -1397,17 +1423,18 @@ export class TrackerReplayer {
       // Clamp to duration to avoid Tone.js RangeError
       player.loopStart = Math.min((sample.loopStart ?? 0) / originalSampleRate, duration - 0.0001);
       player.loopEnd = Math.min((sample.loopEnd ?? 0) / originalSampleRate, duration);
-      
+
       if (player.loopEnd <= player.loopStart) {
         player.loopEnd = duration;
       }
+    } else {
+      player.loop = false;
     }
     player.playbackRate = playbackRate;
 
-    player.connect(ch.gainNode);
-    ch.player = player;
+    ch.player = player; // Keep reference for updatePeriod compatibility
 
-    // Start playback immediately - buffer is already loaded
+    // Start playback - buffer is already loaded, player already connected
     try {
       const startOffset = offset > 0 ? offset / originalSampleRate : 0;
       player.start(safeTime, Math.min(startOffset, duration - 0.0001));
@@ -1417,34 +1444,13 @@ export class TrackerReplayer {
   }
 
   private stopChannel(ch: ChannelState): void {
-    if (ch.player) {
+    // Stop all pooled players (no disposal - they're reused)
+    for (const player of ch.playerPool) {
       try {
-        if (ch.player.state === 'started') ch.player.stop();
-        ch.player.dispose();
+        if (player.state === 'started') player.stop();
       } catch (e) {}
-      ch.player = null;
     }
-  }
-
-  /**
-   * Clean up players that have been scheduled for disposal after their stop time has passed.
-   * This prevents memory leaks from accumulating Tone.Player instances.
-   */
-  private cleanupDisposedPlayers(currentTime: number): void {
-    // Filter and dispose players whose disposal time has passed
-    const remaining: typeof this.playersToDispose = [];
-    for (const entry of this.playersToDispose) {
-      if (currentTime >= entry.disposeAfter) {
-        try {
-          entry.player.dispose();
-        } catch (e) {
-          // Ignore disposal errors
-        }
-      } else {
-        remaining.push(entry);
-      }
-    }
-    this.playersToDispose = remaining;
+    ch.player = null;
   }
 
   private updatePeriod(ch: ChannelState): void {
@@ -1638,9 +1644,15 @@ export class TrackerReplayer {
   dispose(): void {
     this.stop();
     for (const ch of this.channels) {
+      // Dispose all pooled players
+      for (const player of ch.playerPool) {
+        try { player.dispose(); } catch (e) {}
+      }
       ch.gainNode.dispose();
       ch.panNode.dispose();
     }
+    // Clear buffer cache
+    this.bufferCache.clear();
     this.masterGain.dispose();
     this.channels = [];
     this.song = null;
