@@ -11,8 +11,9 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 
-const DECAY_RATE = 0.88;
-const SWING_RANGE = 25;  // Reduced from 50 to stay within channel bounds
+// VU meter timing constants - ProTracker style
+const DECAY_RATE = 0.92;  // Smooth decay for falloff
+const SWING_RANGE = 25;   // Reduced from 50 to stay within channel bounds
 const SWING_SPEED = 0.8;
 const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
@@ -34,7 +35,11 @@ interface MeterState {
   direction: number;
 }
 
-export const ChannelVUMeters: React.FC = () => {
+interface ChannelVUMetersProps {
+  channelWidth?: number; // Override default channel width (for VirtualizedTrackerView)
+}
+
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({ channelWidth: channelWidthProp }) => {
   const { patterns, currentPatternIndex } = useTrackerStore();
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const performanceQuality = useUIStore((state) => state.performanceQuality);
@@ -47,6 +52,7 @@ export const ChannelVUMeters: React.FC = () => {
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
   const containerHeightRef = useRef(200);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
 
   const meterHue = currentThemeId === 'cyan-lineart' ? 180 : 0;
 
@@ -61,7 +67,7 @@ export const ChannelVUMeters: React.FC = () => {
     segmentRefs.current = Array(numChannels).fill(null).map(() => Array(NUM_SEGMENTS).fill(null));
   }, [numChannels]);
 
-  // Measure container height
+  // Measure container height and find scroll container
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
@@ -70,6 +76,23 @@ export const ChannelVUMeters: React.FC = () => {
         meterRefs.current.forEach(ref => {
           if (ref) ref.style.height = `${containerHeightRef.current - 4}px`;
         });
+
+        // Find the scroll container (ancestor or sibling with scrollbar-modern class)
+        // Search upward through parents first
+        let element: HTMLElement | null = containerRef.current.parentElement;
+        while (element) {
+          if (element.classList.contains('scrollbar-modern')) {
+            scrollContainerRef.current = element;
+            break;
+          }
+          // Also check siblings of this element
+          const sibling = element.querySelector('.scrollbar-modern') as HTMLElement;
+          if (sibling) {
+            scrollContainerRef.current = sibling;
+            break;
+          }
+          element = element.parentElement;
+        }
       }
     };
     updateHeight();
@@ -78,23 +101,18 @@ export const ChannelVUMeters: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Track last render time for throttling
-  const lastRenderTimeRef = useRef<number>(0);
-
   // Animation loop using requestAnimationFrame - NO React state updates
-  // Throttled to 30fps to reduce main thread load during playback
+  // Runs at full 60fps for tight sync with audio
   const animate = useCallback(() => {
-    const now = performance.now();
-
-    // Throttle to ~30fps (33ms) to reduce main thread pressure
-    if (now - lastRenderTimeRef.current < 33) {
-      animationRef.current = requestAnimationFrame(animate);
-      return;
-    }
-    lastRenderTimeRef.current = now;
 
     const engine = getToneEngine();
     const triggerLevels = engine.getChannelTriggerLevels(numChannels);
+
+    // Apply scroll offset to container
+    const scrollLeft = scrollContainerRef.current?.scrollLeft || 0;
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translateX(${-scrollLeft}px)`;
+    }
 
     for (let i = 0; i < numChannels; i++) {
       const meter = meterStates.current[i];
@@ -103,11 +121,12 @@ export const ChannelVUMeters: React.FC = () => {
       const trigger = triggerLevels[i] || 0;
       const staggerOffset = i * 0.012;
 
-      // Update level
-      if (trigger > meter.level) {
-        const attackSpeed = 0.7 - staggerOffset;
-        meter.level = meter.level + (trigger - meter.level) * attackSpeed;
+      // Update level - ProTracker style: instant jump to full on trigger, smooth decay
+      if (trigger > 0) {
+        // Instant jump to trigger level (no interpolation)
+        meter.level = trigger;
       } else {
+        // Smooth decay with slight stagger for visual interest
         const decayRate = DECAY_RATE - staggerOffset;
         meter.level = meter.level * decayRate;
         if (meter.level < 0.01) meter.level = 0;
@@ -179,12 +198,32 @@ export const ChannelVUMeters: React.FC = () => {
     return null;
   }
 
-  const ROW_NUM_WIDTH = 48;
-  const CHANNEL_WIDTH = 260;
+  // Note: ROW_NUM_WIDTH is handled by the parent container's left offset
+  const DEFAULT_CHANNEL_WIDTH = 260;
+  const COLLAPSED_CHANNEL_WIDTH = 60;
   const METER_WIDTH = 28;
+  const CHANNEL_WIDTH = channelWidthProp || DEFAULT_CHANNEL_WIDTH;
 
+  // Calculate channel center X accounting for collapsed channels
+  // Parent container already starts at ROW_NUM_WIDTH, so we don't include it here
   const getChannelCenterX = (index: number) => {
-    return ROW_NUM_WIDTH + index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
+    // If using custom channel width (VirtualizedTrackerView), don't account for collapsed
+    if (channelWidthProp) {
+      return index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
+    }
+
+    if (!pattern) return index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
+
+    // Sum widths of all channels before this one
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+      const isCollapsed = pattern.channels[i]?.collapsed;
+      offset += isCollapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH;
+    }
+
+    // Add half of this channel's width to get center
+    const thisChannelWidth = pattern.channels[index]?.collapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH;
+    return offset + thisChannelWidth / 2;
   };
 
   return (

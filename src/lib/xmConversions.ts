@@ -94,27 +94,30 @@ export function xmNoteToString(xmNote: number): string {
  *
  * MIDI: C-4 = 60, C-0 = 12
  */
-export function noteToMidi(note: string | number): number {
+export function noteToMidi(note: string | number | null | undefined): number {
   if (typeof note === 'number') {
     // XM format: 1 = C-0, add 11 to get MIDI (C-0 = 12)
     return note + 11;
   }
 
-  if (note === null || note === '' || note === '...' || note === '===') {
+  // Handle null, undefined, empty, or special note values
+  if (note === null || note === undefined || note === '' || note === '...' || note === '===') {
     return 60; // Default to C-4
   }
 
-  // Parse note string like "C-4" or "C#5"
-  const match = note.match(/^([A-G])([#-])(\d)$/);
+  // Parse note string like "C4", "C-4", "C#5", or "Cb4"
+  // Supports formats: C4, C-4, C#4, Cb4, C#-4, Cb-4
+  const match = note.match(/^([A-G])([#b])?-?(\d)$/i);
   if (!match) {
     return 60; // Default
   }
 
-  const [, noteLetter, sharp, octaveStr] = match;
+  const [, noteLetter, accidental, octaveStr] = match;
   const octave = parseInt(octaveStr, 10);
 
   // Find semitone (0-11)
-  const noteStr = noteLetter + sharp;
+  const upperNote = noteLetter.toUpperCase();
+  const noteStr = accidental ? upperNote + accidental : upperNote + '-';
   const semitone = NOTE_NAMES.indexOf(noteStr);
 
   if (semitone === -1) {

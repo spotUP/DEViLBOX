@@ -1444,9 +1444,10 @@ const PatternEditorComponent: React.FC<PatternEditorProps> = ({ onAcidGenerator 
 
         {/* VU Meters - Heart Tracker style, extend UP from edit bar */}
         <div
-          className="absolute left-0 right-0 pointer-events-none z-20"
+          className="absolute right-0 pointer-events-none z-20 overflow-hidden"
           style={{
             top: 0,
+            left: `${ROW_NUM_WIDTH}px`,
             height: `calc(50% - ${ROW_HEIGHT / 2}px)`,
           }}
         >

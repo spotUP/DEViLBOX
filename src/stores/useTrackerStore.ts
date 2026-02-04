@@ -149,6 +149,10 @@ interface TrackerStore {
   copySelection: () => void;
   cutSelection: () => void;
   paste: () => void;
+  // Advanced paste modes (OpenMPT-style)
+  pasteMix: () => void;           // Only fill empty cells
+  pasteFlood: () => void;         // Paste until pattern end
+  pastePushForward: () => void;   // Insert and shift down
 
   // FT2: Track operations (single-channel)
   copyTrack: (channelIndex: number) => void;
@@ -201,6 +205,9 @@ interface TrackerStore {
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
   setChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
+  reorderChannel: (fromIndex: number, toIndex: number) => void;
+  setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
+  getChannelsInRecordGroup: (group: 1 | 2) => number[];
 
   // Import/Export
   loadPatterns: (patterns: Pattern[]) => void;
@@ -810,6 +817,158 @@ export const useTrackerStore = create<TrackerStore>()(
             const targetCell = pattern.channels[targetChannel].rows[targetRow];
 
             // Merge properties based on pasteMask
+            if (hasMaskBit(pasteMask, MASK_NOTE)) {
+              targetCell.note = sourceCell.note;
+            }
+            if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+              targetCell.instrument = sourceCell.instrument;
+            }
+            if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+              targetCell.volume = sourceCell.volume;
+            }
+            if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+              targetCell.effTyp = sourceCell.effTyp;
+              targetCell.eff = sourceCell.eff;
+            }
+            if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
+              targetCell.effect2 = sourceCell.effect2;
+            }
+          }
+        }
+      }),
+
+    // OpenMPT-style Mix Paste: Only fill empty cells
+    pasteMix: () =>
+      set((state) => {
+        if (!state.clipboard) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { channelIndex, rowIndex } = state.cursor;
+        const { data } = state.clipboard;
+        const { pasteMask } = state;
+
+        for (let ch = 0; ch < data.length; ch++) {
+          const targetChannel = channelIndex + ch;
+          if (targetChannel >= pattern.channels.length) break;
+
+          for (let row = 0; row < data[ch].length; row++) {
+            const targetRow = rowIndex + row;
+            if (targetRow >= pattern.length) break;
+
+            const sourceCell = data[ch][row];
+            const targetCell = pattern.channels[targetChannel].rows[targetRow];
+
+            // Only paste if target cell field is empty (0 or null)
+            if (hasMaskBit(pasteMask, MASK_NOTE) && sourceCell.note !== 0 && targetCell.note === 0) {
+              targetCell.note = sourceCell.note;
+            }
+            if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && sourceCell.instrument !== 0 && targetCell.instrument === 0) {
+              targetCell.instrument = sourceCell.instrument;
+            }
+            if (hasMaskBit(pasteMask, MASK_VOLUME) && sourceCell.volume !== 0 && targetCell.volume === 0) {
+              targetCell.volume = sourceCell.volume;
+            }
+            if (hasMaskBit(pasteMask, MASK_EFFECT) && (sourceCell.effTyp !== 0 || sourceCell.eff !== 0) && targetCell.effTyp === 0 && targetCell.eff === 0) {
+              targetCell.effTyp = sourceCell.effTyp;
+              targetCell.eff = sourceCell.eff;
+            }
+            if (hasMaskBit(pasteMask, MASK_EFFECT2) && sourceCell.effect2 !== null && !targetCell.effect2) {
+              targetCell.effect2 = sourceCell.effect2;
+            }
+          }
+        }
+      }),
+
+    // OpenMPT-style Flood Paste: Paste repeatedly until pattern end
+    pasteFlood: () =>
+      set((state) => {
+        if (!state.clipboard) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { channelIndex, rowIndex } = state.cursor;
+        const { data } = state.clipboard;
+        const { pasteMask } = state;
+        const clipboardRows = data[0]?.length || 0;
+        if (clipboardRows === 0) return;
+
+        for (let ch = 0; ch < data.length; ch++) {
+          const targetChannel = channelIndex + ch;
+          if (targetChannel >= pattern.channels.length) break;
+
+          // Keep pasting until we reach the end of the pattern
+          let currentRow = rowIndex;
+          while (currentRow < pattern.length) {
+            for (let row = 0; row < data[ch].length; row++) {
+              const targetRow = currentRow + row;
+              if (targetRow >= pattern.length) break;
+
+              const sourceCell = data[ch][row];
+              const targetCell = pattern.channels[targetChannel].rows[targetRow];
+
+              if (hasMaskBit(pasteMask, MASK_NOTE)) {
+                targetCell.note = sourceCell.note;
+              }
+              if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+                targetCell.instrument = sourceCell.instrument;
+              }
+              if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+                targetCell.volume = sourceCell.volume;
+              }
+              if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+                targetCell.effTyp = sourceCell.effTyp;
+                targetCell.eff = sourceCell.eff;
+              }
+              if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
+                targetCell.effect2 = sourceCell.effect2;
+              }
+            }
+            currentRow += clipboardRows;
+          }
+        }
+      }),
+
+    // OpenMPT-style Push-Forward Paste: Insert clipboard data and shift existing content down
+    pastePushForward: () =>
+      set((state) => {
+        if (!state.clipboard) return;
+
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { channelIndex, rowIndex } = state.cursor;
+        const { data } = state.clipboard;
+        const { pasteMask } = state;
+        const clipboardRows = data[0]?.length || 0;
+        if (clipboardRows === 0) return;
+
+        for (let ch = 0; ch < data.length; ch++) {
+          const targetChannel = channelIndex + ch;
+          if (targetChannel >= pattern.channels.length) break;
+
+          const channel = pattern.channels[targetChannel];
+
+          // Shift existing rows down (from bottom to insertion point)
+          for (let row = pattern.length - 1; row >= rowIndex + clipboardRows; row--) {
+            const sourceRow = row - clipboardRows;
+            if (sourceRow >= rowIndex) {
+              channel.rows[row] = { ...channel.rows[sourceRow] };
+            }
+          }
+
+          // Insert clipboard data
+          for (let row = 0; row < data[ch].length; row++) {
+            const targetRow = rowIndex + row;
+            if (targetRow >= pattern.length) break;
+
+            const sourceCell = data[ch][row];
+            const targetCell = channel.rows[targetRow];
+
+            // Clear target cell first, then apply paste mask
+            targetCell.note = 0;
+            targetCell.instrument = 0;
+            targetCell.volume = 0;
+            targetCell.effTyp = 0;
+            targetCell.eff = 0;
+            targetCell.effect2 = undefined;
+
             if (hasMaskBit(pasteMask, MASK_NOTE)) {
               targetCell.note = sourceCell.note;
             }
@@ -1538,6 +1697,56 @@ export const useTrackerStore = create<TrackerStore>()(
           pattern.channels[channelIndex].rows = paddedRows.slice(0, pattern.length);
         }
       }),
+
+    reorderChannel: (fromIndex, toIndex) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (
+            fromIndex >= 0 &&
+            fromIndex < pattern.channels.length &&
+            toIndex >= 0 &&
+            toIndex < pattern.channels.length &&
+            fromIndex !== toIndex
+          ) {
+            // Remove channel from original position
+            const [channel] = pattern.channels.splice(fromIndex, 1);
+            // Insert at new position
+            pattern.channels.splice(toIndex, 0, channel);
+          }
+        });
+        // Adjust cursor if it was on the moved channel
+        if (state.cursor.channelIndex === fromIndex) {
+          state.cursor.channelIndex = toIndex;
+        } else if (
+          fromIndex < state.cursor.channelIndex &&
+          toIndex >= state.cursor.channelIndex
+        ) {
+          state.cursor.channelIndex--;
+        } else if (
+          fromIndex > state.cursor.channelIndex &&
+          toIndex <= state.cursor.channelIndex
+        ) {
+          state.cursor.channelIndex++;
+        }
+      }),
+
+    setChannelRecordGroup: (channelIndex, group) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+            pattern.channels[channelIndex].recordGroup = group;
+          }
+        });
+      }),
+
+    getChannelsInRecordGroup: (group) => {
+      const state = get();
+      const pattern = state.patterns[state.currentPatternIndex];
+      if (!pattern) return [];
+      return pattern.channels
+        .map((ch, i) => (ch.recordGroup === group ? i : -1))
+        .filter((i) => i >= 0);
+    },
 
     // Import/Export
     loadPatterns: (patterns) =>

@@ -13,6 +13,10 @@ export interface PianoRollNote {
   midiNote: number;          // MIDI note number (0-127)
   velocity: number;          // Velocity (0-127)
   instrument: number | null; // Instrument number
+
+  // TB-303 specific properties
+  slide?: boolean;           // Slide/legato - pitch glides from previous note without retriggering
+  accent?: boolean;          // Accent - boosts filter cutoff and volume
 }
 
 /**
@@ -48,7 +52,9 @@ export type PianoRollEditOperation =
   | { type: 'delete'; noteIds: string[] }
   | { type: 'move'; noteIds: string[]; deltaRow: number; deltaPitch: number }
   | { type: 'resize'; noteId: string; newEndRow: number }
-  | { type: 'velocity'; noteIds: string[]; newVelocity: number };
+  | { type: 'velocity'; noteIds: string[]; newVelocity: number }
+  | { type: 'slide'; noteIds: string[]; slide: boolean }      // TB-303: Toggle slide
+  | { type: 'accent'; noteIds: string[]; accent: boolean };   // TB-303: Toggle accent
 
 /**
  * Mouse drag state for note editing

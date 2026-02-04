@@ -22,6 +22,7 @@ import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { ToastContainer } from '@components/common/ToastContainer';
+import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 
@@ -531,8 +532,10 @@ function App() {
 
       {/* Toast Notifications */}
       <ToastNotification />
-      {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* Synth Error Dialog - Shows when synth initialization fails */}
+      <SynthErrorDialog />
 
       {/* Update Notification */}
       {updateAvailable && !updateDismissed && (

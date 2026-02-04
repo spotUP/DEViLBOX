@@ -72,6 +72,15 @@ export interface EffectMemory {
 
     // Current frequency for portamento
     currentFreq?: number;
+
+    // Zxx MIDI Macro (IT-style filter)
+    filterCutoff?: number;     // 0-127
+    filterResonance?: number;  // 0-15
+    filterMode?: 'lowpass' | 'highpass' | 'bandpass';
+
+    // Smooth macro target for \xx
+    smoothMacroTarget?: number;
+    smoothMacroStart?: number;
   };
 }
 
@@ -146,6 +155,13 @@ export interface EffectState {
   patternDelay?: {
     rows: number;
   };
+
+  // Smooth MIDI Macro (\xx)
+  smoothMacro?: {
+    startValue: number;
+    targetValue: number;
+    ticksTotal: number;
+  };
 }
 
 // Result of processing an effect - actions to take
@@ -172,6 +188,22 @@ export interface EffectResult {
 
   // Amiga Filter
   setAmigaFilter?: boolean;
+
+  // IT-style Envelope Controls (S77-S7C)
+  envelopeControl?: {
+    volume?: boolean;      // true = on, false = off
+    panning?: boolean;     // true = on, false = off
+    pitch?: boolean;       // true = on, false = off (also controls filter)
+  };
+
+  // IT-style New Note Action (S70-S76)
+  newNoteAction?: 'cut' | 'continue' | 'noteOff' | 'noteFade';
+  duplicateCheck?: 'note' | 'sample' | 'instrument' | 'off';
+
+  // Zxx MIDI Macro (IT-style filter control)
+  setFilterCutoff?: number;    // 0-127 (Z00-Z7F)
+  setFilterResonance?: number; // 0-15 (Z80-Z8F)
+  setFilterMode?: 'lowpass' | 'highpass' | 'bandpass'; // Z90-Z9F
 }
 
 // ProTracker vibrato/tremolo sine table
@@ -535,6 +567,101 @@ export class EffectProcessor {
         state.portaDown = { speed: y / 4 };
       }
     }
+    else if (effectLetter === 'S') {
+      // Sxx - IT-style Extended Commands
+      // S70-S76: Past Note Actions / New Note Actions
+      // S77-S7C: Envelope Controls
+      if (x === 7) {
+        switch (y) {
+          // S70-S73: New Note Action settings
+          case 0x0: // S70 - NNA Cut
+            result.newNoteAction = 'cut';
+            break;
+          case 0x1: // S71 - NNA Continue
+            result.newNoteAction = 'continue';
+            break;
+          case 0x2: // S72 - NNA Note Off
+            result.newNoteAction = 'noteOff';
+            break;
+          case 0x3: // S73 - NNA Note Fade
+            result.newNoteAction = 'noteFade';
+            break;
+
+          // S74-S76: Duplicate Note Check
+          case 0x4: // S74 - Check for same note
+            result.duplicateCheck = 'note';
+            break;
+          case 0x5: // S75 - Check for same sample
+            result.duplicateCheck = 'sample';
+            break;
+          case 0x6: // S76 - Check for same instrument
+            result.duplicateCheck = 'instrument';
+            break;
+
+          // S77-S7C: Envelope Controls
+          case 0x7: // S77 - Volume Envelope Off
+            result.envelopeControl = { ...result.envelopeControl, volume: false };
+            break;
+          case 0x8: // S78 - Volume Envelope On
+            result.envelopeControl = { ...result.envelopeControl, volume: true };
+            break;
+          case 0x9: // S79 - Panning Envelope Off
+            result.envelopeControl = { ...result.envelopeControl, panning: false };
+            break;
+          case 0xA: // S7A - Panning Envelope On
+            result.envelopeControl = { ...result.envelopeControl, panning: true };
+            break;
+          case 0xB: // S7B - Pitch/Filter Envelope Off
+            result.envelopeControl = { ...result.envelopeControl, pitch: false };
+            break;
+          case 0xC: // S7C - Pitch/Filter Envelope On
+            result.envelopeControl = { ...result.envelopeControl, pitch: true };
+            break;
+        }
+      }
+      // S9x - Sound Control (panning surround, etc.) - future extension
+      else if (x === 9) {
+        // S91 - Set surround mode (not implemented)
+      }
+    }
+    else if (effectLetter === 'Z') {
+      // Zxx - MIDI Macro (IT-style filter control)
+      // Z00-Z7F: Filter cutoff (0-127)
+      // Z80-Z8F: Filter resonance (0-15)
+      // Z90-Z9F: Filter mode
+      if (param <= 0x7F) {
+        // Filter cutoff
+        mem.filterCutoff = param;
+        result.setFilterCutoff = param;
+      } else if (param >= 0x80 && param <= 0x8F) {
+        // Filter resonance (0-15)
+        mem.filterResonance = param - 0x80;
+        result.setFilterResonance = param - 0x80;
+      } else if (param >= 0x90 && param <= 0x9F) {
+        // Filter mode
+        const modes: Array<'lowpass' | 'highpass' | 'bandpass'> = ['lowpass', 'highpass', 'bandpass'];
+        const modeIndex = (param - 0x90) % 3;
+        mem.filterMode = modes[modeIndex];
+        result.setFilterMode = modes[modeIndex];
+      }
+    }
+    else if (effect?.[0] === '\\') {
+      // \xx - Smooth MIDI Macro (interpolated filter cutoff slide)
+      // Slides filter cutoff smoothly from current value to param over the row
+      const targetCutoff = parseInt(effect.substring(1), 16);
+      if (!isNaN(targetCutoff) && targetCutoff <= 127) {
+        const startCutoff = mem.filterCutoff ?? 64;
+        mem.smoothMacroTarget = targetCutoff;
+        mem.smoothMacroStart = startCutoff;
+        state.smoothMacro = {
+          startValue: startCutoff,
+          targetValue: targetCutoff,
+          ticksTotal: this.ticksPerRow,
+        };
+        // Set initial cutoff
+        result.setFilterCutoff = startCutoff;
+      }
+    }
 
     return result;
   }
@@ -687,6 +814,7 @@ export class EffectProcessor {
     triggerNote?: boolean;
     cutNote?: boolean;
     globalVolumeAdd?: number;
+    filterCutoffSet?: number; // Smooth macro
   } {
     const state = this.channelStates.get(channelIndex);
     const mem = this.memory[channelIndex];
@@ -829,6 +957,21 @@ export class EffectProcessor {
       result.globalVolumeAdd = gup - gdown;
     }
 
+    // Smooth MIDI Macro (\xx) - interpolate filter cutoff over ticks
+    if (state.smoothMacro) {
+      const { startValue, targetValue, ticksTotal } = state.smoothMacro;
+      const progress = Math.min(1, tick / ticksTotal);
+      const interpolatedValue = Math.round(startValue + (targetValue - startValue) * progress);
+      mem.filterCutoff = interpolatedValue;
+      result.filterCutoffSet = interpolatedValue;
+
+      // When done, clear the smooth macro state
+      if (tick >= ticksTotal) {
+        mem.filterCutoff = targetValue;
+        result.filterCutoffSet = targetValue;
+      }
+    }
+
     return result;
   }
 
@@ -932,7 +1075,15 @@ export class EffectProcessor {
       'R': `Multi retrig interval ${param[0]} vol ${param[1]}`,
       'T': `Tremor on ${param[0]} off ${param[1]}`,
       'X': param[0] === '1' ? `Extra fine porta up ${param[1]}` : `Extra fine porta down ${param[1]}`,
+      'S': EffectProcessor.getSCommandDescription(parseInt(param[0], 16), parseInt(param[1], 16)),
+      'Z': EffectProcessor.getZCommandDescription(parseInt(param, 16)),
     };
+
+    // Handle backslash command separately
+    if (effect[0] === '\\') {
+      const target = parseInt(effect.substring(1), 16);
+      return `Smooth filter slide to ${target}`;
+    }
 
     return descriptions[cmd] || `Unknown effect ${effect}`;
   }
@@ -960,6 +1111,51 @@ export class EffectProcessor {
       0xF: `Funk repeat ${y}`,
     };
     return eDescs[x] || `E${x.toString(16)}${y.toString(16)}`;
+  }
+
+  /**
+   * Get IT-style S-command description
+   */
+  private static getSCommandDescription(x: number, y: number): string {
+    if (x === 7) {
+      const sDescs: Record<number, string> = {
+        0x0: 'NNA: Cut',
+        0x1: 'NNA: Continue',
+        0x2: 'NNA: Note Off',
+        0x3: 'NNA: Note Fade',
+        0x4: 'DNC: Note',
+        0x5: 'DNC: Sample',
+        0x6: 'DNC: Instrument',
+        0x7: 'Volume Envelope Off',
+        0x8: 'Volume Envelope On',
+        0x9: 'Panning Envelope Off',
+        0xA: 'Panning Envelope On',
+        0xB: 'Pitch/Filter Envelope Off',
+        0xC: 'Pitch/Filter Envelope On',
+      };
+      return sDescs[y] || `S7${y.toString(16)}`;
+    }
+    if (x === 9) {
+      return y === 1 ? 'Surround Sound' : `S9${y.toString(16)}`;
+    }
+    return `S${x.toString(16)}${y.toString(16)}`;
+  }
+
+  /**
+   * Get Zxx MIDI Macro description
+   */
+  private static getZCommandDescription(param: number): string {
+    if (param <= 0x7F) {
+      return `Filter cutoff ${param} (${Math.round(param / 127 * 100)}%)`;
+    } else if (param >= 0x80 && param <= 0x8F) {
+      const resonance = param - 0x80;
+      return `Filter resonance ${resonance} (${Math.round(resonance / 15 * 100)}%)`;
+    } else if (param >= 0x90 && param <= 0x9F) {
+      const modes = ['Lowpass', 'Highpass', 'Bandpass'];
+      const mode = modes[(param - 0x90) % 3];
+      return `Filter mode: ${mode}`;
+    }
+    return `Z${param.toString(16).toUpperCase().padStart(2, '0')}`;
   }
 }
 
@@ -1013,6 +1209,31 @@ export const EFFECT_REFERENCE = {
   'Txy': { name: 'Tremor', desc: 'x=on ticks, y=off ticks' },
   'X1x': { name: 'Extra Fine Porta Up', desc: 'Very fine slide up' },
   'X2x': { name: 'Extra Fine Porta Down', desc: 'Very fine slide down' },
+  // IT-style Sxx commands
+  'S70': { name: 'NNA Cut', desc: 'Set New Note Action to cut' },
+  'S71': { name: 'NNA Continue', desc: 'Set New Note Action to continue' },
+  'S72': { name: 'NNA Note Off', desc: 'Set New Note Action to note off' },
+  'S73': { name: 'NNA Note Fade', desc: 'Set New Note Action to fade' },
+  'S74': { name: 'DNC Note', desc: 'Duplicate Note Check: note' },
+  'S75': { name: 'DNC Sample', desc: 'Duplicate Note Check: sample' },
+  'S76': { name: 'DNC Instrument', desc: 'Duplicate Note Check: instrument' },
+  'S77': { name: 'Vol Env Off', desc: 'Turn volume envelope off' },
+  'S78': { name: 'Vol Env On', desc: 'Turn volume envelope on' },
+  'S79': { name: 'Pan Env Off', desc: 'Turn panning envelope off' },
+  'S7A': { name: 'Pan Env On', desc: 'Turn panning envelope on' },
+  'S7B': { name: 'Pitch Env Off', desc: 'Turn pitch/filter envelope off' },
+  'S7C': { name: 'Pitch Env On', desc: 'Turn pitch/filter envelope on' },
+  // Zxx MIDI Macro (IT-style filter)
+  'Zxx': { name: 'MIDI Macro', desc: 'Filter cutoff (00-7F), resonance (80-8F), mode (90-9F)' },
+  'Z00': { name: 'Filter Cutoff 0', desc: 'Set filter cutoff to minimum' },
+  'Z7F': { name: 'Filter Cutoff Max', desc: 'Set filter cutoff to maximum (127)' },
+  'Z80': { name: 'Filter Resonance 0', desc: 'Set filter resonance to minimum' },
+  'Z8F': { name: 'Filter Resonance Max', desc: 'Set filter resonance to maximum' },
+  'Z90': { name: 'Lowpass Filter', desc: 'Set filter to lowpass mode' },
+  'Z91': { name: 'Highpass Filter', desc: 'Set filter to highpass mode' },
+  'Z92': { name: 'Bandpass Filter', desc: 'Set filter to bandpass mode' },
+  // \xx Smooth MIDI Macro
+  '\\xx': { name: 'Smooth MIDI Macro', desc: 'Smoothly slide filter cutoff to value' },
 };
 
 /**

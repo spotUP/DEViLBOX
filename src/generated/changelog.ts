@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-03T15:09:05.142Z
+ * Generated: 2026-02-04T01:16:59.384Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '254';
-export const BUILD_HASH = '05a29ac';
-export const BUILD_DATE = '2026-02-03';
+export const BUILD_NUMBER = '256';
+export const BUILD_HASH = '5b71565';
+export const BUILD_DATE = '2026-02-04';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-03',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve 13 bugs in synths, stores, and components"
+      },
+      {
+        type: 'fix',
+        "description": "Properly handle apostrophes in changelog descriptions and add terser"
+      },
       {
         type: 'fix',
         "description": "Escape nested single quotes in changelog description string"
@@ -214,14 +222,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add Precalc/Bake functionality to instrument editors"
-      },
-      {
-        type: 'feature',
-        "description": "Add 20 factory presets for Space Laser synth"
-      },
-      {
-        type: 'feature',
-        "description": "Add Space Laser synth for classic reggae and anime effects"
       }
     ]
   }

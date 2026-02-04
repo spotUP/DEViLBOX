@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import { MAMEEngine } from './MAMEEngine';
-import { getNativeContext } from '@utils/audio-context';
+// Audio context utilities no longer needed - using Tone.js rawContext directly
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -94,32 +94,35 @@ export class MAMESynth extends Tone.ToneAudioNode {
   }
 
   private startRendering(): void {
-    const context = Tone.getContext();
     const bufferSize = 512; // Minimum 256 for ScriptProcessor
-    
-    // Check if createScriptProcessor is available (it's deprecated but still needed)
-    const rawContext = getNativeContext(context);
-    if (!rawContext.createScriptProcessor) {
+
+    // Get the TRUE native context from Tone.js
+    const toneContext = this.context as any;
+    const rawContext = toneContext.rawContext || toneContext._context;
+
+    if (!rawContext || !rawContext.createScriptProcessor) {
       console.warn('[MAMESynth] ScriptProcessorNode not available, audio rendering disabled');
       return;
     }
-    
+
     // Create a ScriptProcessorNode (deprecated but easiest for this hack)
     const processor = rawContext.createScriptProcessor(bufferSize, 0, 2);
-    
+
     processor.onaudioprocess = (e: AudioProcessingEvent) => {
       if (!this.isInitialized || this.handle === 0) return;
-      
+
       const outL = e.outputBuffer.getChannelData(0);
       const outR = e.outputBuffer.getChannelData(1);
-      
+
       const { left, right } = this.engine.render(this.handle, bufferSize);
-      
+
       outL.set(left);
       outR.set(right);
     };
 
-    Tone.connect(processor, this.outputGain);
+    // Connect ScriptProcessor to Tone.js output - use the native GainNode
+    const nativeOutput = this.outputGain.input as AudioNode;
+    processor.connect(nativeOutput);
   }
 
   public getHandle(): number {

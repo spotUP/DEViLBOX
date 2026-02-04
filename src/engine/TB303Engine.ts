@@ -83,6 +83,7 @@ export class TB303Synth {
   private currentNote: string | null = null;
   private currentNoteFreq: number = 440;
   private isSliding: boolean = false;
+  private gateHigh: boolean = false;  // Gate state for proper 303 retrigger logic
   private baseVolume: number = -6;
   private baseCutoff: number = 800;
   private baseEnvMod: number = 4000;
@@ -481,23 +482,33 @@ export class TB303Synth {
     this.currentNoteFreq = targetFreq;
 
     // Handle slide (portamento to new note without retriggering envelopes)
-    // In tracker notation: slide flag on current note means "slide FROM previous note TO this note"
-    // The previous note does NOT need a slide flag - only the target note does
+    // In tracker notation: slide flag means "slide FROM previous note TO this note"
     //
     // TB-303 AUTHENTIC SLIDE: RC circuit with exponential approach
     // Real 303 uses ~60ms RC time constant for characteristic slide feel
     // The slide starts fast and eases into the target (not linear interpolation)
-    if (slide && this.currentNote && this.currentNote !== note) {
-      const slideTimeMs = this.config.slide.time; // Default 60ms
-      // Divide by 4 so slide is 98% complete at slideTime (4 time constants = 98.2%)
-      // This gives authentic RC curve while feeling "done" at the expected time
-      const timeConstant = (slideTimeMs / 1000) / 4;
+    //
+    // IMPORTANT: Same-pitch slides (Cases 3, 4, 5 in reference doc)
+    // When sliding between notes of the same pitch but different accent attributes,
+    // the gate must remain HIGH and envelopes must NOT retrigger.
+    // This is essential for proper 303 sound on patterns like:
+    //   d(A) -> d(S) -> d(S) -> c#(A)
+    if (slide && this.currentNote && this.gateHigh) {
+      // Slide mode: keep gate HIGH, don't retrigger envelopes
+      // Only slide pitch if different (same-pitch slides just maintain gate)
+      if (this.currentNote !== note) {
+        const slideTimeMs = this.config.slide.time; // Default 60ms
+        // Divide by 4 so slide is 98% complete at slideTime (4 time constants = 98.2%)
+        // This gives authentic RC curve while feeling "done" at the expected time
+        const timeConstant = (slideTimeMs / 1000) / 4;
 
-      // setTargetAtTime creates exponential asymptotic approach like real RC circuit
-      const currentFreq = this.oscillator.frequency.value;
-      this.oscillator.frequency.cancelScheduledValues(now);
-      this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
+        // setTargetAtTime creates exponential asymptotic approach like real RC circuit
+        const currentFreq = this.oscillator.frequency.value;
+        this.oscillator.frequency.cancelScheduledValues(now);
+        this.oscillator.frequency.setValueAtTime(currentFreq, now);
+        this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
+      }
+      // For same-pitch slides: gate stays high, pitch unchanged, no envelope retrigger
 
       this.currentNote = note;
       this.isSliding = true; // Mark that we're in a slide
@@ -513,9 +524,10 @@ export class TB303Synth {
     this.vcaEnvelope.cancel(now);
     this.filterEnvelope.cancel(now);
 
-    // Normal note trigger
+    // Normal note trigger - set gate HIGH
     this.currentNote = note;
     this.isSliding = slide;
+    this.gateHigh = true;  // Gate is now HIGH
 
     // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
     // This creates the characteristic "staccato" attack feel
@@ -660,16 +672,21 @@ export class TB303Synth {
 
     // Slide: portamento from previous note without retriggering envelopes
     // TB-303 AUTHENTIC SLIDE: RC circuit with exponential approach
-    if (slide && this.currentNote && this.currentNote !== note) {
-      const slideTimeMs = this.config.slide.time;
-      // Divide by 4 so slide is 98% complete at slideTime
-      const timeConstant = (slideTimeMs / 1000) / 4;
+    // IMPORTANT: Same-pitch slides (Cases 3, 4, 5) - gate stays HIGH, no envelope retrigger
+    if (slide && this.currentNote && this.gateHigh) {
+      // Slide mode: keep gate HIGH, don't retrigger envelopes
+      // Only slide pitch if different (same-pitch slides just maintain gate)
+      if (this.currentNote !== note) {
+        const slideTimeMs = this.config.slide.time;
+        // Divide by 4 so slide is 98% complete at slideTime
+        const timeConstant = (slideTimeMs / 1000) / 4;
 
-      // setTargetAtTime creates exponential asymptotic approach like real RC circuit
-      const currentFreq = this.oscillator.frequency.value;
-      this.oscillator.frequency.cancelScheduledValues(now);
-      this.oscillator.frequency.setValueAtTime(currentFreq, now);
-      this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
+        // setTargetAtTime creates exponential asymptotic approach like real RC circuit
+        const currentFreq = this.oscillator.frequency.value;
+        this.oscillator.frequency.cancelScheduledValues(now);
+        this.oscillator.frequency.setValueAtTime(currentFreq, now);
+        this.oscillator.frequency.setTargetAtTime(targetFreq, now, timeConstant);
+      }
 
       this.currentNote = note;
       this.isSliding = true;
@@ -681,6 +698,7 @@ export class TB303Synth {
 
     this.currentNote = note;
     this.isSliding = slide;
+    this.gateHigh = true;  // Gate is now HIGH
 
     // TB-303 TRIGGER DELAY: Real 303 has ~4ms delay from gate to envelope start
     const triggerDelay = 0.004; // 4ms like real 303
@@ -794,6 +812,7 @@ export class TB303Synth {
     this.vcaEnvelope.triggerRelease(now);
     this.filterEnvelope.triggerRelease(now);
     this.isSliding = false;
+    this.gateHigh = false;  // Gate is now LOW
   }
 
   /**

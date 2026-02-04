@@ -112,6 +112,7 @@ typedef const char* device_type;
 class attotime {
 public:
     static attotime from_hz(uint32_t hz) { return attotime(); }
+    static attotime from_ticks(uint64_t ticks, uint32_t frequency) { return attotime(); }
     static attotime never;
     const char* to_string() const { return "0.0"; }
 };
@@ -499,7 +500,14 @@ public:
     template<typename T> void save_pointer(T &&item, int count, const char* name = nullptr) {}
     
     void notify_clock_changed() {}
-    
+
+    // Time conversion - convert clock cycles to attotime
+    attotime clocks_to_attotime(uint64_t clocks) const {
+        if (m_clock == 0) return attotime::never;
+        // Simple approximation: return attotime based on clock frequency
+        return attotime::from_ticks(clocks, m_clock);
+    }
+
     template<typename T>
     emu_timer* timer_alloc(T func, void* obj) { return new emu_timer(); }
 

@@ -8,6 +8,9 @@ import { useSettingsStore } from './stores/useSettingsStore'
 import { useTransportStore } from './stores/useTransportStore'
 import { getToneEngine } from './engine/ToneEngine'
 
+// Dev tools: synth tester (adds testAllSynths() etc. to window)
+import './utils/synthTester'
+
 // 1. Subscribe to manual audio latency setting changes
 useSettingsStore.subscribe(
   (state) => {

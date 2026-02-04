@@ -14,6 +14,7 @@ import {
   Wand2,
   Columns,
   LayoutGrid,
+  BarChart3,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -26,6 +27,7 @@ interface CellContextMenuProps {
   channelIndex: number;
   onInterpolate?: () => void;
   onHumanize?: () => void;
+  onOpenParameterEditor?: (field: 'volume' | 'effect' | 'effectParam') => void;
 }
 
 export const CellContextMenu: React.FC<CellContextMenuProps> = ({
@@ -35,6 +37,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   channelIndex,
   onInterpolate,
   onHumanize,
+  onOpenParameterEditor,
 }) => {
   const {
     patterns,
@@ -201,6 +204,30 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       onClick: onHumanize,
     },
     { type: 'divider' },
+    // Visual Parameter Editor
+    {
+      id: 'param-editor',
+      label: 'Visual Parameter Editor',
+      icon: <BarChart3 size={14} />,
+      submenu: [
+        {
+          id: 'param-volume',
+          label: 'Edit Volume...',
+          onClick: () => onOpenParameterEditor?.('volume'),
+        },
+        {
+          id: 'param-effect',
+          label: 'Edit Effect Type...',
+          onClick: () => onOpenParameterEditor?.('effect'),
+        },
+        {
+          id: 'param-effectparam',
+          label: 'Edit Effect Parameter...',
+          onClick: () => onOpenParameterEditor?.('effectParam'),
+        },
+      ],
+    },
+    { type: 'divider' },
     // Selection
     {
       id: 'select-column',
@@ -223,6 +250,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     handleDeleteRow,
     onInterpolate,
     onHumanize,
+    onOpenParameterEditor,
     handleSelectColumn,
     handleSelectChannel,
   ]);

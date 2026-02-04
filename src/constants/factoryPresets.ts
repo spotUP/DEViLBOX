@@ -3188,6 +3188,38 @@ export const MAME_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     volume: -10,
     pan: 0,
   },
+  {
+    type: 'synth' as const,
+    name: 'CZ Brass 1',
+    synthType: 'CZ101',
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'CZ Electric Piano',
+    synthType: 'CZ101',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'CZ Synth Bass',
+    synthType: 'CZ101',
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'CZ Digital Pad',
+    synthType: 'CZ101',
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
 ];
 
 // ============================================================================

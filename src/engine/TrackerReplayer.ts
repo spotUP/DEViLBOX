@@ -146,6 +146,10 @@ interface ChannelState {
   macroDuty: number;             // Current duty cycle from macro
   macroWaveform: number;         // Current waveform from macro
 
+  // TB-303 specific state
+  previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
+  gateHigh: boolean;             // Current gate state for 303-style gate handling
+
   // Audio nodes
   player: Tone.Player | null;
   gainNode: Tone.Gain;
@@ -307,6 +311,8 @@ export class TrackerReplayer {
       macroArpNote: 0,
       macroDuty: 0,
       macroWaveform: 0,
+      previousSlideFlag: false,
+      gateHigh: false,
       player: null,
       gainNode,
       panNode,
@@ -643,14 +649,27 @@ export class TrackerReplayer {
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
         }
 
-        // Trigger the note
-        this.triggerNote(ch, time, offset, chIndex, row.accent, row.slide);
+        // TB-303 SLIDE SEMANTICS:
+        // "Slide is ON on a step if the PREVIOUSLY played step had Slide AND the current step is a valid Note"
+        // This means the slide flag on step N affects the transition FROM step N TO step N+1
+        // So we check if the PREVIOUS row had slide, not the current row
+        const slideActive = ch.previousSlideFlag && noteValue !== null;
+
+        // Trigger the note with proper 303 slide semantics
+        // Pass row.accent directly (accent applies to current note)
+        // Pass slideActive (computed from previous row's slide flag) for pitch glide
+        // Pass row.slide for gate timing (if this row has slide, gate stays high to slide to next)
+        this.triggerNote(ch, time, offset, chIndex, row.accent, slideActive, row.slide ?? false);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
         if ((ch.waveControl & 0x40) === 0) ch.tremoloPos = 0;
       }
     }
+
+    // Update previous slide flag for next row (TB-303 semantics)
+    // Store current row's slide flag to be used when processing the next note
+    ch.previousSlideFlag = row.slide ?? false;
 
     // Handle note off
     if (noteValue === 97 || noteValue === '===') {
@@ -887,19 +906,21 @@ export class TrackerReplayer {
 
       case 0xE: // Extended effects
         if (x === 0x9 && y > 0) {
-          // Retrigger
+          // Retrigger - does NOT slide (it's retriggering the same note)
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-              this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
+            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
           }
         } else if (x === 0xC && y === this.currentTick) {
           // Note cut
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
-          // Note delay
-            this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
+          // Note delay - uses the computed slide from processRow (stored in ch.previousSlideFlag context)
+          // Since this is a delayed trigger of the same note, use the slide state computed at row start
+          const slideActive = ch.previousSlideFlag;
+          this.triggerNote(ch, time, 0, chIndex, row.accent, slideActive, row.slide ?? false);
         }
         break;
 
@@ -919,7 +940,8 @@ export class TrackerReplayer {
             ch.retrigCount = param & 0x0F;
             // Apply volume slide based on retrigVolSlide
             this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-              this.triggerNote(ch, time, 0, chIndex, row.accent, row.slide);
+            // Retrigger - does NOT slide (it's retriggering the same note)
+            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
           }
         }
         break;
@@ -1218,7 +1240,7 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean): void {
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean, currentRowSlide?: boolean): void {
     const safeTime = time ?? Tone.now();
 
     // CRITICAL FIX: With lookahead scheduling, we can't dispose the previous player immediately!
@@ -1285,15 +1307,37 @@ export class TrackerReplayer {
       // Calculate duration based on speed/BPM (one row duration as default)
       const rowDuration = (2.5 / this.bpm) * this.speed;
 
+      // TB-303 MID-STEP GATE TIMING:
+      // Real 303 lowers gate at MIDPOINT of step (not end), unless sliding to next note
+      // The slide flag on CURRENT row means we slide TO the next note, so gate stays high
+      // Check if this is a 303-style synth that needs mid-step gate timing
+      const is303Synth = ch.instrument.synthType === 'TB303' ||
+                         ch.instrument.synthType === 'Buzz3o3';
+
+      // For 303 synths: use half duration (gate low at midpoint) unless:
+      // 1. We're sliding INTO this note (slide = true, from previous row)
+      // 2. This row has slide flag (currentRowSlide = true, will slide to next note)
+      // When sliding, gate stays HIGH for continuous legato
+      // For other synths: use full duration
+      const keepGateHigh = slide || currentRowSlide;
+      const noteDuration = is303Synth && !keepGateHigh
+        ? rowDuration * 0.5  // Mid-step gate off for 303 (non-sliding notes)
+        : rowDuration;       // Full duration for other synths or when sliding
+
+      // Update gate state for 303 synths
+      if (is303Synth) {
+        ch.gateHigh = true;
+      }
+
       engine.triggerNote(
         ch.instrument.id,
         noteName,
-        rowDuration,
+        noteDuration,
         safeTime,
         velocity,
         ch.instrument,
         accent, // accent
-        slide, // slide
+        slide, // slide (slideActive - computed from previous row, for pitch glide)
         undefined, // channelIndex (let engine allocate)
         ch.period // period for MOD playback
       );

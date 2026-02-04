@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
+import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 
 export class V2Synth extends Tone.ToneAudioNode {
   public readonly name: string = 'V2Synth';
@@ -19,23 +19,42 @@ export class V2Synth extends Tone.ToneAudioNode {
   }
 
   private async _initialize() {
-    const nativeCtx = getNativeContext(this.context);
+    // Get the TRUE native context from Tone.js
+    const toneContext = this.context as any;
+    const nativeCtx = toneContext.rawContext || toneContext._context;
+
+    if (!nativeCtx) {
+      throw new Error('Could not get native AudioContext from Tone.js');
+    }
 
     // Add worklet if not already added
+    const baseUrl = import.meta.env.BASE_URL || '/';
     try {
-      await nativeCtx.audioWorklet.addModule('V2Synth.worklet.js');
+      await nativeCtx.audioWorklet.addModule(`${baseUrl}V2Synth.worklet.js`);
     } catch (e) {
       // Worklet might already be added
     }
 
-    // Fetch WASM binary with error handling
-    const response = await fetch('V2Synth.wasm');
-    if (!response.ok) {
-      throw new Error(`Failed to load V2Synth.wasm: ${response.status}`);
-    }
-    const wasmBinary = await response.arrayBuffer();
+    // Fetch WASM binary and JS code in parallel
+    const [wasmResponse, jsResponse] = await Promise.all([
+      fetch(`${baseUrl}V2Synth.wasm`),
+      fetch(`${baseUrl}V2Synth.js`)
+    ]);
 
-    this._worklet = createAudioWorkletNode(this.context, 'v2-synth-processor', {
+    if (!wasmResponse.ok) {
+      throw new Error(`Failed to load V2Synth.wasm: ${wasmResponse.status}`);
+    }
+    if (!jsResponse.ok) {
+      throw new Error(`Failed to load V2Synth.js: ${jsResponse.status}`);
+    }
+
+    const [wasmBinary, jsCode] = await Promise.all([
+      wasmResponse.arrayBuffer(),
+      jsResponse.text()
+    ]);
+
+    // Create worklet using Tone.js's createAudioWorkletNode (standardized-audio-context)
+    this._worklet = toneCreateAudioWorkletNode(nativeCtx, 'v2-synth-processor', {
       outputChannelCount: [2]
     });
 
@@ -56,15 +75,17 @@ export class V2Synth extends Tone.ToneAudioNode {
         }
       };
 
-      // Initialize with binary
+      // Initialize with WASM binary and JS code
       this._worklet!.port.postMessage({
         type: 'init',
-        wasmBinary
+        wasmBinary,
+        jsCode
       });
     });
 
-    // Use Tone.connect for reliable connection between wrappers and nodes
-    Tone.connect(this._worklet, this.output);
+    // Connect worklet to Tone.js output - use the native GainNode
+    const nativeOutput = this.output.input as AudioNode;
+    this._worklet.connect(nativeOutput);
   }
 
   public async ready() {

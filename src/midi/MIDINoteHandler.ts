@@ -2,6 +2,12 @@
  * MIDINoteHandler - Handle incoming MIDI notes for live playing
  *
  * Converts MIDI note on/off messages to tracker synth triggers
+ *
+ * TB-303 LEGATO DETECTION:
+ * When a new note arrives while other notes are still held (overlapping),
+ * this is detected as "legato" and the legato flag is passed to the callback.
+ * For 303-style synths, legato should trigger a SLIDE to the new note
+ * without retriggering the envelopes.
  */
 
 import { getMIDIManager } from './MIDIManager';
@@ -13,7 +19,8 @@ const ACCENT_VELOCITY_THRESHOLD = 100;
 
 export interface MIDINoteHandlerOptions {
   // Callback when note is triggered
-  onNoteOn?: (note: string, velocity: number, accent: boolean, midiNote: number) => void;
+  // legato: true if other notes were held when this note arrived (overlapping notes)
+  onNoteOn?: (note: string, velocity: number, accent: boolean, midiNote: number, legato: boolean) => void;
   // Callback when note is released
   onNoteOff?: (note: string, midiNote: number) => void;
   // Optional channel filter (1-16, or undefined for all channels)
@@ -78,11 +85,16 @@ export class MIDINoteHandler {
     const trackerNote = midiToTrackerNote(midiNote);
     const accent = velocity >= this.options.accentThreshold;
 
+    // TB-303 LEGATO DETECTION:
+    // If any notes are already held when this note arrives, it's a legato transition
+    // This is checked BEFORE adding the new note to activeNotes
+    const legato = this.activeNotes.size > 0;
+
     // Track active note
     this.activeNotes.set(midiNote, trackerNote);
 
-    // Notify listener
-    this.options.onNoteOn(trackerNote, velocity, accent, midiNote);
+    // Notify listener with legato flag
+    this.options.onNoteOn(trackerNote, velocity, accent, midiNote, legato);
   }
 
   /**
@@ -117,6 +129,13 @@ export class MIDINoteHandler {
   }
 
   /**
+   * Check if any notes are currently held (useful for legato detection)
+   */
+  hasActiveNotes(): boolean {
+    return this.activeNotes.size > 0;
+  }
+
+  /**
    * Update options
    */
   setOptions(options: Partial<MIDINoteHandlerOptions>): void {
@@ -143,14 +162,17 @@ export class MIDINoteHandler {
 
 /**
  * Create a note handler connected to the tracker's ToneEngine
+ *
+ * @param triggerNote - Callback to trigger a note (receives legato flag for 303 slide)
+ * @param releaseNote - Callback to release a note
  */
 export function createTrackerNoteHandler(
-  triggerNote: (note: string, velocity: number, accent: boolean) => void,
+  triggerNote: (note: string, velocity: number, accent: boolean, legato: boolean) => void,
   releaseNote: (note: string) => void
 ): MIDINoteHandler {
   return new MIDINoteHandler({
-    onNoteOn: (note, velocity, accent) => {
-      triggerNote(note, velocity, accent);
+    onNoteOn: (note, velocity, accent, _midiNote, legato) => {
+      triggerNote(note, velocity, accent, legato);
     },
     onNoteOff: (note) => {
       releaseNote(note);

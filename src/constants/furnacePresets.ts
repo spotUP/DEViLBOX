@@ -32,7 +32,7 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1,
+      chipType: 0,  // OPN2 (YM2612) - Genesis
       algorithm: 4,
       feedback: 5,
       operators: [
@@ -52,7 +52,7 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1,
+      chipType: 0,  // OPN2 (YM2612) - Genesis
       algorithm: 5,
       feedback: 6,
       operators: [
@@ -72,7 +72,7 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1,
+      chipType: 0,  // OPN2 (YM2612) - Genesis
       algorithm: 2,
       feedback: 7,
       operators: [
@@ -92,7 +92,7 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1,
+      chipType: 0,  // OPN2 (YM2612) - Genesis
       algorithm: 4,
       feedback: 0,
       operators: [
@@ -112,7 +112,7 @@ export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 1,
+      chipType: 0,  // OPN2 (YM2612) - Genesis
       algorithm: 1,
       feedback: 3,
       operators: [

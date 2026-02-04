@@ -557,8 +557,20 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
     }
 
     switch (type) {
-        case CHIP_OPN2: OPN2_Write(&opn2_chip, port, data); break;
-        case CHIP_OPM:  OPM_Write(&opm_chip, port, data); break;
+        case CHIP_OPN2: {
+            // Nuked-OPN2 uses port-based writes: port 0/2 = address, port 1/3 = data
+            // Bank 0 (channels 1-3): ports 0,1  Bank 1 (channels 4-6): ports 2,3
+            int bank = (port >> 8) & 1;
+            OPN2_Write(&opn2_chip, bank * 2, port & 0xFF);     // Address
+            OPN2_Write(&opn2_chip, bank * 2 + 1, data);        // Data
+            break;
+        }
+        case CHIP_OPM: {
+            // Nuked-OPM uses port-based writes: port 0 = address, port 1 = data
+            OPM_Write(&opm_chip, 0, port & 0xFF);              // Address
+            OPM_Write(&opm_chip, 1, data);                     // Data
+            break;
+        }
         case CHIP_OPL3: OPL3_WriteReg(&opl3_chip_inst, (uint16_t)port, data); break;
         case CHIP_PSG:  YMPSG_Write(&psg_chip, data); break;
         case CHIP_NES:  if (nes_apu && nes_dmc) { if (port < 0x4010) nes_apu->Write(port, data); else nes_dmc->Write(port, data); } break;
@@ -568,10 +580,25 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
         case CHIP_N163: if (n163_chip) { if (port == 0xE000) n163_chip->addr_w(data); else if (port == 0xF800) n163_chip->data_w(data); } break;
         case CHIP_VRC6: if (vrc6_chip) vrc6_chip->write(port, data); break;
         case CHIP_SID:  if (sid_chip) sid3_write(sid_chip, port, data); break;
-        case CHIP_OPLL: OPLL_Write(&opll_chip, port, data); break;
+        case CHIP_OPLL: {
+            // Nuked-OPLL uses port-based writes: port 0 = address, port 1 = data
+            OPLL_Write(&opll_chip, 0, port & 0xFF);            // Address
+            OPLL_Write(&opll_chip, 1, data);                   // Data
+            break;
+        }
         case CHIP_AY:   if (ay_chip) { ay_chip->address_w(port); ay_chip->data_w(data); } break;
-        case CHIP_OPNA: if (opna_chip) opna_chip->write(port, data); break;
-        case CHIP_OPNB: if (opnb_chip) opnb_chip->write(port, data); break;
+        case CHIP_OPNA: if (opna_chip) {
+            // ymfm uses offset-based writes: 0/2 = address, 1/3 = data
+            int bank = (port >> 8) & 1;
+            opna_chip->write(bank * 2, port & 0xFF);
+            opna_chip->write(bank * 2 + 1, data);
+        } break;
+        case CHIP_OPNB: if (opnb_chip) {
+            // ymfm uses offset-based writes: 0/2 = address, 1/3 = data
+            int bank = (port >> 8) & 1;
+            opnb_chip->write(bank * 2, port & 0xFF);
+            opnb_chip->write(bank * 2 + 1, data);
+        } break;
         case CHIP_OPN: if (opn_chip) { opn_chip->write(0, port & 0xFF); opn_chip->write(1, data); } break;
         case CHIP_OPNB_B: if (opnb_b_chip) { int bank = (port >> 8) & 1; opnb_b_chip->write(0 + bank * 2, port & 0xFF); opnb_b_chip->write(1 + bank * 2, data); } break;
         case CHIP_TIA:  if (tia_chip) tia_chip->write(port, data); break;
@@ -581,8 +608,16 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
         case CHIP_SWAN: if (swan_chip) swan_chip->SoundWrite(port, data); break;
         case CHIP_OKI:  if (oki_chip) oki_chip->command_w(data); break;
         case CHIP_ES5506: if (es_chip) es_chip->write(port, data); break;
-        case CHIP_OPZ:  if (opz_chip) opz_chip->write(port, data); break;
-        case CHIP_Y8950: if (y8950_chip) y8950_chip->write(port, data); break;
+        case CHIP_OPZ: if (opz_chip) {
+            // ymfm uses offset-based writes: 0 = address, 1 = data
+            opz_chip->write(0, port & 0xFF);
+            opz_chip->write(1, data);
+        } break;
+        case CHIP_Y8950: if (y8950_chip) {
+            // ymfm uses offset-based writes: 0 = address, 1 = data
+            y8950_chip->write(0, port & 0xFF);
+            y8950_chip->write(1, data);
+        } break;
         case CHIP_SEGAPCM: if (segapcm_chip) segapcm_chip->write(port, data); break;
         case CHIP_YMZ280B: if (ymz_chip) ymz_chip->write(port, data); break;
         case CHIP_RF5C68: if (rf5_chip) rf5_chip->rf5c68_w(port, data); break;
@@ -773,14 +808,54 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
         int32_t opll_buf[2];
         
         switch (type) {
-            case CHIP_OPN2: OPN2_Clock(&opn2_chip, out16); buffer_l[i] = (float)out16[0] / 32768.0f; buffer_r[i] = (float)out16[1] / 32768.0f; break;
-            case CHIP_OPM:  OPM_Clock(&opm_chip, out32, &d1, &d2, &d3); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[1] / 32768.0f; break;
-            case CHIP_OPL3: OPL3_GenerateResampled(&opl3_chip_inst, out16); buffer_l[i] = (float)out16[0] / 32768.0f; buffer_r[i] = (float)out16[1] / 32768.0f; break;
+            case CHIP_OPN2: {
+                // OPN2 needs 144 internal clocks per audio sample
+                // At 48kHz output with ~53kHz native rate, we accumulate and average
+                int32_t sum_l = 0, sum_r = 0;
+                for (int c = 0; c < 144; c++) {
+                    OPN2_Clock(&opn2_chip, out16);
+                    sum_l += out16[0];
+                    sum_r += out16[1];
+                }
+                buffer_l[i] = (float)(sum_l / 144) / 32768.0f;
+                buffer_r[i] = (float)(sum_r / 144) / 32768.0f;
+                break;
+            }
+            case CHIP_OPM: {
+                // OPM needs 64 internal clocks per audio sample (32 cycles * 2 phases)
+                int32_t sum_l = 0, sum_r = 0;
+                for (int c = 0; c < 64; c++) {
+                    OPM_Clock(&opm_chip, out32, &d1, &d2, &d3);
+                    sum_l += out32[0];
+                    sum_r += out32[1];
+                }
+                buffer_l[i] = (float)(sum_l / 64) / 32768.0f;
+                buffer_r[i] = (float)(sum_r / 64) / 32768.0f;
+                break;
+            }
+            case CHIP_OPL3: {
+                // OPL3 GenerateResampled handles internal clocking automatically
+                OPL3_GenerateResampled(&opl3_chip_inst, out16);
+                buffer_l[i] = (float)out16[0] / 32768.0f;
+                buffer_r[i] = (float)out16[1] / 32768.0f;
+                break;
+            }
             case CHIP_PSG:  YMPSG_Clock(&psg_chip); YMPSG_GetOutput(&psg_chip, &out32[0], &out32[1]); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[1] / 32768.0f; break;
             case CHIP_NES:  if (nes_apu) { nes_apu->Tick(1); nes_dmc->Tick(1); nes_apu->Render(out32); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[0] / 32768.0f; } break;
             case CHIP_GB: { int gb_cycles = g_sample_rate > 0 ? (4194304 / g_sample_rate) : 87; GB_advance_cycles(&gb_chip, gb_cycles); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break; }
             case CHIP_SID:  if (sid_chip) { sid3_clock(sid_chip); buffer_l[i] = (float)sid_chip->output_l / 32768.0f; buffer_r[i] = (float)sid_chip->output_r / 32768.0f; } break;
-            case CHIP_OPLL: OPLL_Clock(&opll_chip, opll_buf); buffer_l[i] = (float)opll_buf[0] / 32768.0f; buffer_r[i] = (float)opll_buf[1] / 32768.0f; break;
+            case CHIP_OPLL: {
+                // OPLL needs 18 cycles (9 channels * 2) per audio sample
+                int32_t sum_l = 0, sum_r = 0;
+                for (int c = 0; c < 18; c++) {
+                    OPLL_Clock(&opll_chip, opll_buf);
+                    sum_l += opll_buf[0];
+                    sum_r += opll_buf[1];
+                }
+                buffer_l[i] = (float)(sum_l / 18) / 32768.0f;
+                buffer_r[i] = (float)(sum_r / 18) / 32768.0f;
+                break;
+            }
             case CHIP_TIA:  if (tia_chip) { tia_chip->tick(1); buffer_l[i] = (float)tia_chip->myCurrentSample[0] / 32768.0f; buffer_r[i] = (float)tia_chip->myCurrentSample[1] / 32768.0f; } break;
             case CHIP_OPNA: if (opna_chip) { opna_chip->generate(&output_2608); buffer_l[i] = (float)output_2608.data[0] / 32768.0f; buffer_r[i] = (float)output_2608.data[1] / 32768.0f; } break;
             case CHIP_OPNB: if (opnb_chip) { opnb_chip->generate(&output_2610); buffer_l[i] = (float)output_2610.data[0] / 32768.0f; buffer_r[i] = (float)output_2610.data[1] / 32768.0f; } break;

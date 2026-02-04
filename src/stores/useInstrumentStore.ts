@@ -19,6 +19,7 @@ import {
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
   DEFAULT_V2,
+  DEFAULT_SAM,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
   DEFAULT_DRUM_MACHINE,
@@ -32,6 +33,14 @@ import {
   DEFAULT_STRING_MACHINE,
   DEFAULT_FORMANT_SYNTH,
   DEFAULT_WOBBLE_BASS,
+  DEFAULT_DEXED,
+  DEFAULT_OBXD,
+  DEFAULT_DRUMKIT,
+  DEFAULT_MAME_VFX,
+  DEFAULT_MAME_DOC,
+  DEFAULT_MAME_RSA,
+  DEFAULT_MAME_SWP30,
+  DEFAULT_CHIPTUNE_MODULE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
@@ -116,8 +125,55 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
     case 'V2':
       base.v2 = { ...DEFAULT_V2 };
       break;
+    case 'Sam':
+      base.sam = { ...DEFAULT_SAM };
+      break;
     case 'Synare':
       base.synare = { ...DEFAULT_SYNARE };
+      break;
+    case 'Buzz3o3':
+      base.tb303 = { ...DEFAULT_TB303 };
+      base.buzzmachine = {
+        ...DEFAULT_BUZZMACHINE,
+        machineType: 'OomekAggressor' as any,
+        parameters: {
+          0: 0,    // SAW
+          1: 0x78, // Cutoff
+          2: 0x40, // Reso
+          3: 0x40, // EnvMod
+          4: 0x40, // Decay
+          5: 0x40, // Accent
+          6: 100,  // Tuning
+          7: 100,  // Vol
+        }
+      };
+      break;
+    case 'Buzzmachine':
+      base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
+      break;
+    case 'Dexed':
+      base.dexed = { ...DEFAULT_DEXED };
+      break;
+    case 'OBXd':
+      base.obxd = { ...DEFAULT_OBXD };
+      break;
+    case 'DrumKit':
+      base.drumKit = { ...DEFAULT_DRUMKIT };
+      break;
+    case 'ChiptuneModule':
+      base.chiptuneModule = { ...DEFAULT_CHIPTUNE_MODULE };
+      break;
+    case 'MAMEVFX':
+      base.mame = { ...DEFAULT_MAME_VFX };
+      break;
+    case 'MAMEDOC':
+      base.mame = { ...DEFAULT_MAME_DOC };
+      break;
+    case 'MAMERSA':
+      base.mame = { ...DEFAULT_MAME_RSA };
+      break;
+    case 'MAMESWP30':
+      base.mame = { ...DEFAULT_MAME_SWP30 };
       break;
   }
 
@@ -288,7 +344,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.granular ||
         updates.furnace ||
         updates.dubSiren ||
-        updates.synare
+        updates.synare ||
+        updates.sam ||
+        updates.v2Speech
       );
 
       set((state) => {
@@ -348,7 +406,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           const updatedInstrument = get().instruments.find((inst) => inst.id === id);
           
           if (updatedInstrument) {
-            if (updatedInstrument.synthType === 'TB303' && updatedInstrument.tb303 && updates.tb303) {
+            if ((updatedInstrument.synthType === 'TB303' || updatedInstrument.synthType === 'Buzz3o3') && updatedInstrument.tb303 && updates.tb303) {
               engine.updateTB303Parameters(id, updatedInstrument.tb303);
               return; // Handled
             }
@@ -367,7 +425,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
               engine.updateV2Parameters(id, updatedInstrument.v2);
               return; // Handled
             }
-            
+
+            // V2 Speech mode - uses applyConfig pattern
+            if (updatedInstrument.synthType === 'V2' && updatedInstrument.v2Speech && updates.v2Speech) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.v2Speech);
+              return; // Handled
+            }
+
+            // SAM Speech synth - uses applyConfig pattern
+            if (updatedInstrument.synthType === 'Sam' && updatedInstrument.sam && updates.sam) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.sam);
+              return; // Handled
+            }
+
             if (updatedInstrument.synthType === 'Synare' && updatedInstrument.synare && updates.synare) {
               engine.updateSynareParameters(id, updatedInstrument.synare);
               return; // Handled

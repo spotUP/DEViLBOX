@@ -33,22 +33,25 @@ class TB303Processor extends AudioWorkletProcessor {
           abort: (msg, file, line, col) => console.error(`WASM Abort: ${msg} at ${file}:${line}:${col}`),
         }
       };
-      
+
       const { instance } = await WebAssembly.instantiate(binary, imports);
       this.wasmInstance = instance.exports;
-      
-      // Initialize unified DSP systems
-      if (this.wasmInstance.init) this.wasmInstance.init();
-      
+
+      // Initialize unified DSP systems (must call initEngine before initVoice)
+      if (this.wasmInstance.initEngine) this.wasmInstance.initEngine();
+
       // Allocate output buffer
       this.outputPtr = this.wasmInstance.__new(this.bufferSize * 4, 1);
-      
+
       // Initialize this specific voice
       this.wasmInstance.initVoice(this.voiceIndex, sampleRate);
-      
-    this.wasmLoaded = true;
-    this.wasmView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
-    console.log(`🎹 TB303 Voice ${this.voiceIndex}: WASM Engine Active`);
+
+      this.wasmLoaded = true;
+      this.wasmView = new Float32Array(this.wasmInstance.memory.buffer, this.outputPtr, this.bufferSize);
+      console.log(`🎹 TB303 Voice ${this.voiceIndex}: WASM Engine Active`);
+    } catch (e) {
+      console.error(`[TB303] WASM init failed for voice ${this.voiceIndex}:`, e);
+    }
   }
 
   handleMessage(data) {

@@ -5,7 +5,7 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
-import { JC303Synth } from './jc303/JC303Synth';
+import { JC303Synth } from './open303';
 import { MAMESynth } from './MAMESynth';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
@@ -15,7 +15,8 @@ import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
 import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { getNativeContext, createAudioWorkletNode } from '@utils/audio-context';
+import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import { getNativeContext } from '@utils/audio-context';
 
 interface VoiceState {
   instrument: any;
@@ -280,8 +281,10 @@ export class ToneEngine {
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running
-    const toneCtx = Tone.getContext();
+    const toneCtx = Tone.getContext() as any;
     const nativeCtx = getNativeContext(toneCtx);
+    // rawContext is the standardized-audio-context context (needed for toneCreateAudioWorkletNode)
+    const rawContext = toneCtx.rawContext || toneCtx._context;
     
     if (nativeCtx.state !== 'running') {
       await new Promise<void>((resolve) => {
@@ -325,17 +328,17 @@ export class ToneEngine {
     if (!ToneEngine.tb303WorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        // Add module to NATIVE context
-        await nativeCtx.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
-        
+        // Add module to rawContext (standardized-audio-context)
+        await rawContext.audioWorklet.addModule(`${baseUrl}TB303.worklet.js`);
+
         const binary = await fetchDSP();
         if (binary) {
-          // Use WRAPPED context for node creation (handles polyfills)
-          const tempNode = createAudioWorkletNode(toneCtx, 'tb303-processor');
+          // Use rawContext for node creation with Tone.js helper
+          const tempNode = toneCreateAudioWorkletNode(rawContext, 'tb303-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
-        
+
         ToneEngine.tb303WorkletLoaded = true;
       } catch (error) {
         console.error('[ToneEngine] Failed to load TB303 worklet:', error);
@@ -346,17 +349,17 @@ export class ToneEngine {
     if (!ToneEngine.itFilterWorkletLoaded) {
       try {
         const baseUrl = import.meta.env.BASE_URL || '/';
-        // Add module to NATIVE context
-        await nativeCtx.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
-        
+        // Add module to rawContext (standardized-audio-context)
+        await rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+
         const binary = await fetchDSP();
         if (binary) {
-          // Use WRAPPED context for node creation
-          const tempNode = createAudioWorkletNode(toneCtx, 'it-filter-processor');
+          // Use rawContext for node creation with Tone.js helper
+          const tempNode = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
           tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
           tempNode.disconnect();
         }
-        
+
         ToneEngine.itFilterWorkletLoaded = true;
       } catch (error) {
         console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
@@ -371,7 +374,7 @@ export class ToneEngine {
       await furnaceEngine.init(Tone.getContext());
       console.log('[ToneEngine] Furnace WASM chip engine initialized');
     } catch (error) {
-      console.warn('[ToneEngine] Furnace WASM init failed, will use fallback synths:', error);
+      console.warn('[ToneEngine] Furnace WASM init failed:', error);
     }
 
     // Load AmigaFilter worklet handled by its class
@@ -401,7 +404,14 @@ export class ToneEngine {
 
     // Create all instruments
     const samplerConfigs = configs.filter((c) => c.synthType === 'Sampler' || c.synthType === 'Player');
-    const otherConfigs = configs.filter((c) => c.synthType !== 'Sampler' && c.synthType !== 'Player');
+    // Speech synths need async rendering (SAM and V2 with v2Speech)
+    const speechConfigs = configs.filter((c) => c.synthType === 'Sam' || (c.synthType === 'V2' && c.v2Speech));
+    const otherConfigs = configs.filter((c) =>
+      c.synthType !== 'Sampler' &&
+      c.synthType !== 'Player' &&
+      c.synthType !== 'Sam' &&
+      !(c.synthType === 'V2' && c.v2Speech)
+    );
 
     // Create non-sampler instruments immediately
     otherConfigs.forEach((config) => {
@@ -411,6 +421,15 @@ export class ToneEngine {
     // Create sampler instruments
     samplerConfigs.forEach((config) => {
       this.getInstrument(config.id, config);
+    });
+
+    // Create and wait for speech synths
+    const speechReadyPromises: Promise<void>[] = [];
+    speechConfigs.forEach((config) => {
+      const instrument = this.getInstrument(config.id, config);
+      if (instrument?.ready) {
+        speechReadyPromises.push(instrument.ready());
+      }
     });
 
     // Wait for all audio buffers to load
@@ -428,6 +447,17 @@ export class ToneEngine {
         }
       } catch (error) {
         console.error('[ToneEngine] Some samples failed to load:', error);
+      }
+    }
+
+    // Wait for speech synths to render
+    if (speechReadyPromises.length > 0) {
+      try {
+        console.log(`[ToneEngine] Waiting for ${speechReadyPromises.length} speech synths to render...`);
+        await Promise.all(speechReadyPromises);
+        console.log(`[ToneEngine] All ${speechReadyPromises.length} speech synths ready`);
+      } catch (error) {
+        console.error('[ToneEngine] Some speech synths failed to render:', error);
       }
     }
 
@@ -1219,6 +1249,17 @@ export class ToneEngine {
       case 'FurnacePCMDAC':
       case 'DrumKit':
       case 'ChiptuneModule':
+      // JUCE WASM Synths
+      case 'Dexed':
+      case 'OBXd':
+      // MAME-based Synths
+      case 'MAMEVFX':
+      case 'MAMEDOC':
+      case 'MAMERSA':
+      case 'MAMESWP30':
+      case 'CZ101':
+      case 'CEM3394':
+      case 'SCSP':
       // Buzzmachine Generators (WASM-emulated Buzz synths)
       case 'BuzzDTMF':
       case 'BuzzFreqBomb':
@@ -1233,10 +1274,8 @@ export class ToneEngine {
       case 'DubSiren':
       case 'SpaceLaser':
       case 'V2':
+      case 'Sam':
       case 'Synare':
-      case 'MAMEVFX':
-      case 'MAMEDOC':
-      case 'MAMERSA':
       case 'Buzzmachine': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
@@ -1897,17 +1936,25 @@ export class ToneEngine {
   /**
    * Trigger a polyphonic note attack - allocates a voice channel automatically
    * Use this for keyboard and MIDI playback when polyphonic mode is enabled
+   *
+   * @param accent - TB-303 accent flag (boosts filter/volume)
+   * @param slide - TB-303 slide flag (legato - pitch glides without retriggering envelopes)
    */
   public triggerPolyNoteAttack(
     instrumentId: number,
     note: string,
     velocity: number,
-    config: InstrumentConfig
+    config: InstrumentConfig,
+    accent: boolean = false,
+    slide: boolean = false
   ): void {
     // Check if instrument is explicitly marked as monophonic
     if (config.monophonic === true) {
       // Force monophonic: Release any previous notes for this instrument first
-      this.releaseAllPolyNotes(instrumentId, config);
+      // IMPORTANT: For 303 slide, we DON'T release first - the slide maintains the gate
+      if (!slide) {
+        this.releaseAllPolyNotes(instrumentId, config);
+      }
       // Fall through to monophonic triggering logic below
     }
 
@@ -1922,15 +1969,18 @@ export class ToneEngine {
       // Use shared instance (channelIndex undefined)
       // Use immediate time if isLive
       const triggerTime = config.isLive ? this.getImmediateTime() : 0;
-      this.triggerNoteAttack(instrumentId, note, triggerTime, velocity, config);
+      this.triggerNoteAttack(instrumentId, note, triggerTime, velocity, config, undefined, accent, slide);
       return;
     }
 
     // For monophonic synths (TB303, MonoSynth, etc.), allocate separate channel/instance
     // Check if this note is already playing
     if (this.liveVoiceAllocation.has(note)) {
-      // Release the old voice first
-      this.triggerPolyNoteRelease(instrumentId, note, config);
+      // For slide, we don't release - we glide to the new pitch
+      if (!slide) {
+        // Release the old voice first
+        this.triggerPolyNoteRelease(instrumentId, note, config);
+      }
     }
 
     // Allocate a voice channel from the pool
@@ -1946,7 +1996,8 @@ export class ToneEngine {
     const immediateTime = this.getImmediateTime();
 
     // Trigger the note on this channel (creates separate instance for monophonic synths)
-    this.triggerNoteAttack(instrumentId, note, immediateTime, velocity, config, undefined, false, false, channelIndex);
+    // Pass accent and slide flags for 303 behavior
+    this.triggerNoteAttack(instrumentId, note, immediateTime, velocity, config, undefined, accent, slide, channelIndex);
   }
 
   /**
@@ -2055,7 +2106,17 @@ export class ToneEngine {
                         synthType === 'MetalSynth' ||
                         synthType === 'MembraneSynth' ||
                         synthType === 'NoiseSynth' ||
-                        synthType === 'TB303';
+                        synthType === 'TB303' ||
+                        synthType === 'Buzz3o3' ||
+                        synthType === 'BuzzKick' ||
+                        synthType === 'BuzzKickXP' ||
+                        synthType === 'BuzzNoise' ||
+                        synthType === 'BuzzTrilok' ||
+                        synthType === 'Buzz4FM2F' ||
+                        synthType === 'BuzzDynamite6' ||
+                        synthType === 'BuzzM3' ||
+                        synthType === 'DubSiren' ||
+                        synthType === 'Synare';
 
     try {
       if (isMonoStyle) {
@@ -2686,14 +2747,18 @@ export class ToneEngine {
 
   /**
    * Update TB303 parameters in real-time without recreating the synth
+   * Supports both JC303Synth (TB303) and BuzzmachineGenerator (Buzz3o3)
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
-    // Find all channel instances of this instrument
-    const synths: JC303Synth[] = [];
+    // Find all channel instances of this instrument (JC303Synth or BuzzmachineGenerator)
+    const synths: any[] = [];
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && (instrument instanceof JC303Synth)) {
-        synths.push(instrument);
+      if (idPart === String(instrumentId)) {
+        // Check for JC303Synth or BuzzmachineGenerator (Buzz3o3)
+        if (instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator') {
+          synths.push(instrument);
+        }
       }
     });
 
@@ -2705,10 +2770,11 @@ export class ToneEngine {
 
     // Update all instances
     synths.forEach((synth) => {
-      console.log(`[ToneEngine] Updating TB303 parameters for instrument ${instrumentId}`);
+      const isBuzz3o3 = synth.constructor.name === 'BuzzmachineGenerator';
+      console.log(`[ToneEngine] Updating TB303 parameters for instrument ${instrumentId} (${isBuzz3o3 ? 'Buzz3o3' : 'JC303'})`);
 
     // Update core TB303 parameters
-    if (tb303Config.tuning !== undefined && (synth instanceof JC303Synth)) {
+    if (tb303Config.tuning !== undefined) {
       console.log(`[ToneEngine] Set tuning: ${tb303Config.tuning}`);
       synth.setTuning(tb303Config.tuning);
     }
@@ -2930,6 +2996,34 @@ export class ToneEngine {
       if (idPart === String(instrumentId)) {
         if (instrument && typeof (instrument as any).updateParameters === 'function') {
           (instrument as any).updateParameters();
+        }
+      }
+    });
+  }
+
+  /**
+   * Update Dexed (DX7) parameters in real-time
+   */
+  public updateDexedParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
+        }
+      }
+    });
+  }
+
+  /**
+   * Update OBXd (Oberheim) parameters in real-time
+   */
+  public updateOBXdParameters(instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void {
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId)) {
+        if (instrument && typeof (instrument as any).applyConfig === 'function') {
+          (instrument as any).applyConfig(config);
         }
       }
     });
@@ -3654,7 +3748,10 @@ export class ToneEngine {
     const isIT = config.metadata?.importedFrom === 'IT';
     
     if (isIT && ToneEngine.itFilterWorkletLoaded) {
-      filter = createAudioWorkletNode(Tone.getContext(), 'it-filter-processor');
+      // Get the rawContext from Tone.js (standardized-audio-context)
+      const toneContext = Tone.getContext() as any;
+      const rawContext = toneContext.rawContext || toneContext._context;
+      filter = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
     } else {
       filter = new Tone.Filter({
         type: 'lowpass',
@@ -4099,10 +4196,10 @@ export class ToneEngine {
       const current = this.channelTriggerLevels.get(i) || 0;
       this.triggerLevelsCache[i] = current;
 
-      // Decay the trigger level
+      // Clear the trigger after reading - VU component handles decay visually
+      // This ensures triggers are consumed exactly once for tight sync
       if (current > 0) {
-        const decayed = current * 0.85;
-        this.channelTriggerLevels.set(i, decayed < 0.01 ? 0 : decayed);
+        this.channelTriggerLevels.set(i, 0);
       }
     }
     return this.triggerLevelsCache;

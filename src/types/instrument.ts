@@ -130,11 +130,17 @@ export type SynthType =
   | 'MAMEDOC'          // Ensoniq ESQ-1 (ES5503)
   | 'MAMERSA'          // Roland SA (MKS-20/RD-1000)
   | 'MAMESWP30'        // Yamaha SWP30 (AWM2)
+  | 'CZ101'            // Casio CZ-101 Phase Distortion (UPD933)
+  | 'CEM3394'          // Curtis Electromusic analog synth voice (Prophet VS, Matrix-6, ESQ-1)
+  | 'SCSP'             // Sega Saturn SCSP (YMF292-F) 32-voice sound processor
   | 'DubSiren'         // Dub Siren (Osc + LFO + Delay)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
   | 'V2'               // Farbrausch V2 Synth
   | 'Sam'              // Commodore SAM Speech Synth
-  | 'Synare';          // Synare 3 (Electronic Percussion)
+  | 'Synare'           // Synare 3 (Electronic Percussion)
+  // JUCE WASM Synths
+  | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
+  | 'OBXd';            // Oberheim OB-X Analog Synthesizer
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -1281,6 +1287,7 @@ export type BuzzmachineType =
   | 'JeskolaTrilok'
   | 'JeskolaNoise'
   | 'OomekAggressor'
+  | 'OomekAggressorDF'
   | 'MadBrain4FM2F'
   | 'MadBrainDynamite6'
   | 'MakkM3'
@@ -1740,6 +1747,227 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
   wavetables: [],
 };
 
+// ============================================================================
+// JUCE WASM Synth Configurations
+// ============================================================================
+
+/**
+ * DX7 Operator Configuration
+ */
+export interface DexedOperatorConfig {
+  level: number;           // 0-99 output level
+  coarse: number;          // 0-31 coarse frequency ratio
+  fine: number;            // 0-99 fine frequency
+  detune: number;          // 0-14 (7 = center)
+  mode: 'ratio' | 'fixed'; // Frequency mode
+  egRates: [number, number, number, number];   // 0-99 for R1-R4
+  egLevels: [number, number, number, number];  // 0-99 for L1-L4
+  breakPoint: number;      // 0-99 (A-1 to C8)
+  leftDepth: number;       // 0-99 keyboard scaling
+  rightDepth: number;      // 0-99 keyboard scaling
+  leftCurve: number;       // 0-3
+  rightCurve: number;      // 0-3
+  rateScaling: number;     // 0-7
+  ampModSens: number;      // 0-3
+  velocitySens: number;    // 0-7
+}
+
+/**
+ * Dexed (DX7) Synthesizer Configuration
+ */
+export interface DexedConfig {
+  // FM Algorithm (0-31)
+  algorithm: number;
+  // Operator self-feedback (0-7)
+  feedback: number;
+  // Oscillator key sync (0-1)
+  oscSync: boolean;
+
+  // Operator configurations (6 operators)
+  operators: DexedOperatorConfig[];
+
+  // Pitch envelope
+  pitchEgRates: [number, number, number, number];   // 0-99
+  pitchEgLevels: [number, number, number, number];  // 0-99
+
+  // LFO parameters
+  lfoSpeed: number;        // 0-99
+  lfoDelay: number;        // 0-99
+  lfoPitchModDepth: number; // 0-99
+  lfoAmpModDepth: number;   // 0-99
+  lfoSync: boolean;
+  lfoWave: 'triangle' | 'sawDown' | 'sawUp' | 'square' | 'sine' | 'sampleHold';
+  lfoPitchModSens: number; // 0-7
+
+  // Transpose (-24 to +24)
+  transpose: number;
+
+  // Voice name (10 chars max)
+  name?: string;
+}
+
+/**
+ * Default Dexed (INIT VOICE) configuration
+ */
+export const DEFAULT_DEXED: DexedConfig = {
+  algorithm: 0,
+  feedback: 0,
+  oscSync: true,
+  operators: Array.from({ length: 6 }, () => ({
+    level: 99,
+    coarse: 1,
+    fine: 0,
+    detune: 7,
+    mode: 'ratio' as const,
+    egRates: [99, 99, 99, 99] as [number, number, number, number],
+    egLevels: [99, 99, 99, 0] as [number, number, number, number],
+    breakPoint: 0,
+    leftDepth: 0,
+    rightDepth: 0,
+    leftCurve: 0,
+    rightCurve: 0,
+    rateScaling: 0,
+    ampModSens: 0,
+    velocitySens: 0,
+  })),
+  pitchEgRates: [99, 99, 99, 99],
+  pitchEgLevels: [50, 50, 50, 50],
+  lfoSpeed: 35,
+  lfoDelay: 0,
+  lfoPitchModDepth: 0,
+  lfoAmpModDepth: 0,
+  lfoSync: false,
+  lfoWave: 'triangle',
+  lfoPitchModSens: 0,
+  transpose: 0,
+  name: 'INIT VOICE',
+};
+
+/**
+ * OB-Xd (Oberheim) Synthesizer Configuration
+ */
+export interface OBXdConfig {
+  // Oscillator 1
+  osc1Waveform: 'saw' | 'pulse' | 'triangle' | 'noise';
+  osc1Octave: number;        // -2 to +2
+  osc1Detune: number;        // -1 to +1 semitones
+  osc1PulseWidth: number;    // 0-1
+  osc1Level: number;         // 0-1
+
+  // Oscillator 2
+  osc2Waveform: 'saw' | 'pulse' | 'triangle' | 'noise';
+  osc2Octave: number;
+  osc2Detune: number;
+  osc2PulseWidth: number;
+  osc2Level: number;
+
+  // Oscillator modifiers
+  oscSync: boolean;
+  oscXor: boolean;           // Ring modulation style
+
+  // Filter
+  filterCutoff: number;      // 0-1 (maps to 20-20000 Hz)
+  filterResonance: number;   // 0-1
+  filterType: 'lp24' | 'lp12' | 'hp' | 'bp' | 'notch';
+  filterEnvAmount: number;   // 0-1
+  filterKeyTrack: number;    // 0-1
+  filterVelocity: number;    // 0-1
+
+  // Filter envelope (ADSR)
+  filterAttack: number;      // 0-1 (seconds-ish)
+  filterDecay: number;
+  filterSustain: number;
+  filterRelease: number;
+
+  // Amp envelope (ADSR)
+  ampAttack: number;
+  ampDecay: number;
+  ampSustain: number;
+  ampRelease: number;
+
+  // LFO
+  lfoRate: number;           // 0-1 (maps to 0.1-20 Hz)
+  lfoWaveform: 'sine' | 'triangle' | 'saw' | 'square' | 'sampleHold';
+  lfoDelay: number;          // 0-1
+  lfoOscAmount: number;      // 0-1
+  lfoFilterAmount: number;   // 0-1
+  lfoAmpAmount: number;      // 0-1
+  lfoPwAmount: number;       // 0-1
+
+  // Global
+  masterVolume: number;      // 0-1
+  voices: number;            // 1-8
+  unison: boolean;
+  unisonDetune: number;      // 0-1
+  portamento: number;        // 0-1
+  panSpread: number;         // 0-1
+  velocitySensitivity: number; // 0-1
+
+  // Extended
+  noiseLevel: number;        // 0-1
+  subOscLevel: number;       // 0-1
+  subOscOctave: -1 | -2;
+  drift: number;             // 0-1 analog drift
+}
+
+/**
+ * Default OB-Xd configuration
+ */
+export const DEFAULT_OBXD: OBXdConfig = {
+  osc1Waveform: 'saw',
+  osc1Octave: 0,
+  osc1Detune: 0,
+  osc1PulseWidth: 0.5,
+  osc1Level: 1,
+
+  osc2Waveform: 'saw',
+  osc2Octave: 0,
+  osc2Detune: 0.1,
+  osc2PulseWidth: 0.5,
+  osc2Level: 0.7,
+
+  oscSync: false,
+  oscXor: false,
+
+  filterCutoff: 0.7,
+  filterResonance: 0.3,
+  filterType: 'lp24',
+  filterEnvAmount: 0.5,
+  filterKeyTrack: 0,
+  filterVelocity: 0.3,
+
+  filterAttack: 0.01,
+  filterDecay: 0.3,
+  filterSustain: 0.3,
+  filterRelease: 0.3,
+
+  ampAttack: 0.01,
+  ampDecay: 0.2,
+  ampSustain: 0.7,
+  ampRelease: 0.3,
+
+  lfoRate: 0.2,
+  lfoWaveform: 'sine',
+  lfoDelay: 0,
+  lfoOscAmount: 0,
+  lfoFilterAmount: 0,
+  lfoAmpAmount: 0,
+  lfoPwAmount: 0,
+
+  masterVolume: 0.7,
+  voices: 8,
+  unison: false,
+  unisonDetune: 0.1,
+  portamento: 0,
+  panSpread: 0.3,
+  velocitySensitivity: 0.5,
+
+  noiseLevel: 0,
+  subOscLevel: 0,
+  subOscOctave: -1,
+  drift: 0.02,
+};
+
 export type AudioEffectType =
   | 'Distortion'
   | 'Reverb'
@@ -1857,10 +2085,19 @@ export interface SampleConfig {
   multiMap?: Record<string, string>; // Note (e.g. "C4") -> URL map for multi-sampling
   baseNote: string; // "C-4"
   detune: number; // -100 to +100 cents
+
+  // Regular loop (plays after note-off if sustainLoop is enabled)
   loop: boolean;
   loopType?: 'off' | 'forward' | 'pingpong'; // Loop mode
   loopStart: number; // Sample frame index
   loopEnd: number; // Sample frame index
+
+  // Sustain loop (IT-style: plays while note is held, then switches to regular loop)
+  sustainLoop?: boolean;
+  sustainLoopType?: 'off' | 'forward' | 'pingpong';
+  sustainLoopStart?: number; // Sample frame index
+  sustainLoopEnd?: number; // Sample frame index
+
   sampleRate?: number; // For converting loop points to seconds (default 8363 Hz for MOD)
   reverse: boolean;
   playbackRate: number; // 0.25-4x
@@ -2383,6 +2620,9 @@ export interface InstrumentConfig {
   mame?: MAMEConfig;
   // Buzzmachines
   buzzmachine?: BuzzmachineConfig;
+  // JUCE WASM Synths
+  dexed?: Partial<DexedConfig>;
+  obxd?: Partial<OBXdConfig>;
   // Drumkit/Keymap (multi-sample)
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
