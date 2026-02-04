@@ -42,6 +42,8 @@ const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[]
   { type: 'FeedbackDelay', label: 'Feedback Delay', category: 'Time' },
   { type: 'PingPongDelay', label: 'Ping Pong Delay', category: 'Time' },
   { type: 'SpaceEcho', label: 'Space Echo', category: 'Time' },
+  { type: 'SpaceyDelayer', label: 'Spacey Delayer', category: 'Time' },
+  { type: 'RETapeEcho', label: 'RE Tape Echo', category: 'Time' },
 
   // Modulation
   { type: 'BiPhase', label: 'Bi-Phase', category: 'Modulation' },
