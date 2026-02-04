@@ -266,25 +266,62 @@ async function testSynthType(synthType: SynthType): Promise<TestResult> {
 
     logVerbose(`Created instance: ${instrument.constructor.name}`);
 
-    // Test basic connection (won't actually play audio in Node.js)
-    if (typeof (instrument as any).toDestination === 'function') {
-      logVerbose('Has toDestination method');
+    const inst = instrument as any;
+
+    // Verify audio interface methods exist
+    const hasConnect = typeof inst.toDestination === 'function' || typeof inst.connect === 'function';
+    const hasTriggerAttack = typeof inst.triggerAttack === 'function';
+    const hasTriggerRelease = typeof inst.triggerRelease === 'function';
+
+    if (!hasConnect) {
+      throw new Error('Missing audio output method (toDestination/connect)');
     }
 
-    // Test triggerAttack if available
-    if (typeof (instrument as any).triggerAttack === 'function') {
-      logVerbose('Has triggerAttack method');
-      // Don't actually trigger in test mode
-    }
+    if (TEST_AUDIO) {
+      // Audio smoke test: exercise the full audio lifecycle
+      // NOTE: True audio output verification requires the browser test runner (src/test-runner.ts)
 
-    // Test triggerRelease if available
-    if (typeof (instrument as any).triggerRelease === 'function') {
-      logVerbose('Has triggerRelease method');
+      // 1. Connect to destination
+      if (typeof inst.toDestination === 'function') {
+        inst.toDestination();
+        logVerbose('Connected to destination');
+      }
+
+      // 2. Trigger attack (skip sample-based synths that need loaded files)
+      const isSampleBased = ['Sampler', 'Player', 'DrumKit', 'GranularSynth'].includes(synthType);
+
+      if (hasTriggerAttack && !isSampleBased) {
+        inst.triggerAttack('C4');
+        logVerbose('triggerAttack succeeded');
+
+        if (hasTriggerRelease) {
+          try {
+            inst.triggerRelease();
+            logVerbose('triggerRelease succeeded');
+          } catch {
+            // Some synths error on release if envelope already finished
+            logVerbose('triggerRelease skipped (envelope may have completed)');
+          }
+        }
+      } else if (!hasTriggerAttack && !isSampleBased) {
+        throw new Error('Missing triggerAttack method - cannot produce audio');
+      } else if (isSampleBased) {
+        logVerbose('Skipping trigger test (sample-based synth, no loaded samples)');
+      }
+
+      // 3. Verify output node exists
+      if (inst.output === undefined || inst.output === null) {
+        throw new Error('Output node is null/undefined - cannot route audio');
+      }
+      logVerbose('Output node verified');
+    } else {
+      // Creation-only test (no --audio flag)
+      logVerbose(`Methods: connect=${hasConnect}, triggerAttack=${hasTriggerAttack}, triggerRelease=${hasTriggerRelease}`);
     }
 
     // Test dispose
-    if (typeof (instrument as any).dispose === 'function') {
-      (instrument as any).dispose();
+    if (typeof inst.dispose === 'function') {
+      inst.dispose();
       logVerbose('Disposed successfully');
     }
 
@@ -576,6 +613,14 @@ async function runTests() {
   log('');
   log(`Options: verbose=${VERBOSE}, audio=${TEST_AUDIO}, skip-furnace=${SKIP_FURNACE}, skip-buzz=${SKIP_BUZZ}`);
 
+  if (TEST_AUDIO) {
+    log('');
+    log('  --audio: Audio lifecycle smoke tests enabled.');
+    log('  NOTE: This exercises connect/trigger/release but cannot verify');
+    log('  actual audio output. Use the browser test runner for full');
+    log('  audio output verification (silent synth detection).');
+  }
+
   const startTime = Date.now();
 
   // Run tests
@@ -613,6 +658,17 @@ async function runTests() {
     }
     log('');
   }
+
+  // Note about audio testing scope
+  if (!TEST_AUDIO) {
+    log('  NOTE: Tests only verified synth creation/disposal.');
+    log('        Use --audio to also test audio lifecycle (connect/trigger/release).');
+    log('        Use the browser test runner for true audio output verification.');
+  } else {
+    log('  Audio lifecycle tests completed.');
+    log('  For true silent-synth detection, use the browser test runner.');
+  }
+  log('');
 
   // Exit code
   const exitCode = results.summary.failed > 0 ? 1 : 0;

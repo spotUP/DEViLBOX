@@ -1,0 +1,741 @@
+/**
+ * Roland SA Sound Generator - WASM Port for DEViLBOX
+ *
+ * Silicon-accurate emulation of the gate arrays found in the Roland CPU-B
+ * board of SA-synthesis digital pianos. Reverse engineered from silicon images.
+ *   - IC19 R06-0001 (Fujitsu MB60VH142) - Envelope controller
+ *   - IC9  R06-0002 (Fujitsu MB60V141)  - Phase accumulator
+ *   - IC8  R06-0003 (Fujitsu MB61V125)  - Sample mixer/interpolator
+ *
+ * 16 voices x 10 parts = 160 concurrent sample parts
+ * 3 wave ROMs (IC5, IC6, IC7) - 128KB each = 384KB total
+ *
+ * Original MAME source: src/devices/sound/roland_sa.cpp
+ * Copyright holders: giulioz (BSD-3-Clause)
+ *
+ * Used in: Roland HP-3000S, HP-2000, KR-33, and other SA-synthesis pianos
+ */
+
+#include <cstdint>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+#include <emscripten/bind.h>
+
+// BIT macro matching MAME
+#define BIT(x, n) (((x) >> (n)) & 1)
+
+static constexpr unsigned NUM_VOICES = 16;
+static constexpr unsigned PARTS_PER_VOICE = 10;
+static constexpr unsigned CTRL_MEM_SIZE = 0x2000;
+
+// ============================================================================
+// Hardcoded LUTs from MAME source (silicon-accurate)
+// ============================================================================
+
+// LUT for envelope speed (IC19)
+static const uint32_t env_table[256] = {
+    0x000000, 0x000023, 0x000026, 0x000029, 0x00002d, 0x000031, 0x000036,
+    0x00003b, 0x000040, 0x000046, 0x00004c, 0x000052, 0x00005a, 0x000062,
+    0x00006c, 0x000076, 0x000080, 0x00008c, 0x000098, 0x0000a4, 0x0000b4,
+    0x0000c4, 0x0000d8, 0x0000ec, 0x000104, 0x00011c, 0x000134, 0x00014c,
+    0x00016c, 0x00018c, 0x0001b4, 0x0001dc, 0x000200, 0x000230, 0x000260,
+    0x000290, 0x0002d0, 0x000310, 0x000360, 0x0003b0, 0x000400, 0x000460,
+    0x0004c0, 0x000520, 0x0005a0, 0x000620, 0x0006c0, 0x000760, 0x000800,
+    0x0008c0, 0x000980, 0x000a40, 0x000b40, 0x000c40, 0x000d80, 0x000ec0,
+    0x001000, 0x001180, 0x001300, 0x001480, 0x001680, 0x001880, 0x001b00,
+    0x001d80, 0x002000, 0x002300, 0x002600, 0x002900, 0x002d00, 0x003100,
+    0x003600, 0x003b00, 0x004000, 0x004600, 0x004c00, 0x005200, 0x005a00,
+    0x006200, 0x006c00, 0x007600, 0x008000, 0x008c00, 0x009800, 0x00a400,
+    0x00b400, 0x00c400, 0x00d800, 0x00ec00, 0x010000, 0x011800, 0x013000,
+    0x014800, 0x016800, 0x018800, 0x01b000, 0x01d800, 0x020000, 0x023000,
+    0x026000, 0x029000, 0x02d000, 0x031000, 0x036000, 0x03b000, 0x040000,
+    0x046000, 0x04c000, 0x052000, 0x05a000, 0x062000, 0x06c000, 0x076000,
+    0x080000, 0x08c000, 0x098000, 0x0a4000, 0x0b4000, 0x0c4000, 0x0d8000,
+    0x0ec000, 0x100000, 0x118000, 0x130000, 0x148000, 0x168000, 0x188000,
+    0x1b0000, 0x1d8000, 0x000000, 0x1fffdc, 0x1fffd9, 0x1fffd6, 0x1fffd2,
+    0x1fffce, 0x1fffc9, 0x1fffc4, 0x1fffbf, 0x1fffb9, 0x1fffb3, 0x1fffad,
+    0x1fffa5, 0x1fff9d, 0x1fff93, 0x1fff89, 0x1fff7f, 0x1fff73, 0x1fff67,
+    0x1fff5b, 0x1fff4b, 0x1fff3b, 0x1fff27, 0x1fff13, 0x1ffefb, 0x1ffee3,
+    0x1ffecb, 0x1ffeb3, 0x1ffe93, 0x1ffe73, 0x1ffe4b, 0x1ffe23, 0x1ffdff,
+    0x1ffdcf, 0x1ffd9f, 0x1ffd6f, 0x1ffd2f, 0x1ffcef, 0x1ffc9f, 0x1ffc4f,
+    0x1ffbff, 0x1ffb9f, 0x1ffb3f, 0x1ffadf, 0x1ffa5f, 0x1ff9df, 0x1ff93f,
+    0x1ff89f, 0x1ff7ff, 0x1ff73f, 0x1ff67f, 0x1ff5bf, 0x1ff4bf, 0x1ff3bf,
+    0x1ff27f, 0x1ff13f, 0x1fefff, 0x1fee7f, 0x1fecff, 0x1feb7f, 0x1fe97f,
+    0x1fe77f, 0x1fe4ff, 0x1fe27f, 0x1fdfff, 0x1fdcff, 0x1fd9ff, 0x1fd6ff,
+    0x1fd2ff, 0x1fceff, 0x1fc9ff, 0x1fc4ff, 0x1fbfff, 0x1fb9ff, 0x1fb3ff,
+    0x1fadff, 0x1fa5ff, 0x1f9dff, 0x1f93ff, 0x1f89ff, 0x1f7fff, 0x1f73ff,
+    0x1f67ff, 0x1f5bff, 0x1f4bff, 0x1f3bff, 0x1f27ff, 0x1f13ff, 0x1effff,
+    0x1ee7ff, 0x1ecfff, 0x1eb7ff, 0x1e97ff, 0x1e77ff, 0x1e4fff, 0x1e27ff,
+    0x1dffff, 0x1dcfff, 0x1d9fff, 0x1d6fff, 0x1d2fff, 0x1cefff, 0x1c9fff,
+    0x1c4fff, 0x1bffff, 0x1b9fff, 0x1b3fff, 0x1adfff, 0x1a5fff, 0x19dfff,
+    0x193fff, 0x189fff, 0x17ffff, 0x173fff, 0x167fff, 0x15bfff, 0x14bfff,
+    0x13bfff, 0x127fff, 0x113fff, 0x0fffff, 0x0e7fff, 0x0cffff, 0x0b7fff,
+    0x097fff, 0x077fff, 0x04ffff, 0x027fff
+};
+
+// LUT for bits 5/6/7/8 of the subphase (interpolation)
+static const uint16_t addr_table[16] = {
+    0x1e0, 0x080, 0x060, 0x04d, 0x040, 0x036, 0x02d, 0x026,
+    0x020, 0x01b, 0x016, 0x011, 0x00d, 0x00a, 0x006, 0x003
+};
+
+// ============================================================================
+// Parameter IDs for external control
+// ============================================================================
+enum ParamId {
+    PARAM_VOLUME = 0,
+    PARAM_PRESET = 1,
+    PARAM_ATTACK_SPEED = 2,
+    PARAM_RELEASE_SPEED = 3,
+    PARAM_WAVE_HIGH = 4,
+    PARAM_WAVE_LOOP = 5,
+};
+
+// ============================================================================
+// MIDI voice allocation
+// ============================================================================
+struct MIDIVoice {
+    bool active = false;
+    uint8_t midiNote = 0;
+    uint8_t velocity = 0;
+    bool releasing = false;
+};
+
+// ============================================================================
+// Preset definition
+// ============================================================================
+struct SAPreset {
+    uint8_t wave_addr_high;    // Upper wave ROM address
+    uint8_t wave_addr_loop;    // Loop point
+    uint8_t attack_speed;      // Envelope attack speed
+    uint8_t release_speed;     // Envelope release speed
+    uint8_t env_offset;        // Volume offset
+    uint8_t parts_used;        // How many parts per voice (1-10)
+    const char* name;
+};
+
+// Presets derived from typical Roland SA piano ROM layouts
+static const SAPreset sa_presets[] = {
+    { 0x00, 0xF0, 60, 0x8A, 0x00, 2, "Piano 1" },
+    { 0x10, 0xF0, 55, 0x88, 0x00, 2, "Piano 2" },
+    { 0x20, 0xF8, 50, 0x85, 0x00, 1, "E.Piano" },
+    { 0x30, 0xFC, 40, 0x84, 0x00, 1, "Organ" },
+    { 0x40, 0xF0, 30, 0x82, 0x00, 2, "Strings" },
+    { 0x50, 0xF8, 45, 0x86, 0x00, 1, "Choir" },
+    { 0x60, 0xF0, 55, 0x8C, 0x00, 1, "Harpsichord" },
+    { 0x70, 0xF0, 50, 0x88, 0x00, 1, "Vibes" },
+};
+static constexpr int NUM_PRESETS = 8;
+
+// ============================================================================
+// RolandSASynth class
+// ============================================================================
+class RolandSASynth {
+public:
+    RolandSASynth() {
+        memset(m_parts, 0, sizeof(m_parts));
+        memset(m_ctrl_mem, 0, sizeof(m_ctrl_mem));
+        memset(samples_exp, 0, sizeof(samples_exp));
+        memset(samples_exp_sign, 0, sizeof(samples_exp_sign));
+        memset(samples_delta, 0, sizeof(samples_delta));
+        memset(samples_delta_sign, 0, sizeof(samples_delta_sign));
+        memset(phase_exp_table, 0, sizeof(phase_exp_table));
+        memset(samples_exp_table, 0, sizeof(samples_exp_table));
+        for (auto& v : m_voices) {
+            v.active = false;
+            v.midiNote = 0;
+            v.velocity = 0;
+            v.releasing = false;
+        }
+    }
+
+    void initialize(float sampleRate) {
+        m_sampleRate = sampleRate;
+        // Native rate is 20kHz (or 32kHz), we resample
+        m_nativeRate = 20000.0f;
+        m_rateRatio = (double)m_nativeRate / (double)m_sampleRate;
+        m_phaseAccum = 0.0;
+        m_currentPreset = 0;
+        m_masterVolume = 0.8f;
+        m_romsLoaded = false;
+    }
+
+    // ========================================================================
+    // ROM loading - port of roland_sa_device::load_roms() verbatim
+    // ========================================================================
+    void loadROM(int romId, uintptr_t dataPtr, int size) {
+        uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+        if (romId < 0 || romId > 2 || size <= 0) return;
+
+        int copySize = std::min(size, (int)sizeof(m_rom[0]));
+        memcpy(m_rom[romId], data, copySize);
+        m_romSize[romId] = copySize;
+        m_romLoaded[romId] = true;
+
+        // If all 3 ROMs loaded, process them
+        if (m_romLoaded[0] && m_romLoaded[1] && m_romLoaded[2]) {
+            processROMs();
+        }
+    }
+
+    // ========================================================================
+    // Process ROMs - verbatim port from MAME roland_sa_device::load_roms()
+    // ========================================================================
+    void processROMs() {
+        uint8_t* ic5 = m_rom[0];
+        uint8_t* ic6 = m_rom[1];
+        uint8_t* ic7 = m_rom[2];
+
+        // ----------------------------------------------------------------
+        // Generate phase_exp_table[65536] - silicon-accurate from IC9/IC11
+        // ----------------------------------------------------------------
+        for (size_t i = 0; i < 0x10000; i++) {
+            // ROM IC11
+            uint16_t r11_pos = i % 4096;
+            uint16_t r11 = (uint16_t)round(exp2f(13.0f + r11_pos / 4096.0f) - 4096 * 2);
+            bool r11_12 = !((r11 >> 12) & 1);
+            bool r11_11 = !((r11 >> 11) & 1);
+            bool r11_10 = !((r11 >> 10) & 1);
+            bool r11_9 =  !((r11 >> 9) & 1);
+            bool r11_8 =  !((r11 >> 8) & 1);
+            bool r11_7 =  !((r11 >> 7) & 1);
+            bool r11_6 =  !((r11 >> 6) & 1);
+            bool r11_5 =  !((r11 >> 5) & 1);
+            bool r11_4 =  (r11 >> 4) & 1;
+            bool r11_3 =  (r11 >> 3) & 1;
+            bool r11_2 =  (r11 >> 2) & 1;
+            bool r11_1 =  (r11 >> 1) & 1;
+            bool r11_0 =  (r11 >> 0) & 1;
+
+            uint8_t pb0 = ((i / 0x1000) >> 0) & 1;
+            uint8_t pb1 = ((i / 0x1000) >> 1) & 1;
+            uint8_t pb2 = ((i / 0x1000) >> 2) & 1;
+            uint8_t pb3 = ((i / 0x1000) >> 3) & 1;
+
+            // Copy pasted from silicon (IC9 gate array)
+            bool b0 = (!r11_6 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_5 && pb0 && !pb1 && !pb2 && !pb3) || (r11_4 && !pb0 && pb1 && !pb2 && !pb3) || (r11_3 && pb0 && pb1 && !pb2 && !pb3) || (r11_2 && !pb0 && !pb1 && pb2 && !pb3) || (r11_1 && pb0 && !pb1 && pb2 && !pb3) || (r11_0 && !pb0 && pb1 && pb2 && !pb3) || (pb0 && !pb1 && !pb2 && pb3 && pb0 && pb1 && pb2 && !pb3);
+            bool b1 = (!r11_7 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_6 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_5 && !pb0 && pb1 && !pb2 && !pb3) || (r11_4 && pb0 && pb1 && !pb2 && !pb3) || (r11_3 && !pb0 && !pb1 && pb2 && !pb3) || (r11_2 && pb0 && !pb1 && pb2 && !pb3) || (r11_1 && !pb0 && pb1 && pb2 && !pb3) || (r11_0 && pb0 && pb1 && pb2 && !pb3);
+            bool b2 = !(!((!r11_8 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_7 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_6 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_5 && pb0 && pb1 && !pb2 && !pb3) || (r11_4 && !pb0 && !pb1 && pb2 && !pb3) || (r11_3 && pb0 && !pb1 && pb2 && !pb3) || (r11_2 && !pb0 && pb1 && pb2 && !pb3) || (r11_1 && pb0 && pb1 && pb2 && !pb3)) && !(r11_0 && !pb0 && !pb1 && !pb2 && pb3));
+            bool b3 = !(!((!r11_9 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_8 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_7 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_6 && pb0 && pb1 && !pb2 && !pb3) || (!r11_5 && !pb0 && !pb1 && pb2 && !pb3) || (r11_4 && pb0 && !pb1 && pb2 && !pb3) || (r11_3 && !pb0 && pb1 && pb2 && !pb3) || (r11_2 && pb0 && pb1 && pb2 && !pb3)) && !((r11_1 && !pb0 && !pb1 && !pb2 && pb3) || (r11_0 && pb0 && !pb1 && !pb2 && pb3)));
+            bool b4 = !(!((!r11_10 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_9 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_8 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_7 && pb0 && pb1 && !pb2 && !pb3) || (!r11_6 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_5 && pb0 && !pb1 && pb2 && !pb3) || (r11_4 && !pb0 && pb1 && pb2 && !pb3) || (r11_3 && pb0 && pb1 && pb2 && !pb3)) && !((r11_2 && !pb0 && !pb1 && !pb2 && pb3) || (r11_1 && pb0 && !pb1 && !pb2 && pb3) || (r11_0 && !pb0 && pb1 && !pb2 && pb3) || (0 && pb0 && pb1 && !pb2 && pb3)));
+            bool b5 = !(!((!r11_11 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_10 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_9 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_8 && pb0 && pb1 && !pb2 && !pb3) || (!r11_7 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_6 && pb0 && !pb1 && pb2 && !pb3) || (!r11_5 && !pb0 && pb1 && pb2 && !pb3) || (r11_4 && pb0 && pb1 && pb2 && !pb3)) && !((r11_3 && !pb0 && !pb1 && !pb2 && pb3) || (r11_2 && pb0 && !pb1 && !pb2 && pb3) || (r11_1 && !pb0 && pb1 && !pb2 && pb3) || (r11_0 && pb0 && pb1 && !pb2 && pb3)));
+            bool b6 = !(!((!r11_12 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_11 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_10 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_9 && pb0 && pb1 && !pb2 && !pb3) || (!r11_8 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_7 && pb0 && !pb1 && pb2 && !pb3) || (!r11_6 && !pb0 && pb1 && pb2 && !pb3) || (!r11_5 && pb0 && pb1 && pb2 && !pb3)) && !((r11_4 && !pb0 && !pb1 && !pb2 && pb3) || (r11_3 && pb0 && !pb1 && !pb2 && pb3) || (r11_2 && !pb0 && pb1 && !pb2 && pb3) || (r11_1 && pb0 && pb1 && !pb2 && pb3)));
+            bool b7 = !(!((1 && !pb0 && !pb1 && !pb2 && !pb3) || (!r11_12 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_11 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_10 && pb0 && pb1 && !pb2 && !pb3) || (!r11_9 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_8 && pb0 && !pb1 && pb2 && !pb3) || (!r11_7 && !pb0 && pb1 && pb2 && !pb3) || (!r11_6 && pb0 && pb1 && pb2 && !pb3)) && !((!r11_5 && !pb0 && !pb1 && !pb2 && pb3) || (r11_4 && pb0 && !pb1 && !pb2 && pb3) || (r11_3 && !pb0 && pb1 && !pb2 && pb3) || (r11_2 && pb0 && pb1 && !pb2 && pb3)));
+            bool b8 = !(!((0 && !pb0 && !pb1 && !pb2 && !pb3) || (1 && pb0 && !pb1 && !pb2 && !pb3) || (!r11_12 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_11 && pb0 && pb1 && !pb2 && !pb3) || (!r11_10 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_9 && pb0 && !pb1 && pb2 && !pb3) || (!r11_8 && !pb0 && pb1 && pb2 && !pb3) || (!r11_7 && pb0 && pb1 && pb2 && !pb3)) && !((!r11_6 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_5 && pb0 && !pb1 && !pb2 && pb3) || (r11_4 && !pb0 && pb1 && !pb2 && pb3) || (r11_3 && pb0 && pb1 && !pb2 && pb3)));
+            bool b9 = !(!((1 && !pb0 && pb1 && !pb2 && !pb3) || (!r11_12 && pb0 && pb1 && !pb2 && !pb3) || (!r11_11 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_10 && pb0 && !pb1 && pb2 && !pb3) || (!r11_9 && !pb0 && pb1 && pb2 && !pb3) || (!r11_8 && pb0 && pb1 && pb2 && !pb3) || (!r11_7 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_6 && pb0 && !pb1 && !pb2 && pb3)) && !((!r11_5 && !pb0 && pb1 && !pb2 && pb3) || (r11_4 && pb0 && pb1 && !pb2 && pb3)));
+            bool b10 = !(!((1 && pb0 && pb1 && !pb2 && !pb3) || (!r11_12 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_11 && pb0 && !pb1 && pb2 && !pb3) || (!r11_10 && !pb0 && pb1 && pb2 && !pb3) || (!r11_9 && pb0 && pb1 && pb2 && !pb3) || (!r11_8 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_7 && pb0 && !pb1 && !pb2 && pb3) || (!r11_6 && !pb0 && pb1 && !pb2 && pb3)) && !(!r11_5 && pb0 && pb1 && !pb2 && pb3));
+            bool b11 = (1 && !pb0 && !pb1 && pb2 && !pb3) || (!r11_12 && pb0 && !pb1 && pb2 && !pb3) || (!r11_11 && !pb0 && pb1 && pb2 && !pb3) || (!r11_10 && pb0 && pb1 && pb2 && !pb3) || (!r11_9 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_8 && pb0 && !pb1 && !pb2 && pb3) || (!r11_7 && !pb0 && pb1 && !pb2 && pb3) || (!r11_6 && pb0 && pb1 && !pb2 && pb3);
+            bool b12 = (0 && !pb0 && !pb1 && pb2 && !pb3) || (1 && pb0 && !pb1 && pb2 && !pb3) || (!r11_12 && !pb0 && pb1 && pb2 && !pb3) || (!r11_11 && pb0 && pb1 && pb2 && !pb3) || (!r11_10 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_9 && pb0 && !pb1 && !pb2 && pb3) || (!r11_8 && !pb0 && pb1 && !pb2 && pb3) || (!r11_7 && pb0 && pb1 && !pb2 && pb3);
+            bool b13 = (1 && !pb0 && pb1 && pb2 && !pb3) || (!r11_12 && pb0 && pb1 && pb2 && !pb3) || (!r11_11 && !pb0 && !pb1 && !pb2 && pb3) || (!r11_10 && pb0 && !pb1 && !pb2 && pb3) || (!r11_9 && !pb0 && pb1 && !pb2 && pb3) || (!r11_8 && pb0 && pb1 && !pb2 && pb3);
+            bool b14 = !(1 && !(1 && pb0 && pb1 && pb2 && !pb3) && !(!r11_12 && !pb0 && !pb1 && !pb2 && pb3) && !(!r11_11 && pb0 && !pb1 && !pb2 && pb3) && !(!r11_10 && !pb0 && pb1 && !pb2 && pb3) && !(!r11_9 && pb0 && pb1 && !pb2 && pb3));
+            bool b15 = !(!(!pb0 && !pb1 && !pb2 && pb3) && !(!r11_12 && pb0 && !pb1 && !pb2 && pb3) && !(!r11_11 && !pb0 && pb1 && !pb2 && pb3) && !(!r11_10 && pb0 && pb1 && !pb2 && pb3));
+            bool b16 = !(!(pb0 && !pb1 && !pb2 && pb3) && !(!r11_12 && !pb0 && pb1 && !pb2 && pb3) && !(!r11_11 && pb0 && pb1 && !pb2 && pb3));
+            bool b17 = !(!(!pb0 && pb1 && !pb2 && pb3) && !(!r11_12 && pb0 && pb1 && !pb2 && pb3));
+            bool b18 = pb0 && pb1 && !pb2 && pb3;
+
+            phase_exp_table[i] =
+                (uint32_t)b18 << 18 | (uint32_t)b17 << 17 | (uint32_t)b16 << 16 |
+                (uint32_t)b15 << 15 | (uint32_t)b14 << 14 | (uint32_t)b13 << 13 |
+                (uint32_t)b12 << 12 | (uint32_t)b11 << 11 | (uint32_t)b10 << 10 |
+                (uint32_t)b9 << 9 | (uint32_t)b8 << 8 | (uint32_t)b7 << 7 |
+                (uint32_t)b6 << 6 | (uint32_t)b5 << 5 | (uint32_t)b4 << 4 |
+                (uint32_t)b3 << 3 | (uint32_t)b2 << 2 | (uint32_t)b1 << 1 | (uint32_t)b0;
+        }
+
+        // ----------------------------------------------------------------
+        // Generate samples_exp_table[32768] - silicon-accurate from IC10
+        // ----------------------------------------------------------------
+        for (size_t i = 0; i < 0x8000; i++) {
+            uint16_t r10_pos = i % 1024;
+            uint16_t r10 = (uint16_t)round(exp2f(11.0f + (float)(~r10_pos & 0x3FF) / 1024.0f) - 1024);
+            bool r10_9 = BIT(r10, 0);
+            bool r10_8 = BIT(r10, 1);
+            bool r10_0 = BIT(r10, 2);
+            bool r10_1 = BIT(r10, 3);
+            bool r10_2 = BIT(r10, 4);
+            bool r10_3 = BIT(~r10, 5);
+            bool r10_4 = BIT(~r10, 6);
+            bool r10_5 = BIT(~r10, 7);
+            bool r10_6 = BIT(~r10, 8);
+            bool r10_7 = BIT(~r10, 9);
+
+            bool ws = i >= 0x4000;
+            uint8_t a0 = BIT(i / 0x400, 0);
+            uint8_t a1 = BIT(i / 0x400, 1);
+            uint8_t a2 = BIT(i / 0x400, 2);
+            uint8_t a3 = BIT(i / 0x400, 3);
+
+            // Copy pasted from silicon (IC10 ROM / IC8 gate array)
+            bool rb14 = !((!(!a3 && !a2 && !a1 && !a0) && !ws) || (!a3 && !a2 && !a1 && !a0 && ws));
+            bool rb13 = !((((!r10_7 && !a3 && !a2 && !a1 && !a0) || (!a3 && !a2 && !a1 && a0)) && ws) || (!((!r10_7 && !a3 && !a2 && !a1 && !a0) || (!a3 && !a2 && !a1 && a0)) && !ws));
+            bool rb12 = !((((!r10_6 && !a3 && !a2 && !a1 && !a0) || (!r10_7 && !a3 && !a2 && !a1 && a0) || (!a3 && !a2 && a1 && !a0)) && ws) || (!((!r10_6 && !a3 && !a2 && !a1 && !a0) || (!r10_7 && !a3 && !a2 && !a1 && a0) || (!a3 && !a2 && a1 && !a0)) && !ws));
+            bool rb11 = !((((!r10_5 && !a3 && !a2 && !a1 && !a0) || (!r10_6 && !a3 && !a2 && !a1 && a0) || (!r10_7 && !a3 && !a2 && a1 && !a0) || (1 && !a3 && !a2 && a1 && a0)) && ws) || (!((!r10_5 && !a3 && !a2 && !a1 && !a0) || (!r10_6 && !a3 && !a2 && !a1 && a0) || (!r10_7 && !a3 && !a2 && a1 && !a0) || (1 && !a3 && !a2 && a1 && a0)) && !ws));
+            bool rb10 = !((!((!r10_7 && !a3 && !a2 && a1 && a0) || (!r10_6 && !a3 && !a2 && a1 && !a0) || (!r10_5 && !a3 && !a2 && !a1 && a0) || (!r10_4 && !a3 && !a2 && !a1 && !a0)) && !(!a3 && a2 && !a1 && !a0) && !ws) || (!(!((!r10_7 && !a3 && !a2 && a1 && a0) || (!r10_6 && !a3 && !a2 && a1 && !a0) || (!r10_5 && !a3 && !a2 && !a1 && a0) || (!r10_4 && !a3 && !a2 && !a1 && !a0)) && !(!a3 && a2 && !a1 && !a0)) && ws));
+            bool rb9 = !((((1 && !a3 && a2 && !a1 && a0) || (!r10_7 && !a3 && a2 && !a1 && !a0) || (!r10_6 && !a3 && !a2 && a1 && a0) || (!r10_5 && !a3 && !a2 && a1 && !a0) || (!r10_4 && !a3 && !a2 && !a1 && a0) || (!r10_3 && !a3 && !a2 && !a1 && !a0)) && ws) || (!((1 && !a3 && a2 && !a1 && a0) || (!r10_7 && !a3 && a2 && !a1 && !a0) || (!r10_6 && !a3 && !a2 && a1 && a0) || (!r10_5 && !a3 && !a2 && a1 && !a0) || (!r10_4 && !a3 && !a2 && !a1 && a0) || (!r10_3 && !a3 && !a2 && !a1 && !a0)) && !ws));
+            bool rb8 = !((((1 && !a3 && a2 && a1 && !a0) || (!r10_7 && !a3 && a2 && !a1 && a0) || (!r10_6 && !a3 && a2 && !a1 && !a0) || (!r10_5 && !a3 && !a2 && a1 && a0) || (!r10_4 && !a3 && !a2 && a1 && !a0) || (!r10_3 && !a3 && !a2 && !a1 && a0) || (r10_2 && !a3 && !a2 && !a1 && !a0) || (1 && 0)) && ws) || (!((1 && !a3 && a2 && a1 && !a0) || (!r10_7 && !a3 && a2 && !a1 && a0) || (!r10_6 && !a3 && a2 && !a1 && !a0) || (!r10_5 && !a3 && !a2 && a1 && a0) || (!r10_4 && !a3 && !a2 && a1 && !a0) || (!r10_3 && !a3 && !a2 && !a1 && a0) || (r10_2 && !a3 && !a2 && !a1 && !a0) || (1 && 0)) && !ws));
+            bool rb7 = !((((1 && !a3 && a2 && a1 && a0) || (!r10_7 && !a3 && a2 && a1 && !a0) || (!r10_6 && !a3 && a2 && !a1 && a0) || (!r10_5 && !a3 && a2 && !a1 && !a0) || (!r10_4 && !a3 && !a2 && a1 && a0) || (!r10_3 && !a3 && !a2 && a1 && !a0) || (r10_2 && !a3 && !a2 && !a1 && a0) || (r10_1 && !a3 && !a2 && !a1 && !a0)) && ws) || (!((1 && !a3 && a2 && a1 && a0) || (!r10_7 && !a3 && a2 && a1 && !a0) || (!r10_6 && !a3 && a2 && !a1 && a0) || (!r10_5 && !a3 && a2 && !a1 && !a0) || (!r10_4 && !a3 && !a2 && a1 && a0) || (!r10_3 && !a3 && !a2 && a1 && !a0) || (r10_2 && !a3 && !a2 && !a1 && a0) || (r10_1 && !a3 && !a2 && !a1 && !a0)) && !ws));
+            bool rb6 = !((!((1 && a3 && !a2 && !a1 && !a0) || (!r10_7 && !a3 && a2 && a1 && a0) || (!r10_6 && !a3 && a2 && a1 && !a0) || (!r10_5 && !a3 && a2 && !a1 && a0) || (!r10_4 && !a3 && a2 && !a1 && !a0) || (!r10_3 && !a3 && !a2 && a1 && a0) || (r10_2 && !a3 && !a2 && a1 && !a0) || (r10_1 && !a3 && !a2 && !a1 && a0)) && !(r10_0 && !a3 && !a2 && !a1 && !a0) && !ws) || (!(!((1 && a3 && !a2 && !a1 && !a0) || (!r10_7 && !a3 && a2 && a1 && a0) || (!r10_6 && !a3 && a2 && a1 && !a0) || (!r10_5 && !a3 && a2 && !a1 && a0) || (!r10_4 && !a3 && a2 && !a1 && !a0) || (!r10_3 && !a3 && !a2 && a1 && a0) || (r10_2 && !a3 && !a2 && a1 && !a0) || (r10_1 && !a3 && !a2 && !a1 && a0)) && !(r10_0 && !a3 && !a2 && !a1 && !a0)) && ws));
+            bool rb5 = !((!((!r10_7 && a3 && !a2 && !a1 && !a0) || (!r10_6 && !a3 && a2 && a1 && a0) || (!r10_5 && !a3 && a2 && a1 && !a0) || (!r10_4 && !a3 && a2 && !a1 && a0) || (!r10_3 && !a3 && a2 && !a1 && !a0) || (r10_2 && !a3 && !a2 && a1 && a0) || (r10_1 && !a3 && !a2 && a1 && !a0) || (r10_0 && !a3 && !a2 && !a1 && a0)) && !((r10_9 && !a3 && !a2 && !a1 && !a0) || (a3 && !a2 && !a1 && a0)) && !ws) || (!(!((!r10_7 && a3 && !a2 && !a1 && !a0) || (!r10_6 && !a3 && a2 && a1 && a0) || (!r10_5 && !a3 && a2 && a1 && !a0) || (!r10_4 && !a3 && a2 && !a1 && a0) || (!r10_3 && !a3 && a2 && !a1 && !a0) || (r10_2 && !a3 && !a2 && a1 && a0) || (r10_1 && !a3 && !a2 && a1 && !a0) || (r10_0 && !a3 && !a2 && !a1 && a0)) && !((r10_9 && !a3 && !a2 && !a1 && !a0) || (a3 && !a2 && !a1 && a0))) && ws));
+            bool rb4 = !((!((r10_8 && !a3 && !a2 && !a1 && !a0) || (r10_9 && !a3 && !a2 && !a1 && a0) || (r10_0 && !a3 && !a2 && a1 && !a0) || (r10_1 && !a3 && !a2 && a1 && a0) || (r10_2 && !a3 && a2 && !a1 && !a0) || (!r10_3 && !a3 && a2 && !a1 && a0) || (!r10_4 && !a3 && a2 && a1 && !a0) || (!r10_5 && !a3 && a2 && a1 && a0)) && !((!r10_6 && a3 && !a2 && !a1 && !a0) || (!r10_7 && a3 && !a2 && !a1 && a0) || (a3 && !a2 && a1 && !a0)) && !ws) || (!(!((r10_8 && !a3 && !a2 && !a1 && !a0) || (r10_9 && !a3 && !a2 && !a1 && a0) || (r10_0 && !a3 && !a2 && a1 && !a0) || (r10_1 && !a3 && !a2 && a1 && a0) || (r10_2 && !a3 && a2 && !a1 && !a0) || (!r10_3 && !a3 && a2 && !a1 && a0) || (!r10_4 && !a3 && a2 && a1 && !a0) || (!r10_5 && !a3 && a2 && a1 && a0)) && !((!r10_6 && a3 && !a2 && !a1 && !a0) || (!r10_7 && a3 && !a2 && !a1 && a0) || (a3 && !a2 && a1 && !a0))) && ws));
+            bool rb3 = !((!((r10_8 && !a3 && !a2 && !a1 && a0) || (r10_9 && !a3 && !a2 && a1 && !a0) || (r10_0 && !a3 && !a2 && a1 && a0) || (r10_1 && !a3 && a2 && !a1 && !a0) || (r10_2 && !a3 && a2 && !a1 && a0) || (!r10_3 && !a3 && a2 && a1 && !a0) || (!r10_4 && !a3 && a2 && a1 && a0) || (!r10_5 && a3 && !a2 && !a1 && !a0)) && !((!r10_6 && a3 && !a2 && !a1 && a0) || (!r10_7 && a3 && !a2 && a1 && !a0) || (a3 && !a2 && a1 && a0)) && !ws) || (!(!((r10_8 && !a3 && !a2 && !a1 && a0) || (r10_9 && !a3 && !a2 && a1 && !a0) || (r10_0 && !a3 && !a2 && a1 && a0) || (r10_1 && !a3 && a2 && !a1 && !a0) || (r10_2 && !a3 && a2 && !a1 && a0) || (!r10_3 && !a3 && a2 && a1 && !a0) || (!r10_4 && !a3 && a2 && a1 && a0) || (!r10_5 && a3 && !a2 && !a1 && !a0)) && !((!r10_6 && a3 && !a2 && !a1 && a0) || (!r10_7 && a3 && !a2 && a1 && !a0) || (a3 && !a2 && a1 && a0))) && ws));
+            bool rb2 = !((!((r10_8 && !a3 && !a2 && a1 && !a0) || (r10_9 && !a3 && !a2 && a1 && a0) || (r10_0 && !a3 && a2 && !a1 && !a0) || (r10_1 && !a3 && a2 && !a1 && a0) || (r10_2 && !a3 && a2 && a1 && !a0) || (!r10_3 && !a3 && a2 && a1 && a0) || (!r10_4 && a3 && !a2 && !a1 && !a0) || (!r10_5 && a3 && !a2 && !a1 && a0)) && !((!r10_6 && a3 && !a2 && a1 && !a0) || (!r10_7 && a3 && !a2 && a1 && a0) || (a3 && a2 && !a1 && !a0)) && !ws) || (!(!((r10_8 && !a3 && !a2 && a1 && !a0) || (r10_9 && !a3 && !a2 && a1 && a0) || (r10_0 && !a3 && a2 && !a1 && !a0) || (r10_1 && !a3 && a2 && !a1 && a0) || (r10_2 && !a3 && a2 && a1 && !a0) || (!r10_3 && !a3 && a2 && a1 && a0) || (!r10_4 && a3 && !a2 && !a1 && !a0) || (!r10_5 && a3 && !a2 && !a1 && a0)) && !((!r10_6 && a3 && !a2 && a1 && !a0) || (!r10_7 && a3 && !a2 && a1 && a0) || (a3 && a2 && !a1 && !a0))) && ws));
+            bool rb1 = !((!((r10_8 && !a3 && !a2 && a1 && a0) || (r10_9 && !a3 && a2 && !a1 && !a0) || (r10_0 && !a3 && a2 && !a1 && a0) || (r10_1 && !a3 && a2 && a1 && !a0) || (r10_2 && !a3 && a2 && a1 && a0) || (!r10_3 && a3 && !a2 && !a1 && !a0) || (!r10_4 && a3 && !a2 && !a1 && a0) || (!r10_5 && a3 && !a2 && a1 && !a0)) && !((!r10_6 && a3 && !a2 && a1 && a0) || (!r10_7 && a3 && a2 && !a1 && !a0) || (a3 && a2 && !a1 && a0)) && !ws) || (!(!((r10_8 && !a3 && !a2 && a1 && a0) || (r10_9 && !a3 && a2 && !a1 && !a0) || (r10_0 && !a3 && a2 && !a1 && a0) || (r10_1 && !a3 && a2 && a1 && !a0) || (r10_2 && !a3 && a2 && a1 && a0) || (!r10_3 && a3 && !a2 && !a1 && !a0) || (!r10_4 && a3 && !a2 && !a1 && a0) || (!r10_5 && a3 && !a2 && a1 && !a0)) && !((!r10_6 && a3 && !a2 && a1 && a0) || (!r10_7 && a3 && a2 && !a1 && !a0) || (a3 && a2 && !a1 && a0))) && ws));
+            bool rb0 = !((!((r10_8 && !a3 && a2 && !a1 && !a0) || (r10_9 && !a3 && a2 && !a1 && a0) || (r10_0 && !a3 && a2 && a1 && !a0) || (r10_1 && !a3 && a2 && a1 && a0) || (r10_2 && a3 && !a2 && !a1 && !a0) || (!r10_3 && a3 && !a2 && !a1 && a0) || (!r10_4 && a3 && !a2 && a1 && !a0) || (!r10_5 && a3 && !a2 && a1 && a0)) && !((!r10_6 && a3 && a2 && !a1 && !a0) || (!r10_7 && a3 && a2 && !a1 && a0) || (a3 && a2 && a1 && !a0)) && !ws) || (!(!((r10_8 && !a3 && a2 && !a1 && !a0) || (r10_9 && !a3 && a2 && !a1 && a0) || (r10_0 && !a3 && a2 && a1 && !a0) || (r10_1 && !a3 && a2 && a1 && a0) || (r10_2 && a3 && !a2 && !a1 && !a0) || (!r10_3 && a3 && !a2 && !a1 && a0) || (!r10_4 && a3 && !a2 && a1 && !a0) || (!r10_5 && a3 && !a2 && a1 && a0)) && !((!r10_6 && a3 && a2 && !a1 && !a0) || (!r10_7 && a3 && a2 && !a1 && a0) || (a3 && a2 && a1 && !a0))) && ws));
+
+            samples_exp_table[i] =
+                (uint16_t)rb14 << 14 | (uint16_t)rb13 << 13 | (uint16_t)rb12 << 12 |
+                (uint16_t)rb11 << 11 | (uint16_t)rb10 << 10 | (uint16_t)rb9 << 9 |
+                (uint16_t)rb8 << 8 | (uint16_t)rb7 << 7 | (uint16_t)rb6 << 6 |
+                (uint16_t)rb5 << 5 | (uint16_t)rb4 << 4 | (uint16_t)rb3 << 3 |
+                (uint16_t)rb2 << 2 | (uint16_t)rb1 << 1 | (uint16_t)rb0;
+        }
+
+        // ----------------------------------------------------------------
+        // Decode wave ROM values - bit-scrambled from 3 ROMs
+        // ----------------------------------------------------------------
+        for (size_t i = 0; i < 0x20000; i++) {
+            const size_t di = i ^ 0x032A; // Address descrambling: XOR 0b0'00000011'00101010
+
+            const uint16_t exp_sample =
+                BIT( ic5[di], 0) << 13 |
+                BIT( ic6[di], 4) << 12 |
+                BIT( ic7[di], 4) << 11 |
+                BIT(~ic6[di], 0) << 10 |
+                BIT( ic7[di], 7) <<  9 |
+                BIT( ic5[di], 7) <<  8 |
+                BIT(~ic5[di], 5) <<  7 |
+                BIT( ic6[di], 2) <<  6 |
+                BIT( ic7[di], 2) <<  5 |
+                BIT( ic7[di], 1) <<  4 |
+                BIT(~ic5[di], 1) <<  3 |
+                BIT( ic5[di], 3) <<  2 |
+                BIT( ic6[di], 5) <<  1 |
+                BIT(~ic6[di], 7) <<  0;
+            const bool exp_sign = BIT(~ic7[di], 3);
+            samples_exp[i] = exp_sample;
+            samples_exp_sign[i] = exp_sign;
+
+            const uint16_t delta_sample =
+                BIT(~ic7[di], 6) << 8 |
+                BIT( ic5[di], 4) << 7 |
+                BIT( ic7[di], 0) << 6 |
+                BIT(~ic6[di], 3) << 5 |
+                BIT( ic5[di], 2) << 4 |
+                BIT(~ic5[di], 6) << 3 |
+                BIT( ic6[di], 6) << 2 |
+                BIT( ic7[di], 5) << 1 |
+                BIT(~ic6[di], 7) << 0;
+            const bool delta_sign = BIT(ic6[di], 1);
+            samples_delta[i] = delta_sample;
+            samples_delta_sign[i] = delta_sign;
+        }
+
+        m_romsLoaded = true;
+    }
+
+    // ========================================================================
+    // MIDI interface
+    // ========================================================================
+    void noteOn(int note, int velocity) {
+        if (!m_romsLoaded || velocity == 0) {
+            noteOff(note);
+            return;
+        }
+
+        // Find free voice (or steal oldest)
+        int voiceIdx = -1;
+        for (int i = 0; i < (int)NUM_VOICES; i++) {
+            if (!m_voices[i].active) {
+                voiceIdx = i;
+                break;
+            }
+        }
+        if (voiceIdx < 0) {
+            // Steal first releasing voice, or voice 0
+            for (int i = 0; i < (int)NUM_VOICES; i++) {
+                if (m_voices[i].releasing) {
+                    voiceIdx = i;
+                    break;
+                }
+            }
+            if (voiceIdx < 0) voiceIdx = 0;
+        }
+
+        m_voices[voiceIdx].active = true;
+        m_voices[voiceIdx].midiNote = note;
+        m_voices[voiceIdx].velocity = velocity;
+        m_voices[voiceIdx].releasing = false;
+
+        // Configure voice registers
+        const SAPreset& preset = sa_presets[m_currentPreset % NUM_PRESETS];
+        setupVoice(voiceIdx, note, velocity, preset);
+    }
+
+    void noteOff(int note) {
+        for (int i = 0; i < (int)NUM_VOICES; i++) {
+            if (m_voices[i].active && m_voices[i].midiNote == note && !m_voices[i].releasing) {
+                m_voices[i].releasing = true;
+                releaseVoice(i);
+            }
+        }
+    }
+
+    void allNotesOff() {
+        for (int i = 0; i < (int)NUM_VOICES; i++) {
+            if (m_voices[i].active) {
+                m_voices[i].releasing = true;
+                releaseVoice(i);
+            }
+        }
+    }
+
+    // ========================================================================
+    // Parameter control
+    // ========================================================================
+    void setParameter(int paramId, float value) {
+        switch (paramId) {
+            case PARAM_VOLUME:
+                m_masterVolume = std::max(0.0f, std::min(1.0f, value));
+                break;
+            case PARAM_PRESET:
+                m_currentPreset = std::max(0, std::min(NUM_PRESETS - 1, (int)value));
+                break;
+        }
+    }
+
+    void setVolume(float value) {
+        m_masterVolume = std::max(0.0f, std::min(1.0f, value));
+    }
+
+    void programChange(int program) {
+        m_currentPreset = std::max(0, std::min(NUM_PRESETS - 1, program));
+    }
+
+    void controlChange(int cc, int value) {
+        switch (cc) {
+            case 7: // Volume
+                m_masterVolume = value / 127.0f;
+                break;
+        }
+    }
+
+    void pitchBend(int value) {
+        m_pitchBend = value;
+    }
+
+    void setMode(int mode) {
+        // Could switch between 20kHz and 32kHz mode
+    }
+
+    // ========================================================================
+    // Audio processing - verbatim port of sound_stream_update()
+    // ========================================================================
+    void process(uintptr_t outputPtrL, uintptr_t outputPtrR, int numSamples) {
+        float* outL = reinterpret_cast<float*>(outputPtrL);
+        float* outR = reinterpret_cast<float*>(outputPtrR);
+
+        if (!m_romsLoaded) {
+            memset(outL, 0, numSamples * sizeof(float));
+            memset(outR, 0, numSamples * sizeof(float));
+            return;
+        }
+
+        // Process at native rate, then resample to output rate
+        for (int s = 0; s < numSamples; s++) {
+            // Accumulate fractional native samples
+            m_phaseAccum += m_rateRatio;
+
+            while (m_phaseAccum >= 1.0) {
+                m_phaseAccum -= 1.0;
+                processOneSample();
+            }
+
+            // Output current accumulated sample
+            float sample = m_outputAccum / 65536.0f;
+            sample *= m_masterVolume;
+            sample = std::max(-1.0f, std::min(1.0f, sample));
+
+            outL[s] = sample;
+            outR[s] = sample;
+
+            // Check for voices that have finished releasing
+            for (int i = 0; i < (int)NUM_VOICES; i++) {
+                if (m_voices[i].active && m_voices[i].releasing) {
+                    // Check if envelope has reached zero
+                    size_t memOff = i * 0x100;
+                    uint32_t envVal = m_parts[i][0].env_value;
+                    if (envVal < 0x100000) { // Envelope effectively silent
+                        m_voices[i].active = false;
+                        // Mute all parts
+                        for (int p = 0; p < (int)PARTS_PER_VOICE; p++) {
+                            m_ctrl_mem[memOff + p * 0x10 + 6] = 0x02; // flags: mute
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+private:
+    // ========================================================================
+    // Process one sample at native rate - verbatim from MAME
+    // ========================================================================
+    void processOneSample() {
+        m_outputAccum = 0;
+
+        for (size_t voiceI = 0; voiceI < NUM_VOICES; voiceI++) {
+            for (size_t partI = 0; partI < PARTS_PER_VOICE; partI++) {
+                SA_Part& part = m_parts[voiceI][partI];
+                size_t mem_offset = voiceI * 0x100 + partI * 0x10;
+                uint32_t pitch_lut_i     = m_ctrl_mem[mem_offset + 1] | (m_ctrl_mem[mem_offset + 0] << 8);
+                uint32_t wave_addr_loop  = m_ctrl_mem[mem_offset + 2];
+                uint32_t wave_addr_high  = m_ctrl_mem[mem_offset + 3];
+                uint32_t env_dest        = m_ctrl_mem[mem_offset + 4];
+                uint32_t env_speed       = m_ctrl_mem[mem_offset + 5];
+                uint32_t flags           = m_ctrl_mem[mem_offset + 6];
+                uint32_t env_offset      = m_ctrl_mem[mem_offset + 7];
+
+                uint32_t volume;
+                uint32_t waverom_addr;
+                bool ag3_sel_sample_type;
+                bool ag1_phase_hi;
+
+                // IC19 - Envelope controller
+                {
+                    bool env_speed_some_high =
+                        BIT(env_speed, 6) || BIT(env_speed, 5) || BIT(env_speed, 4) || BIT(env_speed, 3) ||
+                        BIT(env_speed, 2) || BIT(env_speed, 1) || BIT(env_speed, 0);
+
+                    uint32_t adder1_a = part.env_value;
+                    if (BIT(flags, 0)) {
+                        adder1_a = 1 << 25;
+                        m_ctrl_mem[mem_offset + 6] &= ~0x01; // Clear reset flag after consuming
+                    }
+                    uint32_t adder1_b = env_table[env_speed];
+                    bool adder1_ci = env_speed_some_high && BIT(env_speed, 7);
+                    if (adder1_ci)
+                        adder1_b |= 0x7f << 21;
+
+                    uint32_t adder3_o = 1 + (adder1_a >> 20) + env_offset;
+                    uint32_t adder3_of = adder3_o > 0xff;
+                    adder3_o &= 0xff;
+
+                    volume = ~(
+                        ((adder1_a >> 14) & 0b111111) |
+                        ((adder3_o & 0b1111) << 6) |
+                        (adder3_of ? ((adder3_o & 0b11110000) << 6) : 0)
+                    ) & 0x3fff;
+
+                    uint32_t adder1_o = adder1_a + adder1_b + (adder1_ci ? 1 : 0);
+                    uint32_t adder1_of = adder1_o > 0xfffffff;
+                    adder1_o &= 0xfffffff;
+
+                    uint32_t adder2_o = (adder1_o >> 20) + (~env_dest & 0xff) + 1;
+                    uint32_t adder2_of = adder2_o > 0xff;
+
+                    bool end_reached = env_speed_some_high && ((adder1_of != (BIT(env_speed, 7))) || ((BIT(env_speed, 7)) != adder2_of));
+
+                    part.env_value = end_reached ? (env_dest << 20) : adder1_o;
+                }
+
+                // IC9 - Phase accumulator
+                {
+                    uint32_t adder1 = (phase_exp_table[pitch_lut_i] + part.sub_phase) & 0xffffff;
+                    uint32_t adder2 = 1 + (adder1 >> 16) + ((~wave_addr_loop) & 0xff);
+                    bool adder2_co = adder2 > 0xff;
+                    adder2 &= 0xff;
+                    uint32_t adder1_and = BIT(flags, 1) ? 0 : (adder1 & 0xffff);
+                    adder1_and |= (BIT(flags, 1) ? 0 : (adder2_co ? adder2 : (adder1 >> 16))) << 16;
+
+                    part.sub_phase = adder1_and;
+                    waverom_addr = (wave_addr_high << 11) | ((part.sub_phase >> 9) & 0x7ff);
+
+                    ag3_sel_sample_type = BIT(waverom_addr, 16) || BIT(waverom_addr, 15) || BIT(waverom_addr, 14) ||
+                                       !((BIT(waverom_addr, 13) && !BIT(waverom_addr, 11) && !BIT(waverom_addr, 12)) || !BIT(waverom_addr, 13));
+                    ag1_phase_hi = (
+                        (BIT(pitch_lut_i, 15) && BIT(pitch_lut_i, 14)) ||
+                        (BIT(part.sub_phase, 23) || BIT(part.sub_phase, 22) || BIT(part.sub_phase, 21) || BIT(part.sub_phase, 20)) ||
+                        BIT(flags, 1)
+                    );
+                }
+
+                // IC8 - Sample mixer/interpolator
+                {
+                    uint32_t waverom_pa = samples_exp[waverom_addr & 0x1FFFF];
+                    uint32_t waverom_pb = samples_delta[waverom_addr & 0x1FFFF];
+                    bool sign_pa = samples_exp_sign[waverom_addr & 0x1FFFF];
+                    bool sign_pb = samples_delta_sign[waverom_addr & 0x1FFFF];
+                    waverom_pa |= ag3_sel_sample_type ? 1 : 0;
+                    waverom_pb |= ag3_sel_sample_type ? 0 : 1;
+
+                    if (ag1_phase_hi)
+                        volume |= 0b1111 << 10;
+
+                    uint32_t adder1_o = volume + waverom_pa;
+                    bool adder1_co = adder1_o > 0x3fff;
+                    adder1_o &= 0x3fff;
+                    if (adder1_co)
+                        adder1_o |= 0x3c00;
+                    uint32_t tmp_1 = adder1_o;
+
+                    uint32_t adder3_o = addr_table[(part.sub_phase >> 5) & 0xf] + (waverom_pb & 0x1ff);
+                    bool adder3_of = adder3_o > 0x1ff;
+                    adder3_o &= 0x1ff;
+                    if (adder3_of)
+                        adder3_o |= 0x1e0;
+
+                    adder1_o = volume + (adder3_o << 5);
+                    adder1_co = adder1_o > 0x3fff;
+                    adder1_o &= 0x3fff;
+                    if (adder1_co)
+                        adder1_o |= 0x3c00;
+                    uint32_t tmp_2 = adder1_o;
+
+                    int32_t exp_val1 = samples_exp_table[(16384 * (int)sign_pa) + (1024 * (tmp_1 >> 10)) + (tmp_1 & 1023)];
+                    int32_t exp_val2 = samples_exp_table[(16384 * (int)sign_pb) + (1024 * (tmp_2 >> 10)) + (tmp_2 & 1023)];
+                    if (sign_pa)
+                        exp_val1 = exp_val1 - 0x8000;
+                    if (sign_pb)
+                        exp_val2 = exp_val2 - 0x8000;
+                    int32_t exp_val = exp_val1 + exp_val2;
+
+                    m_outputAccum += exp_val;
+                }
+            }
+        }
+    }
+
+    // ========================================================================
+    // Voice setup helpers
+    // ========================================================================
+    void setupVoice(int voiceIdx, int midiNote, int velocity, const SAPreset& preset) {
+        size_t memOff = voiceIdx * 0x100;
+
+        // Convert MIDI note to pitch LUT index
+        // The phase_exp_table maps 16-bit pitch values to phase increments
+        // Middle C (60) should map to a reasonable playback speed
+        // Pitch LUT index: higher = faster playback
+        float noteHz = 440.0f * powf(2.0f, (midiNote - 69) / 12.0f);
+        // At 20kHz sample rate, a 1:1 playback would need ~441 for 440Hz
+        // The pitch LUT maps roughly logarithmically
+        uint16_t pitchIdx = (uint16_t)std::max(0.0f, std::min(65535.0f,
+            noteHz * 65536.0f / m_nativeRate));
+
+        // Velocity scaling for envelope offset (louder = lower offset = louder)
+        uint8_t velOffset = (uint8_t)((127 - velocity) / 2);
+
+        // Configure parts for this voice
+        for (int p = 0; p < (int)preset.parts_used && p < (int)PARTS_PER_VOICE; p++) {
+            size_t partOff = memOff + p * 0x10;
+
+            // Pitch (16-bit, big-endian in ctrl_mem)
+            m_ctrl_mem[partOff + 0] = (pitchIdx >> 8) & 0xFF;
+            m_ctrl_mem[partOff + 1] = pitchIdx & 0xFF;
+
+            // Wave address loop
+            m_ctrl_mem[partOff + 2] = preset.wave_addr_loop;
+
+            // Wave address high (offset each part slightly for richness)
+            m_ctrl_mem[partOff + 3] = preset.wave_addr_high + p;
+
+            // Envelope destination (full volume)
+            m_ctrl_mem[partOff + 4] = 0xFF;
+
+            // Envelope speed (attack - positive direction)
+            m_ctrl_mem[partOff + 5] = preset.attack_speed & 0x7F;
+
+            // Flags: bit 0 = reset env to center on first sample
+            m_ctrl_mem[partOff + 6] = 0x01;
+
+            // Env offset (velocity-dependent)
+            m_ctrl_mem[partOff + 7] = velOffset;
+
+            // Reset part state
+            m_parts[voiceIdx][p].sub_phase = 0;
+            m_parts[voiceIdx][p].env_value = 0;
+        }
+
+        // Mute unused parts
+        for (int p = preset.parts_used; p < (int)PARTS_PER_VOICE; p++) {
+            size_t partOff = memOff + p * 0x10;
+            m_ctrl_mem[partOff + 5] = 0; // speed = 0 (no envelope movement)
+            m_ctrl_mem[partOff + 6] = 0x02; // flags: mute
+        }
+        // Note: reset flag (0x01) is cleared by processOneSample() after consumption
+    }
+
+    void releaseVoice(int voiceIdx) {
+        size_t memOff = voiceIdx * 0x100;
+        const SAPreset& preset = sa_presets[m_currentPreset % NUM_PRESETS];
+
+        for (int p = 0; p < (int)preset.parts_used && p < (int)PARTS_PER_VOICE; p++) {
+            size_t partOff = memOff + p * 0x10;
+            // Set envelope to release (destination = 0, speed = negative/decaying)
+            m_ctrl_mem[partOff + 4] = 0x00; // env_dest = 0
+            m_ctrl_mem[partOff + 5] = preset.release_speed; // bit 7 set = negative direction
+        }
+    }
+
+    // ========================================================================
+    // Member data
+    // ========================================================================
+
+    // Part state (from MAME)
+    struct SA_Part {
+        uint32_t sub_phase;
+        uint32_t env_value;
+    };
+
+    SA_Part m_parts[NUM_VOICES][PARTS_PER_VOICE];
+    uint8_t m_ctrl_mem[CTRL_MEM_SIZE];
+
+    // Decoded ROM data
+    uint16_t samples_exp[0x20000];
+    bool samples_exp_sign[0x20000];
+    uint16_t samples_delta[0x20000];
+    bool samples_delta_sign[0x20000];
+
+    // Pre-computed LUTs
+    uint32_t phase_exp_table[0x10000];
+    uint16_t samples_exp_table[0x8000];
+
+    // Raw ROM storage
+    uint8_t m_rom[3][0x20000]; // 3 ROMs x 128KB
+    int m_romSize[3] = {0, 0, 0};
+    bool m_romLoaded[3] = {false, false, false};
+    bool m_romsLoaded = false;
+
+    // MIDI voice state
+    MIDIVoice m_voices[NUM_VOICES];
+
+    // Audio state
+    float m_sampleRate = 44100.0f;
+    float m_nativeRate = 20000.0f;
+    double m_rateRatio = 0.0;
+    double m_phaseAccum = 0.0;
+    int32_t m_outputAccum = 0;
+    float m_masterVolume = 0.8f;
+    int m_currentPreset = 0;
+    int m_pitchBend = 0;
+};
+
+// ============================================================================
+// Emscripten bindings
+// ============================================================================
+EMSCRIPTEN_BINDINGS(RolandSA) {
+    emscripten::class_<RolandSASynth>("RolandSASynth")
+        .constructor<>()
+        .function("initialize", &RolandSASynth::initialize)
+        .function("loadROM", &RolandSASynth::loadROM)
+        .function("noteOn", &RolandSASynth::noteOn)
+        .function("noteOff", &RolandSASynth::noteOff)
+        .function("allNotesOff", &RolandSASynth::allNotesOff)
+        .function("setParameter", &RolandSASynth::setParameter)
+        .function("setVolume", &RolandSASynth::setVolume)
+        .function("programChange", &RolandSASynth::programChange)
+        .function("controlChange", &RolandSASynth::controlChange)
+        .function("pitchBend", &RolandSASynth::pitchBend)
+        .function("setMode", &RolandSASynth::setMode)
+        .function("process", &RolandSASynth::process);
+}

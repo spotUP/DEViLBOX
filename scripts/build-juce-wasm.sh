@@ -78,6 +78,13 @@ cmake --build . --target OBXdWASM --parallel || {
     exit 1
 }
 
+# Build RdPiano
+echo -e "${YELLOW}Building RdPiano (Roland SA)...${NC}"
+cmake --build . --target RdPianoWASM --parallel || {
+    echo -e "${RED}RdPiano build failed${NC}"
+    exit 1
+}
+
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Build Complete!${NC}"
@@ -88,5 +95,7 @@ echo "  - $PUBLIC_DIR/dexed/Dexed.js"
 echo "  - $PUBLIC_DIR/dexed/Dexed.wasm"
 echo "  - $PUBLIC_DIR/obxd/OBXd.js"
 echo "  - $PUBLIC_DIR/obxd/OBXd.wasm"
+echo "  - $PUBLIC_DIR/rdpiano/RdPiano.js"
+echo "  - $PUBLIC_DIR/rdpiano/RdPiano.wasm"
 echo ""
 echo "Don't forget to restart the dev server!"

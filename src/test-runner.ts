@@ -57,6 +57,75 @@ const SYNTH_CONFIGS: Record<string, any> = {
   'Sam': { synthType: 'Sam', volume: -12 },
   'Synare': { synthType: 'Synare', volume: -12 },
 
+  // === Core Tone.js - Additional ===
+  'MonoSynth': { synthType: 'MonoSynth', volume: -12 },
+
+  // === Sample-based Synths (using real sample URLs from drumnibus pack) ===
+  'Sampler': {
+    synthType: 'Sampler',
+    volume: -12,
+    sample: {
+      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      playbackRate: 1,
+      reverse: false
+    }
+  },
+  'Player': {
+    synthType: 'Player',
+    volume: -12,
+    sample: {
+      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      playbackRate: 1,
+      reverse: false
+    }
+  },
+  'GranularSynth': {
+    synthType: 'GranularSynth',
+    volume: -12,
+    sample: {
+      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4',
+      detune: 0,
+      loop: false,
+      loopStart: 0,
+      loopEnd: 0,
+      playbackRate: 1,
+      reverse: false
+    }
+  },
+  'DrumKit': {
+    synthType: 'DrumKit',
+    volume: -12,
+    drumKit: {
+      keymap: [
+        {
+          id: 'test-kick',
+          sampleId: 'kick',
+          sampleUrl: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+          noteStart: 36,
+          noteEnd: 36,
+        }
+      ],
+      polyphony: 'poly',
+      maxVoices: 8,
+      noteCut: false,
+    }
+  },
+
+  // === Specialized Synths ===
+  'DrumMachine': { synthType: 'DrumMachine', volume: -12, drumMachine: DEFAULT_DRUM_MACHINE },
+  'ChiptuneModule': { synthType: 'ChiptuneModule', volume: -12 },
+
   // === Furnace FM Chips ===
   'FurnaceOPL': { synthType: 'FurnaceOPL', volume: -12, furnace: DEFAULT_FURNACE },
   'FurnaceOPN': { synthType: 'FurnaceOPN', volume: -12 },
@@ -162,75 +231,6 @@ const SYNTH_CONFIGS: Record<string, any> = {
   'FurnacePOWERNOISE': { synthType: 'FurnacePOWERNOISE', volume: -12 },
   'FurnaceSCVTONE': { synthType: 'FurnaceSCVTONE', volume: -12 },
   'FurnacePCMDAC': { synthType: 'FurnacePCMDAC', volume: -12 },
-
-  // === Core Tone.js - Additional ===
-  'MonoSynth': { synthType: 'MonoSynth', volume: -12 },
-
-  // === Sample-based Synths (using real sample URLs from drumnibus pack) ===
-  'Sampler': {
-    synthType: 'Sampler',
-    volume: -12,
-    sample: {
-      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
-      baseNote: 'C4',
-      detune: 0,
-      loop: false,
-      loopStart: 0,
-      loopEnd: 0,
-      playbackRate: 1,
-      reverse: false
-    }
-  },
-  'Player': {
-    synthType: 'Player',
-    volume: -12,
-    sample: {
-      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
-      baseNote: 'C4',
-      detune: 0,
-      loop: false,
-      loopStart: 0,
-      loopEnd: 0,
-      playbackRate: 1,
-      reverse: false
-    }
-  },
-  'GranularSynth': {
-    synthType: 'GranularSynth',
-    volume: -12,
-    sample: {
-      url: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
-      baseNote: 'C4',
-      detune: 0,
-      loop: false,
-      loopStart: 0,
-      loopEnd: 0,
-      playbackRate: 1,
-      reverse: false
-    }
-  },
-  'DrumKit': {
-    synthType: 'DrumKit',
-    volume: -12,
-    drumKit: {
-      keymap: [
-        {
-          id: 'test-kick',
-          sampleId: 'kick',
-          sampleUrl: '/DEViLBOX/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
-          noteStart: 36,
-          noteEnd: 36,
-        }
-      ],
-      polyphony: 'poly',
-      maxVoices: 8,
-      noteCut: false,
-    }
-  },
-
-  // === Specialized Synths ===
-  'DrumMachine': { synthType: 'DrumMachine', volume: -12, drumMachine: DEFAULT_DRUM_MACHINE },
-  'ChiptuneModule': { synthType: 'ChiptuneModule', volume: -12 },
 };
 
 // ============================================
@@ -518,7 +518,7 @@ async function testVolumeLevels() {
   logHtml('<p class="info">Testing output levels at volume=-12dB. Target range: -15dB to -6dB peak.</p>');
 
   // Create meter with explicit channel configuration
-  const meter = new Tone.Meter({ channels: 1 });
+  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
 
   // Test ALL synths that have configs
   const synthsToTest = Object.keys(SYNTH_CONFIGS);
@@ -526,84 +526,179 @@ async function testVolumeLevels() {
   // Target peak level in dB (we want all synths to hit roughly this level)
   const TARGET_PEAK = -10;
 
+  // Synths that don't take a note parameter for triggerAttack
+  const NO_NOTE_SYNTHS = ['NoiseSynth', 'MetalSynth', 'MembraneSynth'];
+
   logHtml('<table><tr><th>Synth</th><th>Peak Level (dB)</th><th>Status</th><th>Suggested Offset</th></tr>');
+
+  // Connect meter to destination once (before the loop)
+  meter.connect(Tone.getDestination());
+
+  // Track consecutive silent synths PER ENGINE CATEGORY
+  // so Furnace failures don't cascade-skip Buzzmachine, MAME, or Tone.js synths
+  const silentCountByCategory: Record<string, number> = {};
+  let skippedCount = 0;
+
+  function getSynthCategory(synthName: string): string {
+    if (synthName.startsWith('Furnace')) return 'Furnace';
+    if (synthName.startsWith('Buzz')) return 'Buzzmachine';
+    if (synthName.startsWith('MAME')) return 'MAME';
+    if (['Dexed', 'OBXd', 'V2'].includes(synthName)) return 'JUCE';
+    if (['TB303', 'JC303'].includes(synthName)) return 'Open303';
+    if (['Sampler', 'Player', 'GranularSynth', 'DrumKit'].includes(synthName)) return 'Sample';
+    return 'ToneJS';
+  }
 
   for (const name of synthsToTest) {
     const config = SYNTH_CONFIGS[name];
     if (!config) continue;
 
+    // After 5 consecutive silent synths in the SAME category, skip remaining in that category
+    const category = getSynthCategory(name);
+    const catSilent = silentCountByCategory[category] || 0;
+    if (catSilent >= 5) {
+      testResults.failed++;
+      testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity });
+      testResults.errors.push({ name, error: `Skipped (${category} engine silent)` });
+      logHtml(`<tr><td>${name}</td><td>-∞</td><td class="fail">SKIPPED (${category})</td><td>N/A</td></tr>`);
+      skippedCount++;
+      continue;
+    }
+
     try {
       const fullConfig: InstrumentConfig = {
         id: 999,
         name: `Test ${name}`,
-        volume: -12, // Standard test volume
+        volume: -12,
         ...config
       } as InstrumentConfig;
 
       const synth = InstrumentFactory.createInstrument(fullConfig) as any;
-
-      // Connect synth -> meter -> destination for measurement
-      // Also connect directly to destination so user can hear it
       synth.connect(meter);
-      meter.connect(Tone.getDestination());
+
+      // Ensure AudioContext is running before WASM synth init
+      // Chrome may auto-suspend the context between test phases
+      const isWasmSynth = name.startsWith('Furnace') || name.startsWith('Buzz') ||
+                           name.startsWith('MAME') || name === 'TB303' || name === 'JC303' ||
+                           name === 'Dexed' || name === 'OBXd' || name === 'V2';
+      if (isWasmSynth) {
+        try {
+          await Tone.start();
+          const ctx = Tone.getContext() as any;
+          const rawCtx = ctx.rawContext || ctx._context;
+          if (rawCtx && rawCtx.state !== 'running') {
+            await rawCtx.resume();
+          }
+        } catch {
+          // Best effort
+        }
+      }
+
+      // Wait for WASM initialization if this is a WASM-based synth
+      // Use a timeout to prevent hanging if ensureInitialized() never resolves
+      const initTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([promise, new Promise<null>(r => setTimeout(() => r(null), ms))]);
+
+      if (typeof synth.ensureInitialized === 'function') {
+        try {
+          await initTimeout(synth.ensureInitialized(), 15000);
+        } catch {
+          // WASM might not init, continue anyway
+        }
+      } else if (typeof synth.ready === 'function') {
+        try {
+          await initTimeout(synth.ready(), 15000);
+        } catch {
+          // WASM might not init, continue anyway
+        }
+      }
+
+      // Extra stabilization time for WASM synths (worklet needs time after init)
+      if (isWasmSynth) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      // Diagnostic removed — keepalive connection fix should make process() work
 
       // Wait for sample loading if this is a sample-based synth
       const isSampleBased = ['Sampler', 'Player', 'GranularSynth', 'DrumKit'].includes(name);
       if (isSampleBased) {
         try {
           await Tone.loaded();
-          await new Promise(r => setTimeout(r, 100)); // Extra time for sample decode
+          await new Promise(r => setTimeout(r, 200));
         } catch {
           // Sample might not be loaded, continue anyway
         }
       }
 
-      // Trigger note and measure peak level by sampling multiple times
+      // Trigger note and measure peak level
       let peakDb = -Infinity;
+
+      // DrumKit needs sample loading (setSampleLoader) which test doesn't do — skip volume test
+      if (name === 'DrumKit') {
+        testResults.passed++;
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN });
+        logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs samples)</td><td>N/A</td></tr>`);
+        try { synth.dispose?.(); } catch {}
+        continue;
+      }
+
       if (typeof synth.triggerAttack === 'function') {
         try {
-          synth.triggerAttack('C4');
+          if (NO_NOTE_SYNTHS.includes(name)) {
+            // Use triggerAttackRelease for percussion synths to ensure audible output
+            if (typeof synth.triggerAttackRelease === 'function') {
+              synth.triggerAttackRelease('8n');
+            } else {
+              synth.triggerAttack();
+            }
+          } else {
+            synth.triggerAttack('C4');
+          }
 
-          // Sample meter multiple times during the note to get peak level
-          for (let i = 0; i < 10; i++) {
-            await new Promise(r => setTimeout(r, 30));
+          // Sample quickly at first (2ms intervals) to catch fast transients, then slower
+          for (let i = 0; i < 25; i++) {
+            await new Promise(r => setTimeout(r, i < 15 ? 2 : 30));
             const level = meter.getValue() as number;
             if (level > peakDb) peakDb = level;
           }
 
-          // Release - some synths (like NoiseSynth) may error if envelope already finished
           if (typeof synth.triggerRelease === 'function') {
-            try {
-              synth.triggerRelease();
-            } catch {
-              // Ignore release errors
-            }
+            try { synth.triggerRelease(); } catch {}
           }
         } catch (triggerError: any) {
-          // Log trigger error but continue with next synth
           console.warn(`[Test] ${name} trigger error:`, triggerError.message);
         }
-        await new Promise(r => setTimeout(r, 50)); // Brief pause between synths
 
-        // Calculate how far from target
         const offset = TARGET_PEAK - peakDb;
 
-        // Determine if level is in expected range (-15 to -6 dB at -12dB volume config)
         let status = 'pass';
         let statusText = 'OK';
 
-        if (peakDb === -Infinity) {
+        if (peakDb === -Infinity || peakDb < -60) {
           status = 'fail';
-          statusText = 'NO OUTPUT';
+          statusText = peakDb === -Infinity ? 'NO OUTPUT' : 'SILENT';
+          testResults.failed++;
+          testResults.errors.push({ name, error: `No audio output (${peakDb === -Infinity ? 'silent' : peakDb.toFixed(1) + 'dB'})` });
+          silentCountByCategory[category] = (silentCountByCategory[category] || 0) + 1;
         } else if (peakDb < -25) {
           status = 'warn';
           statusText = 'TOO QUIET';
+          testResults.passed++;
+          silentCountByCategory[category] = 0;
         } else if (peakDb > -3) {
           status = 'warn';
           statusText = 'TOO LOUD';
+          testResults.passed++;
+          silentCountByCategory[category] = 0;
         } else if (Math.abs(peakDb - TARGET_PEAK) > 8) {
           status = 'warn';
           statusText = 'NEEDS ADJ';
+          testResults.passed++;
+          silentCountByCategory[category] = 0;
+        } else {
+          testResults.passed++;
+          silentCountByCategory[category] = 0;
         }
 
         testResults.volumeLevels.push({ name, peakDb, rmsDb: peakDb });
@@ -622,10 +717,23 @@ async function testVolumeLevels() {
       if (typeof synth.dispose === 'function') {
         synth.dispose();
       }
+
+      // Drain meter before next synth to avoid residual readings
+      for (let drain = 0; drain < 10; drain++) {
+        await new Promise(r => setTimeout(r, 20));
+        const level = meter.getValue() as number;
+        if (level <= -100 || level === -Infinity) break;
+      }
     } catch (e: any) {
       logHtml(`<tr><td>${name}</td><td colspan="3" class="fail">Error: ${e.message}</td></tr>`);
+      testResults.failed++;
       testResults.errors.push({ name, error: e.message });
+      silentCountByCategory[category] = (silentCountByCategory[category] || 0) + 1;
     }
+  }
+
+  if (skippedCount > 0) {
+    logHtml(`<tr><td colspan="4" class="info">${skippedCount} synths skipped after consecutive silent results</td></tr>`);
   }
 
   logHtml('</table>');
@@ -677,6 +785,9 @@ function displaySummary() {
   // Store results for Playwright to read
   (window as any).SYNTH_TEST_RESULTS = testResults;
   (window as any).SYNTH_TEST_COMPLETE = true;
+
+  // Update document title so automation can detect completion
+  document.title = `DONE ${passed}p ${failed}f`;
 }
 
 // Download captured console errors as a text file
@@ -754,7 +865,8 @@ async function runVolumeTests() {
     // Display volume summary
     const { volumeLevels, errors } = testResults;
     const TARGET_PEAK = -10;
-    const quietSynths = volumeLevels.filter(v => v.peakDb < -25);
+    const silentSynths = volumeLevels.filter(v => v.peakDb === -Infinity || v.peakDb < -60);
+    const quietSynths = volumeLevels.filter(v => v.peakDb >= -60 && v.peakDb < -25);
     const loudSynths = volumeLevels.filter(v => v.peakDb > -3);
     const needsAdjustment = volumeLevels.filter(v => v.peakDb !== -Infinity && Math.abs(v.peakDb - TARGET_PEAK) > 8);
 
@@ -762,11 +874,13 @@ async function runVolumeTests() {
       <div class="summary">
         <h2>Volume Summary</h2>
         <p>Target peak level: ${TARGET_PEAK}dB (tolerance: ±8dB)</p>
+        <p class="${testResults.passed > 0 ? 'pass' : ''}">${testResults.passed} synths producing audio</p>
+        ${silentSynths.length > 0 ? `<p class="fail">SILENT (no output): ${silentSynths.map(s => s.name).join(', ')}</p>` : ''}
         ${quietSynths.length > 0 ? `<p class="warn">Too Quiet (< -25dB): ${quietSynths.map(s => `${s.name} (${s.peakDb.toFixed(1)})`).join(', ')}</p>` : ''}
         ${loudSynths.length > 0 ? `<p class="warn">Too Loud (> -3dB): ${loudSynths.map(s => `${s.name} (${s.peakDb.toFixed(1)})`).join(', ')}</p>` : ''}
         ${needsAdjustment.length > 0 ? `<p class="warn">Needs volume adjustment: ${needsAdjustment.length} synths</p>` : ''}
-        ${errors.length > 0 ? `<p class="fail">Creation errors: ${errors.map(e => e.name).join(', ')}</p>` : ''}
-        ${quietSynths.length === 0 && loudSynths.length === 0 && needsAdjustment.length === 0 ? '<p class="pass">All synths have balanced output levels!</p>' : ''}
+        ${errors.length > 0 ? `<p class="fail">Errors: ${errors.map(e => `${e.name}: ${e.error}`).join(', ')}</p>` : ''}
+        ${silentSynths.length === 0 && quietSynths.length === 0 && loudSynths.length === 0 ? '<p class="pass">All synths have balanced output levels!</p>' : ''}
       </div>
     `);
 

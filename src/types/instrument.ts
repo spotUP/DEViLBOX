@@ -126,6 +126,33 @@ export type SynthType =
   | 'BuzzDynamite6'    // MadBrain Dynamite6 (additive)
   | 'BuzzM3'           // Makk M3 (dual-osc synth)
   | 'Buzz3o3'          // Oomek Aggressor 3o3 (TB-303 clone)
+  | 'Buzz3o3DF'        // Oomek Aggressor Devil Fish (enhanced 303)
+  | 'BuzzM4'           // Makk M4 (100-waveform wavetable synth)
+  // MAME Hardware-Accurate Synths
+  | 'MAMEAICA'         // Sega AICA (Dreamcast/Naomi)
+  | 'MAMEASC'          // Apple Sound Chip (IIGS/Mac)
+  | 'MAMEAstrocade'    // Bally Astrocade custom sound
+  | 'MAMEC352'         // Namco C352 (arcade PCM, needs ROM)
+  | 'MAMEES5503'       // Ensoniq ES5503 DOC (32-osc wavetable)
+  | 'MAMEICS2115'      // ICS WaveFront (32-voice, needs ROM)
+  | 'MAMEK054539'      // Konami 054539 (arcade PCM, needs ROM)
+  | 'MAMEMEA8000'      // Philips MEA8000 (LPC speech)
+  | 'MAMEMSM5232'      // OKI MSM5232 (8-voice organ/synth)
+  | 'MAMERF5C400'      // Ricoh RF5C400 (32-voice PCM, needs ROM)
+  | 'MAMERolandSA'     // Roland SA (silicon-accurate piano, needs ROM)
+  | 'MAMESN76477'      // TI SN76477 (complex sound generator)
+  | 'MAMESNKWave'      // SNK custom wavetable
+  | 'MAMESP0250'       // GI SP0250 (speech synthesis)
+  | 'MAMETIA'          // Atari 2600 TIA (MAME native)
+  | 'MAMETMS36XX'      // TI TMS36XX (electronic organ)
+  | 'MAMETMS5220'      // TI TMS5220 Speak & Spell (LPC speech)
+  | 'MAMETR707'        // Roland TR-707 (PCM drum machine, needs ROM)
+  | 'MAMEUPD931'       // NEC uPD931 (speech synthesis)
+  | 'MAMEUPD933'       // NEC uPD933 (raw CZ phase distortion chip)
+  | 'MAMEVotrax'       // Votrax SC-01 (classic speech)
+  | 'MAMEYMF271'       // Yamaha OPX (12-voice FM+PCM)
+  | 'MAMEYMOPQ'        // Yamaha OPQ (YM3806 FM)
+  | 'MAMEVASynth'      // Virtual Analog modeling synth
   | 'MAMEVFX'          // Ensoniq VFX (ES5506)
   | 'MAMEDOC'          // Ensoniq ESQ-1 (ES5503)
   | 'MAMERSA'          // Roland SA (MKS-20/RD-1000)
@@ -1291,6 +1318,7 @@ export type BuzzmachineType =
   | 'MadBrain4FM2F'
   | 'MadBrainDynamite6'
   | 'MakkM3'
+  | 'MakkM4'
   | 'CyanPhaseDTMF'
   | 'ElenzilFrequencyBomb';
 
@@ -1968,6 +1996,36 @@ export const DEFAULT_OBXD: OBXdConfig = {
   drift: 0.02,
 };
 
+// ===== RdPiano (Roland SA-synthesis Digital Piano) =====
+
+export interface RdPianoConfig {
+  patch: number;           // 0-15 patch index
+  chorusEnabled: boolean;  // Space-D BBD chorus
+  chorusRate: number;      // 0-14
+  chorusDepth: number;     // 0-14
+  efxEnabled: boolean;     // Phaser EFX toggle
+  phaserRate: number;      // 0.0-1.0
+  phaserDepth: number;     // 0.0-1.0
+  tremoloEnabled: boolean;
+  tremoloRate: number;     // 0-14
+  tremoloDepth: number;    // 0-14
+  volume: number;          // 0.0-1.0
+}
+
+export const DEFAULT_RDPIANO: RdPianoConfig = {
+  patch: 0,
+  chorusEnabled: true,
+  chorusRate: 5,
+  chorusDepth: 14,
+  efxEnabled: false,
+  phaserRate: 0.4,
+  phaserDepth: 0.8,
+  tremoloEnabled: false,
+  tremoloRate: 6,
+  tremoloDepth: 6,
+  volume: 1.0,
+};
+
 export type AudioEffectType =
   | 'Distortion'
   | 'Reverb'
@@ -2019,7 +2077,9 @@ export type AudioEffectType =
   | 'BuzzWhiteChorus'  // WhiteNoise White Chorus
   | 'BuzzZfilter'      // Q Zfilter
   | 'BuzzChorus2'      // FSM Chorus 2
-  | 'BuzzPanzerDelay'; // FSM Panzer Delay
+  | 'BuzzPanzerDelay'  // FSM Panzer Delay
+  | 'SpaceyDelayer'    // WASM SpaceyDelayer multitap tape delay
+  | 'RETapeEcho';      // WASM RE-150/201 tape echo
 
 export type EffectCategory = 'tonejs' | 'neural';
 
@@ -2623,6 +2683,7 @@ export interface InstrumentConfig {
   // JUCE WASM Synths
   dexed?: Partial<DexedConfig>;
   obxd?: Partial<OBXdConfig>;
+  rdpiano?: Partial<RdPianoConfig>;
   // Drumkit/Keymap (multi-sample)
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
@@ -2680,15 +2741,15 @@ export const DEFAULT_TB303: TB303Config = {
     type: 'sawtooth',
   },
   filter: {
-    cutoff: 800,
-    resonance: 65,
+    cutoff: 1000,
+    resonance: 50,
   },
   filterEnvelope: {
-    envMod: 60,
-    decay: 200,
+    envMod: 25,
+    decay: 1000,
   },
   accent: {
-    amount: 70,
+    amount: 0,
   },
   slide: {
     time: 60,

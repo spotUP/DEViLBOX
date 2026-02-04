@@ -179,6 +179,9 @@ const CursorCaret: React.FC<{
     case 'slide':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
       break;
+    case 'probability':
+      caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
+      break;
   }
 
   // When channel is collapsed, cursor can only be on note column
@@ -201,6 +204,9 @@ const CursorCaret: React.FC<{
     caretWidth = CHAR_WIDTH;
   } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
     caretWidth = ACCENT_WIDTH;
+  } else if (cursor.columnType === 'probability') {
+    caretX += cursor.digitIndex * CHAR_WIDTH;
+    caretWidth = CHAR_WIDTH;
   }
 
   return (

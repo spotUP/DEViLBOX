@@ -5,6 +5,7 @@ import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceRegisterMapper } from '../lib/import/formats/FurnaceRegisterMapper';
 import { FurnacePitchUtils } from '../lib/import/formats/FurnacePitchUtils';
 import { reportSynthError } from '../stores/useSynthErrorStore';
+import { getNativeAudioNode } from '../utils/audio-context';
 
 /**
  * FurnaceSynth - Accurate FM Engine for Furnace Tracker Instruments
@@ -74,15 +75,31 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
     // If init is in progress, wait for it to complete
     if (this.initInProgress) {
-      // Poll until init completes (max 2 seconds)
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 200; i++) {
         await new Promise(resolve => setTimeout(resolve, 50));
         if (this.useWasmEngine || !this.initInProgress) break;
       }
-      return;
+      if (this.useWasmEngine) return;
     }
 
+    // Init not in progress and WASM not ready — try (re)initializing
     await this.initEngine();
+
+    // If chipEngine initialized but useWasmEngine wasn't set (race), check directly
+    if (!this.useWasmEngine && this.chipEngine.isInitialized()) {
+      try {
+        const workletOutput = this.chipEngine.getOutput();
+        const target = getNativeAudioNode(this.outputGain);
+        if (target) {
+          workletOutput.connect(target);
+          this.useWasmEngine = true;
+          this.updateParameters();
+          console.log('[FurnaceSynth] ✓ Late WASM connection in ensureInitialized');
+        }
+      } catch (err) {
+        console.warn('[FurnaceSynth] Late WASM connection failed:', err);
+      }
+    }
   }
 
   private async initEngine(): Promise<void> {
@@ -134,8 +151,24 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
       // Check if WASM engine is actually available
       if (this.chipEngine.isInitialized()) {
-        // WASM chip engine outputs directly to its own AudioContext destination
-        // We don't connect to Tone.js - just mark as ready to use WASM
+        // Route worklet audio through FurnaceSynth's output gain for proper
+        // Tone.js signal chain integration (volume control, effects, metering).
+        // Uses the same getNativeAudioNode() pattern as BuzzmachineGenerator:
+        // SAC AudioWorkletNode.connect(SAC GainNode) → SAC handles native routing internally.
+        try {
+          const workletOutput = this.chipEngine.getOutput();
+          const target = getNativeAudioNode(this.outputGain);
+          if (!target) {
+            throw new Error('Could not resolve outputGain to an audio node');
+          }
+          workletOutput.connect(target);
+          console.log('[FurnaceSynth] ✓ Worklet connected to outputGain');
+        } catch (connectErr) {
+          console.error('[FurnaceSynth] Worklet→outputGain connection failed:', connectErr);
+          this.reportInitError('audio', `Could not connect WASM worklet to audio output: ${connectErr}`);
+          this.initInProgress = false;
+          return;
+        }
         this.useWasmEngine = true;
         console.log('[FurnaceSynth] ✓ WASM chip engine ready, chipType:', this.config.chipType);
 
@@ -957,6 +990,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     // 2. Write Key ON (chip-specific)
     console.log(`[FurnaceSynth.triggerAttack] Writing KEY ON`);
     this.writeKeyOn(velocity);
+    this.wasmNoteTriggered = true;
 
     // 3. Process first macro tick
     this.processTick(scheduledTime);

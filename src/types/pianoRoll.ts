@@ -41,7 +41,12 @@ export interface PianoRollViewState {
   snapToGrid: boolean;       // Snap note positions to grid
   gridDivision: number;      // Grid subdivision (1, 2, 4, 8, 16)
   showVelocity: boolean;     // Show velocity bars on notes
+  showVelocityLane: boolean; // Show velocity editing lane at bottom
   channelIndex: number;      // Currently edited channel
+  multiChannel: boolean;     // Show all channels simultaneously
+  scaleKey: string;          // Scale constraint key (e.g., 'chromatic', 'major')
+  scaleRoot: number;         // Scale root note (0-11, C=0)
+  noteLengthPreset: number;  // Default note length in rows (0 = use grid division)
 }
 
 /**
@@ -54,20 +59,42 @@ export type PianoRollEditOperation =
   | { type: 'resize'; noteId: string; newEndRow: number }
   | { type: 'velocity'; noteIds: string[]; newVelocity: number }
   | { type: 'slide'; noteIds: string[]; slide: boolean }      // TB-303: Toggle slide
-  | { type: 'accent'; noteIds: string[]; accent: boolean };   // TB-303: Toggle accent
+  | { type: 'accent'; noteIds: string[]; accent: boolean }    // TB-303: Toggle accent
+  | { type: 'quantize'; noteIds: string[]; gridDivision: number };
+
+/**
+ * Clipboard state for copy/paste
+ */
+export interface PianoRollClipboard {
+  notes: PianoRollNote[];
+  minRow: number;          // Minimum startRow in the copied notes
+  minNote: number;         // Minimum midiNote in the copied notes
+}
 
 /**
  * Mouse drag state for note editing
  */
 export interface DragState {
   isDragging: boolean;
-  mode: 'none' | 'move' | 'resize-start' | 'resize-end' | 'select-box' | 'draw';
+  mode: 'none' | 'move' | 'resize-start' | 'resize-end' | 'select-box' | 'draw' | 'velocity';
   startX: number;
   startY: number;
   currentX: number;
   currentY: number;
   noteId: string | null;     // Note being dragged (for move/resize)
   originalNotes: PianoRollNote[]; // Notes state before drag
+}
+
+/**
+ * Context menu state
+ */
+export interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  noteId: string | null;    // Note that was right-clicked (null = grid)
+  row: number;
+  midiNote: number;
 }
 
 /**
@@ -81,7 +108,12 @@ export const DEFAULT_PIANO_ROLL_VIEW: PianoRollViewState = {
   snapToGrid: true,
   gridDivision: 4,           // Quarter note grid
   showVelocity: true,
+  showVelocityLane: false,
   channelIndex: 0,
+  multiChannel: false,
+  scaleKey: 'chromatic',
+  scaleRoot: 0,              // C
+  noteLengthPreset: 0,       // Use grid division
 };
 
 /**
@@ -116,3 +148,16 @@ export function isBlackKey(midiNote: number): boolean {
   const noteInOctave = midiNote % 12;
   return [1, 3, 6, 8, 10].includes(noteInOctave);
 }
+
+/**
+ * Note length presets (in rows)
+ */
+export const NOTE_LENGTH_PRESETS = [
+  { label: 'Grid', value: 0 },
+  { label: '1/32', value: 1 },
+  { label: '1/16', value: 2 },
+  { label: '1/8', value: 4 },
+  { label: '1/4', value: 8 },
+  { label: '1/2', value: 16 },
+  { label: '1/1', value: 32 },
+];

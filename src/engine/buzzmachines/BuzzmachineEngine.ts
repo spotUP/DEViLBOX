@@ -54,6 +54,7 @@ export const BuzzmachineType = {
   MADBRAIN_4FM2F: 'MadBrain4FM2F',
   MADBRAIN_DYNAMITE6: 'MadBrainDynamite6',
   MAKK_M3: 'MakkM3',
+  MAKK_M4: 'MakkM4',
   CYANPHASE_DTMF: 'CyanPhaseDTMF',
   ELENZIL_FREQUENCYBOMB: 'ElenzilFrequencyBomb',
 } as const;
@@ -461,6 +462,13 @@ export const BUZZMACHINE_INFO: Record<BuzzmachineType, BuzzmachineInfo> = {
     type: 'generator',
     parameters: [],
   },
+  [BuzzmachineType.MAKK_M4]: {
+    name: 'Makk M4',
+    shortName: 'M4',
+    author: 'Makk',
+    type: 'generator',
+    parameters: [],
+  },
   // New distortion/saturation effects
   [BuzzmachineType.ELAK_DIST2]: {
     name: 'Elak Dist2',
@@ -670,19 +678,53 @@ export class BuzzmachineEngine {
       const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
       this.nativeContext = nativeCtx;
 
-      // Check if AudioWorklet is available
-      if (!nativeCtx.audioWorklet) {
-        throw new Error('AudioWorklet not supported in this context');
+      // Check if we got a valid context with AudioWorklet
+      if (!nativeCtx || !nativeCtx.audioWorklet) {
+        console.warn('[BuzzmachineEngine] No AudioWorklet on context, type:', typeof nativeCtx,
+          'rawContext:', typeof ctx.rawContext, '_context:', typeof ctx._context);
+        this.initPromise = null; // Allow retry
+        return;
+      }
+
+      // Ensure context is running - try to resume, then wait up to 5s
+      if (nativeCtx.state !== 'running') {
+        console.log('[BuzzmachineEngine] AudioContext state:', nativeCtx.state, '- attempting resume');
+        try {
+          await nativeCtx.resume();
+        } catch {
+          // Ignore resume errors
+        }
+        if (nativeCtx.state !== 'running') {
+          console.log('[BuzzmachineEngine] Waiting up to 5s for AudioContext to start...');
+          const started = await Promise.race([
+            new Promise<boolean>((resolve) => {
+              const check = () => {
+                if (nativeCtx.state === 'running') resolve(true);
+                else setTimeout(check, 100);
+              };
+              setTimeout(check, 100);
+            }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
+          ]);
+          if (!started) {
+            console.warn('[BuzzmachineEngine] AudioContext not running after 5s wait');
+            this.initPromise = null; // Allow retry
+            return;
+          }
+          console.log('[BuzzmachineEngine] AudioContext became running');
+        }
       }
 
       // Register AudioWorklet module (use BASE_URL for GitHub Pages compatibility)
       const baseUrl = import.meta.env.BASE_URL || '/';
-      await nativeCtx.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js`);
+      const cacheBuster = `?v=${Date.now()}`;
+      await nativeCtx.audioWorklet.addModule(`${baseUrl}Buzzmachine.worklet.js${cacheBuster}`);
       console.log('[BuzzmachineEngine] AudioWorklet registered');
 
       this.isLoaded = true;
     } catch (err) {
       console.error('[BuzzmachineEngine] Init failed:', err);
+      this.initPromise = null; // Allow retry on failure
       throw err;
     }
   }
@@ -812,6 +854,7 @@ export class BuzzmachineEngine {
       [BuzzmachineType.MADBRAIN_4FM2F]: 'MadBrain_4FM2F',
       [BuzzmachineType.MADBRAIN_DYNAMITE6]: 'MadBrain_Dynamite6',
       [BuzzmachineType.MAKK_M3]: 'Makk_M3',
+      [BuzzmachineType.MAKK_M4]: 'Makk_M4',
       [BuzzmachineType.CYANPHASE_DTMF]: 'CyanPhase_DTMF',
       [BuzzmachineType.ELENZIL_FREQUENCYBOMB]: 'Elenzil_FrequencyBomb',
     };

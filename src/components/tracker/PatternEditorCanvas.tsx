@@ -384,17 +384,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     effTyp: number,
     eff: number,
     accent?: boolean,
-    slide?: boolean
+    slide?: boolean,
+    probability?: number
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}-${accent ? 'A' : ''}-${slide ? 'S' : ''}`;
+    const key = `${instrument}-${volume}-${effTyp}-${eff}-${accent ? 'A' : ''}-${slide ? 'S' : ''}-p${probability ?? 'x'}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
 
     // TB-303 accent/slide adds 2 columns
     const hasAcidColumns = accent !== undefined || slide !== undefined;
+    const hasProb = probability !== undefined && probability > 0;
     const canvas = document.createElement('canvas');
-    canvas.width = CHAR_WIDTH * 9 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0);
+    canvas.width = CHAR_WIDTH * 9 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -434,6 +436,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       // Slide - cyan/blue for active
       ctx.fillStyle = slide ? '#06b6d4' : colors.textMuted;
       ctx.fillText(slide ? 'S' : '.', x, y);
+      x += CHAR_WIDTH + 4;
+    }
+
+    // Probability column (if present)
+    if (hasProb) {
+      const clampedProb = Math.min(99, Math.max(0, probability!));
+      const probColor = clampedProb >= 75 ? '#4ade80' : clampedProb >= 50 ? '#facc15' : clampedProb >= 25 ? '#fb923c' : '#f87171';
+      ctx.fillStyle = probColor;
+      ctx.fillText(clampedProb.toString(10).padStart(2, '0'), x, y);
     }
 
     paramCacheRef.current[key] = canvas;
@@ -611,7 +622,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           cell.effTyp || 0,
           cell.eff || 0,
           cell.accent,
-          cell.slide
+          cell.slide,
+          cell.probability
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 

@@ -53,6 +53,22 @@ export class MAMESynth extends Tone.ToneAudioNode {
     this.initEngine();
   }
 
+  /**
+   * Wait for WASM engine to initialize - used by test runner
+   */
+  public async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) return;
+    if (this.initInProgress) {
+      // Poll until init completes (max 10s)
+      for (let i = 0; i < 200; i++) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (this.isInitialized || !this.initInProgress) break;
+      }
+      return;
+    }
+    await this.initEngine();
+  }
+
   private async initEngine(): Promise<void> {
     if (this.initInProgress || this.isInitialized) return;
     this.initInProgress = true;

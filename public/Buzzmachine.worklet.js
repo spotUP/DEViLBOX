@@ -325,7 +325,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       'FSMKick', 'FSMKickXP',
       'JeskolaNoise', 'JeskolaTrilok',
       'MadBrain4FM2F', 'MadBrainDynamite6',
-      'MakkM3', 'OomekAggressor'
+      'MakkM3', 'MakkM4', 'OomekAggressor'
     ];
     return generators.some(g => machineType && machineType.includes(g));
   }
@@ -625,6 +625,21 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
           this.writeByte(this.globalValsPtr + 5, 0x40);   // acclevel default
           this.writeByte(this.globalValsPtr + 6, 0x64);   // finetune = 100 (center, 0 cents)
           this.writeByte(this.globalValsPtr + 7, 0x64);   // volume = 100%
+
+          // Devil Fish extra params (offsets 8-16) - only for DF variant
+          if (machineType.includes('OomekAggressorDF')) {
+            this.writeByte(this.globalValsPtr + 8, 0x40);   // accentDecay default
+            this.writeByte(this.globalValsPtr + 9, 0x60);   // vegDecay default (longer than filter decay)
+            this.writeByte(this.globalValsPtr + 10, 0x00);  // vegSustain = 0 (normal 303)
+            this.writeByte(this.globalValsPtr + 11, 0x00);  // softAttack = 0 (0.3ms, normal 303)
+            this.writeByte(this.globalValsPtr + 12, 0x00);  // filterTracking = 0 (off)
+            this.writeByte(this.globalValsPtr + 13, 0xFF);  // highResonance = no value (keep current/off)
+            this.writeByte(this.globalValsPtr + 14, 0x1E);  // slideTime = 30 (~60ms, original 303)
+            this.writeByte(this.globalValsPtr + 15, 0x00);  // muffler = 0 (off)
+            this.writeByte(this.globalValsPtr + 16, 0x01);  // sweepSpeed = 1 (normal)
+            console.log('[BuzzmachineWorklet] OomekAggressorDF Devil Fish params initialized');
+          }
+
           this.aggressorInitialized = true;
           console.log('[BuzzmachineWorklet] OomekAggressor global params initialized');
         }

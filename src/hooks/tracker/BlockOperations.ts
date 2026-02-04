@@ -6,8 +6,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
-// Types imported for future use
-// import type { TrackerCell, BlockSelection } from '@typedefs';
+import type { TrackerCell } from '@typedefs';
+
+/** Which cell columns block operations should affect */
+export interface ContentMask {
+  note: boolean;
+  instrument: boolean;
+  volume: boolean;
+  effect: boolean;
+  effect2: boolean;
+}
+
+export const DEFAULT_CONTENT_MASK: ContentMask = {
+  note: true,
+  instrument: true,
+  volume: true,
+  effect: true,
+  effect2: true,
+};
 
 export interface BlockOperationsState {
   blockStartMarked: boolean;
@@ -248,6 +264,244 @@ export const useBlockOperations = () => {
   );
 
   /**
+   * Reverse selection - flip row order within block
+   */
+  const reverseBlock = useCallback(() => {
+    const bounds = getBlockBounds();
+    if (!bounds) return;
+
+    const rowCount = bounds.endRow - bounds.startRow + 1;
+    if (rowCount < 2) return;
+
+    // Collect all cells in the block
+    const snapshot: TrackerCell[][] = [];
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const channelCells: TrackerCell[] = [];
+      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+        channelCells.push({ ...pattern.channels[ch].rows[row] });
+      }
+      snapshot.push(channelCells);
+    }
+
+    // Write back in reverse order
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const chIdx = ch - bounds.startChannel;
+      for (let i = 0; i < rowCount; i++) {
+        const srcCell = snapshot[chIdx][rowCount - 1 - i];
+        setCell(ch, bounds.startRow + i, {
+          note: srcCell.note,
+          instrument: srcCell.instrument,
+          volume: srcCell.volume,
+          effTyp: srcCell.effTyp,
+          eff: srcCell.eff,
+          effect2: srcCell.effect2,
+          accent: srcCell.accent,
+          slide: srcCell.slide,
+        });
+      }
+    }
+
+    console.log('Block reversed');
+  }, [getBlockBounds, pattern, setCell]);
+
+  /**
+   * Expand block - double the content by inserting empty rows between each row
+   * Rows beyond the pattern end are clipped
+   */
+  const expandBlock = useCallback(() => {
+    const bounds = getBlockBounds();
+    if (!bounds) return;
+
+    const rowCount = bounds.endRow - bounds.startRow + 1;
+    const patternLength = pattern.channels[0]?.rows.length || 64;
+
+    // Snapshot the block
+    const snapshot: TrackerCell[][] = [];
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const channelCells: TrackerCell[] = [];
+      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+        channelCells.push({ ...pattern.channels[ch].rows[row] });
+      }
+      snapshot.push(channelCells);
+    }
+
+    // Write expanded: original rows at even positions, clear odd positions
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const chIdx = ch - bounds.startChannel;
+      for (let i = 0; i < rowCount * 2; i++) {
+        const destRow = bounds.startRow + i;
+        if (destRow >= patternLength) break;
+
+        if (i % 2 === 0) {
+          // Original row
+          const srcCell = snapshot[chIdx][i / 2];
+          setCell(ch, destRow, {
+            note: srcCell.note,
+            instrument: srcCell.instrument,
+            volume: srcCell.volume,
+            effTyp: srcCell.effTyp,
+            eff: srcCell.eff,
+            effect2: srcCell.effect2,
+            accent: srcCell.accent,
+            slide: srcCell.slide,
+          });
+        } else {
+          // Empty row
+          setCell(ch, destRow, {
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effTyp: 0,
+            eff: 0,
+            effect2: undefined,
+            accent: false,
+            slide: false,
+          });
+        }
+      }
+    }
+
+    if (rowCount * 2 > patternLength - bounds.startRow) {
+      console.warn(`Block expand: content clipped at pattern end (${patternLength} rows)`);
+    }
+    console.log('Block expanded');
+  }, [getBlockBounds, pattern, setCell]);
+
+  /**
+   * Shrink block - compress content by removing every other row
+   */
+  const shrinkBlock = useCallback(() => {
+    const bounds = getBlockBounds();
+    if (!bounds) return;
+
+    const rowCount = bounds.endRow - bounds.startRow + 1;
+    if (rowCount < 2) return;
+
+    // Snapshot the block
+    const snapshot: TrackerCell[][] = [];
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const channelCells: TrackerCell[] = [];
+      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+        channelCells.push({ ...pattern.channels[ch].rows[row] });
+      }
+      snapshot.push(channelCells);
+    }
+
+    // Write shrunk: take every other row, clear the rest
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const chIdx = ch - bounds.startChannel;
+      for (let i = 0; i < rowCount; i++) {
+        const destRow = bounds.startRow + i;
+        const srcIdx = i * 2;
+        if (srcIdx < rowCount) {
+          const srcCell = snapshot[chIdx][srcIdx];
+          setCell(ch, destRow, {
+            note: srcCell.note,
+            instrument: srcCell.instrument,
+            volume: srcCell.volume,
+            effTyp: srcCell.effTyp,
+            eff: srcCell.eff,
+            effect2: srcCell.effect2,
+            accent: srcCell.accent,
+            slide: srcCell.slide,
+          });
+        } else {
+          // Clear remaining rows
+          setCell(ch, destRow, {
+            note: 0,
+            instrument: 0,
+            volume: 0,
+            effTyp: 0,
+            eff: 0,
+            effect2: undefined,
+            accent: false,
+            slide: false,
+          });
+        }
+      }
+    }
+
+    console.log('Block shrunk');
+  }, [getBlockBounds, pattern, setCell]);
+
+  /**
+   * Math operation on block values (volume or effect parameter)
+   */
+  const mathBlock = useCallback(
+    (op: 'add' | 'sub' | 'mul' | 'div', value: number, column: 'volume' | 'eff') => {
+      const bounds = getBlockBounds();
+      if (!bounds) return;
+
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+          const cell = pattern.channels[ch].rows[row];
+          const current = cell[column] as number;
+          if (current === 0 && column === 'volume') continue; // skip empty volume
+
+          let result: number;
+          switch (op) {
+            case 'add': result = current + value; break;
+            case 'sub': result = current - value; break;
+            case 'mul': result = Math.round(current * value); break;
+            case 'div': result = value !== 0 ? Math.round(current / value) : current; break;
+          }
+
+          const max = column === 'volume' ? 0x50 : 0xFF;
+          result = Math.max(0, Math.min(max, result));
+          setCell(ch, row, { [column]: result });
+        }
+      }
+
+      console.log(`Block math: ${op} ${value} on ${column}`);
+    },
+    [getBlockBounds, pattern, setCell]
+  );
+
+  /**
+   * Duplicate block in-place - repeat selection content to fill remaining pattern
+   */
+  const duplicateBlock = useCallback(() => {
+    const bounds = getBlockBounds();
+    if (!bounds) return;
+
+    const rowCount = bounds.endRow - bounds.startRow + 1;
+    const patternLength = pattern.channels[0]?.rows.length || 64;
+
+    // Snapshot the block
+    const snapshot: TrackerCell[][] = [];
+    for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+      const channelCells: TrackerCell[] = [];
+      for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+        channelCells.push({ ...pattern.channels[ch].rows[row] });
+      }
+      snapshot.push(channelCells);
+    }
+
+    // Repeat from end of block to end of pattern
+    let writeRow = bounds.endRow + 1;
+    while (writeRow < patternLength) {
+      for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
+        const chIdx = ch - bounds.startChannel;
+        const srcIdx = (writeRow - bounds.endRow - 1) % rowCount;
+        const srcCell = snapshot[chIdx][srcIdx];
+        setCell(ch, writeRow, {
+          note: srcCell.note,
+          instrument: srcCell.instrument,
+          volume: srcCell.volume,
+          effTyp: srcCell.effTyp,
+          eff: srcCell.eff,
+          effect2: srcCell.effect2,
+          accent: srcCell.accent,
+          slide: srcCell.slide,
+        });
+      }
+      writeRow++;
+    }
+
+    console.log(`Block duplicated (${rowCount} rows repeated to end)`);
+  }, [getBlockBounds, pattern, setCell]);
+
+  /**
    * Handle keyboard shortcuts
    */
   useEffect(() => {
@@ -315,6 +569,20 @@ export const useBlockOperations = () => {
         transposeBlock(-1);
         return;
       }
+
+      // Alt+R - Reverse block
+      if (e.altKey && e.key.toLowerCase() === 'r' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        reverseBlock();
+        return;
+      }
+
+      // Alt+D - Duplicate block
+      if (e.altKey && e.key.toLowerCase() === 'd' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        duplicateBlock();
+        return;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -329,6 +597,8 @@ export const useBlockOperations = () => {
     cutBlock,
     clearBlock,
     transposeBlock,
+    reverseBlock,
+    duplicateBlock,
     selection,
   ]);
 
@@ -347,5 +617,10 @@ export const useBlockOperations = () => {
     transposeBlock,
     amplifyBlock,
     interpolateBlock,
+    reverseBlock,
+    expandBlock,
+    shrinkBlock,
+    mathBlock,
+    duplicateBlock,
   };
 };

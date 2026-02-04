@@ -131,9 +131,9 @@ export class FurnaceChipEngine {
       return this.initPromise;
     }
 
-    // Rate limit retries to once per 2 seconds
+    // Rate limit retries to once per 500ms
     const now = Date.now();
-    if (now - this.lastInitAttempt < 2000) return;
+    if (now - this.lastInitAttempt < 500) return;
     this.lastInitAttempt = now;
 
     // Start initialization
@@ -156,19 +156,42 @@ export class FurnaceChipEngine {
         return;
       }
 
-      // Ensure context is running
+      // Ensure context is running - try to resume, then wait up to 5s
       if (rawContext.state !== 'running') {
-        console.log('[FurnaceChipEngine] AudioContext state:', rawContext.state, '- will retry later');
-        this.initPromise = null;
-        return;
+        console.log('[FurnaceChipEngine] AudioContext state:', rawContext.state, '- attempting resume');
+        try {
+          await rawContext.resume();
+        } catch {
+          // Ignore resume errors
+        }
+        if (rawContext.state !== 'running') {
+          console.log('[FurnaceChipEngine] Waiting up to 5s for AudioContext to start...');
+          const started = await Promise.race([
+            new Promise<boolean>((resolve) => {
+              const check = () => {
+                if (rawContext.state === 'running') resolve(true);
+                else setTimeout(check, 100);
+              };
+              setTimeout(check, 100);
+            }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
+          ]);
+          if (!started) {
+            console.warn('[FurnaceChipEngine] AudioContext not running after 5s wait');
+            this.initPromise = null;
+            return;
+          }
+          console.log('[FurnaceChipEngine] AudioContext became running');
+        }
       }
 
       console.log('[FurnaceChipEngine] AudioContext ready, state:', rawContext.state);
 
       const baseUrl = import.meta.env.BASE_URL || '/';
+      const cacheBuster = `?v=${Date.now()}`;
 
       // Add worklet module to the rawContext (standardized-audio-context)
-      const workletUrl = `${baseUrl}FurnaceChips.worklet.js`;
+      const workletUrl = `${baseUrl}FurnaceChips.worklet.js${cacheBuster}`;
       try {
         await rawContext.audioWorklet.addModule(workletUrl);
         console.log('[FurnaceChipEngine] Worklet module loaded');
@@ -184,8 +207,6 @@ export class FurnaceChipEngine {
       }
 
       // Fetch WASM binary and JS module to pass to worklet
-      // Add cache-busting to ensure fresh WASM is loaded after rebuilds
-      const cacheBuster = `?v=${Date.now()}`;
       const wasmUrl = `${baseUrl}FurnaceChips.wasm${cacheBuster}`;
       const jsUrl = `${baseUrl}FurnaceChips.js${cacheBuster}`;
       console.log('[FurnaceChipEngine] Fetching WASM from:', wasmUrl);
@@ -208,9 +229,22 @@ export class FurnaceChipEngine {
       }
 
       const wasmBinary = await wasmResponse.arrayBuffer();
-      const jsCode = await jsResponse.text();
+      let jsCode = await jsResponse.text();
       console.log('[FurnaceChipEngine] WASM loaded, size:', wasmBinary.byteLength);
       console.log('[FurnaceChipEngine] JS loaded, size:', jsCode.length);
+
+      // Preprocess Emscripten JS for AudioWorklet compatibility:
+      // 1. Replace import.meta.url (not available in Function constructor)
+      // 2. Remove ES module export (invalid in Function body)
+      // 3. Strip Node.js dynamic import block (fails in worklet)
+      // 4. Expose wasmMemory on Module (Emscripten keeps it internal)
+      // 5. Polyfill URL class (not available in AudioWorklet's WorkletGlobalScope)
+      const urlPolyfill = 'if(typeof URL==="undefined"){globalThis.URL=class{constructor(p,b){this.href=(b||"")+p;this.pathname=p;}};}\n';
+      jsCode = urlPolyfill + jsCode
+        .replace(/import\.meta\.url/g, "'.'")
+        .replace(/export\s+default\s+\w+;?/g, '')
+        .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+        .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
 
       try {
         // Store native context reference for diagnostics
@@ -224,9 +258,9 @@ export class FurnaceChipEngine {
         });
 
         if (this.workletNode) {
-          // Connect worklet output directly to destination
-          this.workletNode.connect(rawContext.destination);
-          console.log('[FurnaceChipEngine] AudioWorkletNode created and connected to destination, ctx state:', rawContext.state);
+          // Don't connect directly to destination - let FurnaceSynth route
+          // through its Tone.js output gain for proper signal chain integration
+          console.log('[FurnaceChipEngine] AudioWorkletNode created, ctx state:', rawContext.state);
         }
       } catch (err) {
         console.error('[FurnaceChipEngine] AudioWorkletNode creation failed:', err);
@@ -267,6 +301,35 @@ export class FurnaceChipEngine {
       if (success) {
         this.isLoaded = true;
         console.log('[FurnaceChipEngine] ✓ WASM chips initialized successfully');
+
+        // CRITICAL: Connect worklet through a silent keepalive to destination.
+        // AudioWorkletNode.process() is only called by the browser when the node
+        // is in an active audio graph path to destination. Without this connection,
+        // the worklet sits idle and never renders audio — even though FurnaceSynth
+        // connects it to outputGain (the SAC→native bridge doesn't trigger processing).
+        // The keepalive gain is set to 0 so no audio leaks directly to speakers.
+        // FurnaceSynth.initEngine() connects through outputGain for actual signal routing.
+        try {
+          const keepalive = rawContext.createGain();
+          keepalive.gain.value = 0;
+          this.workletNode!.connect(keepalive);
+          keepalive.connect(rawContext.destination);
+          console.log('[FurnaceChipEngine] ✓ Worklet keepalive → destination (process() activation)');
+        } catch (destErr) {
+          console.warn('[FurnaceChipEngine] Keepalive connection failed:', destErr);
+          // Fallback: try native context
+          try {
+            if (nativeCtx && nativeCtx.destination) {
+              const keepalive = nativeCtx.createGain();
+              keepalive.gain.value = 0;
+              this.workletNode!.connect(keepalive);
+              keepalive.connect(nativeCtx.destination);
+              console.log('[FurnaceChipEngine] ✓ Worklet keepalive → native destination (fallback)');
+            }
+          } catch (nativeErr) {
+            console.warn('[FurnaceChipEngine] Native keepalive also failed:', nativeErr);
+          }
+        }
 
         // Message handler for debug and status messages from worklet
         this.workletNode!.port.addEventListener('message', (event: MessageEvent) => {

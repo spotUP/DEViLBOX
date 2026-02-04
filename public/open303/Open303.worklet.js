@@ -18,6 +18,7 @@ class Open303Processor extends AudioWorkletProcessor {
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.currentNote = -1; // Track currently held note for slide logic
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -31,26 +32,51 @@ class Open303Processor extends AudioWorkletProcessor {
         break;
       case 'noteOn':
         if (this.synth) {
-          // Check if slide flag is set - Open303 WASM may handle this via
-          // a special noteOn signature or by setting slide mode before noteOn
-          if (data.slide && this.synth.setSlide) {
-            this.synth.setSlide(true);
+          // TB-303 slide/trigger logic (matches "Classic-Naive" MIDI implementation):
+          // Open303 internally uses a noteList to decide trigger vs slide.
+          // If noteList is empty → triggerNote() (full envelope retrigger)
+          // If noteList is NOT empty → slideToNote() (pitch glide only, no retrigger)
+          //
+          // For NON-SLIDE notes: send noteOff first to clear noteList → triggerNote
+          // For SLIDE notes: keep previous note held → slideToNote (legato)
+          if (!data.slide && this.currentNote >= 0) {
+            console.log('[Open303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity);
+            this.synth.noteOff(this.currentNote);
+          } else if (data.slide && this.currentNote >= 0) {
+            console.log('[Open303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity);
+          } else {
+            console.log('[Open303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity);
           }
           this.synth.noteOn(data.note, data.velocity);
-          if (data.slide && this.synth.setSlide) {
-            // Reset slide mode after noteOn if the synth handles it per-note
-            // Some 303 implementations keep slide active until next non-slide note
-          }
+          this.currentNote = data.note;
         }
         break;
       case 'noteOff':
         if (this.synth) {
-          this.synth.noteOff(data.note);
+          // Only process noteOff for the actual held note (note=0 is intentionally a no-op)
+          if (data.note > 0 && data.note === this.currentNote) {
+            console.log('[Open303] RELEASE: noteOff(' + data.note + ')');
+            this.synth.noteOff(data.note);
+            this.currentNote = -1;
+          }
+          // note=0 is ignored - worklet handles note transitions via noteOn slide logic
+        }
+        break;
+      case 'gateOff':
+        if (this.synth && this.currentNote >= 0) {
+          // Gate off: release the current note's amp envelope (303 staccato)
+          // This allows the amp envelope to enter its fast release phase,
+          // creating the characteristic punchy staccato between non-slide notes.
+          console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
+          this.synth.noteOff(this.currentNote);
+          this.currentNote = -1;
         }
         break;
       case 'allNotesOff':
         if (this.synth) {
+          console.log('[Open303] ALL NOTES OFF');
           this.synth.allNotesOff();
+          this.currentNote = -1;
         }
         break;
       case 'setParameter':
@@ -116,13 +142,40 @@ class Open303Processor extends AudioWorkletProcessor {
         return;
       }
 
+      // Intercept WebAssembly.instantiate to capture WASM memory
+      // (Emscripten may not export HEAPF32/wasmMemory on Module)
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) {
+              capturedMemory = value;
+              break;
+            }
+          }
+        }
+        return result;
+      };
+
       // Initialize WASM module
       const config = {};
       if (wasmBinary) {
         config.wasmBinary = wasmBinary;
       }
 
-      this.module = await globalThis.Open303(config);
+      try {
+        this.module = await globalThis.Open303(config);
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
+
+      // Store captured memory for buffer access
+      if (!this.module.wasmMemory && capturedMemory) {
+        this.module.wasmMemory = capturedMemory;
+      }
       console.log('[Open303 Worklet] WASM loaded');
 
       // Create synth instance

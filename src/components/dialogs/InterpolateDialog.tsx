@@ -17,6 +17,7 @@ interface InterpolateDialogProps {
 }
 
 type InterpolateColumn = 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan';
+type InterpolateCurve = 'linear' | 'log' | 'exp' | 'scurve';
 
 const COLUMN_OPTIONS: { value: InterpolateColumn; label: string; min: number; max: number }[] = [
   { value: 'volume', label: 'Volume', min: 0, max: 64 },
@@ -26,11 +27,19 @@ const COLUMN_OPTIONS: { value: InterpolateColumn; label: string; min: number; ma
   { value: 'pan', label: 'Pan', min: -100, max: 100 },
 ];
 
+const CURVE_OPTIONS: { value: InterpolateCurve; label: string; description: string }[] = [
+  { value: 'linear', label: 'Linear', description: 'Constant rate of change' },
+  { value: 'log', label: 'Logarithmic', description: 'Fast start, gradual end' },
+  { value: 'exp', label: 'Exponential', description: 'Gradual start, fast end' },
+  { value: 'scurve', label: 'S-Curve', description: 'Smooth ease in/out' },
+];
+
 export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, onClose }) => {
   const { selection, interpolateSelection } = useTrackerStore();
   const [column, setColumn] = useState<InterpolateColumn>('volume');
   const [startValue, setStartValue] = useState(64);
   const [endValue, setEndValue] = useState(0);
+  const [curve, setCurve] = useState<InterpolateCurve>('linear');
 
   const selectedColumnInfo = COLUMN_OPTIONS.find(c => c.value === column)!;
 
@@ -40,7 +49,7 @@ export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, on
       return;
     }
 
-    interpolateSelection(column, startValue, endValue);
+    interpolateSelection(column, startValue, endValue, curve);
     onClose();
   };
 
@@ -118,6 +127,30 @@ export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, on
             max={selectedColumnInfo.max}
             className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary"
           />
+        </div>
+
+        {/* Curve type */}
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Curve</label>
+          <div className="grid grid-cols-4 gap-1">
+            {CURVE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setCurve(opt.value)}
+                className={`px-2 py-1.5 text-xs rounded border transition-colors ${
+                  curve === opt.value
+                    ? 'bg-accent-primary border-accent-primary text-white'
+                    : 'bg-dark-bg border-dark-border text-text-secondary hover:border-text-muted'
+                }`}
+                title={opt.description}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-text-muted mt-1">
+            {CURVE_OPTIONS.find(c => c.value === curve)?.description}
+          </p>
         </div>
 
         {/* Selection info */}

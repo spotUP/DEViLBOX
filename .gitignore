@@ -23,5 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 Reference Code/
+.cache/
+*/.cache/
 juce-wasm/build/
 mame-wasm/build/
+furnace-wasm/build/
+spacey-delayer-wasm/build/
+re-tape-echo-wasm/build/
+public/rdpiano/roms/

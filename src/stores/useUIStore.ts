@@ -17,6 +17,9 @@ interface UIStore {
   modalOpen: string | null;
   sidebarCollapsed: boolean;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
+  rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
+  showBeatLabels: boolean; // Show beat.tick labels alongside row numbers
+  chordEntryMode: boolean; // Chord entry: spread notes across channels
 
   // Responsive layout state
   tb303Collapsed: boolean;
@@ -38,6 +41,9 @@ interface UIStore {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setUseHexNumbers: (useHex: boolean) => void;
+  setRowHighlightInterval: (interval: number) => void;
+  toggleBeatLabels: () => void;
+  toggleChordEntryMode: () => void;
 
   // Responsive layout actions
   toggleTB303Collapsed: () => void;
@@ -63,6 +69,9 @@ export const useUIStore = create<UIStore>()(
       modalOpen: null,
       sidebarCollapsed: false,
       useHexNumbers: true, // Default to hex numbers (FT2 style)
+      rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
+      showBeatLabels: false, // Beat labels off by default
+      chordEntryMode: false, // Chord entry off by default
 
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: false, // TB-303 panel expanded by default
@@ -123,6 +132,21 @@ export const useUIStore = create<UIStore>()(
       setUseHexNumbers: (useHex) =>
         set((state) => {
           state.useHexNumbers = useHex;
+        }),
+
+      setRowHighlightInterval: (interval) =>
+        set((state) => {
+          state.rowHighlightInterval = Math.max(1, Math.min(32, interval));
+        }),
+
+      toggleBeatLabels: () =>
+        set((state) => {
+          state.showBeatLabels = !state.showBeatLabels;
+        }),
+
+      toggleChordEntryMode: () =>
+        set((state) => {
+          state.chordEntryMode = !state.chordEntryMode;
         }),
 
       // Responsive layout actions
@@ -199,6 +223,9 @@ export const useUIStore = create<UIStore>()(
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,
         useHexNumbers: state.useHexNumbers,
+        rowHighlightInterval: state.rowHighlightInterval,
+        showBeatLabels: state.showBeatLabels,
+        chordEntryMode: state.chordEntryMode,
         performanceQuality: state.performanceQuality,
         uiVersion: state.uiVersion,
       }),

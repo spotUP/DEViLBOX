@@ -51,7 +51,7 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
 
     if (this.initInProgress) {
       // Poll until init completes
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 200; i++) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         if (this.useWasmEngine || !this.initInProgress) break;
       }

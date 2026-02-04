@@ -17,6 +17,11 @@ import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 import { getNativeContext } from '@utils/audio-context';
+import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
+import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
+import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
+import { BiPhaseEffect } from './effects/BiPhaseEffect';
+import { DubFilterEffect } from './effects/DubFilterEffect';
 
 interface VoiceState {
   instrument: any;
@@ -1911,7 +1916,8 @@ export class ToneEngine {
         config.synthType === 'Buzz4FM2F' ||
         config.synthType === 'BuzzDynamite6' ||
         config.synthType === 'BuzzM3' ||
-        config.synthType === 'Buzz3o3'
+        config.synthType === 'Buzz3o3' ||
+        config.synthType === 'SpaceLaser'
       ) {
         // These synths use triggerRelease(time) - no note parameter
         instrument.triggerRelease(safeTime);
@@ -3699,6 +3705,61 @@ export class ToneEngine {
       case 'StereoWidener':
         if (node instanceof Tone.StereoWidener) {
           node.width.value = params.width as any ?? 0.5;
+        }
+        break;
+
+      case 'SpaceyDelayer':
+        if (node instanceof SpaceyDelayerEffect) {
+          if (params.firstTap != null) node.setFirstTap(Number(params.firstTap));
+          if (params.tapSize != null) node.setTapSize(Number(params.tapSize));
+          if (params.feedback != null) node.setFeedback(Number(params.feedback));
+          if (params.multiTap != null) node.setMultiTap(Number(params.multiTap));
+          if (params.tapeFilter != null) node.setTapeFilter(Number(params.tapeFilter));
+        }
+        break;
+
+      case 'RETapeEcho':
+        if (node instanceof RETapeEchoEffect) {
+          if (params.mode != null) node.setMode(Number(params.mode));
+          if (params.repeatRate != null) node.setRepeatRate(Number(params.repeatRate));
+          if (params.intensity != null) node.setIntensity(Number(params.intensity));
+          if (params.echoVolume != null) node.setEchoVolume(Number(params.echoVolume));
+          if (params.wow != null) node.setWow(Number(params.wow));
+          if (params.flutter != null) node.setFlutter(Number(params.flutter));
+          if (params.dirt != null) node.setDirt(Number(params.dirt));
+          if (params.inputBleed != null) node.setInputBleed(Number(params.inputBleed));
+          if (params.loopAmount != null) node.setLoopAmount(Number(params.loopAmount));
+          if (params.playheadFilter != null) node.setPlayheadFilter(Number(params.playheadFilter));
+        }
+        break;
+
+      case 'SpaceEcho':
+        if (node instanceof SpaceEchoEffect) {
+          if (params.mode != null) node.setMode(Number(params.mode));
+          if (params.rate != null) node.setRate(Number(params.rate));
+          if (params.intensity != null) node.setIntensity(Number(params.intensity));
+          if (params.echoVolume != null) node.setEchoVolume(Number(params.echoVolume));
+          if (params.reverbVolume != null) node.setReverbVolume(Number(params.reverbVolume));
+          if (params.bass != null) node.setBass(Number(params.bass));
+          if (params.treble != null) node.setTreble(Number(params.treble));
+        }
+        break;
+
+      case 'BiPhase':
+        if (node instanceof BiPhaseEffect) {
+          if (params.rateA != null) (node as any).rateA = Number(params.rateA);
+          if (params.depthA != null) (node as any).depthA = Number(params.depthA);
+          if (params.rateB != null) (node as any).rateB = Number(params.rateB);
+          if (params.depthB != null) (node as any).depthB = Number(params.depthB);
+          if (params.feedback != null) (node as any).feedback = Number(params.feedback);
+        }
+        break;
+
+      case 'DubFilter':
+        if (node instanceof DubFilterEffect) {
+          if (params.cutoff != null) (node as any).cutoff = Number(params.cutoff);
+          if (params.resonance != null) (node as any).resonance = Number(params.resonance);
+          if (params.gain != null) (node as any).gain = Number(params.gain);
         }
         break;
     }

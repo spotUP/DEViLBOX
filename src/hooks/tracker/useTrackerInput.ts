@@ -8,6 +8,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { stringNoteToXM } from '@/lib/xmConversions';
 
@@ -329,13 +330,26 @@ export const useTrackerInput = () => {
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
+      // Chord entry mode: advance to next channel instead of next row
+      const chordEntry = useUIStore.getState().chordEntryMode;
+      if (chordEntry && !isPlaying && targetChannelOverride === undefined) {
+        const channelCount = pattern.channels.length;
+        const nextChannel = cursor.channelIndex + 1;
+        if (nextChannel < channelCount) {
+          moveCursorToChannel(nextChannel);
+          // Don't advance row in chord mode - user advances manually
+          return;
+        }
+        // At last channel: fall through to normal row advance behavior
+      }
+
       // Always advance cursor by editStep after note entry (unless during playback)
       if (editStep > 0 && !isPlaying) {
         const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
         moveCursorToRow(newRow);
       }
     },
-    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel]
+    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel]
   );
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
@@ -655,6 +669,8 @@ export const useTrackerInput = () => {
             setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0, eff: 0 });
           } else if (cursor.columnType === 'effect2') {
             setCell(cursor.channelIndex, cursor.rowIndex, { effect2: null });
+          } else if (cursor.columnType === 'probability') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { probability: undefined });
           } else {
             clearCell(cursor.channelIndex, cursor.rowIndex);
           }
@@ -1114,6 +1130,39 @@ export const useTrackerInput = () => {
 
         // Advance cursor
         if (cursor.digitIndex < 2) {
+          moveCursor('right');
+        } else {
+          moveCursor('right');
+          if (editStep > 0) {
+            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
+            moveCursorToRow(newRow);
+          }
+        }
+        return;
+      }
+
+      // ---------- PROBABILITY COLUMN: Decimal digits 0-9 (percentage 0-99) ----------
+      if (recordMode && cursor.columnType === 'probability' && /^[0-9]$/.test(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const digit = parseInt(key, 10);
+        const currentValue = currentCell.probability || 0;
+
+        let newValue: number;
+        if (cursor.digitIndex === 0) {
+          // Tens digit
+          newValue = (digit * 10) + (currentValue % 10);
+        } else {
+          // Ones digit
+          newValue = (Math.floor(currentValue / 10) * 10) + digit;
+        }
+
+        // Clamp to 0-99
+        newValue = Math.min(99, Math.max(0, newValue));
+
+        setCell(cursor.channelIndex, cursor.rowIndex, { probability: newValue });
+
+        // Advance cursor
+        if (cursor.digitIndex < 1) {
           moveCursor('right');
         } else {
           moveCursor('right');

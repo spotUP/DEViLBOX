@@ -103,6 +103,20 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Reverb & Delay',
     description: 'Roland RE-201 emulation with 3 heads and spring reverb',
   },
+  {
+    category: 'tonejs',
+    type: 'SpaceyDelayer',
+    label: 'Spacey Delayer',
+    group: 'Reverb & Delay',
+    description: 'Multitap tape delay with configurable tap spacing (WASM)',
+  },
+  {
+    category: 'tonejs',
+    type: 'RETapeEcho',
+    label: 'RE Tape Echo',
+    group: 'Reverb & Delay',
+    description: 'Roland RE-150/201 tape echo with wow, flutter, and tape saturation (WASM)',
+  },
 
   // ===== MODULATION (Tone.js) =====
   {
