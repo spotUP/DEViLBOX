@@ -27,7 +27,7 @@ interface HardwareUIWrapperProps {
 const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<any>>> = {
   // Drum Machines
   MAMETR707: TR707Hardware,
-  DrumMachine: TR808Hardware,   // Roland TR-808 Rhythm Composer (1980)
+  DrumMachine: TR808Hardware,   // Roland TR-808/909 Rhythm Composers (1980/1983)
 
   // Synthesizers - Classic
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
