@@ -9,8 +9,6 @@
  * Powers the Casio CZ-101, CZ-1000, CZ-1, CZ-3000, CZ-5000.
  */
 
-const BASE_URL = globalThis.BASE_URL || '/';
-
 class UPD933Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -27,12 +25,18 @@ class UPD933Processor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
+
+    // Initialize oscilloscope support
+    OscilloscopeMixin.init(this);
   }
 
   async handleMessage(data) {
     switch (data.type) {
+      case 'enableOsc':
+        this.oscEnabled = data.enabled;
+        break;
       case 'init':
-        await this.initSynth(data.sampleRate);
+        await this.initSynth(data);
         break;
       case 'noteOn':
         if (this.synth) this.synth.noteOn(data.note, data.velocity);
@@ -70,15 +74,14 @@ class UPD933Processor extends AudioWorkletProcessor {
     }
   }
 
-  async initSynth(sampleRate) {
+  async initSynth(data) {
     try {
       this.cleanup();
 
-      const moduleFactory = await import(`${BASE_URL}mame/UPD933.js`);
-      this.module = await moduleFactory.default();
+      this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'createUPD933Module');
 
       this.synth = new this.module.UPD933Synth();
-      this.synth.initialize(sampleRate);
+      this.synth.initialize(data.sampleRate);
 
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);
@@ -96,18 +99,13 @@ class UPD933Processor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    if (this.lastHeapBuffer !== this.module.HEAPF32.buffer) {
-      this.outputBufferL = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrL,
-        this.bufferSize
-      );
-      this.outputBufferR = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrR,
-        this.bufferSize
-      );
-      this.lastHeapBuffer = this.module.HEAPF32.buffer;
+    const mem = this.module.wasmMemory || (this.module.HEAPF32 ? { buffer: this.module.HEAPF32.buffer } : null);
+    if (!mem) return;
+
+    if (this.lastHeapBuffer !== mem.buffer) {
+      this.outputBufferL = new Float32Array(mem.buffer, this.outputPtrL, this.bufferSize);
+      this.outputBufferR = new Float32Array(mem.buffer, this.outputPtrR, this.bufferSize);
+      this.lastHeapBuffer = mem.buffer;
     }
   }
 
@@ -153,6 +151,9 @@ class UPD933Processor extends AudioWorkletProcessor {
       outputL[i] = this.outputBufferL[i];
       outputR[i] = this.outputBufferR[i];
     }
+
+    // Capture oscilloscope data
+    OscilloscopeMixin.capture(this, outputL);
 
     return true;
   }

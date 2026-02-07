@@ -158,13 +158,11 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       const wasNew = !this.activeChips.has(chipType);
       this.activeChips.add(chipType);
       if (wasNew) {
-        // Send chip activation message to main thread (more reliable than console.log)
         this.port.postMessage({
           type: 'debug',
           message: 'chip activated',
           chipType: chipType,
-          activeChips: [...this.activeChips],
-          processCount: this._processCount || 0
+          activeChips: [...this.activeChips]
         });
       }
       this.furnaceModule._furnace_chip_write(chipType, register, value);
@@ -202,35 +200,18 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
           activeChips: [...this.activeChips]
         });
       }
+    } else if (type === 'ping') {
+      // Echo back pong for testing
+      this.port.postMessage({
+        type: 'debug',
+        message: 'pong',
+        timestamp: event.data.timestamp,
+        receivedAt: Date.now()
+      });
     }
   }
 
   process(inputs, outputs) {
-    // Track process calls
-    if (!this._processCount) this._processCount = 0;
-    this._processCount++;
-
-    // Send message to main thread on first few process calls (more reliable than console.log)
-    if (this._processCount <= 3) {
-      this.port.postMessage({
-        type: 'debug',
-        message: 'process #' + this._processCount,
-        initialized: this.isInitialized,
-        activeChips: this.activeChips ? [...this.activeChips] : []
-      });
-    }
-
-    // Log every 50000 process calls to show we're still running (only if chips active)
-    if (this._processCount % 50000 === 0 && this.activeChips && this.activeChips.size > 0) {
-      this.port.postMessage({
-        type: 'debug',
-        message: 'heartbeat',
-        processCount: this._processCount,
-        activeChipsSize: this.activeChips.size,
-        isInitialized: this.isInitialized
-      });
-    }
-
     if (!this.isInitialized) return true;
 
     // Defensive check - make sure HEAPF32 exists
@@ -265,7 +246,6 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
         ? this.furnaceModule.wasmMemory.buffer
         : this.furnaceModule.HEAPF32.buffer;
       if (this.lView.buffer !== currentBuffer) {
-        // Recreate heap views from current buffer
         if (this.furnaceModule.wasmMemory) {
           this.furnaceModule.HEAPF32 = new Float32Array(this.furnaceModule.wasmMemory.buffer);
           this.furnaceModule.HEAPU8 = new Uint8Array(this.furnaceModule.wasmMemory.buffer);
@@ -277,53 +257,6 @@ class FurnaceChipsProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < length; i++) {
         left[i] += this.lView[i];
         right[i] += this.rView[i];
-      }
-    }
-
-    // Debug: log render cycles - send to main thread for reliable logging
-    if (this.activeChips.size > 0) {
-      if (!this._renderCount) this._renderCount = 0;
-      this._renderCount++;
-
-      const maxL = Math.max(...left);
-      const maxR = Math.max(...right);
-
-      // Send first 10 render results to main thread
-      if (this._renderCount <= 10) {
-        this.port.postMessage({
-          type: 'debug',
-          message: 'render #' + this._renderCount,
-          chips: [...this.activeChips],
-          maxL: maxL.toFixed(6),
-          maxR: maxR.toFixed(6),
-          samples: [left[0].toFixed(6), left[1].toFixed(6), left[2].toFixed(6), left[3].toFixed(6)]
-        });
-      }
-
-      // Log when we first get audio
-      if ((maxL > 0.001 || maxR > 0.001) && !this._loggedFirstAudio) {
-        this.port.postMessage({
-          type: 'debug',
-          message: '✓ First audio detected at render #' + this._renderCount,
-          maxL: maxL,
-          maxR: maxR
-        });
-        this._loggedFirstAudio = true;
-      }
-
-      // Track and log significant audio level changes
-      if (!this._lastMaxL) this._lastMaxL = 0;
-      const levelDiff = Math.abs(maxL - this._lastMaxL);
-      if (levelDiff > 0.05 || (maxL > 0.1 && !this._loggedLoudAudio)) {
-        this.port.postMessage({
-          type: 'debug',
-          message: '★ Audio level change: ' + this._lastMaxL.toFixed(4) + ' → ' + maxL.toFixed(4),
-          render: this._renderCount,
-          maxL: maxL,
-          maxR: maxR
-        });
-        this._lastMaxL = maxL;
-        if (maxL > 0.1) this._loggedLoudAudio = true;
       }
     }
 

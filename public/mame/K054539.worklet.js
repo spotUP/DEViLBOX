@@ -3,8 +3,6 @@
  * Konami PCM/ADPCM Sound Chip for DEViLBOX
  */
 
-const BASE_URL = globalThis.BASE_URL || '/';
-
 class K054539Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -21,12 +19,18 @@ class K054539Processor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
+
+    // Initialize oscilloscope support
+    OscilloscopeMixin.init(this);
   }
 
   async handleMessage(data) {
     switch (data.type) {
+      case 'enableOsc':
+        this.oscEnabled = data.enabled;
+        break;
       case 'init':
-        await this.initSynth(data.sampleRate);
+        await this.initSynth(data);
         break;
       case 'noteOn':
         if (this.synth) {
@@ -60,9 +64,14 @@ class K054539Processor extends AudioWorkletProcessor {
         break;
       case 'loadROM':
         if (this.synth && this.module) {
+          if (!this.module.wasmMemory) {
+            console.error("[Worklet] WASM memory not available");
+            break;
+          }
           // Allocate memory for ROM data
           const romPtr = this.module._malloc(data.size);
-          const romView = new Uint8Array(this.module.HEAPU8.buffer, romPtr, data.size);
+          const heap = new Uint8Array(this.module.wasmMemory.buffer);
+          const romView = new Uint8Array(heap.buffer, romPtr, data.size);
           romView.set(new Uint8Array(data.data));
           this.synth.loadROM(data.offset, romPtr, data.size);
           this.module._free(romPtr);
@@ -106,17 +115,15 @@ class K054539Processor extends AudioWorkletProcessor {
     }
   }
 
-  async initSynth(sampleRate) {
+  async initSynth(data) {
     try {
       this.cleanup();
 
-      // Import the WASM module
-      const moduleFactory = await import(`${BASE_URL}mame/K054539.js`);
-      this.module = await moduleFactory.default();
+      this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'createK054539Module');
 
       // Create synth instance
       this.synth = new this.module.K054539Synth();
-      this.synth.initialize(sampleRate);
+      this.synth.initialize(data.sampleRate);
 
       // Allocate output buffers in WASM memory
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
@@ -135,18 +142,13 @@ class K054539Processor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    if (this.lastHeapBuffer !== this.module.HEAPF32.buffer) {
-      this.outputBufferL = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrL,
-        this.bufferSize
-      );
-      this.outputBufferR = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrR,
-        this.bufferSize
-      );
-      this.lastHeapBuffer = this.module.HEAPF32.buffer;
+    const mem = this.module.wasmMemory || (this.module.HEAPF32 ? { buffer: this.module.HEAPF32.buffer } : null);
+    if (!mem) return;
+
+    if (this.lastHeapBuffer !== mem.buffer) {
+      this.outputBufferL = new Float32Array(mem.buffer, this.outputPtrL, this.bufferSize);
+      this.outputBufferR = new Float32Array(mem.buffer, this.outputPtrR, this.bufferSize);
+      this.lastHeapBuffer = mem.buffer;
     }
   }
 
@@ -192,6 +194,9 @@ class K054539Processor extends AudioWorkletProcessor {
       outputL[i] = this.outputBufferL[i];
       outputR[i] = this.outputBufferR[i];
     }
+
+    // Capture oscilloscope data
+    OscilloscopeMixin.capture(this, outputL);
 
     return true;
   }
