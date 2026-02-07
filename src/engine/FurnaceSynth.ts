@@ -5,7 +5,6 @@ import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceRegisterMapper } from '../lib/import/formats/FurnaceRegisterMapper';
 import { FurnacePitchUtils } from '../lib/import/formats/FurnacePitchUtils';
 import { reportSynthError } from '../stores/useSynthErrorStore';
-import { getNativeAudioNode } from '../utils/audio-context';
 
 /**
  * FurnaceSynth - Accurate FM Engine for Furnace Tracker Instruments
@@ -47,6 +46,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   private wasmNoteTriggered: boolean = false; // Track if note was started via WASM
   private noteOnTime: number = 0; // Time when note was triggered (for minimum gate)
   private static MIN_GATE_TIME = 0.05; // Minimum 50ms gate to allow audio render
+  private _volumeOffsetDb = 0; // Volume normalization offset in dB
 
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
     super();
@@ -61,10 +61,32 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.outputGain = new Tone.Gain(1);
     this.output = this.outputGain;
 
+    // Re-fetch chipEngine to ensure we have the globalThis singleton
+    this.chipEngine = FurnaceChipEngine.getInstance();
+    console.log(`[FurnaceSynth] Created for chip ${config.chipType}, engine initialized: ${this.chipEngine.isInitialized()}`);
+
     // Initialize WASM engine asynchronously - don't block constructor
     // No fallback - if WASM fails, an error will be reported
     // updateParameters() is called inside initEngine() after WASM is ready
     this.initEngine();
+  }
+
+  /**
+   * Get the chip type for this synth instance.
+   */
+  public getChipType(): number {
+    return this.config.chipType;
+  }
+
+  /**
+   * Set volume normalization offset in dB.
+   * Applied to the native output GainNode in the audio path.
+   */
+  public setVolumeOffset(db: number): void {
+    this._volumeOffsetDb = db;
+    if (this.useWasmEngine) {
+      this.chipEngine.setOutputGain(Math.pow(10, db / 20));
+    }
   }
 
   /**
@@ -87,18 +109,12 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
     // If chipEngine initialized but useWasmEngine wasn't set (race), check directly
     if (!this.useWasmEngine && this.chipEngine.isInitialized()) {
-      try {
-        const workletOutput = this.chipEngine.getOutput();
-        const target = getNativeAudioNode(this.outputGain);
-        if (target) {
-          workletOutput.connect(target);
-          this.useWasmEngine = true;
-          this.updateParameters();
-          console.log('[FurnaceSynth] ✓ Late WASM connection in ensureInitialized');
-        }
-      } catch (err) {
-        console.warn('[FurnaceSynth] Late WASM connection failed:', err);
+      this.useWasmEngine = true;
+      if (this._volumeOffsetDb !== 0) {
+        this.chipEngine.setOutputGain(Math.pow(10, this._volumeOffsetDb / 20));
       }
+      this.updateParameters();
+      console.log('[FurnaceSynth] ✓ Late WASM activation in ensureInitialized');
     }
   }
 
@@ -151,25 +167,18 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
       // Check if WASM engine is actually available
       if (this.chipEngine.isInitialized()) {
-        // Route worklet audio through FurnaceSynth's output gain for proper
-        // Tone.js signal chain integration (volume control, effects, metering).
-        // Uses the same getNativeAudioNode() pattern as BuzzmachineGenerator:
-        // SAC AudioWorkletNode.connect(SAC GainNode) → SAC handles native routing internally.
-        try {
-          const workletOutput = this.chipEngine.getOutput();
-          const target = getNativeAudioNode(this.outputGain);
-          if (!target) {
-            throw new Error('Could not resolve outputGain to an audio node');
-          }
-          workletOutput.connect(target);
-          console.log('[FurnaceSynth] ✓ Worklet connected to outputGain');
-        } catch (connectErr) {
-          console.error('[FurnaceSynth] Worklet→outputGain connection failed:', connectErr);
-          this.reportInitError('audio', `Could not connect WASM worklet to audio output: ${connectErr}`);
-          this.initInProgress = false;
-          return;
-        }
+        // Audio routing is handled entirely in FurnaceChipEngine at the native level:
+        // workletNode → engineOutputGain → destination (all native AudioNodes)
+        // This avoids native→SAC connection issues that cause silent failures.
+        // FurnaceSynth controls volume via chipEngine.setOutputGain().
+        //
+        // NOTE: This means Tone.js effects/metering on this.outputGain won't receive
+        // the Furnace audio. For effects support, we'd need a different approach.
         this.useWasmEngine = true;
+        // Apply any pending volume normalization offset
+        if (this._volumeOffsetDb !== 0) {
+          this.chipEngine.setOutputGain(Math.pow(10, this._volumeOffsetDb / 20));
+        }
         console.log('[FurnaceSynth] ✓ WASM chip engine ready, chipType:', this.config.chipType);
 
         // Write parameters to WASM
@@ -351,7 +360,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write duty cycle to PSG/NES/GB chips
    */
-  private writeDutyRegister(duty: number): void {
+  public writeDutyRegister(duty: number): void {
     const chan = this.channelIndex;
 
     if (this.config.chipType === FurnaceChipType.NES) { // NES (4)
@@ -377,7 +386,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write wavetable index select
    */
-  private writeWavetableSelect(index: number): void {
+  public writeWavetableSelect(index: number): void {
     if (this.config.wavetables && this.config.wavetables[index]) {
       const waveData = this.config.wavetables[index].data;
       FurnaceRegisterMapper.uploadWavetable(this.chipEngine, this.config.chipType, waveData);
@@ -387,7 +396,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write panning register
    */
-  private writePanRegister(pan: number): void {
+  public writePanRegister(pan: number): void {
     // pan: -127 (full left) to 127 (full right), 0 = center
     const chan = this.channelIndex;
 
@@ -440,7 +449,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Total Level (0-127)
    */
-  private writeOperatorTL(opIndex: number, tl: number): void {
+  public writeOperatorTL(opIndex: number, tl: number): void {
     const chan = this.channelIndex;
 
     if (this.config.chipType === FurnaceChipType.OPN2) { // OPN2 (0)
@@ -461,7 +470,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Multiplier (0-15)
    */
-  private writeOperatorMult(opIndex: number, mult: number): void {
+  public writeOperatorMult(opIndex: number, mult: number): void {
     const chan = this.channelIndex;
     const op = this.config.operators[opIndex];
     if (!op) return;
@@ -485,7 +494,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Attack Rate (0-31)
    */
-  private writeOperatorAR(opIndex: number, ar: number): void {
+  public writeOperatorAR(opIndex: number, ar: number): void {
     const chan = this.channelIndex;
     const op = this.config.operators[opIndex];
     if (!op) return;
@@ -509,7 +518,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Decay Rate (0-31)
    */
-  private writeOperatorDR(opIndex: number, dr: number): void {
+  public writeOperatorDR(opIndex: number, dr: number): void {
     const chan = this.channelIndex;
     const op = this.config.operators[opIndex];
     if (!op) return;
@@ -533,7 +542,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Sustain Level (0-15)
    */
-  private writeOperatorSL(opIndex: number, sl: number): void {
+  public writeOperatorSL(opIndex: number, sl: number): void {
     const chan = this.channelIndex;
     const op = this.config.operators[opIndex];
     if (!op) return;
@@ -557,7 +566,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   /**
    * Write operator Release Rate (0-15)
    */
-  private writeOperatorRR(opIndex: number, rr: number): void {
+  public writeOperatorRR(opIndex: number, rr: number): void {
     const chan = this.channelIndex;
     const op = this.config.operators[opIndex];
     if (!op) return;
@@ -632,13 +641,83 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       this.chipEngine.write(FurnaceChipType.OPZ, 0x28 + (this.channelIndex & 7), kc);
       // Register 0x30+chan: Key Fraction (KF) - bits 2-7
       this.chipEngine.write(FurnaceChipType.OPZ, 0x30 + (this.channelIndex & 7), kf << 2);
-    } else if (this.config.chipType === FurnaceChipType.OPL3) { // OPL3 (2)
+    } else if (this.config.chipType === FurnaceChipType.OPL3 ||
+               this.config.chipType === FurnaceChipType.Y8950 ||
+               this.config.chipType === FurnaceChipType.OPL4 ||
+               this.config.chipType === FurnaceChipType.ESFM) { // OPL family
       const chanOff = this.channelIndex % 9;
       const oplPart = this.channelIndex < 9 ? 0x000 : 0x100;
-      // Simplified OPL F-Number calculation
-      const fnum = Math.floor((freq * (1 << 19)) / 50000) & 0x3FF;
-      this.chipEngine.write(FurnaceChipType.OPL3, oplPart | (0xA0 + chanOff), fnum & 0xFF);
-      this.chipEngine.write(FurnaceChipType.OPL3, oplPart | (0xB0 + chanOff), 0x20 | ((fnum >> 8) & 3)); // Octave 4 default
+      // OPL F-Number calculation: fnum = (freq * 2^19) / (chipClock / 72)
+      // For OPL3 at 14.31818MHz: chipClock/72 = 198863 Hz
+      // Simplified: fnum = freq * 2^19 / 200000, block adjusts octave
+      let block = 4; // Default block (octave)
+      let fnum = Math.floor((freq * (1 << 19)) / 200000);
+      // Adjust block to keep fnum in valid 10-bit range
+      while (fnum > 1023 && block < 7) {
+        fnum >>= 1;
+        block++;
+      }
+      while (fnum < 256 && block > 0) {
+        fnum <<= 1;
+        block--;
+      }
+      fnum = fnum & 0x3FF;
+      // Store for writeKeyOn to use
+      this._oplBlock = block;
+      this._oplFnum = fnum;
+      // Write frequency registers (but NOT key-on - that's done in writeKeyOn)
+      this.chipEngine.write(this.config.chipType, oplPart | (0xA0 + chanOff), fnum & 0xFF);
+      // B0 register: block(2-4) + fnum high(0-1), NO key-on bit here
+      this.chipEngine.write(this.config.chipType, oplPart | (0xB0 + chanOff), ((block & 7) << 2) | ((fnum >> 8) & 3));
+    } else if (this.config.chipType === FurnaceChipType.OPLL) { // OPLL (11)
+      const chanOff = this.channelIndex % 9;
+      // OPLL F-Number calculation similar to OPL but 9-bit fnum
+      // Reference: opll.cpp toFreq function
+      let block = 4;
+      let fnum = Math.floor((freq * (1 << 18)) / 200000);
+      while (fnum > 511 && block < 7) {
+        fnum >>= 1;
+        block++;
+      }
+      while (fnum < 128 && block > 0) {
+        fnum <<= 1;
+        block--;
+      }
+      fnum = fnum & 0x1FF;
+      this._oplBlock = block;
+      this._oplFnum = fnum;
+      // Write frequency low (register 0x10+chan)
+      this.chipEngine.write(FurnaceChipType.OPLL, 0x10 + chanOff, fnum & 0xFF);
+      // Note: 0x20+chan register with key-on is written in writeKeyOn
+    } else if (this.config.chipType === FurnaceChipType.OPNA ||
+               this.config.chipType === FurnaceChipType.OPNB ||
+               this.config.chipType === FurnaceChipType.OPNB_B) { // OPN family
+      // Same frequency format as OPN2
+      const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
+      const opnaChanOff = this.channelIndex % 3;
+      const opnaPart = this.channelIndex < 3 ? 0 : 1;
+      const opnaRegBase = opnaPart === 0 ? 0x00 : 0x100;
+      this.chipEngine.write(this.config.chipType, opnaRegBase | (0xA0 + opnaChanOff), fnum & 0xFF);
+      this.chipEngine.write(this.config.chipType, opnaRegBase | (0xA4 + opnaChanOff), ((block & 7) << 3) | ((fnum >> 8) & 7));
+    } else if (this.config.chipType === FurnaceChipType.AY ||
+               this.config.chipType === FurnaceChipType.AY8930) { // AY family (12, 50)
+      // AY frequency: period = chipClock / (16 * freq)
+      // Reference: ay.cpp frequency calculation
+      const AY_CLOCK = 1789773;
+      const period = Math.floor(AY_CLOCK / (16 * freq)) & 0xFFF;
+      const chan = this.channelIndex % 3;
+      this.chipEngine.write(this.config.chipType, chan * 2, period & 0xFF);
+      this.chipEngine.write(this.config.chipType, chan * 2 + 1, (period >> 8) & 0x0F);
+    } else if (this.config.chipType === FurnaceChipType.SID ||
+               this.config.chipType === FurnaceChipType.SID_6581 ||
+               this.config.chipType === FurnaceChipType.SID_8580) { // SID family
+      // SID frequency: freq_reg = (freq * 16777216) / chipClock
+      // Reference: c64.cpp frequency calculation
+      const SID_CLOCK = 985248; // PAL
+      const freqReg = Math.floor((freq * 16777216) / SID_CLOCK) & 0xFFFF;
+      const sidVoiceBase = (this.channelIndex % 3) * 7;
+      this.chipEngine.write(this.config.chipType, sidVoiceBase + 0, freqReg & 0xFF);      // Freq low
+      this.chipEngine.write(this.config.chipType, sidVoiceBase + 1, (freqReg >> 8) & 0xFF); // Freq high
     } else if (this.config.chipType === FurnaceChipType.PSG) { // PSG (3)
       const period = Math.floor(3579545 / (32 * freq)) & 0x3FF;
       const chan = this.channelIndex & 3;
@@ -747,8 +826,8 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         break;
 
       case 49: // ESFM (FurnaceChipType.ESFM)
-        // Enhanced OPL3 - use OPL3 mapper
-        FurnaceRegisterMapper.mapOPL3(this.chipEngine, this.channelIndex, this.config);
+        // Enhanced OPL3 - use OPL3 mapper but target ESFM chip
+        FurnaceRegisterMapper.mapOPL3(this.chipEngine, this.channelIndex, this.config, FurnaceChipType.ESFM);
         break;
 
       // === PSG/SQUARE WAVE CHIPS ===
@@ -929,8 +1008,31 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         FurnaceRegisterMapper.mapLYNX(this.chipEngine, this.channelIndex, this.config);
         break;
 
+      // Note: case 43 (T6W28) and case 44 (VB) are handled above in COMPUTER CHIPS section
+
+      case 55: // Namco WSG (FurnaceChipType.NAMCO)
+        FurnaceRegisterMapper.mapNAMCO(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 56: // Commodore PET (FurnaceChipType.PET)
+        FurnaceRegisterMapper.mapPET(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 57: // POKEY (FurnaceChipType.POKEY)
+        FurnaceRegisterMapper.mapPOKEY(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 61: // Amiga Paula (FurnaceChipType.AMIGA)
+        FurnaceRegisterMapper.mapAMIGA(this.chipEngine, this.channelIndex, this.config);
+        break;
+
+      case 62: // PC Speaker (FurnaceChipType.PCSPKR)
+        FurnaceRegisterMapper.mapPCSPKR(this.chipEngine, this.channelIndex, this.config);
+        break;
+
       default:
-        console.warn(`[FurnaceSynth] No mapper for chipType ${this.config.chipType}`);
+        // Silently skip unmapped chips - they may still render via default handling
+        break;
     }
   }
 
@@ -953,6 +1055,9 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       if (this.chipEngine.isInitialized()) {
         // WASM is ready, use it immediately
         this.useWasmEngine = true;
+        if (this._volumeOffsetDb !== 0) {
+          this.chipEngine.setOutputGain(Math.pow(10, this._volumeOffsetDb / 20));
+        }
         // Write init parameters if not already done
         this.updateParameters();
         console.log('[FurnaceSynth] ✓ Using pre-initialized WASM engine, chipType:', this.config.chipType);
@@ -984,6 +1089,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
 
     // 1. Setup registers (with velocity-scaled TL)
     console.log(`[FurnaceSynth.triggerAttack] chipType=${this.config.chipType}, operators.length=${this.config.operators.length}, freq=${freq.toFixed(1)}`);
+    console.log(`[FurnaceSynth.triggerAttack] chipEngine.isInitialized()=${this.chipEngine.isInitialized()}, diag:`, this.chipEngine.getDiagnostics());
     this.updateParameters();
     this.updateFrequency(freq);
 
@@ -1045,17 +1151,24 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     const vol = velocity !== undefined ? Math.floor(velocity * 15) : 15;
 
     switch (this.config.chipType) {
-      case FurnaceChipType.OPN2: // OPN2 (0)
+      case FurnaceChipType.OPN2: { // OPN2 (0)
         const chanOffset = chan % 3;
         const part = chan < 3 ? 0 : 1;
-        const keyOnVal = 0xF0 | (part << 2) | chanOffset; // All 4 operators ON
-        this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOnVal);
+        const keyOffVal = (part << 2) | chanOffset;
+        const keyOnVal = 0xF0 | keyOffVal; // All 4 operators ON
+        // CRITICAL: Furnace does key-off BEFORE key-on (genesis.cpp tick())
+        this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOffVal);  // Key-off first
+        this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOnVal);   // Then key-on
         break;
+      }
 
-      case FurnaceChipType.OPM: // OPM (1)
+      case FurnaceChipType.OPM: { // OPM (1)
         // OPM key-on is register 0x08, bits 0-2 = channel, bits 3-6 = operators
-        this.chipEngine.write(FurnaceChipType.OPM, 0x08, 0x78 | (chan & 7));
+        // CRITICAL: Key-off before key-on (matching Furnace opm.cpp)
+        this.chipEngine.write(FurnaceChipType.OPM, 0x08, chan & 7);         // Key-off first
+        this.chipEngine.write(FurnaceChipType.OPM, 0x08, 0x78 | (chan & 7)); // Then key-on
         break;
+      }
 
       case FurnaceChipType.NES: { // NES (4)
         // Reference: Furnace nes.cpp:387-416 - EXACT byte order from source
@@ -1126,15 +1239,27 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         break;
 
       case FurnaceChipType.PCE: { // PCE (6)
-        // Reference: Furnace pce.cpp:360 - EXACT byte order from source
-        // Register layout: 0x00=chan select, 0x02/0x03=freq, 0x04=control, 0x05=pan
+        // Reference: Furnace pce.cpp:143-160 - updateWave() and pce.cpp:360 - key-on
+        // Register layout: 0x00=chan select, 0x02/0x03=freq, 0x04=control, 0x05=pan, 0x06=wave data
         const pceFreq = Math.floor(3579545 / (32 * this.activeNoteFreq)) & 0xFFF;
         this.chipEngine.write(FurnaceChipType.PCE, 0x00, chan & 7);  // Select channel
+
+        // Load wavetable (required for PCE PSG to produce sound!)
+        // Reference: pce.cpp updateWave(): 0x5f, 0x1f, then 32 bytes to reg 0x06
+        this.chipEngine.write(FurnaceChipType.PCE, 0x04, 0x5F);  // Wave write mode
+        this.chipEngine.write(FurnaceChipType.PCE, 0x04, 0x1F);  // Keep wave write enabled
+        // Write a simple square wave (32 samples, 5-bit values 0-31)
+        for (let i = 0; i < 32; i++) {
+          const sample = i < 16 ? 0x1F : 0x00;  // Square wave
+          this.chipEngine.write(FurnaceChipType.PCE, 0x06, sample);
+        }
+
+        // Set frequency
         this.chipEngine.write(FurnaceChipType.PCE, 0x02, pceFreq & 0xFF);  // Freq low
         this.chipEngine.write(FurnaceChipType.PCE, 0x03, (pceFreq >> 8) & 0x0F);  // Freq high
+        this.chipEngine.write(FurnaceChipType.PCE, 0x05, 0xFF);  // Pan: left+right max
         // pce.cpp:360 - Control: bit 7 = enable, bits 0-4 = volume
         this.chipEngine.write(FurnaceChipType.PCE, 0x04, 0x80 | (vol & 0x1F));
-        this.chipEngine.write(FurnaceChipType.PCE, 0x05, 0xFF);  // Pan: left+right max
         break;
       }
 
@@ -1173,24 +1298,31 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       case FurnaceChipType.OPL3: { // 2
         const chanOff = chan % 9;
         const oplPart = chan < 9 ? 0x000 : 0x100;
-        // Key-on: set bit 5
-        const b0val = 0x20 | ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
-        this.chipEngine.write(FurnaceChipType.OPL3, oplPart | (0xB0 + chanOff), b0val);
+        // CRITICAL: Key-off first (clear bit 5), then key-on (set bit 5) to retrigger envelope
+        const b0off = ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
+        const b0on = 0x20 | b0off;
+        this.chipEngine.write(FurnaceChipType.OPL3, oplPart | (0xB0 + chanOff), b0off);  // Key-off
+        this.chipEngine.write(FurnaceChipType.OPL3, oplPart | (0xB0 + chanOff), b0on);   // Key-on
         break;
       }
 
       case FurnaceChipType.OPLL: { // 11
         const chanOff = chan % 9;
-        // Key-on: set bit 4
-        const freqH = 0x10 | ((this._oplBlock & 7) << 1) | ((this._oplFnum >> 8) & 1);
-        this.chipEngine.write(FurnaceChipType.OPLL, 0x20 + chanOff, freqH);
+        // CRITICAL: Key-off first (clear bit 4), then key-on (set bit 4) to retrigger envelope
+        const freqHoff = ((this._oplBlock & 7) << 1) | ((this._oplFnum >> 8) & 1);
+        const freqHon = 0x10 | freqHoff;
+        this.chipEngine.write(FurnaceChipType.OPLL, 0x20 + chanOff, freqHoff);  // Key-off
+        this.chipEngine.write(FurnaceChipType.OPLL, 0x20 + chanOff, freqHon);   // Key-on
         break;
       }
 
       case FurnaceChipType.OPNA: { // 13
         const opnaChanOff = chan % 3;
         const opnaPart = chan < 3 ? 0 : 1;
-        const opnaKeyOn = 0xF0 | (opnaPart << 2) | opnaChanOff;
+        const opnaKeyOff = (opnaPart << 2) | opnaChanOff;
+        const opnaKeyOn = 0xF0 | opnaKeyOff;
+        // Key-off before key-on
+        this.chipEngine.write(FurnaceChipType.OPNA, 0x28, opnaKeyOff);
         this.chipEngine.write(FurnaceChipType.OPNA, 0x28, opnaKeyOn);
         break;
       }
@@ -1198,14 +1330,17 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       case FurnaceChipType.OPNB: { // 14
         const opnbKonOffs = [1, 2, 5, 6];
         const opnbKonOff = opnbKonOffs[chan & 3];
+        // Key-off before key-on
+        this.chipEngine.write(FurnaceChipType.OPNB, 0x28, opnbKonOff);
         this.chipEngine.write(FurnaceChipType.OPNB, 0x28, 0xF0 | opnbKonOff);
         break;
       }
 
       case FurnaceChipType.OPN: { // 47 - YM2203 (3 FM channels only)
         const opnChanOff = chan % 3;
-        const opnKeyOn = 0xF0 | opnChanOff; // No second bank on OPN
-        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnKeyOn);
+        // Key-off before key-on
+        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnChanOff);
+        this.chipEngine.write(FurnaceChipType.OPN, 0x28, 0xF0 | opnChanOff);
         break;
       }
 
@@ -1216,8 +1351,10 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         const alg = (this.config.algorithm ?? 0) & 7;
         const fb = (this.config.feedback ?? 0) & 7;
         const chVolR = 1; // Right channel enabled
-        const keyOnVal = alg | (fb << 3) | 0x40 | (chVolR << 7);
-        console.log(`[FurnaceSynth] OPZ KEY ON: chan=${chan}, reg=0x${(0x20 + (chan & 7)).toString(16)}, val=0x${keyOnVal.toString(16)}`);
+        const keyOffVal = alg | (fb << 3) | (chVolR << 7); // No 0x40 = key off
+        const keyOnVal = keyOffVal | 0x40; // With 0x40 = key on
+        // Key-off before key-on
+        this.chipEngine.write(FurnaceChipType.OPZ, 0x20 + (chan & 7), keyOffVal);
         this.chipEngine.write(FurnaceChipType.OPZ, 0x20 + (chan & 7), keyOnVal);
         break;
       }
@@ -1226,8 +1363,11 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       case FurnaceChipType.OPL4: {  // 26
         const chip = this.config.chipType;
         const chanOff = chan % 9;
-        const b0val = 0x20 | ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
-        this.chipEngine.write(chip, 0xB0 + chanOff, b0val);
+        // CRITICAL: Key-off first (clear bit 5), then key-on (set bit 5)
+        const b0off = ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
+        const b0on = 0x20 | b0off;
+        this.chipEngine.write(chip, 0xB0 + chanOff, b0off);  // Key-off
+        this.chipEngine.write(chip, 0xB0 + chanOff, b0on);   // Key-on
         break;
       }
 
@@ -1533,16 +1673,23 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         const sidVoiceBase = chan * 7;
         const sidChip = this.config.chipType === 45 ? FurnaceChipType.SID_6581 : FurnaceChipType.SID_8580;
 
-        // c64.cpp:357-359 - Attack/Decay, Sustain/Release, THEN Control with gate
+        // c64.cpp:357-359, 440-442 - Pulse width, Attack/Decay, Sustain/Release, THEN Control with gate
         const attack = 0;  // Fast attack (0-15, 0=fastest)
         const decay = 8;   // Medium decay
         const sustain = 15; // Full sustain
         const release = 8;  // Medium release
-        const waveform = 1; // Pulse wave (bit 6 of control)
+        // SID Control register: Bit 0=Gate, Bit 4=Triangle, Bit 5=Saw, Bit 6=Pulse, Bit 7=Noise
+        const PULSE_WAVE = 0x40;  // Bit 6 = Pulse waveform
+        const GATE_ON = 0x01;     // Bit 0 = Gate
+        // Pulse width (12-bit: 0x000-0xFFF, 50% duty = 0x800)
+        const pulseWidth = 0x800; // 50% duty cycle
 
+        // Set pulse width BEFORE enabling waveform (c64.cpp:440-442)
+        this.chipEngine.write(sidChip, sidVoiceBase + 2, pulseWidth & 0xFF);          // PWL
+        this.chipEngine.write(sidChip, sidVoiceBase + 3, (pulseWidth >> 8) & 0x0F);   // PWH
         this.chipEngine.write(sidChip, sidVoiceBase + 5, (attack << 4) | decay);      // Attack/Decay
         this.chipEngine.write(sidChip, sidVoiceBase + 6, (sustain << 4) | release);   // Sustain/Release
-        this.chipEngine.write(sidChip, sidVoiceBase + 4, (waveform << 4) | 0x01);     // Pulse + gate
+        this.chipEngine.write(sidChip, sidVoiceBase + 4, PULSE_WAVE | GATE_ON);       // Pulse + gate = 0x41
         // Note: Frequency should be set by updateFrequency before keyOn
         break;
       }
@@ -1715,7 +1862,9 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       case FurnaceChipType.OPN: { // 47 - YM2203
         // Reference: Furnace ym2203.cpp - 3 FM channels + 3 SSG channels
         // FM key-on same as OPN2 but only 3 channels
+        // Key-off before key-on
         const opnChanOff = chan % 3;
+        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnChanOff);
         this.chipEngine.write(FurnaceChipType.OPN, 0x28, 0xF0 | opnChanOff);
         break;
       }
@@ -1725,16 +1874,21 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         const opnbBKonOffs = [1, 2, 5, 6, 0, 4]; // 6 FM channels
         const opnbBChan = chan % 6;
         const opnbBKonOff = opnbBKonOffs[opnbBChan];
+        // Key-off before key-on
+        this.chipEngine.write(FurnaceChipType.OPNB_B, 0x28, opnbBKonOff);
         this.chipEngine.write(FurnaceChipType.OPNB_B, 0x28, 0xF0 | opnbBKonOff);
         break;
       }
 
       case FurnaceChipType.ESFM: { // 49 - Enhanced OPL3
         // ESFM has OPL3-compatible key-on
+        // CRITICAL: Key-off first (clear bit 5), then key-on (set bit 5)
         const esfmChanOff = chan % 18;
         const esfmPart = esfmChanOff < 9 ? 0x000 : 0x100;
-        const b0val = 0x20 | ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
-        this.chipEngine.write(FurnaceChipType.ESFM, esfmPart | (0xB0 + (esfmChanOff % 9)), b0val);
+        const esfmB0off = ((this._oplBlock & 7) << 2) | ((this._oplFnum >> 8) & 3);
+        const esfmB0on = 0x20 | esfmB0off;
+        this.chipEngine.write(FurnaceChipType.ESFM, esfmPart | (0xB0 + (esfmChanOff % 9)), esfmB0off);  // Key-off
+        this.chipEngine.write(FurnaceChipType.ESFM, esfmPart | (0xB0 + (esfmChanOff % 9)), esfmB0on);   // Key-on
         break;
       }
 
