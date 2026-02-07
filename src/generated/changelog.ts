@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-04T21:38:30.547Z
+ * Generated: 2026-02-07T15:58:22.282Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '264';
-export const BUILD_HASH = '8a685bc';
-export const BUILD_DATE = '2026-02-04';
+export const BUILD_NUMBER = '288';
+export const BUILD_HASH = '23882bb';
+export const BUILD_DATE = '2026-02-07';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -31,8 +31,110 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-07',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Add hardware UI toggle to generic editor for DrumMachine"
+      },
+      {
+        type: 'improvement',
+        "description": "Rename Drum Machine to Roland TR-808/909 in UI"
+      },
+      {
+        type: 'improvement',
+        "description": "Rename TR-808 UI to TR-808/909 to reflect support for both machines"
+      },
+      {
+        type: 'feature',
+        "description": "Add authentic TR-808 hardware UI based on io-808 design"
+      },
+      {
+        type: 'feature',
+        "description": "Make hardware UI default for synths with hardware UI available"
+      },
+      {
+        type: 'feature',
+        "description": "Add drum machine auto-population to drumpad editor"
+      },
+      {
+        type: 'fix',
+        "description": "Replace isDark references with fixed colors in hardware UIs"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused isDark variables from hardware UIs"
+      },
+      {
+        type: 'fix',
+        "description": "Add NaN guards to Knob component SVG rendering"
+      },
+      {
+        type: 'feature',
+        "description": "Add DX7 and OBXd hardware UIs for iconic synthesizers"
+      },
+      {
+        type: 'feature',
+        "description": "Add hardware UIs for TB-303, D-50, CZ-101, and VFX synthesizers"
+      },
+      {
+        type: 'feature',
+        "description": "Expand FurnaceDispatch platform support and effect routing"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing methods to FurnaceChipEngine and FurnaceRegisterMapper"
+      },
+      {
+        type: 'fix',
+        "description": "Update FurnaceSynth and FurnaceDispatchSynth with public API methods"
+      },
+      {
+        type: 'feature',
+        "description": "Add MAME chip infrastructure and hardware UI system"
+      },
+      {
+        type: 'improvement',
+        "description": "Update WASM build configurations and source files"
+      },
+      {
+        type: 'improvement',
+        "description": "Build: rebuild WASM binaries for all synth engines"
+      },
+      {
+        type: 'fix',
+        "description": "Initialize TR-707 parameters after ROM load for sound output"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent per-channel instance creation for MAME/Furnace/Buzz synths"
+      },
+      {
+        type: 'feature',
+        "description": "Add TR-707 hardware UI with authentic Roland panel design"
+      }
+    ]
+  },
+  {
+    version: '2026-02-04',
     date: '2026-02-04',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Merge Presets into Modules menu and remove Presets dropdown"
+      },
+      {
+        type: 'feature',
+        "description": "Wire SpaceyDelayer and RETapeEcho WASM effects to UI"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 38 failing effect tests (neural + sidechain)"
+      },
+      {
+        type: 'fix',
+        "description": "Calibrate volume normalization for all synths and add ensureInitialized"
+      },
       {
         type: 'feature',
         "description": "Wire 26 new synths to UI, rebuild buzzmachines with MDK fix, add Makk M4"
@@ -134,104 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add preview/jam to LoadPresetModal and fix missing presets in specialized synth editors"
-      },
-      {
-        type: 'feature',
-        "description": "Add SpaceLaser and V2 presets to factory list and unify editor headers"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in usePadTriggers hook"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve SpaceLaser release error and refine Numpad drum triggers"
-      },
-      {
-        type: 'feature',
-        "description": "Restrict drum triggers to Numpad 1-9 and implement NumpadEnter bank swap"
-      }
-    ]
-  },
-  {
-    version: '2026-02-02',
-    date: '2026-02-02',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Map drumpad triggers to numeric keyboard (1-9)"
-      },
-      {
-        type: 'feature',
-        "description": "Implement quantized drumpad recording in record mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add instrument preview to DrumpadEditorModal"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in SamplePackStore export and browser component"
-      },
-      {
-        type: 'fix',
-        "description": "Improve SamplePackStore reactivity to ensure uploaded packs appear in UI"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve sample jamming beeps by restoring Sampler for standard play and adding load guards"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve beeps during sample jamming by favoring Tone.Player for single samples"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add extensive logging to sample pack upload process"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve missing Zap icon import in SamplePackBrowser"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance SamplePackBrowser jamming with 2-octave tracker layout and JAM indicator"
-      },
-      {
-        type: 'feature',
-        "description": "Implement multi-selection and fixed sample preview in SamplePackBrowser"
-      },
-      {
-        type: 'fix',
-        "description": "Rename sample files to remove spaces and fix Drumaxia template loading"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve Sample Pack upload crashes and add loading UI"
-      },
-      {
-        type: 'feature',
-        "description": "Add keyboard and MIDI support for sample preview in SamplePackBrowser"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve BaseAudioContext error in V2Synth initialization"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve missing default config imports in useInstrumentStore"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve final TypeScript errors in ToneEngine and useInstrumentStore"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve critical syntax errors in useInstrumentStore"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve multiple TypeScript errors in V2 synth and Nano-Exporter"
       }
     ]
   }

@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+/// <reference types="vitest" />
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
@@ -35,6 +36,11 @@ function generateVersionFile() {
 export default defineConfig({
   plugins: [react(), generateVersionFile()],
   base: '/DEViLBOX/',
+  test: {
+    // Vitest configuration
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules', 'Reference Code/**', 'dist'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

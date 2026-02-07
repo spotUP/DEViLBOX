@@ -17,6 +17,8 @@ class RdPianoProcessor extends AudioWorkletProcessor {
     this.outputPtrR = 0;
     this.outputBufferL = null;
     this.outputBufferR = null;
+    // Store ROM pointers to prevent use-after-free
+    this.romPointers = [];
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
@@ -46,17 +48,41 @@ class RdPianoProcessor extends AudioWorkletProcessor {
 
       case 'initMCU':
         if (this.synth) {
-          const success = this.synth.initMCU();
-          if (success) {
-            this.isInitialized = true;
-            // Process any pending messages
-            for (const msg of this.pendingMessages) {
-              this.handleMessage({ data: msg });
+          try {
+            // Verify ROMs are loaded before calling initMCU
+            console.log('[RdPiano Worklet] Checking ROM status before initMCU...');
+            const romSet0 = this.synth.isROMSetLoaded(0);
+            const romSet1 = this.synth.isROMSetLoaded(1);
+            const romSet2 = this.synth.isROMSetLoaded(2);
+            console.log(`[RdPiano Worklet] ROM sets loaded: [0]=${romSet0}, [1]=${romSet1}, [2]=${romSet2}`);
+
+            if (!romSet0 && !romSet1 && !romSet2) {
+              console.error('[RdPiano Worklet] No ROM sets loaded! Cannot initialize MCU.');
+              this.port.postMessage({ type: 'error', error: 'No ROM sets loaded before initMCU' });
+              break;
             }
-            this.pendingMessages = [];
-            this.port.postMessage({ type: 'ready' });
-          } else {
-            this.port.postMessage({ type: 'error', error: 'MCU initialization failed' });
+
+            console.log('[RdPiano Worklet] Calling initMCU()...');
+            const success = this.synth.initMCU();
+            console.log('[RdPiano Worklet] initMCU() returned:', success);
+
+            if (success) {
+              this.isInitialized = true;
+              // Process any pending messages
+              for (const msg of this.pendingMessages) {
+                this.handleMessage({ data: msg });
+              }
+              this.pendingMessages = [];
+              this.port.postMessage({ type: 'ready' });
+            } else {
+              this.port.postMessage({ type: 'error', error: 'MCU initialization failed - initMCU returned false' });
+            }
+          } catch (error) {
+            console.error('[RdPiano Worklet] initMCU crashed:', error);
+            this.port.postMessage({
+              type: 'initMCUError',
+              error: error.message || 'WASM memory access error during initMCU'
+            });
           }
         }
         break;
@@ -116,8 +142,13 @@ class RdPianoProcessor extends AudioWorkletProcessor {
   }
 
   loadProgramROM(romData) {
-    if (!this.Module || !this.synth) return;
+    if (!this.Module || !this.synth) {
+      console.error('[RdPiano Worklet] loadProgramROM called but Module or synth not ready');
+      return;
+    }
     const data = new Uint8Array(romData);
+    console.log(`[RdPiano Worklet] Loading program ROM: ${data.byteLength} bytes`);
+
     const ptr = this.Module._malloc(data.byteLength);
     if (!ptr) {
       this.port.postMessage({ type: 'error', error: 'Failed to allocate memory for program ROM' });
@@ -130,41 +161,55 @@ class RdPianoProcessor extends AudioWorkletProcessor {
       return;
     }
     new Uint8Array(heapBuffer, ptr, data.byteLength).set(data);
+
+    console.log(`[RdPiano Worklet] Calling synth.loadProgramROM(ptr=${ptr}, len=${data.byteLength})`);
     this.synth.loadProgramROM(ptr, data.byteLength);
-    this.Module._free(ptr);
+    console.log(`[RdPiano Worklet] Program ROM loaded successfully`);
+
+    // DON'T free ROM memory - WASM module stores pointers to this data
+    // initMCU needs to access it later, freeing causes use-after-free crash
+    this.romPointers.push(ptr);
   }
 
   loadROMSet(setIndex, ic5Data, ic6Data, ic7Data, ic18Data) {
-    if (!this.Module || !this.synth) return;
+    if (!this.Module || !this.synth) {
+      console.error('[RdPiano Worklet] loadROMSet called but Module or synth not ready');
+      return;
+    }
 
+    console.log(`[RdPiano Worklet] Loading ROM set ${setIndex}...`);
     const roms = [
       new Uint8Array(ic5Data),
       new Uint8Array(ic6Data),
       new Uint8Array(ic7Data),
       new Uint8Array(ic18Data),
     ];
+    console.log(`[RdPiano Worklet] ROM sizes: IC5=${roms[0].byteLength}, IC6=${roms[1].byteLength}, IC7=${roms[2].byteLength}, IC18=${roms[3].byteLength}`);
 
     const heapBuffer = this._wasmMemory ? this._wasmMemory.buffer : (this.Module.HEAPU8 ? this.Module.HEAPU8.buffer : null);
     if (!heapBuffer) throw new Error('Cannot access WASM memory for ROM loading');
 
-    const ptrs = roms.map(rom => {
+    const ptrs = roms.map((rom, idx) => {
       const ptr = this.Module._malloc(rom.byteLength);
-      if (!ptr) throw new Error('Failed to allocate memory for ROM');
+      if (!ptr) throw new Error(`Failed to allocate memory for ROM ${idx}`);
       new Uint8Array(heapBuffer, ptr, rom.byteLength).set(rom);
+      console.log(`[RdPiano Worklet] Allocated ROM ${idx} at ptr=${ptr}`);
       return ptr;
     });
 
-    try {
-      this.synth.loadROMSet(
-        setIndex,
-        ptrs[0], roms[0].byteLength,
-        ptrs[1], roms[1].byteLength,
-        ptrs[2], roms[2].byteLength,
-        ptrs[3], roms[3].byteLength
-      );
-    } finally {
-      ptrs.forEach(ptr => this.Module._free(ptr));
-    }
+    console.log(`[RdPiano Worklet] Calling synth.loadROMSet(${setIndex}, ...)`);
+    this.synth.loadROMSet(
+      setIndex,
+      ptrs[0], roms[0].byteLength,
+      ptrs[1], roms[1].byteLength,
+      ptrs[2], roms[2].byteLength,
+      ptrs[3], roms[3].byteLength
+    );
+    console.log(`[RdPiano Worklet] ROM set ${setIndex} loaded successfully`);
+
+    // DON'T free ROM memory - WASM module stores pointers to this data
+    // initMCU needs to access it later, freeing causes use-after-free crash
+    this.romPointers.push(...ptrs);
   }
 
   cleanup() {

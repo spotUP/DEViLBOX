@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/juce-wasm/db303/build/CMakeFiles/DB303WASM.dir
+/Users/spot/Code/DEViLBOX/juce-wasm/db303/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/juce-wasm/db303/build/CMakeFiles/rebuild_cache.dir

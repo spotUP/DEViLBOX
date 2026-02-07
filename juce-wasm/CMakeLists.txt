@@ -57,6 +57,11 @@ add_subdirectory(obxd)
 add_subdirectory(open303)
 
 # ============================================================================
+# DB303 (TB-303 Synthesizer with db303 tweaks) - MIT + GPLv3
+# ============================================================================
+add_subdirectory(db303)
+
+# ============================================================================
 # RdPiano (Roland SA-synthesis Digital Piano) - GPL-3.0
 # ============================================================================
 add_subdirectory(rdpiano)
@@ -65,6 +70,6 @@ add_subdirectory(rdpiano)
 # Combined build target
 # ============================================================================
 add_custom_target(all_synths
-    DEPENDS DexedWASM OBXdWASM Open303WASM RdPianoWASM
+    DEPENDS DexedWASM OBXdWASM Open303WASM DB303WASM RdPianoWASM
     COMMENT "Building all JUCE WASM synths"
 )
