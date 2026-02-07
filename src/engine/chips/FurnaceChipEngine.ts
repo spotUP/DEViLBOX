@@ -2,7 +2,6 @@
  * FurnaceChipEngine - Centralized manager for WASM-based chip emulators
  */
 
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 import { getNativeContext } from '@utils/audio-context';
 
 export const FurnaceChipType = {
@@ -98,8 +97,13 @@ export const FurnaceChipType = {
 
 export type FurnaceChipType = typeof FurnaceChipType[keyof typeof FurnaceChipType];
 
+// Use globalThis to ensure true singleton even across Vite HMR module boundaries
+const GLOBAL_KEY = '__FurnaceChipEngineInstance__';
+
 export class FurnaceChipEngine {
   private static instance: FurnaceChipEngine | null = null;
+  private static instanceId = 0;
+  private myInstanceId: number;
   private isLoaded: boolean = false;
   private initPromise: Promise<void> | null = null;
   private initFailedPermanently: boolean = false; // Only for permanent failures (bad context type)
@@ -107,10 +111,32 @@ export class FurnaceChipEngine {
   private lastInitAttempt: number = 0;
   private writeCount: number = 0;
   private nativeContext: AudioContext | null = null;
+  private rawContext: AudioContext | null = null;
+  // Native GainNode for output - avoids native→SAC connection issues
+  private outputGain: GainNode | null = null;
+
+  private constructor() {
+    this.myInstanceId = ++FurnaceChipEngine.instanceId;
+    console.log(`[FurnaceChipEngine] Created instance #${this.myInstanceId}`);
+  }
 
   public static getInstance(): FurnaceChipEngine {
+    // Check globalThis first to handle Vite HMR module boundaries
+    const globalInstance = (globalThis as any)[GLOBAL_KEY] as FurnaceChipEngine | undefined;
+    if (globalInstance) {
+      // Sync with static reference
+      if (FurnaceChipEngine.instance !== globalInstance) {
+        console.log('[FurnaceChipEngine] Syncing with globalThis instance #' + globalInstance.myInstanceId);
+        FurnaceChipEngine.instance = globalInstance;
+      }
+      return globalInstance;
+    }
+
+    // Create new instance if none exists
     if (!FurnaceChipEngine.instance) {
       FurnaceChipEngine.instance = new FurnaceChipEngine();
+      // Store in globalThis for cross-module access
+      (globalThis as any)[GLOBAL_KEY] = FurnaceChipEngine.instance;
     }
     return FurnaceChipEngine.instance;
   }
@@ -190,15 +216,20 @@ export class FurnaceChipEngine {
       const baseUrl = import.meta.env.BASE_URL || '/';
       const cacheBuster = `?v=${Date.now()}`;
 
-      // Add worklet module to the rawContext (standardized-audio-context)
+      // IMPORTANT: Determine which context we'll use for BOTH module loading AND worklet creation
+      // Must be the same context or the processor won't be found!
+      const ctxForWorklet = (nativeCtx instanceof AudioContext) ? nativeCtx : rawContext;
+      console.log('[FurnaceChipEngine] Using context for worklet:', ctxForWorklet.constructor.name);
+
+      // Add worklet module to the SAME context we'll use for AudioWorkletNode
       const workletUrl = `${baseUrl}FurnaceChips.worklet.js${cacheBuster}`;
       try {
-        await rawContext.audioWorklet.addModule(workletUrl);
-        console.log('[FurnaceChipEngine] Worklet module loaded');
+        await ctxForWorklet.audioWorklet.addModule(workletUrl);
+        console.log('[FurnaceChipEngine] Worklet module loaded on', ctxForWorklet.constructor.name);
       } catch (err: any) {
         // Check if it's "already registered" vs actual error
         if (err?.message?.includes('already') || err?.name === 'InvalidStateError') {
-          console.log('[FurnaceChipEngine] Worklet already registered');
+          console.log('[FurnaceChipEngine] Worklet already registered on', ctxForWorklet.constructor.name);
         } else {
           console.error('[FurnaceChipEngine] Worklet load failed:', workletUrl, err);
           this.initPromise = null; // Allow retry
@@ -250,17 +281,19 @@ export class FurnaceChipEngine {
         // Store native context reference for diagnostics
         this.nativeContext = nativeCtx;
 
-        // Use Tone.js's createAudioWorkletNode with rawContext (standardized-audio-context)
-        // Explicitly set output configuration for stereo
-        this.workletNode = toneCreateAudioWorkletNode(rawContext, 'furnace-chips-processor', {
+        // Use NATIVE AudioWorkletNode directly (not Tone.js wrapper) to avoid
+        // any potential SAC wrapping issues with message ports
+        // ctxForWorklet was determined earlier for module loading
+        console.log('[FurnaceChipEngine] Creating AudioWorkletNode with context type:', ctxForWorklet.constructor.name);
+
+        this.workletNode = new AudioWorkletNode(ctxForWorklet, 'furnace-chips-processor', {
           numberOfOutputs: 1,
           outputChannelCount: [2],
         });
 
         if (this.workletNode) {
-          // Don't connect directly to destination - let FurnaceSynth route
-          // through its Tone.js output gain for proper signal chain integration
-          console.log('[FurnaceChipEngine] AudioWorkletNode created, ctx state:', rawContext.state);
+          console.log('[FurnaceChipEngine] ✓ Native AudioWorkletNode created, ctx state:', ctxForWorklet.state);
+          console.log('[FurnaceChipEngine] port:', this.workletNode.port ? 'exists' : 'null');
         }
       } catch (err) {
         console.error('[FurnaceChipEngine] AudioWorkletNode creation failed:', err);
@@ -300,41 +333,48 @@ export class FurnaceChipEngine {
       const success = await initPromise;
       if (success) {
         this.isLoaded = true;
+        // Store the context we used for worklet (same one for audio routing)
+        // ctxForWorklet was determined at the start of doInit
+        this.rawContext = ctxForWorklet;
         console.log('[FurnaceChipEngine] ✓ WASM chips initialized successfully');
 
-        // CRITICAL: Connect worklet through a silent keepalive to destination.
-        // AudioWorkletNode.process() is only called by the browser when the node
-        // is in an active audio graph path to destination. Without this connection,
-        // the worklet sits idle and never renders audio — even though FurnaceSynth
-        // connects it to outputGain (the SAC→native bridge doesn't trigger processing).
-        // The keepalive gain is set to 0 so no audio leaks directly to speakers.
-        // FurnaceSynth.initEngine() connects through outputGain for actual signal routing.
+        // CRITICAL: Create native audio routing - all connections stay in native context.
+        // workletNode → outputGain → destination (all native AudioNodes)
+        // This avoids the native→SAC connection issue that causes silent failures.
+        // FurnaceSynth controls volume via setOutputGain() instead of connecting to SAC nodes.
         try {
-          const keepalive = rawContext.createGain();
-          keepalive.gain.value = 0;
-          this.workletNode!.connect(keepalive);
-          keepalive.connect(rawContext.destination);
-          console.log('[FurnaceChipEngine] ✓ Worklet keepalive → destination (process() activation)');
+          const gain = ctxForWorklet.createGain();
+          gain.gain.value = 1; // Full volume by default
+          this.workletNode!.connect(gain);
+          gain.connect(ctxForWorklet.destination);
+          this.outputGain = gain;
+          console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → destination (native audio path)');
         } catch (destErr) {
-          console.warn('[FurnaceChipEngine] Keepalive connection failed:', destErr);
-          // Fallback: try native context
+          console.warn('[FurnaceChipEngine] Native connection failed:', destErr);
+          // Fallback: try nativeCtx
           try {
             if (nativeCtx && nativeCtx.destination) {
-              const keepalive = nativeCtx.createGain();
-              keepalive.gain.value = 0;
-              this.workletNode!.connect(keepalive);
-              keepalive.connect(nativeCtx.destination);
-              console.log('[FurnaceChipEngine] ✓ Worklet keepalive → native destination (fallback)');
+              const gain = nativeCtx.createGain();
+              gain.gain.value = 1;
+              this.workletNode!.connect(gain);
+              gain.connect(nativeCtx.destination);
+              this.outputGain = gain;
+              console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → native destination (fallback)');
             }
           } catch (nativeErr) {
-            console.warn('[FurnaceChipEngine] Native keepalive also failed:', nativeErr);
+            console.warn('[FurnaceChipEngine] Native fallback also failed:', nativeErr);
           }
         }
 
         // Message handler for debug and status messages from worklet
         this.workletNode!.port.addEventListener('message', (event: MessageEvent) => {
           if (event.data.type === 'debug') {
-            console.log('[FurnaceWorklet]', event.data.message, event.data);
+            // Highlight write message receipts (they should show MSG_RECV_v2b)
+            if (event.data.msgType === 'write') {
+              console.log('[FurnaceWorklet] ✓ WRITE RECEIVED:', event.data);
+            } else {
+              console.log('[FurnaceWorklet]', event.data.message, event.data);
+            }
           } else if (event.data.type === 'status') {
             console.log('[FurnaceWorklet] Status:', event.data);
           }
@@ -358,25 +398,47 @@ export class FurnaceChipEngine {
    * Write to a chip register
    */
   public write(chipType: FurnaceChipType, register: number, value: number): void {
+    // Debug: on first few writes, log detailed state
+    if (this.writeCount < 5) {
+      console.log(`[FurnaceChipEngine#${this.myInstanceId}] write() - workletNode:`,
+        this.workletNode ? 'exists' : 'null',
+        'port:', this.workletNode?.port ? 'exists' : 'null',
+        'loaded:', this.isLoaded,
+        'ctx state:', this.rawContext?.state,
+        'globalInstance:', (globalThis as any)[GLOBAL_KEY] === this ? 'MATCH' : 'MISMATCH!');
+    }
+
     if (!this.workletNode) {
       if (this.writeCount < 5) {
         console.warn('[FurnaceChipEngine] Write ignored - no worklet node');
       }
+      this.writeCount++;
       return;
     }
-    this.workletNode.port.postMessage({
+
+    // Ensure AudioContext is running - it may have been suspended
+    if (this.rawContext && this.rawContext.state !== 'running') {
+      console.warn('[FurnaceChipEngine] AudioContext suspended, attempting resume...');
+      this.rawContext.resume().catch(() => {});
+    }
+
+    // Send the message
+    const msg = {
       type: 'write',
       chipType,
       register,
-      value
-    });
+      value,
+      writeId: this.writeCount // Add ID for tracking
+    };
+    this.workletNode.port.postMessage(msg);
+
     // Log first few writes AND critical registers for debugging
     // 0x08 = OPM/OPZ key-on, 0x28 = OPN2 key-on, 0xA0-0xA7 = FREQ
     const isCritical = register === 0x08 || register === 0x28 || (register >= 0xA0 && register <= 0xA7);
     if (this.writeCount < 10 || isCritical) {
       const ctxState = this.nativeContext?.state || 'no-ctx';
       const tag = isCritical ? '★' : '';
-      console.log(`[FurnaceChipEngine] ${tag}Write: chip=${chipType}, reg=0x${register.toString(16)}, val=0x${value.toString(16)}, ctx=${ctxState}`);
+      console.log(`[FurnaceChipEngine] ${tag}Write #${this.writeCount}: chip=${chipType}, reg=0x${register.toString(16)}, val=0x${value.toString(16)}, ctx=${ctxState}`);
     }
     this.writeCount++;
   }
@@ -398,6 +460,77 @@ export class FurnaceChipEngine {
   public requestWorkletStatus(): void {
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'getStatus' });
+    }
+  }
+
+  /**
+   * Send a test ping to verify message passing works
+   */
+  public testPing(): void {
+    if (this.workletNode) {
+      console.log('[FurnaceChipEngine] Sending test ping...');
+      this.workletNode.port.postMessage({ type: 'ping', timestamp: Date.now() });
+    } else {
+      console.warn('[FurnaceChipEngine] Cannot ping - no workletNode');
+    }
+  }
+
+  /**
+   * Send a test write to verify write messages reach the worklet
+   */
+  public testWrite(): void {
+    if (this.workletNode) {
+      console.log('[FurnaceChipEngine] Sending TEST write (chipType=0, reg=0xFF, val=0xAA)...');
+      this.workletNode.port.postMessage({
+        type: 'write',
+        chipType: 0,
+        register: 0xFF,
+        value: 0xAA,
+        writeId: -1 // Negative ID marks test writes
+      });
+    } else {
+      console.warn('[FurnaceChipEngine] Cannot test write - no workletNode');
+    }
+  }
+
+  /**
+   * Get the native outputGain node for metering purposes.
+   * Returns the native GainNode that receives audio from the worklet.
+   * Use this to connect a native AnalyserNode for metering WASM audio.
+   */
+  public getNativeOutput(): GainNode | null {
+    return this.outputGain;
+  }
+
+  /**
+   * Debug: Get info about the worklet node and port for diagnostics
+   */
+  public getWorkletDiagnostics(): { hasNode: boolean; hasPort: boolean; portId: string } {
+    const hasNode = this.workletNode !== null;
+    const hasPort = this.workletNode?.port !== null;
+    // Create a unique identifier for the port (for comparing across calls)
+    const portId = hasPort ? `port-inst-${this.myInstanceId}` : 'none';
+    return { hasNode, hasPort, portId };
+  }
+
+  /**
+   * Reset write counter for testing purposes
+   */
+  public resetWriteCount(): void {
+    this.writeCount = 0;
+    const ctxState = this.rawContext?.state || 'no-ctx';
+    console.log(`[FurnaceChipEngine#${this.myInstanceId}] Write count reset to 0, ctx state: ${ctxState}`);
+
+    // Ensure AudioContext is running
+    if (this.rawContext && this.rawContext.state !== 'running') {
+      console.warn(`[FurnaceChipEngine#${this.myInstanceId}] Context not running (${ctxState}), resuming...`);
+      this.rawContext.resume().catch(e => console.error('Resume failed:', e));
+    }
+
+    // Send a verification ping to check if port is still working
+    if (this.workletNode) {
+      console.log(`[FurnaceChipEngine#${this.myInstanceId}] Sending verification ping after reset...`);
+      this.workletNode.port.postMessage({ type: 'ping', timestamp: Date.now(), label: 'post-reset' });
     }
   }
 
@@ -445,6 +578,24 @@ export class FurnaceChipEngine {
   public getOutput(): AudioNode {
     if (!this.workletNode) throw new Error('Engine not initialized');
     return this.workletNode;
+  }
+
+  /**
+   * Set the output gain value (0-1 range).
+   * This controls volume for all Furnace synths using this engine.
+   * Audio routing happens entirely in native context to avoid SAC connection issues.
+   */
+  public setOutputGain(value: number): void {
+    if (this.outputGain) {
+      this.outputGain.gain.setValueAtTime(value, this.rawContext?.currentTime || 0);
+    }
+  }
+
+  /**
+   * Get the current output gain value
+   */
+  public getOutputGainValue(): number {
+    return this.outputGain?.gain.value ?? 1;
   }
 
   /**
