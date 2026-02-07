@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import type { V2Config } from '@/types/instrument';
 
 export class V2Synth extends Tone.ToneAudioNode {
   public readonly name: string = 'V2Synth';
@@ -11,10 +12,12 @@ export class V2Synth extends Tone.ToneAudioNode {
   private _initPromise: Promise<void>;
   private _pendingNotes: Array<{note: number, vel: number}> = [];
   private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+  private _initialConfig?: V2Config;
 
-  constructor() {
+  constructor(config?: V2Config) {
     super();
     this.output = new Tone.Gain();
+    this._initialConfig = config;
     this._initPromise = this._initialize();
   }
 
@@ -102,10 +105,16 @@ export class V2Synth extends Tone.ToneAudioNode {
         if (event.data.type === 'ready') {
           clearTimeout(timeout);
           this._initialized = true;
+          // Apply initial V2 config before flushing notes
+          if (this._initialConfig) {
+            this._applyV2Config(this._initialConfig);
+          }
           // Flush any pending notes that were queued during init
           this._pendingNotes.forEach(n => this._sendMIDI([0x90, n.note, n.vel]));
           this._pendingNotes = [];
           resolve();
+        } else if (event.data.type === 'error') {
+          console.error('[V2Synth] Worklet error:', event.data.error);
         }
       };
 
@@ -184,6 +193,80 @@ export class V2Synth extends Tone.ToneAudioNode {
         index,
         value
       });
+    }
+  }
+
+  /** Apply a V2Config, mapping config fields to WASM parameter indices */
+  public applyConfig(config: V2Config) {
+    if (this._initialized) {
+      this._applyV2Config(config);
+    } else {
+      this._initialConfig = config;
+    }
+  }
+
+  private _applyV2Config(config: V2Config) {
+    // Osc 1 (indices 2-7)
+    if (config.osc1) {
+      this.setParameter(2, config.osc1.mode);
+      this.setParameter(4, config.osc1.transpose + 64);
+      this.setParameter(5, config.osc1.detune + 64);
+      this.setParameter(6, config.osc1.color);
+      this.setParameter(7, config.osc1.level);
+    }
+    // Osc 2 (indices 8-13)
+    if (config.osc2) {
+      this.setParameter(8, config.osc2.mode);
+      this.setParameter(9, config.osc2.ringMod ? 1 : 0);
+      this.setParameter(10, config.osc2.transpose + 64);
+      this.setParameter(11, config.osc2.detune + 64);
+      this.setParameter(12, config.osc2.color);
+      this.setParameter(13, config.osc2.level);
+    }
+    // Osc 3 (indices 14-19)
+    if (config.osc3) {
+      this.setParameter(14, config.osc3.mode);
+      this.setParameter(15, config.osc3.ringMod ? 1 : 0);
+      this.setParameter(16, config.osc3.transpose + 64);
+      this.setParameter(17, config.osc3.detune + 64);
+      this.setParameter(18, config.osc3.color);
+      this.setParameter(19, config.osc3.level);
+    }
+    // Filter 1 (indices 20-22)
+    if (config.filter1) {
+      this.setParameter(20, config.filter1.mode);
+      this.setParameter(21, config.filter1.cutoff);
+      this.setParameter(22, config.filter1.resonance);
+    }
+    // Filter 2 (indices 23-25)
+    if (config.filter2) {
+      this.setParameter(23, config.filter2.mode);
+      this.setParameter(24, config.filter2.cutoff);
+      this.setParameter(25, config.filter2.resonance);
+    }
+    // Routing (indices 26-27)
+    if (config.routing) {
+      this.setParameter(26, config.routing.mode);
+      this.setParameter(27, config.routing.balance);
+    }
+    // Amp Envelope (indices 32-37: Attack, Decay, Sustain, SusTime, Release, Amplify)
+    if (config.envelope) {
+      this.setParameter(32, config.envelope.attack);
+      this.setParameter(33, config.envelope.decay);
+      this.setParameter(34, config.envelope.sustain);
+      this.setParameter(36, config.envelope.release);
+    }
+    // Envelope 2 (indices 38-43: Attack, Decay, Sustain, SusTime, Release, Amplify)
+    if (config.envelope2) {
+      this.setParameter(38, config.envelope2.attack);
+      this.setParameter(39, config.envelope2.decay);
+      this.setParameter(40, config.envelope2.sustain);
+      this.setParameter(42, config.envelope2.release);
+    }
+    // LFO 1 (indices 44-50: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
+    if (config.lfo1) {
+      this.setParameter(47, config.lfo1.rate);
+      this.setParameter(50, config.lfo1.depth);
     }
   }
 

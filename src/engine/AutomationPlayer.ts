@@ -7,7 +7,7 @@
 
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
-import { JC303Synth } from './jc303/JC303Synth';
+import { JC303Synth } from './open303/Open303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import type { TrackerCell, Pattern } from '@typedefs';
 import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';
@@ -236,8 +236,8 @@ export class AutomationPlayer {
 
       switch (parameter) {
         case 'cutoff':
-          // Map 0-1 to 50-18000 Hz (logarithmic)
-          const cutoffHz = 50 * Math.pow(360, value); // 50 to ~18000 Hz
+          // Map 0-1 to 200-5000 Hz (logarithmic) — calibrated to DSP env mod range
+          const cutoffHz = 200 * Math.pow(5000 / 200, value); // 200 to 5000 Hz
           if (isTB303) {
             console.log(`[AutomationPlayer] Applying cutoff: value=${value.toFixed(3)} -> ${cutoffHz.toFixed(0)}Hz`);
             (instrument as JC303Synth).setCutoff(cutoffHz);

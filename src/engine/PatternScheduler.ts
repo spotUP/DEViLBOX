@@ -449,7 +449,7 @@ export class PatternScheduler {
               // Resolve effect string for handler - FIX: include type 0
               const effectStr = (cell.effTyp !== undefined && cell.effTyp !== null)
                 ? xmEffectToString(cell.effTyp, cell.eff ?? 0)
-                : (cell.effect2 && cell.effect2 !== '...') ? cell.effect2 : null;
+                : null;
 
               // Resolve volume for handler - FIX: use 255 as 'empty' sentinel
               // cell.volume 0x00 can be a valid 'set volume to 0' in some formats (like MOD C00)
@@ -520,8 +520,8 @@ export class PatternScheduler {
                 return;
               }
 
-              // Trigger note if requested
-              if (effectResult.triggerNote && !effectResult.preventNoteTrigger) {
+              // Trigger note if requested (skip if channel is muted)
+              if (effectResult.triggerNote && !effectResult.preventNoteTrigger && !engine.isChannelMuted(channelIndex)) {
                 if (instrument) {
                   // Use effectResult.setVolume if available, else default to volumeValue or 0.8
                   const velocity = effectResult.setVolume !== undefined 

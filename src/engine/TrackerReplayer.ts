@@ -697,6 +697,13 @@ export class TrackerReplayer {
 
     // Process tick-0 effects
     this.processEffect0(chIndex, ch, effect, param, time);
+
+    // Process second effect column (effTyp2/eff2)
+    const effect2 = row.effTyp2 ?? 0;
+    const param2 = row.eff2 ?? 0;
+    if (effect2 !== 0 || param2 !== 0) {
+      this.processEffect0(chIndex, ch, effect2, param2, time);
+    }
   }
 
   // ==========================================================================
@@ -706,6 +713,25 @@ export class TrackerReplayer {
   private processEffect0(chIndex: number, ch: ChannelState, effect: number, param: number, time: number): void {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
+
+    // Route effects to Furnace synths (if applicable)
+    // Global effects (position jump, pattern break, speed/tempo) are still processed below
+    if (ch.instrument?.synthType?.startsWith('Furnace')) {
+      const engine = getToneEngine();
+      // Route chip-specific effects to Furnace engine
+      // Skip ONLY global effects that affect playback state, not the chip:
+      // 0x0B = Position jump, 0x0D = Pattern break, 0x0F = Set speed/tempo
+      // Note: 0x10+ are platform-specific in Furnace (FM LFO, TL, etc.) - NOT global
+      const isGlobalEffect = effect === 0x0B || effect === 0x0D || effect === 0x0F;
+      if (!isGlobalEffect) {
+        if (effect === 0x0E) {
+          // Extended effects use Exy format
+          engine.applyFurnaceExtendedEffect(ch.instrument.id, x, y, chIndex);
+        } else {
+          engine.applyFurnaceEffect(ch.instrument.id, effect, param, chIndex);
+        }
+      }
+    }
 
     switch (effect) {
       case 0x0: // Arpeggio - nothing on tick 0
@@ -874,6 +900,19 @@ export class TrackerReplayer {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
+    // Process second effect column
+    const effect2 = row.effTyp2 ?? 0;
+    const param2 = row.eff2 ?? 0;
+    if (effect2 !== 0 || param2 !== 0) {
+      this.processEffectTickSingle(chIndex, ch, row, effect2, param2, time);
+    }
+
+    // Route continuous effects to Furnace dispatch engine (ticks 1+)
+    // The dispatch engine needs per-tick commands for pitch slides, vibrato, etc.
+    if (ch.instrument?.synthType?.startsWith('Furnace')) {
+      this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
+    }
+
     switch (effect) {
       case 0x0: // Arpeggio
         if (param !== 0) this.doArpeggio(ch, param);
@@ -956,6 +995,74 @@ export class TrackerReplayer {
           }
         }
         break;
+    }
+  }
+
+  /**
+   * Process a single effect on ticks 1+ (reusable for effect2 column)
+   */
+  private processEffectTickSingle(chIndex: number, ch: ChannelState, row: TrackerCell, effect: number, param: number, time: number): void {
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
+
+    // Route continuous effects to Furnace dispatch engine (ticks 1+)
+    if (ch.instrument?.synthType?.startsWith('Furnace')) {
+      this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
+    }
+
+    switch (effect) {
+      case 0x0: if (param !== 0) this.doArpeggio(ch, param); break;
+      case 0x1: ch.period = Math.max(113, ch.period - ch.portaSpeed); this.updatePeriod(ch); break;
+      case 0x2: ch.period = Math.min(856, ch.period + ch.portaSpeed); this.updatePeriod(ch); break;
+      case 0x3: this.doTonePortamento(ch); break;
+      case 0x4: this.doVibrato(ch); break;
+      case 0x5: this.doTonePortamento(ch); this.doVolumeSlide(ch, param, time); break;
+      case 0x6: this.doVibrato(ch); this.doVolumeSlide(ch, param, time); break;
+      case 0x7: this.doTremolo(ch, time); break;
+      case 0xA: this.doVolumeSlide(ch, param, time); break;
+      case 0xE:
+        if (x === 0x9 && y > 0) {
+          ch.retrigCount--;
+          if (ch.retrigCount <= 0) {
+            ch.retrigCount = y;
+            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+          }
+        } else if (x === 0xC && y === this.currentTick) {
+          ch.volume = 0;
+          ch.gainNode.gain.setValueAtTime(0, time);
+        } else if (x === 0xD && y === this.currentTick) {
+          const slideActive = ch.previousSlideFlag;
+          this.triggerNote(ch, time, 0, chIndex, row.accent, slideActive, row.slide ?? false);
+        }
+        break;
+      case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
+      case 0x19: this.doPanSlide(ch, ch.panSlide, time); break;
+      case 0x1B:
+        if (ch.retrigCount > 0) {
+          ch.retrigCount--;
+          if (ch.retrigCount <= 0) {
+            ch.retrigCount = param & 0x0F;
+            this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
+            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+          }
+        }
+        break;
+    }
+  }
+
+  /**
+   * Forward a continuous effect (ticks 1+) to the Furnace dispatch engine.
+   * Skip global effects that only affect playback state (position jump, pattern break, speed).
+   */
+  private forwardEffectToFurnace(ch: ChannelState, chIndex: number, effect: number, param: number, x: number, y: number): void {
+    const isGlobalEffect = effect === 0x0B || effect === 0x0D || effect === 0x0F;
+    if (isGlobalEffect || (effect === 0 && param === 0)) return;
+
+    const engine = getToneEngine();
+    if (effect === 0x0E) {
+      engine.applyFurnaceExtendedEffect(ch.instrument!.id, x, y, chIndex);
+    } else {
+      engine.applyFurnaceEffect(ch.instrument!.id, effect, param, chIndex);
     }
   }
 
@@ -1252,6 +1359,12 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean, currentRowSlide?: boolean): void {
+    // Skip note trigger if channel is muted
+    if (channelIndex !== undefined) {
+      const engine = getToneEngine();
+      if (engine.isChannelMuted(channelIndex)) return;
+    }
+
     const safeTime = time ?? Tone.now();
 
     // Stop the current active player at the new note's start time

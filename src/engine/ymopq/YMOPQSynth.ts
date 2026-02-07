@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { freqToYMOPQ } from '@engine/mame/MAMEPitchUtils';
 
 /**
  * YMOPQ Parameter IDs (matching C++ enum)
@@ -14,7 +13,6 @@ const YMOPQParam = {
   REVERB: 5,
   VOLUME: 6,
   // Per-operator params: base + opIndex * 100
-  // opIndex 1-4, so param 110 = op1 TL, 210 = op2 TL, etc.
   OP_TOTAL_LEVEL: 10,
   OP_ATTACK_RATE: 11,
   OP_DECAY_RATE: 12,
@@ -76,156 +74,238 @@ export const YMOPQPreset = {
  * - Per-channel stereo panning (L/R)
  * - 6-bit detune range (wider than other FM chips)
  * - 8 built-in presets: E.Piano, Brass, Strings, Bass, Organ, Lead, Pad, Bell
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, pitch, panning, FM params)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Per-operator control (TL, AR, DR, SR, RR, MULT, DT)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class YMOPQSynth extends Tone.ToneAudioNode {
+export class YMOPQSynth extends MAMEBaseSynth {
   readonly name = 'YMOPQSynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'YMOPQ';
+  protected readonly workletFile = 'YMOPQ.worklet.js';
+  protected readonly processorName = 'ymopq-processor';
 
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // YMOPQ-specific state
+  private currentChannel: number = 0;
+  private currentAlgorithm: number = 0;
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await YMOPQSynth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[YMOPQ] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/YMOPQ.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'ymopq-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[YMOPQ] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-          else if (call.method === 'setOperatorParam') this.setOperatorParam(call.args[0], call.args[1], call.args[2]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
+      channel: this.currentChannel,
     });
   }
 
-  triggerRelease(_time?: number): void {
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
+    this.workletNode.port.postMessage({
+      type: 'noteOff',
+      note: 0,
+      channel: this.currentChannel,
+    });
   }
 
-  releaseAll(): void {
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    const pitch = freqToYMOPQ(freq);
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      kc: pitch.kc,
+      kf: pitch.kf,
+      channel: this.currentChannel,
+    });
   }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
+  protected writeVolume(volume: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
+    // Apply to carrier operators based on algorithm
+    const carriers = this.getCarrierOperators();
+
+    // TL: 0 = max, 127 = min
+    const tl = Math.round((1 - volume) * 127);
+
+    for (const op of carriers) {
+      this.workletNode.port.postMessage({
+        type: 'setOperatorParam',
+        channel: this.currentChannel,
+        op,
+        param: 'tl',
+        value: tl,
+      });
+    }
   }
 
-  // ========================================================================
-  // Parameter interface
-  // ========================================================================
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
+
+    // YMOPQ has L/R enable bits
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+      channel: this.currentChannel,
+    });
+  }
+
+  /**
+   * Get carrier operators based on algorithm
+   */
+  private getCarrierOperators(): number[] {
+    const carrierMaps: Record<number, number[]> = {
+      0: [3],           // Serial: only OP4 outputs
+      1: [3],
+      2: [3],
+      3: [3],
+      4: [1, 3],        // Dual serial: OP2 and OP4
+      5: [1, 2, 3],     // Branching
+      6: [1, 2, 3],
+      7: [0, 1, 2, 3],  // All operators output
+    };
+    return carrierMaps[this.currentAlgorithm] || [3];
+  }
+
+  // ===========================================================================
+  // FM-Specific Override Methods
+  // ===========================================================================
+
+  protected setFMAlgorithm(alg: number): void {
+    this.currentAlgorithm = alg;
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setAlgorithm',
+      value: alg,
+    });
+  }
+
+  protected setFMFeedback(fb: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setFeedback',
+      value: fb,
+    });
+  }
+
+  protected setFMSensitivity(fms: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById(YMOPQParam.LFO_PM_SENS, fms / 7.0);
+  }
+
+  protected setAMSensitivity(ams: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById(YMOPQParam.LFO_AM_SENS, ams / 3.0);
+  }
+
+  // ===========================================================================
+  // Per-Operator Control
+  // ===========================================================================
+
+  setOperatorTL(op: number, tl: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_TOTAL_LEVEL, tl / 127);
+  }
+
+  setOperatorAR(op: number, ar: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_ATTACK_RATE, ar / 31);
+  }
+
+  setOperatorDR(op: number, dr: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_DECAY_RATE, dr / 31);
+  }
+
+  setOperatorSL(op: number, sl: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_SUSTAIN_LEVEL, sl / 15);
+  }
+
+  setOperatorRR(op: number, rr: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_RELEASE_RATE, rr / 15);
+  }
+
+  setOperatorMult(op: number, mult: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_MULTIPLE, mult / 15);
+  }
+
+  setOperatorDetune(op: number, dt: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.setParameterById((op + 1) * 100 + YMOPQParam.OP_DETUNE, dt / 7);
+  }
+
+  // ===========================================================================
+  // YMOPQ-Specific Methods
+  // ===========================================================================
+
+  setChannel(channel: number): void {
+    this.currentChannel = Math.max(0, Math.min(7, channel));
+  }
+
+  setAlgorithm(value: number): void {
+    this.setFMAlgorithm(value);
+  }
+
+  setFeedback(value: number): void {
+    this.setFMFeedback(value);
+  }
+
+  setLFORate(value: number): void {
+    this.sendMessage('setLFORate', value);
+  }
+
+  setVolume(value: number): void {
+    this.sendMessage('setVolume', value);
+  }
+
+  /** Write a value to a YM3806 register */
+  writeRegister(offset: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  controlChange(cc: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
+  }
+
+  pitchBend(value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'pitchBend', value });
+  }
+
+  loadPreset(program: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
+      return;
+    }
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'programChange', program });
+  }
+
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
 
   private setParameterById(paramId: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -240,7 +320,7 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
     // Handle composite operator keys: op1_total_level, op2_attack_rate, etc.
     const opMatch = param.match(/^op(\d+)_(.+)$/);
     if (opMatch) {
-      this.setOperatorParam(parseInt(opMatch[1]), opMatch[2], value);
+      this.setOperatorParamByName(parseInt(opMatch[1]), opMatch[2], value);
       return;
     }
 
@@ -260,17 +340,7 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
     }
   }
 
-  /**
-   * Set a per-operator parameter.
-   * @param opIndex - Operator index (1-4)
-   * @param param - Parameter name
-   * @param value - Parameter value
-   */
-  setOperatorParam(opIndex: number, param: string, value: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'setOperatorParam', args: [opIndex, param, value] });
-      return;
-    }
+  private setOperatorParamByName(opIndex: number, param: string, value: number): void {
     const opParamMap: Record<string, number> = {
       total_level: YMOPQParam.OP_TOTAL_LEVEL,
       attack_rate: YMOPQParam.OP_ATTACK_RATE,
@@ -291,83 +361,9 @@ export class YMOPQSynth extends Tone.ToneAudioNode {
     }
   }
 
-  // ========================================================================
-  // Convenience setters
-  // ========================================================================
-
-  /** Set FM algorithm (0-7). Use YMOPQAlgorithm constants. */
-  setAlgorithm(value: number): void {
-    this.sendMessage('setAlgorithm', value);
-  }
-
-  /** Set operator 1 feedback level (0-7) */
-  setFeedback(value: number): void {
-    this.sendMessage('setFeedback', value);
-  }
-
-  /** Set LFO rate (0-7, ~4Hz to ~47Hz) */
-  setLFORate(value: number): void {
-    this.sendMessage('setLFORate', value);
-  }
-
-  /** Set output volume (0-1) */
-  setVolume(value: number): void {
-    this.sendMessage('setVolume', value);
-  }
-
-  // ========================================================================
-  // Register-level access (for hardware-accurate use)
-  // ========================================================================
-
-  /** Write a value to a YM3806 register */
-  writeRegister(offset: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
-  }
-
-  // ========================================================================
-  // MIDI CC and pitch bend
-  // ========================================================================
-
-  controlChange(cc: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
-  }
-
-  pitchBend(value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'pitchBend', value });
-  }
-
-  /** Load a preset patch by program number (0-7) */
-  loadPreset(program: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
-      return;
-    }
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'programChange', program });
-  }
-
-  // ========================================================================
-  // Internal
-  // ========================================================================
-
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

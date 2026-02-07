@@ -22,6 +22,7 @@
 
 import * as Tone from 'tone';
 import { MAMEEngine, MAMESynthType } from '../MAMEEngine';
+import { loadVFXROMs } from '@engine/mame/MAMEROMLoader';
 
 // ES5506 Voice control bits
 export const ES5506Control = {
@@ -206,6 +207,19 @@ export class VFXSynth extends Tone.ToneAudioNode {
 
     this.isInitialized = true;
     console.log('[VFXSynth] Initialized with ES5506 handle:', this.handle);
+
+    // Auto-load sample ROM banks
+    try {
+      const banks = await loadVFXROMs();
+      for (let i = 0; i < banks.length; i++) {
+        await this.loadSampleROM(i, banks[i].buffer as ArrayBuffer);
+      }
+      console.log('[VFXSynth] ROMs loaded successfully');
+    } catch (error) {
+      console.error('[VFXSynth] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/vfx/ - see /public/roms/README.md');
+      // Continue anyway - synth will initialize but won't produce sound without ROMs
+    }
   }
 
   /**
@@ -313,6 +327,21 @@ export class VFXSynth extends Tone.ToneAudioNode {
     // Start playing (clear stop bit)
     let control = ES5506Control.LOOP_ENABLE;
     this.writeVoiceReg(voiceIndex, ES5506_REG.CONTROL, control);
+
+    return this;
+  }
+
+  /**
+   * Trigger a note with automatic release
+   */
+  triggerAttackRelease(note: string | number, duration: string | number = 0.5, _time?: number, velocity: number = 0.8): this {
+    this.triggerAttack(note, _time, velocity);
+
+    // Schedule release
+    const durationSeconds = typeof duration === 'string' ? Tone.Time(duration).toSeconds() : duration;
+    setTimeout(() => {
+      this.triggerRelease(note);
+    }, durationSeconds * 1000);
 
     return this;
   }

@@ -351,17 +351,17 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     if (!this.is303Style()) return;
 
     // Track current cutoff for filter tracking feature
-    this.currentCutoff = Math.max(50, Math.min(18000, hz));
+    this.currentCutoff = Math.max(200, Math.min(5000, hz));
 
     // Also update post-filter if not using tracking (direct cutoff control)
     if (this.postFilter && this.filterTrackingAmount === 0) {
       this.postFilter.frequency.value = Math.min(18000, this.currentCutoff * 1.5);
     }
 
-    // Map Hz (50-18000) to Aggressor range (0x00-0xF0)
+    // Map Hz (200-5000) to Aggressor range (0x00-0xF0)
     // Aggressor uses a squared curve: cutoff = (param / 240)^2 * 0.8775 + 0.1225
     // Reverse: param = sqrt((cutoff - 0.1225) / 0.8775) * 240
-    const normalized = Math.min(Math.max((hz - 50) / (18000 - 50), 0), 1);
+    const normalized = Math.min(Math.max((hz - 200) / (5000 - 200), 0), 1);
     const param = Math.round(Math.sqrt(normalized) * 0xF0);
     this.setParameter(1, Math.min(0xF0, Math.max(0, param)));
   }

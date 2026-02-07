@@ -144,8 +144,10 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
       // Load worklet module (once per session)
       if (!RdPianoSynth.isWorkletLoaded) {
         if (!RdPianoSynth.workletLoadPromise) {
+          // Add cache-busting timestamp to force reload of worklet changes
+          const cacheBuster = `?v=${Date.now()}`;
           RdPianoSynth.workletLoadPromise = rawContext.audioWorklet.addModule(
-            `${baseUrl}rdpiano/RdPiano.worklet.js`
+            `${baseUrl}rdpiano/RdPiano.worklet.js${cacheBuster}`
           );
         }
         await RdPianoSynth.workletLoadPromise;
@@ -233,17 +235,25 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
         console.error('[RdPiano] Failed to load program ROM. Place ROM files in public/rdpiano/roms/');
         return;
       }
+
+      // Send program ROM to worklet
       this._worklet?.port.postMessage({
         type: 'loadProgramROM',
         romData: progRom,
       });
+
+      // Wait for program ROM to be processed
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Load ROM set for initial patch
       const initialPatch = this.config.patch || 0;
       const romSetIdx = RDPIANO_PATCHES[initialPatch].romSet;
       await this.loadROMSet(romSetIdx);
 
-      // Send initMCU
+      // Wait for ROM set to be processed before calling initMCU
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Send initMCU - may fail due to WASM bug, but worklet handles it gracefully now
       this._worklet?.port.postMessage({ type: 'initMCU' });
 
     } catch (error) {

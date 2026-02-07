@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { freqToYMF271 } from '@engine/mame/MAMEPitchUtils';
 
 /**
  * YMF271 Parameter IDs (matching C++ enum)
@@ -72,145 +71,332 @@ const YMF271Waveform = {
  * - ADSR envelope (Attack, Decay1, Decay2, Release)
  * - LFO with pitch and amplitude modulation
  * - PCM playback mode
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, pitch, panning, FM params)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Per-operator control (TL, AR, DR, RR, MULT, DT)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class YMF271Synth extends Tone.ToneAudioNode {
+export class YMF271Synth extends MAMEBaseSynth {
   readonly name = 'YMF271Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'YMF271';
+  protected readonly workletFile = 'YMF271.worklet.js';
+  protected readonly processorName = 'ymf271-processor';
 
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // YMF271-specific state
+  private currentGroup: number = 0;
+  private currentAlgorithm: number = 0;
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await YMF271Synth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[YMF271] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/YMF271.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    // Get the rawContext from Tone.js (standardized-audio-context)
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'ymf271-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate
-      }
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[YMF271] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate
-    });
-
-    // Connect worklet to Tone.js output - use the input property which is the native GainNode
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  /**
+   * Write key-on to YMF271
+   */
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote = typeof note === 'string'
-      ? Tone.Frequency(note).toMidi()
-      : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
-      velocity: Math.floor(velocity * 127)
+      note,
+      velocity: Math.floor(velocity * 127),
+      group: this.currentGroup,
     });
   }
 
-  triggerRelease(_time?: number): void {
+  /**
+   * Write key-off to YMF271
+   */
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
-      note: 0
+      note: 0,
+      group: this.currentGroup,
     });
   }
 
-  releaseAll(): void {
+  /**
+   * Write frequency to YMF271 using Block+Fnum
+   */
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    const pitch = freqToYMF271(freq);
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      block: pitch.block,
+      fnum: pitch.fnum,
+      group: this.currentGroup,
+    });
   }
 
-  triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
+  /**
+   * Write volume to YMF271 (applies to carrier operators)
+   */
+  protected writeVolume(volume: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
+    // Get carrier operators for current algorithm
+    const carriers = this.getCarrierOperators();
+
+    // TL: 0 = max, 127 = min
+    const tl = Math.round((1 - volume) * 127);
+
+    for (const op of carriers) {
+      this.workletNode.port.postMessage({
+        type: 'setOperatorParam',
+        group: this.currentGroup,
+        op,
+        param: 'tl',
+        value: tl,
+      });
+    }
   }
+
+  /**
+   * Write panning to YMF271 (0-255, 128 = center)
+   */
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
+
+    // YMF271 uses L/R enable bits
+    // For simplicity, map to balance
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+      group: this.currentGroup,
+    });
+  }
+
+  /**
+   * Get carrier operators based on algorithm
+   */
+  private getCarrierOperators(): number[] {
+    // YMF271 algorithm carrier map (simplified)
+    // Algorithm determines which operators output to DAC
+    const carrierMaps: Record<number, number[]> = {
+      0: [3],           // Serial: only OP4 outputs
+      1: [2, 3],
+      2: [2, 3],
+      3: [1, 3],
+      4: [1, 3],
+      5: [0, 2, 3],
+      6: [0, 2, 3],
+      7: [0, 1, 2, 3],  // All operators output
+      // 8-15 similar patterns
+    };
+    return carrierMaps[this.currentAlgorithm % 8] || [3];
+  }
+
+  // ===========================================================================
+  // FM-Specific Override Methods
+  // ===========================================================================
+
+  /**
+   * Set FM algorithm
+   */
+  protected setFMAlgorithm(alg: number): void {
+    this.currentAlgorithm = alg;
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setParameter',
+      paramId: YMF271Param.ALGORITHM,
+      value: alg / 15.0,
+    });
+  }
+
+  /**
+   * Set FM feedback
+   */
+  protected setFMFeedback(fb: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setParameter',
+      paramId: YMF271Param.FEEDBACK,
+      value: fb / 7.0,
+    });
+  }
+
+  /**
+   * Set FM sensitivity (PMS)
+   */
+  protected setFMSensitivity(fms: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setParameter',
+      paramId: YMF271Param.PMS,
+      value: fms / 7.0,
+    });
+  }
+
+  /**
+   * Set AM sensitivity (AMS)
+   */
+  protected setAMSensitivity(ams: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setParameter',
+      paramId: YMF271Param.AMS,
+      value: ams / 3.0,
+    });
+  }
+
+  // ===========================================================================
+  // Per-Operator Control
+  // ===========================================================================
+
+  /**
+   * Set operator Total Level
+   */
+  setOperatorTL(op: number, tl: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'tl',
+      value: tl,
+    });
+  }
+
+  /**
+   * Set operator Attack Rate
+   */
+  setOperatorAR(op: number, ar: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'ar',
+      value: ar,
+    });
+  }
+
+  /**
+   * Set operator Decay1 Rate
+   */
+  setOperatorDR(op: number, dr: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'd1r',
+      value: dr,
+    });
+  }
+
+  /**
+   * Set operator Decay2 Rate
+   */
+  setOperatorD2R(op: number, d2r: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'd2r',
+      value: d2r,
+    });
+  }
+
+  /**
+   * Set operator Release Rate
+   */
+  setOperatorRR(op: number, rr: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'rr',
+      value: rr,
+    });
+  }
+
+  /**
+   * Set operator Multiplier
+   */
+  setOperatorMult(op: number, mult: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'mult',
+      value: mult,
+    });
+  }
+
+  /**
+   * Set operator Detune
+   */
+  setOperatorDetune(op: number, dt: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'dt',
+      value: dt,
+    });
+  }
+
+  /**
+   * Set operator Waveform
+   */
+  setOperatorWaveform(op: number, wave: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setOperatorParam',
+      group: this.currentGroup,
+      op,
+      param: 'waveform',
+      value: wave,
+    });
+  }
+
+  // ===========================================================================
+  // YMF271-Specific Methods
+  // ===========================================================================
+
+  /**
+   * Select which group to control
+   */
+  setGroup(group: number): void {
+    this.currentGroup = Math.max(0, Math.min(11, group));
+  }
+
+  /**
+   * Set LFO frequency
+   */
+  setLFOFrequency(freq: number): void {
+    this.setParameterById(YMF271Param.LFO_FREQ, freq / 255.0);
+  }
+
+  /**
+   * Set LFO waveform (0-3)
+   */
+  setLFOWaveform(wave: number): void {
+    this.setParameterById(YMF271Param.LFO_WAVE, wave / 3.0);
+  }
+
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
 
   private setParameterById(paramId: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -260,11 +446,11 @@ export class YMF271Synth extends Tone.ToneAudioNode {
 
   // Convenience methods for FM parameters
   setAlgorithm(alg: number): void {
-    this.setParameterById(YMF271Param.ALGORITHM, alg / 15.0);
+    this.setFMAlgorithm(alg);
   }
 
   setFeedback(fb: number): void {
-    this.setParameterById(YMF271Param.FEEDBACK, fb / 7.0);
+    this.setFMFeedback(fb);
   }
 
   setWaveform(wave: number): void {
@@ -295,28 +481,8 @@ export class YMF271Synth extends Tone.ToneAudioNode {
     this.setParameterById(YMF271Param.MULTIPLE, mul / 15.0);
   }
 
-  setLFOFrequency(freq: number): void {
-    this.setParameterById(YMF271Param.LFO_FREQ, freq / 255.0);
-  }
-
-  setLFOWaveform(wave: number): void {
-    this.setParameterById(YMF271Param.LFO_WAVE, wave / 3.0);
-  }
-
   setMasterVolume(val: number): void {
     this.setParameterById(YMF271Param.MASTER_VOLUME, val);
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

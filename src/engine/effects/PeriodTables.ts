@@ -19,10 +19,15 @@ export const NOTES_PER_OCTAVE = 12;
  */
 export function periodToFrequency(period: number, ntsc: boolean = false): number {
   if (period <= 0) return 0;
-  
-  const wasm = getToneEngine().getWasmInstance();
-  if (wasm && !ntsc && typeof wasm.periodToHz === 'function') {
-    return wasm.periodToHz(period);
+
+  // Try WASM for higher accuracy, but gracefully fall back if ToneEngine unavailable (e.g., in tests)
+  try {
+    const wasm = getToneEngine().getWasmInstance();
+    if (wasm && !ntsc && typeof wasm.periodToHz === 'function') {
+      return wasm.periodToHz(period);
+    }
+  } catch {
+    // ToneEngine not available (test environment, SSR, etc.) - use pure JS calculation
   }
 
   return (ntsc ? 3579545 : 3546895) / (period * 2); // Corrected formula: clock / (period * 2)
@@ -34,9 +39,14 @@ export function periodToFrequency(period: number, ntsc: boolean = false): number
 export function frequencyToPeriod(hz: number, ntsc: boolean = false): number {
   if (hz <= 0) return 65535;
 
-  const wasm = getToneEngine().getWasmInstance();
-  if (wasm && !ntsc && typeof wasm.hzToPeriod === 'function') {
-    return wasm.hzToPeriod(hz);
+  // Try WASM for higher accuracy, but gracefully fall back if ToneEngine unavailable (e.g., in tests)
+  try {
+    const wasm = getToneEngine().getWasmInstance();
+    if (wasm && !ntsc && typeof wasm.hzToPeriod === 'function') {
+      return wasm.hzToPeriod(hz);
+    }
+  } catch {
+    // ToneEngine not available (test environment, SSR, etc.) - use pure JS calculation
   }
 
   return (ntsc ? 3579545 : 3546895) / (hz * 2);

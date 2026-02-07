@@ -14,6 +14,7 @@
 
 import * as Tone from 'tone';
 import { MAMEEngine, MAMESynthType } from '../MAMEEngine';
+import { loadD50ROMs } from '@engine/mame/MAMEROMLoader';
 
 // D-50 Tone structure constants
 export const D50Structure = {
@@ -242,6 +243,17 @@ export class D50Synth extends Tone.ToneAudioNode {
 
     this.isInitialized = true;
     console.log('[D50Synth] Initialized with Roland SA handle:', this.handle);
+
+    // Auto-load ROMs
+    try {
+      const { firmware, ic30, ic29 } = await loadD50ROMs();
+      await this.loadROMs(ic30.buffer as ArrayBuffer, ic29.buffer as ArrayBuffer, firmware.buffer as ArrayBuffer);
+      console.log('[D50Synth] ROMs loaded successfully');
+    } catch (error) {
+      console.error('[D50Synth] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/d50/ - see /public/roms/README.md');
+      // Continue anyway - synth will initialize but won't produce sound without ROMs
+    }
   }
 
   /**
@@ -342,6 +354,21 @@ export class D50Synth extends Tone.ToneAudioNode {
 
     // Trigger key-on
     this.writeControl(voiceBase + 0x02, 0x01);
+
+    return this;
+  }
+
+  /**
+   * Trigger a note with automatic release
+   */
+  triggerAttackRelease(note: string | number, duration: string | number = 0.5, _time?: number, velocity: number = 0.8): this {
+    this.triggerAttack(note, _time, velocity);
+
+    // Schedule release
+    const durationSeconds = typeof duration === 'string' ? Tone.Time(duration).toSeconds() : duration;
+    setTimeout(() => {
+      this.triggerRelease(note);
+    }, durationSeconds * 1000);
 
     return this;
   }

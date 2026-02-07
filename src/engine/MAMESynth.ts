@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import { MAMEEngine } from './MAMEEngine';
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -135,9 +135,29 @@ export class MAMESynth extends Tone.ToneAudioNode {
       outR.set(right);
     };
 
-    // Connect ScriptProcessor to Tone.js output - use the native GainNode
-    const nativeOutput = this.outputGain.input as AudioNode;
-    processor.connect(nativeOutput);
+    // ScriptProcessorNode lives in the native AudioContext but Tone.js nodes
+    // live in standardized-audio-context (SAC). Native nodes can't connect to
+    // SAC-wrapped nodes. Bridge through a native GainNode in the same context.
+    const nativeGain = rawContext.createGain();
+    processor.connect(nativeGain);
+
+    // Now connect the native gain to the Tone.js output via getNativeAudioNode.
+    // If that fails, fall back to connecting directly to destination.
+    const toneTarget = getNativeAudioNode(this.outputGain);
+    if (toneTarget) {
+      try {
+        nativeGain.connect(toneTarget);
+      } catch {
+        // SAC bridge failed — connect directly to native destination
+        console.warn('[MAMESynth] SAC bridge failed, routing to native destination');
+        nativeGain.connect(rawContext.destination);
+      }
+    } else {
+      nativeGain.connect(rawContext.destination);
+    }
+
+    // Store reference for volume control
+    (this as any)._nativeGain = nativeGain;
   }
 
   public getHandle(): number {
