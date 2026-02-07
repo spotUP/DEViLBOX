@@ -31,3 +31,10 @@ furnace-wasm/build/
 spacey-delayer-wasm/build/
 re-tape-echo-wasm/build/
 public/rdpiano/roms/
+
+# ROM files and sample libraries (copyrighted material)
+public/roms/Mirage4Amiga/
+public/roms/*.zip
+
+# Test artifacts
+.playwright-mcp/
