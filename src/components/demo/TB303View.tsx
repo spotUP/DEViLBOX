@@ -177,7 +177,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
       }
     };
 
-    if (instrument && instrument.synthType === 'TB303') {
+    if (instrument && (instrument.synthType === 'TB303' || instrument.synthType === 'Buzz3o3' || instrument.tb303)) {
       initSequencer();
     }
 
@@ -374,21 +374,11 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     );
   }
 
-  if (instrument.synthType !== 'TB303') {
+  if (!tb303Config && instrument.synthType !== 'TB303' && instrument.synthType !== 'Buzz3o3') {
     return (
       <div className="tb303-view">
         <div className="tb303-error">
           Channel {channelIndex + 1} is using {instrument.synthType}, not TB-303
-        </div>
-      </div>
-    );
-  }
-
-  if (!tb303Config) {
-    return (
-      <div className="tb303-view">
-        <div className="tb303-error">
-          TB-303 configuration missing
         </div>
       </div>
     );
@@ -481,8 +471,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   label="Cutoff"
                   value={cutoff}
                   min={200}
-                  max={10000}
-                  step={10}
+                  max={5000}
+                  logarithmic
                   onChange={handleCutoffChange}
                   bipolar={false}
                   size="md"
@@ -524,7 +514,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   value={decay}
                   min={200}
                   max={2000}
-                  step={10}
+                  logarithmic
                   onChange={handleDecayChange}
                   bipolar={false}
                   size="md"

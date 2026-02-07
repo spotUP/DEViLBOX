@@ -94,7 +94,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   wavetable,
   onChange,
   onRemove,
-  height = 100,
+  height = 180,
   color = '#06b6d4',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,11 +113,17 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const logicalWidth = Math.max(200, length * 6);
+    const logicalWidth = Math.max(320, length * 12);
     const logicalHeight = height;
     
+    // Set internal resolution for retina
     canvas.width = logicalWidth * dpr;
     canvas.height = logicalHeight * dpr;
+
+    // Set CSS display size (critical for retina sharpness)
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+
     ctx.scale(dpr, dpr);
 
     const w = logicalWidth;
@@ -323,9 +329,9 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
       <div className="relative">
         <canvas
           ref={canvasRef}
-          width={Math.max(200, length * 6)}
+          width={Math.max(320, length * 12)}
           height={height}
-          className="cursor-crosshair w-full"
+          className="cursor-crosshair"
           onMouseDown={(e) => { setIsDragging(true); handleMouseEvent(e, true); }}
           onMouseMove={(e) => handleMouseEvent(e)}
           onMouseUp={() => setIsDragging(false)}

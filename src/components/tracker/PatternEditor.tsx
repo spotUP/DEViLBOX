@@ -132,7 +132,8 @@ const CursorCaret: React.FC<{
     return pattern?.channels[state.cursor.channelIndex]?.collapsed ?? false;
   });
 
-  if (isPlaying || channelCount === 0) return null;
+  const recordMode = useTrackerStore((state) => state.recordMode);
+  if (channelCount === 0) return null;
 
   const ROW_NUM_WIDTH = 48;
   const CHANNEL_WIDTH = isMobile ? mobileChannelWidth : 260;
@@ -170,7 +171,8 @@ const CursorCaret: React.FC<{
     case 'effParam':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP;
       break;
-    case 'effect2':
+    case 'effTyp2':
+    case 'effParam2':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
       break;
     case 'accent':
@@ -199,14 +201,28 @@ const CursorCaret: React.FC<{
     // Effect param starts at position 1, has 2 digits (positions 1-2)
     caretX += CHAR_WIDTH + (cursor.digitIndex * CHAR_WIDTH);
     caretWidth = CHAR_WIDTH;
-  } else if (cursor.columnType === 'effect2') {
-    caretX += cursor.digitIndex * CHAR_WIDTH;
+  } else if (cursor.columnType === 'effTyp2') {
+    // Effect2 type is position 0 (1 digit)
+    caretWidth = CHAR_WIDTH;
+  } else if (cursor.columnType === 'effParam2') {
+    // Effect2 param starts at position 1, has 2 digits (positions 1-2)
+    caretX += CHAR_WIDTH + (cursor.digitIndex * CHAR_WIDTH);
     caretWidth = CHAR_WIDTH;
   } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
     caretWidth = ACCENT_WIDTH;
   } else if (cursor.columnType === 'probability') {
     caretX += cursor.digitIndex * CHAR_WIDTH;
     caretWidth = CHAR_WIDTH;
+  }
+
+  // Mode-dependent caret color
+  let caretBg: string;
+  if (recordMode) {
+    caretBg = '#ef4444'; // Red for record mode
+  } else if (isPlaying) {
+    caretBg = '#22c55e'; // Green for playback
+  } else {
+    caretBg = isCyanTheme ? '#00ffff' : '#ef4444'; // Theme default
   }
 
   return (
@@ -217,10 +233,9 @@ const CursorCaret: React.FC<{
         transform: 'translateY(-50%)',
         left: caretX,
         width: caretWidth,
-        height: ROW_HEIGHT,
-        border: `2px solid ${isCyanTheme ? '#00ffff' : '#ef4444'}`,
-        borderRadius: '2px',
-        backgroundColor: isCyanTheme ? 'rgba(0, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+        height: 16,
+        borderRadius: '1px',
+        backgroundColor: caretBg,
         transition: 'left 0.08s ease-out, width 0.08s ease-out',
       }}
     />

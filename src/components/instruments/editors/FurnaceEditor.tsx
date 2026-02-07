@@ -659,8 +659,24 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         </div>
       )}
 
-      {/* PSG / PULSE PANEL */}
-      {category === "PSG" && (
+      {/* CHIP-SPECIFIC PANELS */}
+      {/* Game Boy Panel (chipType 5) */}
+      {config.chipType === 5 && (
+        <GBPanel config={config} onChange={onChange} />
+      )}
+
+      {/* C64/SID Panel (chipType 10) */}
+      {config.chipType === 10 && (
+        <C64Panel config={config} onChange={onChange} />
+      )}
+
+      {/* SNES Panel (chipType 24) */}
+      {config.chipType === 24 && (
+        <SNESPanel config={config} onChange={onChange} />
+      )}
+
+      {/* PSG / PULSE PANEL (for other PSG chips) */}
+      {category === "PSG" && ![5, 10, 24].includes(config.chipType) && (
         <PSGPanel config={config} onChange={onChange} />
       )}
 
@@ -947,47 +963,561 @@ const _MacroMiniView: React.FC<{
 };
 
 // ============================================================================
-// SUB-PANELS (PSG, Wavetable, PCM)
+// SUB-PANELS (PSG, Wavetable, PCM, GB, C64, SNES)
 // ============================================================================
 
-const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config: _config, onChange: _onChange }) => (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
-    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
-      <div className="flex items-center gap-2 mb-4">
-        <Music size={16} className="text-sky-400" />
-        <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Pulse Control</h3>
-      </div>
-      <div className="flex flex-wrap gap-6">
-        <Knob label="DUTY" value={50} min={0} max={100} onChange={() => {}} size="md" color="#38bdf8" />
-        <Knob label="WIDTH" value={50} min={0} max={100} onChange={() => {}} size="md" color="#0ea5e9" />
-      </div>
-    </div>
+// Game Boy Panel - matches Furnace insEdit.cpp GB editor (lines 6991-7243)
+const GB_DEFAULTS = { envVol: 15, envDir: 0, envLen: 2, soundLen: 0, softEnv: false, alwaysInit: true };
 
-    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
-      <div className="flex items-center gap-2 mb-4">
-        <Activity size={16} className="text-rose-400" />
-        <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Noise Mode</h3>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <button className="bg-dark-bg border border-dark-border rounded py-2 font-mono text-[10px] text-rose-400 hover:bg-rose-950/20">WHITE</button>
-        <button className="bg-dark-bg border border-dark-border rounded py-2 font-mono text-[10px] text-text-muted">PERIODIC</button>
-      </div>
-    </div>
+const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const gb = useMemo(() => ({ ...GB_DEFAULTS, ...config.gb }), [config.gb]);
 
-    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
-      <div className="flex items-center gap-2 mb-4">
-        <Settings size={16} className="text-emerald-400" />
-        <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Envelope</h3>
+  const updateGB = useCallback((updates: Partial<typeof gb>) => {
+    onChange({ gb: { ...config.gb, ...GB_DEFAULTS, ...updates } });
+  }, [config.gb, onChange]);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+      {/* Envelope Settings */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-emerald-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-emerald-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">GB Envelope</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between gap-4">
+            <Knob
+              label="VOL"
+              value={gb.envVol}
+              min={0} max={15}
+              onChange={(v) => updateGB({ envVol: Math.round(v) })}
+              size="md" color="#34d399"
+              formatValue={(v) => String(Math.round(v))}
+            />
+            <Knob
+              label="LEN"
+              value={gb.envLen}
+              min={0} max={7}
+              onChange={(v) => updateGB({ envLen: Math.round(v) })}
+              size="md" color="#10b981"
+              formatValue={(v) => String(Math.round(v))}
+            />
+            <Knob
+              label="SND"
+              value={gb.soundLen}
+              min={0} max={64}
+              onChange={(v) => updateGB({ soundLen: Math.round(v) })}
+              size="md" color="#059669"
+              formatValue={(v) => v === 0 || v > 63 ? '∞' : String(Math.round(v))}
+            />
+          </div>
+
+          {/* Direction */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-text-muted font-mono">Direction:</span>
+            <button
+              onClick={() => updateGB({ envDir: 1 })}
+              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                gb.envDir === 1
+                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+              }`}
+            >
+              ↑ UP
+            </button>
+            <button
+              onClick={() => updateGB({ envDir: 0 })}
+              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                gb.envDir === 0
+                  ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+              }`}
+            >
+              ↓ DOWN
+            </button>
+          </div>
+
+          {/* Options */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-dark-border">
+            <button
+              onClick={() => updateGB({ softEnv: !gb.softEnv })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                gb.softEnv
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Soft Envelope
+            </button>
+            <button
+              onClick={() => updateGB({ alwaysInit: !gb.alwaysInit })}
+              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                gb.alwaysInit
+                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              Always Init
+            </button>
+          </div>
+        </div>
       </div>
-      <div className="flex justify-between gap-2">
-        <Knob label="ATK" value={0} min={0} max={15} onChange={() => {}} size="sm" color="#34d399" />
-        <Knob label="DEC" value={8} min={0} max={15} onChange={() => {}} size="sm" color="#10b981" />
-        <Knob label="SUS" value={10} min={0} max={15} onChange={() => {}} size="sm" color="#059669" />
-        <Knob label="REL" value={5} min={0} max={15} onChange={() => {}} size="sm" color="#047857" />
+
+      {/* Envelope Visualization */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Waves size={16} className="text-emerald-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Envelope Shape</h3>
+        </div>
+        <GBEnvelopeVisualization
+          envVol={gb.envVol}
+          envLen={gb.envLen}
+          soundLen={gb.soundLen}
+          envDir={gb.envDir}
+        />
       </div>
     </div>
-  </div>
-);
+  );
+};
+
+// GB Envelope Visualization (matches Furnace drawGBEnv)
+const GBEnvelopeVisualization: React.FC<{
+  envVol: number;
+  envLen: number;
+  soundLen: number;
+  envDir: number;
+}> = ({ envVol, envLen, soundLen, envDir }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const width = 200;
+  const height = 80;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    // Background
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, width, height);
+
+    // Grid lines
+    ctx.strokeStyle = '#1e293b';
+    ctx.setLineDash([2, 2]);
+    for (let i = 0; i <= 4; i++) {
+      const y = (i / 4) * height;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Draw envelope
+    ctx.beginPath();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+
+    const startVol = envDir === 1 ? 0 : envVol;
+    const endVol = envDir === 1 ? envVol : 0;
+    const decaySteps = envLen === 0 ? 1 : 16 - envVol;
+    const totalLength = soundLen === 0 || soundLen > 63 ? width : (soundLen / 64) * width;
+
+    const startY = height - (startVol / 15) * (height - 8) - 4;
+    const endY = height - (endVol / 15) * (height - 8) - 4;
+
+    ctx.moveTo(0, startY);
+
+    if (envLen === 0) {
+      // No decay - stay at initial level
+      ctx.lineTo(totalLength, startY);
+    } else {
+      // Calculate decay time
+      const decayX = Math.min((decaySteps * envLen * 4), totalLength);
+      ctx.lineTo(decayX, endY);
+      // Hold at final level
+      if (decayX < totalLength) {
+        ctx.lineTo(totalLength, endY);
+      }
+    }
+
+    ctx.stroke();
+
+    // Labels
+    ctx.font = '9px monospace';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`V:${envVol}`, 4, 12);
+    ctx.fillText(`L:${envLen}`, 4, 24);
+    ctx.fillText(envDir === 1 ? '↑' : '↓', width - 12, 12);
+  }, [envVol, envLen, soundLen, envDir]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className="w-full rounded border border-dark-border"
+      style={{ height }}
+    />
+  );
+};
+
+// C64/SID Panel - matches Furnace insEdit.cpp C64 editor (lines 7244-7400)
+const C64_DEFAULTS = {
+  triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+  a: 0, d: 8, s: 8, r: 4, duty: 2048, ringMod: false, oscSync: false,
+  toFilter: false, filterCutoff: 1024, filterResonance: 0, filterLP: false, filterBP: false, filterHP: false
+};
+
+const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const c64 = useMemo(() => ({ ...C64_DEFAULTS, ...config.c64 }), [config.c64]);
+
+  const updateC64 = useCallback((updates: Partial<typeof c64>) => {
+    onChange({ c64: { ...config.c64, ...C64_DEFAULTS, ...updates } });
+  }, [config.c64, onChange]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      {/* Waveform Selection */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-violet-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Waves size={16} className="text-violet-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Waveform</h3>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => updateC64({ triOn: !c64.triOn })}
+            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
+              c64.triOn
+                ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+            }`}
+          >
+            TRI
+          </button>
+          <button
+            onClick={() => updateC64({ sawOn: !c64.sawOn })}
+            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
+              c64.sawOn
+                ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+            }`}
+          >
+            SAW
+          </button>
+          <button
+            onClick={() => updateC64({ pulseOn: !c64.pulseOn })}
+            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
+              c64.pulseOn
+                ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+            }`}
+          >
+            PULSE
+          </button>
+          <button
+            onClick={() => updateC64({ noiseOn: !c64.noiseOn })}
+            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
+              c64.noiseOn
+                ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+            }`}
+          >
+            NOISE
+          </button>
+        </div>
+      </div>
+
+      {/* ADSR Envelope */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-amber-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">ADSR Envelope</h3>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <Knob label="A" value={c64.a} min={0} max={15}
+            onChange={(v) => updateC64({ a: Math.round(v) })}
+            size="md" color="#f59e0b" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="D" value={c64.d} min={0} max={15}
+            onChange={(v) => updateC64({ d: Math.round(v) })}
+            size="md" color="#fb923c" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="S" value={c64.s} min={0} max={15}
+            onChange={(v) => updateC64({ s: Math.round(v) })}
+            size="md" color="#fbbf24" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="R" value={c64.r} min={0} max={15}
+            onChange={(v) => updateC64({ r: Math.round(v) })}
+            size="md" color="#facc15" formatValue={(v) => String(Math.round(v))} />
+        </div>
+      </div>
+
+      {/* Duty & Modulation */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings size={16} className="text-cyan-400" />
+            <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Pulse Width</h3>
+          </div>
+          <Knob label="DUTY" value={c64.duty} min={0} max={4095}
+            onChange={(v) => updateC64({ duty: Math.round(v) })}
+            size="md" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
+        </div>
+
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={16} className="text-rose-400" />
+            <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Modulation</h3>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => updateC64({ ringMod: !c64.ringMod })}
+              className={`flex-1 px-2 py-2 text-[10px] font-mono rounded border transition-colors ${
+                c64.ringMod
+                  ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              RING
+            </button>
+            <button
+              onClick={() => updateC64({ oscSync: !c64.oscSync })}
+              className={`flex-1 px-2 py-2 text-[10px] font-mono rounded border transition-colors ${
+                c64.oscSync
+                  ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+                  : 'bg-dark-bg border-dark-border text-text-muted'
+              }`}
+            >
+              SYNC
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Volume2 size={16} className="text-purple-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Filter</h3>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => updateC64({ toFilter: !c64.toFilter })}
+            className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              c64.toFilter
+                ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            Enable
+          </button>
+
+          {c64.toFilter && (
+            <>
+              <Knob label="CUT" value={c64.filterCutoff ?? 1024} min={0} max={2047}
+                onChange={(v) => updateC64({ filterCutoff: Math.round(v) })}
+                size="sm" color="#a855f7" formatValue={(v) => String(Math.round(v))} />
+              <Knob label="RES" value={c64.filterResonance ?? 0} min={0} max={15}
+                onChange={(v) => updateC64({ filterResonance: Math.round(v) })}
+                size="sm" color="#c084fc" formatValue={(v) => String(Math.round(v))} />
+
+              <div className="flex gap-1">
+                <button
+                  onClick={() => updateC64({ filterLP: !c64.filterLP })}
+                  className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                    c64.filterLP
+                      ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                      : 'bg-dark-bg border-dark-border text-text-muted'
+                  }`}
+                >
+                  LP
+                </button>
+                <button
+                  onClick={() => updateC64({ filterBP: !c64.filterBP })}
+                  className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                    c64.filterBP
+                      ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                      : 'bg-dark-bg border-dark-border text-text-muted'
+                  }`}
+                >
+                  BP
+                </button>
+                <button
+                  onClick={() => updateC64({ filterHP: !c64.filterHP })}
+                  className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+                    c64.filterHP
+                      ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                      : 'bg-dark-bg border-dark-border text-text-muted'
+                  }`}
+                >
+                  HP
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// SNES Panel - matches Furnace insEdit.cpp SNES editor (lines 7978-8093)
+const SNES_DEFAULTS = { useEnv: true, gainMode: 0, gain: 127, a: 15, d: 7, s: 7, r: 0 };
+
+const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const snes = useMemo(() => ({ ...SNES_DEFAULTS, ...config.snes }), [config.snes]);
+
+  const updateSNES = useCallback((updates: Partial<typeof snes>) => {
+    onChange({ snes: { ...config.snes, ...SNES_DEFAULTS, ...updates } });
+  }, [config.snes, onChange]);
+
+  const gainModes = ['Direct', 'Inc Linear', 'Inc Bent', 'Dec Linear', 'Dec Exp'];
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+      {/* Envelope Mode */}
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-cyan-500/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-cyan-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SNES Envelope</h3>
+          <button
+            onClick={() => updateSNES({ useEnv: !snes.useEnv })}
+            className={`ml-auto px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
+              snes.useEnv
+                ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                : 'bg-dark-bg border-dark-border text-text-muted'
+            }`}
+          >
+            {snes.useEnv ? 'ADSR' : 'GAIN'}
+          </button>
+        </div>
+
+        {snes.useEnv ? (
+          <div className="flex justify-between gap-4">
+            <Knob label="A" value={snes.a} min={0} max={15}
+              onChange={(v) => updateSNES({ a: Math.round(v) })}
+              size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="D" value={snes.d} min={0} max={7}
+              onChange={(v) => updateSNES({ d: Math.round(v) })}
+              size="md" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="S" value={snes.s} min={0} max={7}
+              onChange={(v) => updateSNES({ s: Math.round(v) })}
+              size="md" color="#67e8f9" formatValue={(v) => String(Math.round(v))} />
+            <Knob label="R" value={snes.r} min={0} max={31}
+              onChange={(v) => updateSNES({ r: Math.round(v) })}
+              size="md" color="#a5f3fc" formatValue={(v) => String(Math.round(v))} />
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="text-[10px] text-text-muted font-mono block mb-1">Gain Mode</label>
+              <select
+                value={typeof snes.gainMode === 'number' ? snes.gainMode : 0}
+                onChange={(e) => updateSNES({ gainMode: parseInt(e.target.value) })}
+                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+              >
+                {gainModes.map((mode, i) => (
+                  <option key={i} value={i}>{mode}</option>
+                ))}
+              </select>
+            </div>
+            <Knob label="GAIN" value={snes.gain} min={0} max={127}
+              onChange={(v) => updateSNES({ gain: Math.round(v) })}
+              size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// PSG Panel - fixed to use actual config values
+const PSG_DEFAULTS = { duty: 50, width: 50, noiseMode: 'white' as const, attack: 0, decay: 8, sustain: 10, release: 5 };
+
+const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const psg = useMemo(() => ({ ...PSG_DEFAULTS, ...config.psg }), [config.psg]);
+
+  const updatePSG = useCallback((updates: Partial<typeof psg>) => {
+    onChange({ psg: { ...config.psg, ...PSG_DEFAULTS, ...updates } });
+  }, [config.psg, onChange]);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Music size={16} className="text-sky-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Pulse Control</h3>
+        </div>
+        <div className="flex flex-wrap gap-6">
+          <Knob label="DUTY" value={psg.duty} min={0} max={100}
+            onChange={(v) => updatePSG({ duty: Math.round(v) })}
+            size="md" color="#38bdf8" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob label="WIDTH" value={psg.width} min={0} max={100}
+            onChange={(v) => updatePSG({ width: Math.round(v) })}
+            size="md" color="#0ea5e9" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </div>
+
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} className="text-rose-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Noise Mode</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => updatePSG({ noiseMode: 'white' })}
+            className={`py-2 font-mono text-[10px] rounded border transition-colors ${
+              psg.noiseMode === 'white'
+                ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:bg-rose-950/20'
+            }`}
+          >
+            WHITE
+          </button>
+          <button
+            onClick={() => updatePSG({ noiseMode: 'periodic' })}
+            className={`py-2 font-mono text-[10px] rounded border transition-colors ${
+              psg.noiseMode === 'periodic'
+                ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                : 'bg-dark-bg border-dark-border text-text-muted hover:bg-rose-950/20'
+            }`}
+          >
+            PERIODIC
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings size={16} className="text-emerald-400" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Envelope</h3>
+        </div>
+        <div className="flex justify-between gap-2">
+          <Knob label="ATK" value={psg.attack} min={0} max={15}
+            onChange={(v) => updatePSG({ attack: Math.round(v) })}
+            size="sm" color="#34d399" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="DEC" value={psg.decay} min={0} max={15}
+            onChange={(v) => updatePSG({ decay: Math.round(v) })}
+            size="sm" color="#10b981" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="SUS" value={psg.sustain} min={0} max={15}
+            onChange={(v) => updatePSG({ sustain: Math.round(v) })}
+            size="sm" color="#059669" formatValue={(v) => String(Math.round(v))} />
+          <Knob label="REL" value={psg.release} min={0} max={15}
+            onChange={(v) => updatePSG({ release: Math.round(v) })}
+            size="sm" color="#047857" formatValue={(v) => String(Math.round(v))} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // @ts-expect-error Reserved for future use
 const _WavetablePanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => (
@@ -1028,24 +1558,66 @@ const _WavetablePanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<F
   </div>
 );
 
-const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config: _config, onChange: _onChange }) => (
-  <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
-    <div className="flex items-center gap-2 mb-4">
-      <Volume2 size={16} className="text-violet-400" />
-      <h3 className="font-mono text-xs font-bold text-text-primary uppercase">PCM Sample Properties</h3>
-    </div>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <Knob label="RATE" value={44100} min={4000} max={48000} onChange={() => {}} size="sm" color="#a78bfa" />
-      <Knob label="START" value={0} min={0} max={65535} onChange={() => {}} size="sm" color="#8b5cf6" />
-      <Knob label="END" value={65535} min={0} max={65535} onChange={() => {}} size="sm" color="#7c3aed" />
-      <Knob label="LOOP" value={0} min={0} max={65535} onChange={() => {}} size="sm" color="#6d28d9" />
-      <div className="flex flex-col items-center justify-center gap-1">
-        <span className="text-[9px] font-bold text-text-muted uppercase">Bit Depth</span>
-        <div className="bg-dark-bg px-2 py-1 rounded border border-dark-border text-xs font-mono text-violet-400">8-BIT</div>
+// PCM Panel - fixed to use actual config values
+const PCM_DEFAULTS = { sampleRate: 44100, loopStart: 0, loopEnd: 65535, loopPoint: 0, bitDepth: 8, loopEnabled: false };
+
+const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
+  const pcm = useMemo(() => ({ ...PCM_DEFAULTS, ...config.pcm }), [config.pcm]);
+
+  const updatePCM = useCallback((updates: Partial<typeof pcm>) => {
+    onChange({ pcm: { ...config.pcm, ...PCM_DEFAULTS, ...updates } });
+  }, [config.pcm, onChange]);
+
+  const bitDepths = [8, 16];
+
+  return (
+    <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
+      <div className="flex items-center gap-2 mb-4">
+        <Volume2 size={16} className="text-violet-400" />
+        <h3 className="font-mono text-xs font-bold text-text-primary uppercase">PCM Sample Properties</h3>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Knob label="RATE" value={pcm.sampleRate} min={4000} max={48000}
+          onChange={(v) => updatePCM({ sampleRate: Math.round(v) })}
+          size="sm" color="#a78bfa" formatValue={(v) => `${Math.round(v/1000)}k`} />
+        <Knob label="START" value={pcm.loopStart} min={0} max={65535}
+          onChange={(v) => updatePCM({ loopStart: Math.round(v) })}
+          size="sm" color="#8b5cf6" formatValue={(v) => String(Math.round(v))} />
+        <Knob label="END" value={pcm.loopEnd} min={0} max={65535}
+          onChange={(v) => updatePCM({ loopEnd: Math.round(v) })}
+          size="sm" color="#7c3aed" formatValue={(v) => String(Math.round(v))} />
+        <Knob label="LOOP" value={pcm.loopPoint} min={0} max={65535}
+          onChange={(v) => updatePCM({ loopPoint: Math.round(v) })}
+          size="sm" color="#6d28d9" formatValue={(v) => String(Math.round(v))} />
+        <div className="flex flex-col items-center justify-center gap-1">
+          <span className="text-[9px] font-bold text-text-muted uppercase">Bit Depth</span>
+          <select
+            value={pcm.bitDepth}
+            onChange={(e) => updatePCM({ bitDepth: parseInt(e.target.value) })}
+            className="bg-dark-bg px-2 py-1 rounded border border-dark-border text-xs font-mono text-violet-400"
+          >
+            {bitDepths.map((d) => (
+              <option key={d} value={d}>{d}-BIT</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-dark-border">
+        <button
+          onClick={() => updatePCM({ loopEnabled: !pcm.loopEnabled })}
+          className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+            pcm.loopEnabled
+              ? 'bg-violet-600/20 border-violet-500/50 text-violet-400'
+              : 'bg-dark-bg border-dark-border text-text-muted'
+          }`}
+        >
+          {pcm.loopEnabled ? '🔁 Loop Enabled' : 'Loop Disabled'}
+        </button>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ============================================================================
 // WAVETABLE COMPONENTS

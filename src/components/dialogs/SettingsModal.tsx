@@ -17,6 +17,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const {
     useHexNumbers,
     setUseHexNumbers,
+    blankEmptyCells,
+    setBlankEmptyCells,
     tb303Collapsed,
     setTB303Collapsed,
     oscilloscopeVisible,
@@ -110,6 +112,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <option value="hex" className="bg-ft2-bg text-ft2-text">Hexadecimal (01, 02, 0A, 0F)</option>
                   <option value="dec" className="bg-ft2-bg text-ft2-text">Decimal (01, 02, 10, 15)</option>
                 </select>
+              </div>
+
+              {/* Blank Empty Cells */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Blank Empty Cells:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Hide ---, .., ... on empty rows</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={blankEmptyCells}
+                  onChange={setBlankEmptyCells}
+                  size="sm"
+                />
               </div>
             </div>
           </section>

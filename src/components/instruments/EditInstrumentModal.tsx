@@ -42,8 +42,11 @@ import {
   DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
   DEFAULT_DRUMKIT,
+  DEFAULT_SAM,
+  DEFAULT_V2,
 } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
+import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
@@ -671,7 +674,9 @@ const InstrumentEditor: React.FC<InstrumentEditorProps> = ({ instrument, onChang
 // ============================================================================
 
 /**
- * Create a temporary instrument config for a given synth type
+ * Create a temporary instrument config for a given synth type.
+ * Always applies the first available factory preset so synths produce
+ * musically useful sound out of the box (e.g. V2 needs patch data, MAME chips need _program).
  */
 function createTempInstrument(synthType: SynthType): InstrumentConfig {
   const base: InstrumentConfig = {
@@ -687,145 +692,94 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
     effects: [],
   };
 
-  // TB-303
+  // --- Set type-specific defaults (structural setup) ---
+
   if (synthType === 'TB303' || synthType === 'Buzz3o3') {
     base.tb303 = { ...DEFAULT_TB303 };
     if (synthType === 'Buzz3o3') {
-      base.buzzmachine = { 
-        ...DEFAULT_BUZZMACHINE, 
+      base.buzzmachine = {
+        ...DEFAULT_BUZZMACHINE,
         machineType: 'OomekAggressor' as any,
         parameters: {
-          0: 0,    // SAW
-          1: 0x78, // Cutoff
-          2: 0x40, // Reso
-          3: 0x40, // EnvMod
-          4: 0x40, // Decay
-          5: 0x40, // Accent
-          6: 100,  // Tuning
-          7: 100,  // Vol
+          0: 0, 1: 0x78, 2: 0x40, 3: 0x40, 4: 0x40, 5: 0x40, 6: 100, 7: 100,
         }
       };
     }
-    return base;
-  }
-
-  // Furnace chip synths
-  if (isFurnaceType(synthType)) {
+  } else if (isFurnaceType(synthType)) {
     base.furnace = { ...DEFAULT_FURNACE };
-    // Set chip type based on synthType
     const chipTypeMap: Partial<Record<SynthType, number>> = {
-      'Furnace': 1,        // OPN2 (Genesis)
-      'FurnaceOPN': 0,     // YM2612
-      'FurnaceOPNA': 13,   // YM2608
-      'FurnaceOPNB': 14,   // YM2610
-      'FurnaceOPM': 1,     // YM2151
-      'FurnaceOPL': 2,     // YMF262
-      'FurnaceOPLL': 23,   // YM2413
-      'FurnaceOPL4': 26,   // YMF278
-      'FurnaceOPZ': 24,    // YM2414
-      'FurnaceESFM': 25,   // ESFM
-      'FurnaceNES': 3,     // 2A03
-      'FurnaceGB': 4,      // Game Boy
-      'FurnaceC64': 5,     // SID
-      'FurnaceSID6581': 5,
-      'FurnaceSID8580': 5,
-      'FurnaceAY': 6,      // AY-3-8910
-      'FurnacePSG': 7,     // SN76489
-      'FurnaceTIA': 8,     // Atari TIA
-      'FurnaceVERA': 9,    // Commander X16
-      'FurnaceSAA': 10,    // SAA1099
-      'FurnaceVIC': 11,    // VIC-20
-      'FurnaceLynx': 12,   // Atari Lynx
-      // ... more chip mappings as needed
+      'Furnace': 1, 'FurnaceOPN': 0, 'FurnaceOPNA': 13, 'FurnaceOPNB': 14,
+      'FurnaceOPM': 1, 'FurnaceOPL': 2, 'FurnaceOPLL': 23, 'FurnaceOPL4': 26,
+      'FurnaceOPZ': 24, 'FurnaceESFM': 25, 'FurnaceNES': 3, 'FurnaceGB': 4,
+      'FurnaceC64': 5, 'FurnaceSID6581': 5, 'FurnaceSID8580': 5, 'FurnaceAY': 6,
+      'FurnacePSG': 7, 'FurnaceTIA': 8, 'FurnaceVERA': 9, 'FurnaceSAA': 10,
+      'FurnaceVIC': 11, 'FurnaceLynx': 12,
     };
     if (chipTypeMap[synthType] !== undefined) {
       base.furnace.chipType = chipTypeMap[synthType]!;
     }
-    return base;
-  }
-
-  // Buzzmachine generators and effects
-  if (isBuzzmachineType(synthType)) {
+  } else if (isBuzzmachineType(synthType)) {
     base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
-    // Map synthType to machine type
     const machineTypeMap: Partial<Record<SynthType, string>> = {
-      'Buzzmachine': 'ArguruDistortion',
-      'BuzzDTMF': 'CyanPhaseDTMF',
-      'BuzzFreqBomb': 'ElenzilFrequencyBomb',
-      'BuzzKick': 'FSMKick',
-      'BuzzKickXP': 'FSMKickXP',
-      'BuzzNoise': 'JeskolaNoise',
-      'BuzzTrilok': 'JeskolaTrilok',
-      'Buzz4FM2F': 'MadBrain4FM2F',
-      'BuzzDynamite6': 'MadBrainDynamite6',
-      'BuzzM3': 'MakkM3',
+      'Buzzmachine': 'ArguruDistortion', 'BuzzDTMF': 'CyanPhaseDTMF',
+      'BuzzFreqBomb': 'ElenzilFrequencyBomb', 'BuzzKick': 'FSMKick',
+      'BuzzKickXP': 'FSMKickXP', 'BuzzNoise': 'JeskolaNoise',
+      'BuzzTrilok': 'JeskolaTrilok', 'Buzz4FM2F': 'MadBrain4FM2F',
+      'BuzzDynamite6': 'MadBrainDynamite6', 'BuzzM3': 'MakkM3',
       'Buzz3o3': 'OomekAggressor',
     };
     if (machineTypeMap[synthType]) {
       base.buzzmachine.machineType = machineTypeMap[synthType] as any;
     }
-    return base;
-  }
-
-  // Sample-based synths
-  if (synthType === 'GranularSynth') {
+  } else if (synthType === 'GranularSynth') {
     base.granular = { ...DEFAULT_GRANULAR };
-    return base;
-  }
-  if (synthType === 'Sampler' || synthType === 'Player') {
-    // Sample-based - minimal config, user loads sample
-    return base;
-  }
-  if (synthType === 'DrumKit') {
+  } else if (synthType === 'DrumKit') {
     base.drumKit = { ...DEFAULT_DRUMKIT };
-    return base;
-  }
-  if (synthType === 'ChiptuneModule') {
-    // Module playback - needs file load
-    return base;
+  } else if (synthType === 'Sam') {
+    base.sam = { ...DEFAULT_SAM };
+  } else if (synthType === 'V2') {
+    base.v2 = { ...DEFAULT_V2 };
+  } else if (synthType !== 'Sampler' && synthType !== 'Player' && synthType !== 'ChiptuneModule') {
+    // Standard synth types
+    switch (synthType) {
+      case 'DrumMachine': base.drumMachine = { ...DEFAULT_DRUM_MACHINE }; break;
+      case 'ChipSynth': base.chipSynth = { ...DEFAULT_CHIP_SYNTH }; break;
+      case 'PWMSynth': base.pwmSynth = { ...DEFAULT_PWM_SYNTH }; break;
+      case 'Wavetable': base.wavetable = { ...DEFAULT_WAVETABLE }; break;
+      case 'SuperSaw': base.superSaw = { ...DEFAULT_SUPERSAW }; break;
+      case 'PolySynth': base.polySynth = { ...DEFAULT_POLYSYNTH }; break;
+      case 'Organ': base.organ = { ...DEFAULT_ORGAN }; break;
+      case 'StringMachine': base.stringMachine = { ...DEFAULT_STRING_MACHINE }; break;
+      case 'FormantSynth': base.formantSynth = { ...DEFAULT_FORMANT_SYNTH }; break;
+      case 'WobbleBass': base.wobbleBass = { ...DEFAULT_WOBBLE_BASS }; break;
+      case 'DubSiren': base.dubSiren = { ...DEFAULT_DUB_SIREN }; break;
+      case 'SpaceLaser': base.spaceLaser = { ...DEFAULT_SPACE_LASER }; break;
+      case 'Synare': base.synare = { ...DEFAULT_SYNARE }; break;
+    }
   }
 
-  // Standard synth types
-  switch (synthType) {
-    case 'DrumMachine':
-      base.drumMachine = { ...DEFAULT_DRUM_MACHINE };
-      break;
-    case 'ChipSynth':
-      base.chipSynth = { ...DEFAULT_CHIP_SYNTH };
-      break;
-    case 'PWMSynth':
-      base.pwmSynth = { ...DEFAULT_PWM_SYNTH };
-      break;
-    case 'Wavetable':
-      base.wavetable = { ...DEFAULT_WAVETABLE };
-      break;
-    case 'SuperSaw':
-      base.superSaw = { ...DEFAULT_SUPERSAW };
-      break;
-    case 'PolySynth':
-      base.polySynth = { ...DEFAULT_POLYSYNTH };
-      break;
-    case 'Organ':
-      base.organ = { ...DEFAULT_ORGAN };
-      break;
-    case 'StringMachine':
-      base.stringMachine = { ...DEFAULT_STRING_MACHINE };
-      break;
-    case 'FormantSynth':
-      base.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
-      break;
-    case 'WobbleBass':
-      base.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
-      break;
-    case 'DubSiren':
-      base.dubSiren = { ...DEFAULT_DUB_SIREN };
-      break;
-    case 'SpaceLaser':
-      base.spaceLaser = { ...DEFAULT_SPACE_LASER };
-      break;
-    case 'Synare':
-      base.synare = { ...DEFAULT_SYNARE };
-      break;
+  // --- Auto-apply first factory preset for ALL synth types ---
+  // This ensures synths get musically useful settings out of the box.
+  // Critical for V2 (needs patch data), MAME chips (need _program), TB303 (better defaults).
+  const savedFurnaceChipType = base.furnace?.chipType;
+  const savedBuzzMachineType = base.buzzmachine?.machineType;
+
+  const firstPreset = getFirstPresetForSynthType(synthType);
+  if (firstPreset) {
+    const { name: _name, type: _type, synthType: _synthType, ...presetConfig } = firstPreset as any;
+    Object.assign(base, presetConfig);
+    // Preserve structural fields that must match the selected synthType
+    base.synthType = synthType;
+    base.id = -1;
+    base.name = getSynthInfo(synthType).name;
+    // Restore Furnace chipType (preset may be generic Furnace, but user chose specific chip)
+    if (savedFurnaceChipType !== undefined && base.furnace) {
+      base.furnace.chipType = savedFurnaceChipType;
+    }
+    // Restore Buzzmachine machineType
+    if (savedBuzzMachineType && base.buzzmachine) {
+      base.buzzmachine.machineType = savedBuzzMachineType;
+    }
   }
 
   return base;

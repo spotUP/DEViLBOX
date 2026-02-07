@@ -1,49 +1,239 @@
 /**
- * TR-808/909 Hardware UI - Roland TR-808/909 Rhythm Composers
+ * TR-808 Hardware UI - 1:1 port of io-808 web emulator
  *
- * Hardware-accurate panel layout matching the original TR-808
- * Based on io-808 web emulator design
- * TR-808 Released: 1980, TR-909 Released: 1983
- * Features: Iconic drum machines with analog (808) and digital (909) synthesis
+ * Every style, dimension, color, and algorithm is taken directly from:
+ * https://github.com/vincentriemer/io-808
+ *
+ * Source files ported:
+ *   theme/variables.js, theme/mixins.js
+ *   components/knob, components/guides, components/drumKnob
+ *   components/drumSwitch, components/instrumentLabel
+ *   components/instrumentColumn, components/appTitle
+ *   components/light, components/stepButton
+ *   components/masterVolumeKnob
+ *   layouts/instrumentColumn, layouts/topRightSection, layouts/app
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 
+// ============================================================================
+// theme/variables.js - exact values
+// ============================================================================
+const grey = '#9b9fa0';
+const darkGrey = '#232425';
+const drumLabel = '#f6edc6';
+const stencilOrange = '#ff5a00';
+const red = '#d03933';
+const buttonOrange = '#e98e2f';
+const yellow = '#dfd442';
+const offWhite = '#e9e8e7';
+const miscKnobInner = '#C8D4C8';
+const levelKnobInner = '#ff5a00';
+const drumHandle = '#111111';
+const slightlyDarkerBlack = '#111111';
+const drumSwitchHandle = '#313335';
+const lightActive = '#FE0000';
+const lightInactive = '#570000';
+
+const baseFontFamily = 'Helvetica, Arial, sans-serif';
+const brandingFontFamily = `"ITC Serif Gothic W03", ${baseFontFamily}`;
+const panelFontFamily = `"Helvetica LT W04", ${baseFontFamily}`;
+
+// ============================================================================
+// theme/mixins.js - exact presets
+// ============================================================================
+const unselectableText: React.CSSProperties = {
+  MozUserSelect: 'none',
+  WebkitUserSelect: 'none',
+  msUserSelect: 'none',
+  userSelect: 'none',
+};
+
+const basePreset: React.CSSProperties = {
+  fontFamily: panelFontFamily,
+  fontWeight: 'bold',
+  textAlign: 'center',
+  letterSpacing: '-0.2px',
+  ...unselectableText,
+  cursor: 'default',
+};
+
+const labelGreyNormal: React.CSSProperties = {
+  ...basePreset,
+  fontSize: 13,
+  color: grey,
+};
+
+const labelGreyLarge: React.CSSProperties = {
+  ...basePreset,
+  fontSize: 15,
+  color: grey,
+};
+
+const labelGreySmall: React.CSSProperties = {
+  ...basePreset,
+  fontSize: 11,
+  color: grey,
+};
+
+const ring = (size: number): React.CSSProperties => ({
+  position: 'absolute',
+  width: size,
+  height: size,
+  left: 0,
+  right: 0,
+  top: 0,
+  bottom: 0,
+  margin: 'auto',
+  borderRadius: '50%',
+});
+
+// ============================================================================
+// Props
+// ============================================================================
 interface TR808HardwareProps {
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
 }
 
-/**
- * TR-808 style drum knob (black handle, green/orange inner)
- */
-const TR808Knob: React.FC<{
-  label: string;
+// ============================================================================
+// components/light/index.js - exact port
+// ============================================================================
+const Light: React.FC<{ active: boolean }> = ({ active }) => {
+  const size = 18;
+  const innerPadding = 4;
+  const baseInnerStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: innerPadding,
+    right: innerPadding,
+    top: innerPadding,
+    bottom: innerPadding,
+    borderRadius: '50%',
+  };
+  return (
+    <div style={{
+      position: 'relative',
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      pointerEvents: 'none',
+    }}>
+      <div style={{ ...baseInnerStyle, backgroundColor: lightInactive }} />
+      <div style={{
+        ...baseInnerStyle,
+        backgroundColor: lightActive,
+        transition: 'opacity 0.1s',
+        opacity: active ? 1 : 0,
+      }} />
+    </div>
+  );
+};
+
+// ============================================================================
+// components/guides/index.js - exact port
+// ============================================================================
+const Guides: React.FC<{
+  num?: number;
+  distance: number;
+  hideCount?: number;
+  guideStyle?: React.CSSProperties;
+  rotate?: boolean;
+  values?: React.ReactNode[];
+  offset?: number;
+}> = React.memo(({
+  num: numProp,
+  distance,
+  hideCount = 0,
+  guideStyle = {},
+  rotate = true,
+  values,
+  offset,
+}) => {
+  let num = numProp ?? 0;
+  let useValues = false;
+  if (values != null && values.length !== 0) {
+    num = values.length;
+    useValues = true;
+  }
+
+  const guides: React.ReactNode[] = [];
+  const angleCounter = 360 / (num + hideCount);
+  let currentAngle = 180 + hideCount * angleCounter;
+
+  if (offset) currentAngle += offset;
+
+  const hideCountAdjust = hideCount > 1 ? hideCount - 1 : 0;
+  const hideCompensation = (angleCounter * hideCountAdjust) / 2;
+
+  for (let i = 0; i < num; i++) {
+    let value: React.ReactNode = null;
+    if (useValues) value = values![i];
+
+    let transform = `translateX(-50%) translateY(-50%) rotate(${currentAngle}deg) translateY(-${distance}px)`;
+    if (rotate === false)
+      transform += ` rotate(-${currentAngle - hideCompensation}deg)`;
+
+    guides.push(
+      <div
+        style={{
+          ...guideStyle,
+          cursor: 'default',
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform,
+        }}
+        key={i}
+      >
+        {value}
+      </div>
+    );
+
+    currentAngle += angleCounter;
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      transform: `rotate(-${hideCompensation}deg)`,
+    }}>
+      {guides}
+    </div>
+  );
+}, () => true);
+
+// ============================================================================
+// Knob - simplified port of components/knob/index.js
+// (drag interaction simplified since we don't have react-gui/use-pan)
+// ============================================================================
+const Knob: React.FC<{
   value: number;
   onChange: (value: number) => void;
-  size?: 'small' | 'medium';
-  isLevel?: boolean;
-}> = ({ label, value, onChange, size = 'medium', isLevel = false }) => {
+  size: number;
+  min: number;
+  max: number;
+  step: number;
+  bufferSize?: number;
+  children?: React.ReactNode;
+}> = ({ value, onChange, size, min, max, step, bufferSize = 360, children }) => {
+  const rootRef = React.useRef<HTMLDivElement>(null);
 
-  const sizeMap = {
-    small: 50,
-    medium: 60,
-  };
-
-  const knobSize = sizeMap[size];
-  const innerSize = Math.floor(knobSize * 0.65);
-  const rotation = -135 + (value * 270);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+  // Drag interaction
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startVal = value;
+    const range = max - min;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const angle = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX);
-      const degrees = angle * (180 / Math.PI);
-      const normalized = (degrees + 135 + 360) % 360;
-      const newValue = Math.max(0, Math.min(1, normalized / 270));
+      const delta = (startY - moveEvent.clientY) / 200;
+      let newValue = startVal + delta * range;
+      // Snap to step
+      newValue = Math.round(newValue / step) * step + min;
+      newValue = Math.max(min, Math.min(max, newValue));
       onChange(newValue);
     };
 
@@ -54,365 +244,872 @@ const TR808Knob: React.FC<{
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
+  }, [value, onChange, min, max, step]);
 
-  // Guide marks (11 marks around the knob)
-  const guides = [];
-  for (let i = 0; i < 11; i++) {
-    const angle = -135 + (i * 27);
-    const rad = (angle * Math.PI) / 180;
-    const distance = knobSize / 2 - 2;
-    const x = knobSize / 2 + Math.cos(rad) * distance;
-    const y = knobSize / 2 + Math.sin(rad) * distance;
-    guides.push(
-      <div
-        key={i}
-        className="absolute w-0.5 h-2 bg-[#9b9fa0]"
-        style={{
-          left: `${x}px`,
-          top: `${y}px`,
-          transform: `rotate(${angle + 90}deg)`,
-          transformOrigin: 'center',
-        }}
-      />
-    );
-  }
+  // io-808: rotationAmount = getNormalizedValue(value, min, max) * bufferSize - bufferSize / 2
+  const normalizedValue = (value - min) / (max - min);
+  const rotationAmount = normalizedValue * bufferSize - bufferSize / 2;
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="text-[10px] font-bold text-[#f6edc6] uppercase tracking-tight text-center min-h-[28px] flex items-center">
-        {label}
+    <div
+      ref={rootRef}
+      style={{
+        position: 'relative',
+        borderRadius: '50%',
+        height: size,
+        width: size,
+        cursor: 'grab',
+      }}
+      onMouseDown={handleMouseDown}
+    >
+      <div style={{
+        position: 'relative',
+        borderRadius: '50%',
+        height: '100%',
+        width: '100%',
+        transform: `rotate(${rotationAmount}deg)`,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// components/drumKnob/index.js - exact port
+// ============================================================================
+const LABEL_HEIGHT = 30;
+
+const DrumKnob: React.FC<{
+  value: number;
+  onChange: (value: number) => void;
+  size?: number;
+  label?: string;
+  level?: boolean;
+}> = React.memo(({ value, onChange, size = 75, label = '', level = false }) => {
+  const knobSize = Math.ceil(size * 0.6);
+
+  return (
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: size,
+      height: size + LABEL_HEIGHT,
+    }}>
+      {/* Label wrapper */}
+      <div style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexGrow: 1,
+      }}>
+        <span style={labelGreyNormal}>{label}</span>
       </div>
 
-      <div
-        className="relative cursor-pointer select-none"
-        style={{ width: knobSize, height: knobSize }}
-      >
-        {/* Guide marks */}
-        {guides}
-
-        {/* Level indicator dot (only for level knobs) */}
-        {isLevel && (
-          <div
-            className="absolute w-1.5 h-1.5 rounded-full bg-[#ff5a00]"
-            style={{
-              right: '8%',
-              top: '37%',
-            }}
-          />
+      {/* Control wrapper */}
+      <div style={{
+        position: 'relative',
+        width: size,
+        height: size,
+      }}>
+        {/* Level indicator dot */}
+        {level && (
+          <div style={{
+            position: 'absolute',
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            backgroundColor: levelKnobInner,
+            right: '8%',
+            top: '37%',
+            zIndex: 2,
+          }} />
         )}
 
-        {/* Outer ring */}
-        <div
-          className="absolute rounded-full shadow-lg"
-          style={{
-            width: knobSize,
-            height: knobSize,
-            background: 'radial-gradient(circle at 35% 35%, #bbb, #888)',
-            border: '2px solid #6b6b6b',
+        {/* Guide marks */}
+        <Guides
+          num={11}
+          distance={size / 3}
+          hideCount={1}
+          guideStyle={{
+            width: 2,
+            backgroundColor: grey,
+            height: size / 3,
           }}
         />
 
-        {/* Inner knob body */}
-        <div
-          className="absolute rounded-full cursor-pointer select-none"
-          style={{
-            width: innerSize,
-            height: innerSize,
-            left: (knobSize - innerSize) / 2,
-            top: (knobSize - innerSize) / 2,
-            background: isLevel
-              ? 'radial-gradient(circle at 30% 30%, #ff7a30, #ff5a00)'
-              : 'radial-gradient(circle at 30% 30%, #d8e8d8, #C8D4C8)',
-            border: '8px solid #111111',
-          }}
-          onMouseDown={handleMouseDown}
-          title={`${label}: ${Math.round(value * 100)}%`}
-        >
-          {/* Handle indicator */}
-          <div
-            className="absolute w-1 h-3 bg-[#111111] rounded-sm"
-            style={{
-              left: '50%',
-              top: '-6px',
-              transform: `translateX(-50%) rotate(${rotation}deg)`,
-              transformOrigin: `50% ${innerSize / 2 + 6}px`,
-            }}
-          />
+        {/* Knob centered with ring() mixin */}
+        <div style={{ ...ring(knobSize), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Knob
+            value={value}
+            onChange={onChange}
+            size={knobSize}
+            min={0}
+            max={100}
+            step={2}
+            bufferSize={300}
+          >
+            {/* Inner circle with drumHandle border */}
+            <div style={{
+              position: 'relative',
+              overflow: 'hidden',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              border: `solid ${drumHandle} 8px`,
+              backgroundColor: level ? levelKnobInner : miscKnobInner,
+            }}>
+              {/* Handle indicator */}
+              <div style={{
+                position: 'absolute',
+                width: 4,
+                height: 12,
+                backgroundColor: drumHandle,
+                top: -6,
+                left: '50%',
+                transform: 'translateX(-50%)',
+              }} />
+            </div>
+          </Knob>
         </div>
       </div>
     </div>
   );
-};
+}, (prev, next) => prev.value === next.value);
 
-/**
- * TR-808 style switch (for conga/tom, claves/rimshot, maracas/handclap)
- */
-const TR808Switch: React.FC<{
-  label1: string;
-  label2: string;
-  active: boolean;
-  onClick: () => void;
-}> = ({ label1, label2, active, onClick }) => {
+// ============================================================================
+// components/drumSwitch/index.js - exact port
+// ============================================================================
+const DrumSwitch: React.FC<{
+  position: number;
+  onChange: (value: number) => void;
+}> = ({ position, onChange }) => {
+  const borderRadius = 2;
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="text-[8px] text-[#f6edc6] uppercase font-bold">{label1}</div>
-      <button
-        onClick={onClick}
-        className="w-8 h-12 rounded-sm transition-colors"
+    <div style={{
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+    }}>
+      {/* Outer track */}
+      <div
         style={{
-          background: active
-            ? 'linear-gradient(180deg, #4a4a4a, #313335)'
-            : 'linear-gradient(180deg, #313335, #1a1a1a)',
-          border: '2px solid #111',
-          boxShadow: active ? 'inset 0 2px 4px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)',
+          position: 'relative',
+          width: 22,
+          height: 50,
+          padding: 4,
+          backgroundColor: slightlyDarkerBlack,
+          borderRadius,
+          cursor: 'pointer',
         }}
-      />
-      <div className="text-[8px] text-[#f6edc6] uppercase font-bold">{label2}</div>
+        onClick={() => onChange(position < 0.5 ? 1 : 0)}
+      >
+        {/* Inner handle */}
+        <div style={{
+          position: 'absolute',
+          width: 22 - 8, // thickness - padding*2
+          height: (50 - 8) / 2, // (length - padding*2) / 2
+          left: 4,
+          top: position < 0.5 ? 4 : 50 - 4 - (50 - 8) / 2,
+          backgroundColor: drumSwitchHandle,
+          borderRadius,
+          transition: 'top 0.1s ease',
+        }} />
+      </div>
     </div>
   );
 };
 
-/**
- * Instrument column (like on the original TR-808)
- */
+// ============================================================================
+// components/instrumentLabel/index.js - exact port
+// ============================================================================
+const baseLabelStyle: React.CSSProperties = {
+  fontFamily: panelFontFamily,
+  whiteSpace: 'pre',
+  color: darkGrey,
+  letterSpacing: -0.5,
+  ...unselectableText,
+};
+
+const InstrumentLabel: React.FC<{ label: string[] }> = ({ label }) => {
+  const formattedLabel = label.map((section, index) => {
+    let style: React.CSSProperties;
+    let value: string;
+    if (section[0] === '*') {
+      style = { ...baseLabelStyle, fontSize: 19, fontWeight: 400 };
+      value = section.slice(1);
+    } else {
+      style = { ...baseLabelStyle, fontSize: 11 };
+      value = section;
+    }
+    return (
+      <div key={index} style={style}>{value}</div>
+    );
+  });
+
+  return (
+    <div style={{
+      width: '100%',
+      height: 36,
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: drumLabel,
+      borderRadius: 4,
+    }}>
+      <div style={{
+        alignItems: 'baseline',
+        cursor: 'default',
+        display: 'flex',
+        flexDirection: 'row',
+        wordSpacing: '-0.1em',
+      }}>
+        {formattedLabel}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// layouts/instrumentColumn/index.js - exact port
+// Knobs on TOP, labels on BOTTOM
+// ============================================================================
+const InstrumentColumnLayout: React.FC<{
+  labels: React.ReactNode[];
+  children: React.ReactNode;
+  width: number;
+  height: number;
+}> = ({ labels, children, width, height }) => {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      width,
+      height,
+      padding: 4,
+    }}>
+      {/* Knobs on TOP */}
+      <div style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
+        {React.Children.map(children, (child, index) => (
+          <div key={index} style={{ marginBottom: 5 }}>
+            {child}
+          </div>
+        ))}
+      </div>
+
+      {/* Labels on BOTTOM */}
+      <div style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }}>
+        {labels.map((label, index) => (
+          <div key={index} style={{ marginTop: 8 }}>
+            {label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// EMPTY_CONTROL constant from components/instrumentColumn
+// ============================================================================
+const EMPTY_CONTROL = 'EMPTY';
+
+// ============================================================================
+// components/instrumentColumn/index.js - exact port
+// ============================================================================
 const InstrumentColumn: React.FC<{
-  name: string;
-  controls: Array<{ label: string; param: string; isLevel?: boolean }>;
-  switchLabels?: { label1: string; label2: string };
+  config: InstrumentConfig;
+  width: number;
+  height: number;
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
-}> = ({ name, controls, switchLabels, parameters, onParamChange }) => {
+}> = ({ config, width, height, parameters, onParamChange }) => {
+  const { type, labels, switchConfig, controls } = config;
+  const DRUM_KNOB_SIZE = Math.ceil(width * 0.72);
+
+  // Create label section
+  const labelComponents: React.ReactNode[] = [];
+  labelComponents.push(
+    <InstrumentLabel key={`${type}-label-0`} label={labels[0]} />
+  );
+  if (labels.length === 2) {
+    if (switchConfig != null) {
+      labelComponents.push(
+        <DrumSwitch
+          key={`${type}-switch`}
+          position={parameters[switchConfig.param] ?? 0}
+          onChange={(v) => onParamChange(switchConfig.param, v)}
+        />
+      );
+    }
+    labelComponents.push(
+      <InstrumentLabel key={`${type}-label-1`} label={labels[1]} />
+    );
+  }
+
+  // Create control section - level knob first, then other controls
+  const controlComponents: React.ReactNode[] = [];
+  controlComponents.push(
+    <DrumKnob
+      key={`${type}-knob-level`}
+      value={parameters[`${type}_level`] ?? 75}
+      onChange={(v) => onParamChange(`${type}_level`, v)}
+      size={DRUM_KNOB_SIZE}
+      label="LEVEL"
+      level
+    />
+  );
+  controls.forEach((controlName, index) => {
+    if (controlName !== EMPTY_CONTROL) {
+      controlComponents.push(
+        <DrumKnob
+          key={`${type}-knob-${index}`}
+          value={parameters[`${type}_${controlName}`] ?? 50}
+          onChange={(v) => onParamChange(`${type}_${controlName}`, v)}
+          size={DRUM_KNOB_SIZE}
+          label={controlName.toUpperCase()}
+        />
+      );
+    } else {
+      // Empty spacer (io-808 uses this for open hihat's first empty slot)
+      controlComponents.push(
+        <div
+          key={`${type}-knob-${index}`}
+          style={{
+            width: DRUM_KNOB_SIZE,
+            height: DRUM_KNOB_SIZE + LABEL_HEIGHT,
+          }}
+        />
+      );
+    }
+  });
+
   return (
-    <div className="flex flex-col items-center gap-2 px-2">
-      {/* Instrument name */}
-      <div className="text-[11px] font-bold text-[#f6edc6] uppercase tracking-tight text-center min-h-[32px] flex items-center">
-        {name}
+    <InstrumentColumnLayout
+      labels={labelComponents}
+      width={width}
+      height={height}
+    >
+      {controlComponents}
+    </InstrumentColumnLayout>
+  );
+};
+
+// ============================================================================
+// components/appTitle/index.js - exact port
+// ============================================================================
+const TitleText: React.FC<{ text: string }> = React.memo(({ text }) => {
+  const eSplit = text.split('e');
+  const result = eSplit.reduce<React.ReactNode[]>((acc, cur, idx) => {
+    if (acc === null) return [cur];
+    const rotatedE = (
+      <span
+        key={idx}
+        style={{
+          display: 'inline-block',
+          transformOrigin: '50% 60%',
+          transform: 'rotate(-40deg)',
+        }}
+      >
+        e
+      </span>
+    );
+    return [...acc, rotatedE, cur];
+  }, null as any);
+  return <>{result}</>;
+});
+
+const lineHeight = 1.5;
+const titleRight = 60;
+const lineTop = 55;
+
+const AppTitle: React.FC<{ width: number; height: number }> = ({ width, height }) => {
+  return (
+    <div style={{ position: 'relative', width, height }}>
+      {/* Orange horizontal line */}
+      <div style={{
+        position: 'absolute',
+        height: `${lineHeight}%`,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        top: `${lineTop}%`,
+        backgroundColor: stencilOrange,
+        width: width - 20,
+      }} />
+
+      {/* Title text */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        alignItems: 'baseline',
+        position: 'absolute',
+        bottom: `calc(${lineTop}% - 17.5px)`,
+        right: titleRight,
+      }}>
+        <div style={{
+          ...labelGreyLarge,
+          fontFamily: brandingFontFamily,
+          marginRight: 40,
+          color: stencilOrange,
+          fontSize: 50,
+          textShadow: `0.3rem 0 ${darkGrey},0.3rem 0rem ${darkGrey},-0.3rem -0 ${darkGrey},-0.3rem 0 ${darkGrey}`,
+        }}>
+          <TitleText text="Rhythm Composer" />
+        </div>
+        <div style={{
+          ...labelGreyLarge,
+          fontFamily: brandingFontFamily,
+          color: stencilOrange,
+          fontSize: 40,
+          letterSpacing: -1.5,
+        }}>
+          <TitleText text="DEViLBOX" />
+        </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col gap-3">
-        {controls.map((control) => (
-          <TR808Knob
-            key={control.param}
-            label={control.label}
-            value={parameters[control.param] ?? 0.5}
-            onChange={(value) => onParamChange(control.param, value)}
-            size="small"
-            isLevel={control.isLevel}
-          />
-        ))}
-
-        {/* Switch (for conga/tom, etc.) */}
-        {switchLabels && (
-          <TR808Switch
-            label1={switchLabels.label1}
-            label2={switchLabels.label2}
-            active={(parameters.switchMode ?? 0) > 0.5}
-            onClick={() => onParamChange('switchMode', (parameters.switchMode ?? 0) > 0.5 ? 0 : 1)}
-          />
-        )}
+      {/* Subtitle */}
+      <div style={{
+        ...labelGreyLarge,
+        fontFamily: brandingFontFamily,
+        position: 'absolute',
+        top: `${lineTop + lineHeight * 3}%`,
+        right: titleRight,
+        fontSize: 28,
+        letterSpacing: -1,
+      }}>
+        <TitleText text="Browser Controlled" />
       </div>
     </div>
   );
 };
 
-/**
- * TR-808 Hardware Panel
- */
+// ============================================================================
+// components/masterVolumeKnob/index.js - exact port
+// ============================================================================
+const labelValues: React.ReactNode[] = [];
+for (let i = 0; i < 11; i++) {
+  if (i === 0) {
+    labelValues.push('MIN');
+  } else if (i === 10) {
+    labelValues.push('MAX');
+  } else {
+    labelValues.push(i);
+  }
+}
+
+const MasterVolumeKnob: React.FC<{
+  value: number;
+  onChange: (value: number) => void;
+  size?: number;
+}> = ({ value, onChange, size = 130 }) => {
+  const knobSize = Math.ceil(size * 0.54);
+  const labelHeight = 9;
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      width: size,
+      height: size + labelHeight,
+    }}>
+      <div style={{
+        position: 'relative',
+        width: size,
+        height: size,
+      }}>
+        {/* Dot guides */}
+        <Guides
+          num={11}
+          distance={size * 0.33}
+          hideCount={1}
+          guideStyle={{
+            width: 5,
+            height: 5,
+            backgroundColor: grey,
+            borderRadius: '50%',
+          }}
+        />
+        {/* Label guides */}
+        <Guides
+          distance={size * 0.45}
+          hideCount={1}
+          rotate={false}
+          values={labelValues}
+          guideStyle={labelGreySmall}
+        />
+        {/* Knob */}
+        <div style={ring(knobSize)}>
+          <Knob
+            value={value}
+            onChange={onChange}
+            size={knobSize}
+            bufferSize={300}
+            min={0}
+            max={100}
+            step={1}
+          >
+            {/* SelectorKnobInner - dark knob with pointer */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              backgroundColor: darkGrey,
+              border: `2px solid ${grey}`,
+            }}>
+              <div style={{
+                position: 'absolute',
+                width: 3,
+                height: '40%',
+                backgroundColor: stencilOrange,
+                top: 2,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                borderRadius: 1,
+              }} />
+            </div>
+          </Knob>
+        </div>
+      </div>
+      <div style={{
+        position: 'relative',
+        ...labelGreyNormal,
+        overflow: 'visible',
+        top: -4,
+      }}>
+        MASTER VOLUME
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// components/stepButton/index.js - exact port
+// ============================================================================
+const StepButton: React.FC<{
+  color: string;
+  active: boolean;
+  onClick: () => void;
+  width?: number;
+  height?: number;
+}> = ({ color, active, onClick, width = 50, height = 80 }) => {
+  return (
+    <div
+      style={{
+        borderRadius: 4,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: 5,
+        backgroundColor: color,
+        width,
+        height,
+        cursor: 'pointer',
+      }}
+      onClick={onClick}
+    >
+      <Light active={active} />
+    </div>
+  );
+};
+
+// ============================================================================
+// Instrument configuration - from layouts/topRightSection/index.js
+// ============================================================================
+interface InstrumentConfig {
+  type: string;
+  labels: string[][];
+  controls: string[];
+  switchConfig?: { param: string };
+}
+
+const instrumentConfig: InstrumentConfig[] = [
+  {
+    type: 'accent',
+    labels: [['*A', '*C', 'CENT']],
+    controls: [],
+  },
+  {
+    type: 'kick',
+    labels: [['*B', 'ASS ', '*D', 'RUM']],
+    controls: ['tone', 'decay'],
+  },
+  {
+    type: 'snare',
+    labels: [['*S', 'NARE ', '*D', 'RUM']],
+    controls: ['tone', 'snappy'],
+  },
+  {
+    type: 'low_tom',
+    labels: [['*L', 'OW ', '*C', 'ONGA'], ['*L', 'OW ', '*T', 'OM']],
+    switchConfig: { param: 'low_tom_selector' },
+    controls: ['tuning'],
+  },
+  {
+    type: 'mid_tom',
+    labels: [['*M', 'ID ', '*C', 'ONGA'], ['*M', 'ID ', '*T', 'OM']],
+    switchConfig: { param: 'mid_tom_selector' },
+    controls: ['tuning'],
+  },
+  {
+    type: 'hi_tom',
+    labels: [['*H', 'I ', '*C', 'ONGA'], ['*H', 'I ', '*T', 'OM']],
+    switchConfig: { param: 'hi_tom_selector' },
+    controls: ['tuning'],
+  },
+  {
+    type: 'rimshot',
+    labels: [['*C', '*L', 'AVES'], ['*R', 'IM ', '*S', 'HOT']],
+    switchConfig: { param: 'rimshot_selector' },
+    controls: [],
+  },
+  {
+    type: 'clap',
+    labels: [['*M', '*A', 'RACAS'], ['HAND ', '*C', 'LA', '*P']],
+    switchConfig: { param: 'clap_selector' },
+    controls: [],
+  },
+  {
+    type: 'cowbell',
+    labels: [['*C', 'OW ', '*B', 'ELL']],
+    controls: [],
+  },
+  {
+    type: 'cymbal',
+    labels: [['*C', '*Y', 'MBAL']],
+    controls: ['tone', 'decay'],
+  },
+  {
+    type: 'oh',
+    labels: [['*O', 'PEN ', '*H', 'IHAT']],
+    controls: [EMPTY_CONTROL, 'decay'],
+  },
+  {
+    type: 'ch',
+    labels: [["*C", "LS'D ", '*H', 'IHAT']],
+    controls: [],
+  },
+];
+
+// Step button colors: 4 red, 4 orange, 4 yellow, 4 white (io-808 pattern)
+const STEP_COLORS = [
+  red, red, red, red,
+  buttonOrange, buttonOrange, buttonOrange, buttonOrange,
+  yellow, yellow, yellow, yellow,
+  offWhite, offWhite, offWhite, offWhite,
+];
+
+// ============================================================================
+// TR808Hardware - Main component
+// Layout: topRightSection (instruments + title) + bottomSection (step buttons)
+// ============================================================================
 export const TR808Hardware: React.FC<TR808HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
+  const [stepPattern, setStepPattern] = React.useState<boolean[]>(
+    new Array(16).fill(false)
+  );
+
+  const toggleStep = useCallback((index: number) => {
+    setStepPattern(prev => {
+      const next = [...prev];
+      next[index] = !next[index];
+      return next;
+    });
+  }, []);
+
+  // Layout constants - derived from io-808's layouts/app/index.js
+  // We scale to fit the panel but keep proportions
+  const SEPARATOR_WIDTH = 1;
+
+  // Top section: instruments (70%) + title (30%)
+  const INSTRUMENTS_HEIGHT_RATIO = 0.7;
+  const TOP_HEIGHT = 520;
+  const instrumentsHeight = Math.ceil(TOP_HEIGHT * INSTRUMENTS_HEIGHT_RATIO);
+  const titleSectionHeight = TOP_HEIGHT - instrumentsHeight;
+
+  // Bottom section
+  const BOTTOM_HEIGHT = 120;
+  const STEP_BUTTON_W = 50;
+  const STEP_BUTTON_H = 80;
 
   return (
-    <div
-      className="rounded-lg overflow-hidden shadow-2xl"
-      style={{
-        background: 'linear-gradient(180deg, #a8a8a8 0%, #888888 100%)',
-      }}
-    >
-      {/* Top Panel - Logo */}
-      <div className="px-6 py-3 bg-gradient-to-r from-gray-800 to-gray-700 border-b-2 border-gray-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-gray-400 text-[10px] font-light tracking-[0.5em] uppercase">Roland</div>
-            <div className="text-white font-black text-4xl tracking-wider" style={{ fontFamily: 'Impact, Arial Black, sans-serif' }}>TR-808/909</div>
-            <div className="text-gray-400 text-[9px] font-light tracking-[0.25em] uppercase">Rhythm Composer</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[#ff5a00] text-xs font-bold tracking-wider uppercase">Analog</div>
-            <div className="text-white text-2xl font-bold">16 STEP</div>
+    <div style={{
+      width: '100%',
+      backgroundColor: darkGrey,
+      overflow: 'hidden',
+    }}>
+      {/* ================================================================ */}
+      {/* TOP SECTION - io-808 topRightSection */}
+      {/* ================================================================ */}
+      <div style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Top divider line */}
+        <div style={{
+          width: '100%',
+          height: 3,
+          backgroundColor: grey,
+        }} />
+
+        {/* Instruments row */}
+        <div style={{
+          width: '100%',
+          height: instrumentsHeight,
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+          {instrumentConfig.reduce<React.ReactNode[]>((components, config, index) => {
+            const result = [...components];
+            // Grey separator between columns
+            if (index !== 0) {
+              result.push(
+                <div
+                  key={`separator-${index}`}
+                  style={{
+                    width: SEPARATOR_WIDTH,
+                    height: instrumentsHeight - 10,
+                    backgroundColor: grey,
+                    flexShrink: 0,
+                  }}
+                />
+              );
+            }
+            result.push(
+              <div
+                key={`column-${index}`}
+                style={{
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  height: instrumentsHeight,
+                  display: 'flex',
+                  justifyContent: 'center',
+                }}
+              >
+                <InstrumentColumn
+                  config={config}
+                  width={110}
+                  height={instrumentsHeight}
+                  parameters={parameters}
+                  onParamChange={onParamChange}
+                />
+              </div>
+            );
+            return result;
+          }, [])}
+        </div>
+
+        {/* Title section */}
+        <div style={{
+          width: '100%',
+          height: titleSectionHeight,
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <AppTitle
+            width={Math.ceil(titleSectionHeight * 5.5)}
+            height={titleSectionHeight}
+          />
+          <div style={{
+            height: titleSectionHeight,
+            display: 'flex',
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <MasterVolumeKnob
+              value={parameters.master_volume ?? 75}
+              onChange={(v) => onParamChange('master_volume', v)}
+              size={Math.floor(titleSectionHeight * 0.86)}
+            />
           </div>
         </div>
+
+        {/* Bottom divider line */}
+        <div style={{
+          width: '100%',
+          height: 3,
+          backgroundColor: grey,
+        }} />
       </div>
 
-      {/* Main Control Panel */}
-      <div className="p-4 bg-gradient-to-b from-[#9b9fa0] to-[#7a7e7f]">
-        {/* Instrument Controls */}
-        <div className="mb-4">
-          <div className="text-[10px] font-bold text-[#f6edc6] uppercase tracking-widest mb-2 pb-1 border-b border-gray-600">
-            Instrument Controls
-          </div>
-
-          <div className="grid grid-cols-6 gap-1">
-            {/* Accent (no controls - just volume level indicator) */}
-            <InstrumentColumn
-              name="*ACCENT"
-              controls={[{ label: 'LEVEL', param: 'accent_level', isLevel: true }]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Bass Drum */}
-            <InstrumentColumn
-              name="*BASS *DRUM"
-              controls={[
-                { label: 'TONE', param: 'kick_tone' },
-                { label: 'DECAY', param: 'kick_decay' },
-                { label: 'LEVEL', param: 'kick_level', isLevel: true },
-              ]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Snare Drum */}
-            <InstrumentColumn
-              name="*SNARE *DRUM"
-              controls={[
-                { label: 'TONE', param: 'snare_tone' },
-                { label: 'SNAPPY', param: 'snare_snappy' },
-                { label: 'LEVEL', param: 'snare_level', isLevel: true },
-              ]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Low Tom/Conga */}
-            <InstrumentColumn
-              name="*LOW *TOM/*CONGA"
-              controls={[
-                { label: 'TUNING', param: 'low_tom_tuning' },
-                { label: 'LEVEL', param: 'low_tom_level', isLevel: true },
-              ]}
-              switchLabels={{ label1: 'TOM', label2: 'CONGA' }}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Mid Tom/Conga */}
-            <InstrumentColumn
-              name="*MID *TOM/*CONGA"
-              controls={[
-                { label: 'TUNING', param: 'mid_tom_tuning' },
-                { label: 'LEVEL', param: 'mid_tom_level', isLevel: true },
-              ]}
-              switchLabels={{ label1: 'TOM', label2: 'CONGA' }}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Hi Tom/Conga */}
-            <InstrumentColumn
-              name="*HI *TOM/*CONGA"
-              controls={[
-                { label: 'TUNING', param: 'hi_tom_tuning' },
-                { label: 'LEVEL', param: 'hi_tom_level', isLevel: true },
-              ]}
-              switchLabels={{ label1: 'TOM', label2: 'CONGA' }}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-          </div>
-
-          {/* Second row */}
-          <div className="grid grid-cols-6 gap-1 mt-4">
-            {/* Rimshot/Claves */}
-            <InstrumentColumn
-              name="*RIM/*CLAVES"
-              controls={[{ label: 'LEVEL', param: 'rimshot_level', isLevel: true }]}
-              switchLabels={{ label1: 'RIM', label2: 'CLAVE' }}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Handclap/Maracas */}
-            <InstrumentColumn
-              name="*CLAP/*MARACAS"
-              controls={[{ label: 'LEVEL', param: 'clap_level', isLevel: true }]}
-              switchLabels={{ label1: 'CLAP', label2: 'MARACA' }}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Cowbell */}
-            <InstrumentColumn
-              name="*COW *BELL"
-              controls={[{ label: 'LEVEL', param: 'cowbell_level', isLevel: true }]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Cymbal */}
-            <InstrumentColumn
-              name="*CYMBAL"
-              controls={[
-                { label: 'TONE', param: 'cymbal_tone' },
-                { label: 'DECAY', param: 'cymbal_decay' },
-                { label: 'LEVEL', param: 'cymbal_level', isLevel: true },
-              ]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Open Hi-Hat */}
-            <InstrumentColumn
-              name="*OPEN *HI-HAT"
-              controls={[
-                { label: 'DECAY', param: 'oh_decay' },
-                { label: 'LEVEL', param: 'oh_level', isLevel: true },
-              ]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-
-            {/* Closed Hi-Hat */}
-            <InstrumentColumn
-              name="*CLSD *HI-HAT"
-              controls={[{ label: 'LEVEL', param: 'ch_level', isLevel: true }]}
-              parameters={parameters}
-              onParamChange={onParamChange}
-            />
-          </div>
+      {/* ================================================================ */}
+      {/* BOTTOM SECTION - Step buttons */}
+      {/* ================================================================ */}
+      <div style={{
+        width: '100%',
+        height: BOTTOM_HEIGHT,
+        backgroundColor: grey,
+        padding: '8px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Step number labels */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          marginBottom: 4,
+        }}>
+          {STEP_COLORS.map((_, i) => (
+            <div key={i} style={{
+              ...labelGreySmall,
+              color: i < 8 ? stencilOrange : darkGrey,
+              fontSize: i < 4 || (i >= 8 && i < 12) ? 13 : 11,
+              fontWeight: 'bold',
+              width: STEP_BUTTON_W,
+              textAlign: 'center',
+            }}>
+              {i + 1}
+            </div>
+          ))}
         </div>
 
-        {/* Master Section */}
-        <div className="mt-6 pt-4 border-t border-gray-600">
-          <div className="text-[10px] font-bold text-[#f6edc6] uppercase tracking-widest mb-3 pb-1">
-            Master
-          </div>
-          <div className="flex gap-6 justify-center">
-            <TR808Knob
-              label="MASTER VOLUME"
-              value={parameters.master_volume || 0.8}
-              onChange={(value) => onParamChange('master_volume', value)}
-              size="medium"
-              isLevel={true}
+        {/* Step buttons row */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'flex-start',
+          flex: 1,
+        }}>
+          {STEP_COLORS.map((color, i) => (
+            <StepButton
+              key={i}
+              color={color}
+              active={stepPattern[i]}
+              onClick={() => toggleStep(i)}
+              width={STEP_BUTTON_W}
+              height={STEP_BUTTON_H}
             />
-            <TR808Knob
-              label="TEMPO"
-              value={parameters.tempo || 0.5}
-              onChange={(value) => onParamChange('tempo', value)}
-              size="medium"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Info */}
-      <div className="px-4 py-1 bg-black border-t border-gray-800">
-        <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
-          Analog/Digital Rhythm Composer • 16-Step Sequencer • 1980/1983
+          ))}
         </div>
       </div>
     </div>
