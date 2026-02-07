@@ -60,6 +60,8 @@ export interface EditorHeaderProps {
   onHelpToggle?: () => void;
   /** Custom header content (for TB303's distinctive branding) */
   customHeader?: React.ReactNode;
+  /** Custom header controls (injected into default header) */
+  customHeaderControls?: React.ReactNode;
   /** Compact mode for specialized editors */
   compact?: boolean;
   /** Precalc/Bake functionality */
@@ -211,6 +213,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   showHelp = false,
   onHelpToggle,
   customHeader,
+  customHeaderControls,
   compact = false,
   onBake,
   onBakePro,
@@ -273,6 +276,9 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <p className="text-xs text-gray-400 truncate">{synthInfo.description}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Custom Header Controls (injected from parent) */}
+            {customHeaderControls}
+
             {/* Live Mode Toggle */}
             <button
               onClick={() => onChange({ isLive: !instrument.isLive })}
