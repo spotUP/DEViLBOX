@@ -9,7 +9,7 @@
  * └─────────────────────────────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
@@ -35,11 +35,11 @@ import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
+import { parseDb303Pattern, convertToDb303Pattern } from '@lib/import/Db303PatternConverter';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { MASTER_PRESETS, type MasterPreset } from '@constants/masterPresets';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { CURRENT_VERSION } from '@generated/changelog';
 
@@ -244,7 +244,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   // Tap Tempo
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
   
-  const [showModulesMenu, setShowModulesMenu] = useState(false);
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
   const [showGrooveMenu, setShowGrooveMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -279,96 +278,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     }
   };
   
-  const modulesMenuRef = useRef<HTMLDivElement>(null);
-  const modulesButtonRef = useRef<HTMLDivElement>(null);
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
   const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
   const grooveMenuRef = useRef<HTMLDivElement>(null);
   const grooveButtonRef = useRef<HTMLDivElement>(null);
 
-  const [modulesMenuPosition, setModulesMenuPosition] = useState({ top: 0, left: 0 });
   const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
   const [grooveMenuPosition, setGrooveMenuPosition] = useState({ top: 0, left: 0 });
 
-  const [bundledModules, setBundledModules] = useState<{ acid: { file: string; name: string }[]; tb303: { file: string; name: string }[]; general: { file: string; name: string }[] } | null>(null);
-
-  // Load modules list from JSON on first menu open
-  useEffect(() => {
-    if (showModulesMenu && !bundledModules) {
-      const basePath = import.meta.env.BASE_URL || '/';
-      fetch(`${basePath}data/songs/modules.json`)
-        .then(r => r.json())
-        .then(data => setBundledModules(data.categories))
-        .catch(() => {
-          // Fallback if modules.json fails to load
-          setBundledModules({
-            acid: [{ file: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks' }],
-            tb303: [],
-            general: [],
-          });
-        });
-    }
-  }, [showModulesMenu, bundledModules]);
-
-  const handleLoadModule = async (filename: string) => {
-    setShowModulesMenu(false);
-    if (isPlaying) {
-      stop();
-      engine.releaseAll();
-    }
-    setIsLoading(true);
-    try {
-      const basePath = import.meta.env.BASE_URL || '/';
-      const response = await fetch(`${basePath}data/songs/${filename}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const songData = await response.json();
-      const { needsMigration, migrateProject } = await import('@/lib/migration');
-      let patterns = songData.patterns;
-      let instruments = songData.instruments;
-      if (needsMigration(patterns, instruments)) {
-        const migrated = migrateProject(patterns, instruments);
-        patterns = migrated.patterns;
-        instruments = migrated.instruments;
-      }
-      if (patterns) {
-        loadPatterns(patterns);
-        if (songData.sequence && Array.isArray(songData.sequence)) {
-          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
-          const order = songData.sequence
-            .map((patternId: string) => patternIdToIndex.get(patternId))
-            .filter((index: number | undefined): index is number => index !== undefined);
-          if (order.length > 0) setPatternOrder(order);
-        }
-      }
-      if (instruments) loadInstruments(instruments);
-      if (songData.metadata) setMetadata(songData.metadata);
-      if (songData.bpm) setBPM(songData.bpm);
-      if (songData.grooveTemplateId) setGrooveTemplate(songData.grooveTemplateId);
-      notify.success(`Loaded: ${songData.metadata?.name || filename}`, 2000);
-    } catch (error) {
-      console.error('Failed to load module:', error);
-      notify.error(`Failed to load ${filename}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLoadMasterPreset = async (preset: MasterPreset) => {
-    setShowModulesMenu(false);
-    if (isPlaying) {
-      stop();
-      engine.releaseAll();
-    }
-    try {
-      loadInstruments(preset.instruments);
-      if (preset.bpm) setBPM(preset.bpm);
-      if (preset.patterns) loadPatterns(preset.patterns);
-      await engine.preloadInstruments(preset.instruments);
-      notify.success(`Loaded Preset: ${preset.name}`);
-    } catch (error) {
-      notify.error('Failed to load preset');
-    }
-  };
 
   const handleLoadMasterFxPreset = (preset: MasterFxPreset) => {
     setShowFxPresetsMenu(false);
@@ -379,13 +296,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     useAudioStore.getState().setMasterEffects(effects as any);
     notify.success(`Applied FX: ${preset.name}`);
   };
-
-  React.useEffect(() => {
-    if (showModulesMenu && modulesButtonRef.current) {
-      const rect = modulesButtonRef.current.getBoundingClientRect();
-      setModulesMenuPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [showModulesMenu]);
 
   React.useEffect(() => {
     if (showFxPresetsMenu && fxPresetsButtonRef.current) {
@@ -402,11 +312,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showGrooveMenu]);
 
   React.useEffect(() => {
-    if (!showModulesMenu && !showFxPresetsMenu && !showGrooveMenu) return;
+    if (!showFxPresetsMenu && !showGrooveMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (showModulesMenu && modulesMenuRef.current && !modulesMenuRef.current.contains(e.target as Node)) {
-        setShowModulesMenu(false);
-      }
       if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
         setShowFxPresetsMenu(false);
       }
@@ -418,7 +325,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showModulesMenu, showFxPresetsMenu, showGrooveMenu]);
+  }, [showFxPresetsMenu, showGrooveMenu]);
 
   const handleSave = () => {
     try {
@@ -509,6 +416,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                     volume: cell.volume || 0,
                     effTyp: cell.effectType || 0,
                     eff: cell.effectParam || 0,
+                    effTyp2: 0,
+                    eff2: 0,
                   };
                 }),
               })),
@@ -611,7 +520,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
         setBPM(songData.bpm);
         setMetadata(songData.metadata);
-        if (songData.grooveTemplateId) setGrooveTemplate(songData.grooveTemplateId);
+        setGrooveTemplate(songData.grooveTemplateId || 'straight');
         notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
       }
     } catch (error) {
@@ -619,6 +528,62 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       notify.error(`Failed to load ${file.name}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // DB303 Pattern Import
+  const handleImportDb303Pattern = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xml';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const xmlString = await file.text();
+        const patternName = file.name.replace('.xml', '') || 'Imported Pattern';
+        const importedPattern = parseDb303Pattern(xmlString, patternName);
+
+        // Add imported pattern to tracker
+        const newPatterns = [...patterns, importedPattern];
+        loadPatterns(newPatterns);
+
+        // Switch to the newly imported pattern
+        setCurrentPattern(newPatterns.length - 1);
+
+        notify.success(`Imported DB303 pattern: ${importedPattern.name}`);
+      } catch (error) {
+        console.error('Failed to import DB303 pattern:', error);
+        notify.error('Failed to import DB303 pattern');
+      }
+    };
+    input.click();
+  };
+
+  // DB303 Pattern Export
+  const handleExportDb303Pattern = () => {
+    try {
+      const currentPattern = patterns[currentPatternIndex];
+      if (!currentPattern) {
+        notify.error('No pattern to export');
+        return;
+      }
+
+      const xml = convertToDb303Pattern(currentPattern);
+
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentPattern.name || 'pattern'}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      notify.success(`Exported: ${currentPattern.name}.xml`);
+    } catch (error) {
+      console.error('Failed to export DB303 pattern:', error);
+      notify.error('Failed to export DB303 pattern');
     }
   };
 
@@ -821,30 +786,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
 
-              <div ref={modulesButtonRef}>
-                <Button variant={showModulesMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowModulesMenu(!showModulesMenu)} disabled={isLoading}>Modules</Button>
-              </div>
-              {showModulesMenu && (
-                <div ref={modulesMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${modulesMenuPosition.top}px`, left: `${modulesMenuPosition.left}px` }}>
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Presets</div>
-                  {MASTER_PRESETS.map((preset) => (
-                    <button key={preset.id} onClick={() => handleLoadMasterPreset(preset)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex flex-col">
-                      <span className="font-bold">{preset.name}</span>
-                      <span className="text-[10px] opacity-60">{preset.description}</span>
-                    </button>
-                  ))}
-                  {!bundledModules ? (
-                    <div className="px-3 py-2 text-sm text-text-muted">Loading...</div>
-                  ) : (<>
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">Acid / 303</div>
-                  {bundledModules.acid.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">TB-303 Patterns</div>
-                  {bundledModules.tb303.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
-                  <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border mt-2">General</div>
-                  {bundledModules.general.map((mod) => (<button key={mod.file} onClick={() => handleLoadModule(mod.file)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors">{mod.name}</button>))}
-                  </>)}
-                </div>
-              )}
+              {/* DB303 Pattern Import/Export */}
+              <Button variant="ghost" size="sm" onClick={handleImportDb303Pattern} title="Import DB303 Pattern (XML)">Import 303</Button>
+              <Button variant="ghost" size="sm" onClick={handleExportDb303Pattern} title="Export Current Pattern as DB303 XML">Export 303</Button>
 
               <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns}>Patterns</Button>
               <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
@@ -907,7 +851,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <ImportModuleDialog isOpen={showImportDialog} onClose={() => setShowImportDialog(false)} onImport={handleModuleImport} />
-      <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} onLoad={async (data: any, filename: string) => {
+      <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data: any, filename: string) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
           const { needsMigration, migrateProject } = await import('@/lib/migration');
@@ -927,7 +871,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           if (instruments) loadInstruments(instruments);
           if (data.metadata) setMetadata(data.metadata);
           if (data.bpm) setBPM(data.bpm);
-          if (data.grooveTemplateId) setGrooveTemplate(data.grooveTemplateId);
+          setGrooveTemplate(data.grooveTemplateId || 'straight');
           notify.success(`Loaded: ${data.metadata?.name || filename}`);
         } catch (error) { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
