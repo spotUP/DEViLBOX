@@ -6,8 +6,6 @@
  * synthesis engine in the audio thread for low-latency output.
  */
 
-const BASE_URL = globalThis.BASE_URL || '/';
-
 class ES5503Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -24,12 +22,18 @@ class ES5503Processor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
+
+    // Initialize oscilloscope support
+    OscilloscopeMixin.init(this);
   }
 
   async handleMessage(data) {
     switch (data.type) {
+      case 'enableOsc':
+        this.oscEnabled = data.enabled;
+        break;
       case 'init':
-        await this.initSynth(data.sampleRate);
+        await this.initSynth(data);
         break;
       case 'noteOn':
         if (this.synth) this.synth.noteOn(data.note, data.velocity);
@@ -81,9 +85,14 @@ class ES5503Processor extends AudioWorkletProcessor {
       // Wave data loading
       case 'loadWaveData':
         if (this.synth && this.module && data.waveData) {
+          if (!this.module.wasmMemory) {
+            console.error("[Worklet] WASM memory not available");
+            break;
+          }
           const bytes = new Uint8Array(data.waveData);
           const ptr = this.module._malloc(bytes.length);
-          this.module.HEAPU8.set(bytes, ptr);
+          const heap = new Uint8Array(this.module.wasmMemory.buffer);
+          heap.set(bytes, ptr);
           this.synth.loadWaveData(ptr, data.offset || 0, bytes.length);
           this.module._free(ptr);
         }
@@ -94,15 +103,14 @@ class ES5503Processor extends AudioWorkletProcessor {
     }
   }
 
-  async initSynth(sampleRate) {
+  async initSynth(data) {
     try {
       this.cleanup();
 
-      const moduleFactory = await import(`${BASE_URL}mame/ES5503.js`);
-      this.module = await moduleFactory.default();
+      this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'createES5503Module');
 
       this.synth = new this.module.ES5503Synth();
-      this.synth.initialize(sampleRate);
+      this.synth.initialize(data.sampleRate);
 
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);
@@ -120,18 +128,13 @@ class ES5503Processor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    if (this.lastHeapBuffer !== this.module.HEAPF32.buffer) {
-      this.outputBufferL = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrL,
-        this.bufferSize
-      );
-      this.outputBufferR = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrR,
-        this.bufferSize
-      );
-      this.lastHeapBuffer = this.module.HEAPF32.buffer;
+    const mem = this.module.wasmMemory || (this.module.HEAPF32 ? { buffer: this.module.HEAPF32.buffer } : null);
+    if (!mem) return;
+
+    if (this.lastHeapBuffer !== mem.buffer) {
+      this.outputBufferL = new Float32Array(mem.buffer, this.outputPtrL, this.bufferSize);
+      this.outputBufferR = new Float32Array(mem.buffer, this.outputPtrR, this.bufferSize);
+      this.lastHeapBuffer = mem.buffer;
     }
   }
 
@@ -177,6 +180,9 @@ class ES5503Processor extends AudioWorkletProcessor {
       outputL[i] = this.outputBufferL[i];
       outputR[i] = this.outputBufferR[i];
     }
+
+    // Capture oscilloscope data
+    OscilloscopeMixin.capture(this, outputL);
 
     return true;
   }

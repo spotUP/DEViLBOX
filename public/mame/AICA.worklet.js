@@ -3,8 +3,6 @@
  * Sega Dreamcast Sound Processor for DEViLBOX
  */
 
-const BASE_URL = globalThis.BASE_URL || '/';
-
 class AICAProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -21,12 +19,18 @@ class AICAProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
+
+    // Initialize oscilloscope support
+    OscilloscopeMixin.init(this);
   }
 
   async handleMessage(data) {
     switch (data.type) {
+      case 'enableOsc':
+        this.oscEnabled = data.enabled;
+        break;
       case 'init':
-        await this.initSynth(data.sampleRate);
+        await this.initSynth(data);
         break;
       case 'noteOn':
         if (this.synth) {
@@ -84,15 +88,14 @@ class AICAProcessor extends AudioWorkletProcessor {
     }
   }
 
-  async initSynth(sampleRate) {
+  async initSynth(data) {
     try {
       this.cleanup();
 
-      const moduleFactory = await import(`${BASE_URL}mame/AICA.js`);
-      this.module = await moduleFactory.default();
+      this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'createAICAModule');
 
       this.synth = new this.module.AICASynth();
-      this.synth.initialize(sampleRate);
+      this.synth.initialize(data.sampleRate);
 
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);
@@ -110,18 +113,13 @@ class AICAProcessor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
-    if (this.lastHeapBuffer !== this.module.HEAPF32.buffer) {
-      this.outputBufferL = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrL,
-        this.bufferSize
-      );
-      this.outputBufferR = new Float32Array(
-        this.module.HEAPF32.buffer,
-        this.outputPtrR,
-        this.bufferSize
-      );
-      this.lastHeapBuffer = this.module.HEAPF32.buffer;
+    const mem = this.module.wasmMemory || (this.module.HEAPF32 ? { buffer: this.module.HEAPF32.buffer } : null);
+    if (!mem) return;
+
+    if (this.lastHeapBuffer !== mem.buffer) {
+      this.outputBufferL = new Float32Array(mem.buffer, this.outputPtrL, this.bufferSize);
+      this.outputBufferR = new Float32Array(mem.buffer, this.outputPtrR, this.bufferSize);
+      this.lastHeapBuffer = mem.buffer;
     }
   }
 
@@ -167,6 +165,9 @@ class AICAProcessor extends AudioWorkletProcessor {
       outputL[i] = this.outputBufferL[i];
       outputR[i] = this.outputBufferR[i];
     }
+
+    // Capture oscilloscope data
+    OscilloscopeMixin.capture(this, outputL);
 
     return true;
   }

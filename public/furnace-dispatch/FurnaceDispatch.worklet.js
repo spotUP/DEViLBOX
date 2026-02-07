@@ -65,7 +65,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           this.pendingMessages.push(data);
           return;
         }
-        this.createChip(data.platformType, data.sampleRate || sampleRate);
+        try {
+          this.createChip(data.platformType, data.sampleRate || sampleRate);
+        } catch (e) {
+          this.port.postMessage({ type: 'error', message: `createChip(${data.platformType}) crashed: ${e.message || e}` });
+        }
         break;
 
       case 'destroyChip':
@@ -106,6 +110,144 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       case 'setWavetable':
         if (this.initialized && this.module) {
           this.setWavetable(data.waveIndex, data.waveData);
+        }
+        break;
+
+      // Full instrument setters for all chip types
+      case 'setFMInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setFMInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setC64Instrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setC64Instrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setNESInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setNESInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setSNESInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setSNESInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setN163Instrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setN163Instrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setFDSInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setFDSInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setAmigaInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setAmigaInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setMultiPCMInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setMultiPCMInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setES5506Instrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setES5506Instrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setESFMInstrument':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setESFMInstrument', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setWaveSynth':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setWaveSynth', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setMacro':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setMacro', data.insIndex, data.macroData);
+        }
+        break;
+
+      case 'setInstrumentFull':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setInstrumentFull', data.insIndex, data.insData);
+        }
+        break;
+
+      case 'setSample':
+        if (this.initialized && this.module) {
+          this.setInstrumentData('setSample', data.sampleIndex, data.sampleData);
+        }
+        break;
+
+      case 'renderSamples':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.renderSamples(this.dispatchHandle);
+          console.log('[FurnaceDispatch Worklet] renderSamples called');
+        }
+        break;
+
+      // Macro control
+      case 'setMacrosEnabled':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.setMacrosEnabled(this.dispatchHandle, data.enabled ? 1 : 0);
+        }
+        break;
+
+      case 'clearMacros':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.clearMacros(this.dispatchHandle, data.insIndex);
+        }
+        break;
+
+      case 'releaseMacros':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.releaseMacros(this.dispatchHandle, data.chan);
+        }
+        break;
+
+      // Compatibility flags
+      case 'setCompatFlags':
+        if (this.dispatchHandle && this.wasm && data.flags) {
+          const heapBuffer = this.getHeapBuffer();
+          if (heapBuffer) {
+            const flags = data.flags instanceof Uint8Array ? data.flags : new Uint8Array(data.flags);
+            const dataPtr = this.module._malloc(flags.length);
+            const heap = new Uint8Array(heapBuffer, dataPtr, flags.length);
+            heap.set(flags);
+            this.wasm.setCompatFlags(this.dispatchHandle, dataPtr, flags.length);
+            this.module._free(dataPtr);
+          }
+        }
+        break;
+
+      case 'setCompatFlag':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.setCompatFlag(this.dispatchHandle, data.flagIndex, data.value);
+        }
+        break;
+
+      case 'resetCompatFlags':
+        if (this.dispatchHandle && this.wasm) {
+          this.wasm.resetCompatFlags(this.dispatchHandle);
         }
         break;
 
@@ -239,6 +381,30 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         setWavetable: this.module._furnace_dispatch_set_wavetable,
         forceIns: this.module._furnace_dispatch_force_ins,
         poke: this.module._furnace_dispatch_poke,
+        // Full instrument setters for all chip types
+        setFMInstrument: this.module._furnace_dispatch_set_fm_instrument,
+        setC64Instrument: this.module._furnace_dispatch_set_c64_instrument,
+        setNESInstrument: this.module._furnace_dispatch_set_nes_instrument,
+        setSNESInstrument: this.module._furnace_dispatch_set_snes_instrument,
+        setN163Instrument: this.module._furnace_dispatch_set_n163_instrument,
+        setFDSInstrument: this.module._furnace_dispatch_set_fds_instrument,
+        setAmigaInstrument: this.module._furnace_dispatch_set_amiga_instrument,
+        setMultiPCMInstrument: this.module._furnace_dispatch_set_multipcm_instrument,
+        setES5506Instrument: this.module._furnace_dispatch_set_es5506_instrument,
+        setESFMInstrument: this.module._furnace_dispatch_set_esfm_instrument,
+        setWaveSynth: this.module._furnace_dispatch_set_wavesynth,
+        setMacro: this.module._furnace_dispatch_set_macro,
+        setInstrumentFull: this.module._furnace_dispatch_set_instrument_full,
+        setSample: this.module._furnace_dispatch_set_sample,
+        renderSamples: this.module._furnace_dispatch_render_samples,
+        // Macro control functions
+        setMacrosEnabled: this.module._furnace_dispatch_set_macros_enabled,
+        clearMacros: this.module._furnace_dispatch_clear_macros,
+        releaseMacros: this.module._furnace_dispatch_release_macros,
+        // Compatibility flags
+        setCompatFlags: this.module._furnace_dispatch_set_compat_flags,
+        setCompatFlag: this.module._furnace_dispatch_set_compat_flag,
+        resetCompatFlags: this.module._furnace_dispatch_reset_compat_flags,
       };
 
       // Allocate audio output buffers in WASM memory
@@ -343,6 +509,32 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     this.module._free(dataPtr);
   }
 
+  /**
+   * Generic instrument data setter for all instrument types.
+   * @param {string} wasmFuncName - Name of the WASM function to call
+   * @param {number} index - Instrument or sample index
+   * @param {Uint8Array} data - Binary data to send
+   */
+  setInstrumentData(wasmFuncName, index, data) {
+    if (!data || !this.module || !this.wasm[wasmFuncName]) {
+      console.warn('[FurnaceDispatch Worklet] Missing:', wasmFuncName, 'or data');
+      return;
+    }
+
+    const heapBuffer = this.getHeapBuffer();
+    if (!heapBuffer) return;
+
+    const dataLen = data.length;
+    const dataPtr = this.module._malloc(dataLen);
+    const heap = new Uint8Array(heapBuffer, dataPtr, dataLen);
+    heap.set(data);
+
+    this.wasm[wasmFuncName](this.dispatchHandle, index, dataPtr, dataLen);
+    this.module._free(dataPtr);
+
+    console.log('[FurnaceDispatch Worklet]', wasmFuncName, 'index:', index, 'size:', dataLen);
+  }
+
   updateBufferViews() {
     if (!this.module || !this.outputPtrL) return;
 
@@ -375,9 +567,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       }
       this.lastOscNeedles[ch] = needle;
 
-      // Read samples ending at the needle position
-      const startPos = (needle - this.oscSampleCount) & 0xFFFF;
-      this.wasm.getOscData(this.dispatchHandle, ch, this.oscPtrOut, startPos, this.oscSampleCount);
+      // Read samples ending at the needle position (C function calculates start internally)
+      this.wasm.getOscData(this.dispatchHandle, ch, this.oscPtrOut, this.oscSampleCount);
 
       // Copy from WASM memory to transferable buffer
       const oscHeapBuffer = this.getHeapBuffer();
@@ -448,27 +639,36 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Advance tick accumulator and call tick() at engine rate
-    this.tickAccumulator += numSamples;
-    while (this.tickAccumulator >= this.samplesPerTick) {
-      this.wasm.tick(this.dispatchHandle);
-      this.tickAccumulator -= this.samplesPerTick;
-    }
+    try {
+      // Advance tick accumulator and call tick() at engine rate
+      this.tickAccumulator += numSamples;
+      while (this.tickAccumulator >= this.samplesPerTick) {
+        this.wasm.tick(this.dispatchHandle);
+        this.tickAccumulator -= this.samplesPerTick;
+      }
 
-    // Render audio from dispatch
-    this.wasm.render(this.dispatchHandle, this.outputPtrL, this.outputPtrR, numSamples);
+      // Render audio from dispatch
+      this.wasm.render(this.dispatchHandle, this.outputPtrL, this.outputPtrR, numSamples);
 
-    // Copy from WASM memory to output
-    for (let i = 0; i < numSamples; i++) {
-      outputL[i] = this.outputBufferL[i];
-      outputR[i] = this.outputBufferR[i];
-    }
+      // Copy from WASM memory to output
+      for (let i = 0; i < numSamples; i++) {
+        outputL[i] = this.outputBufferL[i];
+        outputR[i] = this.outputBufferR[i];
+      }
 
-    // Periodically send oscilloscope data (~30fps)
-    this.oscSendCounter++;
-    if (this.oscSendCounter >= this.oscSendInterval) {
-      this.oscSendCounter = 0;
-      this.readOscilloscopeData();
+      // Periodically send oscilloscope data (~30fps)
+      this.oscSendCounter++;
+      if (this.oscSendCounter >= this.oscSendInterval) {
+        this.oscSendCounter = 0;
+        this.readOscilloscopeData();
+      }
+    } catch (e) {
+      if (!this._errorReported) {
+        this._errorReported = true;
+        const msg = `WASM error in process (platform=${this.platformType}): ${e.message || e}`;
+        this.port.postMessage({ type: 'error', message: msg });
+        console.error('[FurnaceDispatch Worklet]', msg);
+      }
     }
 
     return true;

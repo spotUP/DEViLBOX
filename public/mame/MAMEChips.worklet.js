@@ -31,12 +31,19 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
     this.pendingOps = [];
 
     this.port.onmessage = this.handleMessage.bind(this);
+
+    // Initialize oscilloscope support
+    OscilloscopeMixin.init(this);
   }
 
   async handleMessage(event) {
     const { type, synthType, offset, value, data, romData, ic5, ic6, ic7 } = event.data;
 
     switch (type) {
+      case 'enableOsc':
+        this.oscEnabled = event.data.enabled;
+        break;
+
       case 'init':
         await this.initWasm(event.data.wasmBinary, event.data.jsCode);
         break;
@@ -273,6 +280,9 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
       left[i] = Math.max(-1, Math.min(1, left[i]));
       right[i] = Math.max(-1, Math.min(1, right[i]));
     }
+
+    // Capture oscilloscope data
+    OscilloscopeMixin.capture(this, left);
 
     return true;
   }
