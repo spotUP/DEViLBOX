@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores/useThemeStore';
 
 interface OBXdHardwareProps {
   parameters: Record<string, number>;
@@ -23,8 +22,6 @@ const OBXKnob: React.FC<{
   onChange: (value: number) => void;
   size?: 'small' | 'medium' | 'large';
 }> = ({ label, value, onChange, size = 'medium' }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const sizeMap = {
     small: 'w-10 h-10',
@@ -116,8 +113,6 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   return (
     <div
