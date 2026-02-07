@@ -77,7 +77,7 @@ const VFXKnob: React.FC<{
         />
       </div>
 
-      <div className={`text-[8px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} uppercase tracking-wide text-center max-w-[60px]`}>
+      <div className={`text-[8px] font-semibold text-gray-300 uppercase tracking-wide text-center max-w-[60px]`}>
         {label}
       </div>
     </div>

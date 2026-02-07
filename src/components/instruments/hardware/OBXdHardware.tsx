@@ -78,7 +78,7 @@ const OBXKnob: React.FC<{
         />
       </div>
 
-      <div className={`text-[9px] font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} uppercase tracking-wide text-center`}>
+      <div className={`text-[9px] font-semibold text-gray-300 uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
