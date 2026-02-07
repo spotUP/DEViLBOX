@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores/useThemeStore';
 
 interface VFXHardwareProps {
   parameters: Record<string, number>;
@@ -23,8 +22,6 @@ const VFXKnob: React.FC<{
   onChange: (value: number) => void;
   size?: 'small' | 'medium';
 }> = ({ label, value, onChange, size = 'medium' }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const sizeMap = {
     small: 'w-10 h-10',
@@ -113,8 +110,6 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   return (
     <div

@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores/useThemeStore';
 
 interface TB303HardwareProps {
   parameters: Record<string, number>;
@@ -24,8 +23,6 @@ const TB303Knob: React.FC<{
   size?: 'small' | 'medium' | 'large';
   color?: 'silver' | 'orange';
 }> = ({ label, value, onChange, size = 'medium', color = 'silver' }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const sizeMap = {
     small: 'w-10 h-10',
@@ -102,8 +99,6 @@ const TB303Button: React.FC<{
   onClick?: () => void;
   color?: 'gray' | 'orange' | 'red';
 }> = ({ label, active = false, onClick, color = 'gray' }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const colorMap = {
     gray: active ? 'bg-gray-600' : 'bg-gray-700',
@@ -128,8 +123,6 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   return (
     <div

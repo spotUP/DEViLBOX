@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores/useThemeStore';
 
 interface CZ101HardwareProps {
   parameters: Record<string, number>;
@@ -22,8 +21,6 @@ const CZ101Slider: React.FC<{
   value: number;
   onChange: (value: number) => void;
 }> = ({ label, value, onChange }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(parseFloat(e.target.value));
@@ -104,8 +101,6 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   return (
     <div

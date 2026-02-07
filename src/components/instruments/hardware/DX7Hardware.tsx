@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useThemeStore } from '@stores/useThemeStore';
 
 interface DX7HardwareProps {
   parameters: Record<string, number>;
@@ -22,8 +21,6 @@ const DX7Slider: React.FC<{
   value: number;
   onChange: (value: number) => void;
 }> = ({ label, value, onChange }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(parseFloat(e.target.value));
@@ -99,8 +96,6 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isDark = currentThemeId !== 'cyan-lineart';
 
   return (
     <div
