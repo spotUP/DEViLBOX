@@ -123,7 +123,7 @@ export class FurnaceRegisterMapper {
     const amsPerChan = config.ams ?? 0;
     engine.write(chip, 0x38 + chan, ((pms & 7) << 4) | (amsPerChan & 3));
 
-    const opOffsets = [0x00, 0x10, 0x08, 0x18]; // OPM Op order
+    const opOffsets = [0x00, 0x08, 0x10, 0x18]; // OPM Op order (from fmshared_OPM.h)
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chan;
@@ -152,8 +152,8 @@ export class FurnaceRegisterMapper {
   /**
    * Map OPL3 (YMF262) registers
    */
-  public static mapOPL3(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
-    const chip = FurnaceChipType.OPL3;
+  public static mapOPL3(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig, chipOverride?: number): void {
+    const chip = (chipOverride ?? FurnaceChipType.OPL3) as FurnaceChipType;
 
     // === INIT REGISTERS (from opl.cpp reset()) ===
     // CRITICAL: Enable OPL3 mode - without this, OPL3 behaves as OPL2
@@ -262,13 +262,15 @@ export class FurnaceRegisterMapper {
    * Global: 0x15-0x16: Filter cutoff, 0x17: Filter res/routing, 0x18: Filter mode/volume
    */
   public static mapC64(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
-    const chip = FurnaceChipType.SID;
     const c64 = config.c64;
 
     // Detect if we're using SID3 or classic SID based on chip type
     // SID=10 is SID3, SID_6581=45 and SID_8580=46 are classic
     const isClassicSID = config.chipType === FurnaceChipType.SID_6581 ||
                          config.chipType === FurnaceChipType.SID_8580;
+
+    // Use the actual chip type for writes - critical for classic SID variants!
+    const chip = (isClassicSID ? config.chipType : FurnaceChipType.SID) as FurnaceChipType;
 
     if (isClassicSID) {
       // === CLASSIC SID (6581/8580) ===
@@ -385,16 +387,40 @@ export class FurnaceRegisterMapper {
   public static mapNES(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
     const chip = FurnaceChipType.NES;
 
-    // === INIT REGISTERS (from nes.cpp reset()) ===
+    // === INIT ALL REGISTERS (required to prevent WASM assertion failures) ===
+    // The NES WASM calculates ALL channels even if we only use one, so ALL must be valid
+
     // Reference: nes.cpp line 877: rWrite(0x4015,0x1f)
     // 0x1F = Enable all channels: Square1, Square2, Triangle, Noise, DMC
-    // Note: DMC won't play without sample data, but enable bit is still set
     engine.write(chip, 0x4015, 0x1F);
 
     // Reference: nes.cpp lines 878-879: Initialize sweep registers
     engine.write(chip, 0x4001, 0x08);  // Pulse 1 sweep (disabled)
     engine.write(chip, 0x4005, 0x08);  // Pulse 2 sweep (disabled)
 
+    // === Initialize ALL channels with valid defaults to prevent WASM crashes ===
+
+    // Pulse 1 (channel 0): Set to silent but valid state
+    engine.write(chip, 0x4000, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x4002, 0x00);    // Period low
+    engine.write(chip, 0x4003, 0x08);    // Period high + length counter load
+
+    // Pulse 2 (channel 1): Set to silent but valid state
+    engine.write(chip, 0x4004, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x4006, 0x00);    // Period low
+    engine.write(chip, 0x4007, 0x08);    // Period high + length counter load
+
+    // Triangle (channel 2): Set to silent but valid state
+    engine.write(chip, 0x4008, 0x00);    // Linear counter = 0 (silent)
+    engine.write(chip, 0x400A, 0x00);    // Period low
+    engine.write(chip, 0x400B, 0x08);    // Period high + length counter load
+
+    // Noise (channel 3): CRITICAL - must have valid period to avoid nfreq=0 assertion
+    engine.write(chip, 0x400C, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x400E, 0x08);    // Period index 8 (middle range, valid value)
+    engine.write(chip, 0x400F, 0x08);    // Length counter load
+
+    // === Now set up the specific channel we're using ===
     // NES APU channels:
     // 0: Pulse 1 (0x4000-0x4003)
     // 1: Pulse 2 (0x4004-0x4007)
@@ -405,24 +431,18 @@ export class FurnaceRegisterMapper {
     if (channel < 2) {
       // Pulse channels
       const base = channel * 4;
-
-      // 0x4000/0x4004: Duty (bits 6-7), LC halt (bit 5), Constant Vol (bit 4), Volume (bits 0-3)
       const duty = Math.floor((config.operators[0]?.mult ?? 2) / 4) & 3;
       const vol = Math.max(0, 15 - Math.floor(config.operators[0].tl / 8));
       engine.write(chip, 0x4000 + base, (duty << 6) | 0x30 | (vol & 0x0F));
 
     } else if (channel === 2) {
       // Triangle
-      // 0x4008: Linear counter (bit 7 = control, bits 0-6 = reload value)
       engine.write(chip, 0x4008, 0xFF); // Max length
 
     } else if (channel === 3) {
       // Noise
-      // 0x400C: LC halt (bit 5), Constant Vol (bit 4), Volume (bits 0-3)
       const vol = Math.max(0, 15 - Math.floor(config.operators[0].tl / 8));
       engine.write(chip, 0x400C, 0x30 | (vol & 0x0F));
-      // NOTE: 0x400E (noise period) is NOT initialized at reset per Furnace nes.cpp
-      // It only gets written when a note is played (with duty bit and freq)
     }
   }
 
@@ -844,7 +864,7 @@ export class FurnaceRegisterMapper {
     const amsPerChan = config.ams ?? 0;
     engine.write(chip, 0x38 + chan, ((pms & 7) << 4) | (amsPerChan & 3));
 
-    const opOffsets = [0x00, 0x10, 0x08, 0x18]; // OPM/OPZ Op order
+    const opOffsets = [0x00, 0x08, 0x10, 0x18]; // OPM/OPZ Op order (from fmshared_OPM.h)
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chan;
@@ -1193,6 +1213,48 @@ export class FurnaceRegisterMapper {
     // Bits 0-3: left enable for ch 0-3 (0=on)
     // Bits 4-7: right enable for ch 0-3 (0=on)
     engine.write(chip, 0x50, 0x00);  // Enable all channels on both L+R
+  }
+
+  /**
+   * Map Namco WSG (Pac-Man, Galaga) registers
+   * Reference: namco.cpp sound_enable_w()
+   */
+  public static mapNAMCO(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    // Namco WSG uses pacman_sound_w - no special init needed
+    // Frequency/waveform set via noteOn handlers
+  }
+
+  /**
+   * Map Commodore PET registers
+   * Reference: pet.cpp
+   */
+  public static mapPET(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    // PET uses simple square wave - no special init needed
+  }
+
+  /**
+   * Map POKEY registers
+   * Reference: pokey.cpp
+   */
+  public static mapPOKEY(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    // POKEY has 4 channels with frequency/volume control
+    // No special init needed - handled by noteOn
+  }
+
+  /**
+   * Map Amiga Paula registers
+   * Reference: paula.cpp
+   */
+  public static mapAMIGA(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    // Amiga Paula is sample-based - no register init needed
+  }
+
+  /**
+   * Map PC Speaker registers
+   * Reference: pcspk.cpp
+   */
+  public static mapPCSPKR(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    // PC Speaker is simple square wave - no register init needed
   }
 
   private static getOPL3Slots(chan: number): [number, number] {
