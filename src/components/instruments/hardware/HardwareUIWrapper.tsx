@@ -7,6 +7,7 @@
 import React from 'react';
 import type { SynthType } from '@typedefs/instrument';
 import { TR707Hardware } from './TR707Hardware';
+import { TR808Hardware } from './TR808Hardware';
 import { TB303Hardware } from './TB303Hardware';
 import { D50Hardware } from './D50Hardware';
 import { CZ101Hardware } from './CZ101Hardware';
@@ -26,6 +27,7 @@ interface HardwareUIWrapperProps {
 const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<any>>> = {
   // Drum Machines
   MAMETR707: TR707Hardware,
+  DrumMachine: TR808Hardware,   // Roland TR-808 Rhythm Composer (1980)
 
   // Synthesizers - Classic
   TB303: TB303Hardware,         // Roland TB-303 Bass Line (1981)
