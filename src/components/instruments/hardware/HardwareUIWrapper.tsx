@@ -7,6 +7,10 @@
 import React from 'react';
 import type { SynthType } from '@typedefs/instrument';
 import { TR707Hardware } from './TR707Hardware';
+import { TB303Hardware } from './TB303Hardware';
+import { D50Hardware } from './D50Hardware';
+import { CZ101Hardware } from './CZ101Hardware';
+import { VFXHardware } from './VFXHardware';
 
 interface HardwareUIWrapperProps {
   synthType: SynthType;
@@ -18,12 +22,19 @@ interface HardwareUIWrapperProps {
  * Map of synth types to their hardware UI components
  */
 const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<any>>> = {
+  // Drum Machines
   MAMETR707: TR707Hardware,
+
+  // Synthesizers
+  TB303: TB303Hardware,         // Roland TB-303 Bass Line
+  CZ101: CZ101Hardware,         // Casio CZ-101 Phase Distortion
+  MAMERSA: D50Hardware,         // Roland D-50 LA Synthesis
+  MAMEVFX: VFXHardware,         // Ensoniq VFX Wavetable
+
   // Future hardware UIs:
-  // MAMERSA: D50Hardware,
-  // MAMEVFX: VFXHardware,
-  // MAMEDOC: DOCHardware,
-  // Add more as implemented
+  // MAMEDOC: ESQ1Hardware,     // Ensoniq ESQ-1
+  // Dexed: DX7Hardware,        // Yamaha DX7
+  // OBXd: OBXdHardware,        // Oberheim OB-Xd
 };
 
 /**
