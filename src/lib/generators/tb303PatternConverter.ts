@@ -71,8 +71,8 @@ export function convertTB303Pattern(pattern: TB303Pattern, instrumentId: number 
       eff: 0,
       effTyp2: 0,
       eff2: 0,
-      accent: step.accent,
-      slide: step.slide,
+      flag1: step.accent ? 1 : undefined,
+      flag2: step.slide ? 2 : undefined,
     };
   });
 }

@@ -259,8 +259,8 @@ export function generateAcidPattern(params: AcidPatternParams = {}): TrackerCell
       eff: 0,
       effTyp2: 0,
       eff2: 0,
-      accent: step.accent || false,
-      slide: step.slide || false,
+      flag1: step.accent ? 1 : undefined,
+      flag2: step.slide ? 2 : undefined,
     };
   });
 }

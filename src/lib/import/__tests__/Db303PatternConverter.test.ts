@@ -56,16 +56,16 @@ describe('DB303 Pattern Converter', () => {
       const pattern = parseDb303Pattern(sampleXml);
 
       // Step 4 has accent=true and slide=true
-      expect(pattern.channels[0].rows[4].accent).toBe(true);
-      expect(pattern.channels[0].rows[4].slide).toBe(true);
+      expect(pattern.channels[0].rows[4].flag1).toBe(1);
+      expect(pattern.channels[0].rows[4].flag2).toBe(2);
 
       // Step 0 has accent=false and slide=false
-      expect(pattern.channels[0].rows[0].accent).toBe(false);
-      expect(pattern.channels[0].rows[0].slide).toBe(false);
+      expect(pattern.channels[0].rows[0].flag1).toBeUndefined();
+      expect(pattern.channels[0].rows[0].flag2).toBeUndefined();
 
       // Step 7 has accent=true and slide=true
-      expect(pattern.channels[0].rows[7].accent).toBe(true);
-      expect(pattern.channels[0].rows[7].slide).toBe(true);
+      expect(pattern.channels[0].rows[7].flag1).toBe(1);
+      expect(pattern.channels[0].rows[7].flag2).toBe(2);
     });
 
     it('should handle empty steps (gate=false)', () => {
@@ -114,12 +114,12 @@ describe('DB303 Pattern Converter', () => {
       const pattern2 = parseDb303Pattern(xml);
 
       // Check step 4 (has accent and slide)
-      expect(pattern2.channels[0].rows[4].accent).toBe(true);
-      expect(pattern2.channels[0].rows[4].slide).toBe(true);
+      expect(pattern2.channels[0].rows[4].flag1).toBe(1);
+      expect(pattern2.channels[0].rows[4].flag2).toBe(2);
 
       // Check step 7 (has accent and slide)
-      expect(pattern2.channels[0].rows[7].accent).toBe(true);
-      expect(pattern2.channels[0].rows[7].slide).toBe(true);
+      expect(pattern2.channels[0].rows[7].flag1).toBe(1);
+      expect(pattern2.channels[0].rows[7].flag2).toBe(2);
     });
   });
 

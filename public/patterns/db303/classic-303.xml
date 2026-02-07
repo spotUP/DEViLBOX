@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db303-pattern version="1.0" numSteps="16">
+  <step index="0" key="0" octave="-1" gate="true" accent="true" slide="false"/>
+  <step index="1" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="2" key="0" octave="0" gate="true" accent="false" slide="false"/>
+  <step index="3" key="7" octave="-1" gate="true" accent="false" slide="true"/>
+  <step index="4" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="5" key="0" octave="0" gate="true" accent="false" slide="false"/>
+  <step index="6" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="7" key="3" octave="-1" gate="true" accent="true" slide="false"/>
+  <step index="8" key="0" octave="-1" gate="true" accent="false" slide="false"/>
+  <step index="9" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="10" key="5" octave="-1" gate="true" accent="false" slide="true"/>
+  <step index="11" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="12" key="7" octave="-1" gate="true" accent="true" slide="false"/>
+  <step index="13" key="0" octave="0" gate="false" accent="false" slide="false"/>
+  <step index="14" key="0" octave="0" gate="true" accent="false" slide="false"/>
+  <step index="15" key="0" octave="0" gate="false" accent="false" slide="false"/>
+</db303-pattern>

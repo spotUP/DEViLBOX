@@ -158,8 +158,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
         note: s.note ? s.note.value : null,
         octave: s.note ? s.note.octave : 0,
         upperC: s.note ? s.note.upperC : false,
-        accent: s.accent,
-        slide: s.slide,
+        flag1: s.accent ? 1 : undefined,
+        flag2: s.slide ? 2 : undefined,
         tie: s.tie
       })),
       activeSteps: Math.min(16, cells.length)
@@ -191,8 +191,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
           // Map TD3Step from loader to TD3Step from types (they differ slightly in structure but represent same data)
           const mappedSteps: any[] = firstPatt.steps.map(s => ({
             note: s.rest ? null : { value: s.note, octave: s.octave, upperC: false },
-            accent: s.accent,
-            slide: s.slide,
+            flag1: s.accent ? 1 : undefined,
+            flag2: s.slide ? 2 : undefined,
             tie: s.tie
           }));
 
@@ -217,8 +217,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
         // Map notes if they are in the flat format
         const mappedSteps = data.steps.map((s: any) => ({
           note: s.note === null ? null : { value: s.note, octave: s.octave, upperC: s.upperC || false },
-          accent: s.accent,
-          slide: s.slide,
+          flag1: s.accent ? 1 : undefined,
+          flag2: s.slide ? 2 : undefined,
           tie: s.tie
         }));
 
@@ -296,8 +296,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
       const cell = cells[i];
       setCell(selectedChannel, i, {
         note: cell.note,
-        accent: cell.accent,
-        slide: cell.slide,
+        flag1: cell.flag1,
+        flag2: cell.flag2,
         // Keep existing instrument, volume, and effect values
       });
     }
