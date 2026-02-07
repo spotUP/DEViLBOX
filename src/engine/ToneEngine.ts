@@ -6,6 +6,7 @@
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { JC303Synth } from './open303';
+import { DB303Synth } from './db303';
 import { MAMESynth } from './MAMESynth';
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
@@ -448,6 +449,28 @@ export class ToneEngine {
       }
     }
 
+    // Wait for WASM synths (Open303/DB303) to initialize their AudioWorklet
+    const wasmConfigs = configs.filter((c) => c.synthType === 'TB303' || c.synthType === 'Buzz3o3');
+    if (wasmConfigs.length > 0) {
+      const wasmPromises: Promise<void>[] = [];
+      for (const config of wasmConfigs) {
+        const key = this.getInstrumentKey(config.id, -1);
+        const instrument = this.instruments.get(key);
+        if (instrument?.ensureInitialized) {
+          wasmPromises.push(instrument.ensureInitialized());
+        }
+      }
+      if (wasmPromises.length > 0) {
+        try {
+          console.log(`[ToneEngine] Waiting for ${wasmPromises.length} WASM synth(s) to initialize...`);
+          await Promise.all(wasmPromises);
+          console.log(`[ToneEngine] All WASM synths ready`);
+        } catch (error) {
+          console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
+        }
+      }
+    }
+
     // PERFORMANCE FIX: Warm up CPU-intensive synths by triggering a silent note
     // This forces Tone.js to compile/initialize audio graphs before playback starts
     const warmUpTypes = ['MetalSynth', 'MembraneSynth', 'NoiseSynth', 'FMSynth'];
@@ -481,6 +504,27 @@ export class ToneEngine {
       }
     }
 
+  }
+
+  /**
+   * Ensure all WASM-based synths for the given instruments are initialized.
+   * Creates instances if needed and waits for their AudioWorklet WASM to be ready.
+   */
+  public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
+    const wasmConfigs = configs.filter((c) => c.synthType === 'TB303' || c.synthType === 'Buzz3o3');
+    if (wasmConfigs.length === 0) return;
+
+    const promises: Promise<void>[] = [];
+    for (const config of wasmConfigs) {
+      // Create the instrument if it doesn't exist yet
+      const instrument = this.getInstrument(config.id, config);
+      if (instrument?.ensureInitialized) {
+        promises.push(instrument.ensureInitialized());
+      }
+    }
+    if (promises.length > 0) {
+      await Promise.all(promises);
+    }
   }
 
   /**
@@ -1736,8 +1780,10 @@ export class ToneEngine {
     }
 
     try {
-      // Handle TB-303 with JC303 engine (now supports accent/slide)
+      // Handle TB-303 with JC303 or DB303 engine (both support accent/slide)
       if (instrument instanceof JC303Synth) {
+        instrument.triggerAttack(note, safeTime, velocity, accent, slide);
+      } else if (instrument instanceof DB303Synth) {
         instrument.triggerAttack(note, safeTime, velocity, accent, slide);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
@@ -2303,6 +2349,9 @@ export class ToneEngine {
           } else if (voiceNode instanceof JC303Synth) {
             // JC303 WASM engine (now supports accent/slide)
             voiceNode.triggerAttack(note, safeTime, velocity, accent, slide);
+          } else if (voiceNode instanceof DB303Synth) {
+            // DB303 WASM engine (now supports accent/slide)
+            voiceNode.triggerAttack(note, safeTime, velocity, accent, slide);
           } else {
             // Standard synths - apply slide/accent for 303-style effects
             const targetFreq = Tone.Frequency(note).toFrequency();
@@ -2322,6 +2371,8 @@ export class ToneEngine {
     try {
       // Fallback for non-channel triggers (like pre-listening)
       if (instrument instanceof JC303Synth) {
+        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
+      } else if (instrument instanceof DB303Synth) {
         instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)

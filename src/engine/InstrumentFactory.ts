@@ -1573,8 +1573,10 @@ export class InstrumentFactory {
     const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
 
     if (engineType === 'db303') {
+      console.log('[InstrumentFactory] Creating DB303 synth');
       return this.createDB303(tb303Config, normalizedVolume);
     }
+    console.log('[InstrumentFactory] Creating JC303 synth');
     return this.createJC303(tb303Config, normalizedVolume);
   }
 
@@ -1657,13 +1659,14 @@ export class InstrumentFactory {
     // Devil Fish enhanced parameters (if present)
     const df = tb.devilFish;
     if (df) {
-      if (df.envType !== undefined) synth.setEnvType(df.envType);
-      if (df.reverbMix !== undefined) synth.setReverbMix(df.reverbMix);
-      if (df.reverbDecay !== undefined) synth.setReverbDecay(df.reverbDecay);
+      // NOTE: DB303Synth doesn't have these methods (they were removed in audit)
+      // if (df.envType !== undefined) synth.setEnvType(df.envType);
+      // if (df.reverbMix !== undefined) synth.setReverbMix(df.reverbMix);
+      // if (df.reverbDecay !== undefined) synth.setReverbDecay(df.reverbDecay);
       if (df.overdrive !== undefined) synth.setOverdrive(df.overdrive);
-      if (df.subOscMix !== undefined) synth.setSubOscMix(df.subOscMix);
-      if (df.feedbackVCF !== undefined) synth.setFeedbackVCF(df.feedbackVCF);
-      if (df.pulsewaveVCF !== undefined) synth.setPulsewaveVCF(df.pulsewaveVCF);
+      // if (df.subOscMix !== undefined) synth.setSubOscMix(df.subOscMix);
+      // if (df.feedbackVCF !== undefined) synth.setFeedbackVCF(df.feedbackVCF);
+      // if (df.pulsewaveVCF !== undefined) synth.setPulsewaveVCF(df.pulsewaveVCF);
       if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
       if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
 
