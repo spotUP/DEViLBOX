@@ -1,10 +1,10 @@
 /**
- * TR-808 Hardware UI - Roland TR-808 Rhythm Composer
+ * TR-808/909 Hardware UI - Roland TR-808/909 Rhythm Composers
  *
  * Hardware-accurate panel layout matching the original TR-808
  * Based on io-808 web emulator design
- * Released: 1980
- * Features: Iconic drum machine with 16-step sequencer and analog synthesis
+ * TR-808 Released: 1980, TR-909 Released: 1983
+ * Features: Iconic drum machines with analog (808) and digital (909) synthesis
  */
 
 import React from 'react';
@@ -237,7 +237,7 @@ export const TR808Hardware: React.FC<TR808HardwareProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <div className="text-gray-400 text-[10px] font-light tracking-[0.5em] uppercase">Roland</div>
-            <div className="text-white font-black text-5xl tracking-wider" style={{ fontFamily: 'Impact, Arial Black, sans-serif' }}>TR-808</div>
+            <div className="text-white font-black text-4xl tracking-wider" style={{ fontFamily: 'Impact, Arial Black, sans-serif' }}>TR-808/909</div>
             <div className="text-gray-400 text-[9px] font-light tracking-[0.25em] uppercase">Rhythm Composer</div>
           </div>
           <div className="text-right">
@@ -412,7 +412,7 @@ export const TR808Hardware: React.FC<TR808HardwareProps> = ({
       {/* Bottom Info */}
       <div className="px-4 py-1 bg-black border-t border-gray-800">
         <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
-          Analog Rhythm Composer • 16-Step Sequencer • 1980
+          Analog/Digital Rhythm Composer • 16-Step Sequencer • 1980/1983
         </div>
       </div>
     </div>
