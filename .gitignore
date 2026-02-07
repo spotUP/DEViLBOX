@@ -34,7 +34,8 @@ public/rdpiano/roms/
 
 # ROM files and sample libraries (copyrighted material)
 public/roms/Mirage4Amiga/
-public/roms/*.zip
+public/roms/**/*.zip
+*.zip
 
 # Test artifacts
 .playwright-mcp/
