@@ -1150,6 +1150,8 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // ============================================================================
   // GENERIC SYNTH EDITOR (default)
   // ============================================================================
+  const hasHardwareGeneric = hasHardwareUI(instrument.synthType);
+
   return (
     <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
       {/* Common header with visualization */}
@@ -1158,7 +1160,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onChange={onChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
-        showHelpButton
+        showHelpButton={!hasHardwareGeneric}
         showHelp={showHelp}
         onHelpToggle={() => setShowHelp(!showHelp)}
         onBake={handleBake}
@@ -1166,23 +1168,62 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         onUnbake={handleUnbake}
         isBaked={isBaked}
         isBaking={isBaking}
+        customHeaderControls={
+          hasHardwareGeneric ? (
+            <button
+              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+              className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                uiMode === 'hardware'
+                  ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                  : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+              }`}
+              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+            >
+              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+              <span className="text-[10px] font-bold uppercase">
+                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+              </span>
+            </button>
+          ) : undefined
+        }
       />
 
-      {/* Tab Bar */}
-      <SynthEditorTabs
-        activeTab={genericTab}
-        onTabChange={setGenericTab}
-        hiddenTabs={getHiddenTabs()}
-      />
+      {uiMode === 'hardware' && hasHardwareGeneric ? (
+        /* Hardware UI Mode */
+        <div className="synth-editor-content overflow-y-auto p-4 space-y-4">
+          <HardwareUIWrapper
+            synthType={instrument.synthType}
+            parameters={instrument.parameters || {}}
+            onParamChange={(key, value) => {
+              onChange({
+                parameters: {
+                  ...instrument.parameters,
+                  [key]: value,
+                },
+              });
+            }}
+          />
+        </div>
+      ) : (
+        /* Simple Controls Mode */
+        <>
+          {/* Tab Bar */}
+          <SynthEditorTabs
+            activeTab={genericTab}
+            onTabChange={setGenericTab}
+            hiddenTabs={getHiddenTabs()}
+          />
 
-      {/* Tab Content */}
-      <div className="synth-editor-content">
-        <GenericTabContent
-          instrument={instrument}
-          onChange={onChange}
-          activeTab={genericTab}
-        />
-      </div>
+          {/* Tab Content */}
+          <div className="synth-editor-content">
+            <GenericTabContent
+              instrument={instrument}
+              onChange={onChange}
+              activeTab={genericTab}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
