@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # VASynth - Virtual Analog Subtractive Synthesizer
 # Combines MAME VA building blocks: RC envelope, VCA, 4th-order TPT LPF
 # Based on: CEM3320/CEM3360/CA3280 analog synth IC emulations

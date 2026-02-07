@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/roland_sa/build/CMakeFiles/RolandSA_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/roland_sa/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/roland_sa/build/CMakeFiles/rebuild_cache.dir

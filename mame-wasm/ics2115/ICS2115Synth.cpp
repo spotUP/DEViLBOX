@@ -331,6 +331,51 @@ public:
         const uint8_t* data = reinterpret_cast<const uint8_t*>(dataPtr);
         uint32_t copySize = std::min(size, (uint32_t)(ROM_SIZE - offset));
         std::memcpy(m_rom + offset, data, copySize);
+
+        // After loading ROM, initialize all voices with default sample configuration
+        initializeDefaultSamples();
+    }
+
+    /**
+     * Initialize all voices with a default test waveform
+     * Creates a 512-sample sawtooth wave at the start of ROM
+     */
+    void initializeDefaultSamples() {
+        if (!m_rom) return;
+
+        // Generate a simple sawtooth waveform (512 samples, 8-bit signed)
+        // IMPORTANT: Avoid 0x80 (-128) as it might be treated as special marker
+        const int WAVE_SIZE = 512;
+        for (int i = 0; i < WAVE_SIZE; i++) {
+            // Sawtooth: ramp from -127 to +126 (avoiding -128/0x80 marker)
+            int val = (i - 256) >> 1;
+            if (val == -128) val = -127;  // Replace potential end marker
+            m_rom[i] = static_cast<int8_t>(val);
+        }
+
+        // Configure all 32 voices to use this test sample
+        for (int v = 0; v < NUM_VOICES; v++) {
+            Voice& voice = m_voice[v];
+            // ICS2115 uses 23-bit addresses with 12-bit fractional part
+            voice.osc.start = 0;                    // Start address
+            voice.osc.end = WAVE_SIZE << 12;        // End address (12-bit fractional)
+            voice.osc.fc = 0x1000;                  // Default frequency
+
+            // Set volume to maximum (increase for better test output)
+            voice.vol.acc = 0xffff << 10;           // Volume accumulator (max)
+            voice.vol.start = 0;
+            voice.vol.end = 0xffff << 10;
+            voice.vol.incr = 0;
+            voice.vol.pan = 128;                    // Center pan
+
+            // Enable looping
+            voice.osc_conf.value = 0;
+            voice.osc_conf.bitflags.loop = 1;
+            voice.osc_conf.bitflags.ulaw = 0;       // Linear PCM
+            voice.osc_conf.bitflags.stop = 0;
+
+            voice.vol_ctrl.value = 0;
+        }
     }
 
     // MIDI-style note on
@@ -366,9 +411,8 @@ public:
         float effectiveSampleRate = 33075.0f;  // Typical ICS2115 rate
         v.osc.fc = (uint16_t)(freq * 1024.0f / effectiveSampleRate);
 
-        // Set default sample start/end (whole ROM bank)
-        v.osc.start = 0;
-        v.osc.end = 0x100000 << 12;  // 1MB worth
+        // NOTE: Don't overwrite sample addresses - use the ones from initializeDefaultSamples()
+        // Only reset accumulator and saddr
         v.osc.acc = 0;
         v.osc.saddr = 0;
 

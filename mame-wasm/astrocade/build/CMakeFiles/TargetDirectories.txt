@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/astrocade/build/CMakeFiles/ASTROCADE_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/astrocade/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/astrocade/build/CMakeFiles/rebuild_cache.dir

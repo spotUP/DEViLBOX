@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # SP0250 (GI SP0250 Digital LPC Sound Synthesizer) WASM Build
 # Based on MAME's SP0250 emulator by Olivier Galibert
 # Standalone version without MAME framework dependencies

@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/spot/Code/DEViLBOX/mame-wasm/snkwave/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

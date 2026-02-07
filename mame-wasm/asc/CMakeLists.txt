@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # ASC (Apple Sound Chip) - 4-Voice Wavetable Synthesizer
 # 512-sample wavetable with 9.15 fixed-point phase accumulator
 # Used in: Macintosh SE, II, LC, Classic (1987-1993)

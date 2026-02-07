@@ -167,6 +167,49 @@ public:
     }
 
     /**
+     * JavaScript wrapper for loadROM (takes pointer as uintptr_t)
+     */
+    void loadROMJS(uint32_t offset, uintptr_t dataPtr, uint32_t size) {
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(dataPtr);
+        loadROM(offset, data, size);
+
+        // After loading ROM, initialize all channels with default sample configuration
+        initializeDefaultSamples();
+    }
+
+    /**
+     * Initialize all channels with a default test waveform
+     * Creates a 512-sample sawtooth wave at the start of ROM
+     */
+    void initializeDefaultSamples() {
+        // Generate a simple sawtooth waveform (512 samples, 8-bit signed PCM)
+        // IMPORTANT: Avoid 0x80 (-128) as it's the end-of-sample marker
+        const int WAVE_SIZE = 512;
+        for (int i = 0; i < WAVE_SIZE; i++) {
+            // Sawtooth: ramp from -127 to +126 (avoiding -128/0x80 end marker)
+            int val = (i - 256) >> 1;
+            if (val == -128) val = -127;  // Replace end marker with -127
+            m_rom[i] = static_cast<int8_t>(val);
+        }
+
+        // Configure all 8 channels to use this test sample
+        for (int ch = 0; ch < NUM_CHANNELS; ch++) {
+            K054539Channel* chan = &m_channels[ch];
+            chan->start_addr = 0;           // Start at offset 0
+            chan->loop_start = 0;           // Loop from start
+            chan->sample_type = 0;          // 8-bit signed PCM
+            chan->loop_enable = true;       // Enable looping
+            chan->reverse = false;
+            chan->delta = 0x10000;          // Default pitch (middle C)
+            chan->volume = 0x20;            // Medium volume (0x40 = max, 0 = silent)
+            chan->pan = 7;                  // Center pan (0-14, 7 = center)
+            chan->active = false;           // Mark as inactive so noteOn can find it
+            chan->pos = 0;
+            chan->pfrac = 0;
+        }
+    }
+
+    /**
      * Configure a channel for playback
      */
     void configureChannel(int ch, uint32_t startAddr, uint32_t loopAddr,
@@ -463,6 +506,13 @@ public:
         }
     }
 
+    // JavaScript wrapper for process() - converts uintptr_t to float pointers
+    void processJS(uintptr_t outputLPtr, uintptr_t outputRPtr, int numSamples) {
+        float* outputL = reinterpret_cast<float*>(outputLPtr);
+        float* outputR = reinterpret_cast<float*>(outputRPtr);
+        process(outputL, outputR, numSamples);
+    }
+
     bool isInitialized() const { return m_isInitialized; }
 
 private:
@@ -507,7 +557,7 @@ EMSCRIPTEN_BINDINGS(k054539_synth) {
     emscripten::class_<K054539Synth>("K054539Synth")
         .constructor<>()
         .function("initialize", &K054539Synth::initialize)
-        .function("loadROM", &K054539Synth::loadROM, emscripten::allow_raw_pointers())
+        .function("loadROM", &K054539Synth::loadROMJS)
         .function("configureChannel", &K054539Synth::configureChannel)
         .function("setChannelPitch", &K054539Synth::setChannelPitch)
         .function("setChannelVolume", &K054539Synth::setChannelVolume)
@@ -519,7 +569,7 @@ EMSCRIPTEN_BINDINGS(k054539_synth) {
         .function("noteOff", &K054539Synth::noteOff)
         .function("allNotesOff", &K054539Synth::allNotesOff)
         .function("setParameter", &K054539Synth::setParameter)
-        .function("process", &K054539Synth::process, emscripten::allow_raw_pointers())
+        .function("process", &K054539Synth::processJS)
         .function("isInitialized", &K054539Synth::isInitialized);
 }
 

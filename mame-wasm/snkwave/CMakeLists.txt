@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # SNKWave (SNK Wave Sound Generator) WASM Build
 # Based on MAME's SNKWave emulator by Nicola Salmoria
 # Standalone version without MAME framework dependencies

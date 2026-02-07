@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # RF5C400 (Ricoh 32-Voice PCM) WASM Build
 # Based on MAME's rf5c400 by Ville Linde
 # Standalone version for accurate PCM synthesis with envelopes

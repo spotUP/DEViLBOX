@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # YMF271 (Yamaha OPX 4-Operator FM Synthesizer) WASM Build
 # Based on MAME's YMF271 emulator by R. Belmont, O. Galibert, and hap
 # Standalone version without MAME framework dependencies

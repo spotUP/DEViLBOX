@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # Astrocade Custom I/O Sound Chip WASM Build
 # Based on MAME's Astrocade emulator by Aaron Giles / Frank Palazzolo
 # Standalone version without MAME framework dependencies

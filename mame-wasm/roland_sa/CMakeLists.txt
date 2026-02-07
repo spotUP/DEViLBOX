@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # Roland SA Sound Generator WASM Build
 # Silicon-accurate gate array emulation from Roland SA-synthesis digital pianos
 # 16 voices x 10 parts, 3 wave ROMs (384KB total)

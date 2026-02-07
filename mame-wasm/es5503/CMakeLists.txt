@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # ES5503 (Ensoniq DOC) Wavetable Synthesizer WASM Build
 # Based on MAME's ES5503 emulator v2.4 by R. Belmont
 # Standalone version without MAME framework dependencies

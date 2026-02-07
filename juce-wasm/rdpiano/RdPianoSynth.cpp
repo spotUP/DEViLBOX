@@ -183,8 +183,14 @@ public:
 
     // Create MCU instance and run handshake
     bool initMCU() {
-        if (progRom_.empty()) return false;
-        if (!romSetsLoaded_[0] && !romSetsLoaded_[1] && !romSetsLoaded_[2]) return false;
+        if (progRom_.empty()) {
+            printf("[RdPiano] initMCU failed: progRom_ is empty\n");
+            return false;
+        }
+        if (!romSetsLoaded_[0] && !romSetsLoaded_[1] && !romSetsLoaded_[2]) {
+            printf("[RdPiano] initMCU failed: no ROM sets loaded\n");
+            return false;
+        }
 
         // Find first loaded ROM set for initial construction
         int initSet = 0;
@@ -192,8 +198,27 @@ public:
             if (romSetsLoaded_[i]) { initSet = i; break; }
         }
 
+        // Validate ROM set data before use
+        if (romSets_[initSet].ic5.empty() || romSets_[initSet].ic6.empty() ||
+            romSets_[initSet].ic7.empty() || romSets_[initSet].ic18.empty()) {
+            printf("[RdPiano] initMCU failed: ROM set %d has empty vectors\n", initSet);
+            printf("  ic5: %zu bytes, ic6: %zu bytes, ic7: %zu bytes, ic18: %zu bytes\n",
+                   romSets_[initSet].ic5.size(), romSets_[initSet].ic6.size(),
+                   romSets_[initSet].ic7.size(), romSets_[initSet].ic18.size());
+            return false;
+        }
+
+        printf("[RdPiano] Creating MCU with ROM set %d\n", initSet);
+        printf("  progRom: %zu bytes, first byte: 0x%02x\n", progRom_.size(), progRom_[0]);
+        printf("  ic5: %zu bytes, first byte: 0x%02x\n", romSets_[initSet].ic5.size(), romSets_[initSet].ic5[0]);
+        printf("  ic6: %zu bytes, first byte: 0x%02x\n", romSets_[initSet].ic6.size(), romSets_[initSet].ic6[0]);
+        printf("  ic7: %zu bytes, first byte: 0x%02x\n", romSets_[initSet].ic7.size(), romSets_[initSet].ic7[0]);
+        printf("  ic18: %zu bytes, first byte: 0x%02x\n", romSets_[initSet].ic18.size(), romSets_[initSet].ic18[0]);
+
         // Create MCU with initial ROM set
         if (mcu_) delete mcu_;
+
+        printf("[RdPiano] Calling MCU constructor...\n");
         mcu_ = new Mcu(
             romSets_[initSet].ic5.data(),
             romSets_[initSet].ic6.data(),
@@ -201,6 +226,8 @@ public:
             progRom_.data(),
             romSets_[initSet].ic18.data()
         );
+
+        printf("[RdPiano] MCU created successfully\n");
 
         // Create effects
         if (spaceD_) delete spaceD_;

@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/snkwave/build/CMakeFiles/SNKWAVE_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/snkwave/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/snkwave/build/CMakeFiles/rebuild_cache.dir

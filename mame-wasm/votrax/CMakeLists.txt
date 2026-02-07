@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # Votrax SC-01 (Formant Speech Synthesizer) WASM Build
 # Based on MAME's Votrax SC-01A simulation by Olivier Galibert
 # Standalone version without MAME framework dependencies

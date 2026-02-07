@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/votrax/build/CMakeFiles/VOTRAX_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/votrax/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/votrax/build/CMakeFiles/rebuild_cache.dir

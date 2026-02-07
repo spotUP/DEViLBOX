@@ -307,9 +307,13 @@ public:
                     slot->block = block;
                     slot->fns = fns;
 
-                    // Set velocity-scaled TL for carrier operators
-                    if (op == 3) { // Carrier in most algorithms
-                        slot->tl = 127 - static_cast<int>((velocity / 127.0f) * 64);
+                    // Set TL for all operators
+                    if (op == 3) {
+                        // Carrier: velocity-scaled TL (lower = louder)
+                        slot->tl = 32 - static_cast<int>((velocity / 127.0f) * 24);
+                    } else {
+                        // Modulators: very low TL for strong modulation
+                        slot->tl = 8;
                     }
 
                     // Initialize envelope and LFO
@@ -466,6 +470,13 @@ public:
             outputL[i] = clamp_value(left * scale, -1.0f, 1.0f);
             outputR[i] = clamp_value(right * scale, -1.0f, 1.0f);
         }
+    }
+
+    // JavaScript wrapper for process() - converts uintptr_t to float pointers
+    void processJS(uintptr_t outputLPtr, uintptr_t outputRPtr, int numSamples) {
+        float* outputL = reinterpret_cast<float*>(outputLPtr);
+        float* outputR = reinterpret_cast<float*>(outputRPtr);
+        process(outputL, outputR, numSamples);
     }
 
     bool isInitialized() const { return m_isInitialized; }
@@ -962,7 +973,7 @@ EMSCRIPTEN_BINDINGS(ymf271_synth) {
         .function("noteOff", &YMF271Synth::noteOff)
         .function("allNotesOff", &YMF271Synth::allNotesOff)
         .function("setParameter", &YMF271Synth::setParameter)
-        .function("process", &YMF271Synth::process, emscripten::allow_raw_pointers())
+        .function("process", &YMF271Synth::processJS)
         .function("isInitialized", &YMF271Synth::isInitialized);
 }
 

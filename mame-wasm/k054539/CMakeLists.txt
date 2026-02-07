@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # K054539 (Konami PCM/ADPCM Sound Chip) WASM Build
 # Based on MAME's K054539 emulator by Olivier Galibert
 # Standalone version without MAME framework dependencies

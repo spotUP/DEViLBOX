@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # TR-707 Drum Machine WASM Build
 # Roland TR-707/727 PCM drum machine with analog signal conditioning
 # 10 voices: 8 multiplexed + 2 cymbal, RC envelopes, BPF/LPF chain
