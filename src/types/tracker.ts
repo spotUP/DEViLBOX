@@ -76,7 +76,9 @@ export interface TrackerCell {
 
   // DEViLBOX extensions (stored in extended format)
   effect?: string;              // Legacy string format (e.g., "E01", "300") - combines effTyp+eff
-  effect2?: string;             // Second effect (legacy string format)
+  effTyp2: EffectType;          // Second effect type (0-35)
+  eff2: EffectParam;            // Second effect parameter (0x00-0xFF)
+  effect2?: string;             // Legacy string format (migration only)
 
   // TB-303 specific columns
   accent?: boolean;
@@ -323,7 +325,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effect2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
+  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 
@@ -389,6 +391,8 @@ export const EMPTY_CELL: TrackerCell = {
   volume: 0,      // 0x00 = nothing
   effTyp: 0,      // 0 = no effect (arpeggio with 00 param = no effect)
   eff: 0,         // 0x00 = no parameter
+  effTyp2: 0,     // 0 = no second effect
+  eff2: 0,        // 0x00 = no second parameter
 };
 
 export const NOTE_OFF: TrackerCell = {
@@ -397,4 +401,6 @@ export const NOTE_OFF: TrackerCell = {
   volume: 0,      // 0x00 = nothing
   effTyp: 0,      // 0 = no effect
   eff: 0,         // 0x00 = no parameter
+  effTyp2: 0,     // 0 = no second effect
+  eff2: 0,        // 0x00 = no second parameter
 };
