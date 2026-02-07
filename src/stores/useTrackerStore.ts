@@ -349,7 +349,7 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'
             ];
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
             // Safety: if cursor is on an unknown column, snap to note
@@ -383,7 +383,7 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder2: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'
             ];
             const currentColumnIndex2 = columnOrder2.indexOf(state.cursor.columnType);
             // Safety: if cursor is on an unknown column, snap to note
@@ -747,7 +747,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'],
         };
       }),
 
@@ -759,7 +759,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: pattern.channels.length - 1,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'],
         };
       }),
 

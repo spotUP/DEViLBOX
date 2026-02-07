@@ -124,8 +124,8 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
     steps.push({
       noteIndex: parsed?.noteIndex ?? null,
       octaveShift: parsed?.octaveShift ?? 0,
-      accent: cell.accent || false,
-      slide: cell.slide || false,
+      accent: (cell.flag1 === 1 || cell.flag2 === 1),
+      slide: (cell.flag1 === 2 || cell.flag2 === 2),
       tie: isTie,
       velocity: cell.volume ?? 100, // Convert volume (0-64) to velocity (0-127) - or use as-is if already MIDI velocity
     });
@@ -156,8 +156,8 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
       eff: 0,
       effTyp2: 0,
       eff2: 0,
-      accent: step.accent,
-      slide: step.slide,
+      flag1: step.accent ? 1 : undefined,
+      flag2: step.slide ? 2 : undefined,
     };
   });
 }
@@ -218,8 +218,8 @@ export function useGridPattern(channelIndex: number) {
   const toggleAccent = useCallback(
     (stepIndex: number) => {
       if (stepIndex < 0 || stepIndex >= cells.length) return;
-      const current = cells[stepIndex]?.accent || false;
-      setCell(channelIndex, stepIndex, { accent: !current });
+      const current = (cells[stepIndex]?.flag1 === 1 || cells[stepIndex]?.flag2 === 1);
+      setCell(channelIndex, stepIndex, { flag1: current ? 0 : 1 });
     },
     [channelIndex, cells, setCell]
   );
@@ -228,8 +228,8 @@ export function useGridPattern(channelIndex: number) {
   const toggleSlide = useCallback(
     (stepIndex: number) => {
       if (stepIndex < 0 || stepIndex >= cells.length) return;
-      const current = cells[stepIndex]?.slide || false;
-      setCell(channelIndex, stepIndex, { slide: !current });
+      const current = (cells[stepIndex]?.flag1 === 2 || cells[stepIndex]?.flag2 === 2);
+      setCell(channelIndex, stepIndex, { flag2: current ? 0 : 2 });
     },
     [channelIndex, cells, setCell]
   );
@@ -260,7 +260,7 @@ export function useGridPattern(channelIndex: number) {
   const clearStep = useCallback(
     (stepIndex: number) => {
       if (stepIndex < 0 || stepIndex >= maxSteps) return;
-      setCell(channelIndex, stepIndex, { note: 0, accent: false, slide: false }); // 0 = empty cell
+      setCell(channelIndex, stepIndex, { note: 0, flag1: 0, flag2: 0 }); // 0 = empty cell
     },
     [channelIndex, setCell, maxSteps]
   );
@@ -268,7 +268,7 @@ export function useGridPattern(channelIndex: number) {
   // Clear all steps
   const clearAll = useCallback(() => {
     for (let i = 0; i < maxSteps; i++) {
-      setCell(channelIndex, i, { note: 0, accent: false, slide: false }); // 0 = empty cell
+      setCell(channelIndex, i, { note: 0, flag1: 0, flag2: 0 }); // 0 = empty cell
     }
   }, [channelIndex, setCell, maxSteps]);
 

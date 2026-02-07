@@ -80,9 +80,10 @@ export interface TrackerCell {
   eff2: EffectParam;            // Second effect parameter (0x00-0xFF)
   effect2?: string;             // Legacy string format (migration only)
 
-  // TB-303 specific columns
-  accent?: boolean;
-  slide?: boolean;
+  // TB-303 specific columns (flexible like effect columns)
+  // 0 = empty, 1 = accent, 2 = slide
+  flag1?: number;
+  flag2?: number;
 
   // Automation columns (optional)
   cutoff?: number;              // 0x00-0xFF
@@ -325,7 +326,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'accent' | 'slide' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
+  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 
@@ -349,8 +350,8 @@ export type ColumnVisibility = {
   volume: boolean;
   effect: boolean;
   effect2: boolean;
-  accent: boolean;
-  slide: boolean;
+  flag1: boolean;  // Flexible column: can be accent or slide
+  flag2: boolean;  // Flexible column: can be accent or slide
   cutoff: boolean;
   resonance: boolean;
   envMod: boolean;
@@ -376,8 +377,8 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   volume: true,
   effect: true,
   effect2: true,
-  accent: false,
-  slide: false,
+  flag1: false,
+  flag2: false,
   cutoff: false,
   resonance: false,
   envMod: false,

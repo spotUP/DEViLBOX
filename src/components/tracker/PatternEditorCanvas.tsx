@@ -385,22 +385,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     eff: number,
     effTyp2: number,
     eff2: number,
-    accent?: boolean,
-    slide?: boolean,
+    flag1?: number,
+    flag2?: number,
     probability?: number,
     blankEmpty?: boolean
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}-${effTyp2}-${eff2}-${accent ? 'A' : ''}-${slide ? 'S' : ''}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}`;
+    const key = `${instrument}-${volume}-${effTyp}-${eff}-${effTyp2}-${eff2}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
 
-    // TB-303 accent/slide adds 2 columns
-    const hasAcidColumns = accent !== undefined || slide !== undefined;
+    // Flag columns (flag1/flag2) - 2 flexible columns that can be accent or slide
+    const hasFlagColumns = flag1 !== undefined || flag2 !== undefined;
     const hasProb = probability !== undefined && probability > 0;
     const canvas = document.createElement('canvas');
     // Base: inst(2)+4 vol(2)+4 eff(3)+4 eff2(3)+4 = CW*10+16
-    canvas.width = CHAR_WIDTH * 10 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
+    canvas.width = CHAR_WIDTH * 10 + 16 + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -453,20 +453,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     }
     x += CHAR_WIDTH * 3 + 4;
 
-    // TB-303 Accent/Slide columns (if present)
-    if (hasAcidColumns) {
-      // Accent - yellow/orange for active
-      if (accent) {
+    // Flag columns (if present) - can be accent (1) or slide (2)
+    if (hasFlagColumns) {
+      // Flag 1 - yellow/orange for accent, cyan for slide
+      if (flag1 === 1) {
         ctx.fillStyle = '#f59e0b';
         ctx.fillText('A', x, y);
+      } else if (flag1 === 2) {
+        ctx.fillStyle = '#06b6d4';
+        ctx.fillText('S', x, y);
       } else if (!blankEmpty) {
         ctx.fillStyle = colors.textMuted;
         ctx.fillText('.', x, y);
       }
       x += CHAR_WIDTH + 4;
 
-      // Slide - cyan/blue for active
-      if (slide) {
+      // Flag 2 - yellow/orange for accent, cyan for slide
+      if (flag2 === 1) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillText('A', x, y);
+      } else if (flag2 === 2) {
         ctx.fillStyle = '#06b6d4';
         ctx.fillText('S', x, y);
       } else if (!blankEmpty) {
@@ -609,9 +615,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
     // Track widths - must match getParamCanvas layout exactly
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    // Detect acid/prob columns from first channel's first cell (all cells share same schema)
+    // Detect flag/prob columns from first channel's first cell (all cells share same schema)
     const firstCell = pattern.channels[0]?.rows[0];
-    const hasAcid = firstCell?.accent !== undefined || firstCell?.slide !== undefined;
+    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
     const hasProb = firstCell?.probability !== undefined;
     // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
     // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
@@ -674,8 +680,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           cell.eff || 0,
           cell.effTyp2 || 0,
           cell.eff2 || 0,
-          cell.accent,
-          cell.slide,
+          cell.flag1,
+          cell.flag2,
           cell.probability,
           blankEmpty
         );
@@ -732,10 +738,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         case 'effParam2':
           cursorOffsetX = paramBase + eff2Off + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;
           break;
-        case 'accent':
+        case 'flag1':
           cursorOffsetX = paramBase + acidOff;
           break;
-        case 'slide':
+        case 'flag2':
           cursorOffsetX = paramBase + acidOff + CHAR_WIDTH + 4;
           break;
         case 'probability':
@@ -806,10 +812,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           const ep2 = cell.eff2 ?? 0;
           const effStr = (et2 !== 0 || ep2 !== 0) ? hexByte(ep2) : '..';
           charStr = effStr[di] ?? '.';
-        } else if (col === 'accent') {
-          charStr = cell.accent ? 'A' : '.';
-        } else if (col === 'slide') {
-          charStr = cell.slide ? 'S' : '.';
+        } else if (col === 'flag1') {
+          charStr = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
+        } else if (col === 'flag2') {
+          charStr = cell.flag2 === 1 ? 'A' : cell.flag2 === 2 ? 'S' : '.';
         } else if (col === 'probability') {
           const prob = cell.probability ?? 0;
           const probStr = prob > 0 ? prob.toString(10).padStart(2, '0') : '..';
@@ -944,7 +950,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
   // Calculate channel header width - must match render() layout
   const noteWidthH = CHAR_WIDTH * 3 + 4;
   const firstCellH = pattern?.channels[0]?.rows[0];
-  const hasAcidH = firstCellH?.accent !== undefined || firstCellH?.slide !== undefined;
+  const hasAcidH = firstCellH?.flag1 !== undefined || firstCellH?.flag2 !== undefined;
   const hasProbH = firstCellH?.probability !== undefined;
   const paramWidthH = CHAR_WIDTH * 10 + 16
     + (hasAcidH ? CHAR_WIDTH * 2 + 8 : 0)
