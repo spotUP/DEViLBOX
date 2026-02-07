@@ -17,6 +17,8 @@ interface VoiceState {
 }
 
 export class DrumPadEngine {
+  private static readonly MAX_VOICES = 32; // Polyphony limit
+
   private context: AudioContext;
   private masterGain: GainNode;
   private voices: Map<number, VoiceState> = new Map();
@@ -49,6 +51,11 @@ export class DrumPadEngine {
 
     // Stop any existing voice for this pad
     this.stopPad(pad.id);
+
+    // Enforce polyphony limit with voice stealing
+    if (this.voices.size >= DrumPadEngine.MAX_VOICES) {
+      this.stealOldestVoice();
+    }
 
     const now = this.context.currentTime;
 
@@ -175,6 +182,29 @@ export class DrumPadEngine {
       this.cleanupVoice(padId);
     };
     cleanupSource.start(cleanupTime);
+  }
+
+  /**
+   * Steal the oldest voice when polyphony limit is reached
+   */
+  private stealOldestVoice(): void {
+    if (this.voices.size === 0) return;
+
+    // Find the voice with the oldest start time
+    let oldestPadId: number | null = null;
+    let oldestStartTime = Infinity;
+
+    for (const [padId, voice] of this.voices.entries()) {
+      if (voice.startTime < oldestStartTime) {
+        oldestStartTime = voice.startTime;
+        oldestPadId = padId;
+      }
+    }
+
+    if (oldestPadId !== null) {
+      // Stop the oldest voice to make room
+      this.stopPad(oldestPadId);
+    }
   }
 
   /**

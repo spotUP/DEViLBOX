@@ -2,7 +2,7 @@
  * PadEditor - Detailed pad parameter editor with tabs
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { DrumPad, FilterType, OutputBus } from '../../types/drumpad';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 
@@ -23,6 +23,41 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   const handleUpdate = useCallback((updates: Partial<DrumPad>) => {
     updatePad(padId, updates);
   }, [padId, updatePad]);
+
+  // Memoize ADSR visualization calculations for performance
+  const adsrVisualization = useMemo(() => {
+    if (!pad) return null;
+
+    return (
+      <div className="mt-6 p-4 bg-dark-surface border border-dark-border rounded">
+        <div className="text-xs text-text-muted mb-2 text-center">ENVELOPE SHAPE</div>
+        <div className="h-24 flex items-end justify-around">
+          <div className="flex items-end space-x-1">
+            <div
+              className="w-8 bg-accent-primary"
+              style={{ height: `${(pad.attack / 100) * 100}%` }}
+              title="Attack"
+            />
+            <div
+              className="w-8 bg-accent-secondary"
+              style={{ height: `${(pad.decay / 2000) * 100}%` }}
+              title="Decay"
+            />
+            <div
+              className="w-8 bg-emerald-600"
+              style={{ height: `${pad.sustain}%` }}
+              title="Sustain"
+            />
+            <div
+              className="w-8 bg-blue-600"
+              style={{ height: `${(pad.release / 5000) * 100}%` }}
+              title="Release"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }, [pad?.attack, pad?.decay, pad?.sustain, pad?.release]);
 
   if (!pad) {
     return (
@@ -66,11 +101,12 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`
-              flex-1 px-4 py-2 text-xs font-bold transition-colors
+              flex-1 px-4 py-2 text-xs font-bold transition-all duration-200
               ${activeTab === tab.id
-                ? 'bg-dark-surface text-accent-primary border-b-2 border-accent-primary'
-                : 'text-text-muted hover:text-white'
+                ? 'bg-dark-surface text-accent-primary border-b-2 border-accent-primary scale-105'
+                : 'text-text-muted hover:text-white hover:scale-102'
               }
+              transform-gpu will-change-transform
             `}
           >
             {tab.label}
@@ -79,7 +115,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
       </div>
 
       {/* Tab Content */}
-      <div className="p-4">
+      <div className="p-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
         {activeTab === 'main' && (
           <div className="space-y-4">
             <div>
@@ -216,34 +252,8 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               />
             </div>
 
-            {/* Visual ADSR envelope */}
-            <div className="mt-6 p-4 bg-dark-surface border border-dark-border rounded">
-              <div className="text-xs text-text-muted mb-2 text-center">ENVELOPE SHAPE</div>
-              <div className="h-24 flex items-end justify-around">
-                <div className="flex items-end space-x-1">
-                  <div
-                    className="w-8 bg-accent-primary"
-                    style={{ height: `${(pad.attack / 100) * 100}%` }}
-                    title="Attack"
-                  />
-                  <div
-                    className="w-8 bg-accent-secondary"
-                    style={{ height: `${(pad.decay / 2000) * 100}%` }}
-                    title="Decay"
-                  />
-                  <div
-                    className="w-8 bg-emerald-600"
-                    style={{ height: `${pad.sustain}%` }}
-                    title="Sustain"
-                  />
-                  <div
-                    className="w-8 bg-blue-600"
-                    style={{ height: `${(pad.release / 5000) * 100}%` }}
-                    title="Release"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Visual ADSR envelope (memoized for performance) */}
+            {adsrVisualization}
           </div>
         )}
 

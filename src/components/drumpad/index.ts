@@ -8,3 +8,4 @@ export { PadButton } from './PadButton';
 export { PadEditor } from './PadEditor';
 export { SampleBrowser } from './SampleBrowser';
 export { ConfirmDialog } from './ConfirmDialog';
+export { ErrorBoundary } from './ErrorBoundary';
