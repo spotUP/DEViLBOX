@@ -135,8 +135,9 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   }, [displayValue, value, min, max, logarithmic]);
 
   // Calculate rotation angle (-135 to +135 degrees) - uses display value for visual
+  // Guard against NaN to prevent SVG rendering errors
   const displayNorm = getDisplayNormalized();
-  const rotation = displayNorm * 270 - 135;
+  const rotation = isNaN(displayNorm) || !isFinite(displayNorm) ? -135 : displayNorm * 270 - 135;
 
   // Default value formatting
   const defaultFormatValue = (val: number): string => {
@@ -164,7 +165,9 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const center = knobSize / 2;
 
   const polarToCartesian = (angle: number) => {
-    const rad = ((angle - 90) * Math.PI) / 180;
+    // Guard against NaN to prevent SVG rendering errors
+    const safeAngle = isNaN(angle) || !isFinite(angle) ? -135 : angle;
+    const rad = ((safeAngle - 90) * Math.PI) / 180;
     return {
       x: center + radius * Math.cos(rad),
       y: center + radius * Math.sin(rad),
