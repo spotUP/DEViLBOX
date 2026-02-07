@@ -1,0 +1,11 @@
+# Ignore all ROM files (copyrighted material)
+*.bin
+*.BIN
+*.zip
+*.ZIP
+*.vsm
+*.VSM
+
+# But keep .gitkeep files and README
+!.gitkeep
+!README.md
