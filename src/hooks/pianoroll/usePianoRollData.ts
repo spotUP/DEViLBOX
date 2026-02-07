@@ -84,8 +84,8 @@ export function patternToPianoRollNotes(
         midiNote,
         velocity,
         instrument: cell.instrument,
-        slide: cell.slide || false,
-        accent: cell.accent || false,
+        slide: (cell.flag1 === 2 || cell.flag2 === 2),
+        accent: (cell.flag1 === 1 || cell.flag2 === 1),
       });
     }
   });
@@ -413,7 +413,7 @@ export function usePianoRollData(channelIndex?: number) {
         const [chIndexStr, startRowStr] = noteId.split('-');
         const chIndex = parseInt(chIndexStr, 10);
         const startRow = parseInt(startRowStr, 10);
-        setCell(chIndex, startRow, { slide });
+        setCell(chIndex, startRow, { flag2: slide ? 2 : 0 });
       });
 
       const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
@@ -434,7 +434,7 @@ export function usePianoRollData(channelIndex?: number) {
         const [chIndexStr, startRowStr] = noteId.split('-');
         const chIndex = parseInt(chIndexStr, 10);
         const startRow = parseInt(startRowStr, 10);
-        setCell(chIndex, startRow, { accent });
+        setCell(chIndex, startRow, { flag1: accent ? 1 : 0 });
       });
 
       const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];

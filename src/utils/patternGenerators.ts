@@ -39,7 +39,7 @@ const noteCell = (
   eff: 0,
   effTyp2: 0,
   eff2: 0,
-  accent,
+  flag1: accent ? 1 : 0,
 });
 
 /**
@@ -235,7 +235,7 @@ export function generateSyncopated(opts: GeneratorOptions): TrackerCell[] {
       // Add slide on some notes for 303 feel
       const hasSlide = posInBar === 3 || posInBar === 11;
       const cell = noteCell(note, instrumentId, velocity, accent);
-      cell.slide = hasSlide;
+      cell.flag2 = hasSlide ? 2 : 0;
       cells.push(cell);
     } else {
       cells.push(emptyCell());

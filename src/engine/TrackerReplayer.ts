@@ -381,6 +381,13 @@ export class TrackerReplayer {
     if (!this.song || this.playing) return;
 
     await Tone.start();
+
+    // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
+    // Without this, the first notes are silently dropped because the AudioWorklet
+    // hasn't loaded the WASM binary yet.
+    const engine = getToneEngine();
+    await engine.ensureWASMSynthsReady(this.song.instruments);
+
     this.playing = true;
     this.startScheduler();
 
@@ -606,6 +613,11 @@ export class TrackerReplayer {
   private processRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     if (!this.song) return;
 
+    // Compute accent/slide from flexible flag columns (0=none, 1=accent, 2=slide)
+    // Either flag1 or flag2 can contain accent or slide
+    const accent = (row.flag1 === 1 || row.flag2 === 1);
+    const slide = (row.flag1 === 2 || row.flag2 === 2);
+
     // Get effect info
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
     const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
@@ -668,10 +680,10 @@ export class TrackerReplayer {
         const slideActive = ch.previousSlideFlag && noteValue !== null;
 
         // Trigger the note with proper 303 slide semantics
-        // Pass row.accent directly (accent applies to current note)
+        // Pass accent directly (accent applies to current note)
         // Pass slideActive (computed from previous row's slide flag) for pitch glide
-        // Pass row.slide for gate timing (if this row has slide, gate stays high to slide to next)
-        this.triggerNote(ch, time, offset, chIndex, row.accent, slideActive, row.slide ?? false);
+        // Pass slide for gate timing (if this row has slide, gate stays high to slide to next)
+        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, slide ?? false);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -681,7 +693,7 @@ export class TrackerReplayer {
 
     // Update previous slide flag for next row (TB-303 semantics)
     // Store current row's slide flag to be used when processing the next note
-    ch.previousSlideFlag = row.slide ?? false;
+    ch.previousSlideFlag = slide ?? false;
 
     // Handle note off
     if (noteValue === 97) {
@@ -895,6 +907,10 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private processEffectTick(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
+    // Compute accent/slide from flexible flag columns
+    const accent = (row.flag1 === 1 || row.flag2 === 1);
+    const slide = (row.flag1 === 2 || row.flag2 === 2);
+
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
     const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
     const x = (param >> 4) & 0x0F;
@@ -960,7 +976,7 @@ export class TrackerReplayer {
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
           }
         } else if (x === 0xC && y === this.currentTick) {
           // Note cut
@@ -970,7 +986,7 @@ export class TrackerReplayer {
           // Note delay - uses the computed slide from processRow (stored in ch.previousSlideFlag context)
           // Since this is a delayed trigger of the same note, use the slide state computed at row start
           const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, row.accent, slideActive, row.slide ?? false);
+          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide ?? false);
         }
         break;
 
@@ -991,7 +1007,7 @@ export class TrackerReplayer {
             // Apply volume slide based on retrigVolSlide
             this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
             // Retrigger - does NOT slide (it's retriggering the same note)
-            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
           }
         }
         break;
@@ -1002,6 +1018,10 @@ export class TrackerReplayer {
    * Process a single effect on ticks 1+ (reusable for effect2 column)
    */
   private processEffectTickSingle(chIndex: number, ch: ChannelState, row: TrackerCell, effect: number, param: number, time: number): void {
+    // Compute accent/slide from flexible flag columns
+    const accent = (row.flag1 === 1 || row.flag2 === 1);
+    const slide = (row.flag1 === 2 || row.flag2 === 2);
+
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
@@ -1025,14 +1045,14 @@ export class TrackerReplayer {
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
           }
         } else if (x === 0xC && y === this.currentTick) {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
           const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, row.accent, slideActive, row.slide ?? false);
+          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide ?? false);
         }
         break;
       case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
@@ -1043,7 +1063,7 @@ export class TrackerReplayer {
           if (ch.retrigCount <= 0) {
             ch.retrigCount = param & 0x0F;
             this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-            this.triggerNote(ch, time, 0, chIndex, row.accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
           }
         }
         break;
