@@ -28,6 +28,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  // Animation keyframes (fade in + scale)
+  const modalAnimation = 'animate-in fade-in-0 zoom-in-95 duration-200';
+
   const variantStyles = {
     danger: {
       icon: 'text-red-400',
@@ -49,8 +52,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const styles = variantStyles[variant];
 
   return (
-    <div className="fixed inset-0 z-[60] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center">
-      <div className={`bg-dark-surface border ${styles.border} rounded-lg shadow-2xl max-w-md w-full mx-4`}>
+    <div className={`fixed inset-0 z-[60] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center ${modalAnimation}`}>
+      <div className={`bg-dark-surface border ${styles.border} rounded-lg shadow-2xl max-w-md w-full mx-4 ${modalAnimation}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border">
           <div className="flex items-center gap-3">

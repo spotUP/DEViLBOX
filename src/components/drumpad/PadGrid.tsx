@@ -20,11 +20,17 @@ export const PadGrid: React.FC<PadGridProps> = ({
   // Track velocity for each pad (for visual feedback)
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
 
+  // Track focused pad for keyboard navigation
+  const [focusedPadId, setFocusedPadId] = useState<number>(1);
+
   const { programs, currentProgramId } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
 
   // Audio engine instance
   const engineRef = useRef<DrumPadEngine | null>(null);
+
+  // Grid container ref for keyboard focus
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Initialize audio engine with singleton AudioContext
   useEffect(() => {
@@ -68,6 +74,82 @@ export const PadGrid: React.FC<PadGridProps> = ({
     ];
   }, [currentProgram]);
 
+  // Keyboard navigation (arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't handle if focus is on input element
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      let newFocusedId = focusedPadId;
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          newFocusedId = focusedPadId > 1 ? focusedPadId - 1 : 16;
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          newFocusedId = focusedPadId < 16 ? focusedPadId + 1 : 1;
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          newFocusedId = focusedPadId > 4 ? focusedPadId - 4 : focusedPadId + 12;
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          newFocusedId = focusedPadId <= 12 ? focusedPadId + 4 : focusedPadId - 12;
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          // Trigger focused pad with medium velocity
+          handlePadTrigger(focusedPadId, 100);
+          break;
+        case 'Tab':
+          // Don't prevent default for Tab - let it navigate normally
+          // Just update our focus state to match
+          if (event.shiftKey) {
+            newFocusedId = focusedPadId > 1 ? focusedPadId - 1 : 16;
+          } else {
+            newFocusedId = focusedPadId < 16 ? focusedPadId + 1 : 1;
+          }
+          break;
+        default:
+          return;
+      }
+
+      if (newFocusedId !== focusedPadId) {
+        setFocusedPadId(newFocusedId);
+        // Announce to screen readers
+        const pad = currentProgram?.pads.find(p => p.id === newFocusedId);
+        if (pad) {
+          // Create hidden live region for announcements if it doesn't exist
+          let liveRegion = document.getElementById('pad-navigation-announcer');
+          if (!liveRegion) {
+            liveRegion = document.createElement('div');
+            liveRegion.id = 'pad-navigation-announcer';
+            liveRegion.setAttribute('role', 'status');
+            liveRegion.setAttribute('aria-live', 'polite');
+            liveRegion.setAttribute('aria-atomic', 'true');
+            liveRegion.className = 'sr-only';
+            document.body.appendChild(liveRegion);
+          }
+          liveRegion.textContent = `Pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty)'}`;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedPadId, currentProgram, handlePadTrigger]);
+
   if (!currentProgram) {
     return (
       <div className="flex items-center justify-center h-full text-text-muted">
@@ -90,22 +172,29 @@ export const PadGrid: React.FC<PadGridProps> = ({
       </div>
 
       {/* 4x4 Pad Grid */}
-      <div className="grid grid-cols-4 gap-2">
+      <div
+        ref={gridRef}
+        className="grid grid-cols-4 gap-2"
+        role="grid"
+        aria-label="Drum pad grid"
+      >
         {rows.flat().map((pad) => (
           <PadButton
             key={pad.id}
             pad={pad}
             isSelected={selectedPadId === pad.id}
+            isFocused={focusedPadId === pad.id}
             velocity={padVelocities[pad.id] || 0}
             onTrigger={handlePadTrigger}
             onSelect={onPadSelect}
+            onFocus={() => setFocusedPadId(pad.id)}
           />
         ))}
       </div>
 
       {/* Keyboard hint */}
       <div className="text-[10px] text-text-muted text-center mt-2 font-mono">
-        Click pads to trigger • Shift+Click to select for editing
+        Click/Enter to trigger • Shift+Click to select • Arrow keys to navigate
       </div>
     </div>
   );

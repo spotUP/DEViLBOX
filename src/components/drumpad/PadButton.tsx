@@ -8,18 +8,22 @@ import type { DrumPad } from '../../types/drumpad';
 interface PadButtonProps {
   pad: DrumPad;
   isSelected: boolean;
+  isFocused?: boolean;  // Keyboard focus state
   velocity: number;  // Last triggered velocity (0-127)
   onTrigger: (padId: number, velocity: number) => void;
   onSelect: (padId: number) => void;
+  onFocus?: () => void;  // Focus callback
   className?: string;
 }
 
 export const PadButton: React.FC<PadButtonProps> = ({
   pad,
   isSelected,
+  isFocused = false,
   velocity,
   onTrigger,
   onSelect,
+  onFocus,
   className = '',
 }) => {
   const [isPressed, setIsPressed] = useState(false);
@@ -106,24 +110,28 @@ export const PadButton: React.FC<PadButtonProps> = ({
     <button
       data-pad-id={pad.id}
       className={`
-        relative rounded-lg transition-all duration-75 select-none
+        relative rounded-lg transition-all select-none
         ${padColor}
-        ${!pad.sample ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}
-        ${isPressed ? 'scale-95' : 'scale-100'}
-        ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
+        ${!pad.sample ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:brightness-110 active:brightness-125'}
+        ${isPressed ? 'scale-95 duration-75' : 'scale-100 duration-150'}
+        ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg transition-all duration-200' : ''}
+        ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg transition-all duration-200' : ''}
+        transform-gpu will-change-transform
         ${className}
       `}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
+      onFocus={onFocus}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       disabled={!pad.sample}
-      aria-label={`Drum pad ${pad.id}: ${pad.name}`}
+      tabIndex={0}
+      aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty)'}`}
       aria-pressed={isPressed}
-      role="button"
+      role="gridcell"
       style={{
         aspectRatio: '1',
       }}
