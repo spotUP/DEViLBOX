@@ -187,6 +187,14 @@ export class CZ101Synth extends Tone.ToneAudioNode {
       throw new Error('Could not find native AudioNode for connection');
     }
 
+    // CRITICAL: Connect through silent keepalive to destination to force process() calls
+    try {
+      const keepalive = ctx.createGain();
+      keepalive.gain.value = 0;
+      this.workletNode.connect(keepalive);
+      keepalive.connect(ctx.destination);
+    } catch (_e) { /* keepalive failed */ }
+
     // Wait for worklet ready
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('CZ101 init timeout')), 5000);

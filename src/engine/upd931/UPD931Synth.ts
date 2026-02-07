@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * uPD931 Parameter IDs (matching C++ enum)
@@ -65,186 +64,75 @@ export const UPD931CycleMode = {
  * - Sustain and reverb (extended decay tail)
  *
  * Used in: Casio CT-8000, Casio MT-65 (1981)
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, pitch, panning)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class UPD931Synth extends Tone.ToneAudioNode {
+export class UPD931Synth extends MAMEBaseSynth {
   readonly name = 'UPD931Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
-
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'UPD931';
+  protected readonly workletFile = 'UPD931.worklet.js';
+  protected readonly processorName = 'upd931-processor';
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await UPD931Synth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[UPD931] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/UPD931.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'upd931-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[UPD931] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
     });
   }
 
-  triggerRelease(_time?: number): void {
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
   }
 
-  releaseAll(): void {
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      freq,
+    });
   }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
-
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
-  }
-
-  // ========================================================================
-  // Parameter interface
-  // ========================================================================
-
-  private setParameterById(paramId: number, value: number): void {
+  protected writeVolume(volume: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
+
+    this.workletNode.port.postMessage({
+      type: 'setVolume',
+      value: volume,
+    });
   }
 
-  setParam(param: string, value: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
-      return;
-    }
-    const paramMap: Record<string, number> = {
-      volume: UPD931Param.VOLUME,
-      wave_a: UPD931Param.WAVE_A,
-      wave_b: UPD931Param.WAVE_B,
-      mirror: UPD931Param.MIRROR,
-      invert: UPD931Param.INVERT,
-      mode_a: UPD931Param.MODE_A,
-      mode_b: UPD931Param.MODE_B,
-      key_scaling: UPD931Param.KEY_SCALING,
-    };
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const paramId = paramMap[param];
-    if (paramId !== undefined) {
-      this.setParameterById(paramId, value);
-    }
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+    });
   }
 
-  // ========================================================================
-  // Convenience setters
-  // ========================================================================
+  // ===========================================================================
+  // UPD931-Specific Methods
+  // ===========================================================================
 
   /** Set output volume (0-1) */
   setVolume(value: number): void {
@@ -296,9 +184,9 @@ export class UPD931Synth extends Tone.ToneAudioNode {
     this.setParameterById(UPD931Param.KEY_SCALING, enabled ? 1 : 0);
   }
 
-  // ========================================================================
+  // ===========================================================================
   // MIDI CC and pitch bend
-  // ========================================================================
+  // ===========================================================================
 
   controlChange(cc: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -310,25 +198,40 @@ export class UPD931Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'pitchBend', value });
   }
 
-  // ========================================================================
-  // Internal
-  // ========================================================================
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
+
+  private setParameterById(paramId: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
+  }
+
+  setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
+    const paramMap: Record<string, number> = {
+      volume: UPD931Param.VOLUME,
+      wave_a: UPD931Param.WAVE_A,
+      wave_b: UPD931Param.WAVE_B,
+      mirror: UPD931Param.MIRROR,
+      invert: UPD931Param.INVERT,
+      mode_a: UPD931Param.MODE_A,
+      mode_b: UPD931Param.MODE_B,
+      key_scaling: UPD931Param.KEY_SCALING,
+    };
+
+    const paramId = paramMap[param];
+    if (paramId !== undefined) {
+      this.setParameterById(paramId, value);
+    }
+  }
 
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

@@ -16,38 +16,44 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void initSynth(int samplerate) {
     if (g_synthInstance) return;
-    
-    // V2::InitDefs(); // We don't really need the editor defs for just playing
-    
+
     unsigned int size = synthGetSize();
     g_synthInstance = malloc(size);
     memset(g_synthInstance, 0, size);
-    
-    // Initialize with a default patch map (InitSound)
-    // In V2, the patchmap is basically the concatenated parameters for all 128 programs
-    // For our tracker, we'll mostly use Program 0.
+
+    // Initialize patchmap: zero it, then copy the default V2 InitSound into program 0.
+    // V2::InitSound contains a working sawtooth patch with velocity->amplify modulation,
+    // which is essential for producing audio on Note On.
     memset(g_patchMap, 0, sizeof(g_patchMap));
-    
+    memcpy(g_patchMap, V2::InitSound, V2::SoundSize);
+
     // synthInit(instance, patchmap, samplerate)
     synthInit(g_synthInstance, g_patchMap, samplerate);
+
+    // Set global parameters (reverb, delay, compressor, etc.)
+    synthSetGlobals(g_synthInstance, V2::InitGlobals);
+
+    // Select program 0 on channel 0 via MIDI Program Change
+    unsigned char pgmChange[3] = { 0xC0, 0, 0 };
+    synthProcessMIDI(g_synthInstance, pgmChange);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void processMIDI(int status, int data1, int data2) {
     if (!g_synthInstance) return;
-    
+
     unsigned char msg[3];
     msg[0] = (unsigned char)status;
     msg[1] = (unsigned char)data1;
     msg[2] = (unsigned char)data2;
-    
+
     synthProcessMIDI(g_synthInstance, msg);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void render(float* outputL, float* outputR, int numSamples) {
     if (!g_synthInstance) return;
-    
+
     // V2 renders interleaved or to two buffers
     // void __stdcall synthRender(void *pthis, void *buf, int smp, void *buf2=0, int add=0);
     // If buf2 is provided, it's non-interleaved L and R
@@ -57,22 +63,14 @@ void render(float* outputL, float* outputR, int numSamples) {
 EMSCRIPTEN_KEEPALIVE
 void setParameter(int program, int index, int value) {
     if (!g_synthInstance) return;
-    
-    // To update parameters in real-time, V2 usually expects MIDI CC or 
-    // a full patch re-init. However, we can send a MIDI SysEx or CC 
-    // for standard V2 parameters if we map them.
-    // Classic V2 uses CCs for many things.
-    
-    // For direct parameter access, we'd need to poke into the synth's internal state
-    // which is complex. Easier: send MIDI CC.
-    // Most V2 params map to CCs in a specific way.
-    
-    // Alternatively, poke into the patchmap and call synthInit again? 
-    // No, that's too slow.
-    
-    // Let's use the MIDI CC approach for now as it's built-in.
-    // Status 0xB0 | channel 0
-    processMIDI(0xB0, index, value);
+
+    // Write parameter directly into the patchmap at the correct offset.
+    // V2 reads patch data from the patchmap on Note On, so parameters
+    // must be set BEFORE triggering notes for them to take effect.
+    int offset = program * V2::SoundSize + index;
+    if (offset >= 0 && offset < (int)sizeof(g_patchMap)) {
+        g_patchMap[offset] = (unsigned char)value;
+    }
 }
 
 }

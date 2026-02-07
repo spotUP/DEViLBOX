@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * MEA8000 Parameter IDs (matching C++ enum)
@@ -62,187 +61,75 @@ export const MEA8000Bandwidth = {
  * - Internal 8kHz processing rate (authentic)
  *
  * Used in: Thomson MO5/TO7, Amstrad CPC, Oric (French speech extensions)
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, pitch, panning)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class MEA8000Synth extends Tone.ToneAudioNode {
+export class MEA8000Synth extends MAMEBaseSynth {
   readonly name = 'MEA8000Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
-
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'MEA8000';
+  protected readonly workletFile = 'MEA8000.worklet.js';
+  protected readonly processorName = 'mea8000-processor';
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await MEA8000Synth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[MEA8000] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/MEA8000.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'mea8000-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[MEA8000] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
     });
   }
 
-  triggerRelease(_time?: number): void {
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
   }
 
-  releaseAll(): void {
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      freq,
+    });
   }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
-
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
-  }
-
-  // ========================================================================
-  // Parameter interface
-  // ========================================================================
-
-  private setParameterById(paramId: number, value: number): void {
+  protected writeVolume(volume: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
+
+    this.workletNode.port.postMessage({
+      type: 'setVolume',
+      value: volume,
+    });
   }
 
-  setParam(param: string, value: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
-      return;
-    }
-    const paramMap: Record<string, number> = {
-      volume: MEA8000Param.VOLUME,
-      noise_mode: MEA8000Param.NOISE_MODE,
-      f1_index: MEA8000Param.F1_INDEX,
-      f2_index: MEA8000Param.F2_INDEX,
-      f3_index: MEA8000Param.F3_INDEX,
-      bw_index: MEA8000Param.BW_INDEX,
-      amplitude: MEA8000Param.AMPLITUDE,
-      stereo_width: MEA8000Param.STEREO_WIDTH,
-      interp_time: MEA8000Param.INTERP_TIME,
-    };
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const paramId = paramMap[param];
-    if (paramId !== undefined) {
-      this.setParameterById(paramId, value);
-    }
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+    });
   }
 
-  // ========================================================================
-  // Convenience setters
-  // ========================================================================
+  // ===========================================================================
+  // MEA8000-Specific Methods
+  // ===========================================================================
 
   /** Set output volume (0-1) */
   setVolume(value: number): void {
@@ -272,19 +159,15 @@ export class MEA8000Synth extends Tone.ToneAudioNode {
     this.setParameterById(MEA8000Param.INTERP_TIME, value);
   }
 
-  // ========================================================================
-  // Hardware-level access
-  // ========================================================================
-
   /** Write a register value (0=F1, 1=F2, 2=F3, 3=BW) */
   writeRegister(offset: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
   }
 
-  // ========================================================================
+  // ===========================================================================
   // MIDI CC and pitch bend
-  // ========================================================================
+  // ===========================================================================
 
   controlChange(cc: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -306,25 +189,41 @@ export class MEA8000Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'programChange', program });
   }
 
-  // ========================================================================
-  // Internal
-  // ========================================================================
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
+
+  private setParameterById(paramId: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
+  }
+
+  setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
+    const paramMap: Record<string, number> = {
+      volume: MEA8000Param.VOLUME,
+      noise_mode: MEA8000Param.NOISE_MODE,
+      f1_index: MEA8000Param.F1_INDEX,
+      f2_index: MEA8000Param.F2_INDEX,
+      f3_index: MEA8000Param.F3_INDEX,
+      bw_index: MEA8000Param.BW_INDEX,
+      amplitude: MEA8000Param.AMPLITUDE,
+      stereo_width: MEA8000Param.STEREO_WIDTH,
+      interp_time: MEA8000Param.INTERP_TIME,
+    };
+
+    const paramId = paramMap[param];
+    if (paramId !== undefined) {
+      this.setParameterById(paramId, value);
+    }
+  }
 
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

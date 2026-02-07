@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * SNKWave Parameter IDs (matching C++ enum)
@@ -46,155 +45,142 @@ export const SNKWavePreset = {
  * - Per-voice stereo panning with configurable width
  * - Voice detuning for unison/chorus effects
  * - Simple attack/release envelope per voice
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, wavetable, pitch, panning)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class SNKWaveSynth extends Tone.ToneAudioNode {
+export class SNKWaveSynth extends MAMEBaseSynth {
   readonly name = 'SNKWaveSynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'SNKWave';
+  protected readonly workletFile = 'SNKWave.worklet.js';
+  protected readonly processorName = 'snkwave-processor';
 
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // SNKWave-specific state
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await SNKWaveSynth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[SNKWave] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/SNKWave.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'snkwave-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[SNKWave] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
     });
   }
 
-  triggerRelease(_time?: number): void {
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
   }
 
-  releaseAll(): void {
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      freq,
+    });
   }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
+  protected writeVolume(volume: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
+    this.workletNode.port.postMessage({
+      type: 'setVolume',
+      value: volume,
+    });
   }
 
-  // ========================================================================
-  // Parameter interface
-  // ========================================================================
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
+
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+    });
+  }
+
+  protected writeWavetableSelect(index: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setWaveform',
+      value: index,
+    });
+  }
+
+  // ===========================================================================
+  // SNKWave-Specific Methods
+  // ===========================================================================
+
+  /** Set output volume (0-1) */
+  setVolume(value: number): void {
+    this.sendMessage('setVolume', value);
+  }
+
+  /** Set waveform preset (0-7). Use SNKWavePreset constants. */
+  setWaveform(value: number): void {
+    this.writeWavetableSelect(value);
+  }
+
+  /**
+   * Set a custom waveform (4 bytes, each containing two 3-bit samples).
+   * Byte format: high nibble bits 6-4 = sample A (0-7), low bits 2-0 = sample B (0-7)
+   * The 8 forward samples are automatically mirrored for ping-pong playback.
+   */
+  setCustomWaveform(b0: number, b1: number, b2: number, b3: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setCustomWaveform',
+      b0, b1, b2, b3,
+    });
+  }
+
+  /** Write a value to an SNKWave register (0-5) */
+  writeRegister(offset: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  // ===========================================================================
+  // MIDI CC and pitch bend
+  // ===========================================================================
+
+  controlChange(cc: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
+  }
+
+  pitchBend(value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'pitchBend', value });
+  }
+
+  /** Load a preset waveform by program number (0-7) */
+  loadPreset(program: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
+      return;
+    }
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'programChange', program });
+  }
+
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
 
   private setParameterById(paramId: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -219,86 +205,9 @@ export class SNKWaveSynth extends Tone.ToneAudioNode {
     }
   }
 
-  // ========================================================================
-  // Convenience setters
-  // ========================================================================
-
-  /** Set output volume (0-1) */
-  setVolume(value: number): void {
-    this.sendMessage('setVolume', value);
-  }
-
-  /** Set waveform preset (0-7). Use SNKWavePreset constants. */
-  setWaveform(value: number): void {
-    this.sendMessage('setWaveform', value);
-  }
-
-  /**
-   * Set a custom waveform (4 bytes, each containing two 3-bit samples).
-   * Byte format: high nibble bits 6-4 = sample A (0-7), low bits 2-0 = sample B (0-7)
-   * The 8 forward samples are automatically mirrored for ping-pong playback.
-   */
-  setCustomWaveform(b0: number, b1: number, b2: number, b3: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'setCustomWaveform',
-      b0, b1, b2, b3,
-    });
-  }
-
-  // ========================================================================
-  // Register-level access
-  // ========================================================================
-
-  /** Write a value to an SNKWave register (0-5) */
-  writeRegister(offset: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
-  }
-
-  // ========================================================================
-  // MIDI CC and pitch bend
-  // ========================================================================
-
-  controlChange(cc: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
-  }
-
-  pitchBend(value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'pitchBend', value });
-  }
-
-  /** Load a preset waveform by program number (0-7) */
-  loadPreset(program: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
-      return;
-    }
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'programChange', program });
-  }
-
-  // ========================================================================
-  // Internal
-  // ========================================================================
-
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

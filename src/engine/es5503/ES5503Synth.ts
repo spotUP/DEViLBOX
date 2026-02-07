@@ -1,6 +1,6 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { freqToES5503 } from '@engine/mame/MAMEPitchUtils';
+import { loadES5503ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * ES5503 Parameter IDs (matching C++ enum)
@@ -74,155 +74,257 @@ export const ES5503OscMode = {
  * - Per-oscillator volume (8-bit)
  * - Paired oscillator interactions for sync and AM
  * - Custom wave data loading for sample-based synthesis
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, wavetable, pitch, panning)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Per-voice control
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class ES5503Synth extends Tone.ToneAudioNode {
+export class ES5503Synth extends MAMEBaseSynth {
   readonly name = 'ES5503Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'ES5503';
+  protected readonly workletFile = 'ES5503.worklet.js';
+  protected readonly processorName = 'es5503-processor';
 
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // ES5503-specific state
+  private currentOsc: number = 0;
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
-
-  private async initialize(): Promise<void> {
+  protected async initialize(): Promise<void> {
     try {
-      const context = getNativeContext(this.context);
-      await ES5503Synth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[ES5503] Initialization failed:', err);
+      // Load Ensoniq Mirage wavetable ROM data
+      const romData = await loadES5503ROMs();
+
+      // Call parent initialize first to set up worklet
+      await super.initialize();
+
+      // Load custom wavetables into wave RAM (pages 8+)
+      this.loadWaveData(romData, 2048);  // Start at page 8 (offset 2048)
+
+      console.log('[ES5503] Mirage wavetable ROM loaded successfully');
+    } catch (error) {
+      console.error('[ES5503] ROM loading failed:', error);
+      console.error('Place ROM files in /public/roms/es5503/ - see /public/roms/README.md');
+      // Continue anyway - synth works with 8 built-in waveforms
     }
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/ES5503.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'es5503-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[ES5503] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  /**
+   * Write key-on to ES5503
+   */
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
+      osc: this.currentOsc,
     });
   }
 
-  triggerRelease(_time?: number): void {
+  /**
+   * Write key-off to ES5503
+   */
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
+    this.workletNode.port.postMessage({
+      type: 'noteOff',
+      note: 0,
+      osc: this.currentOsc,
+    });
   }
 
-  releaseAll(): void {
+  /**
+   * Write frequency to ES5503 using accumulator rate
+   */
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
+
+    const accRate = freqToES5503(freq);
+
+    this.workletNode.port.postMessage({
+      type: 'setFrequency',
+      freq: accRate,
+      osc: this.currentOsc,
+    });
   }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
+  /**
+   * Write volume to ES5503 (0-1 normalized)
+   */
+  protected writeVolume(volume: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
+    // ES5503 volume is 0-255
+    const vol = Math.round(volume * 255);
+
+    this.workletNode.port.postMessage({
+      type: 'setVolume',
+      volume: vol,
+      osc: this.currentOsc,
+    });
   }
 
-  // ========================================================================
-  // Parameter interface
-  // ========================================================================
+  /**
+   * Write panning to ES5503 (0-255, 128 = center)
+   */
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
+
+    // ES5503 has per-channel output routing
+    // Map pan to channel assignment (0-7)
+    const channel = Math.round((pan / 255) * 7);
+
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      channel,
+      osc: this.currentOsc,
+    });
+  }
+
+  /**
+   * Write wavetable select
+   */
+  protected writeWavetableSelect(index: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setWaveform',
+      value: index,
+      osc: this.currentOsc,
+    });
+  }
+
+  // ===========================================================================
+  // ES5503-Specific Methods
+  // ===========================================================================
+
+  /**
+   * Select which oscillator to control
+   */
+  setOscillator(osc: number): void {
+    this.currentOsc = Math.max(0, Math.min(31, osc));
+  }
+
+  /** Select built-in waveform (0-7). Use ES5503Waveform constants. */
+  setWaveform(index: number): void {
+    this.writeWavetableSelect(index);
+  }
+
+  /** Set wave table size (0-7). Use ES5503WaveSize constants. */
+  setWaveSize(index: number): void {
+    this.sendMessage('setWaveSize', index);
+  }
+
+  /** Set resolution (0-7, affects frequency precision) */
+  setResolution(index: number): void {
+    this.sendMessage('setResolution', index);
+  }
+
+  /** Set oscillator mode (0-3). Use ES5503OscMode constants. */
+  setOscMode(mode: number): void {
+    this.sendMessage('setOscMode', mode);
+  }
+
+  /** Set attack time in seconds */
+  setAttackTime(seconds: number): void {
+    this.sendMessage('setAttackTime', seconds);
+  }
+
+  /** Set release time in seconds */
+  setReleaseTime(seconds: number): void {
+    this.sendMessage('setReleaseTime', seconds);
+  }
+
+  /** Set output amplitude (0-1) */
+  setAmplitude(amp: number): void {
+    this.sendMessage('setAmplitude', amp);
+  }
+
+  /** Set number of enabled oscillators (1-32). More oscillators = lower per-oscillator sample rate. */
+  setNumOscillators(num: number): void {
+    this.sendMessage('setNumOscillators', num);
+  }
+
+  // ===========================================================================
+  // Wave data loading
+  // ===========================================================================
+
+  /**
+   * Load custom wave data into the ES5503's wave memory.
+   * Data should be Uint8Array of unsigned 8-bit samples (0x80 = center).
+   * Note: 0x00 is reserved as the end-of-sample marker.
+   *
+   * @param data - Unsigned 8-bit sample data
+   * @param offset - Byte offset in wave memory (0-131071)
+   */
+  loadWaveData(data: Uint8Array, offset: number = 0): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'loadWaveData',
+      waveData: data.buffer,
+      offset,
+    });
+  }
+
+  /**
+   * Load wave data into a specific page (256-byte boundary).
+   * Pages 0-7 contain built-in waveforms by default.
+   * Use pages 8+ for custom wave data.
+   */
+  loadWavePage(data: Uint8Array, page: number): void {
+    this.loadWaveData(data.slice(0, 256), page * 256);
+  }
+
+  // ===========================================================================
+  // Register-level access (for advanced/hardware-accurate use)
+  // ===========================================================================
+
+  /** Write a value to an ES5503 register */
+  writeRegister(offset: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  // ===========================================================================
+  // MIDI CC and pitch bend
+  // ===========================================================================
+
+  controlChange(cc: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
+  }
+
+  pitchBend(value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'pitchBend', value });
+  }
+
+  /** Select preset waveform via program change */
+  loadPreset(program: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
+      return;
+    }
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'programChange', program });
+  }
+
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
 
   private setParameterById(paramId: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -251,128 +353,13 @@ export class ES5503Synth extends Tone.ToneAudioNode {
     }
   }
 
-  // ========================================================================
-  // Convenience setters
-  // ========================================================================
-
-  /** Select built-in waveform (0-7). Use ES5503Waveform constants. */
-  setWaveform(index: number): void {
-    this.sendMessage('setWaveform', index);
-  }
-
-  /** Set wave table size (0-7). Use ES5503WaveSize constants. */
-  setWaveSize(index: number): void {
-    this.sendMessage('setWaveSize', index);
-  }
-
-  /** Set resolution (0-7, affects frequency precision) */
-  setResolution(index: number): void {
-    this.sendMessage('setResolution', index);
-  }
-
-  /** Set attack time in seconds */
-  setAttackTime(seconds: number): void {
-    this.sendMessage('setAttackTime', seconds);
-  }
-
-  /** Set release time in seconds */
-  setReleaseTime(seconds: number): void {
-    this.sendMessage('setReleaseTime', seconds);
-  }
-
-  /** Set output amplitude (0-1) */
-  setAmplitude(amp: number): void {
-    this.sendMessage('setAmplitude', amp);
-  }
-
-  /** Set number of enabled oscillators (1-32). More oscillators = lower per-oscillator sample rate. */
-  setNumOscillators(num: number): void {
-    this.sendMessage('setNumOscillators', num);
-  }
-
-  // ========================================================================
-  // Wave data loading
-  // ========================================================================
-
-  /**
-   * Load custom wave data into the ES5503's wave memory.
-   * Data should be Uint8Array of unsigned 8-bit samples (0x80 = center).
-   * Note: 0x00 is reserved as the end-of-sample marker.
-   *
-   * @param data - Unsigned 8-bit sample data
-   * @param offset - Byte offset in wave memory (0-131071)
-   */
-  loadWaveData(data: Uint8Array, offset: number = 0): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'loadWaveData',
-      waveData: data.buffer,
-      offset,
-    });
-  }
-
-  /**
-   * Load wave data into a specific page (256-byte boundary).
-   * Pages 0-7 contain built-in waveforms by default.
-   * Use pages 8+ for custom wave data.
-   */
-  loadWavePage(data: Uint8Array, page: number): void {
-    this.loadWaveData(data.slice(0, 256), page * 256);
-  }
-
-  // ========================================================================
-  // Register-level access (for advanced/hardware-accurate use)
-  // ========================================================================
-
-  /** Write a value to an ES5503 register */
-  writeRegister(offset: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
-  }
-
-  // ========================================================================
-  // MIDI CC and pitch bend
-  // ========================================================================
-
-  controlChange(cc: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'controlChange', cc, value });
-  }
-
-  pitchBend(value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'pitchBend', value });
-  }
-
-  /** Select preset waveform via program change */
-  loadPreset(program: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'loadPreset', args: [program] });
-      return;
-    }
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'programChange', program });
-  }
-
-  // ========================================================================
+  // ===========================================================================
   // Internal
-  // ========================================================================
+  // ===========================================================================
 
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 

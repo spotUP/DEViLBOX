@@ -145,7 +145,11 @@ export class FT2EffectHandler {
   ): FlowControl {
     const mem = this.getChannelMemory(channelIdx);
     const effect = cell.effect;
-    const effect2 = cell.effect2;
+    // Build effect2 string from numeric fields for backward-compatible processing
+    const effect2 = (cell.effTyp2 !== 0 || cell.eff2 !== 0)
+      ? (cell.effTyp2 < 10 ? cell.effTyp2.toString() : String.fromCharCode(55 + cell.effTyp2)) +
+        cell.eff2.toString(16).padStart(2, '0').toUpperCase()
+      : null;
 
     // Reset flow control
     this.flowControl = {

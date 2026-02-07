@@ -315,12 +315,16 @@ export class Open303Synth extends Tone.ToneAudioNode {
   }
 
   setParam(param: string, value: number): void {
+    // Route through named setters for params that have special processing
+    switch (param) {
+      case 'resonance': this.setResonance(value); return;
+      case 'cutoff': this.setCutoff(value); return;
+    }
+
     // Map string param names to Open303 parameter IDs
     const paramMap: { [key: string]: number } = {
       'waveform': Open303Param.WAVEFORM,
       'tuning': Open303Param.TUNING,
-      'cutoff': Open303Param.CUTOFF,
-      'resonance': Open303Param.RESONANCE,
       'env_mod': Open303Param.ENV_MOD,
       'decay': Open303Param.DECAY,
       'accent': Open303Param.ACCENT,
@@ -419,13 +423,20 @@ export class Open303Synth extends Tone.ToneAudioNode {
   }
 
   private applyResonance(): void {
-    let reso = this._baseResonance;
+    const reso = this._baseResonance;
+    // Apply inverse of DSP's exponential resonance curve for linear knob response.
+    // The rosic TeeBeeFilter applies: skewed = (1-exp(-3*x/100)) / (1-exp(-3))
+    // which compresses the top 90% of the knob range into a tiny audible difference.
+    // This inverse mapping makes the knob response perceptually linear.
+    const k = 1 - Math.exp(-3); // ≈ 0.9502
+    let mapped = reso <= 0 ? 0 : reso >= 100 ? 100 :
+      (-100 / 3) * Math.log(1 - (reso / 100) * k);
     if (!this._highResonance) {
-      // Stock 303: resonance pot limited to ~85% of range (no self-oscillation)
-      reso = Math.min(reso, 85);
+      // Stock 303: cap DSP value at 85 to prevent self-oscillation.
+      // This preserves the original ceiling (resonanceRaw=0.85, skewed≈0.97).
+      mapped = Math.min(mapped, 85);
     }
-    // Full range: 0-100% where 100% = self-oscillation
-    this.setParameterById(Open303Param.RESONANCE, reso);
+    this.setParameterById(Open303Param.RESONANCE, mapped);
   }
 
   // --- Advanced / Devil Fish Setters ---

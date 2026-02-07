@@ -1,6 +1,5 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+
+import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 
 /**
  * SN76477 Parameter IDs (matching C++ enum)
@@ -69,127 +68,41 @@ export const SN76477EnvelopeMode = {
  * - 8 mixer modes combining VCO, SLF, and Noise
  * - 4 envelope modes (VCO, One-Shot, Mixer Only, VCO Alt)
  * - All formulas derived from real hardware measurements
+ *
+ * Now extends MAMEBaseSynth for:
+ * - Macro system (volume, arpeggio, pitch, panning)
+ * - Tracker effects (0x00-0x0F and Exy)
+ * - Velocity scaling
+ * - Oscilloscope support
  */
-export class SN76477Synth extends Tone.ToneAudioNode {
+export class SN76477Synth extends MAMEBaseSynth {
   readonly name = 'SN76477Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
 
-  private workletNode: AudioWorkletNode | null = null;
-  private static isWorkletLoaded: boolean = false;
-  private static initializationPromise: Promise<void> | null = null;
-
-  public config: Record<string, unknown> = {};
-  public audioContext: AudioContext;
-  private _disposed: boolean = false;
-  private _initPromise!: Promise<void>;
-  private _pendingCalls: Array<{ method: string; args: any[] }> = [];
-  private _isReady = false;
+  // MAMEBaseSynth chip configuration
+  protected readonly chipName = 'SN76477';
+  protected readonly workletFile = 'SN76477.worklet.js';
+  protected readonly processorName = 'sn76477-processor';
 
   constructor() {
     super();
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
-    this._initPromise = this.initialize();
+    this.initSynth();
   }
 
-  public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
-  }
+  // ===========================================================================
+  // MAMEBaseSynth Abstract Method Implementations
+  // ===========================================================================
 
-  private async initialize(): Promise<void> {
-    try {
-      const context = getNativeContext(this.context);
-      await SN76477Synth.ensureInitialized(context);
-      if (this._disposed) return;
-      this.createNode();
-    } catch (err) {
-      console.error('[SN76477] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.isWorkletLoaded) return;
-    if (this.initializationPromise) return this.initializationPromise;
-
-    this.initializationPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      if (!this.isWorkletLoaded) {
-        try {
-          await context.audioWorklet.addModule(`${baseUrl}mame/SN76477.worklet.js`);
-        } catch (_e) {
-          // Module might already be added
-        }
-        this.isWorkletLoaded = true;
-      }
-    })();
-
-    return this.initializationPromise;
-  }
-
-  private createNode(): void {
-    if (this._disposed) return;
-
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
-
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'sn76477-processor', {
-      outputChannelCount: [2],
-      processorOptions: {
-        sampleRate: rawContext.sampleRate,
-      },
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      if (event.data.type === 'ready') {
-        console.log('[SN76477] WASM node ready');
-        this._isReady = true;
-        for (const call of this._pendingCalls) {
-          if (call.method === 'setParam') this.setParam(call.args[0], call.args[1]);
-          else if (call.method === 'loadPreset') this.loadPreset(call.args[0]);
-        }
-        this._pendingCalls = [];
-      }
-    };
-
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: rawContext.sampleRate,
-    });
-
-    // Connect worklet to Tone.js output
-    const targetNode = this.output.input as AudioNode;
-    this.workletNode.connect(targetNode);
-
-    // CRITICAL: Connect through silent keepalive to destination to force process() calls
-    try {
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (_e) { /* keepalive failed */ }
-  }
-
-  // ========================================================================
-  // MIDI-style note interface
-  // ========================================================================
-
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-
-    const midiNote =
-      typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
-        : Math.round(12 * Math.log2(note / 440) + 69);
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note: midiNote,
+      note,
       velocity: Math.floor(velocity * 127),
     });
   }
 
-  triggerRelease(_time?: number): void {
+  protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
@@ -197,71 +110,36 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     });
   }
 
-  releaseAll(): void {
+  protected writeFrequency(freq: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'allNotesOff' });
-  }
 
-  triggerAttackRelease(
-    note: string | number,
-    duration: string | number,
-    time?: number,
-    velocity?: number
-  ): void {
-    if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1);
-
-    const d = Tone.Time(duration).toSeconds();
-    setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
-      }
-    }, d * 1000);
-  }
-
-  // ========================================================================
-  // Generic parameter interface
-  // ========================================================================
-
-  private setParameterById(paramId: number, value: number): void {
-    if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
-      type: 'setParameter',
-      paramId,
-      value,
+      type: 'setFrequency',
+      freq,
     });
   }
 
-  setParam(param: string, value: number): void {
-    if (!this._isReady) {
-      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
-      return;
-    }
-    const paramMap: Record<string, number> = {
-      vco_freq: SN76477Param.VCO_FREQ,
-      slf_freq: SN76477Param.SLF_FREQ,
-      noise_freq: SN76477Param.NOISE_FREQ,
-      vco_duty_cycle: SN76477Param.VCO_DUTY_CYCLE,
-      mixer_mode: SN76477Param.MIXER_MODE,
-      envelope_mode: SN76477Param.ENVELOPE_MODE,
-      attack_time: SN76477Param.ATTACK_TIME,
-      decay_time: SN76477Param.DECAY_TIME,
-      one_shot_time: SN76477Param.ONE_SHOT_TIME,
-      noise_filter_freq: SN76477Param.NOISE_FILTER_FREQ,
-      amplitude: SN76477Param.AMPLITUDE,
-      vco_mode: SN76477Param.VCO_MODE,
-      enable: SN76477Param.ENABLE,
-    };
+  protected writeVolume(volume: number): void {
+    if (!this.workletNode || this._disposed) return;
 
-    const paramId = paramMap[param];
-    if (paramId !== undefined) {
-      this.setParameterById(paramId, value);
-    }
+    this.workletNode.port.postMessage({
+      type: 'setVolume',
+      value: volume,
+    });
   }
 
-  // ========================================================================
-  // Musician-friendly convenience setters
-  // ========================================================================
+  protected writePanning(pan: number): void {
+    if (!this.workletNode || this._disposed) return;
+
+    this.workletNode.port.postMessage({
+      type: 'setPanning',
+      pan,
+    });
+  }
+
+  // ===========================================================================
+  // SN76477-Specific Methods (Musician-friendly)
+  // ===========================================================================
 
   /** Set VCO frequency in Hz */
   setVCOFreq(hz: number): void {
@@ -328,10 +206,10 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     this.sendMessage('setEnable', enabled ? 0 : 1);
   }
 
-  // ========================================================================
+  // ===========================================================================
   // Raw analog parameter setters (for hardware-accurate control)
   // Values in Ohms (resistors) and Farads (capacitors)
-  // ========================================================================
+  // ===========================================================================
 
   /** Set VCO resistor value in Ohms */
   setVCORes(ohms: number): void {
@@ -353,9 +231,9 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     this.sendMessage('setPitchVoltage', volts);
   }
 
-  // ========================================================================
+  // ===========================================================================
   // Preset sounds (classic arcade effects)
-  // ========================================================================
+  // ===========================================================================
 
   /** Load a preset: 0=UFO, 1=Laser, 2=Explosion, 3=Siren, 4=Engine */
   loadPreset(program: number): void {
@@ -367,9 +245,9 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'programChange', program });
   }
 
-  // ========================================================================
+  // ===========================================================================
   // MIDI CC and pitch bend
-  // ========================================================================
+  // ===========================================================================
 
   controlChange(cc: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
@@ -381,9 +259,9 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'pitchBend', value });
   }
 
-  // ========================================================================
+  // ===========================================================================
   // Static helper: convert common units
-  // ========================================================================
+  // ===========================================================================
 
   /** Convert kOhms to Ohms */
   static RES_K(kohms: number): number {
@@ -410,25 +288,49 @@ export class SN76477Synth extends Tone.ToneAudioNode {
     return pf * 1e-12;
   }
 
-  // ========================================================================
-  // Internal helpers
-  // ========================================================================
+  // ===========================================================================
+  // Parameter Interface
+  // ===========================================================================
+
+  private setParameterById(paramId: number, value: number): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({
+      type: 'setParameter',
+      paramId,
+      value,
+    });
+  }
+
+  setParam(param: string, value: number): void {
+    if (!this._isReady) {
+      this._pendingCalls.push({ method: 'setParam', args: [param, value] });
+      return;
+    }
+    const paramMap: Record<string, number> = {
+      vco_freq: SN76477Param.VCO_FREQ,
+      slf_freq: SN76477Param.SLF_FREQ,
+      noise_freq: SN76477Param.NOISE_FREQ,
+      vco_duty_cycle: SN76477Param.VCO_DUTY_CYCLE,
+      mixer_mode: SN76477Param.MIXER_MODE,
+      envelope_mode: SN76477Param.ENVELOPE_MODE,
+      attack_time: SN76477Param.ATTACK_TIME,
+      decay_time: SN76477Param.DECAY_TIME,
+      one_shot_time: SN76477Param.ONE_SHOT_TIME,
+      noise_filter_freq: SN76477Param.NOISE_FILTER_FREQ,
+      amplitude: SN76477Param.AMPLITUDE,
+      vco_mode: SN76477Param.VCO_MODE,
+      enable: SN76477Param.ENABLE,
+    };
+
+    const paramId = paramMap[param];
+    if (paramId !== undefined) {
+      this.setParameterById(paramId, value);
+    }
+  }
 
   private sendMessage(type: string, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type, value });
-  }
-
-  dispose(): this {
-    this._disposed = true;
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
-    this.output.dispose();
-    super.dispose();
-    return this;
   }
 }
 
