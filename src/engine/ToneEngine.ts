@@ -7,12 +7,15 @@ import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { JC303Synth } from './open303';
 import { MAMESynth } from './MAMESynth';
+import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
-import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
+import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
+import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
+import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
@@ -22,6 +25,7 @@ import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
+import { reportSynthError } from '../stores/useSynthErrorStore';
 
 interface VoiceState {
   instrument: any;
@@ -691,10 +695,14 @@ export class ToneEngine {
    * Create or get instrument (per-channel to avoid automation conflicts)
    */
   public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.PolySynth | Tone.Synth | any {
-    // CRITICAL FIX: Samplers and Players don't need per-channel instances
+    // CRITICAL FIX: Many synth types don't need per-channel instances
     // They're already polyphonic and don't have per-channel automation
-    // Creating new instances causes them to reload samples, causing silence
-    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player';
+    // Creating new instances causes them to reload samples/ROMs/WASM, causing silence and performance issues
+    const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
+    const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
+    const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
+    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd'].includes(config.synthType || '');
+    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || isMAME || isFurnace || isBuzzmachine || isWASMSynth;
     const key = isSharedType
       ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
       : this.getInstrumentKey(instrumentId, channelIndex);
@@ -1248,6 +1256,30 @@ export class ToneEngine {
       case 'CZ101':
       case 'CEM3394':
       case 'SCSP':
+      // MAME Per-Chip WASM Synths
+      case 'MAMEAICA':
+      case 'MAMEASC':
+      case 'MAMEAstrocade':
+      case 'MAMEC352':
+      case 'MAMEES5503':
+      case 'MAMEICS2115':
+      case 'MAMEK054539':
+      case 'MAMEMEA8000':
+      case 'MAMEMSM5232':
+      case 'MAMERF5C400':
+      case 'MAMESN76477':
+      case 'MAMESNKWave':
+      case 'MAMESP0250':
+      case 'MAMETIA':
+      case 'MAMETMS36XX':
+      case 'MAMETMS5220':
+      case 'MAMETR707':
+      case 'MAMEUPD931':
+      case 'MAMEUPD933':
+      case 'MAMEVotrax':
+      case 'MAMEYMF271':
+      case 'MAMEYMOPQ':
+      case 'MAMEVASynth':
       // Buzzmachine Generators (WASM-emulated Buzz synths)
       case 'BuzzDTMF':
       case 'BuzzFreqBomb':
@@ -1269,13 +1301,22 @@ export class ToneEngine {
         break;
       }
 
-      default:
-        // Default to basic synth
-        instrument = new Tone.PolySynth({
-          voice: Tone.Synth,
-          maxPolyphony: 16, // Increased for high BPM playback
-          volume: config.volume || -12,
-        });
+      default: {
+        reportSynthError(
+          config.synthType || 'Unknown',
+          `Unsupported synth type "${config.synthType}". This instrument cannot produce sound.`,
+          {
+            synthName: config.name,
+            errorType: 'init',
+            debugData: { synthType: config.synthType, instrumentId },
+          }
+        );
+        return null;
+      }
+    }
+
+    if (!instrument) {
+      return null;
     }
 
     // Apply filter if specified
@@ -2775,7 +2816,12 @@ export class ToneEngine {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
         // Check for JC303Synth or BuzzmachineGenerator (Buzz3o3)
-        if (instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator') {
+        // Use instanceof with fallback to constructor.name (handles webpack chunking issues)
+        const isJC303 = instrument instanceof JC303Synth ||
+                        instrument.constructor?.name === 'Open303Synth' ||
+                        instrument.name === 'Open303Synth';
+        const isBuzz3o3 = instrument.constructor?.name === 'BuzzmachineGenerator';
+        if (isJC303 || isBuzz3o3) {
           synths.push(instrument);
         }
       }
@@ -2859,6 +2905,25 @@ export class ToneEngine {
       return (instrument as any).getHandle();
     }
     return 0;
+  }
+
+  /**
+   * Get a MAME chip synth instance (extends MAMEBaseSynth)
+   * Used for accessing oscilloscope data and macro controls
+   */
+  public getMAMEChipSynth(instrumentId: number): MAMEBaseSynth | null {
+    const key = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(key);
+    if (instrument instanceof MAMEBaseSynth) {
+      return instrument;
+    }
+    // Also check channel-specific keys
+    for (const [k, inst] of this.instruments) {
+      if (k.startsWith(`${instrumentId}-`) && inst instanceof MAMEBaseSynth) {
+        return inst;
+      }
+    }
+    return null;
   }
 
   /**
@@ -3042,26 +3107,26 @@ export class ToneEngine {
             v2.setParameter(27, config.routing.balance);
           }
 
-          // Amp Envelope (indices 32-37)
+          // Amp Envelope (indices 32-37: Attack, Decay, Sustain, SusTime, Release, Amplify)
           if (config.envelope) {
             v2.setParameter(32, config.envelope.attack);
             v2.setParameter(33, config.envelope.decay);
             v2.setParameter(34, config.envelope.sustain);
-            v2.setParameter(35, config.envelope.release);
+            v2.setParameter(36, config.envelope.release);
           }
 
-          // Envelope 2 (indices 38-43)
+          // Envelope 2 (indices 38-43: Attack, Decay, Sustain, SusTime, Release, Amplify)
           if (config.envelope2) {
             v2.setParameter(38, config.envelope2.attack);
             v2.setParameter(39, config.envelope2.decay);
             v2.setParameter(40, config.envelope2.sustain);
-            v2.setParameter(41, config.envelope2.release);
+            v2.setParameter(42, config.envelope2.release);
           }
 
-          // LFO 1 (indices 44-50)
+          // LFO 1 (indices 44-50: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
           if (config.lfo1) {
-            v2.setParameter(44, config.lfo1.rate);
-            v2.setParameter(45, config.lfo1.depth);
+            v2.setParameter(47, config.lfo1.rate);
+            v2.setParameter(50, config.lfo1.depth);
           }
         }
       }
@@ -3094,6 +3159,251 @@ export class ToneEngine {
         }
       }
     });
+  }
+
+  /**
+   * Apply a tracker effect to a Furnace instrument.
+   * Routes effect through FurnaceEffectRouter → FurnaceDispatchEngine.
+   * @param instrumentId The instrument ID
+   * @param effect Effect code (0x00-0xFF)
+   * @param param Effect parameter (0x00-0xFF)
+   * @param channel Optional channel (defaults to 0)
+   * @returns true if effect was applied, false if instrument is not Furnace-based
+   */
+  public applyFurnaceEffect(instrumentId: number, effect: number, param: number, channel: number = 0): boolean {
+    // Get the synth type for this instrument
+    const synthType = this.instrumentSynthTypes.get(String(instrumentId));
+    if (!synthType || !synthType.startsWith('Furnace')) {
+      return false;
+    }
+
+    // Find the synth instance(s) for this instrument
+    for (const [key, instrument] of this.instruments) {
+      const [idPart] = key.split('-');
+      if (idPart !== String(instrumentId)) continue;
+
+      // Handle FurnaceDispatchSynth (has full effect routing via FurnaceEffectRouter)
+      if (instrument instanceof FurnaceDispatchSynth) {
+        instrument.applyEffect(effect, param, channel);
+        return true;
+      }
+
+      // Handle FurnaceSynth (register-based, needs direct register writes)
+      // For now, handle common effects that FurnaceSynth can process
+      if (instrument instanceof FurnaceSynth) {
+        this.applyFurnaceSynthEffect(instrument, effect, param);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Apply an extended effect (Exy format) to a Furnace instrument.
+   * @param instrumentId The instrument ID
+   * @param x Effect subtype (0x0-0xF)
+   * @param y Effect value (0x0-0xF)
+   * @param channel Optional channel (defaults to 0)
+   * @returns true if effect was applied
+   */
+  public applyFurnaceExtendedEffect(instrumentId: number, x: number, y: number, channel: number = 0): boolean {
+    const synthType = this.instrumentSynthTypes.get(String(instrumentId));
+    if (!synthType || !synthType.startsWith('Furnace')) {
+      return false;
+    }
+
+    for (const [key, instrument] of this.instruments) {
+      const [idPart] = key.split('-');
+      if (idPart !== String(instrumentId)) continue;
+
+      if (instrument instanceof FurnaceDispatchSynth) {
+        instrument.applyExtendedEffect(x, y, channel);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Apply effect to FurnaceSynth (register-based).
+   * Translates effects to register writes based on chip type.
+   * Effect codes match FurnaceEffectRouter mappings.
+   */
+  private applyFurnaceSynthEffect(synth: FurnaceSynth, effect: number, param: number): void {
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
+    const chipType = synth.getChipType();
+
+    // Standard effects (all platforms)
+    switch (effect) {
+      case 0x08: // Panning
+        synth.writePanRegister(param);
+        return;
+    }
+
+    // Platform-specific effect routing
+    if (this.isFMChip(chipType)) {
+      this.applyFMEffect(synth, effect, param, x, y);
+    } else if (this.isPSGChip(chipType)) {
+      this.applyPSGEffect(synth, effect, param, chipType);
+    } else if (this.isWavetableChip(chipType)) {
+      this.applyWavetableEffect(synth, effect, param, chipType);
+    } else if (this.isC64Chip(chipType)) {
+      this.applyC64Effect(synth, effect, param);
+    }
+  }
+
+  /** Check if chip is FM-based */
+  private isFMChip(chipType: number): boolean {
+    return ([
+      FurnaceChipType.OPN2, FurnaceChipType.OPM, FurnaceChipType.OPL3,
+      FurnaceChipType.OPLL, FurnaceChipType.OPNA, FurnaceChipType.OPNB,
+      FurnaceChipType.OPZ, FurnaceChipType.Y8950, FurnaceChipType.OPL4,
+      FurnaceChipType.OPN, FurnaceChipType.OPNB_B, FurnaceChipType.ESFM
+    ] as number[]).includes(chipType);
+  }
+
+  /** Check if chip is PSG-based (square wave with duty/envelope) */
+  private isPSGChip(chipType: number): boolean {
+    return ([
+      FurnaceChipType.NES, FurnaceChipType.GB, FurnaceChipType.PSG,
+      FurnaceChipType.AY, FurnaceChipType.AY8930, FurnaceChipType.SAA,
+      FurnaceChipType.VIC, FurnaceChipType.TED
+    ] as number[]).includes(chipType);
+  }
+
+  /** Check if chip is wavetable-based */
+  private isWavetableChip(chipType: number): boolean {
+    return ([
+      FurnaceChipType.PCE, FurnaceChipType.SCC, FurnaceChipType.SWAN,
+      FurnaceChipType.N163, FurnaceChipType.NAMCO, FurnaceChipType.FDS,
+      FurnaceChipType.BUBBLE, FurnaceChipType.X1_010, FurnaceChipType.SM8521
+    ] as number[]).includes(chipType);
+  }
+
+  /** Check if chip is C64/SID-based */
+  private isC64Chip(chipType: number): boolean {
+    return ([
+      FurnaceChipType.SID, FurnaceChipType.SID_6581, FurnaceChipType.SID_8580
+    ] as number[]).includes(chipType);
+  }
+
+  /** Apply FM-specific effects */
+  private applyFMEffect(synth: FurnaceSynth, effect: number, _param: number, x: number, y: number): void {
+    switch (effect) {
+      // 0x10 = LFO - not directly supported by FurnaceSynth register writes
+      case 0x11: // 11xy - Set operator TL (x=op, y=value*8)
+        synth.writeOperatorTL(x, y * 8);
+        break;
+      case 0x12: // 12xy - Set operator AR (x=op, y=value*2)
+        synth.writeOperatorAR(x, y * 2);
+        break;
+      case 0x13: // 13xy - Set operator DR (x=op, y=value*2)
+        synth.writeOperatorDR(x, y * 2);
+        break;
+      case 0x14: // 14xy - Set operator MULT (x=op, y=value)
+        synth.writeOperatorMult(x, y);
+        break;
+      case 0x15: // 15xy - Set operator RR (x=op, y=value)
+        synth.writeOperatorRR(x, y);
+        break;
+      case 0x16: // 16xy - Set operator SL (x=op, y=value)
+        synth.writeOperatorSL(x, y);
+        break;
+      // 0x17 = DT, 0x18 = ALG/FB, 0x19 = FB - not directly supported
+    }
+  }
+
+  /** Apply PSG-specific effects (NES, GB, AY, etc.) */
+  private applyPSGEffect(synth: FurnaceSynth, effect: number, param: number, chipType: number): void {
+    switch (chipType) {
+      case FurnaceChipType.GB:
+        // GB: 0x10 = sweep, 0x11 = wave select, 0x12 = length/duty
+        if (effect === 0x11) {
+          synth.writeWavetableSelect(param);
+        } else if (effect === 0x12) {
+          synth.writeDutyRegister(param & 0x03); // Lower 2 bits = duty
+        }
+        break;
+
+      case FurnaceChipType.NES:
+        // NES: 0x11 = length counter, 0x12 = duty/envelope
+        if (effect === 0x12) {
+          synth.writeDutyRegister((param >> 6) & 0x03); // Upper 2 bits = duty
+        }
+        break;
+
+      case FurnaceChipType.AY:
+      case FurnaceChipType.AY8930:
+        // AY: 0x10 = envelope shape, 0x11-0x12 = envelope period
+        // These are envelope effects, not duty - handled differently
+        break;
+
+      case FurnaceChipType.PSG:
+        // SN76489: No programmable duty
+        break;
+    }
+  }
+
+  /** Apply wavetable-specific effects (PCE, SCC, N163, etc.) */
+  private applyWavetableEffect(synth: FurnaceSynth, effect: number, param: number, chipType: number): void {
+    switch (chipType) {
+      case FurnaceChipType.PCE:
+        // PCE: 0x10 = LFO mode, 0x11 = LFO speed, 0x12 = wave select
+        if (effect === 0x12) {
+          synth.writeWavetableSelect(param);
+        }
+        break;
+
+      case FurnaceChipType.SCC:
+        // SCC: 0x10 = wave select
+        if (effect === 0x10) {
+          synth.writeWavetableSelect(param);
+        }
+        break;
+
+      case FurnaceChipType.N163:
+        // N163: 0x10 = wave select, 0x11 = wave position, 0x12 = wave length
+        if (effect === 0x10) {
+          synth.writeWavetableSelect(param);
+        }
+        break;
+
+      case FurnaceChipType.NAMCO:
+        // Namco WSG: 0x10 = wave select
+        if (effect === 0x10) {
+          synth.writeWavetableSelect(param);
+        }
+        break;
+
+      case FurnaceChipType.FDS:
+        // FDS: 0x10-0x14 = modulation effects
+        // Wave is set via instrument, not effects
+        break;
+
+      case FurnaceChipType.SWAN:
+      case FurnaceChipType.SM8521:
+      case FurnaceChipType.BUBBLE:
+      case FurnaceChipType.X1_010:
+        // Generic wavetable: 0x10 or 0x11 for wave select
+        if (effect === 0x10 || effect === 0x11) {
+          synth.writeWavetableSelect(param);
+        }
+        break;
+    }
+  }
+
+  /** Apply C64/SID-specific effects */
+  private applyC64Effect(synth: FurnaceSynth, effect: number, param: number): void {
+    // C64: 0x10 = duty reset, 0x11 = cutoff, 0x12 = fine duty
+    // Note: FurnaceSynth may not fully support C64 register writes
+    // These would need specific register write methods in FurnaceSynth
+    if (effect === 0x10 || effect === 0x12) {
+      // Duty effects - would need C64-specific implementation
+      synth.writeDutyRegister(param);
+    }
   }
 
   /**
