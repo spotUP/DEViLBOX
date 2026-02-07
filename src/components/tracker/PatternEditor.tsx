@@ -175,10 +175,10 @@ const CursorCaret: React.FC<{
     case 'effParam2':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
       break;
-    case 'accent':
+    case 'flag1':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP;
       break;
-    case 'slide':
+    case 'flag2':
       caretX += NOTE_WIDTH + CELL_GAP + INSTRUMENT_WIDTH + CELL_GAP + VOLUME_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + EFFECT_WIDTH + CELL_GAP + ACCENT_WIDTH + CELL_GAP;
       break;
     case 'probability':
@@ -208,7 +208,7 @@ const CursorCaret: React.FC<{
     // Effect2 param starts at position 1, has 2 digits (positions 1-2)
     caretX += CHAR_WIDTH + (cursor.digitIndex * CHAR_WIDTH);
     caretWidth = CHAR_WIDTH;
-  } else if (cursor.columnType === 'accent' || cursor.columnType === 'slide') {
+  } else if (cursor.columnType === 'flag1' || cursor.columnType === 'flag2') {
     caretWidth = ACCENT_WIDTH;
   } else if (cursor.columnType === 'probability') {
     caretX += cursor.digitIndex * CHAR_WIDTH;

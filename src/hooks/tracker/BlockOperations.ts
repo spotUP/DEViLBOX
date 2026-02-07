@@ -296,8 +296,8 @@ export const useBlockOperations = () => {
           eff: srcCell.eff,
           effTyp2: srcCell.effTyp2,
           eff2: srcCell.eff2,
-          accent: srcCell.accent,
-          slide: srcCell.slide,
+          flag1: srcCell.flag1,
+          flag2: srcCell.flag2,
         });
       }
     }
@@ -344,8 +344,8 @@ export const useBlockOperations = () => {
             eff: srcCell.eff,
             effTyp2: srcCell.effTyp2,
           eff2: srcCell.eff2,
-            accent: srcCell.accent,
-            slide: srcCell.slide,
+            flag1: srcCell.flag1,
+            flag2: srcCell.flag2,
           });
         } else {
           // Empty row
@@ -357,8 +357,8 @@ export const useBlockOperations = () => {
             eff: 0,
             effTyp2: 0,
             eff2: 0,
-            accent: false,
-            slide: false,
+            flag1: 0,
+            flag2: 0,
           });
         }
       }
@@ -406,8 +406,8 @@ export const useBlockOperations = () => {
             eff: srcCell.eff,
             effTyp2: srcCell.effTyp2,
           eff2: srcCell.eff2,
-            accent: srcCell.accent,
-            slide: srcCell.slide,
+            flag1: srcCell.flag1,
+            flag2: srcCell.flag2,
           });
         } else {
           // Clear remaining rows
@@ -419,8 +419,8 @@ export const useBlockOperations = () => {
             eff: 0,
             effTyp2: 0,
             eff2: 0,
-            accent: false,
-            slide: false,
+            flag1: 0,
+            flag2: 0,
           });
         }
       }
@@ -497,8 +497,8 @@ export const useBlockOperations = () => {
           eff: srcCell.eff,
           effTyp2: srcCell.effTyp2,
           eff2: srcCell.eff2,
-          accent: srcCell.accent,
-          slide: srcCell.slide,
+          flag1: srcCell.flag1,
+          flag2: srcCell.flag2,
         });
       }
       writeRow++;

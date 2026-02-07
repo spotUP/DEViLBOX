@@ -8,10 +8,8 @@ import { NoteCell } from './NoteCell';
 import { InstrumentCell } from './InstrumentCell';
 import { VolumeCell } from './VolumeCell';
 import { EffectCell } from './EffectCell';
-import { AccentCell } from './AccentCell';
-import { SlideCell } from './SlideCell';
+import { FlagCell } from './FlagCell';
 import { ProbabilityCell } from './ProbabilityCell';
-import { useTrackerStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import type { TrackerCell, CursorPosition } from '@typedefs';
 
@@ -31,7 +29,6 @@ interface TrackerRowProps {
 
 export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
   ({ rowIndex, cells, channelColors, cursorColumnType, cursorChannelIndex, isCursorRow: _isCursorRow, isCurrentPlaybackRow: _isCurrentPlaybackRow, channelWidth, channelWidths, collapsedChannels, baseChannelIndex = 0 }) => {
-    const setCell = useTrackerStore((state) => state.setCell);
     const useHexNumbers = useUIStore((state) => state.useHexNumbers);
     const rowHighlightInterval = useUIStore((state) => state.rowHighlightInterval);
     const showBeatLabels = useUIStore((state) => state.showBeatLabels);
@@ -146,18 +143,16 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
                     isEmpty={cell.effTyp2 === 0 && cell.eff2 === 0}
                   />
 
-                  {/* Accent */}
-                  <AccentCell
-                    value={cell.accent}
-                    isActive={isChannelActive && cursorColumnType === 'accent'}
-                    onToggle={() => setCell(actualChannelIndex, rowIndex, { accent: !cell.accent })}
+                  {/* Flag 1 (Accent or Slide) */}
+                  <FlagCell
+                    value={cell.flag1}
+                    isActive={isChannelActive && cursorColumnType === 'flag1'}
                   />
 
-                  {/* Slide */}
-                  <SlideCell
-                    value={cell.slide}
-                    isActive={isChannelActive && cursorColumnType === 'slide'}
-                    onToggle={() => setCell(actualChannelIndex, rowIndex, { slide: !cell.slide })}
+                  {/* Flag 2 (Accent or Slide) */}
+                  <FlagCell
+                    value={cell.flag2}
+                    isActive={isChannelActive && cursorColumnType === 'flag2'}
                   />
 
                   {/* Probability */}

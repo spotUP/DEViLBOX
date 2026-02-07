@@ -325,11 +325,12 @@ export const useTrackerInput = () => {
         insertRow(targetChannel, targetRow);
       }
 
-      // FT2/ProTracker: Only set the note, don't auto-stamp instrument.
-      // Instrument column is edited independently — the classic ProTracker trick
-      // of entering instrument-only rows to change voice mid-pattern relies on this.
+      // FT2: Auto-stamp instrument when entering notes (modern tracker behavior)
+      // If currentInstrumentId is set, stamp it into the pattern
+      // This allows TB-303 and other instruments to work without manual assignment
       setCell(targetChannel, targetRow, {
         note: xmNote,
+        instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
       // Chord entry mode: advance to next channel instead of next row
@@ -825,18 +826,6 @@ export const useTrackerInput = () => {
       if (key === ' ') {
         e.preventDefault();
 
-        // Toggle accent/slide when on those columns (works in both edit and record mode)
-        if (cursor.columnType === 'accent') {
-          const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
-          setCell(cursor.channelIndex, cursor.rowIndex, { accent: !currentCell.accent });
-          return;
-        }
-        if (cursor.columnType === 'slide') {
-          const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
-          setCell(cursor.channelIndex, cursor.rowIndex, { slide: !currentCell.slide });
-          return;
-        }
-
         // FT2 behavior: If playing, stop. If not playing, toggle edit mode.
         if (isPlaying) {
           stop();
@@ -845,22 +834,6 @@ export const useTrackerInput = () => {
           toggleRecordMode();
         }
         return;
-      }
-
-      // Enter: Toggle accent/slide when on those columns
-      if (key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-        if (cursor.columnType === 'accent') {
-          e.preventDefault();
-          const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
-          setCell(cursor.channelIndex, cursor.rowIndex, { accent: !currentCell.accent });
-          return;
-        }
-        if (cursor.columnType === 'slide') {
-          e.preventDefault();
-          const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
-          setCell(cursor.channelIndex, cursor.rowIndex, { slide: !currentCell.slide });
-          return;
-        }
       }
 
       // Ctrl+Enter or Right Enter: Play song
@@ -1129,6 +1102,30 @@ export const useTrackerInput = () => {
           e.preventDefault();
           setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: effKey });
           // FT2: Stay on same column, advance row by editStep with wrapping
+          if (editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          }
+          return;
+        }
+      }
+
+      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2) ----------
+      if (recordMode && (cursor.columnType === 'flag1' || cursor.columnType === 'flag2') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        const flagField = cursor.columnType; // 'flag1' or 'flag2'
+
+        if (keyLower === 'a') {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 1 }); // 1 = accent
+          // Advance row by editStep with wrapping
+          if (editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          }
+          return;
+        }
+        if (keyLower === 's') {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 2 }); // 2 = slide
+          // Advance row by editStep with wrapping
           if (editStep > 0 && !isPlaying) {
             moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           }
