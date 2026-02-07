@@ -6,6 +6,98 @@
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+  // === DEFAULT JC303/DB303 PRESET ===
+  // Based on db303-default-preset.xml
+  // This is the recommended starting point for JC303/DB303
+  {
+    type: 'synth' as const,
+    name: 'JC303 Default',
+    synthType: 'TB303',
+    tb303: {
+      engineType: 'jc303',
+      oscillator: {
+        type: 'sawtooth',
+        pulseWidth: 0,      // 0% (sawtooth)
+        subOscGain: 0,      // Off
+        subOscBlend: 100,   // Full blend when enabled
+      },
+      filter: {
+        cutoff: 1000,       // ~1000 Hz (0.5 normalized)
+        resonance: 50,      // 50% (0.5 normalized)
+      },
+      filterEnvelope: {
+        envMod: 50,         // 50% (0.5 normalized)
+        decay: 300,         // ~300ms (0.5 normalized on log scale)
+      },
+      accent: {
+        amount: 50,         // 50% (0.5 normalized)
+      },
+      slide: {
+        time: 51,           // ~51ms (0.17 normalized)
+        mode: 'exponential',
+      },
+      // Devil Fish parameters from default preset
+      devilFish: {
+        enabled: true,
+        normalDecay: 16.4,              // 0.164 * 100
+        accentDecay: 0.6,                // 0.006 * 100
+        softAttack: 0,                   // 0 * 100
+        accentSoftAttack: 10,            // 0.1 * 100
+        passbandCompensation: 9,         // 0.09 * 100
+        resTracking: 74.3,               // 0.743 * 100
+        filterSelect: 255,               // 255 (full)
+        diodeCharacter: 1,               // 1.0 = authentic
+        duffingAmount: 3,                // 0.03 * 100
+        lpBpMix: 0,                      // 0% bandpass
+        stageNLAmount: 0,                // 0% nonlinearity
+        ensembleAmount: 0,               // 0% ensemble
+        oversamplingOrder: 2,            // 4x oversampling
+        filterTracking: 0,               // 0% tracking
+        filterFM: 0,                     // 0% filter FM
+        // Required defaults for other Devil Fish parameters
+        accentSweepEnabled: true,
+        sweepSpeed: 'normal',
+        highResonance: false,
+        muffler: 'soft',
+        vegDecay: 1230,
+        vegSustain: 0,
+      },
+      // LFO (all off by default)
+      lfo: {
+        waveform: 0,       // Sine
+        rate: 0,           // Off
+        contour: 0,        // No contour
+        pitchDepth: 0,     // No pitch mod
+        pwmDepth: 0,       // No PWM mod
+        filterDepth: 0,    // No filter mod
+      },
+      // Effects (all off by default)
+      chorus: {
+        enabled: false,
+        mode: 0,           // Mode 1 (normalized 0)
+        mix: 50,           // 50% (0.5 normalized)
+      },
+      phaser: {
+        enabled: false,
+        rate: 50,          // 50% (0.5 normalized)
+        depth: 70,         // 70% (0.7 normalized as "width")
+        feedback: 0,       // 0% (0 normalized)
+        mix: 0,            // 0% (0 normalized)
+      },
+      delay: {
+        enabled: false,
+        time: 300,         // 3 = 300ms (assuming 100ms per unit)
+        feedback: 30,      // 30% (0.3 normalized)
+        tone: 50,          // 50% (0.5 normalized)
+        mix: 0,            // 0% (0 normalized)
+        stereo: 50,        // 50% (0.5 normalized as "spread")
+      },
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
+  },
+
   // === DITTYTOY REFERENCE PRESET ===
   // Source: https://dittytoy.net/ditty/0029103012
   // Settings: cutoff=0.26, res=0.67, envmod=0.13, decay=0.78, overdrive=0.73

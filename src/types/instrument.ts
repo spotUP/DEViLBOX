@@ -139,7 +139,6 @@ export type SynthType =
   | 'MAMEMEA8000'      // Philips MEA8000 (LPC speech)
   | 'MAMEMSM5232'      // OKI MSM5232 (8-voice organ/synth)
   | 'MAMERF5C400'      // Ricoh RF5C400 (32-voice PCM, needs ROM)
-  | 'MAMERolandSA'     // Roland SA (silicon-accurate piano, needs ROM)
   | 'MAMESN76477'      // TI SN76477 (complex sound generator)
   | 'MAMESNKWave'      // SNK custom wavetable
   | 'MAMESP0250'       // GI SP0250 (speech synthesis)
@@ -245,10 +244,24 @@ export interface DevilFishConfig {
   vegDecay: number;       // 16-3000ms - VEG (Volume Envelope Generator) decay
   vegSustain: number;     // 0-100% - VEG sustain level (100% = infinite notes)
   softAttack: number;     // 0.3-3000ms (exponential) - attack time for non-accented notes
+  accentSoftAttack?: number; // 0-100% - soft attack amount for accented notes
 
   // Filter controls
   filterTracking: number; // 0-200% - filter frequency tracks note pitch
   filterFM: number;       // 0-100% - VCA output feeds back to filter frequency (audio-rate FM)
+  passbandCompensation?: number; // 0-100% - filter passband level compensation
+  resTracking?: number;   // 0-100% - resonance frequency tracking across keyboard
+  duffingAmount?: number; // 0-100% - non-linear filter effect (Duffing oscillator)
+  lpBpMix?: number;       // 0-100% - lowpass/bandpass filter mix (0=LP, 100=BP)
+  stageNLAmount?: number; // 0-100% - per-stage non-linearity amount
+  filterSelect?: number;  // 0-255 - filter mode/topology selection
+  diodeCharacter?: number; // 0-100% - diode ladder filter character
+
+  // Effects
+  ensembleAmount?: number; // 0-100% - built-in ensemble/chorus effect
+
+  // Audio quality
+  oversamplingOrder?: 0 | 1 | 2 | 3 | 4; // 0=none, 1=2x, 2=4x, 3=8x, 4=16x oversampling
 
   // Accent controls
   sweepSpeed: 'fast' | 'normal' | 'slow'; // Accent sweep circuit behavior
@@ -262,7 +275,7 @@ export interface DevilFishConfig {
 }
 
 export interface TB303Config {
-  engineType?: 'jc303';
+  engineType?: 'jc303' | 'db303'; // jc303 = Open303 engine, db303 = db303 variant with additional tweaks
 
   // Tuning
   tuning?: number; // Master tuning in Hz (default: 440)
@@ -272,6 +285,9 @@ export interface TB303Config {
 
   oscillator: {
     type: 'sawtooth' | 'square';
+    pulseWidth?: number;      // 0-100 (pulse width modulation control)
+    subOscGain?: number;      // 0-100 (sub-oscillator level)
+    subOscBlend?: number;     // 0-100 (sub-oscillator mix with main oscillator)
   };
   filter: {
     cutoff: number; // Stock: 314-2394Hz (exponential) | Devil Fish: 157-4788Hz (2× range)
@@ -300,6 +316,38 @@ export interface TB303Config {
   };
   // Devil Fish modifications (optional - for backward compatibility)
   devilFish?: DevilFishConfig;
+
+  // LFO (Low Frequency Oscillator) - for modulation
+  lfo?: {
+    waveform: 0 | 1 | 2;      // 0=sine, 1=triangle, 2=square
+    rate: number;              // 0-100 (LFO speed/frequency)
+    contour: number;           // 0-100 (envelope contour amount)
+    pitchDepth: number;        // 0-100 (pitch modulation depth)
+    pwmDepth: number;          // 0-100 (pulse width modulation depth)
+    filterDepth: number;       // 0-100 (filter cutoff modulation depth)
+  };
+
+  // Built-in effects
+  chorus?: {
+    enabled: boolean;         // Enable/disable chorus effect
+    mode: 0 | 1 | 2;          // 0=subtle, 1=medium, 2=wide (chorus mode/type)
+    mix: number;              // 0-100 (dry/wet mix)
+  };
+  phaser?: {
+    enabled: boolean;         // Enable/disable phaser effect
+    rate: number;             // 0-100 (LFO speed)
+    depth: number;            // 0-100 (sweep depth/width)
+    feedback: number;         // 0-100 (resonance/feedback amount)
+    mix: number;              // 0-100 (dry/wet mix)
+  };
+  delay?: {
+    enabled: boolean;         // Enable/disable delay effect
+    time: number;             // 0-2000 (delay time in milliseconds)
+    feedback: number;         // 0-100 (delay feedback/repeats)
+    tone: number;             // 0-100 (filter cutoff for delay line)
+    mix: number;              // 0-100 (dry/wet mix)
+    stereo: number;           // 0-100 (stereo spread/width)
+  };
 }
 
 /**
@@ -2082,7 +2130,7 @@ export type AudioEffectType =
   | 'SpaceyDelayer'    // WASM SpaceyDelayer multitap tape delay
   | 'RETapeEcho';      // WASM RE-150/201 tape echo
 
-export type EffectCategory = 'tonejs' | 'neural';
+export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine';
 
 export interface EffectConfig {
   id: string;
@@ -2740,24 +2788,81 @@ export const DEFAULT_TB303: TB303Config = {
   engineType: 'jc303',
   oscillator: {
     type: 'sawtooth',
+    pulseWidth: 0,          // 0% (pure sawtooth, matches db303-default-preset.xml)
+    subOscGain: 0,          // Sub-oscillator off by default (TB-303 didn't have one)
+    subOscBlend: 100,       // Full blend when enabled (matches db303-default-preset.xml)
   },
   filter: {
-    cutoff: 1000,
-    resonance: 50,
+    cutoff: 1000,           // ~1000 Hz (matches db303-default-preset.xml: 0.5 normalized)
+    resonance: 50,          // 50% (matches db303-default-preset.xml: 0.5 normalized)
   },
   filterEnvelope: {
-    envMod: 25,
-    decay: 1000,
+    envMod: 50,             // 50% (matches db303-default-preset.xml: 0.5 normalized)
+    decay: 300,             // ~300ms (matches db303-default-preset.xml: 0.5 normalized on log scale)
   },
   accent: {
-    amount: 0,
+    amount: 50,             // 50% (matches db303-default-preset.xml: 0.5 normalized)
   },
   slide: {
-    time: 60,
+    time: 51,               // ~51ms (matches db303-default-preset.xml: 0.17 normalized)
     mode: 'exponential',
   },
   overdrive: {
     amount: 0,
+  },
+  // Devil Fish parameters from db303-default-preset.xml
+  devilFish: {
+    enabled: true,
+    normalDecay: 16.4,           // 0.164 * 100
+    accentDecay: 0.6,            // 0.006 * 100
+    softAttack: 0,               // 0 * 100
+    accentSoftAttack: 10,        // 0.1 * 100
+    passbandCompensation: 9,     // 0.09 * 100
+    resTracking: 74.3,           // 0.743 * 100
+    filterSelect: 255,           // 255 (full)
+    diodeCharacter: 1,           // 1.0 = authentic
+    duffingAmount: 3,            // 0.03 * 100
+    lpBpMix: 0,                  // 0% bandpass
+    stageNLAmount: 0,            // 0% nonlinearity
+    ensembleAmount: 0,           // 0% ensemble
+    oversamplingOrder: 2,        // 4x oversampling
+    filterTracking: 0,           // 0% tracking
+    filterFM: 0,                 // 0% filter FM
+    // Required defaults for other Devil Fish parameters
+    accentSweepEnabled: true,
+    sweepSpeed: 'normal',
+    highResonance: false,
+    muffler: 'soft',
+    vegDecay: 1230,
+    vegSustain: 0,
+  },
+  lfo: {
+    waveform: 0,        // Sine wave (smoothest modulation)
+    rate: 0,            // LFO off by default
+    contour: 0,         // No envelope contour
+    pitchDepth: 0,      // No pitch modulation
+    pwmDepth: 0,        // No PWM modulation
+    filterDepth: 0,     // No filter modulation
+  },
+  chorus: {
+    enabled: false,     // Chorus off by default
+    mode: 0,            // Mode 1 (matches db303-default-preset.xml)
+    mix: 50,            // 50% wet mix (matches db303-default-preset.xml)
+  },
+  phaser: {
+    enabled: false,     // Phaser off by default
+    rate: 50,           // Medium rate (matches db303-default-preset.xml: 0.5 normalized)
+    depth: 70,          // 70% depth (matches db303-default-preset.xml: 0.7 normalized as "width")
+    feedback: 0,        // No feedback (matches db303-default-preset.xml)
+    mix: 0,             // 0% wet mix (matches db303-default-preset.xml)
+  },
+  delay: {
+    enabled: false,     // Delay off by default
+    time: 300,          // 300ms (matches db303-default-preset.xml: 3 = 300ms)
+    feedback: 30,       // 30% feedback (matches db303-default-preset.xml)
+    tone: 50,           // 50% tone (matches db303-default-preset.xml: 0.5 normalized)
+    mix: 0,             // 0% wet mix (matches db303-default-preset.xml)
+    stereo: 50,         // 50% stereo spread (matches db303-default-preset.xml: 0.5 normalized as "spread")
   },
 };
 
@@ -2775,10 +2880,24 @@ export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
   vegDecay: 3000,        // TB-303 had fixed ~3-4 second VEG decay
   vegSustain: 0,         // No sustain in TB-303
   softAttack: 0.3,       // Minimum (instant attack) - stock TB-303 had fixed ~4ms, DF makes it variable
+  accentSoftAttack: 0.1, // Minimal soft attack for accented notes
 
   // Filter defaults (TB-303 compatible)
   filterTracking: 0,     // TB-303 filter didn't track pitch
   filterFM: 0,           // No filter FM in TB-303
+  passbandCompensation: 9,  // 9% compensation (from db303 default preset)
+  resTracking: 74.3,     // 74.3% resonance tracking (from db303 default preset)
+  duffingAmount: 3,      // 3% non-linear filter effect (from db303 default preset)
+  lpBpMix: 0,            // 100% lowpass (TB-303 had only LP filter)
+  stageNLAmount: 0,      // No per-stage non-linearity in TB-303
+  filterSelect: 255,     // Default filter mode
+  diodeCharacter: 100,   // Full diode ladder character
+
+  // Effects defaults (TB-303 compatible)
+  ensembleAmount: 0,     // No ensemble effect in TB-303
+
+  // Audio quality defaults
+  oversamplingOrder: 2,  // 4x oversampling (2 = 4x from db303 default preset)
 
   // Accent defaults (TB-303 compatible)
   sweepSpeed: 'normal',  // Standard TB-303 accent behavior
