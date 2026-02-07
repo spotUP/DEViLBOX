@@ -142,7 +142,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [showHelp, setShowHelp] = useState(false);
   const [genericTab, setGenericTab] = useState<SynthEditorTab>('oscillator');
   const [isBaking, setIsBaking] = useState(false);
-  const [uiMode, setUIMode] = useState<'simple' | 'hardware'>('simple');
+  // Default to hardware UI if available, otherwise simple UI
+  const [uiMode, setUIMode] = useState<'simple' | 'hardware'>(() =>
+    hasHardwareUI(instrument.synthType) ? 'hardware' : 'simple'
+  );
 
   const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
 
