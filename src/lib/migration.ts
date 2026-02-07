@@ -86,6 +86,30 @@ export function migrateCell(cell: TrackerCell): TrackerCell {
     (migratedCell as any).eff = 0;
   }
 
+  // Migrate effect2 (old string format → numeric effTyp2 + eff2)
+  if ('effect2' in cell && typeof (cell as any).effect2 === 'string') {
+    const effect2Str = (cell as any).effect2 as string;
+    if (effect2Str && effect2Str !== '...' && effect2Str !== '000') {
+      // Parse: first char → effect type (hex 0-F → 0-15), remaining → param (hex 00-FF → 0-255)
+      const [effTyp2, eff2] = effectStringToXM(effect2Str);
+      migratedCell.effTyp2 = effTyp2;
+      migratedCell.eff2 = eff2;
+    } else {
+      migratedCell.effTyp2 = 0;
+      migratedCell.eff2 = 0;
+    }
+    // Remove old effect2 field
+    delete (migratedCell as any).effect2;
+  }
+
+  // Ensure effTyp2 and eff2 fields exist
+  if (migratedCell.effTyp2 === undefined || migratedCell.effTyp2 === null) {
+    migratedCell.effTyp2 = 0;
+  }
+  if (migratedCell.eff2 === undefined || migratedCell.eff2 === null) {
+    migratedCell.eff2 = 0;
+  }
+
   return migratedCell;
 }
 

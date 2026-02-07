@@ -20,6 +20,7 @@ interface UIStore {
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
   showBeatLabels: boolean; // Show beat.tick labels alongside row numbers
   chordEntryMode: boolean; // Chord entry: spread notes across channels
+  blankEmptyCells: boolean; // Hide ---, .., ... etc. for clean pattern view
 
   // Responsive layout state
   tb303Collapsed: boolean;
@@ -44,6 +45,7 @@ interface UIStore {
   setRowHighlightInterval: (interval: number) => void;
   toggleBeatLabels: () => void;
   toggleChordEntryMode: () => void;
+  setBlankEmptyCells: (blank: boolean) => void;
 
   // Responsive layout actions
   toggleTB303Collapsed: () => void;
@@ -72,6 +74,7 @@ export const useUIStore = create<UIStore>()(
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
       showBeatLabels: false, // Beat labels off by default
       chordEntryMode: false, // Chord entry off by default
+      blankEmptyCells: false, // Show ---, .., ... by default
 
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: false, // TB-303 panel expanded by default
@@ -147,6 +150,11 @@ export const useUIStore = create<UIStore>()(
       toggleChordEntryMode: () =>
         set((state) => {
           state.chordEntryMode = !state.chordEntryMode;
+        }),
+
+      setBlankEmptyCells: (blank) =>
+        set((state) => {
+          state.blankEmptyCells = blank;
         }),
 
       // Responsive layout actions
@@ -226,6 +234,7 @@ export const useUIStore = create<UIStore>()(
         rowHighlightInterval: state.rowHighlightInterval,
         showBeatLabels: state.showBeatLabels,
         chordEntryMode: state.chordEntryMode,
+        blankEmptyCells: state.blankEmptyCells,
         performanceQuality: state.performanceQuality,
         uiVersion: state.uiVersion,
       }),

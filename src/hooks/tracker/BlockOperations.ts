@@ -294,7 +294,8 @@ export const useBlockOperations = () => {
           volume: srcCell.volume,
           effTyp: srcCell.effTyp,
           eff: srcCell.eff,
-          effect2: srcCell.effect2,
+          effTyp2: srcCell.effTyp2,
+          eff2: srcCell.eff2,
           accent: srcCell.accent,
           slide: srcCell.slide,
         });
@@ -341,7 +342,8 @@ export const useBlockOperations = () => {
             volume: srcCell.volume,
             effTyp: srcCell.effTyp,
             eff: srcCell.eff,
-            effect2: srcCell.effect2,
+            effTyp2: srcCell.effTyp2,
+          eff2: srcCell.eff2,
             accent: srcCell.accent,
             slide: srcCell.slide,
           });
@@ -353,7 +355,8 @@ export const useBlockOperations = () => {
             volume: 0,
             effTyp: 0,
             eff: 0,
-            effect2: undefined,
+            effTyp2: 0,
+            eff2: 0,
             accent: false,
             slide: false,
           });
@@ -401,7 +404,8 @@ export const useBlockOperations = () => {
             volume: srcCell.volume,
             effTyp: srcCell.effTyp,
             eff: srcCell.eff,
-            effect2: srcCell.effect2,
+            effTyp2: srcCell.effTyp2,
+          eff2: srcCell.eff2,
             accent: srcCell.accent,
             slide: srcCell.slide,
           });
@@ -413,7 +417,8 @@ export const useBlockOperations = () => {
             volume: 0,
             effTyp: 0,
             eff: 0,
-            effect2: undefined,
+            effTyp2: 0,
+            eff2: 0,
             accent: false,
             slide: false,
           });
@@ -490,7 +495,8 @@ export const useBlockOperations = () => {
           volume: srcCell.volume,
           effTyp: srcCell.effTyp,
           eff: srcCell.eff,
-          effect2: srcCell.effect2,
+          effTyp2: srcCell.effTyp2,
+          eff2: srcCell.eff2,
           accent: srcCell.accent,
           slide: srcCell.slide,
         });

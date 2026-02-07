@@ -21,6 +21,8 @@ const emptyCell = (): TrackerCell => ({
   volume: 0,
   effTyp: 0,
   eff: 0,
+  effTyp2: 0,
+  eff2: 0,
 });
 
 // Create a note cell
@@ -35,6 +37,8 @@ const noteCell = (
   volume: 0x10 + volume, // XM volume format (0x10-0x50 = set volume 0-64)
   effTyp: 0,
   eff: 0,
+  effTyp2: 0,
+  eff2: 0,
   accent,
 });
 

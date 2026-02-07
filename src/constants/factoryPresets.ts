@@ -3360,3 +3360,29 @@ export const PRESET_CATEGORIES = {
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
+
+/**
+ * Get the first available factory preset for a given synth type.
+ * Used to auto-initialize new instruments with musically useful settings
+ * so they produce sound immediately (e.g. V2 needs patch data, MAME chips need _program).
+ */
+export function getFirstPresetForSynthType(synthType: string): Omit<InstrumentConfig, 'id'> | null {
+  // Search category-specific collections first (preferred: sustaining/melodic presets)
+  const categoryPresets = PRESET_CATEGORIES[synthType as keyof typeof PRESET_CATEGORIES];
+  if (categoryPresets && categoryPresets.length > 0) {
+    return categoryPresets[0];
+  }
+
+  // Fall back to main factory presets array
+  const fromFactory = FACTORY_PRESETS.find(p => p.synthType === synthType);
+  if (fromFactory) return fromFactory;
+
+  // Check collections not included in FACTORY_PRESETS
+  const fromTB303 = TB303_PRESETS.find(p => p.synthType === synthType);
+  if (fromTB303) return fromTB303 as Omit<InstrumentConfig, 'id'>;
+
+  const fromSynare = SYNARE_PRESETS.find(p => p.synthType === synthType);
+  if (fromSynare) return fromSynare as Omit<InstrumentConfig, 'id'>;
+
+  return null;
+}

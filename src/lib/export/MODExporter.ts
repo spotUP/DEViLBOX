@@ -270,7 +270,7 @@ function convertCellToMODNote(cell: TrackerCell, warnings: string[]): MODNoteDat
   }
 
   // MOD doesn't support effect2 or volume column
-  if (cell.effect2) {
+  if ((cell.effTyp2 !== undefined && cell.effTyp2 !== 0) || (cell.eff2 !== undefined && cell.eff2 !== 0)) {
     warnings.push(`Effect2 column not supported in MOD format (will be lost).`);
   }
 

@@ -154,6 +154,8 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
       volume,
       effTyp: 0,
       eff: 0,
+      effTyp2: 0,
+      eff2: 0,
       accent: step.accent,
       slide: step.slide,
     };

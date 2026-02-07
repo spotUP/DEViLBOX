@@ -43,6 +43,7 @@ import {
   DEFAULT_CHIPTUNE_MODULE,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
+import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
@@ -175,6 +176,15 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
     case 'MAMESWP30':
       base.mame = { ...DEFAULT_MAME_SWP30 };
       break;
+  }
+
+  // Auto-apply first factory preset so new instruments produce useful sound out of the box.
+  // This is critical for synths like V2 (needs patch data) and MAME chips (need _program).
+  const firstPreset = getFirstPresetForSynthType(synthType);
+  if (firstPreset) {
+    const { name: _name, type: _type, synthType: _synthType, ...presetConfig } = firstPreset as any;
+    Object.assign(base, presetConfig);
+    base.synthType = synthType as any; // Preserve the requested synthType
   }
 
   return base;
@@ -399,6 +409,40 @@ export const useInstrumentStore = create<InstrumentStore>()(
           if (synthTypeChanging && updates.synthType === 'Synare' && !instrument.synare) {
             instrument.synare = { ...DEFAULT_SYNARE };
           }
+
+          // Auto-initialize Sam config when synthType changes to 'Sam'
+          if (synthTypeChanging && updates.synthType === 'Sam' && !instrument.sam) {
+            instrument.sam = { ...DEFAULT_SAM };
+          }
+
+          // Auto-apply first factory preset when synthType changes (unless this IS a preset load).
+          // This ensures synths produce sound immediately (V2 needs patch data, MAME chips need _program).
+          // Only applies when switching to a new type — won't affect re-editing existing instruments.
+          if (synthTypeChanging && !isPresetLoad && updates.synthType) {
+            const savedChipType = instrument.furnace?.chipType;
+            const savedMachineType = instrument.buzzmachine?.machineType;
+
+            const firstPreset = getFirstPresetForSynthType(updates.synthType);
+            if (firstPreset) {
+              const { name: _pn, type: _pt, synthType: _pst, ...presetConfig } = firstPreset as any;
+              Object.keys(presetConfig).forEach(key => {
+                const value = presetConfig[key];
+                if (value && typeof value === 'object' && !Array.isArray(value) && (instrument as any)[key]) {
+                  Object.assign((instrument as any)[key], value);
+                } else {
+                  (instrument as any)[key] = value;
+                }
+              });
+              // Preserve structural fields
+              instrument.synthType = updates.synthType as any;
+              if (savedChipType !== undefined && instrument.furnace) {
+                instrument.furnace.chipType = savedChipType;
+              }
+              if (savedMachineType && instrument.buzzmachine) {
+                instrument.buzzmachine.machineType = savedMachineType;
+              }
+            }
+          }
         }
       });
 
@@ -454,7 +498,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
               
               // Mapping (same as UnifiedInstrumentEditor)
               newParams[0] = tb303.oscillator.type === 'square' ? 1 : 0;
-              newParams[1] = Math.round((Math.log2(tb303.filter.cutoff / 50) / Math.log2(18000 / 50)) * 240);
+              newParams[1] = Math.round((Math.log2(tb303.filter.cutoff / 200) / Math.log2(5000 / 200)) * 240);
               newParams[2] = Math.round((tb303.filter.resonance / 100) * 128);
               newParams[3] = Math.round((tb303.filterEnvelope.envMod / 100) * 128);
               newParams[4] = Math.round((Math.log2(tb303.filterEnvelope.decay / 30) / Math.log2(3000 / 30)) * 128);
@@ -1063,6 +1107,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Migrate old instruments (backward compatibility)
       const migratedInstruments = newInstruments.map(inst => ({
         ...inst,
+        // Fix synthType for instruments with tb303 config (stale localStorage migration)
+        synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
+          ? 'TB303' as const
+          : inst.synthType,
         // Add type field if missing (backward compatibility)
         // Sampler = sample, everything else = synth
         type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),

@@ -2,7 +2,7 @@
  * ChipExporter - Unified interface for all chip music export formats
  *
  * Provides a single entry point for exporting captured hardware register logs
- * to various retro music formats (VGM, ZSM, SAP, TIunA).
+ * to various retro music formats (VGM, ZSM, SAP, TIunA, GYM, NSF, GBS, SPC).
  */
 
 import { FurnaceChipEngine, FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
@@ -10,8 +10,12 @@ import { parseRegisterLog, exportToVGM, type VGMExportOptions, type RegisterWrit
 import { exportToZSM, canExportZSM, type ZSMExportOptions } from './ZSMExporter';
 import { exportToSAP, canExportSAP, type SAPExportOptions } from './SAPExporter';
 import { exportToTIunA, canExportTIunA, type TIunAExportOptions } from './TIunAExporter';
+import { exportToGYM, canExportGYM, type GYMExportOptions } from './GYMExporter';
+import { exportToNSF, canExportNSF, type NSFExportOptions } from './NSFExporter';
+import { exportToGBS, canExportGBS, type GBSExportOptions } from './GBSExporter';
+import { exportToSPC, canExportSPC, type SPCExportOptions } from './SPCExporter';
 
-export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna';
+export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna' | 'gym' | 'nsf' | 'gbs' | 'spc';
 
 export interface ChipExportOptions {
   format: ChipExportFormat;
@@ -24,6 +28,10 @@ export interface ChipExportOptions {
   zsm?: Partial<ZSMExportOptions>;
   sap?: Partial<SAPExportOptions>;
   tiuna?: Partial<TIunAExportOptions>;
+  gym?: Partial<GYMExportOptions>;
+  nsf?: Partial<NSFExportOptions>;
+  gbs?: Partial<GBSExportOptions>;
+  spc?: Partial<SPCExportOptions>;
 }
 
 export interface ChipExportResult {
@@ -95,6 +103,34 @@ export const FORMAT_INFO: Record<ChipExportFormat, {
     mimeType: 'application/octet-stream',
     description: 'Simple format for Atari 2600 TIA chip.',
     supportedChips: [FurnaceChipType.TIA]
+  },
+  gym: {
+    name: 'Genesis YM2612 Music',
+    extension: 'gym',
+    mimeType: 'application/octet-stream',
+    description: 'Sega Genesis/Mega Drive format. Supports YM2612 (FM) + SN76489 (PSG).',
+    supportedChips: [FurnaceChipType.OPN2, FurnaceChipType.PSG]
+  },
+  nsf: {
+    name: 'NES Sound Format',
+    extension: 'nsf',
+    mimeType: 'application/octet-stream',
+    description: 'Nintendo Entertainment System music format with embedded 6502 driver.',
+    supportedChips: [FurnaceChipType.NES]
+  },
+  gbs: {
+    name: 'Game Boy Sound',
+    extension: 'gbs',
+    mimeType: 'application/octet-stream',
+    description: 'Nintendo Game Boy music format with embedded Z80 driver.',
+    supportedChips: [FurnaceChipType.GB]
+  },
+  spc: {
+    name: 'SNES SPC700',
+    extension: 'spc',
+    mimeType: 'application/octet-stream',
+    description: 'Super Nintendo music format with SPC700 driver and 64KB RAM dump.',
+    supportedChips: [FurnaceChipType.SNES]
   }
 };
 
@@ -123,6 +159,26 @@ export function getAvailableFormats(writes: RegisterWrite[]): ChipExportFormat[]
   // TIunA requires TIA
   if (canExportTIunA(writes)) {
     formats.push('tiuna');
+  }
+
+  // GYM requires YM2612 or PSG
+  if (canExportGYM(writes)) {
+    formats.push('gym');
+  }
+
+  // NSF requires NES APU
+  if (canExportNSF(writes)) {
+    formats.push('nsf');
+  }
+
+  // GBS requires Game Boy
+  if (canExportGBS(writes)) {
+    formats.push('gbs');
+  }
+
+  // SPC requires SNES/SPC700
+  if (canExportSPC(writes)) {
+    formats.push('spc');
   }
 
   return formats;
@@ -212,6 +268,38 @@ export async function exportChipMusic(
       });
       break;
 
+    case 'gym':
+      data = exportToGYM(writes, {
+        title: options.title,
+        author: options.author,
+        ...options.gym
+      });
+      break;
+
+    case 'nsf':
+      data = exportToNSF(writes, {
+        title: options.title,
+        artist: options.author,
+        ...options.nsf
+      });
+      break;
+
+    case 'gbs':
+      data = exportToGBS(writes, {
+        title: options.title,
+        author: options.author,
+        ...options.gbs
+      });
+      break;
+
+    case 'spc':
+      data = exportToSPC(writes, {
+        title: options.title,
+        artist: options.author,
+        ...options.spc
+      });
+      break;
+
     default:
       throw new Error(`Unsupported export format: ${options.format}`);
   }
@@ -296,5 +384,15 @@ export class ChipRecordingSession {
 }
 
 // Re-export types and functions
-export type { RegisterWrite, VGMExportOptions, ZSMExportOptions, SAPExportOptions, TIunAExportOptions };
+export type {
+  RegisterWrite,
+  VGMExportOptions,
+  ZSMExportOptions,
+  SAPExportOptions,
+  TIunAExportOptions,
+  GYMExportOptions,
+  NSFExportOptions,
+  GBSExportOptions,
+  SPCExportOptions
+};
 export { parseRegisterLog };

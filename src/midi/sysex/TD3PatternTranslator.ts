@@ -145,6 +145,8 @@ export function td3StepToTrackerCell(step: TD3Step, baseOctave: number = TD3_BAS
     volume: 0,
     effTyp: 0,
     eff: 0,
+    effTyp2: 0,
+    eff2: 0,
     accent: step.accent,
     slide: step.slide,
   };

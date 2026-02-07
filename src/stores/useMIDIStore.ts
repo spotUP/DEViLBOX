@@ -114,7 +114,8 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
   switch (param) {
     // 303 Main
     case 'cutoff':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: 50 + (normalized * 17950) } } });
+      // Logarithmic mapping matching the knob range (200-5000 Hz)
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: 200 * Math.pow(5000 / 200, normalized) } } });
       break;
     case 'resonance':
       instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, resonance: normalized * 100 } } });
@@ -132,7 +133,8 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, overdrive: { ...instrument.tb303!.overdrive, amount: normalized * 100 } } });
       break;
     case 'slideTime':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: 10 + (normalized * 490) } } });
+      // Range 2-360 ms matching jc303 reference
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: 2 + (normalized * 358) } } });
       break;
 
     // Siren

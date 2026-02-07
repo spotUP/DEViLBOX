@@ -683,24 +683,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     ],
   },
 
-  // MAMERolandSA - Roland SA Sound Generator
-  MAMERolandSA: {
-    synthType: 'MAMERolandSA',
-    name: 'Roland SA',
-    subtitle: 'Roland SA-Synthesis Digital Piano',
-    color: '#9ca3af',
-    presetCount: 8,
-    presetNames: ['Piano 1', 'Piano 2', 'E.Piano', 'Organ', 'Strings', 'Choir', 'Harpsichord', 'Vibes'],
-    parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'preset', label: 'Preset', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
-      { key: 'attack_speed', label: 'Attack Speed', group: 'Envelope', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
-      { key: 'release_speed', label: 'Release Speed', group: 'Envelope', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
-      { key: 'wave_high', label: 'Wave High', group: 'Voice', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
-      { key: 'wave_loop', label: 'Wave Loop', group: 'Voice', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
-    ],
-  },
-
   // =========================================================================
   // CZ-101 - Casio Phase Distortion Synthesizer
   // =========================================================================

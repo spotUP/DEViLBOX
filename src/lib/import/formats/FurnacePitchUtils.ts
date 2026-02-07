@@ -82,21 +82,29 @@ export class FurnacePitchUtils {
   /**
    * Calculate OPM (YM2151) Key Code and Key Fraction
    * OPM uses a different system: Key Code (octave + note) and 6-bit Fraction
+   * Reference: Furnace arcade.cpp noteMap and hScale function
    */
   public static freqToOPM(freq: number): { kc: number; kf: number } {
+    // OPM note mapping - from Furnace arcade.cpp
+    // The YM2151 doesn't use a linear note mapping; it skips values 3, 7, 11
+    const noteMap = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
+
+    if (freq <= 0) return { kc: 0, kf: 0 };
+
     // Frequency to MIDI note conversion
     const midi = 12 * Math.log2(freq / 440) + 69;
     const note = Math.floor(midi);
     const fraction = midi - note;
 
-    // KC: bits 0-3 = note (0-11), bits 4-6 = octave
+    // KC format: bits 4-6 = octave (0-7), bits 0-3 = note from noteMap
+    // Furnace hScale: ((note/12)<<4)+(noteMap[note%12])
     const octave = Math.floor(note / 12) - 1;
     const noteInOctave = note % 12;
-    
-    // OPM Note mapping is slightly different (0=C#, 1=D... 11=C, 12=C#)
-    // We use a simplified mapping for now
-    const kc = (octave << 4) | (noteInOctave & 0x0F);
-    const kf = Math.floor(fraction * 64); // 6-bit fraction
+
+    // Apply OPM note mapping and clamp octave to valid range
+    const clampedOctave = Math.max(0, Math.min(7, octave));
+    const kc = (clampedOctave << 4) | noteMap[noteInOctave];
+    const kf = Math.floor(fraction * 64) & 0x3F; // 6-bit fraction
 
     return { kc, kf };
   }
