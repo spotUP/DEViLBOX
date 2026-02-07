@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { getPadMappingManager, type PadMapping } from '../../midi/PadMappingManager';
 import { useInstrumentStore, useMIDIStore } from '../../stores';
 import { detectControllerProfile } from '../../midi/controllerProfiles';
 import { useMIDI } from '../../hooks/useMIDI';
 import { getToneEngine } from '../../engine/ToneEngine';
-import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano, Play } from 'lucide-react';
+import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano, Play, Drum } from 'lucide-react';
+import { TR707DrumMap } from '../../engine/tr707/TR707Synth';
 
 interface DrumpadEditorModalProps {
   isOpen: boolean;
@@ -20,6 +21,76 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   const [mappings, setMappings] = useState<PadMapping[]>([]);
   const [selectedPadIndex, setSelectedPadIndex] = useState<number | null>(null);
   const [isLearning, setIsLearning] = useState(false);
+
+  // Detect drum machines in instrument list
+  const drumMachines = useMemo(() => {
+    return instruments.filter(inst =>
+      inst.synthType === 'MAMETR707' ||
+      inst.synthType?.toLowerCase().includes('drum') ||
+      inst.name.toLowerCase().includes('drum machine')
+    );
+  }, [instruments]);
+
+  // Auto-populate pads from drum machine
+  const handleLoadDrumMachine = (drumMachineId: number) => {
+    const drumMachine = instruments.find(inst => inst.id === drumMachineId);
+    if (!drumMachine) return;
+
+    // Clear existing mappings
+    const startNote = 36;
+    const notes = Array.from({ length: 16 }, (_, i) => startNote + i);
+    notes.forEach(n => {
+      const mapping = padManager.getMapping(9, n);
+      if (mapping) padManager.removeMapping(mapping.id);
+    });
+
+    // Map drum machine sounds to pads
+    if (drumMachine.synthType === 'MAMETR707') {
+      // TR-707 mapping
+      const drumMap = [
+        { note: TR707DrumMap.BASS_1, padNote: 36, label: 'Bass 1' },
+        { note: TR707DrumMap.RIMSHOT, padNote: 37, label: 'Rimshot' },
+        { note: TR707DrumMap.SNARE_1, padNote: 38, label: 'Snare 1' },
+        { note: TR707DrumMap.HANDCLAP, padNote: 39, label: 'Handclap' },
+        { note: TR707DrumMap.SNARE_2, padNote: 40, label: 'Snare 2' },
+        { note: TR707DrumMap.LOW_TOM, padNote: 41, label: 'Low Tom' },
+        { note: TR707DrumMap.CLOSED_HIHAT, padNote: 42, label: 'Closed HH' },
+        { note: TR707DrumMap.MID_TOM, padNote: 43, label: 'Mid Tom' },
+        // Bank B
+        { note: TR707DrumMap.OPEN_HIHAT, padNote: 46, label: 'Open HH' },
+        { note: TR707DrumMap.CRASH, padNote: 49, label: 'Crash' },
+        { note: TR707DrumMap.HI_TOM, padNote: 50, label: 'Hi Tom' },
+        { note: TR707DrumMap.RIDE, padNote: 51, label: 'Ride' },
+        { note: TR707DrumMap.TAMBOURINE, padNote: 54, label: 'Tambourine' },
+        { note: TR707DrumMap.COWBELL, padNote: 56, label: 'Cowbell' },
+      ];
+
+      drumMap.forEach(({ note, padNote }) => {
+        padManager.setMapping({
+          id: `9-${padNote}`,
+          inputChannel: 9,
+          inputNote: padNote,
+          type: 'instrument',
+          targetInstrumentId: drumMachine.id,
+          targetNote: note
+        });
+      });
+    } else {
+      // Generic drum machine - map to chromatic notes
+      notes.slice(0, 8).forEach((padNote, i) => {
+        padManager.setMapping({
+          id: `9-${padNote}`,
+          inputChannel: 9,
+          inputNote: padNote,
+          type: 'instrument',
+          targetInstrumentId: drumMachine.id,
+          targetNote: 36 + i // Start from C1 and go up chromatically
+        });
+      });
+    }
+
+    refreshMappings();
+  };
 
   // Load General Preset
   const handleLoadPreset = (_type: 'auto' | '808' | '909' | 'drumnibus') => {
@@ -247,14 +318,45 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
               <LayoutGrid size={24} />
               Drumpad Editor
             </h2>
-            <div className="flex items-center gap-2 bg-dark-bgSecondary p-1 rounded-lg">
-              <span className="text-[10px] font-bold text-text-muted uppercase px-2">Auto-Map:</span>
-              <button 
-                onClick={() => handleLoadPreset('auto')}
-                className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-white rounded transition-colors uppercase"
-              >
-                Match Names
-              </button>
+            <div className="flex items-center gap-2">
+              {/* Drum Machine Auto-Map */}
+              {drumMachines.length > 0 && (
+                <div className="flex items-center gap-2 bg-dark-bgSecondary p-1 rounded-lg">
+                  <Drum size={14} className="text-accent-primary ml-2" />
+                  <span className="text-[10px] font-bold text-text-muted uppercase">Drum Kit:</span>
+                  {drumMachines.length === 1 ? (
+                    <button
+                      onClick={() => handleLoadDrumMachine(drumMachines[0].id)}
+                      className="px-3 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors uppercase"
+                      title={`Auto-map ${drumMachines[0].name} to pads`}
+                    >
+                      {drumMachines[0].name}
+                    </button>
+                  ) : (
+                    <select
+                      onChange={(e) => e.target.value && handleLoadDrumMachine(parseInt(e.target.value))}
+                      className="px-2 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors uppercase cursor-pointer"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select Kit...</option>
+                      {drumMachines.map(dm => (
+                        <option key={dm.id} value={dm.id}>{dm.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Generic Auto-Map */}
+              <div className="flex items-center gap-2 bg-dark-bgSecondary p-1 rounded-lg">
+                <span className="text-[10px] font-bold text-text-muted uppercase px-2">Auto-Map:</span>
+                <button
+                  onClick={() => handleLoadPreset('auto')}
+                  className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-white rounded transition-colors uppercase"
+                >
+                  Match Names
+                </button>
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary">
