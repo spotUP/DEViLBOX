@@ -30,7 +30,7 @@ const CZ101Slider: React.FC<{
     <div className="flex flex-col items-center gap-1">
       {/* Slider track */}
       <div className="relative h-24 w-6 flex items-center justify-center">
-        <div className={`absolute inset-0 rounded ${isDark ? 'bg-gray-800' : 'bg-gray-300'} border ${isDark ? 'border-gray-700' : 'border-gray-400'}`}>
+        <div className={`absolute inset-0 rounded bg-gray-800 border border-gray-700`}>
           {/* Slider groove */}
           <div className="absolute left-1/2 top-1 bottom-1 w-0.5 -translate-x-1/2 bg-gray-900 rounded-full" />
         </div>
@@ -62,7 +62,7 @@ const CZ101Slider: React.FC<{
       </div>
 
       {/* Label */}
-      <div className={`text-[8px] font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'} uppercase tracking-wide text-center`}>
+      <div className={`text-[8px] font-bold text-gray-300 uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>

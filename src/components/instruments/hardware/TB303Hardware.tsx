@@ -83,7 +83,7 @@ const TB303Knob: React.FC<{
         />
       </div>
 
-      <div className={`text-[9px] font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'} uppercase tracking-wide text-center`}>
+      <div className={`text-[9px] font-bold text-gray-300 uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
