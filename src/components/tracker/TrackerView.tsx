@@ -379,6 +379,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   volume: cell.volume || 0,
                   effTyp: cell.effectType || 0,
                   eff: cell.effectParam || 0,
+                  effTyp2: 0,
+                  eff2: 0,
                 };
               }),
             })),
@@ -594,6 +596,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           setShowEffectPicker(false);
         }}
         onClose={() => setShowEffectPicker(false)}
+        synthType={(() => {
+          // Get synth type from current cell's instrument
+          const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+          const pattern = patterns[currentPatternIndex];
+          if (!pattern) return undefined;
+          const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+          if (!cell?.instrument) return undefined;
+          const inst = useInstrumentStore.getState().getInstrument(cell.instrument);
+          return inst?.synthType;
+        })()}
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
@@ -927,6 +939,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           setShowEffectPicker(false);
         }}
         onClose={() => setShowEffectPicker(false)}
+        synthType={(() => {
+          // Get synth type from current cell's instrument
+          const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+          const pattern = patterns[currentPatternIndex];
+          if (!pattern) return undefined;
+          const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+          if (!cell?.instrument) return undefined;
+          const inst = useInstrumentStore.getState().getInstrument(cell.instrument);
+          return inst?.synthType;
+        })()}
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />

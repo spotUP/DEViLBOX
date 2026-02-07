@@ -13,12 +13,12 @@ const PARAMETER_LABELS: Record<GridMappableParameter, { label: string; min: numb
   baseOctave: { label: 'Base Octave', min: 1, max: 6, group: 'General' },
   velocity: { label: 'Velocity', min: 0, max: 127, group: 'General' },
   // TB-303 Main
-  cutoff: { label: 'Cutoff', min: 50, max: 18000, group: '303 Main' },
+  cutoff: { label: 'Cutoff', min: 200, max: 5000, group: '303 Main' },
   resonance: { label: 'Resonance', min: 0, max: 100, group: '303 Main' },
   envMod: { label: 'Env Mod', min: 0, max: 100, group: '303 Main' },
-  decay: { label: 'Decay', min: 30, max: 3000, group: '303 Main' },
+  decay: { label: 'Decay', min: 200, max: 2000, group: '303 Main' },
   accent: { label: 'Accent', min: 0, max: 100, group: '303 Main' },
-  slideTime: { label: 'Slide Time', min: 10, max: 500, group: '303 Main' },
+  slideTime: { label: 'Slide Time', min: 2, max: 360, group: '303 Main' },
   overdrive: { label: 'Overdrive', min: 0, max: 100, group: '303 Main' },
   // TB-303 Devil Fish
   normalDecay: { label: 'Normal Decay', min: 30, max: 3000, group: 'Devil Fish' },

@@ -402,7 +402,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
                       {columnVisibility.instrument && <InstrumentCell value={cell?.instrument ?? 0} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'instrument'} isEmpty={!cell || cell.instrument === 0} />}
                       {columnVisibility.volume && <VolumeCell value={cell?.volume ?? 0} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'volume'} isEmpty={!cell || cell.volume === 0 || cell.volume < 0x10} />}
                       {columnVisibility.effect && <EffectCell effTyp={cell?.effTyp ?? 0} eff={cell?.eff ?? 0} isActive={!isG && isCurRow && isCurCh && (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam')} isEmpty={!cell || (cell.effTyp === 0 && cell.eff === 0)} />}
-                      {columnVisibility.effect2 && <EffectCell value={cell?.effect2} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'effect2'} isEmpty={!cell || !cell.effect2} />}
+                      {columnVisibility.effect2 && <EffectCell effTyp={cell?.effTyp2 ?? 0} eff={cell?.eff2 ?? 0} isActive={!isG && isCurRow && isCurCh && (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2')} isEmpty={!cell || (cell.effTyp2 === 0 && cell.eff2 === 0)} />}
                       {columnVisibility.accent && <AccentCell value={cell?.accent} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'accent'} onToggle={() => !isG && setCell(chIdx, dRIdx, { accent: !cell.accent })} />}
                       {columnVisibility.slide && <SlideCell value={cell?.slide} isActive={!isG && isCurRow && isCurCh && cursor.columnType === 'slide'} onToggle={() => !isG && setCell(chIdx, dRIdx, { slide: !cell.slide })} />}
                       <AutomationColumns

@@ -140,9 +140,10 @@ export const TrackerRow: React.FC<TrackerRowProps> = React.memo(
 
                   {/* Effect 2 */}
                   <EffectCell
-                    value={cell.effect2}
-                    isActive={isChannelActive && cursorColumnType === 'effect2'}
-                    isEmpty={!cell.effect2}
+                    effTyp={cell.effTyp2}
+                    eff={cell.eff2}
+                    isActive={isChannelActive && (cursorColumnType === 'effTyp2' || cursorColumnType === 'effParam2')}
+                    isEmpty={cell.effTyp2 === 0 && cell.eff2 === 0}
                   />
 
                   {/* Accent */}

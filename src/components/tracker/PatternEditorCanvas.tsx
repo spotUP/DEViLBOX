@@ -25,7 +25,7 @@ import * as Tone from 'tone';
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
-export const CHANNEL_WIDTH = 140; // Width per channel in canvas
+// Channel width is computed dynamically in render() based on acid/prob columns
 
 // XM note names
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -383,11 +383,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     volume: number,
     effTyp: number,
     eff: number,
+    effTyp2: number,
+    eff2: number,
     accent?: boolean,
     slide?: boolean,
-    probability?: number
+    probability?: number,
+    blankEmpty?: boolean
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}-${accent ? 'A' : ''}-${slide ? 'S' : ''}-p${probability ?? 'x'}`;
+    const key = `${instrument}-${volume}-${effTyp}-${eff}-${effTyp2}-${eff2}-${accent ? 'A' : ''}-${slide ? 'S' : ''}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
@@ -396,7 +399,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const hasAcidColumns = accent !== undefined || slide !== undefined;
     const hasProb = probability !== undefined && probability > 0;
     const canvas = document.createElement('canvas');
-    canvas.width = CHAR_WIDTH * 9 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
+    // Base: inst(2)+4 vol(2)+4 eff(3)+4 eff2(3)+4 = CW*10+16
+    canvas.width = CHAR_WIDTH * 10 + 16 + (hasAcidColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -407,35 +411,68 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const y = ROW_HEIGHT / 2;
 
     // Instrument (2 hex digits)
-    ctx.fillStyle = instrument === 0 ? colors.textMuted : colors.textInstrument;
-    ctx.fillText(instrument === 0 ? '..' : hexByte(instrument), x, y);
+    if (instrument !== 0) {
+      ctx.fillStyle = colors.textInstrument;
+      ctx.fillText(hexByte(instrument), x, y);
+    } else if (!blankEmpty) {
+      ctx.fillStyle = colors.textMuted;
+      ctx.fillText('..', x, y);
+    }
     x += CHAR_WIDTH * 2 + 4;
 
     // Volume (2 hex digits)
     const hasVolume = volume >= 0x10 && volume <= 0x50;
-    ctx.fillStyle = hasVolume ? colors.textVolume : colors.textMuted;
-    ctx.fillText(hasVolume ? hexByte(volume) : '..', x, y);
+    if (hasVolume) {
+      ctx.fillStyle = colors.textVolume;
+      ctx.fillText(hexByte(volume), x, y);
+    } else if (!blankEmpty) {
+      ctx.fillStyle = colors.textMuted;
+      ctx.fillText('..', x, y);
+    }
     x += CHAR_WIDTH * 2 + 4;
 
-    // Effect (3 hex digits: type + param)
+    // Effect 1 (3 hex digits: type + param)
     const hasEffect = effTyp !== 0 || eff !== 0;
-    ctx.fillStyle = hasEffect ? colors.textEffect : colors.textMuted;
-    const effectStr = hasEffect
-      ? effTyp.toString(16).toUpperCase() + hexByte(eff)
-      : '...';
-    ctx.fillText(effectStr, x, y);
+    if (hasEffect) {
+      ctx.fillStyle = colors.textEffect;
+      ctx.fillText(effTyp.toString(16).toUpperCase() + hexByte(eff), x, y);
+    } else if (!blankEmpty) {
+      ctx.fillStyle = colors.textMuted;
+      ctx.fillText('...', x, y);
+    }
+    x += CHAR_WIDTH * 3 + 4;
+
+    // Effect 2 (3 hex digits: type + param)
+    const hasEffect2 = effTyp2 !== 0 || eff2 !== 0;
+    if (hasEffect2) {
+      ctx.fillStyle = colors.textEffect; // Same color as effect1
+      ctx.fillText(effTyp2.toString(16).toUpperCase() + hexByte(eff2), x, y);
+    } else if (!blankEmpty) {
+      ctx.fillStyle = colors.textMuted;
+      ctx.fillText('...', x, y);
+    }
     x += CHAR_WIDTH * 3 + 4;
 
     // TB-303 Accent/Slide columns (if present)
     if (hasAcidColumns) {
       // Accent - yellow/orange for active
-      ctx.fillStyle = accent ? '#f59e0b' : colors.textMuted;
-      ctx.fillText(accent ? 'A' : '.', x, y);
+      if (accent) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillText('A', x, y);
+      } else if (!blankEmpty) {
+        ctx.fillStyle = colors.textMuted;
+        ctx.fillText('.', x, y);
+      }
       x += CHAR_WIDTH + 4;
 
       // Slide - cyan/blue for active
-      ctx.fillStyle = slide ? '#06b6d4' : colors.textMuted;
-      ctx.fillText(slide ? 'S' : '.', x, y);
+      if (slide) {
+        ctx.fillStyle = '#06b6d4';
+        ctx.fillText('S', x, y);
+      } else if (!blankEmpty) {
+        ctx.fillStyle = colors.textMuted;
+        ctx.fillText('.', x, y);
+      }
       x += CHAR_WIDTH + 4;
     }
 
@@ -508,6 +545,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const cursor = state.cursor;
     const isPlaying = transportState.isPlaying;
     const useHex = uiState.useHexNumbers;
+    const blankEmpty = uiState.blankEmptyCells;
     const speed = transportState.speed;
     const bpm = transportState.bpm;
 
@@ -569,9 +607,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
     const baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
 
-    // Track widths
+    // Track widths - must match getParamCanvas layout exactly
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    const paramWidth = CHAR_WIDTH * 9 + 16;
+    // Detect acid/prob columns from first channel's first cell (all cells share same schema)
+    const firstCell = pattern.channels[0]?.rows[0];
+    const hasAcid = firstCell?.accent !== undefined || firstCell?.slide !== undefined;
+    const hasProb = firstCell?.probability !== undefined;
+    // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
+    // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
+    // Prob: prob(2) +4gap = +CW*2 + 4
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     const channelWidth = noteWidth + paramWidth + 20;
 
     // Clear canvas
@@ -612,8 +659,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
         // Note - flash white on current playing row
         const isCurrentPlayingRow = isPlaying && rowIndex === currentRow;
-        const noteCanvas = getNoteCanvas(cell.note || 0, isCurrentPlayingRow && cell.note > 0);
-        ctx.drawImage(noteCanvas, x, y);
+        const cellNote = cell.note || 0;
+        // Blank empty cells: skip drawing "---" for note=0
+        if (!blankEmpty || cellNote !== 0) {
+          const noteCanvas = getNoteCanvas(cellNote, isCurrentPlayingRow && cellNote > 0);
+          ctx.drawImage(noteCanvas, x, y);
+        }
 
         // Parameters (including TB-303 accent/slide if present)
         const paramCanvas = getParamCanvas(
@@ -621,9 +672,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           cell.volume || 0,
           cell.effTyp || 0,
           cell.eff || 0,
+          cell.effTyp2 || 0,
+          cell.eff2 || 0,
           cell.accent,
           cell.slide,
-          cell.probability
+          cell.probability,
+          blankEmpty
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
@@ -637,45 +691,137 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     ctx.fillStyle = colors.centerLine;
     ctx.fillRect(0, centerLineTop, width, ROW_HEIGHT);
 
-    // Draw cursor (only when not playing)
-    if (!isPlaying) {
+    // Draw cursor — visible in all modes with mode-dependent color
+    // FT2: Each digit is a separate cursor stop, always CHAR_WIDTH wide (except note)
+    {
       const cursorX = LINE_NUMBER_WIDTH + cursor.channelIndex * channelWidth + 8 - scrollLeft;
       let cursorOffsetX = 0;
-      let cursorW = noteWidth;
+      let cursorW = CHAR_WIDTH; // Single char width for all except note
+
+      // Param canvas layout offsets (matches getParamCanvas layout exactly):
+      // inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap  [accent +4gap  slide +4gap]  [prob(2)]
+      const paramBase = noteWidth + 4;
+      // Fixed column positions
+      const instOff = 0;
+      const volOff = CHAR_WIDTH * 2 + 4;
+      const eff1Off = CHAR_WIDTH * 4 + 8;
+      const eff2Off = CHAR_WIDTH * 7 + 12;
+      // Optional column positions depend on which columns exist
+      const acidOff = CHAR_WIDTH * 10 + 16;
+      const probOff = acidOff + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0);
 
       switch (cursor.columnType) {
         case 'note':
           cursorW = noteWidth;
           break;
         case 'instrument':
-          cursorOffsetX = noteWidth + 4;
-          cursorW = CHAR_WIDTH * 2;
+          cursorOffsetX = paramBase + instOff + cursor.digitIndex * CHAR_WIDTH;
           break;
         case 'volume':
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 2 + 4;
-          cursorW = CHAR_WIDTH * 2;
+          cursorOffsetX = paramBase + volOff + cursor.digitIndex * CHAR_WIDTH;
           break;
         case 'effTyp':
+          cursorOffsetX = paramBase + eff1Off;
+          break;
         case 'effParam':
-          cursorOffsetX = noteWidth + 4 + CHAR_WIDTH * 4 + 8;
-          cursorW = CHAR_WIDTH * 3;
+          cursorOffsetX = paramBase + eff1Off + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;
+          break;
+        case 'effTyp2':
+          cursorOffsetX = paramBase + eff2Off;
+          break;
+        case 'effParam2':
+          cursorOffsetX = paramBase + eff2Off + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;
+          break;
+        case 'accent':
+          cursorOffsetX = paramBase + acidOff;
+          break;
+        case 'slide':
+          cursorOffsetX = paramBase + acidOff + CHAR_WIDTH + 4;
+          break;
+        case 'probability':
+          cursorOffsetX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;
+          break;
+        default:
+          cursorOffsetX = paramBase + eff1Off;
           break;
       }
 
-      if ((cursor.columnType === 'instrument' || cursor.columnType === 'volume') && cursor.digitIndex > 0) {
-        cursorOffsetX += cursor.digitIndex * CHAR_WIDTH;
-        cursorW = CHAR_WIDTH;
-      }
-      if ((cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') && cursor.digitIndex > 0) {
-        cursorOffsetX += cursor.digitIndex * CHAR_WIDTH;
-        cursorW = CHAR_WIDTH;
+      // Mode-dependent caret color
+      const isRecording = state.recordMode;
+      let caretBg: string;
+      if (isRecording) {
+        caretBg = '#ef4444'; // Red for record mode
+      } else if (isPlaying) {
+        caretBg = '#22c55e'; // Green for playback
+      } else {
+        caretBg = isCyanTheme ? '#00ffff' : '#ef4444'; // Theme default
       }
 
-      ctx.fillStyle = colors.cursorBg;
-      ctx.fillRect(cursorX + cursorOffsetX - 2, centerLineTop, cursorW + 4, ROW_HEIGHT);
-      ctx.strokeStyle = colors.cursor;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cursorX + cursorOffsetX - 2, centerLineTop, cursorW + 4, ROW_HEIGHT);
+      // Caret dimensions: same height as the row highlight bar
+      const caretH = ROW_HEIGHT;
+      const caretY = centerLineTop;
+      const caretX = cursorX + cursorOffsetX;
+      const caretW = cursorW;
+
+      // Clear any existing content (antialiased text edges bleed through otherwise)
+      ctx.clearRect(caretX, caretY, caretW, caretH);
+      // Draw solid caret background (inverted style)
+      ctx.fillStyle = caretBg;
+      ctx.fillRect(caretX, caretY, caretW, caretH);
+
+      // Extract and redraw the character(s) under the cursor in white (inverted text)
+      const cursorRow = isPlaying ? currentRow : cursor.rowIndex;
+      const cell = pattern.channels[cursor.channelIndex]?.rows[cursorRow];
+      if (cell) {
+        let charStr = '';
+        const col = cursor.columnType;
+        const di = cursor.digitIndex;
+
+        if (col === 'note') {
+          charStr = noteToString(cell.note ?? 0);
+        } else if (col === 'instrument') {
+          const instStr = hexByte(cell.instrument ?? 0);
+          charStr = (cell.instrument ?? 0) === 0 ? '..' : instStr;
+          charStr = charStr[di] ?? '.';
+        } else if (col === 'volume') {
+          const vol = cell.volume ?? 0;
+          const hasVol = vol >= 0x10 && vol <= 0x50;
+          const volStr = hasVol ? hexByte(vol) : '..';
+          charStr = volStr[di] ?? '.';
+        } else if (col === 'effTyp') {
+          const et = cell.effTyp ?? 0;
+          const ep = cell.eff ?? 0;
+          charStr = (et !== 0 || ep !== 0) ? et.toString(16).toUpperCase() : '.';
+        } else if (col === 'effParam') {
+          const et = cell.effTyp ?? 0;
+          const ep = cell.eff ?? 0;
+          const effStr = (et !== 0 || ep !== 0) ? hexByte(ep) : '..';
+          charStr = effStr[di] ?? '.';
+        } else if (col === 'effTyp2') {
+          const et2 = cell.effTyp2 ?? 0;
+          const ep2 = cell.eff2 ?? 0;
+          charStr = (et2 !== 0 || ep2 !== 0) ? et2.toString(16).toUpperCase() : '.';
+        } else if (col === 'effParam2') {
+          const et2 = cell.effTyp2 ?? 0;
+          const ep2 = cell.eff2 ?? 0;
+          const effStr = (et2 !== 0 || ep2 !== 0) ? hexByte(ep2) : '..';
+          charStr = effStr[di] ?? '.';
+        } else if (col === 'accent') {
+          charStr = cell.accent ? 'A' : '.';
+        } else if (col === 'slide') {
+          charStr = cell.slide ? 'S' : '.';
+        } else if (col === 'probability') {
+          const prob = cell.probability ?? 0;
+          const probStr = prob > 0 ? prob.toString(10).padStart(2, '0') : '..';
+          charStr = probStr[di] ?? '.';
+        }
+
+        // Draw inverted text (white on colored background)
+        ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(charStr, caretX, caretY + caretH / 2);
+      }
     }
 
     // Draw fade overlays
@@ -795,10 +941,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     setScrollLeft(e.currentTarget.scrollLeft);
   }, []);
 
-  // Calculate channel header width
-  const noteWidth = CHAR_WIDTH * 3 + 4;
-  const paramWidth = CHAR_WIDTH * 9 + 16;
-  const channelHeaderWidth = noteWidth + paramWidth + 20;
+  // Calculate channel header width - must match render() layout
+  const noteWidthH = CHAR_WIDTH * 3 + 4;
+  const firstCellH = pattern?.channels[0]?.rows[0];
+  const hasAcidH = firstCellH?.accent !== undefined || firstCellH?.slide !== undefined;
+  const hasProbH = firstCellH?.probability !== undefined;
+  const paramWidthH = CHAR_WIDTH * 10 + 16
+    + (hasAcidH ? CHAR_WIDTH * 2 + 8 : 0)
+    + (hasProbH ? CHAR_WIDTH * 2 + 4 : 0);
+  const channelHeaderWidth = noteWidthH + paramWidthH + 20;
   const totalChannelsWidth = pattern ? pattern.channels.length * channelHeaderWidth : 0;
 
   if (!pattern) {
@@ -1006,7 +1157,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
           className="absolute right-0 pointer-events-none z-20 overflow-hidden"
           style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
         >
-          <ChannelVUMeters channelWidth={CHAR_WIDTH * 12 + 40} />
+          <ChannelVUMeters channelWidth={channelHeaderWidth} />
         </div>
 
         <canvas

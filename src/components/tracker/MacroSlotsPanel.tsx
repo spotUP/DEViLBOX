@@ -32,7 +32,8 @@ export const MacroSlotsPanel: React.FC = () => {
                           slot.volume === 0 &&
                           slot.effTyp === 0 &&
                           slot.eff === 0 &&
-                          slot.effect2 === null;
+                          slot.effTyp2 === 0 &&
+                          slot.eff2 === 0;
 
           return (
             <div
@@ -58,8 +59,10 @@ export const MacroSlotsPanel: React.FC = () => {
                     ? `${slot.effTyp.toString(16).toUpperCase()}${slot.eff.toString(16).padStart(2, '0').toUpperCase()}`
                     : '...'}
                 </span>
-                <span className={slot.effect2 ? 'text-pink-400' : 'text-neutral-600'}>
-                  {slot.effect2 || '...'}
+                <span className={slot.effTyp2 !== 0 || slot.eff2 !== 0 ? 'text-pink-400' : 'text-neutral-600'}>
+                  {slot.effTyp2 !== 0 || slot.eff2 !== 0
+                    ? `${slot.effTyp2.toString(16).toUpperCase()}${slot.eff2.toString(16).padStart(2, '0').toUpperCase()}`
+                    : '...'}
                 </span>
               </div>
 

@@ -11,6 +11,8 @@ import {
   EFFECT_CATEGORY_COLORS,
   type EffectCategory,
   type EffectDescription,
+  hasFurnaceEffects,
+  getAllFurnaceEffects,
 } from '@utils/ft2EffectDescriptions';
 
 interface EffectPickerProps {
@@ -18,9 +20,13 @@ interface EffectPickerProps {
   position?: { x: number; y: number };
   onSelect: (effTyp: number, eff: number) => void;
   onClose: () => void;
+  /** Optional synth type to show platform-specific effects */
+  synthType?: string;
 }
 
-const CATEGORY_LABELS: Record<EffectCategory, string> = {
+type ExtendedCategory = EffectCategory | 'chip';
+
+const CATEGORY_LABELS: Record<ExtendedCategory, string> = {
   pitch: 'Pitch',
   volume: 'Volume',
   panning: 'Panning',
@@ -28,13 +34,20 @@ const CATEGORY_LABELS: Record<EffectCategory, string> = {
   global: 'Global',
   sample: 'Sample',
   misc: 'Misc',
+  chip: 'Chip',
 };
 
 const CATEGORY_ORDER: EffectCategory[] = ['pitch', 'volume', 'panning', 'timing', 'global', 'sample', 'misc'];
 
-export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, onSelect, onClose }) => {
+// Add chip color to the color map
+const EXTENDED_CATEGORY_COLORS: Record<ExtendedCategory, string> = {
+  ...EFFECT_CATEGORY_COLORS,
+  chip: 'text-pink-400',
+};
+
+export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, onSelect, onClose, synthType }) => {
   const [filter, setFilter] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<EffectCategory | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<ExtendedCategory | 'all'>('all');
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,26 +69,54 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
 
-  // Collect all effects with their keys (memoized - static data)
+  // Check if we have a Furnace synth type
+  const showFurnaceEffects = synthType && hasFurnaceEffects(synthType);
+
+  // Collect all effects with their keys (memoized)
   const allEffects = useMemo(() => {
-    const effects: (EffectDescription & { key: string; isExtended: boolean })[] = [];
+    const effects: (EffectDescription & { key: string; isExtended: boolean; isFurnace: boolean })[] = [];
 
+    // Standard FT2 effects
     Object.entries(FT2_EFFECT_DESCRIPTIONS).forEach(([key, desc]) => {
-      effects.push({ ...desc, key, isExtended: false });
+      effects.push({ ...desc, key, isExtended: false, isFurnace: false });
     });
 
+    // Extended E-commands
     Object.entries(FT2_E_COMMAND_DESCRIPTIONS).forEach(([key, desc]) => {
-      effects.push({ ...desc, key, isExtended: true });
+      effects.push({ ...desc, key, isExtended: true, isFurnace: false });
     });
+
+    // Furnace platform-specific effects (if applicable)
+    if (showFurnaceEffects && synthType) {
+      const furnaceEffects = getAllFurnaceEffects(synthType);
+      furnaceEffects.forEach((desc) => {
+        // Extract hex code from command (e.g., "10xx" -> "10")
+        const hexCode = desc.command.substring(0, 2);
+        effects.push({
+          ...desc,
+          key: hexCode,
+          isExtended: false,
+          isFurnace: true,
+          category: 'misc' as EffectCategory, // Override for filtering - chip effects shown in "Chip" tab
+        });
+      });
+    }
 
     return effects;
-  }, []);
+  }, [showFurnaceEffects, synthType]);
 
   // Filter effects (memoized on filter/category changes)
   const filtered = useMemo(() => {
     const lowerFilter = filter.toLowerCase();
     return allEffects.filter(eff => {
-      if (selectedCategory !== 'all' && eff.category !== selectedCategory) return false;
+      // Special handling for "chip" category - show only Furnace effects
+      if (selectedCategory === 'chip') {
+        if (!eff.isFurnace) return false;
+      } else if (selectedCategory !== 'all') {
+        // For regular categories, exclude Furnace effects (they go in "Chip" tab)
+        if (eff.isFurnace) return false;
+        if (eff.category !== selectedCategory) return false;
+      }
       if (!filter) return true;
       return (
         eff.name.toLowerCase().includes(lowerFilter) ||
@@ -93,8 +134,12 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
       // E-command: effTyp = 14 (E), eff = subcommand << 4
       const subCmd = parseInt(eff.key.substring(1), 16);
       onSelect(14, subCmd << 4);
+    } else if (eff.isFurnace) {
+      // Furnace platform effect: key is hex code like "10", "11", etc.
+      const effTyp = parseInt(eff.key, 16);
+      onSelect(effTyp, 0);
     } else {
-      // Regular effect: parse key as hex
+      // Regular FT2 effect: parse key as hex
       const effTyp = parseInt(eff.key, 16);
       onSelect(effTyp, 0);
     }
@@ -164,12 +209,25 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
               className={`px-2 py-0.5 text-[10px] rounded ${
                 selectedCategory === cat
                   ? 'bg-neutral-700 text-white'
-                  : `${EFFECT_CATEGORY_COLORS[cat]} hover:opacity-80`
+                  : `${EXTENDED_CATEGORY_COLORS[cat]} hover:opacity-80`
               }`}
             >
               {CATEGORY_LABELS[cat]}
             </button>
           ))}
+          {/* Show Chip tab only when Furnace synth is selected */}
+          {showFurnaceEffects && (
+            <button
+              onClick={() => setSelectedCategory('chip')}
+              className={`px-2 py-0.5 text-[10px] rounded ${
+                selectedCategory === 'chip'
+                  ? 'bg-pink-700 text-white'
+                  : `${EXTENDED_CATEGORY_COLORS.chip} hover:opacity-80`
+              }`}
+            >
+              {CATEGORY_LABELS.chip} ({synthType?.replace('Furnace', '')})
+            </button>
+          )}
         </div>
 
         {/* Effects list */}
@@ -178,10 +236,12 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
             <div className="text-center text-neutral-500 text-xs py-4">No effects match</div>
           ) : (
             filtered.map((eff) => {
-              const colorClass = EFFECT_CATEGORY_COLORS[eff.category];
+              const colorClass = eff.isFurnace
+                ? EXTENDED_CATEGORY_COLORS.chip
+                : EXTENDED_CATEGORY_COLORS[eff.category];
               return (
                 <button
-                  key={eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
+                  key={eff.isFurnace ? `f-${eff.key}` : eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
                   onClick={() => handleSelect(eff)}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-neutral-800 transition-colors text-left group"
                 >
@@ -189,7 +249,10 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
                     {eff.command.substring(0, 3)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-neutral-200 truncate">{eff.name}</div>
+                    <div className="text-xs text-neutral-200 truncate">
+                      {eff.name}
+                      {eff.isFurnace && <span className="ml-1 text-[9px] text-pink-400">(Chip)</span>}
+                    </div>
                     <div className="text-[10px] text-neutral-500 truncate">{eff.description}</div>
                   </div>
                   <span className="text-[9px] text-neutral-600 group-hover:text-neutral-400">
