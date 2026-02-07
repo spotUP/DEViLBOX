@@ -1,0 +1,1 @@
+/opt/homebrew/Cellar/emscripten/4.0.16/libexec/em++ -O3 -DNDEBUG -s WASM=1 -s MODULARIZE=1 -s EXPORT_NAME=createVASynthModule -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=4194304 -s EXPORTED_FUNCTIONS=[_malloc,_free] -s EXPORTED_RUNTIME_METHODS=[ccall,cwrap] -s ENVIRONMENT=web,worker --bind -O3 @CMakeFiles/VASYNTH_WASM.dir/objects1.rsp -o VASynth.js

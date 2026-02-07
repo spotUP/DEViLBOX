@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # C352 (Namco 32-Voice PCM Sound Chip) WASM Build
 # Based on MAME's C352 emulator by R. Belmont and superctr
 # Standalone version without MAME framework dependencies

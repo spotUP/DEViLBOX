@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # TMS36XX (TMS3615/TMS3617) - Tone Matrix Synthesizer
 # 6-note polyphonic organ tone generator with square wave oscillators
 # Used in: Phoenix, Naughty Boy, Pleiads, Monster Bash

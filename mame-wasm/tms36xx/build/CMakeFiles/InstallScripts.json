@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/spot/Code/DEViLBOX/mame-wasm/tms36xx/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

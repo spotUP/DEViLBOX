@@ -332,6 +332,24 @@ public:
         }
 
         m_romsLoaded = true;
+
+        // After processing ROMs, generate a simple test waveform for initial testing
+        // This ensures the synth produces sound even if ROM data is incomplete
+        initializeTestWaveform();
+    }
+
+    /**
+     * Initialize a simple test waveform in wave memory
+     * Creates a 256-sample sawtooth wave for testing
+     */
+    void initializeTestWaveform() {
+        // Generate a simple sawtooth waveform in the first 256 samples of wave memory
+        const int WAVE_SIZE = 256;
+        for (int i = 0; i < WAVE_SIZE && i < 65536; i++) {
+            // Sawtooth: ramp from 0 to 1023 (10-bit)
+            samples_delta[i] = (i * 4) & 0x3FF;
+            samples_delta_sign[i] = false;
+        }
     }
 
     // ========================================================================

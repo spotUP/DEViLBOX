@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # SN76477 (TI Complex Sound Generator) WASM Build
 # Based on MAME's SN76477 emulator by Zsolt Vasvari / Derrick Renaud
 # Standalone version without MAME framework dependencies

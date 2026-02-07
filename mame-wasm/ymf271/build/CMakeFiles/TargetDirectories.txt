@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/ymf271/build/CMakeFiles/YMF271_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ymf271/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ymf271/build/CMakeFiles/rebuild_cache.dir

@@ -196,6 +196,11 @@ public:
         m_noise_filter_cap_voltage = NOISE_CAP_VOLTAGE_MIN;
         m_attack_decay_cap_voltage = AD_CAP_VOLTAGE_MIN;
 
+        // Set fast default envelope times for musical response
+        // Default: 10ms attack, 100ms decay (instead of 1 second!)
+        setAttackTime(0.01);  // 10ms attack
+        setDecayTime(0.1);    // 100ms decay
+
         m_isInitialized = true;
     }
 
@@ -776,6 +781,16 @@ public:
 
             // Clamp
             sample = clamp(sample, -1.0, 1.0);
+
+            // Debug logging (first 10 samples after noteOn)
+            static int debug_counter = 0;
+            if (debug_counter < 10 && m_current_note >= 0) {
+                printf("SN76477: enable=%d vco_cap_v=%.3f vco_out=%d ad_cap_v=%.3f sample=%.3f\n",
+                       m_enable, m_vco_cap_voltage, m_vco_out_ff,
+                       m_attack_decay_cap_voltage, sample);
+                debug_counter++;
+            }
+            if (m_current_note < 0) debug_counter = 0;
 
             float out = static_cast<float>(sample);
             outputL[i] = out;

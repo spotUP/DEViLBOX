@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/tms36xx/build/CMakeFiles/TMS36XX_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/tms36xx/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/tms36xx/build/CMakeFiles/rebuild_cache.dir

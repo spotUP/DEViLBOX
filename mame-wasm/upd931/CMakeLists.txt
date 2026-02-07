@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # uPD931 (NEC/Casio) - Dual Waveform Keyboard Synthesizer
 # Step-based waveform accumulation with mirror/invert modes
 # Used in: Casio CT-8000, MT-65 keyboards (1981)

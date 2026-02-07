@@ -1,0 +1,14 @@
+--- a/src/engine/platform/pcspkr.cpp
++++ b/src/engine/platform/pcspkr.cpp
+@@ -664,9 +664,11 @@ void DivPlatformPCSpeaker::reset() {
+     beepFreq(0);
+   }*/
+
++#ifndef __EMSCRIPTEN__
+   if (realOutThread==NULL) {
+     realOutThread=new std::thread(_pcSpeakerThread,this);
+   }
++#endif
+
+   memset(regPool,0,2);
+ }

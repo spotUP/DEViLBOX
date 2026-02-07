@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # TMS5220 (Texas Instruments) - LPC Speech Synthesizer (Speak & Spell)
 # 10-pole digital lattice filter with chirp/noise excitation
 # Used in: Speak & Spell (1978), arcade games (Berzerk, Star Wars, Bagman)

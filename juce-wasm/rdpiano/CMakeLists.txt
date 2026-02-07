@@ -49,6 +49,7 @@ target_link_options(RdPianoWASM PRIVATE
     "SHELL:-s EXPORT_NAME='createRdPianoModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=33554432"
+    "SHELL:-s TOTAL_STACK=8388608"
     "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free']"

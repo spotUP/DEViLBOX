@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # uPD933 (NEC/Casio) - Phase Distortion Synthesis Chip
 # Casio CZ-series PD synthesis with 8 waveforms, 3 envelope generators per voice
 # Used in: Casio CZ-101, CZ-1000, CZ-1, CZ-3000, CZ-5000

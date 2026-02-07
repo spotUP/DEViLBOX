@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/ymopq/build/CMakeFiles/YMOPQ_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ymopq/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/ymopq/build/CMakeFiles/rebuild_cache.dir

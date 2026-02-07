@@ -157,6 +157,53 @@ public:
     }
 
     /**
+     * JavaScript wrapper for loadROM (takes pointer as uintptr_t)
+     */
+    void loadROMJS(uint32_t offset, uintptr_t dataPtr, uint32_t size) {
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(dataPtr);
+        loadROM(offset, data, size);
+
+        // After loading ROM, initialize all voices with default sample configuration
+        // This creates a simple sawtooth wave for testing
+        initializeDefaultSamples();
+    }
+
+    /**
+     * Initialize all voices with a default test waveform
+     * Creates a 256-sample sawtooth wave at the start of ROM
+     */
+    void initializeDefaultSamples() {
+        // Generate a simple sawtooth waveform (256 samples)
+        const int WAVE_SIZE = 256;
+        for (int i = 0; i < WAVE_SIZE; i++) {
+            // Sawtooth: ramp from -128 to +127
+            m_rom[i] = static_cast<uint8_t>((i - 128) & 0xFF);
+        }
+
+        // Configure all 32 voices to use this test sample
+        for (int v = 0; v < NUM_VOICES; v++) {
+            C352Voice* voice = &m_voices[v];
+            voice->wave_bank = 0;            // Bank 0
+            voice->wave_start = 0;           // Start at offset 0
+            voice->wave_end = WAVE_SIZE;     // End at 256 samples
+            voice->wave_loop = 0;            // Loop from start
+            voice->freq = 0x1000;            // Default frequency (middle C)
+            voice->flags = C352_FLG_LOOP;    // Enable looping
+
+            // Set default volume (max)
+            voice->vol_f = 0xFFFF;  // Max volume L/R
+            voice->vol_r = 0xFFFF;
+
+            // Initialize curr_vol to target values (skip volume ramping for test)
+            // This avoids the volume starting at 0 and slowly ramping up
+            voice->curr_vol[0] = 0xFF;  // Front Left
+            voice->curr_vol[1] = 0xFF;  // Front Right
+            voice->curr_vol[2] = 0xFF;  // Rear Left
+            voice->curr_vol[3] = 0xFF;  // Rear Right
+        }
+    }
+
+    /**
      * Configure a voice for sample playback
      */
     void configureVoice(int voice, uint16_t bank, uint16_t start, uint16_t end,
@@ -199,9 +246,11 @@ public:
         v->flags |= C352_FLG_BUSY;
         v->flags &= ~(C352_FLG_KEYON | C352_FLG_LOOPHIST);
 
-        // Reset volume ramps
-        v->curr_vol[0] = v->curr_vol[1] = 0;
-        v->curr_vol[2] = v->curr_vol[3] = 0;
+        // Initialize volumes to target values instead of 0 (skip slow ramp for testing)
+        v->curr_vol[0] = v->vol_f >> 8;   // Front Left
+        v->curr_vol[1] = v->vol_f & 0xff; // Front Right
+        v->curr_vol[2] = v->vol_r >> 8;   // Rear Left
+        v->curr_vol[3] = v->vol_r & 0xff; // Rear Right
     }
 
     /**
@@ -326,6 +375,13 @@ public:
         }
     }
 
+    // JavaScript wrapper for process() - converts uintptr_t to float pointers
+    void processJS(uintptr_t outputLPtr, uintptr_t outputRPtr, int numSamples) {
+        float* outputL = reinterpret_cast<float*>(outputLPtr);
+        float* outputR = reinterpret_cast<float*>(outputRPtr);
+        process(outputL, outputR, numSamples);
+    }
+
     bool isInitialized() const { return m_isInitialized; }
 
 private:
@@ -421,7 +477,7 @@ EMSCRIPTEN_BINDINGS(c352_synth) {
     emscripten::class_<C352Synth>("C352Synth")
         .constructor<>()
         .function("initialize", &C352Synth::initialize)
-        .function("loadROM", &C352Synth::loadROM, emscripten::allow_raw_pointers())
+        .function("loadROM", &C352Synth::loadROMJS)
         .function("configureVoice", &C352Synth::configureVoice)
         .function("setVoiceVolume", &C352Synth::setVoiceVolume)
         .function("keyOn", &C352Synth::keyOn)
@@ -430,7 +486,7 @@ EMSCRIPTEN_BINDINGS(c352_synth) {
         .function("noteOff", &C352Synth::noteOff)
         .function("allNotesOff", &C352Synth::allNotesOff)
         .function("setParameter", &C352Synth::setParameter)
-        .function("process", &C352Synth::process, emscripten::allow_raw_pointers())
+        .function("process", &C352Synth::processJS)
         .function("isInitialized", &C352Synth::isInitialized);
 }
 

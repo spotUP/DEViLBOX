@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/es5503/build/CMakeFiles/ES5503_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/es5503/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/es5503/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/mame-wasm/upd931/build/CMakeFiles/UPD931_WASM.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/upd931/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/mame-wasm/upd931/build/CMakeFiles/rebuild_cache.dir

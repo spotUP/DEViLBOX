@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # MEA8000 (Philips/Signetics) - 4-Formant Speech Synthesizer
 # Vocoder-style synthesis with sawtooth/noise excitation and 4 cascade filters
 # Used in: Thomson MO5/TO7, Amstrad CPC, Oric Atmos (French speech extensions)

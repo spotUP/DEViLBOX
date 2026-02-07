@@ -9,7 +9,7 @@
 #include "furnace_preempt.h"
 #include "instrument.h"
 #include "wavetable.h"
-#include "sample.h"
+// DivSample is defined in furnace_preempt.h
 
 // Storage for instruments, wavetables, and samples
 static std::vector<DivInstrument*> g_instruments;

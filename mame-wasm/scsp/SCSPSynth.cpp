@@ -53,6 +53,8 @@ static constexpr size_t SAMPLE_RAM_SIZE = 512 * 1024;  // 512KB sample RAM
 static constexpr int SHIFT = 12;
 static constexpr int EG_SHIFT = 16;
 static constexpr int LFO_SHIFT = 8;
+static constexpr int DEFAULT_WAVE_SAMPLES = 256;  // Single-cycle waveform samples
+static constexpr int DEFAULT_WAVE_BYTES = DEFAULT_WAVE_SAMPLES * 2;  // 16-bit = 2 bytes
 
 // Envelope times in ms (from MAME)
 static const double ARTimes[64] = {
@@ -160,6 +162,9 @@ public:
         // Initialize pan tables
         initPanTables();
 
+        // Generate default sawtooth waveform at RAM offset 0
+        generateDefaultWaveform();
+
         m_isInitialized = true;
     }
 
@@ -209,14 +214,12 @@ public:
 
         SCSPSlot& s = m_slots[slot];
 
-        // Convert MIDI note to SCSP pitch
-        int octave = (midiNote / 12) - 5;  // MIDI 60 = C4 = octave 0
-        int note = midiNote % 12;
-        int fns = note * 85;  // Approximate FNS for each semitone
-
-        s.octave = clamp_value(octave, -8, 7);
-        s.fns = fns & 0x3FF;
-        computeStep(s);
+        // Compute playback step from MIDI note frequency.
+        // Default waveform is DEFAULT_WAVE_SAMPLES samples (DEFAULT_WAVE_BYTES bytes) per cycle.
+        // step (24.8 fixed point) = freq * bytesPerCycle / sampleRate * 256
+        double freq = 440.0 * pow(2.0, (midiNote - 69.0) / 12.0);
+        s.step = static_cast<u32>(freq * DEFAULT_WAVE_BYTES * 256.0 / m_sampleRate);
+        if (s.step == 0) s.step = 1;  // Ensure non-zero step
 
         // Set envelope based on velocity
         s.totalLevel = 255 - (velocity * 2);
@@ -339,6 +342,29 @@ public:
     }
 
 private:
+    /**
+     * Generate a default single-cycle sawtooth waveform at RAM offset 0
+     * and configure all 32 slots to use it with looping enabled.
+     */
+    void generateDefaultWaveform() {
+        for (int i = 0; i < DEFAULT_WAVE_SAMPLES; i++) {
+            // Sawtooth: linearly from -32768 to +32767
+            s16 val = static_cast<s16>(-32768 + (65535 * i / DEFAULT_WAVE_SAMPLES));
+            // Store as big-endian 16-bit
+            m_sampleRAM[i * 2]     = static_cast<u8>((val >> 8) & 0xFF);
+            m_sampleRAM[i * 2 + 1] = static_cast<u8>(val & 0xFF);
+        }
+
+        // Configure all 32 slots to use the default waveform
+        for (int slot = 0; slot < SCSP_SLOTS; slot++) {
+            m_slots[slot].sampleAddr = 0;
+            m_slots[slot].loopStart = 0;
+            m_slots[slot].loopEnd = DEFAULT_WAVE_BYTES;
+            m_slots[slot].loop = true;
+            m_slots[slot].pcm8bit = false;
+        }
+    }
+
     void initEnvelopeTables() {
         for (int i = 0; i < 64; i++) {
             double rate = ARTimes[i];

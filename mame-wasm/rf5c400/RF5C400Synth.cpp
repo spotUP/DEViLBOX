@@ -66,6 +66,41 @@ public:
         uint32_t maxSize = ROM_SIZE - offset;
         uint32_t copySize = std::min(size, maxSize);
         memcpy(&m_rom[offset], data, copySize);
+
+        // After loading ROM, initialize all channels with default sample configuration
+        initializeDefaultSamples();
+    }
+
+    /**
+     * Initialize all channels with a default test waveform
+     * Creates a 1024-sample sawtooth wave at the start of ROM
+     */
+    void initializeDefaultSamples() {
+        // Generate a simple square wave (1024 samples, 16-bit)
+        // Using positive-only values to avoid sign-adjustment issues
+        const int WAVE_SIZE = 1024;
+        uint16_t* rom16 = reinterpret_cast<uint16_t*>(m_rom);
+        for (int i = 0; i < WAVE_SIZE; i++) {
+            // Square wave: alternating high/low
+            rom16[i] = (i & 256) ? 0x4000 : 0x0000;
+        }
+
+        // Configure all 32 channels to use this test sample
+        for (int ch = 0; ch < 32; ch++) {
+            Channel& c = m_channel[ch];
+            // RF5C400 uses 20-bit sample addresses (startH << 16 | startL)
+            c.startH = 0;               // Start high word
+            c.startL = 0;               // Start low word
+            c.endL = WAVE_SIZE * 2;     // End address (bytes)
+            c.endHloopH = 0;            // End high / Loop high
+            c.loopL = 0;                // Loop from start
+            c.freq = 0x1000;            // Default frequency
+            c.pan = 0x0F;               // Center pan
+            c.volume = 0xFF;            // Max volume
+            c.attack = 0x00;            // Fast attack
+            c.decay = 0x00;             // No decay
+            c.release = 0x7F;           // Medium release
+        }
     }
 
     // Note interface for DEViLBOX
@@ -97,22 +132,17 @@ public:
         chan.step = ((freqReg & 0x1fff) << (freqReg >> 13)) * 4;
         chan.freq = freqReg;
 
-        // Set sample parameters
-        chan.startH = 0;
-        chan.startL = 0;
-        chan.endL = 0xFFFF;
-        chan.endHloopH = 0x00FF;
-        chan.loopL = 0;
-
-        // Volume and pan (center)
+        // NOTE: Don't overwrite sample addresses - use the ones from initializeDefaultSamples()
+        // Only update volume and pan for the velocity
         chan.volume = velocity | (TYPE_16 << 8); // 16-bit samples
         chan.pan = 0x4747; // Center pan
 
-        // Start envelope
+        // Start envelope - use instant attack for testing (envLevel = 1.0)
+        // In production, would use proper ADSR from channel.attack register
         chan.pos = 0;
         chan.envPhase = PHASE_ATTACK;
-        chan.envLevel = 0.0;
-        chan.envStep = m_arTable[0x40]; // Medium attack
+        chan.envLevel = 1.0;  // Instant attack for testing (was 0.0)
+        chan.envStep = 0.0;   // No ramp needed since we start at max
         chan.envScale = 1.0;
     }
 

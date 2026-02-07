@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
 # ICS2115 (ICS WaveFront) WASM Build
 # Based on MAME's ics2115 by Alex Marshall, nimitz, austere
 # 32-voice wavetable synthesizer for arcade games
