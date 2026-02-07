@@ -2,6 +2,7 @@
   "version": "1.0.0",
   "categories": {
     "acid": [
+      { "file": "acid-core.dbox", "name": "Acid Core (TB-303 + TR-909)" },
       { "file": "phuture-acid-tracks.dbox", "name": "Phuture - Acid Tracks" },
       { "file": "hardfloor-funalogue.dbox", "name": "Hardfloor - Funalogue" },
       { "file": "josh-wink-higher-state.dbox", "name": "Josh Wink - Higher State" },
@@ -27,6 +28,7 @@
       { "file": "public-energy-three-o-three-part-2-.dbox", "name": "Public Energy - Three O Three (Part 2)" }
     ],
     "general": [
+      { "file": "deep-house.dbox", "name": "Deep House (Atmospheric)" },
       { "file": "mr-oizo-flat-beat.dbox", "name": "Mr Oizo - Flat Beat" },
       { "file": "new-order-confusion.dbox", "name": "New Order - Confusion" },
       { "file": "edge-of-motion-setup-707.dbox", "name": "Edge of Motion - 707 Setup" }
