@@ -94,6 +94,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   constructor() {
     super();
+    console.log('[DB303Synth] Constructor called');
     this.audioContext = getNativeContext(this.context);
     this.output = new Tone.Gain(1);
 

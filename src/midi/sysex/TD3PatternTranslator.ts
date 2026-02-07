@@ -123,8 +123,8 @@ export function trackerCellToTD3Step(cell: TrackerCell, baseOctave: number = TD3
 
   const step: TD3Step = {
     note: isRest ? null : trackerNoteToTD3(noteStr, baseOctave),
-    accent: cell.accent || false,
-    slide: cell.slide || false,
+    accent: (cell.flag1 === 1 || cell.flag2 === 1),
+    slide: (cell.flag1 === 2 || cell.flag2 === 2),
     tie: false, // Note: Tie detection is handled in trackerPatternToTD3Steps which has access to previous cells
   };
 
@@ -147,8 +147,8 @@ export function td3StepToTrackerCell(step: TD3Step, baseOctave: number = TD3_BAS
     eff: 0,
     effTyp2: 0,
     eff2: 0,
-    accent: step.accent,
-    slide: step.slide,
+    flag1: step.accent ? 1 : undefined,
+    flag2: step.slide ? 2 : undefined,
   };
 
   return cell;

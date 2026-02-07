@@ -82,8 +82,8 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
         eff: 0,
         effTyp2: 0,
         eff2: 0,
-        accent: step.accent,
-        slide: step.slide,
+        flag1: step.accent ? 1 : undefined,
+        flag2: step.slide ? 2 : undefined,
       });
     } else {
       // Empty step
@@ -152,8 +152,8 @@ export function convertToDb303Pattern(pattern: Pattern): string {
 
     const hasNote = cell.note > 0 && cell.note <= 96;
     const gate = hasNote;
-    const accent = cell.accent || false;
-    const slide = cell.slide || false;
+    const accent = (cell.flag1 === 1 || cell.flag2 === 1);
+    const slide = (cell.flag1 === 2 || cell.flag2 === 2);
 
     let key = 0;
     let octave = 0;

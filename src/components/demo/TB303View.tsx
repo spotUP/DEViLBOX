@@ -135,8 +135,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
         active: hasNote,
         note,
         octave,
-        accent: !!row?.accent,
-        slide: !!row?.slide,
+        accent: !!(row?.flag1 === 1 || row?.flag2 === 1),
+        slide: !!(row?.flag1 === 2 || row?.flag2 === 2),
       });
     }
 
@@ -322,7 +322,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const handleClearPattern = () => {
     // Clear first 16 rows of the current channel
     for (let i = 0; i < 16; i++) {
-      setCell(channelIndex, i, { note: 0, accent: false, slide: false }); // XM format: 0 = no note
+      setCell(channelIndex, i, { note: 0, flag1: 0, flag2: 0 }); // XM format: 0 = no note
     }
   };
 
@@ -337,8 +337,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
 
       setCell(channelIndex, i, {
         note: active ? tb303ToTrackerNote(note, octave) : 0, // XM format: 0 = no note
-        accent,
-        slide,
+        flag1: accent ? 1 : 0,
+        flag2: slide ? 2 : 0,
       });
     }
   };
@@ -347,8 +347,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const handleStepChange = useCallback((stepIndex: number, step: TB303Step) => {
     setCell(channelIndex, stepIndex, {
       note: step.active ? tb303ToTrackerNote(step.note, step.octave) : 0, // XM format: 0 = no note
-      accent: step.accent,
-      slide: step.slide,
+      flag1: step.accent ? 1 : undefined,
+      flag2: step.slide ? 2 : undefined,
     });
   }, [channelIndex, setCell]);
 
@@ -358,8 +358,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
 
     setCell(channelIndex, stepIndex, {
       note: newActive ? tb303ToTrackerNote(currentStep.note, currentStep.octave) : 0, // XM format: 0 = no note
-      accent: currentStep.accent,
-      slide: currentStep.slide,
+      flag1: currentStep.accent ? 1 : undefined,
+      flag2: currentStep.slide ? 2 : undefined,
     });
   }, [channelIndex, setCell, steps]);
 
