@@ -137,7 +137,7 @@ export const useTrackerInput = () => {
   const moveCursor = useTrackerStore((state) => state.moveCursor);
   const moveCursorToRow = useTrackerStore((state) => state.moveCursorToRow);
   const moveCursorToChannel = useTrackerStore((state) => state.moveCursorToChannel);
-  const _moveCursorToColumn = useTrackerStore((state) => state.moveCursorToColumn);
+  const moveCursorToColumn = useTrackerStore((state) => state.moveCursorToColumn);
   const setCell = useTrackerStore((state) => state.setCell);
   const clearCell = useTrackerStore((state) => state.clearCell);
   const setCurrentPattern = useTrackerStore((state) => state.setCurrentPattern);
@@ -325,9 +325,11 @@ export const useTrackerInput = () => {
         insertRow(targetChannel, targetRow);
       }
 
+      // FT2/ProTracker: Only set the note, don't auto-stamp instrument.
+      // Instrument column is edited independently — the classic ProTracker trick
+      // of entering instrument-only rows to change voice mid-pattern relies on this.
       setCell(targetChannel, targetRow, {
         note: xmNote,
-        instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
       // Chord entry mode: advance to next channel instead of next row
@@ -343,13 +345,13 @@ export const useTrackerInput = () => {
         // At last channel: fall through to normal row advance behavior
       }
 
-      // Always advance cursor by editStep after note entry (unless during playback)
+      // FT2: Always advance cursor by editStep after note entry (unless during playback)
+      // Uses modulo wrapping, not clamping — FT2: (row + editRowSkip) % numRows
       if (editStep > 0 && !isPlaying) {
-        const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-        moveCursorToRow(newRow);
+        moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
       }
     },
-    [cursor, currentInstrumentId, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel]
+    [cursor, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel]
   );
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
@@ -471,39 +473,47 @@ export const useTrackerInput = () => {
       }
 
       // Tab/Shift+Tab: Jump to next/previous track (with wrapping)
+      // FT2: Tab always lands on CURSOR_NOTE of target channel
       if (key === 'Tab') {
         e.preventDefault();
         if (e.shiftKey) {
-          // Shift+Tab: Previous channel, wrap to last if at first
-          if (cursor.channelIndex > 0) {
-            moveCursorToChannel(cursor.channelIndex - 1);
-          } else {
-            moveCursorToChannel(pattern.channels.length - 1);
+          // FT2 Shift+Tab: If already on note column, go to previous channel
+          // If on any other column, just jump to note column of same channel
+          if (cursor.columnType === 'note') {
+            if (cursor.channelIndex > 0) {
+              moveCursorToChannel(cursor.channelIndex - 1);
+            } else {
+              moveCursorToChannel(pattern.channels.length - 1);
+            }
           }
         } else {
-          // Tab: Next channel, wrap to first if at last
+          // FT2 Tab: Always go to note column of next channel
           if (cursor.channelIndex < pattern.channels.length - 1) {
             moveCursorToChannel(cursor.channelIndex + 1);
           } else {
             moveCursorToChannel(0);
           }
         }
+        // FT2: Always reset to note column
+        moveCursorToColumn('note');
         return;
       }
 
-      // Alt+Q..I: Jump to track 0-7
+      // Alt+Q..I: Jump to track 0-7 (FT2: always lands on note column)
       if (e.altKey && ALT_TRACK_MAP_1[keyLower] !== undefined) {
         e.preventDefault();
         const track = ALT_TRACK_MAP_1[keyLower] % pattern.channels.length;
         moveCursorToChannel(track);
+        moveCursorToColumn('note');
         return;
       }
 
-      // Alt+A..K: Jump to track 8-15
+      // Alt+A..K: Jump to track 8-15 (FT2: always lands on note column)
       if (e.altKey && ALT_TRACK_MAP_2[keyLower] !== undefined) {
         e.preventDefault();
         const track = ALT_TRACK_MAP_2[keyLower] % pattern.channels.length;
         moveCursorToChannel(track);
+        moveCursorToColumn('note');
         return;
       }
 
@@ -633,6 +643,7 @@ export const useTrackerInput = () => {
       // ============================================
 
       // Delete: Different behaviors based on modifiers (requires edit mode)
+      // FT2: Delete clears fields then advances by editRowSkip with wrapping
       if (key === 'Delete' && recordMode) {
         e.preventDefault();
         if (e.shiftKey) {
@@ -667,13 +678,17 @@ export const useTrackerInput = () => {
             setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
           } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') {
             setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0, eff: 0 });
-          } else if (cursor.columnType === 'effect2') {
-            setCell(cursor.channelIndex, cursor.rowIndex, { effect2: null });
+          } else if (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: 0, eff2: 0 });
           } else if (cursor.columnType === 'probability') {
             setCell(cursor.channelIndex, cursor.rowIndex, { probability: undefined });
           } else {
             clearCell(cursor.channelIndex, cursor.rowIndex);
           }
+        }
+        // FT2: Advance by editStep after delete (same as any data entry)
+        if (editStep > 0 && !isPlaying) {
+          moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
         }
         return;
       }
@@ -862,10 +877,9 @@ export const useTrackerInput = () => {
           // When recording during playback, enter at the current playback row
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursor.rowIndex;
           setCell(cursor.channelIndex, targetRow, { note: 97 }); // 97 = note off in XM format
-          // Always advance cursor by editStep after note entry (unless during playback)
+          // FT2: Advance cursor by editStep with wrapping (unless during playback)
           if (editStep > 0 && !isPlaying) {
-            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-            moveCursorToRow(newRow);
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           }
         }
         return;
@@ -1016,15 +1030,9 @@ export const useTrackerInput = () => {
         if (newValue > 128) newValue = 128;
         setCell(cursor.channelIndex, cursor.rowIndex, { instrument: newValue });
 
-        // Advance cursor
-        if (cursor.digitIndex < 1) {
-          moveCursor('right');
-        } else {
-          moveCursor('right');
-          if (editStep > 0) {
-            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-            moveCursorToRow(newRow);
-          }
+        // FT2: Stay on same column/digit, advance row by editStep with wrapping
+        if (editStep > 0 && !isPlaying) {
+          moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
         }
         return;
       }
@@ -1043,7 +1051,10 @@ export const useTrackerInput = () => {
             // FT2: volume 0x51-0x5F clamps to 0x50
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursor.channelIndex, cursor.rowIndex, { volume: newValue });
-            moveCursor('right');
+            // FT2: Stay on same column/digit, advance row by editStep with wrapping
+            if (editStep > 0 && !isPlaying) {
+              moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+            }
             return;
           }
         } else {
@@ -1064,10 +1075,9 @@ export const useTrackerInput = () => {
             if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
             setCell(cursor.channelIndex, cursor.rowIndex, { volume: newValue });
 
-            moveCursor('right');
-            if (editStep > 0) {
-              const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-              moveCursorToRow(newRow);
+            // FT2: Stay on same column/digit, advance row by editStep with wrapping
+            if (editStep > 0 && !isPlaying) {
+              moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
             }
             return;
           }
@@ -1080,7 +1090,10 @@ export const useTrackerInput = () => {
         if (effKey !== undefined) {
           e.preventDefault();
           setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: effKey });
-          moveCursor('right');
+          // FT2: Stay on same column, advance row by editStep with wrapping
+          if (editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          }
           return;
         }
       }
@@ -1102,41 +1115,47 @@ export const useTrackerInput = () => {
 
         setCell(cursor.channelIndex, cursor.rowIndex, { eff: newValue });
 
-        // Advance cursor
-        if (cursor.digitIndex < 1) {
-          moveCursor('right');
-        } else {
-          moveCursor('right');
-          if (editStep > 0) {
-            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-            moveCursorToRow(newRow);
-          }
+        // FT2: Stay on same column/digit, advance row by editStep with wrapping
+        if (editStep > 0 && !isPlaying) {
+          moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
         }
         return;
       }
 
-      // ---------- EFFECT2 (DEViLBOX extension): String-based for now ----------
-      if (recordMode && cursor.columnType === 'effect2' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        const hexDigit = key.toUpperCase();
-        const currentValue = currentCell.effect2 || '...';
-        let currentStr = currentValue === '...' ? '000' : currentValue.padEnd(3, '0');
-        const chars = currentStr.split('');
-
-        chars[cursor.digitIndex] = hexDigit;
-
-        const newStr = chars.join('');
-        setCell(cursor.channelIndex, cursor.rowIndex, { effect2: newStr });
-
-        // Advance cursor
-        if (cursor.digitIndex < 2) {
-          moveCursor('right');
-        } else {
-          moveCursor('right');
-          if (editStep > 0) {
-            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-            moveCursorToRow(newRow);
+      // ---------- EFFECT2 TYPE (EFX2_0): FT2 effect command keys (0-9, A-Z) ----------
+      if (recordMode && cursor.columnType === 'effTyp2' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
+        if (effKey !== undefined) {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: effKey });
+          // FT2: Stay on same column, advance row by editStep with wrapping
+          if (editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           }
+          return;
+        }
+      }
+
+      // ---------- EFFECT2 PARAMETER (EFX2_1/EFX2_2): Hex digits only ----------
+      if (recordMode && cursor.columnType === 'effParam2' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const hexDigit = parseInt(key, 16);
+        const currentValue = currentCell.eff2 || 0;
+
+        let newValue: number;
+        if (cursor.digitIndex === 0) {
+          // High nibble
+          newValue = (hexDigit << 4) | (currentValue & 0x0F);
+        } else {
+          // Low nibble
+          newValue = (currentValue & 0xF0) | hexDigit;
+        }
+
+        setCell(cursor.channelIndex, cursor.rowIndex, { eff2: newValue });
+
+        // FT2: Stay on same column/digit, advance row by editStep with wrapping
+        if (editStep > 0 && !isPlaying) {
+          moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
         }
         return;
       }
@@ -1161,15 +1180,9 @@ export const useTrackerInput = () => {
 
         setCell(cursor.channelIndex, cursor.rowIndex, { probability: newValue });
 
-        // Advance cursor
-        if (cursor.digitIndex < 1) {
-          moveCursor('right');
-        } else {
-          moveCursor('right');
-          if (editStep > 0) {
-            const newRow = Math.min(pattern.length - 1, cursor.rowIndex + editStep);
-            moveCursorToRow(newRow);
-          }
+        // FT2: Stay on same column/digit, advance row by editStep with wrapping
+        if (editStep > 0 && !isPlaying) {
+          moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
         }
         return;
       }
@@ -1192,6 +1205,7 @@ export const useTrackerInput = () => {
       moveCursor,
       moveCursorToRow,
       moveCursorToChannel,
+      moveCursorToColumn,
       setCell,
       clearCell,
       setCurrentPattern,

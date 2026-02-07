@@ -145,6 +145,8 @@ function createPatternFromMIDI(
         volume: 0,
         effTyp: 0,
         eff: 0,
+        effTyp2: 0,
+        eff2: 0,
       }));
 
       // Convert notes to tracker cells
@@ -220,6 +222,8 @@ function createPatternFromTrack(
     volume: 0,
     effTyp: 0,
     eff: 0,
+    effTyp2: 0,
+    eff2: 0,
   }));
 
   // Convert notes to tracker cells

@@ -557,45 +557,6 @@ export const MAME_CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   },
 
   // ============================================
-  // Roland SA - Silicon-Accurate Piano
-  // ============================================
-  {
-    type: 'synth',
-    name: 'Roland SA Piano',
-    synthType: 'MAMERolandSA',
-    parameters: { _program: 0 },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'Roland SA E.Piano',
-    synthType: 'MAMERolandSA',
-    parameters: { _program: 2 },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'Roland SA Organ',
-    synthType: 'MAMERolandSA',
-    parameters: { _program: 3 },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'Roland SA Strings',
-    synthType: 'MAMERolandSA',
-    parameters: { _program: 4 },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-
   // ============================================
   // PCM Chips - Default presets
   // ============================================

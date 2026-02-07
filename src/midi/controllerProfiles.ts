@@ -110,12 +110,12 @@ export type TrackerAction = keyof typeof TRACKER_ACTIONS;
  */
 export const TB303_PARAMETERS = {
   // Main controls
-  'tb303.cutoff': { label: 'Cutoff', min: 50, max: 18000, category: '303 Main' },
+  'tb303.cutoff': { label: 'Cutoff', min: 200, max: 5000, category: '303 Main' },
   'tb303.resonance': { label: 'Resonance', min: 0, max: 100, category: '303 Main' },
   'tb303.envMod': { label: 'Env Mod', min: 0, max: 100, category: '303 Main' },
-  'tb303.decay': { label: 'Decay', min: 30, max: 3000, category: '303 Main' },
+  'tb303.decay': { label: 'Decay', min: 200, max: 2000, category: '303 Main' },
   'tb303.accent': { label: 'Accent', min: 0, max: 100, category: '303 Main' },
-  'tb303.slideTime': { label: 'Slide Time', min: 10, max: 500, category: '303 Main' },
+  'tb303.slideTime': { label: 'Slide Time', min: 2, max: 360, category: '303 Main' },
   'tb303.overdrive': { label: 'Overdrive', min: 0, max: 100, category: '303 Main' },
 
   // Devil Fish

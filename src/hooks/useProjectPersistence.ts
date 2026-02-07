@@ -152,10 +152,8 @@ export function loadProjectFromStorage(): boolean {
       audioStore.setMasterEffects(project.masterEffects);
     }
 
-    // Load groove template
-    if (project.grooveTemplateId) {
-      transportStore.setGrooveTemplate(project.grooveTemplateId);
-    }
+    // Load groove template (always reset to straight if not specified)
+    transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
 
     // Auto-bake any instruments that need it (async)
     instrumentStore.autoBakeInstruments();

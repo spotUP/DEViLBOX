@@ -378,40 +378,74 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         }
 
         case 'chip': {
+          // Validate chip export
           if (!chipLogData || chipLogData.length === 0) {
-            notify.warning('No chip data recorded. Press Record first, then play your song.');
+            notify.error('No recording data. Press Record and play your song first.');
             return;
           }
 
-          // Calculate loop point in samples from row number
-          // Formula: samples = row * (60 / BPM) * (speed / 6) * sampleRate
-          // Simplified: samples = row * secondsPerRow * 44100
-          const rowsPerBeat = 4; // Assuming 4 rows per beat (tracker standard)
-          const beatsPerSecond = bpm / 60;
-          const secondsPerRow = 1 / (beatsPerSecond * rowsPerBeat);
-          const loopPointSamples = chipLoopPoint > 0
-            ? Math.floor(chipLoopPoint * secondsPerRow * 44100)
-            : undefined;
+          if (chipWrites.length === 0) {
+            notify.error('No register writes captured. Make sure Furnace chips are playing.');
+            return;
+          }
 
-          const chipResult = await exportChipMusic(chipLogData, {
-            format: chipFormat,
-            title: chipTitle || metadata.name || 'Untitled',
-            author: chipAuthor || metadata.author || 'Unknown',
-            loopPoint: loopPointSamples,
-          });
+          if (!availableChipFormats.includes(chipFormat)) {
+            const usedChips = getLogStatistics(chipWrites).usedChips
+              .map(c => c.name)
+              .join(', ');
+            notify.error(`${FORMAT_INFO[chipFormat].name} format is not compatible with chips used: ${usedChips}. Try VGM for universal compatibility.`);
+            return;
+          }
 
-          // Download the file
-          const url = URL.createObjectURL(chipResult.data);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = chipResult.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          if (!chipTitle.trim()) {
+            notify.error('Please enter a title for your export.');
+            return;
+          }
 
-          notify.success(`${FORMAT_INFO[chipFormat].name} file exported successfully!`);
-          onClose();
+          // Show progress
+          setIsRendering(true);
+          setRenderProgress(0);
+
+          try {
+            // Calculate loop point in samples from row number
+            // Formula: samples = row * (60 / BPM) * (speed / 6) * sampleRate
+            // Simplified: samples = row * secondsPerRow * 44100
+            const rowsPerBeat = 4; // Assuming 4 rows per beat (tracker standard)
+            const beatsPerSecond = bpm / 60;
+            const secondsPerRow = 1 / (beatsPerSecond * rowsPerBeat);
+            const loopPointSamples = chipLoopPoint > 0
+              ? Math.floor(chipLoopPoint * secondsPerRow * 44100)
+              : undefined;
+
+            setRenderProgress(50);
+
+            const chipResult = await exportChipMusic(chipLogData, {
+              format: chipFormat,
+              title: chipTitle || metadata.name || 'Untitled',
+              author: chipAuthor || metadata.author || 'Unknown',
+              loopPoint: loopPointSamples,
+            });
+
+            setRenderProgress(100);
+
+            // Download the file
+            const url = URL.createObjectURL(chipResult.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = chipResult.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            notify.success(`${FORMAT_INFO[chipFormat].name} file exported successfully!`);
+            onClose();
+          } catch (error) {
+            notify.error(`Export failed: ${(error as Error).message}`);
+          } finally {
+            setIsRendering(false);
+            setRenderProgress(0);
+          }
           break;
         }
 
@@ -1235,6 +1269,42 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       </div>
                     )}
 
+                    {/* Quick presets */}
+                    {chipWrites.length > 0 && (
+                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                        <div className="text-xs font-mono text-text-muted mb-2">QUICK PRESETS</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setChipFormat('vgm')}
+                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left"
+                          >
+                            🌐 Universal (VGM)
+                          </button>
+                          <button
+                            onClick={() => setChipFormat('gym')}
+                            disabled={!availableChipFormats.includes('gym')}
+                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            🎮 Genesis (GYM)
+                          </button>
+                          <button
+                            onClick={() => setChipFormat('nsf')}
+                            disabled={!availableChipFormats.includes('nsf')}
+                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            🕹️ NES (NSF)
+                          </button>
+                          <button
+                            onClick={() => setChipFormat('gbs')}
+                            disabled={!availableChipFormats.includes('gbs')}
+                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            🎮 Game Boy (GBS)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Format selection */}
                     <div>
                       <label className="block text-xs font-mono text-text-muted mb-2">
@@ -1244,6 +1314,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         {(['vgm', 'gym', 'nsf', 'gbs', 'spc', 'zsm', 'sap', 'tiuna'] as ChipExportFormat[]).map((fmt) => {
                           const info = FORMAT_INFO[fmt];
                           const isAvailable = availableChipFormats.includes(fmt) || chipWrites.length === 0;
+
+                          // Loop support indicators
+                          const loopSupport = {
+                            vgm: { supported: true, type: 'custom' },
+                            gym: { supported: false, type: 'none' },
+                            nsf: { supported: true, type: 'auto' },
+                            gbs: { supported: true, type: 'auto' },
+                            spc: { supported: false, type: 'none' },
+                            zsm: { supported: false, type: 'none' },
+                            sap: { supported: false, type: 'none' },
+                            tiuna: { supported: false, type: 'none' },
+                          }[fmt];
+
                           return (
                             <button
                               key={fmt}
@@ -1259,12 +1342,58 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                                 }
                               `}
                             >
-                              <div className="font-mono text-sm font-semibold">{info.name}</div>
+                              <div className="flex items-center justify-between">
+                                <div className="font-mono text-sm font-semibold">{info.name}</div>
+                                {loopSupport.type === 'custom' && (
+                                  <span className="text-xs opacity-70" title="Custom loop point supported">🔁</span>
+                                )}
+                                {loopSupport.type === 'auto' && (
+                                  <span className="text-xs opacity-70" title="Loops entire song automatically">↻</span>
+                                )}
+                              </div>
                               <div className="text-xs opacity-70">.{info.extension}</div>
                             </button>
                           );
                         })}
                       </div>
+
+                      {/* Loop point warning/info */}
+                      {chipLoopPoint > 0 && (
+                        <div className="mt-2 text-xs">
+                          {(() => {
+                            const loopType = {
+                              vgm: 'custom',
+                              nsf: 'auto',
+                              gbs: 'auto',
+                              gym: 'none',
+                              spc: 'none',
+                              zsm: 'none',
+                              sap: 'none',
+                              tiuna: 'none',
+                            }[chipFormat];
+
+                            if (loopType === 'custom') {
+                              return (
+                                <div className="text-green-400">
+                                  ✓ Loop point at row {chipLoopPoint} will be used
+                                </div>
+                              );
+                            } else if (loopType === 'auto') {
+                              return (
+                                <div className="text-yellow-400">
+                                  ⚠️ {chipFormat.toUpperCase()} loops entire song (custom loop points not supported)
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="text-yellow-400">
+                                  ⚠️ {chipFormat.toUpperCase()} format does not support loop points
+                                </div>
+                              );
+                            }
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     {/* Metadata */}
@@ -1326,6 +1455,26 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                           : 'Set to 0 for no loop (one-shot playback)'}
                       </p>
                     </div>
+
+                    {/* Export progress */}
+                    {isRendering && exportMode === 'chip' && (
+                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-mono text-text-muted">
+                            Exporting {FORMAT_INFO[chipFormat].name}...
+                          </span>
+                          <span className="text-xs font-mono text-accent-primary">
+                            {renderProgress}%
+                          </span>
+                        </div>
+                        <div className="h-2 bg-dark-border rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent-primary transition-all duration-300"
+                            style={{ width: `${renderProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Format description */}
                     <div className="text-xs font-mono text-text-muted bg-dark-bg border border-dark-border rounded-lg p-3">

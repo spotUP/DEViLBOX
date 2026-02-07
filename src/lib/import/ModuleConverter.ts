@@ -52,6 +52,8 @@ function convertCell(rawCell: RawPatternCell): TrackerCell {
     volume: xmVolume,
     effTyp: effectType,
     eff: parameter,
+    effTyp2: 0,
+    eff2: 0,
   };
 
   return cell;
@@ -73,14 +75,19 @@ function convertXMNote(xmNote: XMNote): TrackerCell {
   const volume = xmNote.volume;
 
   // XM instrument numbers are 1-indexed (0 = no instrument, 1-128 = valid)
+  // Note: instrument without note is valid (ProTracker envelope retrigger / instrument swap)
   const instrument = xmNote.instrument;
 
-  // Legacy effect2 field - can be used for volume column effects if needed
-  let effect2: string | undefined = undefined;
+  // Second effect column - derived from volume column effects if present
+  let effTyp2 = 0;
+  let eff2 = 0;
   if (volume >= 0x60) {
-    // Volume column effect - optionally store as effect2 string for compatibility
+    // Volume column effect - convert to numeric effTyp2/eff2
     const converted = convertVolumeColumnEffect(volume);
-    effect2 = converted !== null ? converted : undefined;
+    if (converted !== null) {
+      effTyp2 = converted[0];
+      eff2 = converted[1];
+    }
   }
 
   return {
@@ -89,37 +96,38 @@ function convertXMNote(xmNote: XMNote): TrackerCell {
     volume,
     effTyp,
     eff,
-    effect2,
+    effTyp2,
+    eff2,
   };
 }
 
 /**
  * Convert XM volume column to effect string
  */
-function convertVolumeColumnEffect(volumeByte: number): string | null {
+function convertVolumeColumnEffect(volumeByte: number): [number, number] | null {
   const type = volumeByte >> 4;
   const param = volumeByte & 0x0F;
 
   switch (type) {
-    case 0x6: // Volume slide down
-      return `A0${param.toString(16).toUpperCase()}`;
-    case 0x7: // Volume slide up
-      return `A${param.toString(16).toUpperCase()}0`;
-    case 0x8: // Fine volume down
-      return `EB${param.toString(16).toUpperCase()}`;
-    case 0x9: // Fine volume up
-      return `EA${param.toString(16).toUpperCase()}`;
-    case 0xB: // Vibrato (depth)
-      return `40${param.toString(16).toUpperCase()}`;
-    case 0xC: // Set panning
-      return `8${(param * 17).toString(16).toUpperCase().padStart(2, '0')}`;
-    case 0xD: // Panning slide left
-      return `P0${param.toString(16).toUpperCase()}`; // Custom panning slide
-    case 0xE: // Panning slide right
-      return `P${param.toString(16).toUpperCase()}0`; // Custom panning slide
-    case 0xF: // Tone portamento
+    case 0x6: // Volume slide down → Axy (effTyp=0xA, eff=0y)
+      return [0xA, param];
+    case 0x7: // Volume slide up → Axy (effTyp=0xA, eff=x0)
+      return [0xA, param << 4];
+    case 0x8: // Fine volume down → EBx (effTyp=0xE, eff=0xB0 + y)
+      return [0xE, 0xB0 + param];
+    case 0x9: // Fine volume up → EAx (effTyp=0xE, eff=0xA0 + y)
+      return [0xE, 0xA0 + param];
+    case 0xB: // Vibrato (depth) → 40y (effTyp=0x4, eff=0y)
+      return [0x4, param];
+    case 0xC: // Set panning → 8xx (effTyp=0x8, eff=param*17)
+      return [0x8, param * 17];
+    case 0xD: // Panning slide left → P0y (effTyp=0x19, eff=0y)
+      return [0x19, param];
+    case 0xE: // Panning slide right → Px0 (effTyp=0x19, eff=x0)
+      return [0x19, param << 4];
+    case 0xF: // Tone portamento → 3xx (effTyp=0x3, eff=param*16)
       const speed = param > 0 ? param * 16 : 0;
-      return `3${speed.toString(16).toUpperCase().padStart(2, '0')}`;
+      return [0x3, speed];
     default:
       return null;
   }
@@ -150,6 +158,8 @@ function convertMODNote(modNote: MODNote): TrackerCell {
     volume,
     effTyp,
     eff,
+    effTyp2: 0,
+    eff2: 0,
     period: modNote.period, // Store raw period for accurate playback
   };
 }
@@ -203,6 +213,8 @@ export function convertSongToPatterns(song: RawSongData): Pattern[] {
             volume: 0,
             effTyp: 0,
             eff: 0,
+            effTyp2: 0,
+            eff2: 0,
           });
         }
       }
@@ -363,6 +375,8 @@ export function convertXMModule(
             volume: 0,
             effTyp: 0,
             eff: 0,
+            effTyp2: 0,
+            eff2: 0,
           });
         }
       }
@@ -465,6 +479,8 @@ export function convertMODModule(
             volume: 0,
             effTyp: 0,
             eff: 0,
+            effTyp2: 0,
+            eff2: 0,
           });
         }
       }

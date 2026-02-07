@@ -216,14 +216,14 @@ function convertCellToXMNote(cell: TrackerCell, _warnings: string[]): XMNoteData
   // Convert instrument
   const instrument = cell.instrument || 0;
 
-  // Convert volume (combine direct volume and effect2 volume column)
+  // Convert volume (combine direct volume and effTyp2/eff2 volume column)
   let volume = 0;
   if (cell.volume !== null) {
     // Direct volume set (0-64)
     volume = 0x10 + Math.min(cell.volume, 0x40);
-  } else if (cell.effect2) {
-    // Convert effect2 back to volume column effect
-    volume = convertEffectToVolumeColumn(cell.effect2);
+  } else if ((cell.effTyp2 !== undefined && cell.effTyp2 !== 0) || (cell.eff2 !== undefined && cell.eff2 !== 0)) {
+    // Convert numeric effTyp2/eff2 back to volume column effect
+    volume = convertEffectToVolumeColumnNumeric(cell.effTyp2 ?? 0, cell.eff2 ?? 0);
   }
 
   // Convert main effect
@@ -282,38 +282,35 @@ function parseEffect(effect: string): { type: number; param: number } {
 }
 
 /**
- * Convert effect2 command back to XM volume column
+ * Convert numeric effTyp2/eff2 back to XM volume column byte
  */
-function convertEffectToVolumeColumn(effect: string): number {
-  const parsed = parseEffect(effect);
-
-  // Map common effects back to volume column
-  if (parsed.type === 0xA) {
+function convertEffectToVolumeColumnNumeric(effTyp: number, eff: number): number {
+  if (effTyp === 0xA) {
     // Volume slide
-    const x = (parsed.param >> 4) & 0x0F;
-    const y = parsed.param & 0x0F;
+    const x = (eff >> 4) & 0x0F;
+    const y = eff & 0x0F;
 
     if (x > 0) return 0x70 + x; // Volume slide up
     if (y > 0) return 0x60 + y; // Volume slide down
   }
 
-  if (parsed.type === 0xE) {
-    const x = (parsed.param >> 4) & 0x0F;
-    const y = parsed.param & 0x0F;
+  if (effTyp === 0xE) {
+    const x = (eff >> 4) & 0x0F;
+    const y = eff & 0x0F;
 
     if (x === 0xA) return 0x90 + y; // Fine volume up (EAx)
     if (x === 0xB) return 0x80 + y; // Fine volume down (EBx)
   }
 
-  if (parsed.type === 0x4) {
+  if (effTyp === 0x4) {
     // Vibrato depth
-    const y = parsed.param & 0x0F;
+    const y = eff & 0x0F;
     return 0xB0 + y;
   }
 
-  if (parsed.type === 0x3) {
+  if (effTyp === 0x3) {
     // Tone portamento
-    const speed = Math.floor(parsed.param / 16);
+    const speed = Math.floor(eff / 16);
     return 0xF0 + Math.min(speed, 0x0F);
   }
 

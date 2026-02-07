@@ -42,7 +42,8 @@ interface MacroSlot {
   volume: number;
   effTyp: number;
   eff: number;
-  effect2: string | null;
+  effTyp2: number;
+  eff2: number;
 }
 
 const createEmptyMacroSlot = (): MacroSlot => ({
@@ -51,7 +52,8 @@ const createEmptyMacroSlot = (): MacroSlot => ({
   volume: 0,
   effTyp: 0,
   eff: 0,
-  effect2: null,
+  effTyp2: 0,
+  eff2: 0,
 });
 
 interface TrackerStore {
@@ -312,7 +314,8 @@ export const useTrackerStore = create<TrackerStore>()(
           volume: 2,
           effTyp: 1,
           effParam: 2,
-          effect2: 3,
+          effTyp2: 1,
+          effParam2: 2,
           cutoff: 2,
           resonance: 2,
           envMod: 2,
@@ -346,15 +349,26 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'
             ];
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
+            // Safety: if cursor is on an unknown column, snap to note
+            if (currentColumnIndex === -1) {
+              state.cursor.columnType = 'note';
+              state.cursor.digitIndex = 0;
+              break;
+            }
             if (currentColumnIndex > 0) {
               state.cursor.columnType = columnOrder[currentColumnIndex - 1];
               const nextDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
               state.cursor.digitIndex = nextDigits > 0 ? nextDigits - 1 : 0;
-            } else if (state.cursor.channelIndex > 0) {
-              state.cursor.channelIndex--;
+            } else {
+              // FT2: Wrap from channel 0 note to last channel's last column
+              if (state.cursor.channelIndex > 0) {
+                state.cursor.channelIndex--;
+              } else {
+                state.cursor.channelIndex = numChannels - 1;
+              }
               state.cursor.columnType = columnOrder[columnOrder.length - 1];
               const nextDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
               state.cursor.digitIndex = nextDigits > 0 ? nextDigits - 1 : 0;
@@ -369,14 +383,25 @@ export const useTrackerStore = create<TrackerStore>()(
             }
 
             const columnOrder2: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'
+              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'
             ];
             const currentColumnIndex2 = columnOrder2.indexOf(state.cursor.columnType);
+            // Safety: if cursor is on an unknown column, snap to note
+            if (currentColumnIndex2 === -1) {
+              state.cursor.columnType = 'note';
+              state.cursor.digitIndex = 0;
+              break;
+            }
             if (currentColumnIndex2 < columnOrder2.length - 1) {
               state.cursor.columnType = columnOrder2[currentColumnIndex2 + 1];
               state.cursor.digitIndex = 0;
-            } else if (state.cursor.channelIndex < numChannels - 1) {
-              state.cursor.channelIndex++;
+            } else {
+              // FT2: Wrap from last channel's last column to channel 0 note
+              if (state.cursor.channelIndex < numChannels - 1) {
+                state.cursor.channelIndex++;
+              } else {
+                state.cursor.channelIndex = 0;
+              }
               state.cursor.columnType = 'note';
               state.cursor.digitIndex = 0;
             }
@@ -722,7 +747,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'],
         };
       }),
 
@@ -734,7 +759,7 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: pattern.channels.length - 1,
           startRow: 0,
           endRow: pattern.length - 1,
-          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effect2', 'accent', 'slide', 'probability'],
+          columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'accent', 'slide', 'probability'],
         };
       }),
 
@@ -834,7 +859,8 @@ export const useTrackerStore = create<TrackerStore>()(
               targetCell.eff = sourceCell.eff;
             }
             if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-              targetCell.effect2 = sourceCell.effect2;
+              targetCell.effTyp2 = sourceCell.effTyp2;
+              targetCell.eff2 = sourceCell.eff2;
             }
           }
         }
@@ -875,8 +901,9 @@ export const useTrackerStore = create<TrackerStore>()(
               targetCell.effTyp = sourceCell.effTyp;
               targetCell.eff = sourceCell.eff;
             }
-            if (hasMaskBit(pasteMask, MASK_EFFECT2) && sourceCell.effect2 !== null && !targetCell.effect2) {
-              targetCell.effect2 = sourceCell.effect2;
+            if (hasMaskBit(pasteMask, MASK_EFFECT2) && (sourceCell.effTyp2 !== 0 || sourceCell.eff2 !== 0) && targetCell.effTyp2 === 0 && targetCell.eff2 === 0) {
+              targetCell.effTyp2 = sourceCell.effTyp2;
+              targetCell.eff2 = sourceCell.eff2;
             }
           }
         }
@@ -922,7 +949,8 @@ export const useTrackerStore = create<TrackerStore>()(
                 targetCell.eff = sourceCell.eff;
               }
               if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-                targetCell.effect2 = sourceCell.effect2;
+                targetCell.effTyp2 = sourceCell.effTyp2;
+                targetCell.eff2 = sourceCell.eff2;
               }
             }
             currentRow += clipboardRows;
@@ -970,7 +998,8 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.volume = 0;
             targetCell.effTyp = 0;
             targetCell.eff = 0;
-            targetCell.effect2 = undefined;
+            targetCell.effTyp2 = 0;
+            targetCell.eff2 = 0;
 
             if (hasMaskBit(pasteMask, MASK_NOTE)) {
               targetCell.note = sourceCell.note;
@@ -986,7 +1015,8 @@ export const useTrackerStore = create<TrackerStore>()(
               targetCell.eff = sourceCell.eff;
             }
             if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-              targetCell.effect2 = sourceCell.effect2;
+              targetCell.effTyp2 = sourceCell.effTyp2;
+              targetCell.eff2 = sourceCell.eff2;
             }
           }
         }
@@ -1045,7 +1075,8 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.eff = sourceCell.eff;
           }
           if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-            targetCell.effect2 = sourceCell.effect2;
+            targetCell.effTyp2 = sourceCell.effTyp2;
+            targetCell.eff2 = sourceCell.eff2;
           }
         }
       }),
@@ -1065,7 +1096,8 @@ export const useTrackerStore = create<TrackerStore>()(
           volume: cell.volume,
           effTyp: cell.effTyp,
           eff: cell.eff,
-          effect2: cell.effect2 ?? null,
+          effTyp2: cell.effTyp2,
+          eff2: cell.eff2,
         };
       }),
 
@@ -1095,8 +1127,9 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.effTyp = macro.effTyp;
             targetCell.eff = macro.eff;
           }
-          if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
-            targetCell.effect2 = macro.effect2;
+          if (hasMaskBit(pasteMask, MASK_EFFECT2) && (macro.effTyp2 !== 0 || macro.eff2 !== 0)) {
+            targetCell.effTyp2 = macro.effTyp2;
+            targetCell.eff2 = macro.eff2;
           }
         } else {
           // Insert mode: shift rows down and insert macro
@@ -1116,8 +1149,9 @@ export const useTrackerStore = create<TrackerStore>()(
             newRow.effTyp = macro.effTyp;
             newRow.eff = macro.eff;
           }
-          if (hasMaskBit(pasteMask, MASK_EFFECT2) && macro.effect2 !== null) {
-            newRow.effect2 = macro.effect2;
+          if (hasMaskBit(pasteMask, MASK_EFFECT2) && (macro.effTyp2 !== 0 || macro.eff2 !== 0)) {
+            newRow.effTyp2 = macro.effTyp2;
+            newRow.eff2 = macro.eff2;
           }
 
           // Shift rows down

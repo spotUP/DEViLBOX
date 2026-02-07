@@ -236,6 +236,8 @@ export function generateAcidPattern(params: AcidPatternParams = {}): TrackerCell
         volume: 0,
         effTyp: 0,
         eff: 0,
+        effTyp2: 0,
+        eff2: 0,
       };
     }
 
@@ -255,6 +257,8 @@ export function generateAcidPattern(params: AcidPatternParams = {}): TrackerCell
       volume,
       effTyp: 0,
       eff: 0,
+      effTyp2: 0,
+      eff2: 0,
       accent: step.accent || false,
       slide: step.slide || false,
     };

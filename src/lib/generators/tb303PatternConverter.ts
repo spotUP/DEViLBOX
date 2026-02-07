@@ -52,6 +52,8 @@ export function convertTB303Pattern(pattern: TB303Pattern, instrumentId: number 
         volume: 0,
         effTyp: 0,
         eff: 0,
+        effTyp2: 0,
+        eff2: 0,
       };
     }
 
@@ -67,6 +69,8 @@ export function convertTB303Pattern(pattern: TB303Pattern, instrumentId: number 
       volume,
       effTyp: 0,
       eff: 0,
+      effTyp2: 0,
+      eff2: 0,
       accent: step.accent,
       slide: step.slide,
     };
@@ -85,6 +89,8 @@ export function padPattern(cells: TrackerCell[], targetLength: number): TrackerC
       volume: 0,
       effTyp: 0,
       eff: 0,
+      effTyp2: 0,
+      eff2: 0,
     });
   }
   return padded.slice(0, targetLength);

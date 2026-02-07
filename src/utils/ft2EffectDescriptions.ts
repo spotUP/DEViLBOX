@@ -313,8 +313,10 @@ export const FT2_E_COMMAND_DESCRIPTIONS: Record<string, EffectDescription> = {
 
 /**
  * Get description for an FT2 effect command
+ * @param effectString - Effect string like "A00" or "10F0"
+ * @param synthType - Optional synth type for platform-specific effects
  */
-export function getFT2EffectDescription(effectString: string | null): EffectDescription | null {
+export function getFT2EffectDescription(effectString: string | null, synthType?: string): EffectDescription | null {
   if (!effectString || effectString === '...' || effectString.length < 3) {
     return null;
   }
@@ -336,7 +338,7 @@ export function getFT2EffectDescription(effectString: string | null): EffectDesc
     }
   }
 
-  // Regular command
+  // Regular FT2 command (0-F, G, H)
   if (FT2_EFFECT_DESCRIPTIONS[command]) {
     // Clone and fill in actual parameter
     const desc = { ...FT2_EFFECT_DESCRIPTIONS[command] };
@@ -344,14 +346,665 @@ export function getFT2EffectDescription(effectString: string | null): EffectDesc
     return desc;
   }
 
+  // Check for Furnace platform-specific effects (0x10+)
+  const effectCode = parseInt(command + param1, 16);
+  if (effectCode >= 0x10) {
+    const furnaceDesc = getFurnaceEffectDescription(effectCode, synthType);
+    if (furnaceDesc) {
+      const desc = { ...furnaceDesc };
+      desc.command = effectString;
+      return desc;
+    }
+  }
+
+  return null;
+}
+
+// ============================================================================
+// FURNACE PLATFORM-SPECIFIC EFFECTS (0x10+)
+// Effects vary by chip type - see FurnaceEffectRouter for routing
+// ============================================================================
+
+export type FurnacePlatformFamily = 'fm' | 'c64' | 'gb' | 'nes' | 'pce' | 'psg' | 'namco' | 'snes' | 'sample';
+
+/**
+ * Furnace FM chip effects (OPN2, OPM, OPL, OPLL, OPZ, ESFM)
+ */
+export const FURNACE_FM_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set LFO Speed',
+    description: 'Set the LFO speed for FM chip vibrato/tremolo',
+    parameters: 'xx=LFO speed (00-FF)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set TL (Total Level)',
+    description: 'Set operator total level (volume)',
+    parameters: 'xx=TL value (00-7F, lower=louder)',
+    tick: 'tick-0',
+    category: 'volume',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set AR (Attack Rate)',
+    description: 'Set operator attack rate',
+    parameters: 'xx=AR value (00-1F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xx',
+    name: 'Set DR (Decay Rate)',
+    description: 'Set operator decay rate',
+    parameters: 'xx=DR value (00-1F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set MULT (Multiplier)',
+    description: 'Set operator frequency multiplier',
+    parameters: 'xx=MULT value (00-0F)',
+    tick: 'tick-0',
+    category: 'pitch',
+  },
+  '15': {
+    command: '15xx',
+    name: 'Set RR (Release Rate)',
+    description: 'Set operator release rate',
+    parameters: 'xx=RR value (00-0F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '16': {
+    command: '16xx',
+    name: 'Set SL (Sustain Level)',
+    description: 'Set operator sustain level',
+    parameters: 'xx=SL value (00-0F)',
+    tick: 'tick-0',
+    category: 'volume',
+  },
+  '17': {
+    command: '17xx',
+    name: 'Set DT (Detune)',
+    description: 'Set operator detune',
+    parameters: 'xx=DT value (00-07)',
+    tick: 'tick-0',
+    category: 'pitch',
+  },
+  '18': {
+    command: '18xx',
+    name: 'Set SSG-EG',
+    description: 'Set SSG envelope generator mode',
+    parameters: 'xx=SSG-EG mode (00-0F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '19': {
+    command: '19xx',
+    name: 'Set Algorithm',
+    description: 'Set FM algorithm (operator routing)',
+    parameters: 'xx=algorithm (00-07)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '1A': {
+    command: '1Axx',
+    name: 'Set Feedback',
+    description: 'Set operator 1 feedback level',
+    parameters: 'xx=feedback (00-07)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '1B': {
+    command: '1Bxy',
+    name: 'Set AM/PM Depth',
+    description: 'Set amplitude/phase modulation depth',
+    parameters: 'x=AM depth (0-3), y=PM depth (0-7)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '1C': {
+    command: '1Cxx',
+    name: 'FM Hard Reset',
+    description: 'Force hard reset on note (key-off before key-on)',
+    parameters: 'xx=01 (enable), 00 (disable)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace C64/SID effects
+ */
+export const FURNACE_C64_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Filter Cutoff',
+    description: 'Set SID filter cutoff frequency',
+    parameters: 'xx=cutoff (00-FF, 11-bit scaled)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Filter Resonance',
+    description: 'Set SID filter resonance',
+    parameters: 'xx=resonance (00-0F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Filter Mode',
+    description: 'Set SID filter mode',
+    parameters: 'xx: 0=off, 1=LP, 2=BP, 4=HP (can combine)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xx',
+    name: 'Set Ring Mod',
+    description: 'Enable/disable ring modulation',
+    parameters: 'xx=01 (on), 00 (off)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Hard Sync',
+    description: 'Enable/disable oscillator hard sync',
+    parameters: 'xx=01 (on), 00 (off)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '15': {
+    command: '15xx',
+    name: 'Set Pulse Width',
+    description: 'Set pulse wave width',
+    parameters: 'xx=pulse width (00-FF, scaled to 12-bit)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace Game Boy effects
+ */
+export const FURNACE_GB_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Envelope',
+    description: 'Set volume envelope (NRx2 register)',
+    parameters: 'xx: high nibble=volume, low nibble=direction+period',
+    tick: 'tick-0',
+    category: 'volume',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Wave',
+    description: 'Load wavetable into wave channel',
+    parameters: 'xx=wavetable index (00-FF)',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Duty',
+    description: 'Set pulse wave duty cycle',
+    parameters: 'xx: 0=12.5%, 1=25%, 2=50%, 3=75%',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xy',
+    name: 'Set Sweep',
+    description: 'Set frequency sweep (channel 1 only)',
+    parameters: 'x=period (0-7), y=direction+shift',
+    tick: 'tick-0',
+    category: 'pitch',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Noise Mode',
+    description: 'Set noise channel width mode',
+    parameters: 'xx: 0=15-bit (normal), 1=7-bit (metallic)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace NES effects
+ */
+export const FURNACE_NES_EFFECTS: Record<string, EffectDescription> = {
+  '11': {
+    command: '11xx',
+    name: 'Set DMC',
+    description: 'Set DMC sample parameters',
+    parameters: 'xx=DMC control value',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Duty/Noise',
+    description: 'Set pulse duty or noise mode',
+    parameters: 'xx: pulse 0-3=duty, noise 0=short 1=long',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xy',
+    name: 'Set Sweep',
+    description: 'Set frequency sweep (pulse channels)',
+    parameters: 'x=period, y=direction+shift',
+    tick: 'tick-0',
+    category: 'pitch',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Envelope Mode',
+    description: 'Set envelope/length counter mode',
+    parameters: 'xx=envelope settings',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '18': {
+    command: '18xx',
+    name: 'FDS Mod Depth',
+    description: 'Set FDS modulation depth',
+    parameters: 'xx=mod depth (00-3F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '19': {
+    command: '19xx',
+    name: 'FDS Mod Speed High',
+    description: 'Set FDS modulation speed (high byte)',
+    parameters: 'xx=speed high byte',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace PCE/TurboGrafx effects
+ */
+export const FURNACE_PCE_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set LFO Mode',
+    description: 'Set PCE LFO mode',
+    parameters: 'xx=LFO mode (00-03)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set LFO Speed',
+    description: 'Set PCE LFO speed',
+    parameters: 'xx=LFO speed (00-FF)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Wave',
+    description: 'Load wavetable',
+    parameters: 'xx=wavetable index (00-FF)',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+};
+
+/**
+ * Furnace PSG/AY effects (AY-3-8910, SN76489, etc.)
+ */
+export const FURNACE_PSG_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Envelope Shape',
+    description: 'Set AY envelope shape',
+    parameters: 'xx=shape (00-0F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Envelope Period Low',
+    description: 'Set AY envelope period (low byte)',
+    parameters: 'xx=period low byte',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Envelope Period High',
+    description: 'Set AY envelope period (high byte)',
+    parameters: 'xx=period high byte',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xx',
+    name: 'Set Auto-Envelope',
+    description: 'Enable auto-envelope (track note pitch)',
+    parameters: 'xx=auto-envelope numerator',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Noise Freq',
+    description: 'Set noise frequency',
+    parameters: 'xx=noise period (00-1F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '15': {
+    command: '15xx',
+    name: 'Set Noise Mode',
+    description: 'Set noise/tone mixing mode',
+    parameters: 'xx=mode bits (tone/noise enable)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace Namco/N163 effects
+ */
+export const FURNACE_NAMCO_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Wave',
+    description: 'Load wavetable',
+    parameters: 'xx=wavetable index (00-FF)',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Wave Position',
+    description: 'Set wave position in RAM',
+    parameters: 'xx=position (00-FF)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Wave Length',
+    description: 'Set wave length',
+    parameters: 'xx=length (must be power of 2)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xx',
+    name: 'Wave Load',
+    description: 'Load wave from position',
+    parameters: 'xx=load parameters',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Channel Limit',
+    description: 'Set max active channels (N163)',
+    parameters: 'xx=channel count (1-8)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace SNES effects
+ */
+export const FURNACE_SNES_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Echo Enable',
+    description: 'Enable/disable echo for channel',
+    parameters: 'xx=01 (on), 00 (off)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Echo Delay',
+    description: 'Set echo delay time',
+    parameters: 'xx=delay (00-0F, 16ms steps)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Echo Feedback',
+    description: 'Set echo feedback amount',
+    parameters: 'xx=feedback (-80 to 7F)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '13': {
+    command: '13xx',
+    name: 'Set Echo Volume',
+    description: 'Set echo volume',
+    parameters: 'xx=volume (-80 to 7F)',
+    tick: 'tick-0',
+    category: 'volume',
+  },
+  '14': {
+    command: '14xx',
+    name: 'Set Echo FIR',
+    description: 'Set echo FIR filter coefficient',
+    parameters: 'xx=coefficient index and value',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '15': {
+    command: '15xx',
+    name: 'Set Pitch Mod',
+    description: 'Enable pitch modulation from prev channel',
+    parameters: 'xx=01 (on), 00 (off)',
+    tick: 'tick-0',
+    category: 'pitch',
+  },
+  '16': {
+    command: '16xx',
+    name: 'Set Gain Mode',
+    description: 'Set ADSR/gain mode',
+    parameters: 'xx=gain mode (see SNES docs)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '17': {
+    command: '17xx',
+    name: 'Set Invert',
+    description: 'Invert waveform phase',
+    parameters: 'xx: 1=left, 2=right, 3=both',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+};
+
+/**
+ * Furnace sample-based effects (Amiga, SEGAPCM, QSound, etc.)
+ */
+export const FURNACE_SAMPLE_EFFECTS: Record<string, EffectDescription> = {
+  '10': {
+    command: '10xx',
+    name: 'Set Sample Mode',
+    description: 'Set sample playback mode',
+    parameters: 'xx=mode (chip-specific)',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '11': {
+    command: '11xx',
+    name: 'Set Sample Bank',
+    description: 'Set sample bank',
+    parameters: 'xx=bank number',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '12': {
+    command: '12xx',
+    name: 'Set Direction',
+    description: 'Set sample playback direction',
+    parameters: 'xx: 0=forward, 1=reverse',
+    tick: 'tick-0',
+    category: 'sample',
+  },
+  '20': {
+    command: '20xx',
+    name: 'ES5506 Filter Mode',
+    description: 'Set ES5506 filter mode',
+    parameters: 'xx=filter mode (00-03)',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '21': {
+    command: '21xx',
+    name: 'ES5506 Filter K1',
+    description: 'Set ES5506 filter K1 coefficient',
+    parameters: 'xx=K1 value',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '22': {
+    command: '22xx',
+    name: 'ES5506 Filter K2',
+    description: 'Set ES5506 filter K2 coefficient',
+    parameters: 'xx=K2 value',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '30': {
+    command: '30xx',
+    name: 'QSound Echo',
+    description: 'Set QSound echo feedback',
+    parameters: 'xx=echo feedback',
+    tick: 'tick-0',
+    category: 'misc',
+  },
+  '31': {
+    command: '31xx',
+    name: 'QSound Surround',
+    description: 'Set QSound surround/3D position',
+    parameters: 'xx=surround position',
+    tick: 'tick-0',
+    category: 'panning',
+  },
+};
+
+/**
+ * Map synth types to their effect tables
+ */
+const SYNTH_TYPE_TO_EFFECTS: Record<string, Record<string, EffectDescription>> = {
+  // FM chips
+  'FurnaceOPN': FURNACE_FM_EFFECTS,
+  'FurnaceOPN2': FURNACE_FM_EFFECTS,
+  'FurnaceOPM': FURNACE_FM_EFFECTS,
+  'FurnaceOPL': FURNACE_FM_EFFECTS,
+  'FurnaceOPL2': FURNACE_FM_EFFECTS,
+  'FurnaceOPL3': FURNACE_FM_EFFECTS,
+  'FurnaceOPLL': FURNACE_FM_EFFECTS,
+  'FurnaceOPZ': FURNACE_FM_EFFECTS,
+  'FurnaceESFM': FURNACE_FM_EFFECTS,
+  // C64/SID
+  'FurnaceC64': FURNACE_C64_EFFECTS,
+  'FurnaceSID2': FURNACE_C64_EFFECTS,
+  'FurnaceSID3': FURNACE_C64_EFFECTS,
+  // Game Boy
+  'FurnaceGB': FURNACE_GB_EFFECTS,
+  // NES
+  'FurnaceNES': FURNACE_NES_EFFECTS,
+  'FurnaceFDS': FURNACE_NES_EFFECTS,
+  'FurnaceVRC6': FURNACE_NES_EFFECTS,
+  'Furnace5E01': FURNACE_NES_EFFECTS,
+  // PCE
+  'FurnacePCE': FURNACE_PCE_EFFECTS,
+  // PSG
+  'FurnaceAY': FURNACE_PSG_EFFECTS,
+  'FurnaceAY8930': FURNACE_PSG_EFFECTS,
+  'FurnaceSAA': FURNACE_PSG_EFFECTS,
+  'FurnaceSMS': FURNACE_PSG_EFFECTS,
+  'FurnaceT6W28': FURNACE_PSG_EFFECTS,
+  // Namco/wavetable
+  'FurnaceN163': FURNACE_NAMCO_EFFECTS,
+  'FurnaceSCC': FURNACE_NAMCO_EFFECTS,
+  'FurnaceVB': FURNACE_NAMCO_EFFECTS,
+  'FurnaceSWAN': FURNACE_NAMCO_EFFECTS,
+  'FurnaceX1_010': FURNACE_NAMCO_EFFECTS,
+  // SNES
+  'FurnaceSNES': FURNACE_SNES_EFFECTS,
+  // Sample-based
+  'FurnaceAmiga': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceSEGAPCM': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceQSOUND': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceES5506': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceRF5C68': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceC140': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceC219': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceK054539': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceYMZ280B': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceGA20': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceK007232': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceK053260': FURNACE_SAMPLE_EFFECTS,
+  'FurnaceOKI': FURNACE_SAMPLE_EFFECTS,
+};
+
+/**
+ * Get Furnace platform-specific effect description
+ */
+export function getFurnaceEffectDescription(effectCode: number, synthType?: string): EffectDescription | null {
+  const hexCode = effectCode.toString(16).toUpperCase().padStart(2, '0');
+
+  // If synth type provided, try to get chip-specific description
+  if (synthType) {
+    const effectTable = SYNTH_TYPE_TO_EFFECTS[synthType];
+    if (effectTable && effectTable[hexCode]) {
+      return effectTable[hexCode];
+    }
+  }
+
+  // Fall back to FM effects (most common)
+  if (FURNACE_FM_EFFECTS[hexCode]) {
+    return FURNACE_FM_EFFECTS[hexCode];
+  }
+
   return null;
 }
 
 /**
- * Format effect description for tooltip display
+ * Get all Furnace effects for a synth type
  */
-export function formatEffectTooltip(effectString: string | null): string | null {
-  const desc = getFT2EffectDescription(effectString);
+export function getAllFurnaceEffects(synthType?: string): EffectDescription[] {
+  if (synthType && SYNTH_TYPE_TO_EFFECTS[synthType]) {
+    return Object.values(SYNTH_TYPE_TO_EFFECTS[synthType]);
+  }
+  // Return FM effects as default
+  return Object.values(FURNACE_FM_EFFECTS);
+}
+
+/**
+ * Check if a synth type has platform-specific effects
+ */
+export function hasFurnaceEffects(synthType: string): boolean {
+  return synthType.startsWith('Furnace') || synthType in SYNTH_TYPE_TO_EFFECTS;
+}
+
+/**
+ * Format effect description for tooltip display
+ * @param effectString - Effect string like "A00" or "10F0"
+ * @param synthType - Optional synth type for platform-specific effects
+ */
+export function formatEffectTooltip(effectString: string | null, synthType?: string): string | null {
+  const desc = getFT2EffectDescription(effectString, synthType);
   if (!desc) return null;
 
   let tooltip = `${desc.command}: ${desc.name}\n`;
@@ -364,9 +1017,11 @@ export function formatEffectTooltip(effectString: string | null): string | null 
 
 /**
  * Get short effect name for display
+ * @param effectString - Effect string like "A00" or "10F0"
+ * @param synthType - Optional synth type for platform-specific effects
  */
-export function getEffectShortName(effectString: string | null): string | null {
-  const desc = getFT2EffectDescription(effectString);
+export function getEffectShortName(effectString: string | null, synthType?: string): string | null {
+  const desc = getFT2EffectDescription(effectString, synthType);
   return desc ? desc.name : null;
 }
 
@@ -381,9 +1036,11 @@ export function getAllFT2EffectCommands(): EffectDescription[] {
 
 /**
  * Get color class for an FT2 effect command (by category)
+ * @param effectString - Effect string like "A00" or "10F0"
+ * @param synthType - Optional synth type for platform-specific effects
  */
-export function getEffectColorClass(effectString: string | null): string {
-  const desc = getFT2EffectDescription(effectString);
+export function getEffectColorClass(effectString: string | null, synthType?: string): string {
+  const desc = getFT2EffectDescription(effectString, synthType);
   if (!desc) return 'text-orange-400'; // default
   return EFFECT_CATEGORY_COLORS[desc.category];
 }
