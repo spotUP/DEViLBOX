@@ -5,6 +5,7 @@ import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { clsx } from 'clsx';
 import { CURRENT_VERSION } from '@generated/changelog';
+import { parseDb303Preset, convertToDb303Preset } from '@lib/import/Db303PresetConverter';
 
 interface JC303StyledKnobPanelProps {
   config: TB303Config;
@@ -104,8 +105,16 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
   const updateOscillator = (type: 'sawtooth' | 'square') => {
     console.log(`[JC303 UI] Oscillator update: type=${type}`);
     const currentConfig = configRef.current;
-    onChange({ 
-      oscillator: { ...currentConfig.oscillator, type } 
+    onChange({
+      oscillator: { ...currentConfig.oscillator, type }
+    });
+  };
+
+  const updateOscillatorParam = (key: string, value: any) => {
+    console.log(`[JC303 UI] Oscillator param update: ${key}=${value}`);
+    const currentConfig = configRef.current;
+    onChange({
+      oscillator: { ...currentConfig.oscillator, [key]: value }
     });
   };
 
@@ -122,6 +131,66 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
     // Tuning is a top-level property so we can just send it directly
     // but using the pattern for consistency
     onChange({ tuning });
+  };
+
+  const updateLfo = (key: string, value: any) => {
+    console.log(`[JC303 UI] LFO update: ${key}=${value}`);
+    const currentConfig = configRef.current;
+    const currentLfo = currentConfig.lfo || {
+      waveform: 0,
+      rate: 0,
+      contour: 0,
+      pitchDepth: 0,
+      pwmDepth: 0,
+      filterDepth: 0,
+    };
+    onChange({
+      lfo: { ...currentLfo, [key]: value },
+    });
+  };
+
+  const updateChorus = (key: string, value: any) => {
+    console.log(`[JC303 UI] Chorus update: ${key}=${value}`);
+    const currentConfig = configRef.current;
+    const currentChorus = currentConfig.chorus || {
+      enabled: false,
+      mode: 1,
+      mix: 30,
+    };
+    onChange({
+      chorus: { ...currentChorus, [key]: value },
+    });
+  };
+
+  const updatePhaser = (key: string, value: any) => {
+    console.log(`[JC303 UI] Phaser update: ${key}=${value}`);
+    const currentConfig = configRef.current;
+    const currentPhaser = currentConfig.phaser || {
+      enabled: false,
+      rate: 50,
+      depth: 50,
+      feedback: 30,
+      mix: 30,
+    };
+    onChange({
+      phaser: { ...currentPhaser, [key]: value },
+    });
+  };
+
+  const updateDelay = (key: string, value: any) => {
+    console.log(`[JC303 UI] Delay update: ${key}=${value}`);
+    const currentConfig = configRef.current;
+    const currentDelay = currentConfig.delay || {
+      enabled: false,
+      time: 250,
+      feedback: 30,
+      tone: 70,
+      mix: 25,
+      stereo: 50,
+    };
+    onChange({
+      delay: { ...currentDelay, [key]: value },
+    });
   };
 
   // Coordinates from Gui.cpp (930x363)
@@ -146,17 +215,62 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
     letterSpacing: '0.05em',
   });
 
+  // Import preset from XML file
+  const handleImportPreset = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xml';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const xmlString = event.target?.result as string;
+          const parsed = parseDb303Preset(xmlString);
+          const mergedConfig = { ...config, ...parsed };
+          onChange(mergedConfig as any);
+          console.log('[JC303 UI] Preset imported successfully');
+        } catch (error) {
+          console.error('[JC303 UI] Failed to import preset:', error);
+          alert('Failed to import preset. Please check the XML file format.');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  // Export current preset as XML file
+  const handleExportPreset = () => {
+    try {
+      const xml = convertToDb303Preset(config);
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `db303-preset-${Date.now()}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+      console.log('[JC303 UI] Preset exported successfully');
+    } catch (error) {
+      console.error('[JC303 UI] Failed to export preset:', error);
+      alert('Failed to export preset.');
+    }
+  };
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className="w-full overflow-visible flex justify-center py-4 select-none"
-      style={{ minHeight: `${(isBuzz3o3 ? 340 : 363) * scale + 32}px` }}
+      style={{ minHeight: `${(isBuzz3o3 ? 340 : 580) * scale + 32}px` }}
     >
       <div
         className="relative bg-[#1a1a1a] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-b-8 border-r-4 border-black/40 overflow-hidden"
         style={{
           width: '930px',
-          height: isBuzz3o3 ? '340px' : '363px', 
+          height: isBuzz3o3 ? '340px' : '480px', 
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
           background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
@@ -170,16 +284,21 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           {/* Section divider for second row */}
           <div className="absolute top-[230px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
-          
+          {/* Section divider for third row (LFO) */}
+          {!isBuzz3o3 && (
+            <div className="absolute top-[350px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+          )}
+
           {/* Group Labels */}
           <div style={labelStyle(40, 115, 100)} className="text-accent-primary opacity-80">Oscillator</div>
           <div style={labelStyle(180, 115, 580)} className="text-accent-primary opacity-80">Filter & Envelope</div>
           <div style={labelStyle(800, 115, 100)} className="text-accent-primary opacity-80">Output</div>
-          
+
           {!isBuzz3o3 && (
             <>
               <div style={labelStyle(40, 238, 500)} className="text-red-500/70">Devil Fish Modifications</div>
               <div style={labelStyle(550, 238, 340)} className="text-orange-500/70">Neural Overdrive</div>
+              <div style={labelStyle(40, 358, 880)} className="text-purple-500/70">LFO (Low Frequency Oscillator)</div>
             </>
           )}
         </div>
@@ -197,6 +316,46 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             size="lg"
             color="#00ffff"
             formatValue={(v) => v > 50 ? 'SQR' : 'SAW'}
+          />
+        </div>
+
+        {/* Oscillator Enhancements (Sub-row below Waveform) */}
+        {/* Pulse Width */}
+        <div style={style(14, 215, 35, 35)}>
+          <Knob
+            value={config.oscillator.pulseWidth ?? 50}
+            min={0}
+            max={100}
+            onChange={(v) => updateOscillatorParam('pulseWidth', v)}
+            label="PWM"
+            size="sm"
+            color="#00cccc"
+          />
+        </div>
+
+        {/* Sub Oscillator Gain */}
+        <div style={style(54, 215, 35, 35)}>
+          <Knob
+            value={config.oscillator.subOscGain ?? 0}
+            min={0}
+            max={100}
+            onChange={(v) => updateOscillatorParam('subOscGain', v)}
+            label="SubG"
+            size="sm"
+            color="#00cccc"
+          />
+        </div>
+
+        {/* Sub Oscillator Blend */}
+        <div style={style(94, 215, 35, 35)}>
+          <Knob
+            value={config.oscillator.subOscBlend ?? 0}
+            min={0}
+            max={100}
+            onChange={(v) => updateOscillatorParam('subOscBlend', v)}
+            label="SubB"
+            size="sm"
+            color="#00cccc"
           />
         </div>
 
@@ -218,8 +377,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
         <div style={style(287, 139, 60, 60)}>
           <Knob
             value={config.filter.cutoff}
-            min={50}
-            max={18000}
+            min={200}
+            max={5000}
             logarithmic
             onChange={(v) => updateFilter('cutoff', v)}
             label="Cutoff"
@@ -258,8 +417,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
         <div style={style(584, 139, 60, 60)}>
           <Knob
             value={config.filterEnvelope.decay}
-            min={30}
-            max={3000}
+            min={config.devilFish?.enabled ? 30 : 200}
+            max={config.devilFish?.enabled ? 3000 : 2000}
             logarithmic
             onChange={(v) => updateFilterEnvelope('decay', v)}
             label="Decay"
@@ -412,8 +571,9 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             <div style={style(410, 273, 35, 35)}>
               <Knob
                 value={config.slide?.time || 60}
-                min={10}
-                max={500}
+                min={2}
+                max={360}
+                logarithmic
                 onChange={(v) => updateSlide(v)}
                 label="Slide"
                 size="sm"
@@ -494,15 +654,85 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
             </div>
 
             {/* Overdrive LED */}
-            <div 
-              style={style(856, 243, 12, 12)} 
+            <div
+              style={style(856, 243, 12, 12)}
               className={clsx(
-                "rounded-full border border-black/40 transition-all duration-300", 
+                "rounded-full border border-black/40 transition-all duration-300",
                 (config.overdrive?.amount ?? 0) > 0
-                  ? "bg-orange-500 shadow-[0_0_10px_#f97316]" 
+                  ? "bg-orange-500 shadow-[0_0_10px_#f97316]"
                   : "bg-orange-950"
               )}
             ></div>
+
+            {/* Extended Devil Fish Parameters (Sub-row) */}
+
+            {/* Duffing Amount (Non-linear filter) */}
+            <div style={{ ...style(125, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.duffingAmount ?? 3}
+                min={0}
+                max={100}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('duffingAmount', v)}
+                label="Duff"
+                size="sm"
+                color="#ff6666"
+              />
+            </div>
+
+            {/* LP/BP Mix */}
+            <div style={{ ...style(172, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.lpBpMix ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('lpBpMix', v)}
+                label="LP/BP"
+                size="sm"
+                color="#ff6666"
+                formatValue={(v) => v < 50 ? 'LP' : 'BP'}
+              />
+            </div>
+
+            {/* Resonance Tracking */}
+            <div style={{ ...style(219, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.resTracking ?? 74.3}
+                min={0}
+                max={100}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('resTracking', v)}
+                label="ResTrk"
+                size="sm"
+                color="#ff6666"
+              />
+            </div>
+
+            {/* Ensemble Amount */}
+            <div style={{ ...style(266, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.ensembleAmount ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('ensembleAmount', v)}
+                label="Ensbl"
+                size="sm"
+                color="#ff6666"
+              />
+            </div>
+
+            {/* Oversampling Order */}
+            <div style={{ ...style(313, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+              <Knob
+                value={config.devilFish?.oversamplingOrder ?? 2}
+                min={0}
+                max={4}
+                step={1}
+                onChange={(v) => config.devilFish?.enabled && updateDevilFish('oversamplingOrder', Math.round(v))}
+                label="O/S"
+                size="sm"
+                color="#ff6666"
+                formatValue={(v) => ['Off', '2x', '4x', '8x', '16x'][Math.round(v)] || 'Off'}
+              />
+            </div>
           </>
         )}
 
@@ -596,6 +826,293 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
           </>
         )}
 
+        {/* --- ROW 3: LFO (Low Frequency Oscillator) --- */}
+        {!isBuzz3o3 && (
+          <>
+            {/* LFO Waveform */}
+            <div style={style(52, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.waveform ?? 0}
+                min={0}
+                max={2}
+                step={1}
+                onChange={(v) => updateLfo('waveform', Math.round(v))}
+                label="Wave"
+                size="md"
+                color="#a855f7"
+                formatValue={(v) => ['Sine', 'Tri', 'Sqr'][Math.round(v)] || 'Sine'}
+              />
+            </div>
+
+            {/* LFO Rate */}
+            <div style={style(151, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.rate ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateLfo('rate', v)}
+                label="Rate"
+                size="md"
+                color="#a855f7"
+              />
+            </div>
+
+            {/* LFO Contour */}
+            <div style={style(250, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.contour ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateLfo('contour', v)}
+                label="Contour"
+                size="md"
+                color="#a855f7"
+              />
+            </div>
+
+            {/* LFO Pitch Depth */}
+            <div style={style(349, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.pitchDepth ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateLfo('pitchDepth', v)}
+                label="Pitch"
+                size="md"
+                color="#a855f7"
+              />
+            </div>
+
+            {/* LFO PWM Depth */}
+            <div style={style(448, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.pwmDepth ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateLfo('pwmDepth', v)}
+                label="PWM"
+                size="md"
+                color="#a855f7"
+              />
+            </div>
+
+            {/* LFO Filter Depth */}
+            <div style={style(547, 385, 60, 60)}>
+              <Knob
+                value={config.lfo?.filterDepth ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => updateLfo('filterDepth', v)}
+                label="Filter"
+                size="md"
+                color="#a855f7"
+              />
+            </div>
+
+            {/* LFO Info */}
+            <div style={style(650, 388, 260, 50)} className="flex flex-col justify-center text-[9px] text-gray-500">
+              <span>Modulation Source</span>
+              <span className="text-purple-500">Pitch • PWM • Filter Cutoff</span>
+            </div>
+          </>
+        )}
+
+        {/* --- ROW 4: Built-in Effects --- */}
+        {!isBuzz3o3 && (
+          <>
+            {/* Row divider */}
+            <div className="absolute top-[460px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+
+            {/* Row label */}
+            <div style={labelStyle(40, 468, 880)} className="text-green-500/70">Built-in Effects</div>
+
+            {/* Chorus Section */}
+            <div style={labelStyle(40, 490, 100)} className="text-green-400/60 text-[10px]">CHORUS</div>
+
+            {/* Chorus Enable */}
+            <div style={style(52, 495, 35, 35)}>
+              <Toggle
+                value={config.chorus?.enabled ?? false}
+                onChange={(v) => updateChorus('enabled', v)}
+                label="On"
+                size="sm"
+              />
+            </div>
+
+            {/* Chorus Mode */}
+            <div style={style(95, 495, 35, 35)}>
+              <Knob
+                value={config.chorus?.mode ?? 1}
+                min={0}
+                max={2}
+                step={1}
+                onChange={(v) => updateChorus('mode', Math.round(v))}
+                label="Mode"
+                size="sm"
+                color="#22c55e"
+                formatValue={(v) => ['Sub', 'Med', 'Wide'][Math.round(v)] || 'Med'}
+              />
+            </div>
+
+            {/* Chorus Mix */}
+            <div style={style(138, 495, 35, 35)}>
+              <Knob
+                value={config.chorus?.mix ?? 30}
+                min={0}
+                max={100}
+                onChange={(v) => updateChorus('mix', v)}
+                label="Mix"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Phaser Section */}
+            <div style={labelStyle(215, 490, 100)} className="text-green-400/60 text-[10px]">PHASER</div>
+
+            {/* Phaser Enable */}
+            <div style={style(227, 495, 35, 35)}>
+              <Toggle
+                value={config.phaser?.enabled ?? false}
+                onChange={(v) => updatePhaser('enabled', v)}
+                label="On"
+                size="sm"
+              />
+            </div>
+
+            {/* Phaser Rate */}
+            <div style={style(270, 495, 35, 35)}>
+              <Knob
+                value={config.phaser?.rate ?? 50}
+                min={0}
+                max={100}
+                onChange={(v) => updatePhaser('rate', v)}
+                label="Rate"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Phaser Depth */}
+            <div style={style(313, 495, 35, 35)}>
+              <Knob
+                value={config.phaser?.depth ?? 50}
+                min={0}
+                max={100}
+                onChange={(v) => updatePhaser('depth', v)}
+                label="Depth"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Phaser Feedback */}
+            <div style={style(356, 495, 35, 35)}>
+              <Knob
+                value={config.phaser?.feedback ?? 30}
+                min={0}
+                max={100}
+                onChange={(v) => updatePhaser('feedback', v)}
+                label="FB"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Phaser Mix */}
+            <div style={style(399, 495, 35, 35)}>
+              <Knob
+                value={config.phaser?.mix ?? 30}
+                min={0}
+                max={100}
+                onChange={(v) => updatePhaser('mix', v)}
+                label="Mix"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Delay Section */}
+            <div style={labelStyle(476, 490, 100)} className="text-green-400/60 text-[10px]">DELAY</div>
+
+            {/* Delay Enable */}
+            <div style={style(488, 495, 35, 35)}>
+              <Toggle
+                value={config.delay?.enabled ?? false}
+                onChange={(v) => updateDelay('enabled', v)}
+                label="On"
+                size="sm"
+              />
+            </div>
+
+            {/* Delay Time */}
+            <div style={style(531, 495, 35, 35)}>
+              <Knob
+                value={config.delay?.time ?? 250}
+                min={0}
+                max={2000}
+                onChange={(v) => updateDelay('time', v)}
+                label="Time"
+                size="sm"
+                color="#22c55e"
+                formatValue={(v) => `${Math.round(v)}ms`}
+              />
+            </div>
+
+            {/* Delay Feedback */}
+            <div style={style(574, 495, 35, 35)}>
+              <Knob
+                value={config.delay?.feedback ?? 30}
+                min={0}
+                max={100}
+                onChange={(v) => updateDelay('feedback', v)}
+                label="FB"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Delay Tone */}
+            <div style={style(617, 495, 35, 35)}>
+              <Knob
+                value={config.delay?.tone ?? 70}
+                min={0}
+                max={100}
+                onChange={(v) => updateDelay('tone', v)}
+                label="Tone"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Delay Mix */}
+            <div style={style(660, 495, 35, 35)}>
+              <Knob
+                value={config.delay?.mix ?? 25}
+                min={0}
+                max={100}
+                onChange={(v) => updateDelay('mix', v)}
+                label="Mix"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+
+            {/* Delay Stereo */}
+            <div style={style(703, 495, 35, 35)}>
+              <Knob
+                value={config.delay?.stereo ?? 50}
+                min={0}
+                max={100}
+                onChange={(v) => updateDelay('stereo', v)}
+                label="Stereo"
+                size="sm"
+                color="#22c55e"
+              />
+            </div>
+          </>
+        )}
+
         {/* Brand/Signature & Engine Selector */}
         <div className="absolute top-4 left-6 flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -605,8 +1122,12 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
               </svg>
             </div>
             <div className="flex flex-col -space-y-1">
-              <span className="text-white font-black italic text-xl tracking-tighter">JC-303</span>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Open303 WASM Engine</span>
+              <span className="text-white font-black italic text-xl tracking-tighter">
+                {config.engineType === 'db303' ? 'DB-303' : 'JC-303'}
+              </span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">
+                {config.engineType === 'db303' ? 'DB303 WASM Engine' : 'Open303 WASM Engine'}
+              </span>
             </div>
           </div>
 
@@ -636,9 +1157,39 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
 
           <div className="h-8 w-px bg-gray-800"></div>
 
-          <div className="flex flex-col justify-center">
-            <span className="text-[8px] font-bold text-gray-500">ENGINE</span>
-            <span className="text-[10px] text-accent-primary font-mono">Open303 WASM</span>
+          <div className="flex flex-col">
+            <label className="text-[8px] font-bold text-gray-500 mb-1">ENGINE</label>
+            <select
+              value={config.engineType || 'jc303'}
+              onChange={(e) => {
+                const engineType = e.target.value as 'jc303' | 'db303';
+                console.log(`[JC303 UI] Engine change: ${engineType}`);
+                onChange({ engineType });
+              }}
+              className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors"
+            >
+              <option value="jc303">Open303 (JC-303)</option>
+              <option value="db303">DB303 (db303 variant)</option>
+            </select>
+          </div>
+
+          <div className="h-8 w-px bg-gray-800"></div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleImportPreset}
+              className="bg-[#111] text-[10px] text-green-500 border border-gray-800 rounded px-3 py-1 hover:bg-gray-900 hover:border-green-500/50 transition-colors font-bold"
+              title="Import db303 XML preset"
+            >
+              IMPORT
+            </button>
+            <button
+              onClick={handleExportPreset}
+              className="bg-[#111] text-[10px] text-blue-500 border border-gray-800 rounded px-3 py-1 hover:bg-gray-900 hover:border-blue-500/50 transition-colors font-bold"
+              title="Export as db303 XML preset"
+            >
+              EXPORT
+            </button>
           </div>
         </div>
 

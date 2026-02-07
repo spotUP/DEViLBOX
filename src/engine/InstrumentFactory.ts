@@ -46,6 +46,7 @@ import { SAMSynth } from './sam/SAMSynth';
 import { V2Synth } from './v2/V2Synth';
 import { V2SpeechSynth } from './v2/V2SpeechSynth';
 import { JC303Synth } from './open303/Open303Synth';
+import { DB303Synth } from './db303/DB303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
@@ -67,13 +68,10 @@ import { ES5503Synth } from './es5503/ES5503Synth';
 import { ICS2115Synth } from './ics2115/ICS2115Synth';
 import { K054539Synth } from './k054539/K054539Synth';
 import { MEA8000Synth } from './mea8000/MEA8000Synth';
-import { MSM5232Synth } from './msm5232/MSM5232Synth';
 import { RF5C400Synth } from './rf5c400/RF5C400Synth';
-import { RolandSASynth } from './roland_sa/RolandSASynth';
 import { SN76477Synth } from './sn76477/SN76477Synth';
 import { SNKWaveSynth } from './snkwave/SNKWaveSynth';
 import { SP0250Synth } from './sp0250/SP0250Synth';
-import { TIASynth } from './tia/TIASynth';
 import { TMS36XXSynth } from './tms36xx/TMS36XXSynth';
 import { TMS5220Synth } from './tms5220/TMS5220Synth';
 import { TR707Synth } from './tr707/TR707Synth';
@@ -83,6 +81,72 @@ import { VotraxSynth } from './votrax/VotraxSynth';
 import { YMF271Synth } from './ymf271/YMF271Synth';
 import { YMOPQSynth } from './ymopq/YMOPQSynth';
 import { VASynthSynth } from './vasynth/VASynthSynth';
+
+/** Map synthType strings to FurnaceDispatchPlatform values for non-FM chips */
+const SYNTH_TO_DISPATCH: Record<string, number> = {
+  // Console PSG chips
+  FurnaceNES: FurnaceDispatchPlatform.NES,
+  FurnaceGB: FurnaceDispatchPlatform.GB,
+  FurnaceSNES: FurnaceDispatchPlatform.SNES,
+  FurnacePCE: FurnaceDispatchPlatform.PCE,
+  FurnacePSG: FurnaceDispatchPlatform.SMS,
+  FurnaceVB: FurnaceDispatchPlatform.VBOY,
+  FurnaceLynx: FurnaceDispatchPlatform.LYNX,
+  FurnaceSWAN: FurnaceDispatchPlatform.SWAN,
+  FurnaceVRC6: FurnaceDispatchPlatform.VRC6,
+  FurnaceN163: FurnaceDispatchPlatform.N163,
+  FurnaceFDS: FurnaceDispatchPlatform.FDS,
+  FurnaceMMC5: FurnaceDispatchPlatform.MMC5,
+  FurnaceGBA: FurnaceDispatchPlatform.GBA_DMA,
+  FurnaceNDS: FurnaceDispatchPlatform.NDS,
+  FurnacePOKEMINI: FurnaceDispatchPlatform.POKEMINI,
+  // Commodore / Computer chips
+  FurnaceC64: FurnaceDispatchPlatform.C64_6581,
+  FurnaceSID6581: FurnaceDispatchPlatform.C64_6581,
+  FurnaceSID8580: FurnaceDispatchPlatform.C64_8580,
+  FurnaceAY: FurnaceDispatchPlatform.AY8910,
+  FurnaceAY8930: FurnaceDispatchPlatform.AY8930,
+  FurnaceVIC: FurnaceDispatchPlatform.VIC20,
+  FurnaceSAA: FurnaceDispatchPlatform.SAA1099,
+  FurnaceTED: FurnaceDispatchPlatform.TED,
+  FurnaceVERA: FurnaceDispatchPlatform.VERA,
+  FurnaceSCC: FurnaceDispatchPlatform.SCC,
+  FurnaceTIA: FurnaceDispatchPlatform.TIA,
+  FurnaceAMIGA: FurnaceDispatchPlatform.AMIGA,
+  FurnacePET: FurnaceDispatchPlatform.PET,
+  FurnacePCSPKR: FurnaceDispatchPlatform.PCSPKR,
+  FurnaceZXBEEPER: FurnaceDispatchPlatform.SFX_BEEPER,
+  FurnacePOKEY: FurnaceDispatchPlatform.POKEY,
+  FurnacePONG: FurnaceDispatchPlatform.PONG,
+  FurnacePV1000: FurnaceDispatchPlatform.PV1000,
+  FurnaceDAVE: FurnaceDispatchPlatform.DAVE,
+  FurnaceSU: FurnaceDispatchPlatform.SOUND_UNIT,
+  FurnacePOWERNOISE: FurnaceDispatchPlatform.POWERNOISE,
+  // Sample-based chips
+  FurnaceSEGAPCM: FurnaceDispatchPlatform.SEGAPCM,
+  FurnaceQSOUND: FurnaceDispatchPlatform.QSOUND,
+  FurnaceES5506: FurnaceDispatchPlatform.ES5506,
+  FurnaceRF5C68: FurnaceDispatchPlatform.RF5C68,
+  FurnaceC140: FurnaceDispatchPlatform.C140,
+  FurnaceK007232: FurnaceDispatchPlatform.K007232,
+  FurnaceK053260: FurnaceDispatchPlatform.K053260,
+  FurnaceGA20: FurnaceDispatchPlatform.GA20,
+  FurnaceOKI: FurnaceDispatchPlatform.MSM6295,
+  FurnaceYMZ280B: FurnaceDispatchPlatform.YMZ280B,
+  FurnaceX1_010: FurnaceDispatchPlatform.X1_010,
+  FurnaceMSM6258: FurnaceDispatchPlatform.MSM6258,
+  FurnaceMSM5232: FurnaceDispatchPlatform.MSM5232,
+  FurnaceMULTIPCM: FurnaceDispatchPlatform.MULTIPCM,
+  FurnaceNAMCO: FurnaceDispatchPlatform.NAMCO,
+  FurnacePCMDAC: FurnaceDispatchPlatform.PCM_DAC,
+  // Misc chips
+  FurnaceBUBBLE: FurnaceDispatchPlatform.BUBSYS_WSG,
+  FurnaceSM8521: FurnaceDispatchPlatform.SM8521,
+  FurnaceT6W28: FurnaceDispatchPlatform.T6W28,
+  FurnaceSUPERVISION: FurnaceDispatchPlatform.SUPERVISION,
+  FurnaceUPD1771: FurnaceDispatchPlatform.UPD1771C,
+  FurnaceSCVTONE: FurnaceDispatchPlatform.UPD1771C,
+};
 
 export class InstrumentFactory {
   /**
@@ -107,13 +171,79 @@ export class InstrumentFactory {
     'TB303': 15,           // Calibrated: measured -24.9dB at offset 0. Raw peak ~-12.9dB. Target -10dB.
     'JC303': 15,           // Same engine as TB303
     'Buzz3o3': 5,          // Kept (WASM-dependent)
-    'Furnace': 0,          // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 7
-    'FurnaceGB': 0,        // Reset to 0 - unmeasured
-    'FurnaceNES': 0,       // Reset to 0 - unmeasured
-    'FurnaceOPN': 0,       // Reset to 0 - unmeasured
-    'FurnaceOPM': 0,       // Reset to 0 - unmeasured
-    'FurnaceC64': 0,       // Reset to 0 - unmeasured
-    'FurnaceAY': 0,        // Reset to 0 - unmeasured
+    'Furnace': 0,          // Generic Furnace - WASM dispatcher, no chip-specific output
+    // Furnace FM chips - recalibrated 2026-02-05 after WASM gain fixes
+    'FurnaceOPN': 7,       // Measured: -17.0dB → need +7dB
+    'FurnaceOPM': 2,       // Measured: -12.1dB → need +2dB
+    'FurnaceOPL': 10,      // Measured: -19.5dB → need +10dB
+    'FurnaceOPLL': 2,      // Measured: -12.1dB → need +2dB
+    'FurnaceESFM': 0,      // Measured: -18.2dB (test isolation, varies) → conservative 0
+    'FurnaceOPZ': 0,       // Measured: -19.2dB (test isolation, varies) → conservative 0
+    'FurnaceOPNA': 5,      // Measured: -14.6dB → need +5dB
+    'FurnaceOPNB': 5,      // Measured: -15.4dB → need +5dB
+    'FurnaceOPL4': 6,      // Measured: -16.3dB → need +6dB
+    'FurnaceY8950': 6,     // Measured: -16.4dB → need +6dB
+    'FurnaceVRC7': 2,      // Measured: -11.3dB → need +1-2dB
+    'FurnaceOPN2203': 0,   // Measured: -9.5dB → already near target
+    'FurnaceOPNBB': 2,     // Measured: -11.5dB → need +2dB
+    // Furnace Dispatch chips - calibrated 2026-02-05 via browser test runner
+    'FurnaceNES': 7,       // Measured: -17.3dB → need +7dB
+    'FurnaceGB': 4,        // Measured: -13.6dB → need +4dB
+    'FurnaceSNES': -10,    // Measured: 0.0dB (clipping) → need -10dB
+    'FurnacePCE': 3,       // Measured: -12.9dB → need +3dB
+    'FurnacePSG': 3,       // Measured: -13.1dB → need +3dB
+    'FurnaceVB': 16,       // Measured: -25.7dB → need +16dB
+    'FurnaceLynx': 3,      // Measured: -13.2dB → need +3dB
+    'FurnaceSWAN': 4,      // Measured: -13.9dB → need +4dB
+    'FurnaceVRC6': 3,      // Measured: -13.0dB → need +3dB
+    'FurnaceN163': 7,      // Measured: -17.1dB → need +7dB
+    'FurnaceFDS': 3,       // Measured: -13.4dB → need +3dB
+    'FurnaceMMC5': 37,     // Measured: -46.8dB → need +37dB
+    'FurnaceGBA': -10,     // Measured: 0.0dB (clipping) → need -10dB
+    'FurnaceNDS': 3,       // Measured: -13.1dB → need +3dB
+    'FurnacePOKEMINI': -10, // Measured: -0.0dB (clipping) → need -10dB
+    'FurnaceC64': 6,       // Measured: -16.1dB → need +6dB
+    'FurnaceSID6581': 6,   // Measured: -16.0dB → need +6dB
+    'FurnaceSID8580': 6,   // Measured: -15.9dB → need +6dB
+    'FurnaceAY': 3,        // Measured: -13.3dB → need +3dB
+    'FurnaceAY8930': 3,    // Measured: -13.2dB → need +3dB
+    'FurnaceVIC': 3,       // Measured: -12.8dB → need +3dB
+    'FurnaceSAA': 6,       // Measured: -16.2dB → need +6dB
+    'FurnaceTED': -4,      // Measured: -5.9dB → need -4dB
+    'FurnaceVERA': 17,     // Measured: -26.5dB → need +17dB
+    'FurnaceSCC': 9,       // Measured: -18.5dB → need +9dB
+    'FurnaceTIA': -7,      // Measured: -3.2dB → need -7dB
+    'FurnaceAMIGA': 3,     // Measured: -13.0dB → need +3dB
+    'FurnacePET': -10,     // Measured: -0.0dB (clipping) → need -10dB
+    'FurnacePCSPKR': -10,  // Measured 2026-02-07: -0.0dB → need -10dB
+    'FurnaceZXBEEPER': -4, // Measured: -6.1dB → need -4dB
+    'FurnacePOKEY': 7,     // Measured: -17.3dB → need +7dB
+    'FurnacePONG': -10,    // Measured: -0.0dB (clipping) → need -10dB
+    'FurnacePV1000': 3,    // Measured: -12.6dB → need +3dB
+    'FurnaceDAVE': 3,      // Measured: -13.0dB → need +3dB
+    'FurnaceSU': 8,        // Measured: -18.3dB → need +8dB
+    'FurnacePOWERNOISE': -4, // Measured: -6.0dB → need -4dB
+    'FurnaceSEGAPCM': -5,  // Measured: -4.8dB → need -5dB
+    'FurnaceQSOUND': 5,    // Measured: -15.2dB → need +5dB
+    'FurnaceES5506': 38,   // Measured: -47.7dB → need +38dB
+    'FurnaceRF5C68': 0,    // Silent - needs further investigation (2026-02-07)
+    'FurnaceC140': 8,      // Measured: -18.0dB → need +8dB
+    'FurnaceK007232': -4,  // Measured: -6.1dB → need -4dB
+    'FurnaceK053260': 3,   // Measured: -12.5dB → need +3dB
+    'FurnaceGA20': 3,      // Measured: -12.6dB → need +3dB
+    'FurnaceOKI': 44,      // Measured: -54.3dB → need +44dB
+    'FurnaceYMZ280B': 14,  // Measured: -23.8dB → need +14dB
+    'FurnaceX1_010': 15,   // Measured: -24.6dB → need +15dB
+    'FurnaceMSM6258': -10, // Measured 2026-02-07: -0.1dB → need -10dB
+    'FurnaceMSM5232': 10,  // Measured: -19.7dB → need +10dB
+    'FurnaceMULTIPCM': 14, // Measured: -24.1dB → need +14dB
+    'FurnaceNAMCO': 3,     // Measured: -13.0dB → need +3dB
+    'FurnacePCMDAC': -5,   // Measured: -4.9dB → need -5dB
+    'FurnaceBUBBLE': 3,    // Measured: -13.2dB → need +3dB
+    'FurnaceSM8521': 3,    // Measured: -12.8dB → need +3dB
+    'FurnaceT6W28': 3,     // Measured: -13.0dB → need +3dB
+    'FurnaceSUPERVISION': 3, // Measured: -13.1dB → need +3dB
+    'FurnaceUPD1771': 3,   // Measured: -12.7dB → need +3dB
     'BuzzKick': 3,         // Calibrated with output gain: measured -13.1dB, target -10
     'BuzzKickXP': 5,       // Calibrated with output gain: measured -21.7dB, target -10
     'BuzzNoise': 7,        // Calibrated with output gain: measured -22.3dB, target -10
@@ -123,7 +253,7 @@ export class InstrumentFactory {
     'Buzz3o3DF': 8,        // Calibrated with output gain: measured -13.8dB, target -10
     'Synare': 7,           // Measured: -7.1dB (OK)
     'DubSiren': 13,        // Measured: -0.5dB → reduce 10 (now uses getNormalizedVolume)
-    'SpaceLaser': 35,      // Recalibrated: measured -16.2dB, target -10
+    'SpaceLaser': 24,      // Measured 2026-02-05: peak 1.2dB at offset 35 → need -11dB delta
     'V2': 0,               // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 30
     'Sam': 16,             // Measured: -2.5dB → reduce 7 (now uses getNormalizedVolume)
     'SuperSaw': 9,         // Measured: -7.8dB (OK)
@@ -135,9 +265,9 @@ export class InstrumentFactory {
     'Wavetable': 5,        // Calibrated: raw peak ~-3.4dB, gain=-12+5=-7 → target ~-10dB
     'Organ': 3,            // Measured: -2.8dB → reduce 7
     'Sampler': 10,         // Measured: -20.3dB → increase 10
-    'Player': 0,           // Sample-based - no normalization needed
-    'GranularSynth': 8,    // Kept (no reliable measurement)
-    'DrumMachine': 10,     // Recalibrated: measured -14.6dB, target -10
+    'Player': 10,          // Measured 2026-02-05: peak -19.6dB → need +10dB delta
+    'GranularSynth': -47,  // Measured 2026-02-05: peak +45dB at offset 8 → need -55dB delta (engine runs very hot)
+    'DrumMachine': 18,     // Measured 2026-02-05: peak -18.4dB at offset 10 → need +8dB delta
     'ChiptuneModule': -6,  // Measured: -3.8dB → decrease 6
     'DrumKit': 0,          // Kept (test sample may not load)
     // MAME/WASM synths - CAUTION: test runner can't measure these (WASM doesn't init in test)
@@ -149,33 +279,30 @@ export class InstrumentFactory {
     'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
     'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
     'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
-    'CEM3394': 0,          // WASM - no measurement possible in test
-    'SCSP': 0,             // WASM - no measurement possible in test
-    // MAME chip synths - all reset to 0 (unmeasured, WASM doesn't init in test)
-    'MAMEAstrocade': 0,
-    'MAMESN76477': 0,
-    'MAMEASC': 0,
-    'MAMEES5503': 0,
-    'MAMEMEA8000': 0,
-    'MAMEMSM5232': 0,
-    'MAMESNKWave': 0,
-    'MAMESP0250': 0,
-    'MAMETMS36XX': 0,
-    'MAMEVotrax': 0,
-    'MAMEYMOPQ': 0,
-    'MAMETIA': 0,
-    'MAMEUPD931': 0,
-    'MAMEUPD933': 0,
-    'MAMETMS5220': 0,
-    'MAMEYMF271': 0,
-    'MAMETR707': 0,
-    'MAMEVASynth': 0,
-    'MAMEAICA': 0,
-    'MAMEICS2115': 0,
-    'MAMEK054539': 0,
-    'MAMEC352': 0,
-    'MAMERF5C400': 0,
-    'MAMERolandSA': 0,
+    'CEM3394': 19,         // Measured 2026-02-05: peak -29.2dB → need +19dB delta
+    'SCSP': 15,            // Measured 2026-02-05: peak -25.2dB → need +15dB
+    // MAME chip synths - calibrated 2026-02-07 via browser test runner
+    'MAMEAstrocade': 18,   // Measured: -27.6dB → need +18dB
+    'MAMESN76477': 5,      // Measured: -15.0dB → need +5dB
+    'MAMEASC': 11,         // Measured: -21.4dB → need +11dB
+    'MAMEES5503': 62,      // Measured: -72.1dB (nearly silent) → need +62dB
+    'MAMEMEA8000': 12,     // Measured: -22.2dB → need +12dB
+    'MAMESNKWave': 8,      // Measured: -18.2dB → need +8dB
+    'MAMESP0250': 26,      // Measured: -35.8dB → need +26dB
+    'MAMETMS36XX': 6,      // Measured: -16.5dB → need +6dB
+    'MAMEVotrax': 20,      // Measured: -30.4dB → need +20dB
+    'MAMEYMOPQ': 19,       // Measured 2026-02-07: -29.1dB → need +19dB
+    'MAMEUPD931': 23,      // Measured: -33.2dB → need +23dB
+    'MAMEUPD933': 28,      // Measured: -38.3dB → need +28dB
+    'MAMETMS5220': 37,     // Measured: -47.2dB → need +37dB
+    'MAMEYMF271': 15,      // Measured: -24.9dB → need +15dB
+    'MAMETR707': 22,       // Measured 2026-02-07: -31.6dB → need +22dB
+    'MAMEVASynth': 20,     // Measured: -30.0dB → need +20dB
+    'MAMEAICA': 0,         // Silent (sample-playback chip, needs ROM + mapping)
+    'MAMEICS2115': 35,     // Measured 2026-02-07: -44.6dB → need +35dB
+    'MAMEK054539': 22,     // Measured 2026-02-07: -31.8dB → need +22dB
+    'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
+    'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
   };
 
   /**
@@ -277,188 +404,40 @@ export class InstrumentFactory {
       case 'FurnaceVRC7':
         instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPLL); // VRC7 uses OPLL core
         break;
-      case 'FurnaceNES':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NES);
+      // Non-FM Furnace chips — use FurnaceDispatchSynth (native WASM dispatch)
+      case 'FurnaceNES': case 'FurnaceGB': case 'FurnaceSNES': case 'FurnacePCE':
+      case 'FurnacePSG': case 'FurnaceVB': case 'FurnaceLynx': case 'FurnaceSWAN':
+      case 'FurnaceVRC6': case 'FurnaceN163': case 'FurnaceFDS': case 'FurnaceMMC5':
+      case 'FurnaceGBA': case 'FurnaceNDS': case 'FurnacePOKEMINI':
+      case 'FurnaceC64': case 'FurnaceSID6581': case 'FurnaceSID8580':
+      case 'FurnaceAY': case 'FurnaceAY8930': case 'FurnaceVIC': case 'FurnaceSAA':
+      case 'FurnaceTED': case 'FurnaceVERA': case 'FurnaceSCC': case 'FurnaceTIA':
+      case 'FurnaceAMIGA': case 'FurnacePET': case 'FurnacePCSPKR':
+      case 'FurnaceZXBEEPER': case 'FurnacePOKEY': case 'FurnacePONG':
+      case 'FurnacePV1000': case 'FurnaceDAVE': case 'FurnaceSU':
+      case 'FurnacePOWERNOISE':
+      case 'FurnaceSEGAPCM': case 'FurnaceQSOUND': case 'FurnaceES5506':
+      case 'FurnaceRF5C68': case 'FurnaceC140': case 'FurnaceK007232':
+      case 'FurnaceK053260': case 'FurnaceGA20': case 'FurnaceOKI':
+      case 'FurnaceYMZ280B': case 'FurnaceX1_010': case 'FurnaceMSM6258':
+      case 'FurnaceMSM5232': case 'FurnaceMULTIPCM': case 'FurnaceNAMCO':
+      case 'FurnacePCMDAC': case 'FurnaceBUBBLE': case 'FurnaceSM8521':
+      case 'FurnaceT6W28': case 'FurnaceSUPERVISION': case 'FurnaceUPD1771': {
+        const dispatchPlatform = SYNTH_TO_DISPATCH[config.synthType];
+        if (dispatchPlatform !== undefined) {
+          instrument = new FurnaceDispatchSynth(dispatchPlatform);
+        } else {
+          instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN2);
+        }
         break;
-      case 'FurnaceGB':
-        // Use native Furnace dispatch WASM for Game Boy (real chip emulation)
-        instrument = new FurnaceDispatchSynth(FurnaceDispatchPlatform.GB);
-        break;
-      case 'FurnaceSNES':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SNES);
-        break;
-      case 'FurnacePCE':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCE);
-        break;
-      case 'FurnacePSG':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PSG);
-        break;
-      case 'FurnaceVB':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VB);
-        break;
-      case 'FurnaceLynx':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.LYNX);
-        break;
-      case 'FurnaceSWAN':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SWAN);
-        break;
-      case 'FurnaceVRC6':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VRC6);
-        break;
-      case 'FurnaceN163':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.N163);
-        break;
-      case 'FurnaceFDS':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.FDS);
-        break;
-      case 'FurnaceMMC5':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MMC5);
-        break;
-      case 'FurnaceC64':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID);
-        break;
-      case 'FurnaceAY':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AY);
-        break;
-      case 'FurnaceVIC':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VIC);
-        break;
-      case 'FurnaceSAA':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SAA);
-        break;
-      case 'FurnaceTED':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.TED);
-        break;
-      case 'FurnaceVERA':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.VERA);
-        break;
-      case 'FurnaceSCC':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SCC);
-        break;
-      case 'FurnaceTIA':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.TIA);
-        break;
-      case 'FurnaceSEGAPCM':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SEGAPCM);
-        break;
-      case 'FurnaceQSOUND':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.QSOUND);
-        break;
-      case 'FurnaceES5506':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.ES5506);
-        break;
-      case 'FurnaceRF5C68':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.RF5C68);
-        break;
-      case 'FurnaceC140':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.C140);
-        break;
-      case 'FurnaceK007232':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.K007232);
-        break;
-      case 'FurnaceK053260':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.K053260);
-        break;
-      case 'FurnaceGA20':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.GA20);
-        break;
-      case 'FurnaceOKI':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.OKI);
-        break;
-      case 'FurnaceYMZ280B':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.YMZ280B);
-        break;
-      case 'FurnaceX1_010':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.X1_010);
-        break;
-      case 'FurnaceBUBBLE':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.BUBBLE);
-        break;
-      case 'FurnaceSM8521':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SM8521);
-        break;
-      case 'FurnaceT6W28':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.T6W28);
-        break;
-      case 'FurnaceSUPERVISION':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SUPERVISION);
-        break;
-      case 'FurnaceUPD1771':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.UPD1771);
-        break;
+      }
 
-      // === Additional Furnace Chips ===
-      case 'FurnaceAMIGA':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AMIGA);
-        break;
-      case 'FurnaceAY8930':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.AY8930);
-        break;
-      case 'FurnaceDAVE':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.DAVE);
-        break;
-      case 'FurnaceGBA':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.GBA_DMA);
-        break;
-      case 'FurnaceMSM5232':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MSM5232);
-        break;
-      case 'FurnaceMSM6258':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MSM6258);
-        break;
-      case 'FurnaceMULTIPCM':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.MULTIPCM);
-        break;
-      case 'FurnaceNAMCO':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NAMCO);
-        break;
-      case 'FurnaceNDS':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.NDS);
-        break;
+      // FM chips that stay on FurnaceSynth (already produce audio)
       case 'FurnaceOPN2203':
         instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN);
         break;
       case 'FurnaceOPNBB':
         instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPNB_B);
-        break;
-      case 'FurnacePCMDAC':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCMDAC);
-        break;
-      case 'FurnacePCSPKR':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PCSPKR);
-        break;
-      case 'FurnacePET':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PET);
-        break;
-      case 'FurnacePOKEMINI':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POKEMINI);
-        break;
-      case 'FurnacePOKEY':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POKEY);
-        break;
-      case 'FurnacePONG':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PONG);
-        break;
-      case 'FurnacePOWERNOISE':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.POWERNOISE);
-        break;
-      case 'FurnacePV1000':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.PV1000);
-        break;
-      case 'FurnaceSCVTONE':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SCVTONE);
-        break;
-      case 'FurnaceSID6581':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID_6581);
-        break;
-      case 'FurnaceSID8580':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SID_8580);
-        break;
-      case 'FurnaceSU':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.SU);
-        break;
-      case 'FurnaceZXBEEPER':
-        instrument = this.createFurnaceWithChip(config, FurnaceChipType.ZXBEEPER);
         break;
 
       case 'Sampler':
@@ -562,7 +541,12 @@ export class InstrumentFactory {
         break;
 
       case 'MAMEVFX':
+      case 'VFX':
         instrument = this.createVFX(config);
+        break;
+
+      case 'D50':
+        instrument = this.createD50(config);
         break;
 
       case 'MAMEDOC':
@@ -653,14 +637,8 @@ export class InstrumentFactory {
       case 'MAMEMEA8000':
         instrument = this.createMAMEMEA8000(config);
         break;
-      case 'MAMEMSM5232':
-        instrument = this.createMAMEMSM5232(config);
-        break;
       case 'MAMERF5C400':
         instrument = this.createMAMERF5C400(config);
-        break;
-      case 'MAMERolandSA':
-        instrument = this.createMAMERolandSA(config);
         break;
       case 'MAMESN76477':
         instrument = this.createMAMESN76477(config);
@@ -670,9 +648,6 @@ export class InstrumentFactory {
         break;
       case 'MAMESP0250':
         instrument = this.createMAMESP0250(config);
-        break;
-      case 'MAMETIA':
-        instrument = this.createMAMETIA(config);
         break;
       case 'MAMETMS36XX':
         instrument = this.createMAMETMS36XX(config);
@@ -712,6 +687,16 @@ export class InstrumentFactory {
       default:
         console.warn(`Unknown synth type: ${config.synthType}, defaulting to Synth`);
         instrument = this.createSynth(config);
+    }
+
+    // Apply volume normalization for Furnace WASM synths
+    // These route audio through native GainNodes (bypassing Tone.js gain),
+    // so we use setVolumeOffset() to control the native gain
+    if (config.synthType.startsWith('Furnace') && instrument) {
+      const offset = this.VOLUME_NORMALIZATION_OFFSETS[config.synthType] ?? 0;
+      if (offset !== 0 && 'setVolumeOffset' in instrument) {
+        (instrument as any).setVolumeOffset(offset);
+      }
     }
 
     return instrument;
@@ -770,13 +755,17 @@ export class InstrumentFactory {
         });
         break;
 
-      case 'Reverb':
-        node = new Tone.Reverb({
+      case 'Reverb': {
+        const reverb = new Tone.Reverb({
           decay: config.parameters.decay || 1.5,
           preDelay: config.parameters.preDelay || 0.01,
           wet: wetValue,
         });
+        // Reverb needs to generate its impulse response before it can process audio
+        await reverb.ready;
+        node = reverb;
         break;
+      }
 
       case 'Delay':
         node = new Tone.FeedbackDelay({
@@ -1574,12 +1563,18 @@ export class InstrumentFactory {
     });
   }
 
-  private static createTB303(config: InstrumentConfig): JC303Synth {
+  private static createTB303(config: InstrumentConfig): JC303Synth | DB303Synth {
     const tb303Config = config.tb303 || { ...DEFAULT_TB303 };
+    const engineType = tb303Config.engineType || 'jc303';
 
-    // Use Open303 WASM engine for authentic TB-303 sound
+    // Use selected WASM engine for authentic TB-303 sound
+    // engineType: 'jc303' = Open303 engine, 'db303' = db303 variant with additional tweaks
     // Apply normalized volume boost for TB303
     const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
+
+    if (engineType === 'db303') {
+      return this.createDB303(tb303Config, normalizedVolume);
+    }
     return this.createJC303(tb303Config, normalizedVolume);
   }
 
@@ -1624,6 +1619,103 @@ export class InstrumentFactory {
       if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
       if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
       if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
+    }
+
+    if (volume !== undefined) {
+      synth.setVolume(volume);
+    }
+
+    return synth;
+  }
+
+  /**
+   * Create a DB303 (db303 variant TB-303) with tb303 config applied
+   */
+  private static createDB303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): DB303Synth {
+    const synth = new DB303Synth();
+
+    // Core 303 parameters
+    synth.setCutoff(tb.filter.cutoff);
+    synth.setResonance(tb.filter.resonance);
+    synth.setEnvMod(tb.filterEnvelope.envMod);
+    synth.setDecay(tb.filterEnvelope.decay);
+    synth.setAccent(tb.accent.amount);
+    synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
+
+    // Oscillator enhancements
+    if (tb.oscillator.pulseWidth !== undefined) synth.setPulseWidth(tb.oscillator.pulseWidth);
+    if (tb.oscillator.subOscGain !== undefined) synth.setSubOscGain(tb.oscillator.subOscGain);
+    if (tb.oscillator.subOscBlend !== undefined) synth.setSubOscBlend(tb.oscillator.subOscBlend);
+
+    // VCA envelope
+    synth.setVegDecay(1230); // matches Open303 default
+
+    if (tb.tuning !== undefined) {
+      synth.setTuning(tb.tuning);
+    }
+
+    // Devil Fish enhanced parameters (if present)
+    const df = tb.devilFish;
+    if (df) {
+      if (df.envType !== undefined) synth.setEnvType(df.envType);
+      if (df.reverbMix !== undefined) synth.setReverbMix(df.reverbMix);
+      if (df.reverbDecay !== undefined) synth.setReverbDecay(df.reverbDecay);
+      if (df.overdrive !== undefined) synth.setOverdrive(df.overdrive);
+      if (df.subOscMix !== undefined) synth.setSubOscMix(df.subOscMix);
+      if (df.feedbackVCF !== undefined) synth.setFeedbackVCF(df.feedbackVCF);
+      if (df.pulsewaveVCF !== undefined) synth.setPulsewaveVCF(df.pulsewaveVCF);
+      if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
+      if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
+
+      // Extended Devil Fish parameters
+      if (df.accentSoftAttack !== undefined) synth.setAccentSoftAttack(df.accentSoftAttack);
+      if (df.passbandCompensation !== undefined) synth.setPassbandCompensation(df.passbandCompensation);
+      if (df.resTracking !== undefined) synth.setResTracking(df.resTracking);
+      if (df.duffingAmount !== undefined) synth.setDuffingAmount(df.duffingAmount);
+      if (df.lpBpMix !== undefined) synth.setLpBpMix(df.lpBpMix);
+      if (df.stageNLAmount !== undefined) synth.setStageNLAmount(df.stageNLAmount);
+      if (df.filterSelect !== undefined) synth.setFilterSelect(df.filterSelect);
+      if (df.diodeCharacter !== undefined) synth.setDiodeCharacter(df.diodeCharacter);
+      if (df.ensembleAmount !== undefined) synth.setEnsembleAmount(df.ensembleAmount);
+      if (df.oversamplingOrder !== undefined) synth.setOversamplingOrder(df.oversamplingOrder);
+    }
+
+    // LFO parameters (if present)
+    const lfo = tb.lfo;
+    if (lfo) {
+      if (lfo.waveform !== undefined) synth.setLfoWaveform(lfo.waveform);
+      if (lfo.rate !== undefined) synth.setLfoRate(lfo.rate);
+      if (lfo.contour !== undefined) synth.setLfoContour(lfo.contour);
+      if (lfo.pitchDepth !== undefined) synth.setLfoPitchDepth(lfo.pitchDepth);
+      if (lfo.pwmDepth !== undefined) synth.setLfoPwmDepth(lfo.pwmDepth);
+      if (lfo.filterDepth !== undefined) synth.setLfoFilterDepth(lfo.filterDepth);
+    }
+
+    // Built-in effects (Tone.js effects)
+    const chorus = tb.chorus;
+    if (chorus) {
+      if (chorus.enabled !== undefined) synth.setChorusEnabled(chorus.enabled);
+      if (chorus.mode !== undefined) synth.setChorusMode(chorus.mode);
+      if (chorus.mix !== undefined) synth.setChorusMix(chorus.mix);
+    }
+
+    const phaser = tb.phaser;
+    if (phaser) {
+      if (phaser.enabled !== undefined) synth.setPhaserEnabled(phaser.enabled);
+      if (phaser.rate !== undefined) synth.setPhaserRate(phaser.rate);
+      if (phaser.depth !== undefined) synth.setPhaserDepth(phaser.depth);
+      if (phaser.feedback !== undefined) synth.setPhaserFeedback(phaser.feedback);
+      if (phaser.mix !== undefined) synth.setPhaserMix(phaser.mix);
+    }
+
+    const delay = tb.delay;
+    if (delay) {
+      if (delay.enabled !== undefined) synth.setDelayEnabled(delay.enabled);
+      if (delay.time !== undefined) synth.setDelayTime(delay.time);
+      if (delay.feedback !== undefined) synth.setDelayFeedback(delay.feedback);
+      if (delay.tone !== undefined) synth.setDelayTone(delay.tone);
+      if (delay.mix !== undefined) synth.setDelayMix(delay.mix);
+      if (delay.stereo !== undefined) synth.setDelayStereo(delay.stereo);
     }
 
     if (volume !== undefined) {
@@ -2165,7 +2257,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.1,
           },
-          volume: config.volume ?? -6,
+          volume: this.getNormalizedVolume('DrumMachine', config.volume),
         });
 
         // Add saturation via waveshaper if drive > 0
@@ -2282,7 +2374,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.1,
           },
-          volume: config.volume ?? -6,
+          volume: this.getNormalizedVolume('DrumMachine', config.volume),
         });
 
         // Noise component for snare "snap"
@@ -2294,7 +2386,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.05,
           },
-          volume: (config.volume ?? -6) + (snareConfig.snappy / 15 - 3),
+          volume: (this.getNormalizedVolume('DrumMachine', config.volume)) + (snareConfig.snappy / 15 - 3),
         });
 
         // 909 uses notch filter at 1000Hz on snare
@@ -2353,7 +2445,7 @@ export class InstrumentFactory {
               envelope: {
                 decay: sc.toneDecay / 1000,
               },
-              volume: (config.volume ?? -6) + (sc.snappy / 15 - 3),
+              volume: (this.getNormalizedVolume('DrumMachine', config.volume)) + (sc.snappy / 15 - 3),
             });
             filter.set({
               type: sc.filterType,
@@ -2569,7 +2661,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.1,
           },
-          volume: config.volume ?? -6,
+          volume: this.getNormalizedVolume('DrumMachine', config.volume),
         });
 
         // Small amount of noise for attack character
@@ -2581,7 +2673,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.02,
           },
-          volume: (config.volume ?? -6) - 20 + (tomConfig.tone / 5), // Very subtle noise
+          volume: (this.getNormalizedVolume('DrumMachine', config.volume)) - 20 + (tomConfig.tone / 5), // Very subtle noise
         });
 
         const output = new Tone.Gain(1);
@@ -2630,7 +2722,7 @@ export class InstrumentFactory {
               envelope: {
                 decay: tc.toneDecay / 1000,
               },
-              volume: (config.volume ?? -6) - 20 + (tc.tone / 5),
+              volume: (this.getNormalizedVolume('DrumMachine', config.volume)) - 20 + (tc.tone / 5),
             });
           },
           volume: synth.volume,
@@ -3059,7 +3151,7 @@ export class InstrumentFactory {
             sustain: 0,
             release: 0.01,
           },
-          volume: config.volume ?? -12,
+          volume: this.getNormalizedVolume('DrumMachine', config.volume),
         });
 
         // Highpass filter removes low frequencies, keeps bright rattle
@@ -4472,8 +4564,8 @@ export class InstrumentFactory {
       return synth as unknown as Tone.ToneAudioNode;
     }
 
-    // Regular V2 synth mode
-    const synth = new V2Synth();
+    // Regular V2 synth mode - pass V2 config for initial patch parameters
+    const synth = new V2Synth(config.v2 || undefined);
 
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('V2', config.volume));
 
@@ -4665,8 +4757,8 @@ export class InstrumentFactory {
   private static applyChipParameters(synth: any, config: InstrumentConfig): void {
     const params = config.parameters;
     if (!params) return;
-    // If _program is set, load built-in WASM preset first
-    if (typeof params._program === 'number') {
+    // If _program is set, load built-in WASM preset first (not all chips support it)
+    if (typeof params._program === 'number' && typeof synth.loadPreset === 'function') {
       synth.loadPreset(params._program);
     }
     // Apply individual parameter overrides
@@ -4732,23 +4824,9 @@ export class InstrumentFactory {
     return synth as unknown as Tone.ToneAudioNode;
   }
 
-  private static createMAMEMSM5232(config: InstrumentConfig): Tone.ToneAudioNode {
-    const synth = new MSM5232Synth();
-    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEMSM5232', config.volume));
-    this.applyChipParameters(synth, config);
-    return synth as unknown as Tone.ToneAudioNode;
-  }
-
   private static createMAMERF5C400(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new RF5C400Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERF5C400', config.volume));
-    this.applyChipParameters(synth, config);
-    return synth as unknown as Tone.ToneAudioNode;
-  }
-
-  private static createMAMERolandSA(config: InstrumentConfig): Tone.ToneAudioNode {
-    const synth = new RolandSASynth();
-    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMERolandSA', config.volume));
     this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
@@ -4770,13 +4848,6 @@ export class InstrumentFactory {
   private static createMAMESP0250(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new SP0250Synth();
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMESP0250', config.volume));
-    this.applyChipParameters(synth, config);
-    return synth as unknown as Tone.ToneAudioNode;
-  }
-
-  private static createMAMETIA(config: InstrumentConfig): Tone.ToneAudioNode {
-    const synth = new TIASynth();
-    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMETIA', config.volume));
     this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
   }
