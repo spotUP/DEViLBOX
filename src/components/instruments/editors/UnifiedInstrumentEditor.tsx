@@ -34,14 +34,21 @@ import { ChipSynthControls } from '../controls/ChipSynthControls';
 import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
+import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
+import { MAMEMacroEditor, type MacroData } from './MAMEMacroEditor';
+import { WavetableListEditor } from './WavetableEditor';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
-import { isMAMEChipType } from '@constants/chipParameters';
-import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic } from 'lucide-react';
+import { isMAMEChipType, getChipSynthDef } from '@constants/chipParameters';
+import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
+import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic, Monitor, Cpu } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
+
+// Import hardware UI components
+import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
 type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd';
@@ -135,6 +142,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [showHelp, setShowHelp] = useState(false);
   const [genericTab, setGenericTab] = useState<SynthEditorTab>('oscillator');
   const [isBaking, setIsBaking] = useState(false);
+  const [uiMode, setUIMode] = useState<'simple' | 'hardware'>('simple');
 
   const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
 
@@ -911,6 +919,38 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // MAME CHIP SYNTH EDITOR (data-driven controls)
   // ============================================================================
   if (editorMode === 'mamechip') {
+    // Get chip capabilities for this synth type
+    const chipName = instrument.synthType.replace('MAME', '');
+    const chipCaps = getChipCapabilities(chipName);
+    const chipDef = getChipSynthDef(instrument.synthType);
+
+    // Get/initialize macro data from instrument config
+    const macros: MacroData[] = instrument.parameters?.macros || [];
+
+    const handleMacrosChange = (newMacros: MacroData[]) => {
+      onChange({
+        parameters: {
+          ...instrument.parameters,
+          macros: newMacros,
+        },
+      });
+    };
+
+    // Get/initialize wavetable data from instrument config
+    const wavetables = instrument.parameters?.wavetables || [];
+
+    const handleWavetablesChange = (newWavetables: any[]) => {
+      onChange({
+        parameters: {
+          ...instrument.parameters,
+          wavetables: newWavetables,
+        },
+      });
+    };
+
+    // Check if hardware UI is available for this synth type
+    const hasHardware = hasHardwareUI(instrument.synthType);
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
@@ -919,17 +959,86 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
+          customHeaderControls={
+            hasHardware ? (
+              <button
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  uiMode === 'hardware'
+                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                }`}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="text-[10px] font-bold uppercase">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
         />
-        <div className="synth-editor-content overflow-y-auto p-4">
-          <ChipSynthControls
-            synthType={instrument.synthType}
-            parameters={instrument.parameters || {}}
-            instrumentId={instrument.id}
-            onParamChange={handleChipParamChange}
-            onTextChange={handleChipTextChange}
-            onLoadPreset={handleChipPresetLoad}
-            onRomUpload={handleChipRomUpload}
-          />
+        <div className="synth-editor-content overflow-y-auto p-4 space-y-4">
+          {uiMode === 'hardware' && hasHardware ? (
+            /* Hardware UI Mode */
+            <HardwareUIWrapper
+              synthType={instrument.synthType}
+              parameters={instrument.parameters || {}}
+              onParamChange={handleChipParamChange}
+            />
+          ) : (
+            /* Simple Controls Mode */
+            <>
+              {/* Oscilloscope */}
+              <MAMEOscilloscope
+                instrumentId={instrument.id}
+                height={100}
+                color={chipDef?.color}
+              />
+
+              {/* Chip Parameters */}
+              <ChipSynthControls
+                synthType={instrument.synthType}
+                parameters={instrument.parameters || {}}
+                instrumentId={instrument.id}
+                onParamChange={handleChipParamChange}
+                onTextChange={handleChipTextChange}
+                onLoadPreset={handleChipPresetLoad}
+                onRomUpload={handleChipRomUpload}
+              />
+
+              {/* Macro Editor */}
+              <MAMEMacroEditor
+                instrumentId={instrument.id}
+                macros={macros}
+                onChange={handleMacrosChange}
+                chipCapabilities={{
+                  hasWavetable: chipCaps.hasWavetable,
+                  hasFM: chipCaps.hasFM,
+                  hasNoise: chipCaps.hasNoise,
+                  hasPanning: chipCaps.hasPanning,
+                }}
+              />
+
+              {/* Wavetable Editor (for chips that support it) */}
+              {chipCaps.hasWavetable && (
+                <div className="rounded-lg overflow-hidden border border-dark-border">
+                  <div className="px-3 py-2 bg-dark-surface border-b border-dark-border">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                      Wavetables
+                    </span>
+                  </div>
+                  <div className="p-2">
+                    <WavetableListEditor
+                      wavetables={wavetables.length > 0 ? wavetables : [{ id: 0, data: new Array(32).fill(15), len: 32, max: 31 }]}
+                      onChange={handleWavetablesChange}
+                      maxWavetables={16}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     );
