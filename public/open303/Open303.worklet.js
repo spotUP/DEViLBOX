@@ -6,6 +6,9 @@
  * The WASM module JS is passed as a string and executed via Function constructor.
  */
 
+// Performance: Disable note event logging (causes severe slowdown)
+const DEBUG_NOTE_EVENTS = false;
+
 class Open303Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -51,12 +54,12 @@ class Open303Processor extends AudioWorkletProcessor {
           // For NON-SLIDE notes: send noteOff first to clear noteList → triggerNote
           // For SLIDE notes: keep previous note held → slideToNote (legato)
           if (!data.slide && this.currentNote >= 0) {
-            console.log('[Open303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity);
+            if (DEBUG_NOTE_EVENTS) console.log('[Open303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity);
             this.synth.noteOff(this.currentNote);
           } else if (data.slide && this.currentNote >= 0) {
-            console.log('[Open303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity);
+            if (DEBUG_NOTE_EVENTS) console.log('[Open303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity);
           } else {
-            console.log('[Open303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity);
+            if (DEBUG_NOTE_EVENTS) console.log('[Open303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity);
           }
           this.synth.noteOn(data.note, data.velocity);
           this.currentNote = data.note;
@@ -66,7 +69,7 @@ class Open303Processor extends AudioWorkletProcessor {
         if (this.synth) {
           // Only process noteOff for the actual held note (note=0 is intentionally a no-op)
           if (data.note > 0 && data.note === this.currentNote) {
-            console.log('[Open303] RELEASE: noteOff(' + data.note + ')');
+            if (DEBUG_NOTE_EVENTS) console.log('[Open303] RELEASE: noteOff(' + data.note + ')');
             this.synth.noteOff(data.note);
             this.currentNote = -1;
           }
@@ -77,14 +80,14 @@ class Open303Processor extends AudioWorkletProcessor {
         if (this.synth && this.currentNote >= 0) {
           // Gate off: VCA envelope enters 16ms release (matching real 303 hardware).
           // Real TB-303: 8ms hold + 8ms linear decay when gate goes LOW.
-          console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
           this.synth.noteOff(this.currentNote);
           this.currentNote = -1;
         }
         break;
       case 'allNotesOff':
         if (this.synth) {
-          console.log('[Open303] ALL NOTES OFF');
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] ALL NOTES OFF');
           this.synth.allNotesOff();
           this.currentNote = -1;
         }
