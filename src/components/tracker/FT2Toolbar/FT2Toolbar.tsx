@@ -181,6 +181,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setGrooveTemplate,
     swing,
     setSwing,
+    grooveSteps,
+    setGrooveSteps,
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
@@ -700,31 +702,40 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                     })}
                     
                     {/* Manual Swing Control */}
-                    <div className="mt-auto border-t border-dark-border p-3 bg-dark-bgSecondary/30">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-text-muted uppercase">Manual Swing</span>
+                    <div className="mt-auto border-t border-dark-border p-3 bg-dark-bgSecondary/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-text-muted uppercase">Groove Amount</span>
                         <span className="text-[10px] font-mono text-accent-primary font-bold">{swing}%</span>
                       </div>
                       <input 
                         type="range" 
                         min="0" 
-                        max="100" 
+                        max="200" 
                         value={swing} 
                         onChange={(e) => setSwing(parseInt(e.target.value))}
-                        className={`w-full accent-accent-primary cursor-pointer ${grooveTemplateId !== 'straight' ? 'opacity-30 grayscale' : ''}`}
-                        title="Adjust swing amount (0-100%). Overrides templates if not set to 0."
+                        className="w-full accent-accent-primary cursor-pointer"
+                        title="Adjust groove intensity (0-200%). 100% is normal, >100% stretches the feel."
                       />
-                      <div className="flex justify-between text-[8px] text-text-muted mt-1 font-mono">
-                        <span>PUSH</span>
-                        <span>0%</span>
-                        <span>TRIPLET</span>
-                        <span>LATE</span>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-text-muted uppercase">Cycle Steps</span>
+                        <select 
+                          value={grooveSteps}
+                          onChange={(e) => setGrooveSteps(parseInt(e.target.value))}
+                          className="bg-dark-bgTertiary text-accent-primary border border-dark-border rounded px-1 text-[10px] font-mono outline-none"
+                          title="Groove Cycle Duration (steps). Standard 16th swing is 2 steps."
+                        >
+                          {[2, 4, 8, 16, 32, 64].map(s => (
+                            <option key={s} value={s}>{s} steps</option>
+                          ))}
+                        </select>
                       </div>
-                      {grooveTemplateId !== 'straight' && (
-                        <div className="text-[9px] text-accent-warning mt-2 italic leading-tight">
-                          Note: Selection above overrides manual swing.
-                        </div>
-                      )}
+
+                      <div className="flex justify-between text-[8px] text-text-muted mt-1 font-mono">
+                        <span>OFF</span>
+                        <span>NORMAL</span>
+                        <span>EXTREME</span>
+                      </div>
                     </div>
                   </div>
                 )}
