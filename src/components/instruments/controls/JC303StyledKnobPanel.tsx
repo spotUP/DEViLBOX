@@ -34,7 +34,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     const updateScale = () => {
       if (containerRef.current?.parentElement) {
         const parentWidth = containerRef.current.parentElement.clientWidth;
-        const panelWidth = 930 + 32; // width + padding
+        const panelWidth = 1080 + 32; // width + padding
         if (parentWidth < panelWidth) {
           setScale(parentWidth / panelWidth);
         } else {
@@ -193,7 +193,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     });
   };
 
-  // Coordinates from Gui.cpp (930x363)
+  // Coordinates from Gui.cpp (Now scaled for 1080x720)
   const style = (x: number, y: number, width: number, height: number) => ({
     left: `${x}px`,
     top: `${y}px`,
@@ -208,11 +208,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     width: `${width}px`,
     position: 'absolute' as const,
     textAlign: 'center' as const,
-    fontSize: '9px',
+    fontSize: '10px',
     fontWeight: 'bold',
     color: '#888',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
+    letterSpacing: '0.08em',
   });
 
   // Import preset from XML file
@@ -264,13 +264,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     <div
       ref={containerRef}
       className="w-full overflow-visible flex justify-center py-4 select-none"
-      style={{ minHeight: `${(isBuzz3o3 ? 340 : 580) * scale + 32}px` }}
+      style={{ minHeight: `${(isBuzz3o3 ? 380 : 760) * scale + 32}px` }}
     >
       <div
         className="relative bg-[#1a1a1a] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-b-8 border-r-4 border-black/40 overflow-hidden"
         style={{
-          width: '930px',
-          height: isBuzz3o3 ? '340px' : '480px', 
+          width: '1080px',
+          height: isBuzz3o3 ? '380px' : '720px', 
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
           background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
@@ -283,22 +283,22 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           {/* Main section dividers */}
           <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           {/* Section divider for second row */}
-          <div className="absolute top-[230px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+          <div className="absolute top-[260px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           {/* Section divider for third row (LFO) */}
           {!isBuzz3o3 && (
-            <div className="absolute top-[350px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+            <div className="absolute top-[430px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           )}
 
           {/* Group Labels */}
-          <div style={labelStyle(40, 115, 100)} className="text-accent-primary opacity-80">Oscillator</div>
-          <div style={labelStyle(180, 115, 580)} className="text-accent-primary opacity-80">Filter & Envelope</div>
-          <div style={labelStyle(800, 115, 100)} className="text-accent-primary opacity-80">Output</div>
+          <div style={labelStyle(40, 115, 120)} className="text-accent-primary opacity-80">Oscillator</div>
+          <div style={labelStyle(200, 115, 680)} className="text-accent-primary opacity-80">Filter & Envelope</div>
+          <div style={labelStyle(940, 115, 100)} className="text-accent-primary opacity-80">Output</div>
 
           {!isBuzz3o3 && (
             <>
-              <div style={labelStyle(40, 238, 500)} className="text-red-500/70">Devil Fish Modifications</div>
-              <div style={labelStyle(550, 238, 340)} className="text-orange-500/70">Neural Overdrive</div>
-              <div style={labelStyle(40, 358, 880)} className="text-purple-500/70">LFO (Low Frequency Oscillator)</div>
+              <div style={labelStyle(40, 268, 600)} className="text-red-500/70">Devil Fish Modifications</div>
+              <div style={labelStyle(650, 268, 400)} className="text-orange-500/70">Neural Overdrive</div>
+              <div style={labelStyle(40, 438, 1000)} className="text-purple-500/70">LFO (Low Frequency Oscillator)</div>
             </>
           )}
         </div>
@@ -306,7 +306,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {/* --- ROW 1: Main Controls --- */}
 
         {/* Waveform Blend */}
-        <div style={style(46, 140, 70, 70)}>
+        <div style={style(60, 145, 80, 80)}>
           <Knob
             value={typeof config.oscillator.type === 'string' ? (config.oscillator.type === 'square' ? 100 : 0) : 0}
             min={0}
@@ -321,7 +321,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
         {/* Oscillator Enhancements (Sub-row below Waveform) */}
         {/* Pulse Width */}
-        <div style={style(14, 215, 35, 35)}>
+        <div style={style(24, 225, 35, 35)}>
           <Knob
             value={config.oscillator.pulseWidth ?? 50}
             min={0}
@@ -334,7 +334,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Sub Oscillator Gain */}
-        <div style={style(54, 215, 35, 35)}>
+        <div style={style(74, 225, 35, 35)}>
           <Knob
             value={config.oscillator.subOscGain ?? 0}
             min={0}
@@ -347,7 +347,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Sub Oscillator Blend */}
-        <div style={style(94, 215, 35, 35)}>
+        <div style={style(124, 225, 35, 35)}>
           <Knob
             value={config.oscillator.subOscBlend ?? 0}
             min={0}
@@ -360,7 +360,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Tuning */}
-        <div style={style(188, 139, 60, 60)}>
+        <div style={style(210, 145, 65, 65)}>
           <Knob
             value={config.tuning ?? 0}
             min={-100}
@@ -374,7 +374,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Cutoff */}
-        <div style={style(287, 139, 60, 60)}>
+        <div style={style(320, 145, 65, 65)}>
           <Knob
             value={config.filter.cutoff}
             min={200}
@@ -388,7 +388,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Resonance */}
-        <div style={style(386, 139, 60, 60)}>
+        <div style={style(430, 145, 65, 65)}>
           <Knob
             value={config.filter.resonance}
             min={0}
@@ -401,7 +401,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Env Mod */}
-        <div style={style(485, 139, 60, 60)}>
+        <div style={style(540, 145, 65, 65)}>
           <Knob
             value={config.filterEnvelope.envMod}
             min={0}
@@ -414,7 +414,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Decay */}
-        <div style={style(584, 139, 60, 60)}>
+        <div style={style(650, 145, 65, 65)}>
           <Knob
             value={config.filterEnvelope.decay}
             min={config.devilFish?.enabled ? 30 : 200}
@@ -428,7 +428,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Accent */}
-        <div style={style(683, 139, 60, 60)}>
+        <div style={style(760, 145, 65, 65)}>
           <Knob
             value={config.accent.amount}
             min={0}
@@ -441,7 +441,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* Volume */}
-        <div style={style(813, 140, 70, 70)}>
+        <div style={style(950, 145, 80, 80)}>
           <Knob
             value={(volume ?? -12) + 60}
             min={0}
@@ -462,7 +462,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {!isBuzz3o3 && (
           <>
             {/* Devil Fish Toggle */}
-            <div style={style(52, 273, 50, 45)} className="flex flex-col items-center">
+            <div style={style(52, 310, 50, 45)} className="flex flex-col items-center">
               <Toggle
                 label=""
                 value={config.devilFish?.enabled || false}
@@ -475,7 +475,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             
             {/* Status LED */}
             <div 
-              style={style(82, 243, 12, 12)} 
+              style={style(82, 280, 12, 12)} 
               className={clsx(
                 "rounded-full border border-black/40 transition-all duration-300", 
                 config.devilFish?.enabled 
@@ -485,7 +485,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             ></div>
 
             {/* Normal Decay */}
-            <div style={{ ...style(125, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(125, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.normalDecay || 200}
                 min={30}
@@ -499,7 +499,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Accent Decay */}
-            <div style={{ ...style(172, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(185, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.accentDecay || 200}
                 min={30}
@@ -513,7 +513,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Accent Attack */}
-            <div style={{ ...style(219, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(245, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.accentAttack ?? 3.0}
                 min={0.3}
@@ -527,7 +527,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Soft Attack */}
-            <div style={{ ...style(266, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(305, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.softAttack || 0.3}
                 min={0.3}
@@ -541,7 +541,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* VEG Decay */}
-            <div style={{ ...style(313, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(365, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.vegDecay ?? 3000}
                 min={16}
@@ -555,7 +555,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* VEG Sustain */}
-            <div style={{ ...style(360, 273, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(425, 310, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.vegSustain ?? 0}
                 min={0}
@@ -568,7 +568,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Slide Time */}
-            <div style={style(410, 273, 35, 35)}>
+            <div style={style(495, 310, 40, 40)}>
               <Knob
                 value={config.slide?.time || 60}
                 min={2}
@@ -582,7 +582,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Drive Amount / Sqr Driver */}
-            <div style={style(460, 273, 35, 35)}>
+            <div style={style(555, 310, 40, 40)}>
               <Knob
                 value={config.overdrive?.amount || 0}
                 min={0}
@@ -597,7 +597,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             {/* --- NEURAL OVERDRIVE SECTION --- */}
             
             {/* Overdrive Level */}
-            <div style={style(566, 273, 35, 35)}>
+            <div style={style(660, 310, 40, 40)}>
               <Knob
                 value={config.overdrive?.amount || 0}
                 min={0}
@@ -610,7 +610,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Model Selector */}
-            <div style={style(615, 275, 120, 40)} className="flex flex-col">
+            <div style={style(720, 312, 140, 40)} className="flex flex-col">
               <label className="text-[8px] font-bold text-orange-500/70 mb-1 ml-1">MODEL</label>
               <select 
                 value={config.overdrive?.modelIndex ?? 0}
@@ -629,7 +629,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Dry/Wet Mix */}
-            <div style={style(749, 273, 35, 35)}>
+            <div style={style(880, 310, 40, 40)}>
               <Knob
                 value={config.overdrive?.dryWet ?? 100}
                 min={0}
@@ -642,7 +642,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Overdrive Enable Toggle */}
-            <div style={style(826, 273, 50, 45)} className="flex flex-col items-center">
+            <div style={style(970, 310, 50, 45)} className="flex flex-col items-center">
               <Toggle
                 label=""
                 value={(config.overdrive?.amount ?? 0) > 0}
@@ -655,7 +655,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
             {/* Overdrive LED */}
             <div
-              style={style(856, 243, 12, 12)}
+              style={style(1000, 280, 12, 12)}
               className={clsx(
                 "rounded-full border border-black/40 transition-all duration-300",
                 (config.overdrive?.amount ?? 0) > 0
@@ -667,7 +667,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             {/* Extended Devil Fish Parameters (Sub-row) */}
 
             {/* Duffing Amount (Non-linear filter) */}
-            <div style={{ ...style(125, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(125, 365, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.duffingAmount ?? 3}
                 min={0}
@@ -680,7 +680,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LP/BP Mix */}
-            <div style={{ ...style(172, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(185, 365, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.lpBpMix ?? 0}
                 min={0}
@@ -694,7 +694,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Resonance Tracking */}
-            <div style={{ ...style(219, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(245, 365, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.resTracking ?? 74.3}
                 min={0}
@@ -707,7 +707,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Ensemble Amount */}
-            <div style={{ ...style(266, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(305, 365, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.ensembleAmount ?? 0}
                 min={0}
@@ -720,7 +720,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Oversampling Order */}
-            <div style={{ ...style(313, 318, 35, 35), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
+            <div style={{ ...style(365, 365, 40, 40), opacity: config.devilFish?.enabled ? 1 : 0.3 }}>
               <Knob
                 value={config.devilFish?.oversamplingOrder ?? 2}
                 min={0}
@@ -740,10 +740,10 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {isBuzz3o3 && (
           <>
             {/* Section Label */}
-            <div style={labelStyle(40, 238, 500)} className="text-cyan-500/70">External Effects Chain</div>
+            <div style={labelStyle(40, 268, 600)} className="text-cyan-500/70">External Effects Chain</div>
 
             {/* Overdrive Enable Toggle */}
-            <div style={style(52, 273, 50, 45)} className="flex flex-col items-center">
+            <div style={style(52, 310, 50, 45)} className="flex flex-col items-center">
               <Toggle
                 label=""
                 value={(config.overdrive?.amount ?? 0) > 0}
@@ -756,7 +756,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
             {/* Overdrive LED */}
             <div
-              style={style(82, 243, 12, 12)}
+              style={style(82, 280, 12, 12)}
               className={clsx(
                 "rounded-full border border-black/40 transition-all duration-300",
                 (config.overdrive?.amount ?? 0) > 0
@@ -766,7 +766,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             ></div>
 
             {/* Overdrive Amount */}
-            <div style={{ ...style(147, 273, 35, 35), opacity: (config.overdrive?.amount ?? 0) > 0 ? 1 : 0.3 }}>
+            <div style={{ ...style(147, 310, 40, 40), opacity: (config.overdrive?.amount ?? 0) > 0 ? 1 : 0.3 }}>
               <Knob
                 value={config.overdrive?.amount || 0}
                 min={0}
@@ -779,7 +779,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Muffler Mode */}
-            <div style={style(220, 268, 100, 50)} className="flex flex-col">
+            <div style={style(220, 305, 120, 50)} className="flex flex-col">
               <label className="text-[8px] font-bold text-cyan-500/70 mb-1 ml-1">MUFFLER</label>
               <select
                 value={config.devilFish?.muffler ?? 'off'}
@@ -794,7 +794,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* High Resonance Toggle */}
-            <div style={style(340, 273, 50, 45)} className="flex flex-col items-center">
+            <div style={style(360, 310, 50, 45)} className="flex flex-col items-center">
               <Toggle
                 label=""
                 value={config.devilFish?.highResonance ?? false}
@@ -806,7 +806,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Filter Tracking */}
-            <div style={style(420, 273, 35, 35)}>
+            <div style={style(440, 310, 40, 40)}>
               <Knob
                 value={config.devilFish?.filterTracking ?? 0}
                 min={0}
@@ -819,7 +819,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Info Label */}
-            <div style={style(500, 268, 200, 50)} className="flex flex-col justify-center text-[9px] text-gray-500">
+            <div style={style(520, 305, 250, 50)} className="flex flex-col justify-center text-[10px] text-gray-500">
               <span>Oomek Aggressor WASM</span>
               <span className="text-cyan-600">+ Tone.js Effects Chain</span>
             </div>
@@ -830,7 +830,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {!isBuzz3o3 && (
           <>
             {/* LFO Waveform */}
-            <div style={style(52, 385, 60, 60)}>
+            <div style={style(60, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.waveform ?? 0}
                 min={0}
@@ -845,7 +845,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO Rate */}
-            <div style={style(151, 385, 60, 60)}>
+            <div style={style(170, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.rate ?? 0}
                 min={0}
@@ -858,7 +858,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO Contour */}
-            <div style={style(250, 385, 60, 60)}>
+            <div style={style(280, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.contour ?? 0}
                 min={0}
@@ -871,7 +871,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO Pitch Depth */}
-            <div style={style(349, 385, 60, 60)}>
+            <div style={style(390, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.pitchDepth ?? 0}
                 min={0}
@@ -884,7 +884,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO PWM Depth */}
-            <div style={style(448, 385, 60, 60)}>
+            <div style={style(500, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.pwmDepth ?? 0}
                 min={0}
@@ -897,7 +897,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO Filter Depth */}
-            <div style={style(547, 385, 60, 60)}>
+            <div style={style(610, 465, 65, 65)}>
               <Knob
                 value={config.lfo?.filterDepth ?? 0}
                 min={0}
@@ -910,7 +910,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* LFO Info */}
-            <div style={style(650, 388, 260, 50)} className="flex flex-col justify-center text-[9px] text-gray-500">
+            <div style={style(720, 468, 300, 50)} className="flex flex-col justify-center text-[10px] text-gray-500">
               <span>Modulation Source</span>
               <span className="text-purple-500">Pitch • PWM • Filter Cutoff</span>
             </div>
@@ -921,16 +921,16 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {!isBuzz3o3 && (
           <>
             {/* Row divider */}
-            <div className="absolute top-[460px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+            <div className="absolute top-[560px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
 
             {/* Row label */}
-            <div style={labelStyle(40, 468, 880)} className="text-green-500/70">Built-in Effects</div>
+            <div style={labelStyle(40, 568, 1000)} className="text-green-500/70">Built-in Effects</div>
 
             {/* Chorus Section */}
-            <div style={labelStyle(40, 490, 100)} className="text-green-400/60 text-[10px]">CHORUS</div>
+            <div style={labelStyle(40, 595, 120)} className="text-green-400/60 text-[10px]">CHORUS</div>
 
             {/* Chorus Enable */}
-            <div style={style(52, 495, 35, 35)}>
+            <div style={style(60, 615, 40, 40)}>
               <Toggle
                 value={config.chorus?.enabled ?? false}
                 onChange={(v) => updateChorus('enabled', v)}
@@ -940,7 +940,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Chorus Mode */}
-            <div style={style(95, 495, 35, 35)}>
+            <div style={style(110, 615, 40, 40)}>
               <Knob
                 value={config.chorus?.mode ?? 1}
                 min={0}
@@ -955,7 +955,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Chorus Mix */}
-            <div style={style(138, 495, 35, 35)}>
+            <div style={style(160, 615, 40, 40)}>
               <Knob
                 value={config.chorus?.mix ?? 30}
                 min={0}
@@ -968,10 +968,10 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Phaser Section */}
-            <div style={labelStyle(215, 490, 100)} className="text-green-400/60 text-[10px]">PHASER</div>
+            <div style={labelStyle(245, 595, 120)} className="text-green-400/60 text-[10px]">PHASER</div>
 
             {/* Phaser Enable */}
-            <div style={style(227, 495, 35, 35)}>
+            <div style={style(260, 615, 40, 40)}>
               <Toggle
                 value={config.phaser?.enabled ?? false}
                 onChange={(v) => updatePhaser('enabled', v)}
@@ -981,7 +981,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Phaser Rate */}
-            <div style={style(270, 495, 35, 35)}>
+            <div style={style(310, 615, 40, 40)}>
               <Knob
                 value={config.phaser?.rate ?? 50}
                 min={0}
@@ -994,7 +994,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Phaser Depth */}
-            <div style={style(313, 495, 35, 35)}>
+            <div style={style(360, 615, 40, 40)}>
               <Knob
                 value={config.phaser?.depth ?? 50}
                 min={0}
@@ -1007,7 +1007,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Phaser Feedback */}
-            <div style={style(356, 495, 35, 35)}>
+            <div style={style(410, 615, 40, 40)}>
               <Knob
                 value={config.phaser?.feedback ?? 30}
                 min={0}
@@ -1020,7 +1020,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Phaser Mix */}
-            <div style={style(399, 495, 35, 35)}>
+            <div style={style(460, 615, 40, 40)}>
               <Knob
                 value={config.phaser?.mix ?? 30}
                 min={0}
@@ -1033,10 +1033,10 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Section */}
-            <div style={labelStyle(476, 490, 100)} className="text-green-400/60 text-[10px]">DELAY</div>
+            <div style={labelStyle(545, 595, 120)} className="text-green-400/60 text-[10px]">DELAY</div>
 
             {/* Delay Enable */}
-            <div style={style(488, 495, 35, 35)}>
+            <div style={style(560, 615, 40, 40)}>
               <Toggle
                 value={config.delay?.enabled ?? false}
                 onChange={(v) => updateDelay('enabled', v)}
@@ -1046,7 +1046,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Time */}
-            <div style={style(531, 495, 35, 35)}>
+            <div style={style(610, 615, 40, 40)}>
               <Knob
                 value={config.delay?.time ?? 250}
                 min={0}
@@ -1060,7 +1060,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Feedback */}
-            <div style={style(574, 495, 35, 35)}>
+            <div style={style(660, 615, 40, 40)}>
               <Knob
                 value={config.delay?.feedback ?? 30}
                 min={0}
@@ -1073,7 +1073,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Tone */}
-            <div style={style(617, 495, 35, 35)}>
+            <div style={style(710, 615, 40, 40)}>
               <Knob
                 value={config.delay?.tone ?? 70}
                 min={0}
@@ -1086,7 +1086,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Mix */}
-            <div style={style(660, 495, 35, 35)}>
+            <div style={style(760, 615, 40, 40)}>
               <Knob
                 value={config.delay?.mix ?? 25}
                 min={0}
@@ -1099,7 +1099,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </div>
 
             {/* Delay Stereo */}
-            <div style={style(703, 495, 35, 35)}>
+            <div style={style(810, 615, 40, 40)}>
               <Knob
                 value={config.delay?.stereo ?? 50}
                 min={0}
