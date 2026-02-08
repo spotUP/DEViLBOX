@@ -33,6 +33,10 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
+  // Transient UI state (not persisted)
+  statusMessage: string;
+  prevStatusMessage: string;
+
   // Actions
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
@@ -46,6 +50,7 @@ interface UIStore {
   toggleBeatLabels: () => void;
   toggleChordEntryMode: () => void;
   setBlankEmptyCells: (blank: boolean) => void;
+  setStatusMessage: (msg: string, carry?: boolean, timeout?: number) => void;
 
   // Responsive layout actions
   toggleTB303Collapsed: () => void;
@@ -86,6 +91,10 @@ export const useUIStore = create<UIStore>()(
 
       // Performance settings (default to high quality)
       performanceQuality: 'high',
+
+      // Transient state
+      statusMessage: '',
+      prevStatusMessage: '',
 
       // Actions
       togglePanel: (panel) =>
@@ -155,6 +164,27 @@ export const useUIStore = create<UIStore>()(
       setBlankEmptyCells: (blank) =>
         set((state) => {
           state.blankEmptyCells = blank;
+        }),
+
+      setStatusMessage: (msg, carry = false, timeout = 2000) =>
+        set((state) => {
+          if (carry) {
+            state.prevStatusMessage = msg;
+          }
+          state.statusMessage = msg;
+
+          // Clear after timeout if specified
+          if (timeout > 0) {
+            if ((window as any)._statusTimeout) {
+              clearTimeout((window as any)._statusTimeout);
+            }
+
+            (window as any)._statusTimeout = setTimeout(() => {
+              // We need to use the store's set method directly here as we're in a timeout
+              useUIStore.getState().setStatusMessage(useUIStore.getState().prevStatusMessage, false, 0);
+              (window as any)._statusTimeout = null;
+            }, timeout);
+          }
         }),
 
       // Responsive layout actions

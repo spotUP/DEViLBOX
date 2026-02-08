@@ -70,7 +70,7 @@ const StatusBar: React.FC<{
   const displayRow = isPlaying ? currentRow : cursorRow;
 
   return (
-    <div className="flex-shrink-0 bg-dark-bgSecondary border-t border-dark-border px-4 py-2 flex items-center justify-between text-xs font-mono">
+    <div className="flex-shrink-0 bg-dark-bgSecondary border-t border-dark-border px-4 py-2 flex items-center justify-between text-xs font-mono relative">
       <div className="flex items-center gap-4">
         <span className="text-text-muted">
           Row: <span className="text-accent-primary">{displayRow.toString().padStart(2, '0')}</span>
@@ -87,6 +87,7 @@ const StatusBar: React.FC<{
           {recordMode ? 'REC' : 'EDIT'}
         </span>
       </div>
+
       <div className="flex items-center gap-2 text-text-muted">
         <span className={isPlaying ? 'text-accent-success' : ''}>
           {isPlaying ? '▶ PLAYING' : '⏸ STOPPED'}
@@ -100,6 +101,7 @@ StatusBar.displayName = 'StatusBar';
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({ onAcidGenerator }) => {
   const { isMobile } = useResponsiveSafe();
+  const statusMessage = useUIStore((state) => state.statusMessage);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
@@ -998,7 +1000,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     <div className="flex flex-col h-full" {...(isMobile ? swipeHandlers : {})}>
       {/* Mobile Channel Header */}
       {isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border">
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative">
+          {/* Status Message Overlay (PT2 Style) */}
+          {statusMessage && (
+            <div className="absolute inset-0 flex items-center justify-center bg-dark-bgTertiary z-30 pointer-events-none">
+              <span className="text-accent-primary font-bold tracking-[0.3em] text-sm animate-pulse">
+                {statusMessage.toUpperCase()}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between px-3 py-2">
             <button
               onClick={handleSwipeRight}
@@ -1061,10 +1071,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       {/* Desktop Channel Header */}
       {!isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
-          <div className="flex">
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20 relative h-[37px]">
+          {/* Status Message Overlay (PT2 Style) - Replaces header content when active */}
+          {statusMessage && (
+            <div className="absolute inset-0 flex items-center justify-center bg-dark-bgTertiary z-30 pointer-events-none border-b border-dark-border">
+              <span className="text-accent-primary font-bold tracking-[0.3em] text-sm animate-pulse">
+                {statusMessage.toUpperCase()}
+              </span>
+            </div>
+          )}
+          
+          <div className="flex h-full">
             {/* Row number column header */}
-            <div className="flex-shrink-0 px-2 py-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
+            <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
                  style={{ width: LINE_NUMBER_WIDTH }}>
               ROW
             </div>
