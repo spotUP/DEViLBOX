@@ -713,21 +713,35 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                         max="200" 
                         value={swing} 
                         onChange={(e) => setSwing(parseInt(e.target.value))}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setSwing(100);
+                        }}
                         className="w-full accent-accent-primary cursor-pointer"
-                        title="Adjust groove intensity (0-200%). 100% is normal, >100% stretches the feel."
+                        title="Adjust groove intensity (0-200%). 100% is Standard Triplet. Right-click to reset."
                       />
                       
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-text-muted uppercase">Cycle Steps</span>
+                        <span className="text-[10px] font-bold text-text-muted uppercase">Resolution</span>
                         <select 
                           value={grooveSteps}
-                          onChange={(e) => setGrooveSteps(parseInt(e.target.value))}
+                          onChange={(e) => {
+                            setGrooveSteps(parseInt(e.target.value));
+                            if (grooveTemplateId !== 'straight') {
+                              setGrooveTemplate('straight');
+                            }
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                           className="bg-dark-bgTertiary text-accent-primary border border-dark-border rounded px-1 text-[10px] font-mono outline-none"
-                          title="Groove Cycle Duration (steps). Standard 16th swing is 2 steps."
+                          title="Swing Note Resolution. 2 = 16th Shuffle, 4 = 8th Jazz Swing."
                         >
-                          {[2, 4, 8, 16, 32, 64].map(s => (
-                            <option key={s} value={s}>{s} steps</option>
-                          ))}
+                          <option value={2}>16th (2 steps)</option>
+                          <option value={4}>8th (4 steps)</option>
+                          <option value={8}>1/4 note (8 steps)</option>
+                          <option value={16}>1 bar (16 steps)</option>
+                          <option value={32}>2 bars (32 steps)</option>
+                          <option value={64}>4 bars (64 steps)</option>
                         </select>
                       </div>
 

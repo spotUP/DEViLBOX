@@ -893,24 +893,37 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               max="200" 
               value={swing} 
               onChange={(e) => setSwing(parseInt(e.target.value))}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setSwing(100);
+              }}
               className="w-16 h-1 accent-accent-primary cursor-pointer"
-              title="Adjust groove amount/intensity (0-200%). 100% is default."
+              title="Adjust groove amount/intensity (0-200%). 100% is default. Right-click to reset."
             />
             <span className={`text-[10px] font-mono w-8 ${swing !== 100 ? 'text-accent-primary font-bold' : 'text-text-muted'}`}>
               {swing}%
             </span>
             
-            <span className="text-[10px] text-text-muted font-mono ml-1">Steps:</span>
+            <span className="text-[10px] text-text-muted font-mono ml-1" title="Swing Resolution">Res:</span>
             <select 
               value={grooveSteps}
-              onChange={(e) => setGrooveSteps(parseInt(e.target.value))}
+              onChange={(e) => {
+                setGrooveSteps(parseInt(e.target.value));
+                if (grooveTemplateId !== 'straight') {
+                  setGrooveTemplate('straight');
+                }
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="bg-dark-bgSecondary text-accent-primary border border-dark-border rounded px-0.5 text-[10px] font-mono outline-none cursor-pointer"
-              title="Groove Cycle Duration (steps). Only active when 'Straight' groove is selected."
-              disabled={grooveTemplateId !== 'straight'}
+              title="Swing Note Resolution. 2=16th, 4=8th Jazz."
             >
-              {[2, 4, 8, 16, 32, 64].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              <option value={2}>16</option>
+              <option value={4}>8</option>
+              <option value={8}>4</option>
+              <option value={16}>1b</option>
+              <option value={32}>2b</option>
+              <option value={64}>4b</option>
             </select>
           </div>
         </div>

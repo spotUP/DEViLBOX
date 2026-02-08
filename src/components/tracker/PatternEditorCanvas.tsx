@@ -581,12 +581,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         currentRow = audioState.row;
 
         if (smoothScrolling) {
-          // Calculate smooth offset based on time elapsed within current row
-          const timeSinceRowStart = audioTime - audioState.time;
-          const secondsPerRow = (2.5 / audioBpm) * audioSpeed;
+          // ACCURATE SMOOTH SCROLLING:
+          // The replayer provides the exact 'time' when each row was triggered.
+          // To calculate progress, we need the start time of the NEXT row.
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true); // Peek ahead using the new parameter
+          
+          let effectiveRowDuration: number;
+          if (nextState && nextState.row !== audioState.row) {
+            // We have the next row start time, so we know exactly how long this row lasted
+            effectiveRowDuration = nextState.time - audioState.time;
+          } else {
+            // Fallback: use grid duration
+            effectiveRowDuration = (2.5 / audioBpm) * audioSpeed;
+          }
 
-          // Progress through current row (0 to 1)
-          const progress = Math.min(Math.max(timeSinceRowStart / secondsPerRow, 0), 1);
+          // Calculate progress (0 to 1) based on actual duration
+          const timeSinceRowStart = audioTime - audioState.time;
+          const progress = Math.min(Math.max(timeSinceRowStart / effectiveRowDuration, 0), 1);
           smoothOffset = progress * ROW_HEIGHT;
         } else {
           smoothOffset = 0;
