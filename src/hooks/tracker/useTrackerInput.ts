@@ -1119,26 +1119,26 @@ export const useTrackerInput = () => {
         }
       }
 
-      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2) ----------
+      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2), '0'/'.' to clear ----------
       if (recordMode && (cursor.columnType === 'flag1' || cursor.columnType === 'flag2') && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const flagField = cursor.columnType; // 'flag1' or 'flag2'
 
         if (keyLower === 'a') {
           e.preventDefault();
           setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 1 }); // 1 = accent
-          // Advance row by editStep with wrapping
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
-          }
+          if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           return;
         }
         if (keyLower === 's') {
           e.preventDefault();
           setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 2 }); // 2 = slide
-          // Advance row by editStep with wrapping
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
-          }
+          if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          return;
+        }
+        if (key === '0' || key === '.') {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 0 }); // 0 = clear
+          if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           return;
         }
       }

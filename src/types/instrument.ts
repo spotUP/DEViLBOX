@@ -248,7 +248,8 @@ export interface DevilFishConfig {
 
   // Filter controls
   filterTracking: number; // 0-200% - filter frequency tracks note pitch
-  filterFM: number;       // 0-100% - VCA output feeds back to filter frequency (audio-rate FM)
+  filterFmDepth: number;  // 0-100% - VCA output feeds back to filter frequency (audio-rate FM)
+  filterInputDrive?: number; // 0-1 (db303 truth)
   passbandCompensation?: number; // 0-100% - filter passband level compensation
   resTracking?: number;   // 0-100% - resonance frequency tracking across keyboard
   duffingAmount?: number; // 0-100% - non-linear filter effect (Duffing oscillator)
@@ -262,6 +263,11 @@ export interface DevilFishConfig {
 
   // Audio quality
   oversamplingOrder?: 0 | 1 | 2 | 3 | 4; // 0=none, 1=2x, 2=4x, 3=8x, 4=16x oversampling
+
+  // Korg/Advanced Filter
+  korgStiffness?: number; // 0-1
+  korgWarmth?: number;    // 0-1
+  korgFilterFm?: number;  // 0-1
 
   // Accent controls
   sweepSpeed: 'fast' | 'normal' | 'slow'; // Accent sweep circuit behavior
@@ -279,6 +285,13 @@ export interface TB303Config {
 
   // Tuning
   tuning?: number; // Master tuning in Hz (default: 440)
+
+  // Volume
+  volume?: number; // 0-1 (db303 truth)
+
+  // Extended toggles (db303 feature)
+  extendedCutoff?: boolean;
+  extendedEnvMod?: boolean;
 
   // Tempo-relative envelopes (for slower tempos = longer sweeps)
   tempoRelative?: boolean; // Default: false (absolute ms), true = scale with BPM
@@ -325,6 +338,7 @@ export interface TB303Config {
     pitchDepth: number;        // 0-100 (pitch modulation depth)
     pwmDepth: number;          // 0-100 (pulse width modulation depth)
     filterDepth: number;       // 0-100 (filter cutoff modulation depth)
+    stiffDepth?: number;       // 0-100 (stiffness modulation depth)
   };
 
   // Built-in effects
@@ -2827,7 +2841,7 @@ export const DEFAULT_TB303: TB303Config = {
     ensembleAmount: 0,           // 0% ensemble
     oversamplingOrder: 2,        // 4x oversampling
     filterTracking: 0,           // 0% tracking
-    filterFM: 0,                 // 0% filter FM
+    filterFmDepth: 0,                 // 0% filter FM
     // Required defaults for other Devil Fish parameters
     accentSweepEnabled: true,
     sweepSpeed: 'normal',
@@ -2884,7 +2898,7 @@ export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
 
   // Filter defaults (TB-303 compatible)
   filterTracking: 0,     // TB-303 filter didn't track pitch
-  filterFM: 0,           // No filter FM in TB-303
+  filterFmDepth: 0,           // No filter FM in TB-303
   passbandCompensation: 9,  // 9% compensation (from db303 default preset)
   resTracking: 74.3,     // 74.3% resonance tracking (from db303 default preset)
   duffingAmount: 3,      // 3% non-linear filter effect (from db303 default preset)

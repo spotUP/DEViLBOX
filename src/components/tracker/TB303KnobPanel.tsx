@@ -48,11 +48,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
     });
   }, [targetInstrument, updateInstrument]);
 
-  const handleVolumeChange = useCallback((volume: number) => {
-    if (!targetInstrument) return;
-    updateInstrument(targetInstrument.id, { volume });
-  }, [targetInstrument, updateInstrument]);
-
   if (!targetInstrument || !targetInstrument.tb303) {
     return null;
   }
@@ -83,8 +78,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
           key={targetInstrument.id}
           config={targetInstrument.tb303} 
           onChange={handleConfigChange}
-          volume={targetInstrument.volume}
-          onVolumeChange={handleVolumeChange}
         />
       </div>
 

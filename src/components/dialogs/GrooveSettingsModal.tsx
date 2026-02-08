@@ -42,15 +42,15 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-ft2 p-6 flex flex-col md:flex-row gap-8">
+        <div className="flex-1 overflow-hidden p-0 flex flex-col md:flex-row min-h-0">
           {/* Left Column: Presets */}
-          <div className="flex-1 space-y-6">
-            <section>
-              <h3 className="text-ft2-highlight text-xs font-bold mb-4 tracking-wider uppercase flex items-center gap-2">
+          <div className="w-full md:w-72 flex flex-col bg-dark-bgSecondary border-r border-ft2-border min-h-0">
+            <section className="flex flex-col flex-1 min-h-0 p-6">
+              <h3 className="flex-shrink-0 text-ft2-highlight text-xs font-bold mb-4 tracking-wider uppercase flex items-center gap-2">
                 Groove Templates
               </h3>
               
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 scrollbar-ft2">
+              <div className="flex-1 overflow-y-auto pr-2 scrollbar-ft2 space-y-4">
                 {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
                   const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
                   if (grooves.length === 0) return null;
@@ -91,7 +91,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
           </div>
 
           {/* Right Column: Intensity & Humanization */}
-          <div className="flex-1 space-y-8">
+          <div className="flex-1 overflow-y-auto scrollbar-ft2 p-6 space-y-8 min-h-0">
             {/* Global Intensity */}
             <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <div className="flex items-center justify-between">

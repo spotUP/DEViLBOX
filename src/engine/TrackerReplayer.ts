@@ -531,27 +531,18 @@ export class TrackerReplayer {
     if (transportState.speed !== this.speed) this.speed = transportState.speed;
 
     const tickInterval = 2.5 / this.bpm;
-    const rowDuration = tickInterval * this.speed;
-    
-    // SMOOTH TICK DISTRIBUTION:
-    // Calculate actual durations for the current and next row to determine 
-    // the precise timing for sub-row ticks.
-    const currentOffset = this.calculateGrooveOffset(this.pattPos, rowDuration, transportState);
-    const nextOffset = this.calculateGrooveOffset(this.pattPos + 1, rowDuration, transportState);
-    
-    // Effective duration of the current row (from this RowStart to next RowStart)
-    const effectiveRowDuration = rowDuration + (nextOffset - currentOffset);
-    const effectiveTickInterval = effectiveRowDuration / this.speed;
+    let safeTime = time;
 
-    // Apply offset to the base schedule time for Tick 0 (Row Start)
-    let safeTime = time + currentOffset;
+    // Apply groove/swing to Tick 0 only
+    if (this.currentTick === 0) {
+      const rowDuration = tickInterval * this.speed;
+      safeTime += this.calculateGrooveOffset(this.pattPos, rowDuration, transportState);
+    }
 
     // Apply micro-timing jitter (Humanization)
     if (transportState.jitter > 0) {
-      // Max jitter is 10ms at 100%
       const jitterMs = (transportState.jitter / 100) * 0.01;
-      const randomOffset = (Math.random() * 2 - 1) * jitterMs;
-      safeTime += randomOffset;
+      safeTime += (Math.random() * 2 - 1) * jitterMs;
     }
 
     // Get current pattern
@@ -574,14 +565,12 @@ export class TrackerReplayer {
         // Tick 0: Read new row data
         this.processRow(ch, channel, row, safeTime);
       } else {
-        // Ticks 1+: Process continuous effects at the correctly spaced tick time
-        // Shift time by currentOffset (start of row) + distributed ticks
-        const shiftedTickTime = safeTime + (this.currentTick * effectiveTickInterval);
-        this.processEffectTick(ch, channel, row, shiftedTickTime);
+        // Ticks 1+: Process continuous effects
+        this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
       }
 
       // Process Furnace macros every tick
-      this.processMacros(channel, safeTime + (this.currentTick * effectiveTickInterval));
+      this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
     }
 
     // Notify tick processing
@@ -735,7 +724,7 @@ export class TrackerReplayer {
         // Pass accent directly (accent applies to current note)
         // Pass slideActive (computed from previous row's slide flag) for pitch glide
         // Pass slide for gate timing (if this row has slide, gate stays high to slide to next)
-        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, slide ?? false);
+        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, slide);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -1038,7 +1027,7 @@ export class TrackerReplayer {
           // Note delay - uses the computed slide from processRow (stored in ch.previousSlideFlag context)
           // Since this is a delayed trigger of the same note, use the slide state computed at row start
           const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide ?? false);
+          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
         }
         break;
 
@@ -1104,7 +1093,7 @@ export class TrackerReplayer {
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
           const slideActive = ch.previousSlideFlag;
-          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide ?? false);
+          this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
         }
         break;
       case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
@@ -1430,7 +1419,7 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slide?: boolean, currentRowSlide?: boolean): void {
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean): void {
     // Skip note trigger if channel is muted
     if (channelIndex !== undefined) {
       const engine = getToneEngine();
@@ -1485,32 +1474,23 @@ export class TrackerReplayer {
     }
 
     // Check if this is a synth instrument (has synthType) or sample-based
-
     if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
       // Use ToneEngine for synth instruments (TB303, drums, etc.)
       // Calculate duration based on speed/BPM (one row duration as default)
       const rowDuration = (2.5 / this.bpm) * this.speed;
 
       // TB-303 MID-STEP GATE TIMING:
-      // Real 303 lowers gate at MIDPOINT of step (not end), unless sliding to next note
-      // The slide flag on CURRENT row means we slide TO the next note, so gate stays high
-      // Check if this is a 303-style synth that needs mid-step gate timing
+      // Real 303 lowers gate at ~50-80% of step, unless sliding to next note.
+      // Slide on CURRENT row means gate stays high until next note starts.
       const is303Synth = ch.instrument.synthType === 'TB303' ||
-                         ch.instrument.synthType === 'Buzz3o3' ||
-                         ch.instrument.synthType === 'Buzz3o3DF';
-
+                         ch.instrument.synthType === 'Buzz3o3';
+      
       // For 303 synths: use 80% duration for standard notes to ensure the gate
       // drops before the next tick starts (prevents unintentional slides).
-      // Use 100% (full row duration) for sliding notes to maintain legato.
-      const keepGateHigh = slide || currentRowSlide;
-      const noteDuration = is303Synth && !keepGateHigh
-        ? rowDuration * 0.8  // 80% gate for punchy acid retrigger
-        : rowDuration;       // 100% gate for slides
-
-      // Update gate state for 303 synths
-      if (is303Synth) {
-        ch.gateHigh = true;
-      }
+      // Use 105% (slight overlap) for sliding notes to guarantee legato.
+      const noteDuration = is303Synth && !currentRowSlide
+        ? rowDuration * 0.8  // 80% gate for punchy retrigger
+        : rowDuration * 1.05; // 105% gate for guaranteed slide overlap
 
       engine.triggerNote(
         ch.instrument.id,
@@ -1520,7 +1500,7 @@ export class TrackerReplayer {
         velocity,
         ch.instrument,
         accent, // accent
-        slide, // slide (slideActive - computed from previous row, for pitch glide)
+        slideActive, // slideActive (computed from previous row, for pitch glide)
         undefined, // channelIndex (let engine allocate)
         ch.period // period for MOD playback
       );

@@ -611,8 +611,6 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             showFilterCurve={false}
             showHeader={false}
             isJC303={true}
-            volume={instrument.volume}
-            onVolumeChange={(v) => onChange({ volume: v })}
             isBuzz3o3={instrument.synthType === 'Buzz3o3'}
           />
         </div>
