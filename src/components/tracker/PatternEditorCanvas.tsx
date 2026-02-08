@@ -7,7 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
-import { useAutomationStore } from '@stores/useAutomationStore';
+import { AutomationLanes } from './AutomationLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChannelVUMeter } from './ChannelVUMeter';
@@ -56,58 +56,17 @@ interface PatternEditorCanvasProps {
   onAcidGenerator?: (channelIndex: number) => void;
 }
 
-// Status Bar component
-const StatusBar: React.FC<{
-  patternLength: number;
-  channelCount: number;
-}> = React.memo(({ patternLength, channelCount }) => {
-  const { isPlaying, currentRow } = useTransportStore(
-    useShallow((state) => ({ isPlaying: state.isPlaying, currentRow: state.currentRow }))
-  );
-  const cursorRow = useTrackerStore((state) => state.cursor.rowIndex);
-  const cursorChannel = useTrackerStore((state) => state.cursor.channelIndex);
-  const insertMode = useTrackerStore((state) => state.insertMode);
-  const recordMode = useTrackerStore((state) => state.recordMode);
-  const displayRow = isPlaying ? currentRow : cursorRow;
-
-  return (
-    <div className="flex-shrink-0 bg-dark-bgSecondary border-t border-dark-border px-4 py-2 flex items-center justify-between text-xs font-mono relative">
-      <div className="flex items-center gap-4">
-        <span className="text-text-muted">
-          Row: <span className="text-accent-primary">{displayRow.toString().padStart(2, '0')}</span>
-          /<span className="text-text-secondary">{(patternLength - 1).toString().padStart(2, '0')}</span>
-        </span>
-        <span className="text-text-muted">
-          Ch: <span className="text-accent-primary">{(cursorChannel + 1).toString().padStart(2, '0')}</span>
-          /<span className="text-text-secondary">{channelCount.toString().padStart(2, '0')}</span>
-        </span>
-        <span className="text-text-muted" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
-          Mode: <span className={insertMode ? 'text-accent-warning' : 'text-accent-primary'}>{insertMode ? 'INS' : 'OVR'}</span>
-        </span>
-        <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-muted'}`}>
-          {recordMode ? 'REC' : 'EDIT'}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2 text-text-muted">
-        <span className={isPlaying ? 'text-accent-success' : ''}>
-          {isPlaying ? '▶ PLAYING' : '⏸ STOPPED'}
-        </span>
-      </div>
-    </div>
-  );
-});
-StatusBar.displayName = 'StatusBar';
-
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({ onAcidGenerator }) => {
   const { isMobile } = useResponsiveSafe();
-  const statusMessage = useUIStore((state) => state.statusMessage);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+  const [visibleStart, setVisibleStart] = useState(0);
+  const [renderCounter, setRenderCounter] = useState(0);
   // PERF: Use ref instead of state for channel triggers to avoid re-renders
   const channelTriggersRef = useRef<ChannelTrigger[]>([]);
 
@@ -123,6 +82,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Get pattern and actions
   const {
     pattern,
+    patterns,
+    currentPatternIndex,
     addChannel,
     removeChannel,
     toggleChannelMute,
@@ -135,9 +96,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     pasteTrack,
     mobileChannelIndex,
     cursor,
-    selection
+    selection,
+    showGhostPatterns
   } = useTrackerStore(useShallow((state) => ({
     pattern: state.patterns[state.currentPatternIndex],
+    patterns: state.patterns,
+    currentPatternIndex: state.currentPatternIndex,
     addChannel: state.addChannel,
     removeChannel: state.removeChannel,
     toggleChannelMute: state.toggleChannelMute,
@@ -151,6 +115,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     mobileChannelIndex: state.cursor.channelIndex,
     cursor: state.cursor,
     selection: state.selection,
+    showGhostPatterns: state.showGhostPatterns,
   })));
 
   const { instruments } = useInstrumentStore(useShallow((state) => ({
@@ -212,7 +177,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const colors = useMemo(() => ({
     bg: '#0a0a0b',
     rowNormal: '#0d0d0e',
-    rowHighlight: '#151518',
+    rowHighlight: '#111113', // More subtle highlight (was #151518)
     centerLine: isCyanTheme ? 'rgba(0, 255, 255, 0.25)' : 'rgba(239, 68, 68, 0.25)',
     cursor: isCyanTheme ? '#00ffff' : '#ef4444',
     cursorBg: isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)',
@@ -282,6 +247,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         eff: 0,
       });
     }
+    useUIStore.getState().setStatusMessage('CHANNEL CLEARED');
   }, [pattern, setCell]);
 
   const handleCopyChannel = useCallback((channelIndex: number) => {
@@ -306,6 +272,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         setCell(channelIndex, row, { ...cell, note: newNote });
       }
     }
+    useUIStore.getState().setStatusMessage(`TRANSPOSE ${semitones > 0 ? '+' : ''}${semitones}`);
   }, [pattern, setCell]);
 
   const handleHumanize = useCallback((channelIndex: number) => {
@@ -318,6 +285,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         setCell(channelIndex, row, { ...cell, volume: newVolume });
       }
     }
+    useUIStore.getState().setStatusMessage('HUMANIZED');
   }, [pattern, setCell]);
 
   const handleInterpolate = useCallback((channelIndex: number) => {
@@ -351,6 +319,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const cell = channel.rows[row];
       setCell(channelIndex, row, { ...cell, volume: interpolatedVolume });
     }
+    useUIStore.getState().setStatusMessage('INTERPOLATED');
   }, [pattern, setCell]);
 
   // PERF: VU meter polling moved to ref-based update (no React re-renders)
@@ -556,6 +525,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const pattern = state.patterns[state.currentPatternIndex];
     const smoothScrolling = transportState.smoothScrolling;
+    const showGhostPatterns = state.showGhostPatterns;
 
     if (!pattern) {
       ctx.fillStyle = colors.bg;
@@ -577,7 +547,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const { width, height } = dimensions;
     const patternLength = pattern.length;
-    const numChannels = pattern.channels.length;
 
     // Audio-synced scrolling (BassoonTracker pattern)
     // Get state from audio context time, NOT from wall-clock or store updates
@@ -637,12 +606,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Calculate visible lines
     const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
     const topLines = Math.floor(visibleLines / 2);
-    const visibleStart = currentRow - topLines;
-    const visibleEnd = visibleStart + visibleLines;
+    const vStart = currentRow - topLines;
+    const visibleEnd = vStart + visibleLines;
 
     // Center line position - apply smooth offset
     const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
     const baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
+    
+    // Channel count is global across all patterns (enforced by addChannel/removeChannel)
+    const numChannels = pattern.channels.length;
+    
+    // Update scroll position for AutomationLanes (throttled to avoid excessive re-renders)
+    if (Math.abs(baseY - scrollY) > 0.5 || vStart !== visibleStart) {
+      setScrollY(baseY);
+      setVisibleStart(vStart);
+      setRenderCounter(c => c + 1);
+    }
 
     // Track widths - must match getParamCanvas layout exactly
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -675,11 +654,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
     // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
     // Prob: prob(2) +4gap = +CW*2 + 4
-    // Automation: auto(2) +4gap = +CW*2 + 4
+    // Automation: space for curve lane (no hex values shown)
     const paramWidth = CHAR_WIDTH * 10 + 16
       + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
       + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; // Always show automation column
+      + CHAR_WIDTH * 2 + 4; // Space for automation lane
     const channelWidth = noteWidth + paramWidth + 20;
 
     // Clear canvas
@@ -689,37 +668,132 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Draw rows
     for (let i = visibleStart; i < visibleEnd; i++) {
       let rowIndex: number;
+      let isGhostRow = false;
+      let ghostPattern = null;
+      
       if (isPlaying) {
-        rowIndex = ((i % patternLength) + patternLength) % patternLength;
+        // During playback, show sequential flow through patterns
+        if (showGhostPatterns && i < 0) {
+          // Previous pattern
+          if (currentPatternIndex > 0) {
+            ghostPattern = patterns[currentPatternIndex - 1];
+            rowIndex = ghostPattern.length + i; // i is negative
+            isGhostRow = true;
+          } else if (patterns.length > 1) {
+            // Wraparound to last pattern
+            ghostPattern = patterns[patterns.length - 1];
+            rowIndex = ghostPattern.length + i;
+            isGhostRow = true;
+          } else {
+            continue;
+          }
+        } else if (showGhostPatterns && i >= patternLength) {
+          // Next pattern
+          if (currentPatternIndex < patterns.length - 1) {
+            ghostPattern = patterns[currentPatternIndex + 1];
+            rowIndex = i - patternLength;
+            isGhostRow = true;
+          } else if (patterns.length > 1) {
+            // Wraparound to first pattern
+            ghostPattern = patterns[0];
+            rowIndex = i - patternLength;
+            isGhostRow = true;
+          } else {
+            continue;
+          }
+        } else if (i < 0 || i >= patternLength) {
+          // Ghost patterns disabled - skip out of range rows
+          continue;
+        } else {
+          rowIndex = i;
+        }
       } else {
-        if (i < 0 || i >= patternLength) continue;
-        rowIndex = i;
+        // Allow ghost rows from adjacent patterns in edit mode
+        if (showGhostPatterns && i < 0) {
+          // Previous pattern (with wraparound)
+          if (currentPatternIndex > 0) {
+            ghostPattern = patterns[currentPatternIndex - 1];
+            rowIndex = ghostPattern.length + i; // i is negative, so this wraps
+            isGhostRow = true;
+          } else if (patterns.length > 1) {
+            // Wraparound to last pattern
+            ghostPattern = patterns[patterns.length - 1];
+            rowIndex = ghostPattern.length + i; // i is negative, so this wraps
+            isGhostRow = true;
+          } else {
+            continue; // Only one pattern
+          }
+        } else if (showGhostPatterns && i >= patternLength) {
+          // Next pattern (with wraparound)
+          if (currentPatternIndex < patterns.length - 1) {
+            ghostPattern = patterns[currentPatternIndex + 1];
+            rowIndex = i - patternLength;
+            isGhostRow = true;
+          } else if (patterns.length > 1) {
+            // Wraparound to first pattern
+            ghostPattern = patterns[0];
+            rowIndex = i - patternLength;
+            isGhostRow = true;
+          } else {
+            continue; // Only one pattern
+          }
+        } else if (i < 0 || i >= patternLength) {
+          // Ghost patterns disabled - skip out of range rows
+          continue;
+        } else {
+          rowIndex = i;
+        }
       }
 
-      const y = baseY + ((i - visibleStart) * ROW_HEIGHT);
+      const y = baseY + ((i - vStart) * ROW_HEIGHT);
       if (y < -ROW_HEIGHT || y > height + ROW_HEIGHT) continue;
 
       // Row background
       const isHighlight = rowIndex % 4 === 0;
+      
+      // Apply ghost opacity to background if needed
+      if (isGhostRow) {
+        ctx.globalAlpha = 0.35;
+      }
+      
       ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
       ctx.fillRect(0, y, width, ROW_HEIGHT);
+      
+      // Reset alpha for line number (so it's readable)
+      if (isGhostRow) {
+        ctx.globalAlpha = 1.0;
+      }
 
       // Line number
       const lineNumCanvas = getLineNumberCanvas(rowIndex, useHex);
       ctx.drawImage(lineNumCanvas, 4, y);
+      
+      // Apply ghost opacity for content (not background/line numbers)
+      if (isGhostRow) {
+        ctx.globalAlpha = 0.35;
+      }
 
-      // Draw each channel
+      // Draw each channel (use ghost pattern if available)
+      const sourcePattern = ghostPattern || pattern;
       for (let ch = 0; ch < numChannels; ch++) {
-        const cell = pattern.channels[ch].rows[rowIndex];
-        if (!cell) continue;
-
         const x = LINE_NUMBER_WIDTH + ch * channelWidth + 8 - scrollLeft;
 
         // Skip if outside visible area
         if (x + channelWidth < 0 || x > width) continue;
 
-        // Note - flash white on current playing row
-        const isCurrentPlayingRow = isPlaying && rowIndex === currentRow;
+        // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
+        if (!sourcePattern.channels[ch]) {
+          // Draw channel separator for missing channels
+          ctx.fillStyle = colors.border;
+          ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
+          continue;
+        }
+
+        // Get cell from source pattern
+        const cell = sourcePattern.channels[ch].rows[rowIndex];
+
+        // Note - flash white on current playing row (but not ghost rows)
+        const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;
         const cellNote = cell.note || 0;
         // Blank empty cells: skip drawing "---" for note=0
         if (!blankEmpty || cellNote !== 0) {
@@ -742,51 +816,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
-        // Automation value (always show after probability)
-        const automationParam = 'cutoff'; // Default to cutoff
-        const allCurves = useAutomationStore.getState().curves;
-        const curve = allCurves.find(
-          c => c.patternId === pattern.id && c.channelIndex === ch && c.parameter === automationParam
-        );
-        let autoValue: number | null = null;
-        if (curve) {
-          const rawValue = useAutomationStore.getState().getValueAtRow(curve.id, rowIndex);
-          autoValue = rawValue !== null ? Math.round(rawValue * 255) : null;
-        }
-        
-        // Draw automation column - calculate position based on actual columns present
-        // Base params: inst(2)+gap(4) vol(2)+gap(4) eff(3)+gap(4) eff2(3)+gap(4) = CW*10+16
-        let autoX = x + noteWidth + 4 + (CHAR_WIDTH * 10 + 16);
-        
-        // Add acid columns if this cell has them
-        const cellHasFlags = cell.flag1 !== undefined || cell.flag2 !== undefined;
-        if (cellHasFlags) {
-          autoX += CHAR_WIDTH * 2 + 8; // accent/slide columns
-        }
-        
-        // Add probability column if this cell has it
-        const cellHasProb = cell.probability !== undefined && cell.probability > 0;
-        if (cellHasProb) {
-          autoX += CHAR_WIDTH * 2 + 4; // probability column
-        }
-        
-        autoX += 4; // gap before automation
-        
-        ctx.font = '14px "JetBrains Mono", monospace';
-        ctx.textBaseline = 'middle';
-        
-        if (autoValue !== null) {
-          ctx.fillStyle = '#10b981'; // green for cutoff automation
-          const hexVal = autoValue.toString(16).toUpperCase().padStart(2, '0');
-          ctx.fillText(hexVal, autoX, y + ROW_HEIGHT / 2);
-        } else {
-          ctx.fillStyle = colors.textMuted;
-          ctx.fillText('··', autoX, y + ROW_HEIGHT / 2);
-        }
-
         // Channel separator
         ctx.fillStyle = colors.border;
         ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
+      }
+      
+      // Reset alpha after ghost row
+      if (isGhostRow) {
+        ctx.globalAlpha = 1.0;
       }
     }
 
@@ -928,19 +965,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
 
-    // Draw fade overlays
-    const gradient1 = ctx.createLinearGradient(0, 0, 0, 60);
-    gradient1.addColorStop(0, colors.bg);
-    gradient1.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient1;
-    ctx.fillRect(0, 0, width, 60);
-
-    const gradient2 = ctx.createLinearGradient(0, height - 60, 0, height);
-    gradient2.addColorStop(0, 'transparent');
-    gradient2.addColorStop(1, colors.bg);
-    ctx.fillStyle = gradient2;
-    ctx.fillRect(0, height - 60, width, 60);
-
   }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme]);
 
   // Animation loop - unlocked framerate for maximum smoothness
@@ -1014,7 +1038,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (!pattern) return;
 
         const currentRow = state.cursor.rowIndex;
-        const newRow = Math.max(0, Math.min(pattern.length - 1, currentRow + delta));
+        // Allow scrolling beyond pattern boundaries to see ghost patterns
+        const newRow = Math.min(pattern.length + 32, currentRow + delta); // Allow scrolling 32 rows into next pattern
         useTrackerStore.getState().moveCursorToRow(newRow);
       } else {
         // Horizontal scroll - scroll channels
@@ -1038,8 +1063,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const hasProbH = firstCellH?.probability !== undefined;
   const paramWidthH = CHAR_WIDTH * 10 + 16
     + (hasAcidH ? CHAR_WIDTH * 2 + 8 : 0)
-    + (hasProbH ? CHAR_WIDTH * 2 + 4 : 0);
-  const channelHeaderWidth = noteWidthH + paramWidthH + 20;
+    + (hasProbH ? CHAR_WIDTH * 2 + 4 : 0)
+    + CHAR_WIDTH * 2 + 4; // Automation column
+  const channelHeaderWidth = noteWidthH + paramWidthH + 20 + 20; // +20 for automation lane visual space
+  // Channel count is global across all patterns (enforced by addChannel/removeChannel)
   const totalChannelsWidth = pattern ? pattern.channels.length * channelHeaderWidth : 0;
 
   if (!pattern) {
@@ -1058,14 +1085,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       {/* Mobile Channel Header */}
       {isMobile && (
         <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative">
-          {/* Status Message Overlay (PT2 Style) */}
-          {statusMessage && (
-            <div className="absolute inset-0 flex items-center justify-center bg-dark-bgTertiary z-30 pointer-events-none">
-              <span className="text-accent-primary font-bold tracking-[0.3em] text-sm animate-pulse">
-                {statusMessage.toUpperCase()}
-              </span>
-            </div>
-          )}
           <div className="flex items-center justify-between px-3 py-2">
             <button
               onClick={handleSwipeRight}
@@ -1129,15 +1148,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       {/* Desktop Channel Header */}
       {!isMobile && (
         <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20 relative h-[37px]">
-          {/* Status Message Overlay (PT2 Style) - Replaces header content when active */}
-          {statusMessage && (
-            <div className="absolute inset-0 flex items-center justify-center bg-dark-bgTertiary z-30 pointer-events-none border-b border-dark-border">
-              <span className="text-accent-primary font-bold tracking-[0.3em] text-sm animate-pulse">
-                {statusMessage.toUpperCase()}
-              </span>
-            </div>
-          )}
-          
           <div className="flex h-full">
             {/* Row number column header */}
             <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
@@ -1155,6 +1165,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <div className="flex" style={{ width: totalChannelsWidth }}>
                 {pattern.channels.map((channel, idx) => {
                   const trigger = channelTriggersRef.current[idx] || { level: 0, triggered: false };
+                  
                   return (
                     <div
                       key={channel.id}
@@ -1268,6 +1279,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           }}
         />
 
+        {/* Automation Lanes Overlay */}
+        {pattern && (
+          <AutomationLanes
+            key={`automation-${pattern.id}-${renderCounter}`}
+            patternId={pattern.id}
+            patternLength={pattern.length}
+            rowHeight={ROW_HEIGHT}
+            channelCount={pattern.channels.length}
+            channelWidth={channelHeaderWidth}
+            rowNumWidth={LINE_NUMBER_WIDTH}
+            scrollOffset={scrollY}
+            visibleStart={visibleStart}
+            parameter="cutoff"
+            prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
+            prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
+            nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
+            nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
+          />
+        )}
+
         {/* VU Meters overlay - moved AFTER canvas and added z-30 */}
         <div
           className="absolute right-0 pointer-events-none z-30 overflow-hidden"
@@ -1297,9 +1328,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           />
         )}
       </div>
-
-      {/* Status Bar */}
-      <StatusBar patternLength={pattern.length} channelCount={pattern.channels.length} />
     </div>
   );
 });
