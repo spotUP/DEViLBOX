@@ -200,13 +200,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     smoothScrolling, 
     setSmoothScrolling, 
     grooveTemplateId, 
-    setGrooveTemplate 
+    setGrooveTemplate,
+    swing,
+    setSwing
   } = useTransportStore(useShallow((state) => ({
     setBPM: state.setBPM,
     smoothScrolling: state.smoothScrolling,
     setSmoothScrolling: state.setSmoothScrolling,
     grooveTemplateId: state.grooveTemplateId,
     setGrooveTemplate: state.setGrooveTemplate,
+    swing: state.swing,
+    setSwing: state.setSwing,
   })));
   const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
     masterMuted: state.masterMuted,
@@ -874,6 +878,23 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 ))}
               </optgroup>
             </select>
+          </div>
+
+          {/* Swing Amount Slider (Compact) */}
+          <div className="flex items-center gap-1 ml-1 pl-2 border-l border-dark-border">
+            <span className="text-[10px] text-text-muted font-mono">Swing:</span>
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={swing} 
+              onChange={(e) => setSwing(parseInt(e.target.value))}
+              className={`w-16 h-1 accent-accent-primary cursor-pointer ${grooveTemplateId !== 'straight' ? 'opacity-30 grayscale' : ''}`}
+              title="Adjust manual swing amount (0-100%). Only active when 'Straight' groove is selected."
+            />
+            <span className={`text-[10px] font-mono w-6 ${swing > 0 && grooveTemplateId === 'straight' ? 'text-accent-primary font-bold' : 'text-text-muted'}`}>
+              {swing}%
+            </span>
           </div>
         </div>
 
