@@ -24,6 +24,7 @@ class Open303Processor extends AudioWorkletProcessor {
     this.currentNote = -1; // Track currently held note for slide logic
     this.pendingMessages = []; // Queue messages received before WASM init completes
     this.initializing = false;
+    this.eventQueue = []; // Queue for sample-accurate events
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -45,44 +46,13 @@ class Open303Processor extends AudioWorkletProcessor {
         await this.initSynth(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
       case 'noteOn':
-        if (this.synth) {
-          // TB-303 slide/trigger logic (matches "Classic-Naive" MIDI implementation):
-          // Open303 internally uses a noteList to decide trigger vs slide.
-          // If noteList is empty → triggerNote() (full envelope retrigger)
-          // If noteList is NOT empty → slideToNote() (pitch glide only, no retrigger)
-          //
-          // For NON-SLIDE notes: send noteOff first to clear noteList → triggerNote
-          // For SLIDE notes: keep previous note held → slideToNote (legato)
-          if (!data.slide && this.currentNote >= 0) {
-            if (DEBUG_NOTE_EVENTS) console.log('[Open303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity);
-            this.synth.noteOff(this.currentNote);
-          } else if (data.slide && this.currentNote >= 0) {
-            if (DEBUG_NOTE_EVENTS) console.log('[Open303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity);
-          } else {
-            if (DEBUG_NOTE_EVENTS) console.log('[Open303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity);
-          }
-          this.synth.noteOn(data.note, data.velocity);
-          this.currentNote = data.note;
-        }
-        break;
       case 'noteOff':
-        if (this.synth) {
-          // Only process noteOff for the actual held note (note=0 is intentionally a no-op)
-          if (data.note > 0 && data.note === this.currentNote) {
-            if (DEBUG_NOTE_EVENTS) console.log('[Open303] RELEASE: noteOff(' + data.note + ')');
-            this.synth.noteOff(data.note);
-            this.currentNote = -1;
-          }
-          // note=0 is ignored - worklet handles note transitions via noteOn slide logic
-        }
-        break;
       case 'gateOff':
-        if (this.synth && this.currentNote >= 0) {
-          // Gate off: VCA envelope enters 16ms release (matching real 303 hardware).
-          // Real TB-303: 8ms hold + 8ms linear decay when gate goes LOW.
-          if (DEBUG_NOTE_EVENTS) console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
-          this.synth.noteOff(this.currentNote);
-          this.currentNote = -1;
+        if (data.time !== undefined) {
+          this.eventQueue.push(data);
+          this.eventQueue.sort((a, b) => a.time - b.time);
+        } else {
+          this.processEvent(data);
         }
         break;
       case 'allNotesOff':
@@ -90,6 +60,7 @@ class Open303Processor extends AudioWorkletProcessor {
           if (DEBUG_NOTE_EVENTS) console.log('[Open303] ALL NOTES OFF');
           this.synth.allNotesOff();
           this.currentNote = -1;
+          this.eventQueue = [];
         }
         break;
       case 'setParameter':
@@ -144,6 +115,40 @@ class Open303Processor extends AudioWorkletProcessor {
         break;
       case 'dispose':
         this.cleanup();
+        break;
+    }
+  }
+
+  processEvent(data) {
+    if (!this.synth) return;
+
+    switch (data.type) {
+      case 'noteOn':
+        // TB-303 slide/trigger logic
+        if (!data.slide && this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity);
+          this.synth.noteOff(this.currentNote);
+        } else if (data.slide && this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity);
+        } else {
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity);
+        }
+        this.synth.noteOn(data.note, data.velocity);
+        this.currentNote = data.note;
+        break;
+      case 'noteOff':
+        if (data.note > 0 && data.note === this.currentNote) {
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] RELEASE: noteOff(' + data.note + ')');
+          this.synth.noteOff(data.note);
+          this.currentNote = -1;
+        }
+        break;
+      case 'gateOff':
+        if (this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[Open303] GATE OFF: noteOff(' + this.currentNote + ')');
+          this.synth.noteOff(this.currentNote);
+          this.currentNote = -1;
+        }
         break;
     }
   }
@@ -320,7 +325,8 @@ class Open303Processor extends AudioWorkletProcessor {
 
     const outputL = output[0];
     const outputR = output[1] || output[0];
-    const numSamples = Math.min(outputL.length, this.bufferSize);
+    const blockLength = outputL.length;
+    const numSamples = Math.min(blockLength, this.bufferSize);
 
     // Check for WASM memory growth
     this.updateBufferViews();
@@ -329,13 +335,56 @@ class Open303Processor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Process audio through WASM
-    this.synth.process(this.outputPtrL, this.outputPtrR, numSamples);
-
-    // Copy from WASM memory to output buffers
-    for (let i = 0; i < numSamples; i++) {
-      outputL[i] = this.outputBufferL[i];
-      outputR[i] = this.outputBufferR[i];
+    // Process audio block with sample-accurate event handling
+    const sampleTime = 1.0 / sampleRate;
+    
+    let processedSamples = 0;
+    
+    while (processedSamples < numSamples) {
+      // Find events scheduled within this sub-block
+      let nextEventIndex = -1;
+      let samplesToNextEvent = numSamples - processedSamples;
+      
+      const blockEndTime = currentTime + (processedSamples + samplesToNextEvent) * sampleTime;
+      
+      for (let i = 0; i < this.eventQueue.length; i++) {
+        if (this.eventQueue[i].time < blockEndTime) {
+          nextEventIndex = i;
+          const eventOffset = Math.max(0, this.eventQueue[i].time - (currentTime + processedSamples * sampleTime));
+          samplesToNextEvent = Math.floor(eventOffset / sampleTime);
+          break;
+        }
+      }
+      
+      // Render sub-block before event
+      if (samplesToNextEvent > 0) {
+        this.synth.process(this.outputPtrL, this.outputPtrR, samplesToNextEvent);
+        
+        // Copy sub-block to output
+        for (let i = 0; i < samplesToNextEvent; i++) {
+          outputL[processedSamples + i] = this.outputBufferL[i];
+          outputR[processedSamples + i] = this.outputBufferR[i];
+        }
+        
+        processedSamples += samplesToNextEvent;
+      }
+      
+      // Process the event
+      if (nextEventIndex >= 0) {
+        const event = this.eventQueue.shift();
+        this.processEvent(event);
+      } else {
+        // No more events in this block, process remaining samples
+        const remaining = numSamples - processedSamples;
+        if (remaining > 0) {
+          this.synth.process(this.outputPtrL, this.outputPtrR, remaining);
+          for (let i = 0; i < remaining; i++) {
+            outputL[processedSamples + i] = this.outputBufferL[i];
+            outputR[processedSamples + i] = this.outputBufferR[i];
+          }
+          processedSamples += remaining;
+        }
+      }
     }
 
     return true;
