@@ -20,10 +20,16 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
-import { StereoField } from '@components/visualization/StereoField';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
-import { EnvelopeVisualizer } from '@components/ui/EnvelopeVisualizer';
-import { AccentChargeVisualizer } from '@components/ui/AccentChargeVisualizer';
+import { CircularVU } from '@components/visualization/CircularVU';
+import { FrequencyBars } from '@components/visualization/FrequencyBars';
+import { ParticleField } from '@components/visualization/ParticleField';
+import { ChannelWaveforms } from '@components/visualization/ChannelWaveforms';
+import { ChannelActivityGrid } from '@components/visualization/ChannelActivityGrid';
+import { ChannelSpectrums } from '@components/visualization/ChannelSpectrums';
+import { ChannelCircularVU } from '@components/visualization/ChannelCircularVU';
+import { ChannelParticles } from '@components/visualization/ChannelParticles';
+import { SineScroller } from '@components/visualization/SineScroller';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
@@ -195,7 +201,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'>('logo');
+  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'>('logo');
 
   // Tap Tempo
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
@@ -210,7 +216,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
   const handleLogoAnimationComplete = useCallback(() => {
-    setVizMode('waveform');
+    // Auto-cycle to next visualizer after logo animation completes
+    const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'sineScroll'];
+    const currentIndex = modes.indexOf('logo');
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setVizMode(modes[nextIndex]);
   }, []);
 
   // Handle fullscreen changes from keyboard (F11) or other sources
@@ -749,8 +759,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         </div>
 
         <div className="flex-1 min-w-[120px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group" onClick={() => {
-          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
-          setVizMode(modes[(modes.indexOf(vizMode as any) + 1) % modes.length]);
+          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'sineScroll'];
+          const currentIndex = modes.indexOf(vizMode);
+          const nextIndex = (currentIndex + 1) % modes.length;
+          setVizMode(modes[nextIndex]);
         }}>
           {/* Version Number */}
           <div className="absolute bottom-1 right-2 text-[9px] font-mono text-text-muted opacity-40 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
@@ -761,10 +773,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <>
               {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />}
               {vizMode === 'channels' && <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'stereo' && <StereoField height={compactToolbar ? 70 : 100} />}
               {vizMode === 'logo' && <LogoAnimation height={compactToolbar ? 70 : 100} onComplete={handleLogoAnimationComplete} />}
-              {vizMode === 'envelope' && <EnvelopeVisualizer attack={3} decay={instruments.find(i => i.synthType === 'TB303')?.parameters?.decay ?? 200} sustain={0} release={50} envMod={instruments.find(i => i.synthType === 'TB303')?.parameters?.envMod ?? 60} height={compactToolbar ? 70 : 100} color="var(--color-synth-envelope)" label="Filter Envelope" />}
-              {vizMode === 'accent' && <AccentChargeVisualizer charge={0} sweepSpeed={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.sweepSpeed ?? 'normal'} enabled={instruments.find(i => i.synthType === 'TB303')?.parameters?.devilFish?.accentSweepEnabled ?? true} height={compactToolbar ? 70 : 100} color="var(--color-synth-accent)" />}
+              {vizMode === 'circular' && <CircularVU height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'bars' && <FrequencyBars height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'particles' && <ParticleField height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanWaves' && <ChannelWaveforms height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanActivity' && <ChannelActivityGrid height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanSpectrum' && <ChannelSpectrums height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanCircular' && <ChannelCircularVU height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanParticles' && <ChannelParticles height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'sineScroll' && <SineScroller height={compactToolbar ? 70 : 100} />}
             </>
           )}
         </div>
