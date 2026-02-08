@@ -15,16 +15,21 @@ interface LogoAnimationProps {
 // Stop at 10 seconds to freeze the logo before it disappears
 const ANIMATION_STOP_MS = 10000;
 
-export const LogoAnimation: React.FC<LogoAnimationProps> = ({
+const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
   height = 100,
   onComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string | null>(null);
-  const [key, _setKey] = useState(0); // Used for animation restart (disabled - now skips instead)
   const animationRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep onComplete ref up to date without triggering re-renders
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   // Use refs for animation state to avoid stale closure issues
   const animationCompleteRef = useRef(false);
@@ -32,7 +37,7 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
   const { currentThemeId } = useThemeStore();
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
-  // Load SVG content
+  // Load SVG content once on mount
   useEffect(() => {
     const basePath = import.meta.env.BASE_URL || '/';
     fetch(`${basePath}assets/up-rough-logo.svg`)
@@ -64,21 +69,16 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
   }, []);
 
 
-  // Reset animation state when key changes (animation restarts)
+  // Set timer once on mount to pause animation before it ends
   useEffect(() => {
     animationCompleteRef.current = false;
-
-    // Clear any existing timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
 
     // Set timer to pause animation before it ends (and hides the logo)
     timerRef.current = setTimeout(() => {
       pauseAnimations();
       animationCompleteRef.current = true;
       // Notify parent that animation is complete (can skip to next visualizer)
-      onComplete?.();
+      onCompleteRef.current?.();
     }, ANIMATION_STOP_MS);
 
     return () => {
@@ -86,7 +86,7 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
         clearTimeout(timerRef.current);
       }
     };
-  }, [key, pauseAnimations, onComplete]);
+  }, [pauseAnimations]); // Removed key and onComplete dependencies
 
 
   // Simple color animation (no audio-reactive effects)
@@ -99,9 +99,9 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     const container = svgContainerRef.current;
     const baseColor = isCyanTheme ? '#00ffff' : '#00d4aa';
 
-    // Just set the base color, no effects
+    // Just set the base color and zoom, no effects
     container.style.color = baseColor;
-    container.style.transform = '';
+    container.style.transform = 'scale(1.5)';
     container.style.filter = '';
 
     animationRef.current = requestAnimationFrame(animate);
@@ -131,7 +131,7 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
       cancelAnimationFrame(animationRef.current);
     }
     // Skip to next visualizer
-    onComplete?.();
+    onCompleteRef.current?.();
   };
 
   const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
@@ -151,13 +151,13 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
       {svgContent ? (
         <div
           ref={svgContainerRef}
-          key={key}
           className="flex items-center justify-center"
           style={{
             height: '100%',
             width: '100%',
             color: defaultColor,
             transformOrigin: 'center center',
+            transform: 'scale(1.5)',
           }}
           dangerouslySetInnerHTML={{ __html: svgContent }}
         />
@@ -167,3 +167,6 @@ export const LogoAnimation: React.FC<LogoAnimationProps> = ({
     </div>
   );
 };
+
+// Wrap in React.memo to prevent unnecessary re-renders
+export const LogoAnimation = React.memo(LogoAnimationComponent);
