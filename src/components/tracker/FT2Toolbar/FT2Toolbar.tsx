@@ -179,6 +179,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     stop,
     grooveTemplateId,
     setGrooveTemplate,
+    swing,
+    setSwing,
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
@@ -696,6 +698,34 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                         </div>
                       );
                     })}
+                    
+                    {/* Manual Swing Control */}
+                    <div className="mt-auto border-t border-dark-border p-3 bg-dark-bgSecondary/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold text-text-muted uppercase">Manual Swing</span>
+                        <span className="text-[10px] font-mono text-accent-primary font-bold">{swing}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={swing} 
+                        onChange={(e) => setSwing(parseInt(e.target.value))}
+                        className={`w-full accent-accent-primary cursor-pointer ${grooveTemplateId !== 'straight' ? 'opacity-30 grayscale' : ''}`}
+                        title="Adjust swing amount (0-100%). Overrides templates if not set to 0."
+                      />
+                      <div className="flex justify-between text-[8px] text-text-muted mt-1 font-mono">
+                        <span>PUSH</span>
+                        <span>0%</span>
+                        <span>TRIPLET</span>
+                        <span>LATE</span>
+                      </div>
+                      {grooveTemplateId !== 'straight' && (
+                        <div className="text-[9px] text-accent-warning mt-2 italic leading-tight">
+                          Note: Selection above overrides manual swing.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

@@ -505,18 +505,12 @@ export class TrackerReplayer {
     
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
       grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration);
-      if (this.currentTick === 0 && grooveOffset !== 0) {
-        console.log(`[Replayer] Row ${this.pattPos} shifted by ${Math.round(grooveOffset * 1000)}ms (Template: ${grooveTemplate.name})`);
-      }
     } else {
       const swingAmount = transportState.swing;
       if (swingAmount !== 0 && swingAmount !== 50 && (this.pattPos % 2) === 1) {
         const maxSwingOffset = rowDuration * 0.5;
         const normalizedSwing = (swingAmount - 50) / 50;
         grooveOffset = normalizedSwing * maxSwingOffset;
-        if (this.currentTick === 0) {
-          console.log(`[Replayer] Row ${this.pattPos} shifted by ${Math.round(grooveOffset * 1000)}ms (Swing: ${swingAmount}%)`);
-        }
       }
     }
 
