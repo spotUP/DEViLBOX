@@ -150,7 +150,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     patterns,
     currentPatternIndex,
     setCurrentPattern,
-    duplicatePattern,
     deletePattern,
     addPattern,
     expandPattern,
@@ -166,6 +165,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     toggleRecordMode,
     setEditStep,
     reset: resetTracker,
+    duplicatePosition,
+    removeFromOrder,
   } = useTrackerStore();
 
   const {
@@ -532,12 +533,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const songLength = patterns.length;
 
   const handlePositionChange = (newPos: number) => {
-    if (newPos >= 0 && newPos < songLength) setCurrentPattern(newPos);
+    setCurrentPosition(newPos);
   };
 
-  const handleInsertPosition = () => duplicatePattern(currentPatternIndex);
-  const handleDeletePosition = () => { if (songLength > 1) deletePattern(currentPatternIndex); };
-  const handlePatternChange = (newPat: number) => handlePositionChange(newPat);
+  const handleInsertPosition = () => duplicatePosition(currentPositionIndex);
+  const handleDeletePosition = () => { if (patternOrder.length > 1) removeFromOrder(currentPositionIndex); };
+  const handlePatternChange = (newPat: number) => {
+    // Update the pattern index at the current order position
+    const newOrder = [...patternOrder];
+    newOrder[currentPositionIndex] = newPat;
+    setPatternOrder(newOrder);
+    setCurrentPattern(newPat);
+  };
 
   // Handle song length changes (add/remove patterns)
   const handleSongLengthChange = (newLength: number) => {
@@ -594,13 +601,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         <div className="flex-shrink-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
-              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={(pos) => {
-                setCurrentPosition(pos);
-                setCurrentPattern(patternOrder[pos] ?? pos);
-              }} min={0} max={patternOrder.length - 1} format="hex" />
+              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} format="hex" />
               <div className="flex gap-1 ml-auto">
                 <Button variant="default" size="sm" onClick={handleInsertPosition} className="min-w-[32px]">Ins</Button>
-                <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={songLength <= 1} className="min-w-[32px]">Del</Button>
+                <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={patternOrder.length <= 1} className="min-w-[32px]">Del</Button>
               </div>
             </div>
             <div className="ft2-section ft2-col-2">
