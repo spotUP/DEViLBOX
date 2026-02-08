@@ -1272,7 +1272,7 @@
 
   .ft2-toolbar-row > .ft2-section {
     flex-shrink: 0;
-    border-right: 1px solid var(--ft2-border);
+    border-right: none;
   }
 
   .ft2-toolbar-row > .ft2-section:last-child {
@@ -1484,31 +1484,30 @@
 }
 
 .ft2-toolbar-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 250px 220px 220px 200px 1fr;
   align-items: center;
-  gap: 10px;
-  min-height: 30px;
+  min-height: 32px;
   flex-shrink: 0;
   width: 100%;
-  /* Allow wrapping on smaller screens instead of scrolling */
-  flex-wrap: wrap;
 }
 
 .ft2-toolbar-row-menu {
   display: flex;
   grid-template-columns: none;
+  gap: 6px;
+  padding: 6px 14px;
 }
 
 .ft2-section {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-right: 1px solid #3a3a42;
-  flex-shrink: 0;
+  gap: 10px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  height: 100%;
   white-space: nowrap;
-  /* Allow shrinking on very small screens */
   min-width: 0;
 }
 
@@ -1521,24 +1520,11 @@
   padding-right: 0;
 }
 
-/* Sections with FIXED widths for proper column alignment across rows */
-.ft2-section-pos {
-  flex-shrink: 0;
-  flex-grow: 0;
-  width: 200px;  /* Column 1: Position/Pattern/Song Len + Ins/Del buttons */
-}
-
-.ft2-section-tempo {
-  flex-shrink: 0;
-  flex-grow: 0;
-  width: 130px;  /* Column 2: BPM/Speed/Edit Step */
-}
-
-.ft2-section-pattern {
-  flex-shrink: 0;
-  flex-grow: 0;
-  width: 130px;  /* Column 3: Pattern/Length/Expand+Shrink */
-}
+/* Column Classes for Strict Alignment */
+.ft2-col-1 { width: 250px; }
+.ft2-col-2 { width: 220px; }
+.ft2-col-3 { width: 220px; }
+.ft2-col-4, .ft2-col-instrument { width: 200px; }
 
 .ft2-section-playback {
   flex-shrink: 0;
@@ -1776,23 +1762,9 @@
 }
 
 /* Fixed label widths for proper alignment across rows */
-.ft2-section-pos .ft2-numeric-label {
+.ft2-numeric-label {
   display: inline-block;
-  width: 62px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.ft2-section-tempo .ft2-numeric-label {
-  display: inline-block;
-  width: 62px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.ft2-section-pattern .ft2-numeric-label {
-  display: inline-block;
-  width: 52px;
+  width: 70px;
   text-align: right;
   white-space: nowrap;
 }

@@ -45,51 +45,6 @@ import { CURRENT_VERSION } from '@generated/changelog';
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbox', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
-// PERFORMANCE: Separate component for row display to isolate currentRow subscription
-// This prevents the entire toolbar from re-rendering on every row change (~12x/sec during playback)
-const RowDisplay: React.FC = React.memo(() => {
-  const storeRow = useTransportStore((state) => state.currentRow);
-  const isPlaying = useTransportStore((state) => state.isPlaying);
-  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
-  const [displayRow, setDisplayRow] = useState(storeRow);
-
-  // Sync with audio clock during playback using animation loop
-  React.useEffect(() => {
-    if (!isPlaying) {
-      setDisplayRow(storeRow);
-      return;
-    }
-
-    let rafId: number;
-    const replayer = getTrackerReplayer();
-
-    const update = () => {
-      // Get audio-synced row with 10ms lookahead
-      const state = replayer.getStateAtTime(Tone.now() + 0.01);
-      if (state) {
-        setDisplayRow(state.row);
-      }
-      rafId = requestAnimationFrame(update);
-    };
-
-    rafId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, storeRow]);
-
-  return (
-    <div className="ft2-section ft2-section-playback">
-      <span className="ft2-row-display">
-        Row: <span className="ft2-row-value">
-          {useHexNumbers
-            ? displayRow.toString(16).toUpperCase().padStart(2, '0')
-            : displayRow.toString(10).padStart(2, '0')
-          }
-        </span>
-      </span>
-    </div>
-  );
-});
-
 // Create instruments for imported module
 function createInstrumentsForModule(
   patterns: Pattern[],
@@ -651,33 +606,39 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       <div className="flex">
         <div className="flex-shrink-0">
           <div className="ft2-toolbar-row">
-            <div className="ft2-section ft2-section-pos">
+            <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={currentPositionIndex} onChange={(pos) => {
                 setCurrentPosition(pos);
                 setCurrentPattern(patternOrder[pos] ?? pos);
               }} min={0} max={patternOrder.length - 1} format="hex" />
-              <Button variant="default" size="sm" onClick={handleInsertPosition}>Ins</Button>
-              <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={songLength <= 1}>Del</Button>
-            </div>
-            <div className="ft2-section ft2-section-tempo">
-              <div className="ft2-numeric-group">
-                <span className="ft2-numeric-label">BPM:</span>
-                <span className="ft2-numeric-value">{bpm.toString().padStart(3, '0')}</span>
+              <div className="flex gap-1 ml-auto">
+                <Button variant="default" size="sm" onClick={handleInsertPosition} className="min-w-[32px]">Ins</Button>
+                <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={songLength <= 1} className="min-w-[32px]">Del</Button>
               </div>
+            </div>
+            <div className="ft2-section ft2-col-2">
+              <FT2NumericInput
+                label="BPM"
+                value={bpm}
+                onChange={setBPM}
+                min={32}
+                max={255}
+                throttleMs={50}
+              />
               <Button
                 variant={tapActive ? 'primary' : 'default'}
                 size="sm"
                 onClick={handleTapTempo}
                 title={`Tap Tempo (${tapCount} taps)`}
-                className="min-w-[40px]"
+                className="min-w-[40px] ml-1"
               >
                 <MousePointerClick size={14} />
               </Button>
             </div>
-            <div className="ft2-section ft2-section-pattern">
+            <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
             </div>
-            <div className="ft2-section"><InstrumentSelector /></div>
+            <div className="ft2-section ft2-col-instrument"><InstrumentSelector /></div>
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
@@ -687,20 +648,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
           {!compactToolbar && (
             <div className="ft2-toolbar-row">
-              <div className="ft2-section ft2-section-pos">
-                <FT2NumericInput label="Pattern" value={currentPatternIndex} onChange={handlePatternChange} min={0} max={songLength - 1} format="hex" />
+              <div className="ft2-section ft2-col-1">
+                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
               </div>
-              <div className="ft2-section ft2-section-tempo">
+              <div className="ft2-section ft2-col-2">
                 <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
                 <div ref={grooveButtonRef}>
                   <Button
-                    variant={showGrooveMenu || grooveTemplateId !== 'straight' ? 'primary' : 'default'}
+                    variant="default"
                     size="sm"
                     onClick={() => setShowGrooveMenu(!showGrooveMenu)}
-                    title="Groove Template"
-                    className="min-w-[60px] text-xs"
+                    title={`Groove Template: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'}`}
+                    className={`min-w-[32px] ml-1 ${grooveTemplateId !== 'straight' ? 'text-accent-primary' : ''}`}
                   >
-                    {GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name?.slice(0, 8) || 'Groove'}
+                    Grv
                   </Button>
                 </div>
                 {showGrooveMenu && (
@@ -738,7 +699,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   </div>
                 )}
               </div>
-              <div className="ft2-section ft2-section-pattern">
+              <div className="ft2-section ft2-col-3">
                 <FT2NumericInput
                   label="Length"
                   value={patternLength}
@@ -758,22 +719,28 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   ]}
                 />
               </div>
+              <div className="ft2-section ft2-col-4"></div>
             </div>
           )}
 
           {!compactToolbar && (
             <div className="ft2-toolbar-row">
-              <div className="ft2-section ft2-section-pos">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
-              </div>
-              <div className="ft2-section ft2-section-tempo">
+              <div className="ft2-section ft2-col-1">
                 <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
               </div>
-              <div className="ft2-section ft2-section-pattern">
-                <Button variant="default" size="sm" onClick={handleExpand}>Expand</Button>
-                <Button variant="default" size="sm" onClick={handleShrink}>Shrink</Button>
+              <div className="ft2-section ft2-col-2">
+                <div className="ft2-numeric-group">
+                  <span className="ft2-numeric-label">Modify:</span>
+                  <div className="flex gap-1 ml-1">
+                    <Button variant="default" size="sm" onClick={handleExpand} className="min-w-[48px] text-[10px] py-0 h-5">Expand</Button>
+                    <Button variant="default" size="sm" onClick={handleShrink} className="min-w-[48px] text-[10px] py-0 h-5">Shrink</Button>
+                  </div>
+                </div>
               </div>
-              <RowDisplay />
+              <div className="ft2-section ft2-col-3">
+              </div>
+              <div className="ft2-section ft2-col-4">
+              </div>
             </div>
           )}
 
