@@ -401,9 +401,12 @@ namespace rosic
     tmp *= ampScaler;
 
     // find out whether we may switch ourselves off for the next call:
-    idle = false;
-    //idle = (sequencer.getSequencerMode() == AcidSequencer::OFF && ampEnv.endIsReached() 
-    //        && fabs(tmp) < 0.000001); // ampEnvOut < 0.000001;
+    // When amplitude envelope finishes release and output is near zero, go idle
+    // This allows triggerNote to properly reset oscillator/filter on next note
+    if (sequencer.getSequencerMode() == AcidSequencer::OFF && ampEnv.endIsReached() 
+        && fabs(tmp) < 0.000001) {
+      idle = true;
+    }
 
     return tmp;
   }

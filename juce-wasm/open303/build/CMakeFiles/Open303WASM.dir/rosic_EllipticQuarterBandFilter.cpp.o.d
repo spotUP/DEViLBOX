@@ -1,0 +1,20 @@
+CMakeFiles/Open303WASM.dir/rosic_EllipticQuarterBandFilter.cpp.o: \
+  /Users/spot/Code/DEViLBOX/juce-wasm/open303/rosic_EllipticQuarterBandFilter.cpp \
+  /Users/spot/Code/DEViLBOX/juce-wasm/open303/rosic_EllipticQuarterBandFilter.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/compat/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__config \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__config_site \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__configuration/abi.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__configuration/compiler.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__configuration/platform.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__configuration/availability.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/__configuration/language.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/features.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/bits/alltypes.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/strings.h \
+  /Users/spot/Code/DEViLBOX/juce-wasm/open303/GlobalDefinitions.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/c++/v1/float.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/float.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/float.h

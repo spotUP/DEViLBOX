@@ -84,7 +84,7 @@ export const PianoPopover: React.FC<PianoPopoverProps> = ({
     onChange({ octave: newOct });
   }, [step.octave, onChange]);
 
-  const handleToggle = useCallback((prop: 'accent' | 'slide') => {
+  const handleToggle = useCallback((prop: 'accent' | 'slide' | 'mute' | 'hammer') => {
     onChange({ [prop]: !step[prop] });
   }, [step, onChange]);
 
@@ -176,6 +176,27 @@ export const PianoPopover: React.FC<PianoPopoverProps> = ({
                 onClick={() => handleToggle('slide')}
               >
                 <span>SL</span>
+              </button>
+            </div>
+          </div>
+
+          {/* TT-303 Extensions */}
+          <div className="control-group">
+            <div className="control-label">TT-303</div>
+            <div className="modifier-toggles">
+              <button
+                className={`modifier-btn mute ${step.mute ? 'active' : ''}`}
+                onClick={() => handleToggle('mute')}
+                title="Mute - silent step, data preserved"
+              >
+                <span>MT</span>
+              </button>
+              <button
+                className={`modifier-btn hammer ${step.hammer ? 'active' : ''}`}
+                onClick={() => handleToggle('hammer')}
+                title="Hammer - legato without pitch glide"
+              >
+                <span>HM</span>
               </button>
             </div>
           </div>

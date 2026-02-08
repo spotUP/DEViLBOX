@@ -7,7 +7,7 @@
 
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
-import { JC303Synth } from './open303/Open303Synth';
+import { DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import type { TrackerCell, Pattern } from '@typedefs';
 import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';

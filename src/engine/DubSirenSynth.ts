@@ -1,6 +1,15 @@
 import * as Tone from 'tone';
 import type { DubSirenConfig } from '@/types/instrument';
 
+// Default config values for defensive initialization
+const DEFAULT_CONFIG: DubSirenConfig = {
+  oscillator: { type: 'sine', frequency: 440 },
+  lfo: { enabled: true, type: 'square', rate: 2, depth: 100 },
+  delay: { enabled: true, time: 0.3, feedback: 0.4, wet: 0.3 },
+  filter: { enabled: true, type: 'lowpass', frequency: 2000, rolloff: -24 },
+  reverb: { enabled: true, decay: 1.5, wet: 0.1 },
+};
+
 export class DubSirenSynth {
   private osc: Tone.Oscillator;
   private filter: Tone.Filter;
@@ -13,25 +22,34 @@ export class DubSirenSynth {
   private lfo: Tone.LFO;
 
   constructor(config: DubSirenConfig) {
+    // Merge with defaults to handle partial configs
+    const cfg = {
+      oscillator: { ...DEFAULT_CONFIG.oscillator, ...config?.oscillator },
+      lfo: { ...DEFAULT_CONFIG.lfo, ...config?.lfo },
+      delay: { ...DEFAULT_CONFIG.delay, ...config?.delay },
+      filter: { ...DEFAULT_CONFIG.filter, ...config?.filter },
+      reverb: { ...DEFAULT_CONFIG.reverb, ...config?.reverb },
+    };
+
     // Output Volume
     this.output = new Tone.Volume(0);
 
     // Effects Chain
     this.reverb = new Tone.Reverb({
-      decay: config.reverb.decay,
-      wet: config.reverb.enabled ? config.reverb.wet : 0
+      decay: cfg.reverb.decay,
+      wet: cfg.reverb.enabled ? cfg.reverb.wet : 0
     });
 
     this.delay = new Tone.FeedbackDelay({
-      delayTime: config.delay.time,
-      feedback: config.delay.feedback,
-      wet: config.delay.enabled ? config.delay.wet : 0
+      delayTime: cfg.delay.time,
+      feedback: cfg.delay.feedback,
+      wet: cfg.delay.enabled ? cfg.delay.wet : 0
     });
 
     this.filter = new Tone.Filter({
-      frequency: config.filter.frequency,
-      type: config.filter.type,
-      rolloff: config.filter.rolloff,
+      frequency: cfg.filter.frequency,
+      type: cfg.filter.type,
+      rolloff: cfg.filter.rolloff,
       Q: 1
     });
 
@@ -43,23 +61,23 @@ export class DubSirenSynth {
 
     // Oscillator
     this.osc = new Tone.Oscillator({
-      type: config.oscillator.type
+      type: cfg.oscillator.type
     });
 
     // Control Signals
     // Base Frequency Signal
     this.signal = new Tone.Signal({
       units: "frequency",
-      value: config.oscillator.frequency,
+      value: cfg.oscillator.frequency,
     });
 
     // LFO for modulation
     this.lfo = new Tone.LFO({
-      type: config.lfo.type,
-      frequency: config.lfo.rate,
+      type: cfg.lfo.type,
+      frequency: cfg.lfo.rate,
       amplitude: 1, // Always 1, we control range via min/max
-      min: -config.lfo.depth, // Depth in Hz for frequency modulation
-      max: config.lfo.depth
+      min: -cfg.lfo.depth, // Depth in Hz for frequency modulation
+      max: cfg.lfo.depth
     });
 
     // Connect modulation
@@ -68,7 +86,7 @@ export class DubSirenSynth {
     this.osc.frequency.value = 0;
     this.signal.connect(this.osc.frequency);
     
-    if (config.lfo.enabled) {
+    if (cfg.lfo.enabled) {
       this.lfo.connect(this.osc.frequency);
       this.lfo.start();
     }

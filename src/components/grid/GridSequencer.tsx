@@ -3,17 +3,18 @@
  *
  * Layout:
  * - 12 pitch rows (C to B) for one octave
- * - Note properties shown on cells: accent (orange), slide (arrow), octave (+/-)
+ * - Note properties shown on cells: accent (orange), slide (arrow), mute (M), hammer (H), octave (+/-)
  *
  * Interactions:
- * - Click: toggle note
+ * - Click: toggle note (with preview sound)
  * - Shift+click: toggle accent
  * - Ctrl/Cmd+click: toggle slide
  * - Alt+click: cycle octave (normal → +1 → -1 → normal)
- * - Right-click: context menu with all options
+ * - Right-click: context menu with all options including TT-303 mute/hammer
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import * as Tone from 'tone';
 import { useGridPattern } from '../../hooks/useGridPattern';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { GridControls } from './GridControls';
@@ -21,9 +22,13 @@ import { NoteGridCell } from './GridCell';
 import { SCALES, isNoteInScale } from '../../lib/scales';
 import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
+import { useTrackerStore } from '../../stores/useTrackerStore';
+import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
+const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 const NOTE_INDICES = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]; // Reversed for display (high to low)
 
 interface GridSequencerProps {
@@ -41,6 +46,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     setNote,
     toggleAccent,
     toggleSlide,
+    toggleMute,
+    toggleHammer,
     setOctaveShift,
     setVelocity,
     clearAll,
@@ -175,6 +182,39 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     return unsubscribe;
   }, [onMessage, applyGridMIDIValue, setBaseOctave]);
 
+  // Preview sound state (always enabled for now - could add UI toggle later)
+  const [previewEnabled] = useState(true);
+
+  // Preview note sound (like db303 editor)
+  const previewNote = useCallback((noteIndex: number, octaveShift: number = 0, accent: boolean = false, slide: boolean = false) => {
+    if (!previewEnabled) return;
+
+    try {
+      const engine = getToneEngine();
+      if (!engine) return;
+
+      // Get the instrument for this channel
+      const { patterns, currentPatternIndex } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      const channel = pattern?.channels[channelIndex];
+      const instrumentId = channel?.instrumentId ?? 1;
+      const instrument = useInstrumentStore.getState().instruments.find(i => i.id === instrumentId);
+
+      if (instrument) {
+        // Build full note with octave
+        const noteName = NOTE_NAMES_FORWARD[noteIndex];
+        const noteOctave = baseOctave + octaveShift;
+        const fullNote = `${noteName}${noteOctave}`;
+
+        // Trigger a short preview note
+        engine.triggerNote(instrumentId, fullNote, 0.2, Tone.now(), 0.8, instrument, accent, slide);
+      }
+    } catch (e) {
+      // Silently ignore preview errors
+      console.debug('[GridSequencer] Preview error:', e);
+    }
+  }, [previewEnabled, channelIndex, baseOctave]);
+
   // Handle note cell click - stable callback
   const handleNoteClick = useCallback(
     (noteIndex: number, stepIndex: number) => {
@@ -187,9 +227,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         // Set the new note, preserving octave shift if there was a note, otherwise default to 0
         const octaveShift = step?.noteIndex !== null ? step.octaveShift : 0;
         setNote(stepIndex, noteIndex, octaveShift);
+
+        // Preview the note sound
+        previewNote(noteIndex, octaveShift, step?.accent || false, step?.slide || false);
       }
     },
-    [setNote]
+    [setNote, previewNote]
   );
 
   // Handle setting octave shift directly
@@ -296,6 +339,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         } else if (e.key === 's' || e.key === 'S') {
           e.preventDefault();
           toggleSlide(stepIndex);
+        } else if (e.key === 'm' || e.key === 'M') {
+          e.preventDefault();
+          toggleMute(stepIndex);  // TT-303 mute
+        } else if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          toggleHammer(stepIndex);  // TT-303 hammer
         } else if (e.key === 'o' || e.key === 'O') {
           e.preventDefault();
           // Cycle octave: 0 -> 1 -> -1 -> 0
@@ -319,7 +368,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         }
       }
     },
-    [focusedCell, handleNoteClick, maxSteps, toggleAccent, toggleSlide, setOctaveShift, setVelocity]
+    [focusedCell, handleNoteClick, maxSteps, toggleAccent, toggleSlide, toggleMute, toggleHammer, setOctaveShift, setVelocity]
   );
 
   return (
@@ -400,11 +449,15 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       isFocused={isFocused}
                       accent={isActive ? step?.accent : false}
                       slide={isActive ? step?.slide : false}
+                      mute={isActive ? step?.mute : false}
+                      hammer={isActive ? step?.hammer : false}
                       octaveShift={isActive ? step?.octaveShift : 0}
                       velocity={isActive ? step?.velocity : 100}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
+                      onToggleMute={toggleMute}
+                      onToggleHammer={toggleHammer}
                       onSetOctave={handleSetOctave}
                       onSetVelocity={setVelocity}
                       onFocus={() => setFocusedCell({ noteIndex, stepIndex: stepIdx })}
@@ -441,6 +494,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
             <span>Enter/Space: toggle</span>
             <span>A: accent</span>
             <span>S: slide</span>
+            <span>M: mute</span>
+            <span>H: hammer</span>
             <span>O: octave</span>
             <span>V: velocity reset</span>
             <span>+/-: velocity ±10</span>

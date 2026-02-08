@@ -3,54 +3,62 @@ import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build
 import { getNativeContext } from '@utils/audio-context';
 
 /**
- * DB303 Parameter IDs (matching C++ enum)
- * Using as const object for erasableSyntaxOnly compatibility
+ * DB303 Parameter Names
+ * These map to WASM setters like setCutoff, setResonance, etc.
+ * The worklet constructs the setter name by capitalizing the first letter.
+ * 
+ * NOTE: Some parameters have special WASM function names (Korg filter params):
+ * - diodeCharacter -> setKorgWarmth
+ * - duffingAmount -> setKorgStiffness (with sticky-zero transform)
+ * - filterFmDepth -> setKorgFilterFm
+ * - resTracking -> setKorgIbiasScale (with 0.1 + value * 3.9 transform)
  */
 const DB303Param = {
-  CUTOFF: 0,
-  RESONANCE: 1,
-  ENV_MOD: 2,
-  DECAY: 3,
-  ACCENT: 4,
-  WAVEFORM: 5,
-  PULSE_WIDTH: 6,
-  SUB_OSC_GAIN: 7,
-  SUB_OSC_BLEND: 8,
-  NORMAL_DECAY: 9,
-  ACCENT_DECAY: 10,
-  SOFT_ATTACK: 11,
-  ACCENT_SOFT_ATTACK: 12,
-  PASSBAND_COMPENSATION: 13,
-  RES_TRACKING: 14,
-  FILTER_INPUT_DRIVE: 15,
-  FILTER_SELECT: 16,
-  DIODE_CHARACTER: 17,
-  DUFFING_AMOUNT: 18,
-  FILTER_FM_DEPTH: 19,
-  LP_BP_MIX: 20,
-  FILTER_TRACKING: 21,
-  SLIDE_TIME: 22,
-  LFO_RATE: 23,
-  LFO_CONTOUR: 24,
-  LFO_PITCH_DEPTH: 25,
-  LFO_PWM_DEPTH: 26,
-  LFO_FILTER_DEPTH: 27,
-  LFO_STIFF_DEPTH: 28,
-  CHORUS_MIX: 29,
-  PHASER_RATE: 30,
-  PHASER_WIDTH: 31,
-  PHASER_FEEDBACK: 32,
-  PHASER_MIX: 33,
-  DELAY_TIME: 34,
-  DELAY_FEEDBACK: 35,
-  DELAY_TONE: 36,
-  DELAY_MIX: 37,
-  DELAY_SPREAD: 38,
-  TUNING: 39,
-  VOLUME: 40,
-  LFO_WAVEFORM: 41,
-  ENSEMBLE_AMOUNT: 42,
-  OVERSAMPLING_ORDER: 43
+  CUTOFF: 'cutoff',
+  RESONANCE: 'resonance',
+  ENV_MOD: 'envMod',
+  DECAY: 'decay',
+  ACCENT: 'accent',
+  WAVEFORM: 'waveform',
+  PULSE_WIDTH: 'pulseWidth',
+  SUB_OSC_GAIN: 'subOscGain',
+  SUB_OSC_BLEND: 'subOscBlend',
+  NORMAL_DECAY: 'normalDecay',
+  ACCENT_DECAY: 'accentDecay',
+  SOFT_ATTACK: 'softAttack',
+  ACCENT_SOFT_ATTACK: 'accentSoftAttack',
+  PASSBAND_COMPENSATION: 'passbandCompensation',
+  RES_TRACKING: 'resTracking',
+  FILTER_INPUT_DRIVE: 'filterInputDrive',
+  FILTER_SELECT: 'filterSelect',
+  // Korg filter parameters - use special WASM function names
+  DIODE_CHARACTER: 'korgWarmth',  // setKorgWarmth
+  DUFFING_AMOUNT: 'korgStiffness',  // setKorgStiffness (needs sticky-zero transform)
+  FILTER_FM_DEPTH: 'korgFilterFm',  // setKorgFilterFm
+  LP_BP_MIX: 'lpBpMix',
+  FILTER_TRACKING: 'filterTracking',
+  SLIDE_TIME: 'slideTime',
+  LFO_RATE: 'lfoRate',
+  LFO_CONTOUR: 'lfoContour',
+  LFO_PITCH_DEPTH: 'lfoPitchDepth',
+  LFO_PWM_DEPTH: 'lfoPwmDepth',
+  LFO_FILTER_DEPTH: 'lfoFilterDepth',
+  LFO_STIFF_DEPTH: 'lfoStiffDepth',
+  CHORUS_MIX: 'chorusMix',
+  PHASER_RATE: 'phaserLfoRate',  // Note: WASM uses 'setPhaserLfoRate'
+  PHASER_WIDTH: 'phaserLfoWidth',  // Note: WASM uses 'setPhaserLfoWidth'
+  PHASER_FEEDBACK: 'phaserFeedback',
+  PHASER_MIX: 'phaserMix',
+  DELAY_TIME: 'delayTime',
+  DELAY_FEEDBACK: 'delayFeedback',
+  DELAY_TONE: 'delayTone',
+  DELAY_MIX: 'delayMix',
+  DELAY_SPREAD: 'delaySpread',
+  TUNING: 'tuning',
+  VOLUME: 'volume',
+  LFO_WAVEFORM: 'lfoWaveform',
+  CHORUS_MODE: 'chorusMode',
+  OVERSAMPLING_ORDER: 'oversamplingOrder'
 } as const;
 
 export class DB303Synth extends Tone.ToneAudioNode {
@@ -82,7 +90,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   // Queue parameter messages that arrive before worklet node is ready
-  private _pendingParams: Array<{ paramId: number; value: number }> = [];
+  private _pendingParams: Array<{ paramId: string; value: number }> = [];
   // Track pending release timeout so slides can cancel it
   private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -178,12 +186,20 @@ export class DB303Synth extends Tone.ToneAudioNode {
     if (existingPromise) return existingPromise;
 
     const initPromise = (async () => {
-      // Hardcoded path based on vite.config.ts base: '/DEViLBOX/'
-      // Files are in public/db303/
-      await context.audioWorklet.addModule(`/DEViLBOX/db303/DB303.worklet.js`);
-      // ...
-          fetch(`/DEViLBOX/db303/DB303.wasm`),
-          fetch(`/DEViLBOX/db303/DB303.js`)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+
+      // Load worklet module for THIS context
+      try {
+        await context.audioWorklet.addModule(`${baseUrl}db303/DB303.worklet.js`);
+      } catch (e) {
+        // Module might already be added to this context
+      }
+
+      // Fetch WASM and JS code (shared across all contexts)
+      if (!this.wasmBinary || !this.jsCode) {
+        const [wasmResponse, jsResponse] = await Promise.all([
+          fetch(`${baseUrl}db303/DB303.wasm`),
+          fetch(`${baseUrl}db303/DB303.js`)
         ]);
 
         if (wasmResponse.ok) {
@@ -276,7 +292,11 @@ export class DB303Synth extends Tone.ToneAudioNode {
     } catch (_e) { /* keepalive failed */ }
   }
 
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false): void {
+  // Store current slideTime for hammer restoration
+  private _savedSlideTime: number = 0.5;
+  private _currentSlideTime: number = 0.5;
+
+  triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (!this.workletNode || this._disposed) return;
 
     // Cancel any pending release from previous note — prevents gate-off
@@ -295,6 +315,14 @@ export class DB303Synth extends Tone.ToneAudioNode {
     if (accent && finalVelocity < 100) finalVelocity = 127;
     if (!accent && finalVelocity >= 100) finalVelocity = 99;
 
+    // Hammer: temporarily set slideTime to 0 for instant pitch change
+    // TT-303 Hammer = legato but NO pitch glide
+    // When hammer is set, we want instant pitch (no glide), but slide=true keeps gate high
+    if (hammer) {
+      this._savedSlideTime = this._currentSlideTime;
+      this.setSlideTime(0); // Instant pitch change
+    }
+
     // Pass slide flag to worklet for proper 303 slide behavior
     // When slide=true: worklet keeps previous note held → DB303 slideToNote (legato)
     // When slide=false: worklet releases previous note first → DB303 triggerNote (retrigger)
@@ -305,6 +333,16 @@ export class DB303Synth extends Tone.ToneAudioNode {
       velocity: finalVelocity,
       slide: slide
     });
+
+    // Restore slideTime after hammer note
+    if (hammer) {
+      // Use setTimeout to restore after the note attack settles
+      setTimeout(() => {
+        if (!this._disposed) {
+          this.setSlideTime(this._savedSlideTime);
+        }
+      }, 50); // 50ms should be enough for the pitch to settle
+    }
   }
 
   triggerRelease(time?: number): void {
@@ -330,11 +368,11 @@ export class DB303Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'allNotesOff' });
   }
 
-  triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false): void {
+  triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (this._disposed) return;
     
     const safeTime = time ?? Tone.now();
-    this.triggerAttack(note, safeTime, velocity || 1, accent, slide);
+    this.triggerAttack(note, safeTime, velocity || 1, accent, slide, hammer);
 
     const d = Tone.Time(duration).toSeconds();
     
@@ -353,105 +391,117 @@ export class DB303Synth extends Tone.ToneAudioNode {
     }, Math.max(0, delayMs)) as unknown as ReturnType<typeof setTimeout>;
   }
 
-  private setParameterById(paramId: number, value: number): void {
+  /**
+   * Send a parameter to the WASM engine via the worklet.
+   * Parameters are sent by name (e.g., 'cutoff') and the worklet constructs
+   * the setter name (e.g., 'setCutoff') to call on the WASM engine.
+   */
+  private setParameterByName(paramName: string, value: number): void {
     if (this._disposed) {
-      console.warn(`[DB303] setParameter BLOCKED: disposed (paramId=${paramId}, value=${value})`);
+      console.warn(`[DB303] setParameter BLOCKED: disposed (paramName=${paramName}, value=${value})`);
       return;
     }
     if (!this.workletNode) {
       // Queue parameter for replay once worklet is ready
-      // Replace any existing entry for the same paramId
-      const existing = this._pendingParams.findIndex(p => p.paramId === paramId);
+      // Replace any existing entry for the same paramName
+      const existing = this._pendingParams.findIndex(p => p.paramId === paramName);
       if (existing >= 0) {
         this._pendingParams[existing].value = value;
       } else {
-        this._pendingParams.push({ paramId, value });
+        this._pendingParams.push({ paramId: paramName, value });
       }
-      console.log(`[DB303] setParameter QUEUED (workletNode null): paramId=${paramId}, value=${value}, queue=${this._pendingParams.length}`);
+      console.log(`[DB303] setParameter QUEUED (workletNode null): paramName=${paramName}, value=${value}, queue=${this._pendingParams.length}`);
       return;
     }
     this.workletNode.port.postMessage({
       type: 'setParameter',
-      paramId,
+      paramId: paramName,  // String param name, worklet constructs setter
       value
     });
   }
 
   setParam(param: string, value: number): void {
-    // Map string param names to DB303 parameter IDs
-    const paramMap: { [key: string]: number } = {
-      'cutoff': DB303Param.CUTOFF,
-      'resonance': DB303Param.RESONANCE,
-      'env_mod': DB303Param.ENV_MOD,
-      'decay': DB303Param.DECAY,
-      'accent': DB303Param.ACCENT,
-      'waveform': DB303Param.WAVEFORM,
-      'pulse_width': DB303Param.PULSE_WIDTH,
-      'sub_osc_gain': DB303Param.SUB_OSC_GAIN,
-      'sub_osc_blend': DB303Param.SUB_OSC_BLEND,
-      'normal_decay': DB303Param.NORMAL_DECAY,
-      'accent_decay': DB303Param.ACCENT_DECAY,
-      'soft_attack': DB303Param.SOFT_ATTACK,
-      'accent_soft_attack': DB303Param.ACCENT_SOFT_ATTACK,
-      'passband_compensation': DB303Param.PASSBAND_COMPENSATION,
-      'res_tracking': DB303Param.RES_TRACKING,
-      'filter_input_drive': DB303Param.FILTER_INPUT_DRIVE,
-      'filter_select': DB303Param.FILTER_SELECT,
-      'diode_character': DB303Param.DIODE_CHARACTER,
-      'duffing_amount': DB303Param.DUFFING_AMOUNT,
-      'filter_fm_depth': DB303Param.FILTER_FM_DEPTH,
-      'lp_bp_mix': DB303Param.LP_BP_MIX,
-      'filter_tracking': DB303Param.FILTER_TRACKING,
-      'slide_time': DB303Param.SLIDE_TIME,
-      'lfo_rate': DB303Param.LFO_RATE,
-      'lfo_contour': DB303Param.LFO_CONTOUR,
-      'lfo_pitch_depth': DB303Param.LFO_PITCH_DEPTH,
-      'lfo_pwm_depth': DB303Param.LFO_PWM_DEPTH,
-      'lfo_filter_depth': DB303Param.LFO_FILTER_DEPTH,
-      'lfo_stiff_depth': DB303Param.LFO_STIFF_DEPTH,
-      'chorus_mix': DB303Param.CHORUS_MIX,
-      'phaser_rate': DB303Param.PHASER_RATE,
-      'phaser_width': DB303Param.PHASER_WIDTH,
-      'phaser_feedback': DB303Param.PHASER_FEEDBACK,
-      'phaser_mix': DB303Param.PHASER_MIX,
-      'delay_time': DB303Param.DELAY_TIME,
-      'delay_feedback': DB303Param.DELAY_FEEDBACK,
-      'delay_tone': DB303Param.DELAY_TONE,
-      'delay_mix': DB303Param.DELAY_MIX,
-      'delay_spread': DB303Param.DELAY_SPREAD,
-      'tuning': DB303Param.TUNING
-    };
-
-    const paramId = paramMap[param];
-    if (paramId !== undefined) {
-      this.setParameterById(paramId, value);
+    // Map external param names to setter method calls
+    // This ensures transformations (like sticky-zero for duffing) are applied
+    switch (param) {
+      case 'cutoff': this.setCutoff(value); break;
+      case 'resonance': this.setResonance(value); break;
+      case 'env_mod': this.setEnvMod(value); break;
+      case 'decay': this.setDecay(value); break;
+      case 'accent': this.setAccent(value); break;
+      case 'waveform': this.setWaveform(value); break;
+      case 'pulse_width': this.setPulseWidth(value); break;
+      case 'sub_osc_gain': this.setSubOscGain(value); break;
+      case 'sub_osc_blend': this.setSubOscBlend(value); break;
+      case 'normal_decay': this.setNormalDecay(value); break;
+      case 'accent_decay': this.setAccentDecay(value); break;
+      case 'soft_attack': this.setSoftAttack(value); break;
+      case 'accent_soft_attack': this.setAccentSoftAttack(value); break;
+      case 'passband_compensation': this.setPassbandCompensation(value); break;
+      case 'res_tracking': this.setResTracking(value); break;
+      case 'filter_input_drive': this.setFilterInputDrive(value); break;
+      case 'filter_select': this.setFilterSelect(value); break;
+      case 'diode_character': this.setDiodeCharacter(value); break;
+      case 'duffing_amount': this.setDuffingAmount(value); break;
+      case 'filter_fm_depth': this.setFilterFmDepth(value); break;
+      case 'lp_bp_mix': this.setLpBpMix(value); break;
+      case 'filter_tracking': this.setFilterTracking(value); break;
+      case 'slide_time': this.setSlideTime(value); break;
+      case 'lfo_rate': this.setLfoRate(value); break;
+      case 'lfo_contour': this.setLfoContour(value); break;
+      case 'lfo_pitch_depth': this.setLfoPitchDepth(value); break;
+      case 'lfo_pwm_depth': this.setLfoPwmDepth(value); break;
+      case 'lfo_filter_depth': this.setLfoFilterDepth(value); break;
+      case 'lfo_stiff_depth': this.setLfoStiffDepth(value); break;
+      case 'chorus_mix': this.setChorusMix(value); break;
+      case 'phaser_rate': this.setPhaserRate(value); break;
+      case 'phaser_width': this.setPhaserWidth(value); break;
+      case 'phaser_feedback': this.setPhaserFeedback(value); break;
+      case 'phaser_mix': this.setPhaserMix(value); break;
+      case 'delay_time': this.setDelayTime(value); break;
+      case 'delay_feedback': this.setDelayFeedback(value); break;
+      case 'delay_tone': this.setDelayTone(value); break;
+      case 'delay_mix': this.setDelayMix(value); break;
+      case 'delay_spread': this.setDelaySpread(value); break;
+      case 'tuning': this.setTuning(value); break;
+      case 'volume': this.setVolume(value); break;
+      case 'lfo_waveform': this.setLfoWaveform(value); break;
+      case 'chorus_mode': this.setChorusMode(value); break;
+      case 'oversampling_order': this.setOversamplingOrder(value); break;
+      default:
+        console.warn(`[DB303] Unknown parameter: ${param}`);
     }
   }
 
-  // --- Core Setters (Updating to use 0-1 normalized values for WASM engine) ---
+  // --- Core Setters (Converting 0-1 normalized values to WASM ranges) ---
+  // The C++ DB303Synth expects actual values, not normalized 0-1
   setCutoff(value: number): void {
-    // db303 truth: cutoff knob is 0-1
-    this.setParameterById(DB303Param.CUTOFF, value);
+    // C++ expects Hz (20-20000), UI sends 0-1
+    // Clamp to prevent overflow if bogus values arrive
+    const clamped = Math.max(0, Math.min(1, value));
+    const hz = 20 + clamped * (5000 - 20);  // Map to reasonable 303 range
+    this.setParameterByName(DB303Param.CUTOFF, hz);
   }
 
   setResonance(value: number): void {
-    // db303 truth: resonance knob is 0-1
-    this.setParameterById(DB303Param.RESONANCE, value);
+    // C++ expects 0-100%, UI sends 0-1
+    this.setParameterByName(DB303Param.RESONANCE, value * 100);
   }
 
   setEnvMod(value: number): void {
-    // db303 truth: envMod knob is 0-1
-    this.setParameterById(DB303Param.ENV_MOD, value);
+    // C++ expects 0-100%, UI sends 0-1
+    this.setParameterByName(DB303Param.ENV_MOD, value * 100);
   }
 
   setDecay(value: number): void {
-    // db303 truth: decay knob is 0-1
-    this.setParameterById(DB303Param.DECAY, value);
+    // C++ expects ms (30-3000), UI sends 0-1
+    const ms = 30 + value * (3000 - 30);
+    this.setParameterByName(DB303Param.DECAY, ms);
   }
 
   setAccent(value: number): void {
-    // db303 truth: accent knob is 0-1
-    this.setParameterById(DB303Param.ACCENT, value);
+    // C++ expects 0-100%, UI sends 0-1
+    this.setParameterByName(DB303Param.ACCENT, value * 100);
   }
 
   setAccentAmount(value: number): void {
@@ -459,23 +509,29 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   setSlideTime(value: number): void {
-    // db303 truth: slideTime knob is 0-1
-    this.setParameterById(DB303Param.SLIDE_TIME, value);
+    // C++ expects ms (1-500), UI sends 0-1
+    const ms = 1 + value * 499;
+    this._currentSlideTime = value;
+    this.setParameterByName(DB303Param.SLIDE_TIME, ms);
   }
 
   setVolume(value: number): void {
-    // db303 truth: volume knob is 0-1
-    this.setParameterById(DB303Param.VOLUME, value);
+    // C++ expects dB (around -12 default), UI sends 0-1
+    // Map 0-1 to -40dB to 0dB
+    const db = -40 + value * 40;
+    this.setParameterByName(DB303Param.VOLUME, db);
   }
 
   setWaveform(value: number): void {
-    // db303 truth: waveform knob is 0-1 (blend)
-    this.setParameterById(DB303Param.WAVEFORM, value);
+    // C++ expects 0-1 (saw to square blend) - same as UI
+    this.setParameterByName(DB303Param.WAVEFORM, value);
   }
 
   setTuning(value: number): void {
-    // db303 truth: tuning knob is 0-1
-    this.setParameterById(DB303Param.TUNING, value);
+    // C++ expects Hz (default 440)
+    // If value is 0-1, map to 415-466 (about +/- 1 semitone around 440)
+    const hz = value <= 1 ? 415 + value * 51 : value;
+    this.setParameterByName(DB303Param.TUNING, hz);
   }
 
   // ============================================================================
@@ -484,37 +540,37 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   setLfoWaveform(waveform: number): void {
     // 0 = sine, 1 = triangle, 2 = square
-    this.setParameterById(DB303Param.LFO_WAVEFORM, waveform);
+    this.setParameterByName(DB303Param.LFO_WAVEFORM, waveform);
   }
 
   setLfoRate(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_RATE, value);
+    this.setParameterByName(DB303Param.LFO_RATE, value);
   }
 
   setLfoContour(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_CONTOUR, value);
+    this.setParameterByName(DB303Param.LFO_CONTOUR, value);
   }
 
   setLfoPitchDepth(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_PITCH_DEPTH, value);
+    this.setParameterByName(DB303Param.LFO_PITCH_DEPTH, value);
   }
 
   setLfoPwmDepth(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_PWM_DEPTH, value);
+    this.setParameterByName(DB303Param.LFO_PWM_DEPTH, value);
   }
 
   setLfoFilterDepth(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_FILTER_DEPTH, value);
+    this.setParameterByName(DB303Param.LFO_FILTER_DEPTH, value);
   }
 
   setLfoStiffDepth(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LFO_STIFF_DEPTH, value);
+    this.setParameterByName(DB303Param.LFO_STIFF_DEPTH, value);
   }
 
   // ============================================================================
@@ -523,145 +579,204 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   setNormalDecay(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.NORMAL_DECAY, value);
+    this.setParameterByName(DB303Param.NORMAL_DECAY, value);
   }
 
   setAccentDecay(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.ACCENT_DECAY, value);
+    this.setParameterByName(DB303Param.ACCENT_DECAY, value);
   }
 
   setSoftAttack(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.SOFT_ATTACK, value);
+    this.setParameterByName(DB303Param.SOFT_ATTACK, value);
   }
 
   setAccentSoftAttack(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.ACCENT_SOFT_ATTACK, value);
+    this.setParameterByName(DB303Param.ACCENT_SOFT_ATTACK, value);
   }
 
   setPassbandCompensation(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.PASSBAND_COMPENSATION, value);
+    this.setParameterByName(DB303Param.PASSBAND_COMPENSATION, value);
   }
 
   setResTracking(value: number): void {
-    // 0-1 normalized
-    this.setParameterById(DB303Param.RES_TRACKING, value);
+    // db303 reference: inverts the value then calls setKorgIbiasScale(0.1 + value * 3.9)
+    // The inversion happens in the parameter handler, so we apply both here:
+    // Invert: 1 - value, then scale: 0.1 + (1 - value) * 3.9
+    // This maps 0->4.0, 0.5->2.05, 1->0.1 (inverse tracking)
+    const inverted = 1 - value;
+    const scaled = 0.1 + inverted * 3.9;
+    this.setParameterByName('korgIbiasScale', scaled);
   }
 
   setFilterInputDrive(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.FILTER_INPUT_DRIVE, value);
+    this.setParameterByName(DB303Param.FILTER_INPUT_DRIVE, value);
   }
 
   setFilterSelect(mode: number): void {
     // 0-255 (filter mode/topology selection)
-    this.setParameterById(DB303Param.FILTER_SELECT, mode);
+    this.setParameterByName(DB303Param.FILTER_SELECT, mode);
   }
 
   setDiodeCharacter(value: number): void {
-    // 0-1 normalized
-    this.setParameterById(DB303Param.DIODE_CHARACTER, value);
+    // 0-1 normalized - maps to setKorgWarmth in WASM
+    this.setParameterByName(DB303Param.DIODE_CHARACTER, value);
   }
 
   setDuffingAmount(value: number): void {
-    // 0-1 normalized
-    this.setParameterById(DB303Param.DUFFING_AMOUNT, value);
+    // Apply sticky-zero transformation from db303 reference:
+    // Values within ±0.16 (±8% of center) snap to 0
+    // This creates a dead zone in the middle of the knob
+    let transformed: number;
+    if (Math.abs(value) < 0.16) {
+      transformed = 0;
+    } else {
+      const sign = value > 0 ? 1 : -1;
+      transformed = sign * (Math.abs(value) - 0.16) / 0.84;
+    }
+    this.setParameterByName(DB303Param.DUFFING_AMOUNT, transformed);
   }
 
   setFilterFmDepth(value: number): void {
-    // 0-1 normalized
-    this.setParameterById(DB303Param.FILTER_FM_DEPTH, value);
+    // 0-1 normalized - maps to setKorgFilterFm in WASM
+    this.setParameterByName(DB303Param.FILTER_FM_DEPTH, value);
   }
 
   setLpBpMix(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.LP_BP_MIX, value);
+    this.setParameterByName(DB303Param.LP_BP_MIX, value);
   }
 
   setFilterTracking(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.FILTER_TRACKING, value);
+    this.setParameterByName(DB303Param.FILTER_TRACKING, value);
   }
 
-  setEnsembleAmount(value: number): void {
-    // 0-1 normalized
-    this.setParameterById(DB303Param.ENSEMBLE_AMOUNT, value);
+  setChorusMode(mode: number): void {
+    // 0-3 chorus mode
+    this.setParameterByName(DB303Param.CHORUS_MODE, mode);
   }
 
   setOversamplingOrder(order: number): void {
     // 0-4 oversampling
-    this.setParameterById(DB303Param.OVERSAMPLING_ORDER, order);
+    this.setParameterByName(DB303Param.OVERSAMPLING_ORDER, order);
   }
 
   // Oscillator enhancement setters
 
   setPulseWidth(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.PULSE_WIDTH, value);
+    this.setParameterByName(DB303Param.PULSE_WIDTH, value);
   }
 
   setSubOscGain(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.SUB_OSC_GAIN, value);
+    this.setParameterByName(DB303Param.SUB_OSC_GAIN, value);
   }
 
   setSubOscBlend(value: number): void {
     // 0-1 normalized
-    this.setParameterById(DB303Param.SUB_OSC_BLEND, value);
+    this.setParameterByName(DB303Param.SUB_OSC_BLEND, value);
   }
 
   // Built-in effects setters (sending normalized 0-1 to WASM if supported, or using Tone.js)
 
   setChorusMix(value: number): void {
-    this.setParameterById(DB303Param.CHORUS_MIX, value);
-    this.chorus.wet.value = value;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.CHORUS_MIX, clamped);
+    this.chorus.wet.value = clamped;
   }
 
   setPhaserRate(value: number): void {
-    this.setParameterById(DB303Param.PHASER_RATE, value);
-    this.phaser.frequency.value = 0.1 + value * 9.9;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.PHASER_RATE, clamped);
+    const targetFreq = 0.1 + clamped * 9.9;
+    try {
+      this.phaser.frequency.exponentialRampToValueAtTime(
+        Math.max(0.01, targetFreq),
+        this.context.currentTime + 0.1
+      );
+    } catch {
+      this.phaser.frequency.value = Math.max(0.01, targetFreq);
+    }
   }
 
   setPhaserWidth(value: number): void {
-    this.setParameterById(DB303Param.PHASER_WIDTH, value);
-    this.phaser.octaves = 1 + value * 4;
+    // Clamp to 0-1 range to prevent overflow
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.PHASER_WIDTH, clamped);
+    this.phaser.octaves = 1 + clamped * 4;
   }
 
   setPhaserFeedback(value: number): void {
-    this.setParameterById(DB303Param.PHASER_FEEDBACK, value);
-    this.phaser.Q.value = value * 20;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.PHASER_FEEDBACK, clamped);
+    const targetQ = clamped * 20;
+    try {
+      this.phaser.Q.linearRampToValueAtTime(
+        Math.min(30, targetQ),
+        this.context.currentTime + 0.1
+      );
+    } catch {
+      this.phaser.Q.value = Math.min(30, targetQ);
+    }
   }
 
   setPhaserMix(value: number): void {
-    this.setParameterById(DB303Param.PHASER_MIX, value);
-    this.phaser.wet.value = value;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.PHASER_MIX, clamped);
+    this.phaser.wet.value = clamped;
   }
 
   setDelayTime(value: number): void {
-    this.setParameterById(DB303Param.DELAY_TIME, value);
-    this.delay.delayTime.value = 0.01 + value * 2.0; // 10ms to 2s
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.DELAY_TIME, clamped);
+    // Tone.js delayTime is in seconds, but the param expects 0-1
+    // Map 0-1 input to 0.01-1.0 seconds
+    const targetTime = 0.01 + clamped * 0.99;
+    try {
+      this.delay.delayTime.linearRampToValueAtTime(
+        targetTime,
+        this.context.currentTime + 0.1
+      );
+    } catch {
+      this.delay.delayTime.value = targetTime;
+    }
   }
 
   setDelayFeedback(value: number): void {
-    this.setParameterById(DB303Param.DELAY_FEEDBACK, value);
-    this.delay.feedback.value = value * 0.95;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.DELAY_FEEDBACK, clamped);
+    this.delay.feedback.value = clamped * 0.95;
   }
 
   setDelayTone(value: number): void {
-    this.setParameterById(DB303Param.DELAY_TONE, value);
-    this.delayFilter.frequency.value = 200 + value * 7800;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.DELAY_TONE, clamped);
+    const targetFreq = 200 + clamped * 7800;
+    // Use exponentialRampToValueAtTime for smooth filter changes (100ms for stability)
+    try {
+      this.delayFilter.frequency.exponentialRampToValueAtTime(
+        Math.max(20, targetFreq),
+        this.context.currentTime + 0.1
+      );
+    } catch {
+      this.delayFilter.frequency.value = Math.max(20, targetFreq);
+    }
   }
 
   setDelayMix(value: number): void {
-    this.setParameterById(DB303Param.DELAY_MIX, value);
-    this.delay.wet.value = value;
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.DELAY_MIX, clamped);
+    this.delay.wet.value = clamped;
   }
 
   setDelaySpread(value: number): void {
-    this.setParameterById(DB303Param.DELAY_SPREAD, value);
+    this.setParameterByName(DB303Param.DELAY_SPREAD, value);
   }
 
   // --- Missing methods for compatibility ---
@@ -705,7 +820,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   setVegSustain(percent: number): void {
     // Forward to WASM if supported
-    this.setParameterById(DB303Param.NORMAL_DECAY + 1, percent / 100); // Guessing index
+    this.setParameterByName(DB303Param.NORMAL_DECAY + 1, percent / 100); // Guessing index
   }
 
   setFilterFM(percent: number): void {
@@ -742,7 +857,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
     let val = 1;
     if (mode === 'fast') val = 0;
     else if (mode === 'slow') val = 2;
-    this.setParameterById(DB303Param.NORMAL_DECAY + 7, val / 2); // Guessing index
+    this.setParameterByName(DB303Param.NORMAL_DECAY + 7, val / 2); // Guessing index
   }
 
   setHighResonanceEnabled(_enabled: boolean): void {
@@ -751,6 +866,33 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   setAccentSweepEnabled(_enabled: boolean): void {
     // Always enabled in db303
+  }
+
+  // Enable/disable methods for effects
+  setChorusEnabled(enabled: boolean): void {
+    // Toggle chorus wet to enable/disable
+    if (!enabled) {
+      this.chorus.wet.value = 0;
+    }
+  }
+
+  setPhaserEnabled(enabled: boolean): void {
+    // Toggle phaser wet to enable/disable
+    if (!enabled) {
+      this.phaser.wet.value = 0;
+    }
+  }
+
+  setPhaserDepth(value: number): void {
+    // Map to phaser octaves (like setPhaserWidth)
+    this.phaser.octaves = 1 + value * 4;
+  }
+
+  setDelayEnabled(enabled: boolean): void {
+    // Toggle delay wet to enable/disable
+    if (!enabled) {
+      this.delay.wet.value = 0;
+    }
   }
 
   async loadGuitarMLModel(_index: number): Promise<void> {}

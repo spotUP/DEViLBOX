@@ -2,9 +2,9 @@
  * GridCell - Individual cell in the grid sequencer
  *
  * Note cells support:
- * - Visual indicators for accent, slide, octave shift
+ * - Visual indicators for accent, slide, mute, hammer, octave shift
  * - Modifier keys: Shift=accent, Ctrl/Cmd=slide, Alt=octave cycle
- * - Right-click context menu
+ * - Right-click context menu with TT-303 extensions (mute, hammer)
  */
 
 import React, { memo, useState, useCallback, useEffect } from 'react';
@@ -70,10 +70,14 @@ interface NoteContextMenuProps {
   y: number;
   accent: boolean;
   slide: boolean;
+  mute: boolean;
+  hammer: boolean;
   octaveShift: number;
   velocity: number;
   onToggleAccent: () => void;
   onToggleSlide: () => void;
+  onToggleMute: () => void;
+  onToggleHammer: () => void;
   onSetOctave: (shift: number) => void;
   onSetVelocity: (velocity: number) => void;
   onClose: () => void;
@@ -84,10 +88,14 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
   y,
   accent,
   slide,
+  mute,
+  hammer,
   octaveShift,
   velocity,
   onToggleAccent,
   onToggleSlide,
+  onToggleMute,
+  onToggleHammer,
   onSetOctave,
   onSetVelocity,
   onClose,
@@ -133,6 +141,22 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
         >
           <span className={`w-3 h-3 ${slide ? 'text-accent-secondary' : 'text-text-muted'}`}>↗</span>
           Slide {slide && '✓'}
+        </button>
+        <div className="border-t border-dark-border my-1" />
+        {/* TT-303 Extensions */}
+        <button
+          onClick={() => { onToggleMute(); onClose(); }}
+          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${mute ? 'text-yellow-400' : 'text-text-secondary'}`}
+        >
+          <span className={`w-3 h-3 rounded-sm ${mute ? 'bg-yellow-400' : 'border border-text-muted'}`} />
+          Mute {mute && '✓'}
+        </button>
+        <button
+          onClick={() => { onToggleHammer(); onClose(); }}
+          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${hammer ? 'text-cyan-400' : 'text-text-secondary'}`}
+        >
+          <span className={`w-3 h-3 rounded-sm ${hammer ? 'bg-cyan-400' : 'border border-text-muted'}`} />
+          Hammer {hammer && '✓'}
         </button>
         <div className="border-t border-dark-border my-1" />
         <button
@@ -207,11 +231,15 @@ interface NoteCellProps {
   isFocused?: boolean;
   accent?: boolean;
   slide?: boolean;
+  mute?: boolean;    // TT-303: Silent step
+  hammer?: boolean;  // TT-303: Legato without glide
   octaveShift?: number;
   velocity?: number;
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
+  onToggleMute?: (stepIndex: number) => void;
+  onToggleHammer?: (stepIndex: number) => void;
   onSetOctave?: (stepIndex: number, shift: number) => void;
   onSetVelocity?: (stepIndex: number, velocity: number) => void;
   onFocus?: () => void;
@@ -226,11 +254,15 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   isFocused = false,
   accent = false,
   slide = false,
+  mute = false,
+  hammer = false,
   octaveShift = 0,
   velocity = 100,
   onClick,
   onToggleAccent,
   onToggleSlide,
+  onToggleMute,
+  onToggleHammer,
   onSetOctave,
   onSetVelocity,
   onFocus,
@@ -280,6 +312,14 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   const handleToggleSlide = useCallback(() => {
     onToggleSlide?.(stepIndex);
   }, [onToggleSlide, stepIndex]);
+
+  const handleToggleMute = useCallback(() => {
+    onToggleMute?.(stepIndex);
+  }, [onToggleMute, stepIndex]);
+
+  const handleToggleHammer = useCallback(() => {
+    onToggleHammer?.(stepIndex);
+  }, [onToggleHammer, stepIndex]);
 
   const handleSetOctave = useCallback((shift: number) => {
     onSetOctave?.(stepIndex, shift);
@@ -357,9 +397,22 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         aria-pressed={isActive}
       >
         {/* Slide indicator - diagonal line */}
-        {isActive && slide && (
+        {/* Slide indicator - diagonal line */}
+        {isActive && slide && !mute && (
           <span className="absolute inset-0 flex items-center justify-center text-white/90 text-xs font-bold">
             ↗
+          </span>
+        )}
+        {/* Mute indicator */}
+        {isActive && mute && (
+          <span className="absolute inset-0 flex items-center justify-center text-yellow-400 text-xs font-bold">
+            M
+          </span>
+        )}
+        {/* Hammer indicator */}
+        {isActive && hammer && !mute && (
+          <span className="absolute inset-0 flex items-center justify-center text-cyan-400 text-xs font-bold">
+            H
           </span>
         )}
       </button>
@@ -371,10 +424,14 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           y={contextMenu.y}
           accent={accent}
           slide={slide}
+          mute={mute}
+          hammer={hammer}
           octaveShift={octaveShift}
           velocity={velocity}
           onToggleAccent={handleToggleAccent}
           onToggleSlide={handleToggleSlide}
+          onToggleMute={handleToggleMute}
+          onToggleHammer={handleToggleHammer}
           onSetOctave={handleSetOctave}
           onSetVelocity={handleSetVelocity}
           onClose={handleCloseMenu}

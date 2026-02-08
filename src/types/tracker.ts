@@ -326,7 +326,7 @@ export interface PatternSequence {
 export interface CursorPosition {
   channelIndex: number;
   rowIndex: number;
-  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability';
+  columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effParam' | 'effTyp2' | 'effParam2' | 'flag1' | 'flag2' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'probability' | 'automation';
   digitIndex: number; // For hex input (0-2 depending on column)
 }
 

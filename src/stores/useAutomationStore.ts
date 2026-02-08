@@ -91,18 +91,18 @@ export const useAutomationStore = create<AutomationStore>()(
     channelLanes: new Map(),
 
     // Actions
-    addCurve: (patternId, channelIndex, parameter) =>
+    addCurve: (patternId, channelIndex, parameter) => {
+      const newCurve: AutomationCurve = {
+        id: `curve-${Date.now()}`,
+        patternId,
+        channelIndex,
+        parameter,
+        mode: 'curve',
+        interpolation: 'linear',
+        points: [],
+        enabled: true,
+      };
       set((state) => {
-        const newCurve: AutomationCurve = {
-          id: `curve-${Date.now()}`,
-          patternId,
-          channelIndex,
-          parameter,
-          mode: 'curve',
-          interpolation: 'linear',
-          points: [],
-          enabled: true,
-        };
         state.curves.push(newCurve);
         state.selectedCurveId = newCurve.id;
         // Rebuild automation data
@@ -112,8 +112,9 @@ export const useAutomationStore = create<AutomationStore>()(
           if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
           state.automation[c.patternId][c.channelIndex][c.parameter] = c;
         });
-        return newCurve.id;
-      }) as unknown as string,
+      });
+      return newCurve.id;
+    },
 
     removeCurve: (curveId) =>
       set((state) => {

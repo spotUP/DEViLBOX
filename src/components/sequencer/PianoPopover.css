@@ -194,6 +194,19 @@
   color: var(--color-text-inverse);
 }
 
+/* TT-303 extension buttons */
+.modifier-btn.mute.active {
+  background: #facc15; /* yellow-400 */
+  border-color: #facc15;
+  color: #000;
+}
+
+.modifier-btn.hammer.active {
+  background: #22d3ee; /* cyan-400 */
+  border-color: #22d3ee;
+  color: #000;
+}
+
 .preview-toggle {
   display: flex;
   align-items: center;

@@ -105,7 +105,9 @@ function App() {
 
   // Apply auto-compact mode on small screens (runs once on mount)
   useEffect(() => {
+    console.log('[App] Applying auto-compact, current tb303Collapsed:', useUIStore.getState().tb303Collapsed);
     applyAutoCompact();
+    console.log('[App] After auto-compact, tb303Collapsed:', useUIStore.getState().tb303Collapsed);
   }, [applyAutoCompact]);
 
   const { save: saveProject } = useProjectPersistence();

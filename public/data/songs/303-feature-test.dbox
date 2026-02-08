@@ -1,0 +1,504 @@
+{
+  "format": "devilbox-dbox",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "303-feature-test",
+    "name": "303 Feature Test",
+    "author": "DEViLBOX",
+    "description": "Comprehensive TB-303 feature test: accent, slide, mute, hammer, octave shifts, DevilFish mode. Pattern 1: Basic accent/slide, Pattern 2: Mute/hammer test, Pattern 3: Octave jumps with slides, Pattern 4: Complex acid line with all features.",
+    "createdAt": "2026-02-08T00:00:00.000Z",
+    "modifiedAt": "2026-02-08T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 130,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "TB-303 Acid Bass",
+      "type": "synth",
+      "synthType": "TB303",
+      "tb303": {
+        "engineType": "accurate",
+        "tempoRelative": false,
+        "oscillator": { "type": "sawtooth" },
+        "filter": {
+          "cutoff": 500,
+          "resonance": 75
+        },
+        "filterEnvelope": {
+          "envMod": 80,
+          "decay": 1500
+        },
+        "accent": { "amount": 85 },
+        "slide": { "time": 80, "mode": "exponential" },
+        "devilFish": {
+          "enabled": true,
+          "normalDecay": 1500,
+          "accentDecay": 2000,
+          "vegDecay": 1800,
+          "vegSustain": 80,
+          "softAttack": 3,
+          "filterTracking": 100,
+          "filterFM": 20,
+          "accentSweepEnabled": true,
+          "sweepSpeed": "normal"
+        },
+        "overdrive": {
+          "amount": 50,
+          "modelIndex": 0,
+          "drive": 50,
+          "dryWet": 100
+        }
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 2,
+      "name": "909 Kick",
+      "type": "synth",
+      "synthType": "MembraneSynth",
+      "envelope": {
+        "attack": 2,
+        "decay": 400,
+        "sustain": 0,
+        "release": 100
+      },
+      "parameters": {
+        "pitchDecay": 0.05,
+        "octaves": 6
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0
+    },
+    {
+      "id": 3,
+      "name": "909 Clap",
+      "type": "synth",
+      "synthType": "NoiseSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 150,
+        "sustain": 0,
+        "release": 50
+      },
+      "effects": [],
+      "volume": -12,
+      "pan": 0
+    },
+    {
+      "id": 4,
+      "name": "Hihat",
+      "type": "synth",
+      "synthType": "MetalSynth",
+      "envelope": {
+        "attack": 1,
+        "decay": 80,
+        "sustain": 0,
+        "release": 20
+      },
+      "effects": [],
+      "volume": -14,
+      "pan": 0
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-accent-slide",
+      "name": "P1: Accent & Slide Test",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-303-1",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            {"note": 36, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 38, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 43, "instrument": 1, "volume": 0, "flag1": 1, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 41, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-kick-1",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#ef4444",
+          "rows": [
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-hihat-1",
+          "name": "Hihat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#fbbf24",
+          "rows": [
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-mute-hammer",
+      "name": "P2: Mute & Hammer Test",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-303-2",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            {"note": 36, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 38, "instrument": 1, "volume": 0, "flag1": 3, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 40, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 41, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 43, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 45, "instrument": 1, "volume": 0, "flag1": 3, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 43, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 41, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-kick-2",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#ef4444",
+          "rows": [
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-clap-2",
+          "name": "Clap",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 3,
+          "color": "#a855f7",
+          "rows": [
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 3, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 3, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-octave-jumps",
+      "name": "P3: Octave Jumps + Slides",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-303-3",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            {"note": 24, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 48, "instrument": 1, "volume": 0, "flag1": 1, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 24, "instrument": 1, "volume": 0, "flag1": 1, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 48, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-kick-3",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#ef4444",
+          "rows": [
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-hihat-3",
+          "name": "Hihat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#fbbf24",
+          "rows": [
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pattern-all-features",
+      "name": "P4: Complex Acid (All Features)",
+      "length": 16,
+      "channels": [
+        {
+          "id": "ch-303-4",
+          "name": "303 Bass",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#22c55e",
+          "rows": [
+            {"note": 36, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 38, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 40, "instrument": 1, "volume": 0, "flag1": 3, "effTyp": 0, "eff": 0},
+            {"note": 41, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 43, "instrument": 1, "volume": 0, "flag1": 1, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 48, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 47, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 45, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0},
+            {"note": 43, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag1": 3, "effTyp": 0, "eff": 0},
+            {"note": 48, "instrument": 1, "volume": 0, "flag1": 1, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 1, "volume": 0, "flag2": 2, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 38, "instrument": 1, "volume": 0, "flag2": 4, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-kick-4",
+          "name": "Kick",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#ef4444",
+          "rows": [
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 36, "instrument": 2, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-clap-4",
+          "name": "Clap",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 3,
+          "color": "#a855f7",
+          "rows": [
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 3, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 3, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 0, "instrument": 0, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        },
+        {
+          "id": "ch-hihat-4",
+          "name": "Hihat",
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 4,
+          "color": "#fbbf24",
+          "rows": [
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0},
+            {"note": 60, "instrument": 4, "volume": 0, "effTyp": 0, "eff": 0}
+          ]
+        }
+      ]
+    }
+  ],
+  "sequence": ["pattern-accent-slide", "pattern-mute-hammer", "pattern-octave-jumps", "pattern-all-features"],
+  "masterVolume": 0,
+  "masterEffects": []
+}

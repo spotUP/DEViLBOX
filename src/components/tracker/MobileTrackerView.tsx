@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { MobileTabBar, type MobileTab } from '@components/layout/MobileTabBar';
-import { PatternEditor } from './PatternEditor';
+import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
@@ -70,7 +70,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden mobile-bottom-padding">
         {activeTab === 'pattern' && (
-          <PatternEditor />
+          <PatternEditorCanvas />
         )}
 
         {activeTab === 'instruments' && (

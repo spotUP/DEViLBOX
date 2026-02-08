@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
+import { useAutomationStore } from '@stores/useAutomationStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChannelVUMeter } from './ChannelVUMeter';
@@ -460,28 +461,40 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
     x += CHAR_WIDTH * 3 + 4;
 
-    // Flag columns (if present) - can be accent (1) or slide (2)
+    // Flag columns (if present) - can be accent (1), slide (2), mute (3), hammer (4)
     if (hasFlagColumns) {
-      // Flag 1 - yellow/orange for accent, cyan for slide
+      // Flag 1 - yellow/orange for accent, cyan for slide, yellow for mute, cyan for hammer
       if (flag1 === 1) {
         ctx.fillStyle = '#f59e0b';
         ctx.fillText('A', x, y);
       } else if (flag1 === 2) {
         ctx.fillStyle = '#06b6d4';
         ctx.fillText('S', x, y);
+      } else if (flag1 === 3) {
+        ctx.fillStyle = '#facc15'; // yellow-400 for mute
+        ctx.fillText('M', x, y);
+      } else if (flag1 === 4) {
+        ctx.fillStyle = '#22d3ee'; // cyan-400 for hammer
+        ctx.fillText('H', x, y);
       } else if (!blankEmpty) {
         ctx.fillStyle = colors.textMuted;
         ctx.fillText('.', x, y);
       }
       x += CHAR_WIDTH + 4;
 
-      // Flag 2 - yellow/orange for accent, cyan for slide
+      // Flag 2 - yellow/orange for accent, cyan for slide, yellow for mute, cyan for hammer
       if (flag2 === 1) {
         ctx.fillStyle = '#f59e0b';
         ctx.fillText('A', x, y);
       } else if (flag2 === 2) {
         ctx.fillStyle = '#06b6d4';
         ctx.fillText('S', x, y);
+      } else if (flag2 === 3) {
+        ctx.fillStyle = '#facc15'; // yellow-400 for mute
+        ctx.fillText('M', x, y);
+      } else if (flag2 === 4) {
+        ctx.fillStyle = '#22d3ee'; // cyan-400 for hammer
+        ctx.fillText('H', x, y);
       } else if (!blankEmpty) {
         ctx.fillStyle = colors.textMuted;
         ctx.fillText('.', x, y);
@@ -662,9 +675,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
     // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
     // Prob: prob(2) +4gap = +CW*2 + 4
+    // Automation: auto(2) +4gap = +CW*2 + 4
     const paramWidth = CHAR_WIDTH * 10 + 16
       + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4; // Always show automation column
     const channelWidth = noteWidth + paramWidth + 20;
 
     // Clear canvas
@@ -726,6 +741,48 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           blankEmpty
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
+
+        // Automation value (always show after probability)
+        const automationParam = 'cutoff'; // Default to cutoff
+        const allCurves = useAutomationStore.getState().curves;
+        const curve = allCurves.find(
+          c => c.patternId === pattern.id && c.channelIndex === ch && c.parameter === automationParam
+        );
+        let autoValue: number | null = null;
+        if (curve) {
+          const rawValue = useAutomationStore.getState().getValueAtRow(curve.id, rowIndex);
+          autoValue = rawValue !== null ? Math.round(rawValue * 255) : null;
+        }
+        
+        // Draw automation column - calculate position based on actual columns present
+        // Base params: inst(2)+gap(4) vol(2)+gap(4) eff(3)+gap(4) eff2(3)+gap(4) = CW*10+16
+        let autoX = x + noteWidth + 4 + (CHAR_WIDTH * 10 + 16);
+        
+        // Add acid columns if this cell has them
+        const cellHasFlags = cell.flag1 !== undefined || cell.flag2 !== undefined;
+        if (cellHasFlags) {
+          autoX += CHAR_WIDTH * 2 + 8; // accent/slide columns
+        }
+        
+        // Add probability column if this cell has it
+        const cellHasProb = cell.probability !== undefined && cell.probability > 0;
+        if (cellHasProb) {
+          autoX += CHAR_WIDTH * 2 + 4; // probability column
+        }
+        
+        autoX += 4; // gap before automation
+        
+        ctx.font = '14px "JetBrains Mono", monospace';
+        ctx.textBaseline = 'middle';
+        
+        if (autoValue !== null) {
+          ctx.fillStyle = '#10b981'; // green for cutoff automation
+          const hexVal = autoValue.toString(16).toUpperCase().padStart(2, '0');
+          ctx.fillText(hexVal, autoX, y + ROW_HEIGHT / 2);
+        } else {
+          ctx.fillStyle = colors.textMuted;
+          ctx.fillText('··', autoX, y + ROW_HEIGHT / 2);
+        }
 
         // Channel separator
         ctx.fillStyle = colors.border;

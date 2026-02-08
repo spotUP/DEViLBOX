@@ -82,12 +82,12 @@ export const useUIStore = create<UIStore>()(
       blankEmptyCells: false, // Show ---, .., ... by default
 
       // Responsive layout state (default to expanded/visible)
-      tb303Collapsed: false, // TB-303 panel expanded by default
+      tb303Collapsed: true, // TB-303 panel ALWAYS collapsed by default
       oscilloscopeVisible: true,
       compactToolbar: false, // FT2 toolbar expanded by default
       autoCompactApplied: false,
       showSamplePackModal: false,
-      uiVersion: 0,
+      uiVersion: 8, // Start at v8 to ensure migration runs
 
       // Performance settings (default to high quality)
       performanceQuality: 'high',
@@ -223,11 +223,16 @@ export const useUIStore = create<UIStore>()(
           const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
 
           // Version 4: FT2 toolbar expanded by default
-          // Version 5: TB-303 panel expanded by default
-          if (state.uiVersion < 5) {
-            state.uiVersion = 5;
-            state.tb303Collapsed = false; // Expand TB-303 panel
+          // Version 5: TB-303 panel expanded by default (was)
+          // Version 6: TB-303 panel collapsed by default
+          // Version 7: Force TB-303 collapsed even if already at v6
+          // Version 8: Nuclear option - force collapse no matter what
+          if (state.uiVersion < 8) {
+            console.log('[UIStore] Migration v8: Forcing TB-303 collapsed (was:', state.tb303Collapsed, ')');
+            state.uiVersion = 8;
+            state.tb303Collapsed = true; // FORCE collapse TB-303 panel
             state.compactToolbar = false; // Expand FT2 toolbar
+            console.log('[UIStore] Migration v8: TB-303 now collapsed:', state.tb303Collapsed);
           }
 
           // Only apply once per session

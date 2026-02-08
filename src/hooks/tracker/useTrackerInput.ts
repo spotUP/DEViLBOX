@@ -1119,7 +1119,7 @@ export const useTrackerInput = () => {
         }
       }
 
-      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2), '0'/'.' to clear ----------
+      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2), 'M' for mute (3), 'H' for hammer (4), '0'/'.' to clear ----------
       if (recordMode && (cursor.columnType === 'flag1' || cursor.columnType === 'flag2') && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const flagField = cursor.columnType; // 'flag1' or 'flag2'
 
@@ -1132,6 +1132,18 @@ export const useTrackerInput = () => {
         if (keyLower === 's') {
           e.preventDefault();
           setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 2 }); // 2 = slide
+          if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          return;
+        }
+        if (keyLower === 'm') {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 3 }); // 3 = mute (TT-303)
+          if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          return;
+        }
+        if (keyLower === 'h') {
+          e.preventDefault();
+          setCell(cursor.channelIndex, cursor.rowIndex, { [flagField]: 4 }); // 4 = hammer (TT-303)
           if (editStep > 0 && !isPlaying) moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
           return;
         }
