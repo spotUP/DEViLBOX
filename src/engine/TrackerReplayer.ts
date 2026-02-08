@@ -19,7 +19,7 @@ import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { getGrooveOffset, GROOVE_TEMPLATES } from '@/types/audio';
+import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 
 // ============================================================================
 // CONSTANTS
@@ -363,7 +363,7 @@ export class TrackerReplayer {
 
   // Lookahead scheduling state (BassoonTracker pattern)
   // BassoonTracker uses: 200ms initial buffer, 1 SECOND during playback, scheduler every 10ms
-  private scheduleAheadTime = 0.05; // Schedule 50ms ahead (tight stop, glitch-free)
+  private scheduleAheadTime = 0.1; // Increased to 100ms to support early 'push' grooves
   private schedulerInterval = 0.015; // Check every 15ms (must be < scheduleAheadTime)
   private nextScheduleTime = 0;
   
@@ -441,10 +441,6 @@ export class TrackerReplayer {
     }
   }
 
-  /**
-   * Start the lookahead scheduler. Used by both play() and resume().
-   * Uses raw setInterval instead of Tone.Loop for more reliable scheduling.
-   */
   private startScheduler(): void {
     this.startTime = Tone.now() + 0.02;
     this.nextScheduleTime = this.startTime;
@@ -492,6 +488,28 @@ export class TrackerReplayer {
     this.schedulerTimerId = setInterval(schedulerTick, this.schedulerInterval * 1000);
   }
 
+  private calculateGrooveOffset(row: number, rowDuration: number, state: any): number {
+    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId);
+    const intensity = state.swing / 100;
+
+    if (grooveTemplate && grooveTemplate.id !== 'straight') {
+      return getGrooveOffset(grooveTemplate, row, rowDuration) * intensity;
+    } else {
+      // MANUAL SWING AUDIT FIX:
+      // Use 'Second Half' logic for correct resolution feel
+      const grooveSteps = state.grooveSteps || 2;
+      const isSwungHalf = (row % grooveSteps) >= (grooveSteps / 2);
+      
+      if (state.swing !== 100 && isSwungHalf) {
+        // Standard Triplet (100% swing) = 33.3% of row duration shift
+        const tripletShift = 0.3333;
+        const shiftFactor = (state.swing / 100) * tripletShift;
+        return shiftFactor * rowDuration;
+      }
+    }
+    return 0;
+  }
+
   // ==========================================================================
   // TICK PROCESSING - THE HEART OF THE REPLAYER
   // ==========================================================================
@@ -515,32 +533,18 @@ export class TrackerReplayer {
     const tickInterval = 2.5 / this.bpm;
     const rowDuration = tickInterval * this.speed;
     
-    let grooveOffset = 0;
-    const grooveTemplateId = transportState.grooveTemplateId;
-    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId);
+    // SMOOTH TICK DISTRIBUTION:
+    // Calculate actual durations for the current and next row to determine 
+    // the precise timing for sub-row ticks.
+    const currentOffset = this.calculateGrooveOffset(this.pattPos, rowDuration, transportState);
+    const nextOffset = this.calculateGrooveOffset(this.pattPos + 1, rowDuration, transportState);
     
-    // intensity: 0% = 0x, 100% = 1x (normal), 200% = 2x (stretched)
-    const intensity = transportState.swing / 100;
-    
-    if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      // Scale template values by intensity
-      grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration) * intensity;
-    } else {
-      // Manual swing: 100 is neutral, 200 is max late, 0 is max early (push)
-      const swingAmount = transportState.swing;
-      const grooveSteps = transportState.grooveSteps || 2;
-      
-      // Swing only on the LAST step of the cycle (e.g. step 1, 3, 7...)
-      if (swingAmount !== 100 && (this.pattPos % grooveSteps) === (grooveSteps - 1)) {
-        const maxSwingOffset = rowDuration * 0.5;
-        // Normalize: 100 -> 0, 200 -> 1, 0 -> -1
-        const normalizedSwing = (swingAmount - 100) / 100;
-        grooveOffset = normalizedSwing * maxSwingOffset;
-      }
-    }
+    // Effective duration of the current row (from this RowStart to next RowStart)
+    const effectiveRowDuration = rowDuration + (nextOffset - currentOffset);
+    const effectiveTickInterval = effectiveRowDuration / this.speed;
 
-    // Apply offset to the base schedule time
-    const safeTime = time + grooveOffset;
+    // Apply offset to the base schedule time for Tick 0 (Row Start)
+    const safeTime = time + currentOffset;
 
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
@@ -562,12 +566,14 @@ export class TrackerReplayer {
         // Tick 0: Read new row data
         this.processRow(ch, channel, row, safeTime);
       } else {
-        // Ticks 1+: Process continuous effects
-        this.processEffectTick(ch, channel, row, safeTime);
+        // Ticks 1+: Process continuous effects at the correctly spaced tick time
+        // Shift time by currentOffset (start of row) + distributed ticks
+        const shiftedTickTime = safeTime + (this.currentTick * effectiveTickInterval);
+        this.processEffectTick(ch, channel, row, shiftedTickTime);
       }
 
       // Process Furnace macros every tick
-      this.processMacros(channel, safeTime);
+      this.processMacros(channel, safeTime + (this.currentTick * effectiveTickInterval));
     }
 
     // Notify tick processing
@@ -602,10 +608,22 @@ export class TrackerReplayer {
    * Get display state for audio-synced UI rendering (BassoonTracker pattern).
    * Call this in the render loop with audioContext.currentTime + lookahead.
    * Returns the most recent state that should be displayed at the given time.
+   * @param time Web Audio time
+   * @param peek If true, just look at the state at that time without dequeuing older states
    */
-  public getStateAtTime(time: number): DisplayState | null {
+  public getStateAtTime(time: number, peek: boolean = false): DisplayState | null {
     if (!this.playing) {
       return this.lastDequeuedState;
+    }
+
+    if (peek) {
+      // Just find the state matching the time in the queue
+      let best = this.lastDequeuedState;
+      for (const state of this.stateQueue) {
+        if (state.time <= time) best = state;
+        else break;
+      }
+      return best;
     }
 
     // Dequeue states that are past the requested time
@@ -1436,7 +1454,19 @@ export class TrackerReplayer {
 
     const engine = getToneEngine();
     const noteName = periodToNoteName(ch.period);
-    const velocity = ch.volume / 64;
+    
+    // --- Groove Velocity/Dynamics ---
+    const transportState = useTransportStore.getState();
+    const grooveTemplateId = transportState.grooveTemplateId;
+    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId);
+    const intensity = transportState.swing / 100;
+    
+    let velocityOffset = 0;
+    if (grooveTemplate) {
+      velocityOffset = getGrooveVelocity(grooveTemplate, this.pattPos) * intensity;
+    }
+    
+    const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
 
     // Schedule VU meter trigger at the correct audio time (not scheduling time)
     // Use Tone.Draw to sync the visual update with audio playback

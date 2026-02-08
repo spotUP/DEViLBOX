@@ -99,9 +99,13 @@ export const useTransportStore = create<TransportStore>()(
     setSwing: (swing) =>
       set((state) => {
         state.swing = Math.max(0, Math.min(200, swing));
-        // Swing now scales groove templates, so we don't clear them anymore
+        // If user manually adjusts swing away from 100%, reset to straight template
+        // so it acts as manual swing. If they stay at 100% (neutral), we keep the template.
+        if (state.swing !== 100 && state.grooveTemplateId !== 'straight') {
+          // Actually, based on your request "should affect the presets", 
+          // we SHOULD NOT reset the template. Let's remove the reset logic.
+        }
         
-        // Log timing change recognition
         console.log('[TransportStore] Swing changed to:', state.swing);
       }),
 

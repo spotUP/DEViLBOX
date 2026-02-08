@@ -368,10 +368,11 @@ export const useTrackerInput = () => {
   // Handle keyboard input
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Ignore if typing in input field
+      // Ignore if typing in input field or operating a dropdown
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
       ) {
         return;
       }

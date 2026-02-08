@@ -60,9 +60,9 @@ export const MIN_BPM = 20;
 export const MAX_BPM = 999;
 
 /**
- * Groove Template - Defines timing offsets for rows in a pattern
+ * Groove Template - Defines timing and velocity offsets for rows in a pattern
  * Each value represents timing offset as percentage (-50 to +50)
- * Positive = delay (late), Negative = early (push)
+ * Velocity offsets represent gain multiplier (e.g. -0.2 = 20% quieter)
  */
 export interface GrooveTemplate {
   id: string;
@@ -71,6 +71,8 @@ export interface GrooveTemplate {
   description?: string;
   /** Array of timing offsets for each row in the groove cycle (typically 2-16 values) */
   values: number[];
+  /** Optional array of velocity/gain offsets (-1.0 to 1.0) for each row */
+  velocityOffsets?: number[];
   /** BPM range this groove works best with (optional hint) */
   suggestedBpmRange?: [number, number];
 }
@@ -95,32 +97,36 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     id: 'light-shuffle',
     name: 'Light Shuffle',
     category: 'shuffle',
-    description: 'Subtle triplet feel (54%)',
+    description: 'Subtle rhythmic bounce (16th)',
     values: [0, 8],
+    velocityOffsets: [0, -0.05], // Swung note slightly quieter
   },
   {
     id: 'medium-shuffle',
     name: 'Medium Shuffle',
     category: 'shuffle',
-    description: 'Classic shuffle feel (58%)',
+    description: 'Classic bouncy shuffle feel',
     values: [0, 16],
+    velocityOffsets: [0, -0.1],
   },
   {
     id: 'heavy-shuffle',
     name: 'Heavy Shuffle',
     category: 'shuffle',
-    description: 'Strong triplet feel (66%)',
-    values: [0, 33],
+    description: 'Strong triplet-style bounce',
+    values: [0, 25],
+    velocityOffsets: [0, -0.15],
   },
   {
     id: 'triplet',
     name: 'Full Triplet',
     category: 'shuffle',
-    description: 'True triplet timing (66.7%)',
+    description: 'True 2:1 triplet timing (66%)',
     values: [0, 33],
+    velocityOffsets: [0, -0.2],
   },
 
-  // MPC-style swing values
+  // MPC-style swing values (Famous for timing + heavy velocity ghosting)
   {
     id: 'mpc-50',
     name: 'MPC 50%',
@@ -134,6 +140,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'swing',
     description: 'MPC light swing',
     values: [0, 8],
+    velocityOffsets: [0, -0.08],
   },
   {
     id: 'mpc-58',
@@ -141,6 +148,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'swing',
     description: 'MPC medium swing',
     values: [0, 16],
+    velocityOffsets: [0, -0.12],
   },
   {
     id: 'mpc-62',
@@ -148,6 +156,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'swing',
     description: 'MPC heavy swing',
     values: [0, 25],
+    velocityOffsets: [0, -0.18],
   },
   {
     id: 'mpc-66',
@@ -155,22 +164,17 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'swing',
     description: 'MPC maximum swing',
     values: [0, 33],
-  },
-  {
-    id: 'mpc-71',
-    name: 'MPC 71%',
-    category: 'swing',
-    description: 'MPC extreme swing (beyond triplet)',
-    values: [0, 42],
+    velocityOffsets: [0, -0.25],
   },
 
-  // Funk grooves (syncopated patterns)
+  // Funk grooves (Syncopated: emphasis on 1 and 3, ghosting on 2 and 4)
   {
     id: 'funk-16th',
     name: 'Funk 16th',
     category: 'funk',
     description: '16th note funk groove',
     values: [0, 5, -3, 10],
+    velocityOffsets: [0.1, -0.2, 0.05, -0.3], // Hard emphasis on 1, deep ghost on 4
     suggestedBpmRange: [90, 130],
   },
   {
@@ -179,6 +183,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'funk',
     description: 'Relaxed funk feel, everything slightly late',
     values: [3, 8, 5, 12],
+    velocityOffsets: [0.05, -0.1, 0.05, -0.15],
     suggestedBpmRange: [80, 110],
   },
   {
@@ -187,6 +192,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'funk',
     description: 'Rushed funk feel, snappy timing',
     values: [-2, 5, -5, 8],
+    velocityOffsets: [0.15, -0.15, 0.1, -0.2],
     suggestedBpmRange: [100, 140],
   },
 
@@ -197,6 +203,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'hip-hop',
     description: 'Classic 90s hip-hop swing',
     values: [0, 12, 0, 8],
+    velocityOffsets: [0.1, -0.15, 0.05, -0.1],
     suggestedBpmRange: [85, 100],
   },
   {
@@ -205,6 +212,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'hip-hop',
     description: 'Drunk/loose timing for lo-fi beats',
     values: [5, 15, -3, 18],
+    velocityOffsets: [-0.05, -0.2, -0.1, -0.25],
     suggestedBpmRange: [70, 95],
   },
   {
@@ -213,6 +221,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'hip-hop',
     description: 'Triplet hi-hat groove for trap',
     values: [0, 22, 11, 33, 0, 22],
+    velocityOffsets: [0.1, -0.2, -0.1, -0.3, 0.05, -0.25],
     suggestedBpmRange: [130, 160],
   },
 
@@ -223,6 +232,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'custom',
     description: 'Irregular timing for experimental feel',
     values: [0, 8, -5, 15, 3, 20, -8, 12],
+    velocityOffsets: [0, -0.1, 0.05, -0.2, 0.1, -0.15, 0.05, -0.3],
   },
   {
     id: 'push-pull',
@@ -230,6 +240,7 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     category: 'custom',
     description: 'Alternating early/late for tension',
     values: [-10, 10, -10, 10],
+    velocityOffsets: [0.1, -0.1, 0.1, -0.1],
   },
 ];
 
@@ -250,4 +261,17 @@ export function getGrooveOffset(groove: GrooveTemplate, row: number, rowDuration
   // Convert percentage (-50 to +50) to time offset
   // Max offset is 50% of row duration
   return (grooveValue / 100) * rowDuration;
+}
+
+/**
+ * Get velocity/gain offset for a specific row
+ * @param groove The groove template to use
+ * @param row The current row number
+ * @returns Velocity offset (-1.0 to 1.0)
+ */
+export function getGrooveVelocity(groove: GrooveTemplate, row: number): number {
+  if (!groove.velocityOffsets || groove.velocityOffsets.length === 0) return 0;
+
+  const grooveIndex = row % groove.velocityOffsets.length;
+  return groove.velocityOffsets[grooveIndex];
 }

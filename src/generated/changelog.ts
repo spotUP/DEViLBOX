@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T10:57:06.702Z
+ * Generated: 2026-02-08T11:02:18.435Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '322';
-export const BUILD_HASH = '0bd64e6';
+export const BUILD_NUMBER = '323';
+export const BUILD_HASH = 'e125ed1';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-08',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement adjustable groove cycle duration and immediate re-sync"
+      },
       {
         type: 'fix',
         "description": "Remove unused tickLoop property"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add MAME chip infrastructure and hardware UI system"
-      },
-      {
-        type: 'improvement',
-        "description": "Update WASM build configurations and source files"
       }
     ]
   }

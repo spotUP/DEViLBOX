@@ -20,7 +20,7 @@ import { xmNoteToToneJS, xmEffectToString } from '@/lib/xmConversions';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
-import { getGrooveOffset } from '@typedefs/audio';
+import { getGrooveOffset, getGrooveVelocity } from '@typedefs/audio';
 
 interface AutomationData {
   [patternId: string]: {
@@ -518,10 +518,23 @@ export class PatternScheduler {
               // Trigger note if requested (skip if channel is muted)
               if (effectResult.triggerNote && !effectResult.preventNoteTrigger && !engine.isChannelMuted(channelIndex)) {
                 if (instrument) {
+                  // --- Groove Velocity/Dynamics ---
+                  const transportState = useTransportStore.getState();
+                  const grooveTemplate = transportState.getGrooveTemplate();
+                  const intensity = transportState.swing / 100;
+                  
+                  let velocityOffset = 0;
+                  if (grooveTemplate) {
+                    velocityOffset = getGrooveVelocity(grooveTemplate, row) * intensity;
+                  }
+
                   // Use effectResult.setVolume if available, else default to volumeValue or 0.8
-                  const velocity = effectResult.setVolume !== undefined 
+                  let velocity = effectResult.setVolume !== undefined 
                     ? effectResult.setVolume / 64 
                     : (volumeValue !== null && volumeValue <= 64 ? volumeValue / 64 : 0.8);
+                  
+                  // Apply groove dynamics
+                  velocity = Math.max(0, Math.min(1, velocity + velocityOffset));
                   
                   const toneNote = xmNoteToToneJS(cell.note);
                   

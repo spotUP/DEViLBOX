@@ -341,11 +341,11 @@ class Open303Processor extends AudioWorkletProcessor {
     
     // Process sub-blocks
     while (processedSamples < numSamples) {
-      const blockStartTime = this.currentTime + processedSamples * sampleTime;
+      const blockStartTime = currentTime + processedSamples * sampleTime;
       
       // Find the next event in this block
       let nextEvent = null;
-      if (this.eventQueue.length > 0 && this.eventQueue[0].time <= this.currentTime + numSamples * sampleTime) {
+      if (this.eventQueue.length > 0 && this.eventQueue[0].time <= currentTime + numSamples * sampleTime) {
         nextEvent = this.eventQueue[0];
       }
 
@@ -376,7 +376,7 @@ class Open303Processor extends AudioWorkletProcessor {
         this.processEvent(event);
       } else if (nextEvent && processedSamples === numSamples) {
         // Event is at the very end of or after this block
-        if (nextEvent.time <= this.currentTime + numSamples * sampleTime) {
+        if (nextEvent.time <= currentTime + numSamples * sampleTime) {
           const event = this.eventQueue.shift();
           this.processEvent(event);
         }
