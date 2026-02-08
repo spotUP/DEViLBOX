@@ -3,7 +3,7 @@
  * Positioned to align with channel columns in the pattern editor
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { useAutomationStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
 
@@ -15,6 +15,7 @@ interface AutomationLanesProps {
   channelWidth: number;
   rowNumWidth: number;
   scrollOffset: number;
+  visibleStart: number;
   parameter?: string;
   // For showing ghost curves from adjacent patterns
   prevPatternId?: string;
@@ -75,42 +76,6 @@ const getParameterColor = (parameter: string): string => {
 
 const LANE_WIDTH = 20;
 
-// Generate SVG path strings for a single curve (memoizable)
-const generateCurvePaths = (
-  curve: AutomationCurve,
-  pLength: number,
-  rowHeight: number
-): { linePath: string; fillPath: string } => {
-  const pathPoints: string[] = [];
-  const fillPoints: string[] = [`M ${LANE_WIDTH} ${pLength * rowHeight}`];
-
-  // Build line path
-  for (let row = 0; row < pLength; row++) {
-    const value = getInterpolatedValue(curve, row);
-    if (value !== null) {
-      const x = value * (LANE_WIDTH - 2) + 1;
-      const y = row * rowHeight + rowHeight / 2;
-      pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
-    }
-  }
-
-  // Build fill path (going backwards)
-  for (let row = pLength - 1; row >= 0; row--) {
-    const value = getInterpolatedValue(curve, row);
-    if (value !== null) {
-      const x = value * (LANE_WIDTH - 2) + 1;
-      const y = row * rowHeight + rowHeight / 2;
-      fillPoints.push(`L ${x} ${y}`);
-    }
-  }
-  fillPoints.push(`L ${LANE_WIDTH} 0 Z`);
-
-  return {
-    linePath: pathPoints.join(' '),
-    fillPath: fillPoints.join(' '),
-  };
-};
-
 export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternId,
   patternLength,
@@ -119,6 +84,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   channelWidth,
   rowNumWidth,
   scrollOffset: _scrollOffset,
+  visibleStart,
   parameter = 'cutoff',
   prevPatternId,
   prevPatternLength,
@@ -127,6 +93,16 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 }) => {
   // Subscribe directly to curves array to ensure re-render on changes
   const allCurves = useAutomationStore((state) => state.curves);
+  const addPoint = useAutomationStore((state) => state.addPoint);
+  const removePoint = useAutomationStore((state) => state.removePoint);
+
+  // Drag state
+  const [dragState, setDragState] = useState<{
+    curveId: string;
+    row: number;
+    channelIndex: number;
+  } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Get automation curves for all channels (current pattern)
   const curves = useMemo(() => {
@@ -176,28 +152,15 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return result;
   }, [nextPatternId, channelCount, parameter, allCurves]);
 
-  // Memoize SVG path generation for current pattern curves
-  const currentPaths = useMemo(() => {
-    return curves.map(curve =>
-      curve ? generateCurvePaths(curve, patternLength, rowHeight) : null
-    );
-  }, [curves, patternLength, rowHeight]);
+  const color = getParameterColor(parameter);
+  const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
+  const nextLen = nextPatternId ? (nextPatternLength || patternLength) : 0;
 
-  // Memoize SVG path generation for previous pattern curves
-  const prevLen = prevPatternLength || patternLength;
-  const prevPaths = useMemo(() => {
-    return prevCurves.map(curve =>
-      curve ? generateCurvePaths(curve, prevLen, rowHeight) : null
-    );
-  }, [prevCurves, prevLen, rowHeight]);
-
-  // Memoize SVG path generation for next pattern curves
-  const nextLen = nextPatternLength || patternLength;
-  const nextPaths = useMemo(() => {
-    return nextCurves.map(curve =>
-      curve ? generateCurvePaths(curve, nextLen, rowHeight) : null
-    );
-  }, [nextCurves, nextLen, rowHeight]);
+  // Calculate full virtual range (prev + current + next patterns)
+  const prevHeight = prevLen * rowHeight;
+  const currentHeight = patternLength * rowHeight;
+  const nextHeight = nextLen * rowHeight;
+  const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
 
   // Check if any channel has automation data (including adjacent patterns)
   const hasAnyData = curves.some(c => c !== null) ||
@@ -208,33 +171,122 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return null; // Don't render anything if no automation data
   }
 
-  const color = getParameterColor(parameter);
+  // Mouse event handlers for editing
+  const handleMouseDown = useCallback((
+    e: React.MouseEvent,
+    curve: AutomationCurve,
+    channelIndex: number,
+    laneLeft: number,
+    yOffset: number
+  ) => {
+    if (e.button !== 0) return; // Only left click
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-  // Calculate full virtual range (prev + current + next patterns)
-  const prevHeight = prevLen * rowHeight;
-  const currentHeight = patternLength * rowHeight;
-  const nextHeight = nextLen * rowHeight;
-  const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
+    // Calculate row and value from mouse position
+    const mouseY = e.clientY - rect.top - yOffset;
+    const row = Math.floor(mouseY / rowHeight);
+    
+    if (row < 0 || row >= patternLength) return;
 
-  // Helper to render curves using pre-computed paths
+    const mouseX = e.clientX - rect.left - laneLeft;
+    const value = Math.max(0, Math.min(1, (mouseX - 1) / (LANE_WIDTH - 2)));
+
+    // Add or update point
+    addPoint(curve.id, row, value);
+    setDragState({ curveId: curve.id, row, channelIndex });
+  }, [patternLength, rowHeight, addPoint]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragState || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const curve = curves[dragState.channelIndex];
+    if (!curve) return;
+
+    const laneLeft = dragState.channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
+    const yOffset = prevLen * rowHeight;
+    
+    const mouseY = e.clientY - rect.top - yOffset;
+    const row = Math.floor(mouseY / rowHeight);
+    
+    if (row < 0 || row >= patternLength) return;
+
+    const mouseX = e.clientX - rect.left - laneLeft;
+    const value = Math.max(0, Math.min(1, (mouseX - 1) / (LANE_WIDTH - 2)));
+
+    // Update point
+    addPoint(curve.id, row, value);
+  }, [dragState, curves, channelWidth, prevLen, rowHeight, patternLength, addPoint]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragState(null);
+  }, []);
+
+  const handleDoubleClick = useCallback((
+    e: React.MouseEvent,
+    curve: AutomationCurve,
+    yOffset: number
+  ) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const mouseY = e.clientY - rect.top - yOffset;
+    const row = Math.floor(mouseY / rowHeight);
+    
+    if (row < 0 || row >= patternLength) return;
+
+    // Remove point at this row if it exists
+    const existingPoint = curve.points.find(p => p.row === row);
+    if (existingPoint) {
+      removePoint(curve.id, row);
+    }
+  }, [patternLength, rowHeight, removePoint]);
+
+  // Helper to render curves for a single pattern at a virtual y position
   const renderPatternCurves = (
     patternCurves: (AutomationCurve | null)[],
-    paths: ({ linePath: string; fillPath: string } | null)[],
     pLength: number,
     startVirtualRow: number, // Virtual row index where this pattern starts
     opacity: number,
-    keyPrefix: string
+    keyPrefix: string,
+    isCurrentPattern: boolean
   ) => {
     return patternCurves.map((curve, channelIndex) => {
       if (!curve) return null;
-
-      const pathData = paths[channelIndex];
-      if (!pathData) return null;
 
       // Position this lane at the right edge of the channel
       const laneLeft = channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
+
+      // Build SVG path
+      const pathPoints: string[] = [];
+      const fillPoints: string[] = [`M ${LANE_WIDTH} ${pHeight}`];
+
+      for (let row = 0; row < pLength; row++) {
+        const value = getInterpolatedValue(curve, row);
+        if (value !== null) {
+          const x = value * (LANE_WIDTH - 2) + 1;
+          const y = row * rowHeight + rowHeight / 2;
+          pathPoints.push(`${pathPoints.length === 0 ? 'M' : 'L'} ${x} ${y}`);
+        }
+      }
+
+      // Build fill path (going backwards)
+      for (let row = pLength - 1; row >= 0; row--) {
+        const value = getInterpolatedValue(curve, row);
+        if (value !== null) {
+          const x = value * (LANE_WIDTH - 2) + 1;
+          const y = row * rowHeight + rowHeight / 2;
+          fillPoints.push(`L ${x} ${y}`);
+        }
+      }
+      fillPoints.push(`L ${LANE_WIDTH} 0 Z`);
 
       return (
         <div
@@ -245,18 +297,21 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
             top: yOffset,
             width: LANE_WIDTH,
             height: pHeight,
+            cursor: isCurrentPattern ? 'crosshair' : 'default',
           }}
+          onMouseDown={isCurrentPattern ? (e) => handleMouseDown(e, curve, channelIndex, laneLeft, yOffset) : undefined}
+          onDoubleClick={isCurrentPattern ? (e) => handleDoubleClick(e, curve, yOffset) : undefined}
         >
           <svg width={LANE_WIDTH} height={pHeight}>
             {/* Fill */}
             <path
-              d={pathData.fillPath}
+              d={fillPoints.join(' ')}
               fill={color}
               fillOpacity={0.1 * opacity}
             />
             {/* Line */}
             <path
-              d={pathData.linePath}
+              d={pathPoints.join(' ')}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
@@ -285,42 +340,46 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   // Previous pattern: virtualIndex from -prevLen to -1
   // Current pattern: virtualIndex from 0 to patternLength-1
   // Next pattern: virtualIndex from patternLength to patternLength+nextLen-1
-  const prevStartRow = -prevLen;
-  // currentStartRow = 0 and nextStartRow = patternLength (implicit)
 
   return (
     <div
-      className="automation-lanes pointer-events-none"
+      ref={containerRef}
+      className="automation-lanes"
       style={{
         position: 'absolute',
-        top: prevStartRow * rowHeight, // Start at negative position for prev pattern
+        // Container includes prev+current+next patterns
+        // Position so current pattern (at yOffset=prevLen*rowHeight within container) aligns with screen row 0
+        top: _scrollOffset - (visibleStart * rowHeight) - (prevLen * rowHeight),
         left: rowNumWidth,
         right: 0,
         height: totalVirtualHeight,
         zIndex: 5,
       }}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       {/* Previous pattern curves (ghost, above) */}
       {prevCurves.length > 0 && renderPatternCurves(
         prevCurves,
-        prevPaths,
         prevLen,
-        0, // Relative to this container's top (which is already offset)
-        0.35,
-        'prev'
+        0, // At top of container
+        0.5,
+        'prev',
+        false
       )}
 
       {/* Current pattern curves */}
-      {renderPatternCurves(curves, currentPaths, patternLength, prevLen, 1, 'current')}
+      {renderPatternCurves(curves, patternLength, prevLen, 1, 'current', true)}
 
       {/* Next pattern curves (ghost, below) */}
       {nextCurves.length > 0 && renderPatternCurves(
         nextCurves,
-        nextPaths,
         nextLen,
         prevLen + patternLength,
-        0.35,
-        'next'
+        0.5,
+        'next',
+        false
       )}
     </div>
   );
