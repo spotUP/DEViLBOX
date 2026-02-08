@@ -10,7 +10,6 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
@@ -18,7 +17,6 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
@@ -665,31 +663,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   </Button>
                 </div>
                 {showGrooveMenu && (
-                  <div ref={grooveMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[200px] max-h-[300px] overflow-y-auto" style={{ top: `${grooveMenuPosition.top}px`, left: `${grooveMenuPosition.left}px` }}>
+                  <div ref={grooveMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[220px] max-w-[300px] max-h-[400px] overflow-y-auto whitespace-normal" style={{ top: `${grooveMenuPosition.top}px`, left: `${grooveMenuPosition.left}px` }}>
                     {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
                       const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
                       if (grooves.length === 0) return null;
                       return (
-                        <div key={category}>
-                          <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase">
+                        <div key={category} className="flex flex-col">
+                          <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase bg-dark-bgSecondary/50">
                             {category}
                           </div>
-                          {grooves.map(groove => (
+                          {grooves.map((groove, idx) => (
                             <button
                               key={groove.id}
                               onClick={() => {
                                 setGrooveTemplate(groove.id);
                                 setShowGrooveMenu(false);
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
+                              className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors ${
+                                idx !== grooves.length - 1 ? 'border-b border-dark-border' : ''
+                              } ${
                                 groove.id === grooveTemplateId
                                   ? 'bg-accent-primary/20 text-accent-primary'
                                   : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
                               }`}
                             >
-                              <span className="font-bold">{groove.name}</span>
+                              <div className="font-bold">{groove.name}</div>
                               {groove.description && (
-                                <span className="block text-[10px] opacity-60">{groove.description}</span>
+                                <div className="text-[10px] opacity-60 leading-tight mt-0.5">{groove.description}</div>
                               )}
                             </button>
                           ))}

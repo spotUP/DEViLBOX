@@ -12,7 +12,6 @@
 
 import * as Tone from 'tone';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
 
 export class AmigaFilter extends Tone.ToneAudioNode {
   readonly name: string = 'AmigaFilter';
