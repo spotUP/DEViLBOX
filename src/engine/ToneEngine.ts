@@ -2905,58 +2905,136 @@ export class ToneEngine {
     // Update all instances
     synths.forEach((synth) => {
       // Update core TB303 parameters
-    if (tb303Config.tuning !== undefined) {
-      synth.setTuning(tb303Config.tuning);
-    }
-    if (tb303Config.filter) {
-      synth.setCutoff(tb303Config.filter.cutoff);
-      synth.setResonance(tb303Config.filter.resonance);
-    }
-    if (tb303Config.filterEnvelope) {
-      synth.setEnvMod(tb303Config.filterEnvelope.envMod);
-      // Only set decay here if Devil Fish is NOT enabled - when DF is enabled,
-      // normalDecay and accentDecay are set separately and would be overwritten
-      if (!tb303Config.devilFish?.enabled) {
+      if (tb303Config.tuning !== undefined) {
+        synth.setTuning(tb303Config.tuning);
+      }
+      if (tb303Config.filter) {
+        synth.setCutoff(tb303Config.filter.cutoff);
+        synth.setResonance(tb303Config.filter.resonance);
+      }
+      if (tb303Config.filterEnvelope) {
+        synth.setEnvMod(tb303Config.filterEnvelope.envMod);
         synth.setDecay(tb303Config.filterEnvelope.decay);
       }
-    }
-    if (tb303Config.accent) {
-      synth.setAccentAmount(tb303Config.accent.amount);
-    }
-    if (tb303Config.slide) {
-      synth.setSlideTime(tb303Config.slide.time);
-    }
-    if (tb303Config.overdrive) {
-      synth.setOverdrive(tb303Config.overdrive.amount);
-    }
-    if (tb303Config.oscillator) {
-      // @ts-ignore - TS struggles with the union type parameter inference here despite all classes accepting the string union
-      synth.setWaveform(tb303Config.oscillator.type);
-    }
-
-    // Update Devil Fish parameters
-    if (tb303Config.devilFish) {
-      const df = tb303Config.devilFish;
-
-      if (df.enabled) {
-        // Apply Devil Fish-specific parameters
-        synth.setNormalDecay(df.normalDecay);
-        synth.setAccentDecay(df.accentDecay);
-        if (df.accentAttack !== undefined) {
-          synth.setParam('accent_attack', df.accentAttack);
-        }
-        synth.setVegDecay(df.vegDecay);
-        synth.setVegSustain(df.vegSustain);
-        synth.setSoftAttack(df.softAttack);
-      } else {
-        // Reset DF-specific parameters to TB-303 hardware defaults (rosic calibration)
-        synth.setAccentDecay(200);        // rosic default: accentDecay = 200 ms
-        synth.setParam('accent_attack', 3); // rosic default: accentAttack = 3 ms
-        synth.setVegDecay(1230);           // rosic default: ampEnv.setDecay(1230)
-        synth.setVegSustain(0);            // rosic default: ampEnv.setSustainLevel(0.0)
-        synth.setSoftAttack(3);            // rosic default: normalAttack = 3 ms
+      if (tb303Config.accent) {
+        synth.setAccentAmount(tb303Config.accent.amount);
       }
-    }
+      if (tb303Config.slide) {
+        synth.setSlideTime(tb303Config.slide.time);
+      }
+      if (tb303Config.overdrive) {
+        synth.setOverdrive(tb303Config.overdrive.amount);
+      }
+      if (tb303Config.oscillator) {
+        if (typeof synth.setWaveform === 'function') {
+          // If it's a blendable waveform (JC303/DB303), send the type
+          // The synth class handles string-to-blend-value conversion
+          synth.setWaveform(tb303Config.oscillator.type);
+        }
+        
+        // Handle Oscillator enhancements if available
+        if (tb303Config.oscillator.pulseWidth !== undefined && typeof synth.setPulseWidth === 'function') {
+          synth.setPulseWidth(tb303Config.oscillator.pulseWidth);
+        }
+        if (tb303Config.oscillator.subOscGain !== undefined && typeof synth.setSubOscGain === 'function') {
+          synth.setSubOscGain(tb303Config.oscillator.subOscGain);
+        }
+        if (tb303Config.oscillator.subOscBlend !== undefined && typeof synth.setSubOscBlend === 'function') {
+          synth.setSubOscBlend(tb303Config.oscillator.subOscBlend);
+        }
+      }
+
+      // Update Devil Fish parameters
+      if (tb303Config.devilFish) {
+        const df = tb303Config.devilFish;
+        if (typeof synth.enableDevilFish === 'function') {
+          synth.enableDevilFish(df.enabled);
+        }
+
+        if (df.enabled) {
+          // Normal note and accent note decay
+          if (typeof synth.setNormalDecay === 'function') synth.setNormalDecay(df.normalDecay);
+          if (typeof synth.setAccentDecay === 'function') synth.setAccentDecay(df.accentDecay);
+          
+          // Soft attack for normal and accented notes
+          if (typeof synth.setSoftAttack === 'function') synth.setSoftAttack(df.softAttack);
+          if (df.accentSoftAttack !== undefined && typeof synth.setAccentSoftAttack === 'function') {
+            synth.setAccentSoftAttack(df.accentSoftAttack);
+          }
+          
+          // VEG (Volume Envelope Generator) controls
+          if (typeof synth.setVegDecay === 'function') synth.setVegDecay(df.vegDecay);
+          if (typeof synth.setVegSustain === 'function') synth.setVegSustain(df.vegSustain);
+          
+          // Filter enhancements
+          if (typeof synth.setFilterTracking === 'function') synth.setFilterTracking(df.filterTracking);
+          if (typeof synth.setFilterFmDepth === 'function') synth.setFilterFmDepth(df.filterFmDepth);
+          if (df.passbandCompensation !== undefined && typeof synth.setPassbandCompensation === 'function') {
+            synth.setPassbandCompensation(df.passbandCompensation);
+          }
+          if (df.resTracking !== undefined && typeof synth.setResTracking === 'function') {
+            synth.setResTracking(df.resTracking);
+          }
+          if (df.duffingAmount !== undefined && typeof synth.setDuffingAmount === 'function') {
+            synth.setDuffingAmount(df.duffingAmount);
+          }
+          if (df.lpBpMix !== undefined && typeof synth.setLpBpMix === 'function') {
+            synth.setLpBpMix(df.lpBpMix);
+          }
+          if (df.filterSelect !== undefined && typeof synth.setFilterSelect === 'function') {
+            synth.setFilterSelect(df.filterSelect);
+          }
+          if (df.diodeCharacter !== undefined && typeof synth.setDiodeCharacter === 'function') {
+            synth.setDiodeCharacter(df.diodeCharacter);
+          }
+          
+          // Built-in ensemble/chorus
+          if (df.ensembleAmount !== undefined && typeof synth.setEnsembleAmount === 'function') {
+            synth.setEnsembleAmount(df.ensembleAmount);
+          }
+          
+          // Quality
+          if (df.oversamplingOrder !== undefined && typeof synth.setOversamplingOrder === 'function') {
+            synth.setOversamplingOrder(df.oversamplingOrder);
+          }
+          
+          if (typeof synth.setMuffler === 'function') synth.setMuffler(df.muffler);
+          if (typeof synth.setSweepSpeed === 'function') synth.setSweepSpeed(df.sweepSpeed);
+          if (typeof synth.setHighResonance === 'function') synth.setHighResonance(df.highResonance);
+        }
+      }
+
+      // Update LFO parameters if available
+      if (tb303Config.lfo && typeof synth.setLfoRate === 'function') {
+        synth.setLfoWaveform(tb303Config.lfo.waveform);
+        synth.setLfoRate(tb303Config.lfo.rate);
+        synth.setLfoContour(tb303Config.lfo.contour);
+        synth.setLfoPitchDepth(tb303Config.lfo.pitchDepth);
+        synth.setLfoPwmDepth(tb303Config.lfo.pwmDepth);
+        synth.setLfoFilterDepth(tb303Config.lfo.filterDepth);
+        if (tb303Config.lfo.stiffDepth !== undefined && typeof synth.setLfoStiffDepth === 'function') {
+          synth.setLfoStiffDepth(tb303Config.lfo.stiffDepth);
+        }
+      }
+
+      // Update Effects parameters if available
+      if (tb303Config.chorus && typeof synth.setChorusMix === 'function') {
+        synth.setChorusMode(tb303Config.chorus.mode);
+        synth.setChorusMix(tb303Config.chorus.enabled ? tb303Config.chorus.mix : 0);
+      }
+      if (tb303Config.phaser && typeof synth.setPhaserMix === 'function') {
+        synth.setPhaserRate(tb303Config.phaser.rate);
+        synth.setPhaserWidth(tb303Config.phaser.depth);
+        synth.setPhaserFeedback(tb303Config.phaser.feedback);
+        synth.setPhaserMix(tb303Config.phaser.enabled ? tb303Config.phaser.mix : 0);
+      }
+      if (tb303Config.delay && typeof synth.setDelayMix === 'function') {
+        synth.setDelayTime(tb303Config.delay.time);
+        synth.setDelayFeedback(tb303Config.delay.feedback);
+        synth.setDelayTone(tb303Config.delay.tone);
+        synth.setDelayMix(tb303Config.delay.enabled ? tb303Config.delay.mix : 0);
+        synth.setDelaySpread(tb303Config.delay.stereo);
+      }
     }); // End synths.forEach
   }
 

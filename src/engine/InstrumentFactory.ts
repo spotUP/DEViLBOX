@@ -1583,24 +1583,39 @@ export class InstrumentFactory {
   private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
     const synth = new JC303Synth();
 
-    // Apply parameters from TB303 config
-    synth.setCutoff(tb.filter.cutoff);
-    synth.setResonance(tb.filter.resonance);
-    synth.setEnvMod(tb.filterEnvelope.envMod);
-    synth.setDecay(tb.filterEnvelope.decay);
-    synth.setAccent(tb.accent.amount);
+    // Calibration constants for normalization
+    const CUTOFF_MIN = 314;
+    const CUTOFF_MAX = 2394;
+    const DECAY_MIN = 200;
+    const DECAY_MAX = 2000;
+    const SLIDE_MIN = 2;
+    const SLIDE_MAX = 360;
+
+    // Helper to normalize value if it's outside 0-1 range
+    const norm = (v: number, min: number, max: number) => {
+      if (v >= 0 && v <= 1) return v;
+      // Assume logarithmic mapping for cutoff/decay if values are large
+      if (max > 100) return Math.log(v / min) / Math.log(max / min);
+      return (v - min) / (max - min);
+    };
+
+    // Apply parameters from TB303 config (normalizing if they are in Hz/ms)
+    synth.setCutoff(norm(tb.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
+    synth.setResonance(tb.filter.resonance > 1 ? tb.filter.resonance / 100 : tb.filter.resonance);
+    synth.setEnvMod(tb.filterEnvelope.envMod > 1 ? tb.filterEnvelope.envMod / 100 : tb.filterEnvelope.envMod);
+    synth.setDecay(norm(tb.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
+    synth.setAccent(tb.accent.amount > 1 ? tb.accent.amount / 100 : tb.accent.amount);
     synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
 
     // Override C++ WASM VCA envelope to rosic's hardware-calibrated defaults.
-    // The baked-in WASM binary has setAmpDecay(3000)/setAmpRelease(16) which
-    // deviate from rosic's carefully tuned values (1230ms/1.0ms).
-    synth.setVegDecay(1230);  // rosic default: ampEnv.setDecay(1230)
+    // Normalized value for 1230ms
+    synth.setVegDecay(norm(1230, DECAY_MIN, DECAY_MAX));
 
     if (tb.slide) {
-      synth.setSlideTime(tb.slide.time);
+      synth.setSlideTime(norm(tb.slide.time, SLIDE_MIN, SLIDE_MAX));
     }
     if (tb.overdrive) {
-      synth.setOverdrive(tb.overdrive.amount);
+      synth.setOverdrive(tb.overdrive.amount > 1 ? tb.overdrive.amount / 100 : tb.overdrive.amount);
     }
 
     // Devil Fish mods
@@ -1611,20 +1626,20 @@ export class InstrumentFactory {
       }
       if (df.muffler) synth.setMuffler(df.muffler);
       if (df.highResonance) synth.setHighResonanceEnabled(df.highResonance);
-      if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking);
-      if (df.normalDecay !== undefined) synth.setNormalDecay(df.normalDecay);
-      if (df.accentDecay !== undefined) synth.setAccentDecay(df.accentDecay);
-      if (df.accentAttack !== undefined) synth.setParam('accent_attack', df.accentAttack);
-      if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay);
-      if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain);
-      if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack);
+      if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking > 1 ? df.filterTracking / 100 : df.filterTracking);
+      if (df.normalDecay !== undefined) synth.setNormalDecay(df.normalDecay > 1 ? df.normalDecay / 100 : df.normalDecay);
+      if (df.accentDecay !== undefined) synth.setAccentDecay(df.accentDecay > 1 ? df.accentDecay / 100 : df.accentDecay);
+      // Skip accentAttack for now as it's a raw param
+      if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay > 1 ? df.vegDecay / 100 : df.vegDecay);
+      if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain > 1 ? df.vegSustain / 100 : df.vegSustain);
+      if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack > 1 ? df.softAttack / 100 : df.softAttack);
       if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
-      if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
+      if (df.filterFmDepth !== undefined) synth.setFilterFmDepth(df.filterFmDepth > 1 ? df.filterFmDepth / 100 : df.filterFmDepth);
       if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
     }
 
     if (volume !== undefined) {
-      synth.setVolume(volume);
+      synth.setVolume(volume > 1 ? (volume + 60) / 60 : volume);
     }
 
     return synth;
@@ -1636,62 +1651,73 @@ export class InstrumentFactory {
   private static createDB303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): DB303Synth {
     const synth = new DB303Synth();
 
+    // Calibration constants
+    const CUTOFF_MIN = 314;
+    const CUTOFF_MAX = 2394;
+    const DECAY_MIN = 200;
+    const DECAY_MAX = 2000;
+    const SLIDE_MIN = 2;
+    const SLIDE_MAX = 360;
+
+    const norm = (v: number, min: number, max: number) => {
+      if (v >= 0 && v <= 1) return v;
+      if (max > 100) return Math.log(v / min) / Math.log(max / min);
+      return (v - min) / (max - min);
+    };
+
     // Core 303 parameters
-    synth.setCutoff(tb.filter.cutoff);
-    synth.setResonance(tb.filter.resonance);
-    synth.setEnvMod(tb.filterEnvelope.envMod);
-    synth.setDecay(tb.filterEnvelope.decay);
-    synth.setAccent(tb.accent.amount);
+    synth.setCutoff(norm(tb.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
+    synth.setResonance(tb.filter.resonance > 1 ? tb.filter.resonance / 100 : tb.filter.resonance);
+    synth.setEnvMod(tb.filterEnvelope.envMod > 1 ? tb.filterEnvelope.envMod / 100 : tb.filterEnvelope.envMod);
+    synth.setDecay(norm(tb.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
+    synth.setAccent(tb.accent.amount > 1 ? tb.accent.amount / 100 : tb.accent.amount);
     synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
 
     // Oscillator enhancements
-    if (tb.oscillator.pulseWidth !== undefined) synth.setPulseWidth(tb.oscillator.pulseWidth);
-    if (tb.oscillator.subOscGain !== undefined) synth.setSubOscGain(tb.oscillator.subOscGain);
-    if (tb.oscillator.subOscBlend !== undefined) synth.setSubOscBlend(tb.oscillator.subOscBlend);
+    if (tb.oscillator.pulseWidth !== undefined) synth.setPulseWidth(tb.oscillator.pulseWidth > 1 ? tb.oscillator.pulseWidth / 100 : tb.oscillator.pulseWidth);
+    if (tb.oscillator.subOscGain !== undefined) synth.setSubOscGain(tb.oscillator.subOscGain > 1 ? tb.oscillator.subOscGain / 100 : tb.oscillator.subOscGain);
+    if (tb.oscillator.subOscBlend !== undefined) synth.setSubOscBlend(tb.oscillator.subOscBlend > 1 ? tb.oscillator.subOscBlend / 100 : tb.oscillator.subOscBlend);
 
     // VCA envelope
-    synth.setVegDecay(1230); // matches Open303 default
+    synth.setVegDecay(norm(1230, DECAY_MIN, DECAY_MAX)); 
 
     if (tb.tuning !== undefined) {
-      synth.setTuning(tb.tuning);
+      synth.setTuning(tb.tuning > 1 ? (tb.tuning - 440) / 440 : tb.tuning);
     }
 
     // Devil Fish enhanced parameters (if present)
     const df = tb.devilFish;
     if (df) {
-      // NOTE: DB303Synth doesn't have these methods (they were removed in audit)
-      // if (df.envType !== undefined) synth.setEnvType(df.envType);
-      // if (df.reverbMix !== undefined) synth.setReverbMix(df.reverbMix);
-      // if (df.reverbDecay !== undefined) synth.setReverbDecay(df.reverbDecay);
-      if (df.overdrive !== undefined) synth.setOverdrive(df.overdrive);
-      // if (df.subOscMix !== undefined) synth.setSubOscMix(df.subOscMix);
-      // if (df.feedbackVCF !== undefined) synth.setFeedbackVCF(df.feedbackVCF);
-      // if (df.pulsewaveVCF !== undefined) synth.setPulsewaveVCF(df.pulsewaveVCF);
-      if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
+      if (df.filterFmDepth !== undefined) synth.setFilterFM(df.filterFmDepth > 1 ? df.filterFmDepth / 100 : df.filterFmDepth);
       if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
 
       // Extended Devil Fish parameters
-      if (df.accentSoftAttack !== undefined) synth.setAccentSoftAttack(df.accentSoftAttack);
-      if (df.passbandCompensation !== undefined) synth.setPassbandCompensation(df.passbandCompensation);
-      if (df.resTracking !== undefined) synth.setResTracking(df.resTracking);
-      if (df.duffingAmount !== undefined) synth.setDuffingAmount(df.duffingAmount);
-      if (df.lpBpMix !== undefined) synth.setLpBpMix(df.lpBpMix);
-      if (df.stageNLAmount !== undefined) synth.setStageNLAmount(df.stageNLAmount);
+      if (df.accentSoftAttack !== undefined) synth.setAccentSoftAttack(df.accentSoftAttack > 1 ? df.accentSoftAttack / 100 : df.accentSoftAttack);
+      if (df.passbandCompensation !== undefined) synth.setPassbandCompensation(df.passbandCompensation > 1 ? df.passbandCompensation / 100 : df.passbandCompensation);
+      if (df.resTracking !== undefined) synth.setResTracking(df.resTracking > 1 ? df.resTracking / 100 : df.resTracking);
+      if (df.duffingAmount !== undefined) synth.setDuffingAmount(df.duffingAmount > 1 ? df.duffingAmount / 100 : df.duffingAmount);
+      if (df.lpBpMix !== undefined) synth.setLpBpMix(df.lpBpMix > 1 ? df.lpBpMix / 100 : df.lpBpMix);
       if (df.filterSelect !== undefined) synth.setFilterSelect(df.filterSelect);
-      if (df.diodeCharacter !== undefined) synth.setDiodeCharacter(df.diodeCharacter);
-      if (df.ensembleAmount !== undefined) synth.setEnsembleAmount(df.ensembleAmount);
-      if (df.oversamplingOrder !== undefined) synth.setOversamplingOrder(df.oversamplingOrder);
+      if (df.diodeCharacter !== undefined) synth.setDiodeCharacter(df.diodeCharacter > 1 ? df.diodeCharacter / 100 : df.diodeCharacter);
+      
+      if (df.normalDecay !== undefined) synth.setNormalDecay(norm(df.normalDecay, DECAY_MIN, DECAY_MAX));
+      if (df.accentDecay !== undefined) synth.setAccentDecay(norm(df.accentDecay, DECAY_MIN, DECAY_MAX));
+      if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack > 1 ? df.softAttack / 100 : df.softAttack);
+      
+      if (df.muffler !== undefined) synth.setMuffler(df.muffler);
+      if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
+      if (df.highResonance !== undefined) synth.setHighResonanceEnabled(df.highResonance);
     }
 
     // LFO parameters (if present)
     const lfo = tb.lfo;
     if (lfo) {
       if (lfo.waveform !== undefined) synth.setLfoWaveform(lfo.waveform);
-      if (lfo.rate !== undefined) synth.setLfoRate(lfo.rate);
-      if (lfo.contour !== undefined) synth.setLfoContour(lfo.contour);
-      if (lfo.pitchDepth !== undefined) synth.setLfoPitchDepth(lfo.pitchDepth);
-      if (lfo.pwmDepth !== undefined) synth.setLfoPwmDepth(lfo.pwmDepth);
-      if (lfo.filterDepth !== undefined) synth.setLfoFilterDepth(lfo.filterDepth);
+      if (lfo.rate !== undefined) synth.setLfoRate(lfo.rate > 1 ? lfo.rate / 100 : lfo.rate);
+      if (lfo.contour !== undefined) synth.setLfoContour(lfo.contour > 1 ? lfo.contour / 100 : lfo.contour);
+      if (lfo.pitchDepth !== undefined) synth.setLfoPitchDepth(lfo.pitchDepth > 1 ? lfo.pitchDepth / 100 : lfo.pitchDepth);
+      if (lfo.pwmDepth !== undefined) synth.setLfoPwmDepth(lfo.pwmDepth > 1 ? lfo.pwmDepth / 100 : lfo.pwmDepth);
+      if (lfo.filterDepth !== undefined) synth.setLfoFilterDepth(lfo.filterDepth > 1 ? lfo.filterDepth / 100 : lfo.filterDepth);
     }
 
     // Built-in effects (Tone.js effects)
@@ -1699,30 +1725,30 @@ export class InstrumentFactory {
     if (chorus) {
       if (chorus.enabled !== undefined) synth.setChorusEnabled(chorus.enabled);
       if (chorus.mode !== undefined) synth.setChorusMode(chorus.mode);
-      if (chorus.mix !== undefined) synth.setChorusMix(chorus.mix);
+      if (chorus.mix !== undefined) synth.setChorusMix(chorus.mix > 1 ? chorus.mix / 100 : chorus.mix);
     }
 
     const phaser = tb.phaser;
     if (phaser) {
       if (phaser.enabled !== undefined) synth.setPhaserEnabled(phaser.enabled);
-      if (phaser.rate !== undefined) synth.setPhaserRate(phaser.rate);
-      if (phaser.depth !== undefined) synth.setPhaserDepth(phaser.depth);
-      if (phaser.feedback !== undefined) synth.setPhaserFeedback(phaser.feedback);
-      if (phaser.mix !== undefined) synth.setPhaserMix(phaser.mix);
+      if (phaser.rate !== undefined) synth.setPhaserRate(phaser.rate > 1 ? phaser.rate / 100 : phaser.rate);
+      if (phaser.depth !== undefined) synth.setPhaserDepth(phaser.depth > 1 ? phaser.depth / 100 : phaser.depth);
+      if (phaser.feedback !== undefined) synth.setPhaserFeedback(phaser.feedback > 1 ? phaser.feedback / 100 : phaser.feedback);
+      if (phaser.mix !== undefined) synth.setPhaserMix(phaser.mix > 1 ? phaser.mix / 100 : phaser.mix);
     }
 
     const delay = tb.delay;
     if (delay) {
       if (delay.enabled !== undefined) synth.setDelayEnabled(delay.enabled);
-      if (delay.time !== undefined) synth.setDelayTime(delay.time);
-      if (delay.feedback !== undefined) synth.setDelayFeedback(delay.feedback);
-      if (delay.tone !== undefined) synth.setDelayTone(delay.tone);
-      if (delay.mix !== undefined) synth.setDelayMix(delay.mix);
-      if (delay.stereo !== undefined) synth.setDelayStereo(delay.stereo);
+      if (delay.time !== undefined) synth.setDelayTime(delay.time > 1 ? delay.time / 2000 : delay.time);
+      if (delay.feedback !== undefined) synth.setDelayFeedback(delay.feedback > 1 ? delay.feedback / 100 : delay.feedback);
+      if (delay.tone !== undefined) synth.setDelayTone(delay.tone > 1 ? delay.tone / 100 : delay.tone);
+      if (delay.mix !== undefined) synth.setDelayMix(delay.mix > 1 ? delay.mix / 100 : delay.mix);
+      if (delay.stereo !== undefined) synth.setDelaySpread(delay.stereo > 1 ? delay.stereo / 100 : delay.stereo);
     }
 
     if (volume !== undefined) {
-      synth.setVolume(volume);
+      synth.setVolume(volume > 1 ? (volume + 60) / 60 : volume);
     }
 
     return synth;

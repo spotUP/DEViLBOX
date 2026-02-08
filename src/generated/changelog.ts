@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T11:02:18.435Z
+ * Generated: 2026-02-08T14:33:19.680Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '323';
-export const BUILD_HASH = 'e125ed1';
+export const BUILD_NUMBER = '331';
+export const BUILD_HASH = '6f2819b';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -33,6 +33,38 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-08',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Implement authentic ProTracker status messages in pattern header"
+      },
+      {
+        type: 'improvement',
+        "description": "Implement collapsible sections for cleaner vertical layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Expand TB-303 panel dimensions and optimize control spacing"
+      },
+      {
+        type: 'fix',
+        "description": "Optimize FT2 toolbar layout to prevent horizontal overflow"
+      },
+      {
+        type: 'fix',
+        "description": "Correct position and pattern order management in toolbar"
+      },
+      {
+        type: 'improvement',
+        "description": "Fix white dividers in groove settings modal"
+      },
+      {
+        type: 'improvement',
+        "description": "Move groove controls to dedicated settings modal and simplify toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance groove templates with velocity dynamics"
+      },
       {
         type: 'feature',
         "description": "Implement adjustable groove cycle duration and immediate re-sync"
@@ -206,38 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Replace isDark references with fixed colors in hardware UIs"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused isDark variables from hardware UIs"
-      },
-      {
-        type: 'fix',
-        "description": "Add NaN guards to Knob component SVG rendering"
-      },
-      {
-        type: 'feature',
-        "description": "Add DX7 and OBXd hardware UIs for iconic synthesizers"
-      },
-      {
-        type: 'feature',
-        "description": "Add hardware UIs for TB-303, D-50, CZ-101, and VFX synthesizers"
-      },
-      {
-        type: 'feature',
-        "description": "Expand FurnaceDispatch platform support and effect routing"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing methods to FurnaceChipEngine and FurnaceRegisterMapper"
-      },
-      {
-        type: 'fix',
-        "description": "Update FurnaceSynth and FurnaceDispatchSynth with public API methods"
-      },
-      {
-        type: 'feature',
-        "description": "Add MAME chip infrastructure and hardware UI system"
       }
     ]
   }

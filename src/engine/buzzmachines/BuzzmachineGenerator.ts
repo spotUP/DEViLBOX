@@ -52,7 +52,6 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   private mufflerMode: MufflerMode = 'off';
   private filterTrackingAmount = 0;   // 0-100
   private currentCutoff = 1000;       // Track cutoff for filter tracking
-  private highResonanceEnabled = false;
 
   constructor(machineType: BuzzmachineType) {
     super();
@@ -344,13 +343,14 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   }
 
   /**
-   * Set filter cutoff frequency (Hz)
+   * Set filter cutoff frequency (0-1 normalized)
    * Maps to Aggressor's cutoff parameter (0x00-0xF0)
    */
-  public setCutoff(hz: number): void {
+  public setCutoff(value: number): void {
     if (!this.is303Style()) return;
 
-    // Track current cutoff for filter tracking feature
+    // Track current normalized cutoff
+    const hz = 200 * Math.pow(100, value); // Approximate for tracking logic
     this.currentCutoff = Math.max(200, Math.min(5000, hz));
 
     // Also update post-filter if not using tracking (direct cutoff control)
@@ -358,145 +358,128 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       this.postFilter.frequency.value = Math.min(18000, this.currentCutoff * 1.5);
     }
 
-    // Map Hz (200-5000) to Aggressor range (0x00-0xF0)
     // Aggressor uses a squared curve: cutoff = (param / 240)^2 * 0.8775 + 0.1225
-    // Reverse: param = sqrt((cutoff - 0.1225) / 0.8775) * 240
-    const normalized = Math.min(Math.max((hz - 200) / (5000 - 200), 0), 1);
-    const param = Math.round(Math.sqrt(normalized) * 0xF0);
+    // Reverse: param = sqrt((cutoff_norm - 0.1225) / 0.8775) * 240
+    // But since we now get 0-1 normalized from UI, we can just scale it
+    const param = Math.round(value * 0xF0);
     this.setParameter(1, Math.min(0xF0, Math.max(0, param)));
   }
 
   /**
-   * Set filter resonance (0-100)
+   * Set filter resonance (0-1 normalized)
    * Maps to Aggressor's resonance parameter (0x00-0x80)
    */
-  public setResonance(percent: number): void {
+  public setResonance(value: number): void {
     if (!this.is303Style()) return;
-    // Map 0-100 to 0x00-0x80 (0-128)
-    const param = Math.round((percent / 100) * 0x80);
+    const param = Math.round(value * 0x80);
     this.setParameter(2, Math.min(0x80, Math.max(0, param)));
   }
 
   /**
-   * Set envelope modulation amount (0-100)
+   * Set envelope modulation amount (0-1 normalized)
    * Maps to Aggressor's envmod parameter (0x00-0x80)
    */
-  public setEnvMod(percent: number): void {
+  public setEnvMod(value: number): void {
     if (!this.is303Style()) return;
-    const param = Math.round((percent / 100) * 0x80);
+    const param = Math.round(value * 0x80);
     this.setParameter(3, Math.min(0x80, Math.max(0, param)));
   }
 
   /**
-   * Set envelope decay time (ms)
+   * Set envelope decay time (0-1 normalized)
    * Maps to Aggressor's decay parameter (0x00-0x80)
    */
-  public setDecay(ms: number): void {
+  public setDecay(value: number): void {
     if (!this.is303Style()) return;
-    // Map decay 30-3000ms to 0x00-0x80
-    // Aggressor uses: Decay = pow((param / 128), 0.1) * 0.992
-    const normalized = Math.min(Math.max((ms - 30) / (3000 - 30), 0), 1);
-    const param = Math.round(Math.pow(normalized, 10) * 0x80);
+    const param = Math.round(value * 0x80);
     this.setParameter(4, Math.min(0x80, Math.max(0, param)));
   }
 
   /**
-   * Set accent level (0-100)
+   * Set accent level (0-1 normalized)
    * Maps to Aggressor's acclevel parameter (0x00-0x80)
    */
-  public setAccentAmount(percent: number): void {
+  public setAccentAmount(value: number): void {
     if (!this.is303Style()) return;
-    // Map 0-100 to 0x00-0x80, but Aggressor uses /64 internally so double the range
-    const param = Math.round((percent / 100) * 0x80);
+    const param = Math.round(value * 0x80);
     this.setParameter(5, Math.min(0x80, Math.max(0, param)));
   }
 
   /**
    * Alias for setAccentAmount (matches TB303/Open303 API)
    */
-  public setAccent(percent: number): void {
-    this.setAccentAmount(percent);
+  public setAccent(value: number): void {
+    this.setAccentAmount(value);
   }
 
   /**
-   * Set fine tuning (cents, -100 to +100)
+   * Set fine tuning (0-1 normalized, 0.5 = center)
    * Maps to Aggressor's finetune parameter (0x00-0xC8, center=0x64)
    */
-  public setTuning(cents: number): void {
+  public setTuning(value: number): void {
     if (!this.is303Style()) return;
-    // Map -100 to +100 cents to 0x00-0xC8 (0-200)
-    const param = Math.round(cents + 100);
+    const param = Math.round(value * 0xC8);
     this.setParameter(6, Math.min(0xC8, Math.max(0, param)));
   }
 
   /**
-   * Set volume (dB, typically -60 to 0)
+   * Set volume (0-1 normalized)
    * Maps to Aggressor's volume parameter (0x00-0xC8)
    */
-  public setVolume(volumeDb: number): void {
+  public setVolume(value: number): void {
     if (!this.is303Style()) return;
-    // Map dB to 0-200 range
-    // -60dB = 0, 0dB = 100
-    const param = Math.round(Math.max(0, Math.min(100, volumeDb + 60)) * 2);
+    const param = Math.round(value * 0xC8);
     this.setParameter(7, Math.min(0xC8, Math.max(0, param)));
   }
 
   /**
-   * Set oscillator waveform
+   * Set oscillator waveform (0-1 normalized blend)
    * Maps to Aggressor's osctype parameter (0=saw, 1=square)
    */
-  public setWaveform(type: 'sawtooth' | 'square' | number): void {
+  public setWaveform(value: number | 'sawtooth' | 'square'): void {
     if (!this.is303Style()) return;
     let param: number;
-    if (typeof type === 'number') {
-      param = type >= 0.5 ? 1 : 0;
+    if (typeof value === 'number') {
+      param = value >= 0.5 ? 1 : 0;
     } else {
-      param = type === 'square' ? 1 : 0;
+      param = value === 'square' ? 1 : 0;
     }
     this.setParameter(0, param);
   }
 
   /**
-   * Set slide time (ms)
+   * Set slide time (0-1 normalized)
    * Devil Fish WASM: maps to parameter 14 (10-500ms)
-   * Original Aggressor: fixed ~60ms glide
    */
-  public setSlideTime(ms: number): void {
+  public setSlideTime(value: number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
-      // Devil Fish WASM: param 14, range 0-100 maps to 10-500ms
-      const normalized = Math.max(0, Math.min(1, (ms - 10) / 490));
-      const param = Math.round(normalized * 100);
+      const param = Math.round(value * 100);
       this.setParameter(14, param);
     }
-    // Original Aggressor has fixed slide time (~60ms)
   }
 
   // ============================================
   // DEVIL FISH STYLE ENHANCEMENTS
-  // These use the external effects chain to provide features
-  // the Aggressor WASM doesn't natively support
   // ============================================
 
   /**
    * Enable/disable Devil Fish mode
-   * For Devil Fish WASM: activates native Devil Fish parameters
-   * For original Aggressor: uses external effects chain
    */
   public enableDevilFish(enabled: boolean, config?: { overdrive?: number; muffler?: MufflerMode }): void {
     if (!this.is303Style()) return;
 
     if (enabled) {
       // Default Devil Fish settings
-      this.setOverdrive(config?.overdrive ?? 30);
+      this.setOverdrive(config?.overdrive ?? 0.3); // 30% -> 0.3
       this.setMuffler(config?.muffler ?? 'mid');
       this.setHighResonanceEnabled(true);
 
       // Devil Fish WASM: also set some sensible defaults for other params
       if (this.isDevilFishWasm()) {
-        this.setFilterTracking(50);   // Moderate filter tracking
-        this.setSlideTime(60);        // 60ms slide
+        this.setFilterTracking(0.5);   // 50% -> 0.5
+        this.setSlideTime(0.17);       // ~60ms -> 0.17
         this.setSweepSpeed('normal');
       }
 
@@ -513,36 +496,33 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   }
 
   /**
-   * Set overdrive amount (0-100)
+   * Set overdrive amount (0-1 normalized)
    * Uses external Tone.js Distortion for saturation
    */
   public setOverdrive(amount: number): void {
     if (!this.is303Style() || !this.overdrive) return;
 
-    this.overdriveAmount = Math.max(0, Math.min(100, amount));
+    this.overdriveAmount = Math.min(Math.max(amount, 0), 1);
 
     if (this.overdriveAmount === 0) {
-      // Bypass overdrive
       this.overdrive.wet.value = 0;
     } else {
-      // Scale wet mix: 0-100 -> 0-0.8 (never 100% wet to preserve some clean signal)
-      this.overdrive.wet.value = (this.overdriveAmount / 100) * 0.8;
-      // Adjust distortion character based on amount
-      this.overdrive.distortion = 0.2 + (this.overdriveAmount / 100) * 0.6;
+      // Scale wet mix: 0-1 -> 0-0.8
+      this.overdrive.wet.value = this.overdriveAmount * 0.8;
+      // Adjust distortion character
+      this.overdrive.distortion = 0.2 + this.overdriveAmount * 0.6;
     }
   }
 
   /**
-   * Set muffler mode (Devil Fish mod)
+   * Set muffler mode
    * Devil Fish WASM: param 15 (0=off, 1=soft, 2=hard)
-   * Original Aggressor: external lowpass filter
    */
   public setMuffler(mode: string): void {
     if (!this.is303Style()) return;
 
     this.mufflerMode = mode as MufflerMode;
 
-    // Devil Fish WASM: send to parameter 15
     if (this.isDevilFishWasm()) {
       let param: number;
       switch (this.mufflerMode) {
@@ -561,7 +541,6 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       this.setParameter(15, param);
     }
 
-    // Also apply to external filter (for original Aggressor or as additional processing)
     if (this.mufflerFilter) {
       switch (this.mufflerMode) {
         case 'dark':
@@ -586,18 +565,34 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   }
 
   /**
-   * Set filter tracking amount (0-100)
+   * Update filter tracking based on current note
+   * Called internally when triggering notes
+   */
+  private applyFilterTracking(frequency: number): void {
+    if (!this.postFilter || this.filterTrackingAmount === 0) return;
+
+    // Base cutoff + tracking offset based on note frequency
+    // Higher notes = higher filter cutoff
+    const baseFreq = 440; // A4 reference
+    const octaveOffset = Math.log2(frequency / baseFreq);
+    const trackingOffset = octaveOffset * this.filterTrackingAmount * 2000;
+
+    const targetCutoff = Math.max(200, Math.min(18000, this.currentCutoff + trackingOffset));
+    this.postFilter.frequency.value = targetCutoff;
+  }
+
+  /**
+   * Set filter tracking amount (0-1 normalized)
    * Devil Fish WASM: param 12 (0-200%)
    * Original Aggressor: post-filter follows note pitch
    */
-  public setFilterTracking(percent: number): void {
+  public setFilterTracking(value: number): void {
     if (!this.is303Style()) return;
-    this.filterTrackingAmount = Math.max(0, Math.min(100, percent));
+    this.filterTrackingAmount = Math.min(Math.max(value, 0), 1);
 
-    // Devil Fish WASM: send to parameter 12 (range 0-200, so 100% = 100)
     if (this.isDevilFishWasm()) {
-      // Map 0-100 to 0-200 range (100% = full tracking)
-      const param = Math.round(percent * 2);
+      // Map 0-1 to 0-200 range
+      const param = Math.round(value * 200);
       this.setParameter(12, Math.min(200, param));
     }
     // For original Aggressor, tracking is applied in triggerAttack
@@ -605,20 +600,14 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
 
   /**
    * Enable/disable high resonance mode
-   * Devil Fish WASM: param 13 (0/1 switch)
-   * Original Aggressor: boost Q of post-filter
    */
   public setHighResonanceEnabled(enabled: boolean): void {
     if (!this.is303Style()) return;
 
-    this.highResonanceEnabled = enabled;
-
-    // Devil Fish WASM: send to parameter 13
     if (this.isDevilFishWasm()) {
       this.setParameter(13, enabled ? 1 : 0);
     }
 
-    // Also apply to external post-filter (for original Aggressor or additional processing)
     if (this.postFilter) {
       this.postFilter.Q.value = enabled ? 4 : 1;
     }
@@ -631,197 +620,102 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     this.setHighResonanceEnabled(enabled);
   }
 
-  /**
-   * Get high resonance enabled state
-   */
-  public getHighResonanceEnabled(): boolean {
-    return this.highResonanceEnabled;
-  }
-
-  /**
-   * Get current overdrive amount (0-100)
-   */
-  public getOverdrive(): number {
-    return this.overdriveAmount;
-  }
-
-  /**
-   * Get current muffler mode
-   */
-  public getMufflerMode(): MufflerMode {
-    return this.mufflerMode;
-  }
-
-  /**
-   * Get current filter tracking amount (0-100)
-   */
-  public getFilterTracking(): number {
-    return this.filterTrackingAmount;
-  }
-
-  /**
-   * Check if Devil Fish mode is active
-   * (overdrive > 0 OR muffler is not off OR high resonance enabled)
-   */
-  public isDevilFishEnabled(): boolean {
-    return this.overdriveAmount > 0 ||
-           this.mufflerMode !== 'off' ||
-           this.highResonanceEnabled;
-  }
-
-  /**
-   * Update filter tracking based on current note
-   * Called internally when triggering notes
-   */
-  private applyFilterTracking(frequency: number): void {
-    if (!this.postFilter || this.filterTrackingAmount === 0) return;
-
-    // Base cutoff + tracking offset based on note frequency
-    // Higher notes = higher filter cutoff
-    const baseFreq = 440; // A4 reference
-    const octaveOffset = Math.log2(frequency / baseFreq);
-    const trackingOffset = octaveOffset * (this.filterTrackingAmount / 100) * 2000;
-
-    const targetCutoff = Math.max(200, Math.min(18000, this.currentCutoff + trackingOffset));
-    this.postFilter.frequency.value = targetCutoff;
-  }
-
   // ============================================
   // ENVELOPE PARAMETERS (limited support)
-  // The Aggressor has its own decay parameter, but we can
-  // adjust gain envelope for some control
   // ============================================
 
   /**
-   * Set normal decay time (ms)
-   * Devil Fish WASM: param 4 (normal decay)
-   * Original Aggressor: param 4 (shared decay)
+   * Set normal decay time (0-1 normalized)
+   * Devil Fish WASM: param 4
    */
-  public setNormalDecay(ms: number): void {
+  public setNormalDecay(value: number): void {
     if (!this.is303Style()) return;
-    // Forward to the WASM decay parameter (param 4)
-    this.setDecay(ms);
+    this.setDecay(value);
   }
 
   /**
-   * Set accent decay time (ms)
-   * Devil Fish WASM: param 8 (separate accent decay)
-   * Original Aggressor: uses same decay as normal notes
+   * Set accent decay time (0-1 normalized)
+   * Devil Fish WASM: param 8
    */
-  public setAccentDecay(ms: number): void {
+  public setAccentDecay(value: number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
-      // Devil Fish WASM has separate accent decay (param 8)
-      const normalized = Math.min(Math.max((ms - 30) / (3000 - 30), 0), 1);
-      const param = Math.round(Math.pow(normalized, 10) * 0x80);
+      const param = Math.round(value * 0x80);
       this.setParameter(8, Math.min(0x80, Math.max(0, param)));
     }
-    // Original Aggressor doesn't have separate accent decay
   }
 
   /**
-   * Set VEG (Volume Envelope Generator) decay
-   * Devil Fish WASM: param 9 (16-3000ms)
-   * Original Aggressor: not supported
+   * Set VEG (Volume Envelope Generator) decay (0-1 normalized)
+   * Devil Fish WASM: param 9
    */
-  public setVegDecay(ms: number): void {
+  public setVegDecay(value: number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
-      // Map 16-3000ms to 0-128 range
-      const normalized = Math.min(Math.max((ms - 16) / (3000 - 16), 0), 1);
-      const param = Math.round(normalized * 128);
+      const param = Math.round(value * 128);
       this.setParameter(9, Math.min(0x80, Math.max(0, param)));
     }
-    // Original Aggressor has single combined envelope
   }
 
   /**
-   * Set VEG sustain level (0-100%)
+   * Set VEG sustain level (0-1 normalized)
    * Devil Fish WASM: param 10
-   * Original Aggressor: not supported
    */
-  public setVegSustain(percent: number): void {
+  public setVegSustain(value: number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
-      // Map 0-100% to 0-100 param value
-      const param = Math.round(Math.max(0, Math.min(100, percent)));
+      const param = Math.round(value * 100);
       this.setParameter(10, param);
     }
-    // Original Aggressor has fixed sustain behavior
   }
 
   /**
-   * Set soft attack time (ms)
-   * Devil Fish WASM: param 11 (0.3-30ms)
-   * Original Aggressor: fixed ~3ms attack
+   * Set soft attack time (0-1 normalized)
+   * Devil Fish WASM: param 11
    */
-  public setSoftAttack(ms: number): void {
+  public setSoftAttack(value: number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
-      // Map 0.3-30ms to 0-100 range
-      const normalized = Math.min(Math.max((ms - 0.3) / (30 - 0.3), 0), 1);
-      const param = Math.round(normalized * 100);
+      const param = Math.round(value * 100);
       this.setParameter(11, Math.min(100, Math.max(0, param)));
     }
-    // Original Aggressor has fixed ~3ms attack
   }
 
   /**
-   * Set sub-oscillator level (0-100)
-   * Devil Fish mod: adds a square wave one octave below
-   * Aggressor WASM doesn't support sub-oscillator natively
+   * Set filter FM amount (0-1 normalized)
    */
-  public setSubOsc(_level: number): void {
+  public setFilterFM(value: number): void {
     if (!this.is303Style()) return;
-    // Sub-oscillator would require modifying the WASM to add an additional oscillator
+    if (this.isDevilFishWasm()) {
+      // Devil Fish WASM has filter FM at parameter 19
+      this.setParameter(19, Math.round(value * 100));
+    }
   }
 
   /**
-   * Set filter FM amount
-   * Not directly supported in either WASM
+   * Set sweep speed mode (0-1 normalized or string)
    */
-  public setFilterFM(_percent: number): void {
-    // N/A - Would require modifying the WASM
-  }
-
-  /**
-   * Set sweep speed mode (fast/normal/slow)
-   * Devil Fish WASM: param 16 (0=fast, 1=normal, 2=slow)
-   * Original Aggressor: fixed sweep behavior
-   */
-  public setSweepSpeed(mode: string): void {
+  public setSweepSpeed(mode: string | number): void {
     if (!this.is303Style()) return;
 
     if (this.isDevilFishWasm()) {
       let param: number;
-      switch (mode.toLowerCase()) {
-        case 'fast':
-          param = 0;
-          break;
-        case 'slow':
-          param = 2;
-          break;
-        case 'normal':
-        default:
-          param = 1;
-          break;
+      if (typeof mode === 'number') {
+        param = Math.round(mode * 2); // 0, 1, 2
+      } else {
+        switch (mode.toLowerCase()) {
+          case 'fast': param = 0; break;
+          case 'slow': param = 2; break;
+          case 'normal':
+          default: param = 1; break;
+        }
       }
       this.setParameter(16, param);
     }
-    // Original Aggressor has fixed sweep behavior
-  }
-
-  /**
-   * Enable/disable accent sweep
-   * Part of sweep speed control in Devil Fish WASM
-   */
-  public setAccentSweepEnabled(_enabled: boolean): void {
-    // Accent sweep is always active in both WASMs
-    // Speed is controlled via setSweepSpeed for Devil Fish
   }
 
   // ============================================

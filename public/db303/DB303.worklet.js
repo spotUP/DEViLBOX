@@ -65,7 +65,18 @@ class DB303Processor extends AudioWorkletProcessor {
         break;
       case 'setParameter':
         if (this.synth) {
-          this.synth.setParameter(data.paramId, data.value);
+          // If paramId is a string, try to use it as a named setter
+          if (typeof data.paramId === 'string') {
+            const setterName = 'set' + data.paramId.charAt(0).toUpperCase() + data.paramId.slice(1);
+            if (typeof this.synth[setterName] === 'function') {
+              this.synth[setterName](data.value);
+              break;
+            }
+          }
+          // Fallback to setParameter(id, value)
+          if (typeof this.synth.setParameter === 'function') {
+            this.synth.setParameter(data.paramId, data.value);
+          }
         }
         break;
       case 'controlChange':

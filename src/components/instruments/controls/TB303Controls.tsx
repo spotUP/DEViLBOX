@@ -18,27 +18,20 @@ interface TB303ControlsProps {
   showHeader?: boolean;
   /** Use the JC303 styled panel */
   isJC303?: boolean;
-  volume?: number;
-  onVolumeChange?: (volume: number) => void;
   isBuzz3o3?: boolean;
 }
 
 export const TB303Controls: React.FC<TB303ControlsProps> = ({
   config,
   onChange,
-  volume,
-  onVolumeChange,
   isBuzz3o3 = false,
 }) => {
   return (
-    <JC303StyledKnobPanel 
-      config={config} 
-      onChange={onChange} 
-      volume={volume} 
-      onVolumeChange={onVolumeChange} 
-      isBuzz3o3={isBuzz3o3}
-    />
-  );
+        <JC303StyledKnobPanel
+          config={config}
+          onChange={onChange}
+          isBuzz3o3={isBuzz3o3}
+        />  );
 };
 
 export default TB303Controls;
