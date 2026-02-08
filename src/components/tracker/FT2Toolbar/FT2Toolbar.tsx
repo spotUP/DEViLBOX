@@ -25,6 +25,7 @@ import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { EnvelopeVisualizer } from '@components/ui/EnvelopeVisualizer';
 import { AccentChargeVisualizer } from '@components/ui/AccentChargeVisualizer';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
+import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
@@ -180,9 +181,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     grooveTemplateId,
     setGrooveTemplate,
     swing,
-    setSwing,
-    grooveSteps,
-    setGrooveSteps,
+    jitter,
+    useMpcScale,
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
@@ -200,7 +200,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
   
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
-  const [showGrooveMenu, setShowGrooveMenu] = useState(false);
+  const [showGrooveSettings, setShowGrooveSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -235,11 +235,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
   const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
-  const grooveMenuRef = useRef<HTMLDivElement>(null);
-  const grooveButtonRef = useRef<HTMLDivElement>(null);
 
   const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
-  const [grooveMenuPosition, setGrooveMenuPosition] = useState({ top: 0, left: 0 });
 
 
   const handleLoadMasterFxPreset = (preset: MasterFxPreset) => {
@@ -260,27 +257,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   }, [showFxPresetsMenu]);
 
   React.useEffect(() => {
-    if (showGrooveMenu && grooveButtonRef.current) {
-      const rect = grooveButtonRef.current.getBoundingClientRect();
-      setGrooveMenuPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [showGrooveMenu]);
-
-  React.useEffect(() => {
-    if (!showFxPresetsMenu && !showGrooveMenu) return;
+    if (!showFxPresetsMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
         setShowFxPresetsMenu(false);
       }
-      // Close groove menu when clicking outside
-      if (showGrooveMenu && grooveMenuRef.current && !grooveMenuRef.current.contains(e.target as Node) &&
-          grooveButtonRef.current && !grooveButtonRef.current.contains(e.target as Node)) {
-        setShowGrooveMenu(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showFxPresetsMenu, showGrooveMenu]);
+  }, [showFxPresetsMenu]);
 
   const handleSave = () => {
     try {
@@ -655,104 +640,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               </div>
               <div className="ft2-section ft2-col-2">
                 <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
-                <div ref={grooveButtonRef}>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setShowGrooveMenu(!showGrooveMenu)}
-                    title={`Groove Template: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'}`}
-                    className={`min-w-[32px] ml-1 ${grooveTemplateId !== 'straight' ? 'text-accent-primary' : ''}`}
-                  >
-                    Grv
-                  </Button>
-                </div>
-                {showGrooveMenu && (
-                  <div ref={grooveMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[220px] max-w-[300px] max-h-[400px] overflow-y-auto whitespace-normal" style={{ top: `${grooveMenuPosition.top}px`, left: `${grooveMenuPosition.left}px` }}>
-                    {['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'].map(category => {
-                      const grooves = GROOVE_TEMPLATES.filter(g => g.category === category);
-                      if (grooves.length === 0) return null;
-                      return (
-                        <div key={category} className="flex flex-col">
-                          <div className="px-3 py-1 text-[10px] font-bold text-text-muted border-b border-dark-border uppercase bg-dark-bgSecondary/50">
-                            {category}
-                          </div>
-                          {grooves.map((groove, idx) => (
-                            <button
-                              key={groove.id}
-                              onClick={() => {
-                                setGrooveTemplate(groove.id);
-                                setShowGrooveMenu(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors ${
-                                idx !== grooves.length - 1 ? 'border-b border-dark-border' : ''
-                              } ${
-                                groove.id === grooveTemplateId
-                                  ? 'bg-accent-primary/20 text-accent-primary'
-                                  : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-                              }`}
-                            >
-                              <div className="font-bold">{groove.name}</div>
-                              {groove.description && (
-                                <div className="text-[10px] opacity-60 leading-tight mt-0.5">{groove.description}</div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Manual Swing Control */}
-                    <div className="mt-auto border-t border-dark-border p-3 bg-dark-bgSecondary/30 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-text-muted uppercase">Groove Amount</span>
-                        <span className="text-[10px] font-mono text-accent-primary font-bold">{swing}%</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="200" 
-                        value={swing} 
-                        onChange={(e) => setSwing(parseInt(e.target.value))}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setSwing(100);
-                        }}
-                        className="w-full accent-accent-primary cursor-pointer"
-                        title="Adjust groove intensity (0-200%). 100% is Standard Triplet. Right-click to reset."
-                      />
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-text-muted uppercase">Resolution</span>
-                        <select 
-                          value={grooveSteps}
-                          onChange={(e) => {
-                            setGrooveSteps(parseInt(e.target.value));
-                            if (grooveTemplateId !== 'straight') {
-                              setGrooveTemplate('straight');
-                            }
-                          }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          className="bg-dark-bgTertiary text-accent-primary border border-dark-border rounded px-1 text-[10px] font-mono outline-none"
-                          title="Swing Note Resolution. 2 = 16th Shuffle, 4 = 8th Jazz Swing."
-                        >
-                          <option value={2}>16th (2 steps)</option>
-                          <option value={4}>8th (4 steps)</option>
-                          <option value={8}>1/4 note (8 steps)</option>
-                          <option value={16}>1 bar (16 steps)</option>
-                          <option value={32}>2 bars (32 steps)</option>
-                          <option value={64}>4 bars (64 steps)</option>
-                        </select>
-                      </div>
-
-                      <div className="flex justify-between text-[8px] text-text-muted mt-1 font-mono">
-                        <span>OFF</span>
-                        <span>NORMAL</span>
-                        <span>EXTREME</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowGrooveSettings(true)}
+                  title={`Groove & Swing Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'})`}
+                  className={`min-w-[32px] ml-1 ${grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0 ? 'text-accent-primary font-bold shadow-glow-sm border-accent-primary/50' : ''}`}
+                >
+                  Groove
+                </Button>
+                {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
               </div>
               <div className="ft2-section ft2-col-3">
                 <FT2NumericInput

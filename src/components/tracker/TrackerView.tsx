@@ -34,6 +34,7 @@ import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
+import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
@@ -199,22 +200,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setBPM, 
     smoothScrolling, 
     setSmoothScrolling, 
-    grooveTemplateId, 
-    setGrooveTemplate,
+    grooveTemplateId,
     swing,
-    setSwing,
-    grooveSteps,
-    setGrooveSteps
+    jitter,
+    useMpcScale
   } = useTransportStore(useShallow((state) => ({
     setBPM: state.setBPM,
     smoothScrolling: state.smoothScrolling,
     setSmoothScrolling: state.setSmoothScrolling,
     grooveTemplateId: state.grooveTemplateId,
-    setGrooveTemplate: state.setGrooveTemplate,
     swing: state.swing,
-    setSwing: state.setSwing,
-    grooveSteps: state.grooveSteps,
-    setGrooveSteps: state.setGrooveSteps,
+    jitter: state.jitter,
+    useMpcScale: state.useMpcScale,
   })));
   const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
     masterMuted: state.masterMuted,
@@ -235,6 +232,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showEffectPicker, setShowEffectPicker] = useState(false);
   const [showUndoHistory, setShowUndoHistory] = useState(false);
   const [showPatternMatrix, setShowPatternMatrix] = useState(false);
+  const [showGrooveSettings, setShowGrooveSettings] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
   // FT2 dialogs
   const [showScaleVolume, setShowScaleVolume] = useState(false);
@@ -842,89 +840,20 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             {smoothScrolling ? 'Smooth' : 'Stepped'}
           </button>
 
-          {/* Groove Selector */}
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-text-muted font-mono">Groove:</span>
-            <select
-              value={grooveTemplateId}
-              onChange={(e) => setGrooveTemplate(e.target.value)}
-              className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1.5 py-0.5 text-xs font-mono cursor-pointer hover:bg-dark-bgHover focus:outline-none focus:border-accent-primary"
-              title="Groove/Swing Template - Applies timing offsets to notes for shuffle/swing feel"
-            >
-              <optgroup label="Straight">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'straight').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Shuffle">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'shuffle').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Swing">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'swing').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Funk">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'funk').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Hip-Hop">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'hip-hop').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Custom">
-                {GROOVE_TEMPLATES.filter(t => t.category === 'custom').map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          {/* Swing Amount Slider (Compact) */}
+          {/* Groove Settings Button */}
           <div className="flex items-center gap-1 ml-1 pl-2 border-l border-dark-border">
-            <span className="text-[10px] text-text-muted font-mono" title="Groove Amount / Intensity">Amt:</span>
-            <input 
-              type="range" 
-              min="0" 
-              max="200" 
-              value={swing} 
-              onChange={(e) => setSwing(parseInt(e.target.value))}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setSwing(100);
-              }}
-              className="w-16 h-1 accent-accent-primary cursor-pointer"
-              title="Adjust groove amount/intensity (0-200%). 100% is default. Right-click to reset."
-            />
-            <span className={`text-[10px] font-mono w-8 ${swing !== 100 ? 'text-accent-primary font-bold' : 'text-text-muted'}`}>
-              {swing}%
-            </span>
-            
-            <span className="text-[10px] text-text-muted font-mono ml-1" title="Swing Resolution">Res:</span>
-            <select 
-              value={grooveSteps}
-              onChange={(e) => {
-                setGrooveSteps(parseInt(e.target.value));
-                if (grooveTemplateId !== 'straight') {
-                  setGrooveTemplate('straight');
-                }
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-dark-bgSecondary text-accent-primary border border-dark-border rounded px-0.5 text-[10px] font-mono outline-none cursor-pointer"
-              title="Swing Note Resolution. 2=16th, 4=8th Jazz."
+            <button
+              onClick={() => setShowGrooveSettings(true)}
+              className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
+                grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0
+                  ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/50'
+                  : 'bg-dark-bgSecondary text-text-secondary border border-dark-border hover:text-text-primary'
+              }`}
+              title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'})`}
             >
-              <option value={2}>16</option>
-              <option value={4}>8</option>
-              <option value={8}>4</option>
-              <option value={16}>1b</option>
-              <option value={32}>2b</option>
-              <option value={64}>4b</option>
-            </select>
+              GROOVE
+            </button>
+            {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
           </div>
         </div>
 
