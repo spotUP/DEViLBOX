@@ -57,7 +57,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                   
                   return (
                     <div key={category} className="space-y-1">
-                      <div className="text-[10px] font-bold text-text-muted uppercase px-1 pb-1 border-b border-ft2-border/30">
+                      <div className="text-[10px] font-bold text-text-muted uppercase px-1 pb-1 border-b border-dark-border">
                         {category}
                       </div>
                       <div className="grid grid-cols-1 gap-1 pt-1">
@@ -68,7 +68,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                             className={`w-full text-left px-3 py-2 text-xs font-mono transition-all rounded ${
                               groove.id === grooveTemplateId
                                 ? 'bg-accent-primary text-white font-bold shadow-glow-sm'
-                                : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary bg-dark-bgSecondary/50 border border-transparent hover:border-ft2-border'
+                                : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary bg-dark-bgSecondary border border-transparent hover:border-ft2-border'
                             }`}
                           >
                             <div className="flex justify-between items-center">
@@ -76,7 +76,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                               {groove.id === grooveTemplateId && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
                             </div>
                             {groove.description && (
-                              <div className={`text-[10px] mt-0.5 leading-tight ${groove.id === grooveTemplateId ? 'text-white/80' : 'opacity-60'}`}>
+                              <div className={`text-[10px] mt-0.5 leading-tight ${groove.id === grooveTemplateId ? 'text-white' : 'opacity-60'}`}>
                                 {groove.description}
                               </div>
                             )}
@@ -93,7 +93,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
           {/* Right Column: Intensity & Humanization */}
           <div className="flex-1 space-y-8">
             {/* Global Intensity */}
-            <section className="bg-dark-bgSecondary/30 p-4 border border-ft2-border rounded-lg space-y-4">
+            <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-ft2-highlight text-xs font-bold tracking-wider uppercase">Global Intensity</h3>
                 <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
             </section>
 
             {/* Resolution */}
-            <section className="bg-dark-bgSecondary/30 p-4 border border-ft2-border rounded-lg space-y-4">
+            <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <h3 className="text-ft2-highlight text-xs font-bold tracking-wider uppercase">Swing Resolution</h3>
               <div className="grid grid-cols-3 gap-2">
                 {[2, 4, 8, 16, 32, 64].map(s => (
@@ -169,7 +169,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
             </section>
 
             {/* Humanization */}
-            <section className="bg-dark-bgSecondary/30 p-4 border border-ft2-border rounded-lg space-y-4">
+            <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-cyan-400 text-xs font-bold tracking-wider uppercase">Humanization (Jitter)</h3>
                 <span className="text-lg font-mono text-cyan-400 font-bold leading-none">{jitter}%</span>
