@@ -1506,8 +1506,7 @@ export class TrackerReplayer {
     
     const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
 
-    // Schedule VU meter trigger at the correct audio time (not scheduling time)
-    // Use Tone.Draw to sync the visual update with audio playback
+    // Schedule VU meter trigger at exact audio playback time for tight sync
     if (channelIndex !== undefined) {
       Tone.Draw.schedule(() => {
         engine.triggerChannelMeter(channelIndex, velocity);
