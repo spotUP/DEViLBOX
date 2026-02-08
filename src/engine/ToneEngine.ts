@@ -50,6 +50,7 @@ interface VoiceState {
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
   private static itFilterWorkletLoaded: boolean = false; // Track if ITFilter worklet is loaded
+  private static itFilterWorkletPromise: Promise<void> | null = null; // Promise for ITFilter loading
 
   // Master routing chain: instruments → masterInput → masterEffects → masterChannel → analyzers → destination
   public masterInput: Tone.Gain; // Where instruments connect
@@ -335,23 +336,34 @@ export class ToneEngine {
 
     // Pre-load ITFilter AudioWorklet
     if (!ToneEngine.itFilterWorkletLoaded) {
-      try {
-        const baseUrl = import.meta.env.BASE_URL || '/';
-        // Add module to rawContext (standardized-audio-context)
-        await rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+      if (!ToneEngine.itFilterWorkletPromise) {
+        ToneEngine.itFilterWorkletPromise = (async () => {
+          try {
+            const baseUrl = import.meta.env.BASE_URL || '/';
+            // Add module to rawContext (standardized-audio-context)
+            await rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
 
-        const binary = await fetchDSP();
-        if (binary) {
-          // Use rawContext for node creation with Tone.js helper
-          const tempNode = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
-          tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
-          tempNode.disconnect();
-        }
+            const binary = await fetchDSP();
+            if (binary) {
+              // Use rawContext for node creation with Tone.js helper
+              const tempNode = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
+              tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
+              tempNode.disconnect();
+            }
 
-        ToneEngine.itFilterWorkletLoaded = true;
-      } catch (error) {
-        console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
+            ToneEngine.itFilterWorkletLoaded = true;
+          } catch (error: any) {
+            console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
+            // Only keep the promise if it's already registered. 
+            // Otherwise, allow retry on next attempt.
+            const isAlreadyRegistered = error?.message?.includes('already') || error?.message?.includes('duplicate');
+            if (!isAlreadyRegistered) {
+              ToneEngine.itFilterWorkletPromise = null;
+            }
+          }
+        })();
       }
+      await ToneEngine.itFilterWorkletPromise;
     }
 
     // Pre-initialize Furnace WASM chip engine

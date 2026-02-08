@@ -325,32 +325,50 @@ export class DB303Synth extends Tone.ToneAudioNode {
     });
   }
 
-  triggerRelease(_time?: number): void {
+  triggerRelease(time?: number): void {
     if (!this.workletNode || this._disposed) return;
+    
+    const safeTime = time ?? Tone.now();
+    
     // Send gateOff to release the VCA envelope with hardware-accurate 16ms release.
     // Real TB-303: gate LOW → 8ms hold + 8ms linear decay → silence.
     // This creates the characteristic staccato between non-slide notes.
     this.workletNode.port.postMessage({
-      type: 'gateOff'
+      type: 'gateOff',
+      time: safeTime
     });
   }
 
   releaseAll(): void {
     if (!this.workletNode || this._disposed) return;
+    if (this._releaseTimeout !== null) {
+      clearTimeout(this._releaseTimeout);
+      this._releaseTimeout = null;
+    }
     this.workletNode.port.postMessage({ type: 'allNotesOff' });
   }
 
   triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false): void {
     if (this._disposed) return;
-    this.triggerAttack(note, time, velocity || 1, accent, slide);
+    
+    const safeTime = time ?? Tone.now();
+    this.triggerAttack(note, safeTime, velocity || 1, accent, slide);
 
     const d = Tone.Time(duration).toSeconds();
+    
+    // Calculate precise delay relative to NOW to account for lookahead
+    const delayMs = (safeTime + d - Tone.now()) * 1000;
+    
+    if (this._releaseTimeout !== null) {
+      clearTimeout(this._releaseTimeout);
+    }
+
     this._releaseTimeout = setTimeout(() => {
       this._releaseTimeout = null;
       if (!this._disposed) {
         this.triggerRelease();
       }
-    }, d * 1000);
+    }, Math.max(0, delayMs)) as unknown as ReturnType<typeof setTimeout>;
   }
 
   private setParameterById(paramId: number, value: number): void {

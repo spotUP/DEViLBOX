@@ -38,10 +38,11 @@ interface MeterState {
 
 interface ChannelVUMetersProps {
   channelWidth?: number; // Override default channel width (for VirtualizedTrackerView)
+  scrollLeft?: number;   // NEW: Explicit scroll offset from parent
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWidth: channelWidthProp }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWidth: channelWidthProp, scrollLeft: scrollLeftProp = 0 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -57,7 +58,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
   const containerHeightRef = useRef(200);
-  const scrollContainerRef = useRef<HTMLElement | null>(null);
 
   const meterHue = currentThemeId === 'cyan-lineart' ? 180 : 0;
 
@@ -72,7 +72,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
     segmentRefs.current = Array(numChannels).fill(null).map(() => Array(NUM_SEGMENTS).fill(null));
   }, [numChannels]);
 
-  // Measure container height and find scroll container
+  // Measure container height
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
@@ -81,21 +81,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
         meterRefs.current.forEach(ref => {
           if (ref) ref.style.height = `${containerHeightRef.current - 4}px`;
         });
-
-        // Find the scroll container marked with data-vu-scroll
-        let element: HTMLElement | null = containerRef.current.parentElement;
-        while (element) {
-          if (element.hasAttribute('data-vu-scroll')) {
-            scrollContainerRef.current = element;
-            break;
-          }
-          const sibling = element.querySelector('[data-vu-scroll]') as HTMLElement;
-          if (sibling) {
-            scrollContainerRef.current = sibling;
-            break;
-          }
-          element = element.parentElement;
-        }
       }
     };
     updateHeight();
@@ -111,10 +96,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
     const engine = getToneEngine();
     const triggerLevels = engine.getChannelTriggerLevels(numChannels);
 
-    // Apply scroll offset to container
-    const scrollLeft = scrollContainerRef.current?.scrollLeft || 0;
+    // Apply scroll offset to container from PROP
     if (containerRef.current) {
-      containerRef.current.style.transform = `translateX(${-scrollLeft}px)`;
+      containerRef.current.style.transform = `translateX(${-scrollLeftProp}px)`;
     }
 
     for (let i = 0; i < numChannels; i++) {
@@ -175,7 +159,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
     }
 
     animationRef.current = requestAnimationFrame(animate);
-  }, [numChannels, meterHue]);
+  }, [numChannels, meterHue, scrollLeftProp]);
 
   // Start/stop animation
   useEffect(() => {

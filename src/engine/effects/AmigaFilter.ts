@@ -36,6 +36,11 @@ export class AmigaFilter extends Tone.ToneAudioNode {
 
   private _initialized = false;
   private _initializing = false;
+  private _retryCount = 0;
+  private static readonly MAX_RETRIES = 3;
+
+  // Static map to track loading promises per context to avoid multiple addModule calls
+  private static _loadPromises = new WeakMap<any, Promise<void>>();
 
   constructor() {
     super();
@@ -87,52 +92,93 @@ export class AmigaFilter extends Tone.ToneAudioNode {
 
   private async initWorklet() {
     if (this._initialized || this._initializing) return;
+    if (this._retryCount >= AmigaFilter.MAX_RETRIES) {
+      console.warn(`[AmigaFilter] Max retries (${AmigaFilter.MAX_RETRIES}) reached. Filter will remain in bypass mode.`);
+      return;
+    }
+    
     this._initializing = true;
 
     try {
-      // Get native AudioContext from Tone.js context
-      const rawContext = getNativeContext(this.context);
+      // Get the Tone.js context wrapper (standardized-audio-context)
+      // This is CRITICAL: we must use the wrapper for addModule so that 
+      // createAudioWorkletNode (which also uses the wrapper) can find the processor.
+      const toneCtx = this.context as any;
+      const workletContext = toneCtx.rawContext || toneCtx._context;
 
       // Verify we have a valid context with audioWorklet support
-      if (!rawContext || !rawContext.audioWorklet) {
+      if (!workletContext || !workletContext.audioWorklet) {
         console.warn('[AmigaFilter] AudioWorklet not supported or no valid context');
         this._initializing = false;
         return;
       }
 
       // Verify the context is in running state
-      if (rawContext.state !== 'running') {
+      if (workletContext.state !== 'running') {
         console.warn('[AmigaFilter] Context not running, deferring init');
         this._initializing = false;
         return;
       }
 
       const baseUrl = import.meta.env.BASE_URL || '/';
+      const cacheBuster = `?v=${Date.now()}`;
 
-      // Try to add the worklet module - might fail if already registered
-      try {
-        await rawContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js`);
-      } catch (e: any) {
-        // Module might already be registered - this is fine
-        if (e?.message?.includes('already') || e?.name === 'InvalidStateError') {
-          console.log('[AmigaFilter] Worklet already registered');
-        } else {
-          throw e;
-        }
+      // Ensure we only call addModule once per context
+      let loadPromise = AmigaFilter._loadPromises.get(workletContext);
+      if (!loadPromise) {
+        loadPromise = (async () => {
+          try {
+            await workletContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js${cacheBuster}`);
+          } catch (e: any) {
+            // Module might already be registered - this is fine
+            const isAlreadyRegistered = e?.message?.includes('already') || e?.message?.includes('duplicate');
+            if (isAlreadyRegistered) {
+              console.log('[AmigaFilter] Worklet already registered');
+            } else {
+              // If it failed for any other reason (including InvalidStateError from a transitioning context),
+              // allow retry by deleting from map.
+              AmigaFilter._loadPromises.delete(workletContext);
+              throw e;
+            }
+          }
+        })();
+        AmigaFilter._loadPromises.set(workletContext, loadPromise);
       }
 
+      // Wait for module to be loaded
+      await loadPromise;
+
       // Use Tone.js's createAudioWorkletNode for context compatibility
-      this._worklet = toneCreateAudioWorkletNode(rawContext, 'amiga-filter-processor');
+      try {
+        this._worklet = toneCreateAudioWorkletNode(workletContext, 'amiga-filter-processor');
+      } catch (e: any) {
+        if (e?.name === 'InvalidStateError') {
+          // This usually means the processor name is unknown, meaning addModule failed silently
+          this._retryCount++;
+          console.warn(`[AmigaFilter] Processor not registered after addModule (retry ${this._retryCount}/${AmigaFilter.MAX_RETRIES})`);
+          AmigaFilter._loadPromises.delete(workletContext);
+          this._initializing = false;
+          
+          // Retry once after a delay
+          if (this._retryCount < AmigaFilter.MAX_RETRIES) {
+            setTimeout(() => this.initWorklet(), 500);
+          }
+          return;
+        }
+        throw e;
+      }
 
       // Initialize worklet with coefficients
-      this._worklet.port.postMessage({
-        type: 'INIT',
-        coeffs: {
-          hp: { a1: this.hp_a1, a2: this.hp_a2 },
-          lp1: { a1: this.lp1_a1, a2: this.lp1_a2 },
-          lp2: { a1: this.lp2_a1, a2: this.lp2_a2, b1: this.lp2_b1, b2: this.lp2_b2 }
-        }
-      });
+      if (this._worklet) {
+        this._worklet.port.postMessage({
+          type: 'INIT',
+          coeffs: {
+            hp: { a1: this.hp_a1, a2: this.hp_a2 },
+            lp1: { a1: this.lp1_a1, a2: this.lp1_a2 },
+            lp2: { a1: this.lp2_a1, a2: this.lp2_a2, b1: this.lp2_b1, b2: this.lp2_b2 }
+          }
+        });
+      }
 
       if (this._worklet) {
         // Disconnect bypass before connecting through worklet
@@ -152,6 +198,7 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       console.error('[AmigaFilter] Failed to load worklet:', e);
       // Keep bypass connection (already connected in constructor)
       this._initializing = false;
+      this._retryCount++;
     }
   }
 

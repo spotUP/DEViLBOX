@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T00:41:16.196Z
+ * Generated: 2026-02-08T09:44:29.006Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '315';
-export const BUILD_HASH = '0f9f1f3';
+export const BUILD_NUMBER = '316';
+export const BUILD_HASH = 'a461565';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -31,6 +31,16 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-08',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Comprehensive tracker optimization (memoization, jank fixes, and UI smoothing)"
+      }
+    ]
+  },
+  {
+    version: '2026-02-07',
     date: '2026-02-07',
     changes: [
       {
@@ -234,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Wire SpaceyDelayer and RETapeEcho WASM effects to UI"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 38 failing effect tests (neural + sidechain)"
       }
     ]
   }
