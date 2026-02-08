@@ -232,9 +232,6 @@ export class TrackerReplayer {
   // Channels
   private channels: ChannelState[] = [];
 
-  // Tick timer
-  private tickLoop: Tone.Loop | null = null;
-
   // Master output
   private masterGain: Tone.Gain;
 
@@ -373,6 +370,9 @@ export class TrackerReplayer {
   // Drift-free timing state
   private startTime = 0;
   private totalTicksScheduled = 0;
+  private lastGrooveTemplateId = 'straight';
+  private lastSwingAmount = 100;
+  private lastGrooveSteps = 2;
 
   // Raw interval timer ID (more reliable than Tone.Loop for scheduling)
   private schedulerTimerId: ReturnType<typeof setInterval> | null = null;
@@ -383,12 +383,14 @@ export class TrackerReplayer {
     await Tone.start();
 
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
-    // Without this, the first notes are silently dropped because the AudioWorklet
-    // hasn't loaded the WASM binary yet.
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
 
     this.playing = true;
+    const transportState = useTransportStore.getState();
+    this.lastGrooveTemplateId = transportState.grooveTemplateId;
+    this.lastSwingAmount = transportState.swing;
+    this.lastGrooveSteps = transportState.grooveSteps;
     this.startScheduler();
 
     console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed} (lookahead=${this.scheduleAheadTime}s)`);
@@ -403,14 +405,7 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
 
-    // Legacy Tone.Loop cleanup (if any)
-    if (this.tickLoop) {
-      this.tickLoop.stop();
-      this.tickLoop.dispose();
-      this.tickLoop = null;
-    }
-
-    // Stop all channels (stops pool players without disposing)
+    // Stop all channels
     for (const ch of this.channels) {
       this.stopChannel(ch);
     }
@@ -420,6 +415,9 @@ export class TrackerReplayer {
     this.pattPos = 0;
     this.currentTick = 0;
     this.totalTicksScheduled = 0;
+    this.lastGrooveTemplateId = 'straight';
+    this.lastSwingAmount = 100;
+    this.lastGrooveSteps = 2;
 
     // Clear audio-synced state queue
     this.clearStateQueue();
@@ -432,9 +430,6 @@ export class TrackerReplayer {
     if (this.schedulerTimerId !== null) {
       clearInterval(this.schedulerTimerId);
       this.schedulerTimerId = null;
-    }
-    if (this.tickLoop) {
-      this.tickLoop.stop();
     }
     this.playing = false;
   }
@@ -460,6 +455,27 @@ export class TrackerReplayer {
 
       const currentTime = Tone.now();
       const scheduleUntil = currentTime + this.scheduleAheadTime;
+      const transportState = useTransportStore.getState();
+      
+      // Force immediate re-sync if groove/tempo parameters changed significantly
+      const grooveChanged = transportState.grooveTemplateId !== this.lastGrooveTemplateId || 
+                            transportState.swing !== this.lastSwingAmount ||
+                            transportState.grooveSteps !== this.lastGrooveSteps ||
+                            Math.abs(transportState.bpm - this.bpm) > 0.1;
+
+      if (grooveChanged) {
+        // Reset timing relative to NOW to apply new timing rules immediately
+        this.startTime = currentTime + 0.01;
+        this.nextScheduleTime = this.startTime;
+        this.totalTicksScheduled = 0;
+        this.lastGrooveTemplateId = transportState.grooveTemplateId;
+        this.lastSwingAmount = transportState.swing;
+        this.lastGrooveSteps = transportState.grooveSteps;
+        this.bpm = transportState.bpm;
+        this.speed = transportState.speed;
+        console.log(`[Replayer] Re-syncing scheduler for new groove: ${this.lastGrooveTemplateId} @ ${this.lastSwingAmount}% (${this.lastGrooveSteps} steps)`);
+      }
+
       const tickInterval = 2.5 / this.bpm;
 
       // Fill the buffer - schedule all ticks within look-ahead window
@@ -503,13 +519,22 @@ export class TrackerReplayer {
     const grooveTemplateId = transportState.grooveTemplateId;
     const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId);
     
+    // intensity: 0% = 0x, 100% = 1x (normal), 200% = 2x (stretched)
+    const intensity = transportState.swing / 100;
+    
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration);
+      // Scale template values by intensity
+      grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration) * intensity;
     } else {
+      // Manual swing: 100 is neutral, 200 is max late, 0 is max early (push)
       const swingAmount = transportState.swing;
-      if (swingAmount !== 0 && swingAmount !== 50 && (this.pattPos % 2) === 1) {
+      const grooveSteps = transportState.grooveSteps || 2;
+      
+      // Swing only on the LAST step of the cycle (e.g. step 1, 3, 7...)
+      if (swingAmount !== 100 && (this.pattPos % grooveSteps) === (grooveSteps - 1)) {
         const maxSwingOffset = rowDuration * 0.5;
-        const normalizedSwing = (swingAmount - 50) / 50;
+        // Normalize: 100 -> 0, 200 -> 1, 0 -> -1
+        const normalizedSwing = (swingAmount - 100) / 100;
         grooveOffset = normalizedSwing * maxSwingOffset;
       }
     }
