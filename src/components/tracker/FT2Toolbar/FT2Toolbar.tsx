@@ -597,8 +597,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
-      <div className="flex">
-        <div className="flex-shrink-0">
+      <div className="flex min-w-0 overflow-hidden">
+        <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} format="hex" />
@@ -748,8 +748,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 min-w-[200px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group" onClick={() => {
-          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
+        <div className="flex-1 min-w-[120px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group" onClick={() => {
+          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'stereo' | 'logo' | 'envelope' | 'accent'> = ['waveform', 'spectrum', 'channels', 'stereo', 'envelope', 'accent'];
           setVizMode(modes[(modes.indexOf(vizMode as any) + 1) % modes.length]);
         }}>
           {/* Version Number */}
