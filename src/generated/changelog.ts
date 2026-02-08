@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T20:31:28.743Z
+ * Generated: 2026-02-08T23:17:46.751Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '332';
-export const BUILD_HASH = '4f99105';
+export const BUILD_NUMBER = '333';
+export const BUILD_HASH = '7a9a4ed';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-08',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add automation lane to tracker channels"
+      },
       {
         type: 'fix',
         "description": "Resolve WASM loading errors and update synth implementations"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Make hardware UI default for synths with hardware UI available"
-      },
-      {
-        type: 'feature',
-        "description": "Add drum machine auto-population to drumpad editor"
       }
     ]
   }
