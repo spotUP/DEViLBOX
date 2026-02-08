@@ -270,7 +270,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
         })}
         {/* VU Meters Overlay - positioned over channel headers */}
         <div
-          className="absolute pointer-events-none z-40 overflow-hidden"
+          className="absolute pointer-events-none z-40"
           style={{
             top: HEADER_HEIGHT / 2,
             left: ROW_NUMBER_WIDTH,
@@ -336,7 +336,7 @@ const VirtualizedTrackerViewComponent: React.FC = () => {
 
         {/* Automation Overlay */}
         <div style={{ position: 'absolute', top: showGhostPatterns ? GHOST_ROWS * ROW_HEIGHT : 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 15 }}>
-          <AutomationLanes patternId={pattern.id} patternLength={pattern.length} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} scrollOffset={0} prevPatternId={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].id : undefined} nextPatternId={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].id : undefined} prevPatternLength={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].length : undefined} nextPatternLength={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].length : undefined} />
+          <AutomationLanes patternId={pattern.id} patternLength={pattern.length} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} scrollOffset={0} visibleStart={0} prevPatternId={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].id : undefined} nextPatternId={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].id : undefined} prevPatternLength={currentPatternIndex > 0 ? patterns[currentPatternIndex - 1].length : undefined} nextPatternLength={currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1].length : undefined} />
           <MacroLanes pattern={pattern} rowHeight={ROW_HEIGHT} channelCount={pattern.channels.length} channelWidth={COLUMN_WIDTH_BASE} rowNumWidth={ROW_NUMBER_WIDTH} />
         </div>
 
