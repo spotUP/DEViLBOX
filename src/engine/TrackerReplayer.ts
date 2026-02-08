@@ -1432,17 +1432,16 @@ export class TrackerReplayer {
       // The slide flag on CURRENT row means we slide TO the next note, so gate stays high
       // Check if this is a 303-style synth that needs mid-step gate timing
       const is303Synth = ch.instrument.synthType === 'TB303' ||
-                         ch.instrument.synthType === 'Buzz3o3';
+                         ch.instrument.synthType === 'Buzz3o3' ||
+                         ch.instrument.synthType === 'Buzz3o3DF';
 
-      // For 303 synths: use half duration (gate low at midpoint) unless:
-      // 1. We're sliding INTO this note (slide = true, from previous row)
-      // 2. This row has slide flag (currentRowSlide = true, will slide to next note)
-      // When sliding, gate stays HIGH for continuous legato
-      // For other synths: use full duration
+      // For 303 synths: use 80% duration for standard notes to ensure the gate
+      // drops before the next tick starts (prevents unintentional slides).
+      // Use 100% (full row duration) for sliding notes to maintain legato.
       const keepGateHigh = slide || currentRowSlide;
       const noteDuration = is303Synth && !keepGateHigh
-        ? rowDuration * 0.5  // Mid-step gate off for 303 (non-sliding notes)
-        : rowDuration;       // Full duration for other synths or when sliding
+        ? rowDuration * 0.8  // 80% gate for punchy acid retrigger
+        : rowDuration;       // 100% gate for slides
 
       // Update gate state for 303 synths
       if (is303Synth) {

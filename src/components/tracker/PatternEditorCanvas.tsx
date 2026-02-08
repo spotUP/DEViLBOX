@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
+import { useTrackerStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChannelVUMeter } from './ChannelVUMeter';
@@ -148,6 +148,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     mobileChannelIndex: state.cursor.channelIndex,
     cursor: state.cursor,
     selection: state.selection,
+  })));
+
+  const { instruments } = useInstrumentStore(useShallow((state) => ({
+    instruments: state.instruments
   })));
 
   // Audio-synced display state ref (BassoonTracker pattern)
@@ -616,10 +620,32 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Track widths - must match getParamCanvas layout exactly
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    // Detect flag/prob columns from first channel's first cell (all cells share same schema)
-    const firstCell = pattern.channels[0]?.rows[0];
-    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
-    const hasProb = firstCell?.probability !== undefined;
+    
+    // Detect flag/prob columns by scanning current pattern data
+    // Also force them visible if the current channel's instrument is a 303
+    let hasAcid = false;
+    let hasProb = false;
+    
+    // Scan all channels for flag/prob data
+    for (const channel of pattern.channels) {
+      if (hasAcid && hasProb) break;
+      
+      // Check if this channel uses a 303 synth
+      if (!hasAcid && channel.instrumentId !== null) {
+        const inst = instruments.find(i => i.id === channel.instrumentId);
+        if (inst?.synthType === 'TB303' || inst?.synthType === 'Buzz3o3') {
+          hasAcid = true;
+        }
+      }
+
+      // Check first row of each channel for schema
+      const cell = channel.rows[0];
+      if (cell) {
+        if (cell.flag1 !== undefined || cell.flag2 !== undefined) hasAcid = true;
+        if (cell.probability !== undefined) hasProb = true;
+      }
+    }
+
     // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
     // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
     // Prob: prob(2) +4gap = +CW*2 + 4
@@ -1146,14 +1172,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
       >
-        {/* VU Meters overlay */}
-        <div
-          className="absolute right-0 pointer-events-none z-20 overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
-        >
-          <ChannelVUMeters channelWidth={channelHeaderWidth} />
-        </div>
-
         <canvas
           ref={canvasRef}
           style={{
@@ -1162,6 +1180,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             display: 'block',
           }}
         />
+
+        {/* VU Meters overlay - moved AFTER canvas and added z-30 */}
+        <div
+          className="absolute right-0 pointer-events-none z-30 overflow-hidden"
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
+        >
+          <ChannelVUMeters channelWidth={channelHeaderWidth} scrollLeft={scrollLeft} />
+        </div>
 
         {/* Cell context menu */}
         <CellContextMenu
