@@ -30,11 +30,17 @@ interface TransportStore extends TransportState {
   grooveTemplateId: string;
   // Groove cycle length (for manual swing and custom grooves)
   grooveSteps: number;
+  // Micro-timing jitter (0-100%)
+  jitter: number;
+  // Use MPC swing scale (50-75%) instead of 0-200%
+  useMpcScale: boolean;
 
   // Actions
   setBPM: (bpm: number) => void;
   setTimeSignature: (numerator: number, denominator: number) => void;
   setSwing: (swing: number) => void;
+  setJitter: (jitter: number) => void;
+  setUseMpcScale: (use: boolean) => void;
   setPosition: (position: string) => void;
   play: () => void;
   pause: () => void;
@@ -83,6 +89,8 @@ export const useTransportStore = create<TransportStore>()(
     loopStartRow: 0, // 0 = no loop point set
     grooveTemplateId: 'straight', // Default to straight timing (no groove)
     grooveSteps: 2, // Default to 2 steps (standard 16th swing)
+    jitter: 0,
+    useMpcScale: false,
 
     // Actions
     setBPM: (bpm) =>
@@ -98,15 +106,35 @@ export const useTransportStore = create<TransportStore>()(
 
     setSwing: (swing) =>
       set((state) => {
-        state.swing = Math.max(0, Math.min(200, swing));
-        // If user manually adjusts swing away from 100%, reset to straight template
-        // so it acts as manual swing. If they stay at 100% (neutral), we keep the template.
-        if (state.swing !== 100 && state.grooveTemplateId !== 'straight') {
-          // Actually, based on your request "should affect the presets", 
-          // we SHOULD NOT reset the template. Let's remove the reset logic.
+        // Clamp based on scale mode
+        if (state.useMpcScale) {
+          state.swing = Math.max(50, Math.min(75, swing));
+        } else {
+          state.swing = Math.max(0, Math.min(200, swing));
         }
         
         console.log('[TransportStore] Swing changed to:', state.swing);
+      }),
+
+    setJitter: (jitter) =>
+      set((state) => {
+        state.jitter = Math.max(0, Math.min(100, jitter));
+      }),
+
+    setUseMpcScale: (use) =>
+      set((state) => {
+        const prevUse = state.useMpcScale;
+        if (prevUse === use) return;
+        
+        state.useMpcScale = use;
+        // Convert current swing value to roughly match feel on new scale
+        if (use) {
+          // 0-200 -> 50-75 (100 -> 62.5)
+          state.swing = 50 + (state.swing / 200) * 25;
+        } else {
+          // 50-75 -> 0-200
+          state.swing = ((state.swing - 50) / 25) * 200;
+        }
       }),
 
     setPosition: (position) =>
@@ -305,6 +333,8 @@ export const useTransportStore = create<TransportStore>()(
         state.loopStartRow = 0;
         state.grooveTemplateId = 'straight';
         state.grooveSteps = 2;
+        state.jitter = 0;
+        state.useMpcScale = false;
       }),
   }))
 );

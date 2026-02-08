@@ -544,7 +544,15 @@ export class TrackerReplayer {
     const effectiveTickInterval = effectiveRowDuration / this.speed;
 
     // Apply offset to the base schedule time for Tick 0 (Row Start)
-    const safeTime = time + currentOffset;
+    let safeTime = time + currentOffset;
+
+    // Apply micro-timing jitter (Humanization)
+    if (transportState.jitter > 0) {
+      // Max jitter is 10ms at 100%
+      const jitterMs = (transportState.jitter / 100) * 0.01;
+      const randomOffset = (Math.random() * 2 - 1) * jitterMs;
+      safeTime += randomOffset;
+    }
 
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
