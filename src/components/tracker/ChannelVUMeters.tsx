@@ -7,8 +7,9 @@
  * to avoid 60+ state updates per second during animation.
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, memo } from 'react';
 import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 
 // VU meter timing constants - ProTracker style
@@ -39,8 +40,12 @@ interface ChannelVUMetersProps {
   channelWidth?: number; // Override default channel width (for VirtualizedTrackerView)
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({ channelWidth: channelWidthProp }) => {
-  const { patterns, currentPatternIndex } = useTrackerStore();
+// PERFORMANCE: Memoize to prevent re-renders on every scroll step
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWidth: channelWidthProp }) => {
+  const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
+    patterns: s.patterns,
+    currentPatternIndex: s.currentPatternIndex
+  })));
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const performanceQuality = useUIStore((state) => state.performanceQuality);
   const pattern = patterns[currentPatternIndex];
@@ -263,4 +268,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = ({ channelWidth: 
       })}
     </div>
   );
-};
+});
+
+ChannelVUMeters.displayName = 'ChannelVUMeters';

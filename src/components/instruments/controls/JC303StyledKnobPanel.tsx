@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, useState } from 'react';
+import React, { useRef, useLayoutEffect, useState, memo } from 'react';
 import type { TB303Config } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Knob } from '@components/controls/Knob';
@@ -15,7 +15,7 @@ interface JC303StyledKnobPanelProps {
   isBuzz3o3?: boolean;
 }
 
-export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
+export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   config,
   onChange,
   volume,
@@ -1201,4 +1201,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = ({
       </div>
     </div>
   );
-};
+});
+
+JC303StyledKnobPanel.displayName = 'JC303StyledKnobPanel';

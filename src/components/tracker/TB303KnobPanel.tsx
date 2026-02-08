@@ -3,14 +3,14 @@
  * Now uses the JC303 VST-style layout for authentic experience.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, memo } from 'react';
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
 import type { TB303Config } from '@typedefs/instrument';
 
-export const TB303KnobPanel: React.FC = () => {
+export const TB303KnobPanel: React.FC = memo(() => {
   const { instruments, updateInstrument } = useInstrumentStore(
     useShallow((state) => ({ 
       instruments: state.instruments, 
@@ -98,6 +98,8 @@ export const TB303KnobPanel: React.FC = () => {
       )}
     </div>
   );
-};
+});
+
+TB303KnobPanel.displayName = 'TB303KnobPanel';
 
 export default TB303KnobPanel;

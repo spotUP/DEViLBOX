@@ -16,7 +16,6 @@ import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
-import { useProjectPersistence } from '@hooks/useProjectPersistence';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@/engine/TrackerReplayer';
@@ -230,7 +229,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
-  useProjectPersistence();
   const { instruments, loadInstruments, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
