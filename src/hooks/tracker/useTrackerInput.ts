@@ -758,11 +758,13 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && !e.altKey) {
         e.preventDefault();
         copySelection();
+        useUIStore.getState().setStatusMessage('COPY');
         return;
       }
       if ((e.ctrlKey || e.metaKey) && keyLower === 'x' && !e.altKey) {
         e.preventDefault();
         cutSelection();
+        useUIStore.getState().setStatusMessage('CUT');
         return;
       }
       if ((e.ctrlKey || e.metaKey) && keyLower === 'v' && !e.altKey) {
@@ -770,8 +772,10 @@ export const useTrackerInput = () => {
         if (e.shiftKey) {
           // Ctrl+Shift+V: Mix Paste (only fill empty cells)
           pasteMix();
+          useUIStore.getState().setStatusMessage('MIX PASTE');
         } else {
           paste();
+          useUIStore.getState().setStatusMessage('PASTE');
         }
         return;
       }
@@ -830,9 +834,12 @@ export const useTrackerInput = () => {
         // FT2 behavior: If playing, stop. If not playing, toggle edit mode.
         if (isPlaying) {
           stop();
+          useUIStore.getState().setStatusMessage('STOPPED');
         } else {
           // Toggle edit/record mode
           toggleRecordMode();
+          const isRec = useTrackerStore.getState().recordMode;
+          useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
         }
         return;
       }
@@ -864,6 +871,7 @@ export const useTrackerInput = () => {
         e.preventDefault();
         const octave = parseInt(key.substring(1));
         setCurrentOctave(octave);
+        useUIStore.getState().setStatusMessage(`OCTAVE ${octave}`);
         return;
       }
 
@@ -871,15 +879,16 @@ export const useTrackerInput = () => {
       // Shift+` decreases, plain ` increases
       if (key === '`' || key === '~') {
         e.preventDefault();
+        let newStep: number;
         if (e.shiftKey) {
           // Decrease edit step (wrap from 0 to 16)
-          const newStep = editStep === 0 ? 16 : editStep - 1;
-          setEditStep(newStep);
+          newStep = editStep === 0 ? 16 : editStep - 1;
         } else {
           // Increase edit step (wrap from 16 to 0)
-          const newStep = editStep === 16 ? 0 : editStep + 1;
-          setEditStep(newStep);
+          newStep = editStep === 16 ? 0 : editStep + 1;
         }
+        setEditStep(newStep);
+        useUIStore.getState().setStatusMessage(`EDIT STEP ${newStep}`);
         return;
       }
 
