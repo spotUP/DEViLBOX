@@ -319,6 +319,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // When slide=false: worklet releases previous note first → DB303 triggerNote (retrigger)
     this.workletNode.port.postMessage({
       type: 'noteOn',
+      time: _time, // Pass time for sample-accurate scheduling
       note: midiNote,
       velocity: finalVelocity,
       slide: slide
@@ -335,7 +336,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // This creates the characteristic staccato between non-slide notes.
     this.workletNode.port.postMessage({
       type: 'gateOff',
-      time: safeTime
+      time: safeTime // Pass time for sample-accurate scheduling
     });
   }
 

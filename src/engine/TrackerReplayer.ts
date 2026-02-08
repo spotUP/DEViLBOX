@@ -19,7 +19,7 @@ import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { getGrooveOffset } from '@/types/audio';
+import { getGrooveOffset, GROOVE_TEMPLATES } from '@/types/audio';
 
 // ============================================================================
 // CONSTANTS
@@ -490,30 +490,38 @@ export class TrackerReplayer {
     }
 
     // --- Groove & Swing Support ---
-    // PERFORMANCE: Use cached values where possible
     const transportState = useTransportStore.getState();
-    const bpm = this.bpm;
-    const speed = this.speed;
-    const tickInterval = 2.5 / bpm;
-    const rowDuration = tickInterval * speed;
+    
+    // Sync BPM and Speed from UI if they changed
+    if (transportState.bpm !== this.bpm) this.bpm = transportState.bpm;
+    if (transportState.speed !== this.speed) this.speed = transportState.speed;
+
+    const tickInterval = 2.5 / this.bpm;
+    const rowDuration = tickInterval * this.speed;
     
     let grooveOffset = 0;
-    const grooveTemplate = transportState.grooveTemplateId !== 'straight' ? 
-      transportState.getGrooveTemplate() : null;
+    const grooveTemplateId = transportState.grooveTemplateId;
+    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId);
     
-    if (grooveTemplate) {
+    if (grooveTemplate && grooveTemplate.id !== 'straight') {
       grooveOffset = getGrooveOffset(grooveTemplate, this.pattPos, rowDuration);
+      if (this.currentTick === 0 && grooveOffset !== 0) {
+        console.log(`[Replayer] Row ${this.pattPos} shifted by ${Math.round(grooveOffset * 1000)}ms (Template: ${grooveTemplate.name})`);
+      }
     } else {
       const swingAmount = transportState.swing;
       if (swingAmount !== 0 && swingAmount !== 50 && (this.pattPos % 2) === 1) {
         const maxSwingOffset = rowDuration * 0.5;
         const normalizedSwing = (swingAmount - 50) / 50;
         grooveOffset = normalizedSwing * maxSwingOffset;
+        if (this.currentTick === 0) {
+          console.log(`[Replayer] Row ${this.pattPos} shifted by ${Math.round(grooveOffset * 1000)}ms (Swing: ${swingAmount}%)`);
+        }
       }
     }
 
-    // Apply offset to safeTime
-    const safeTime = (time ?? Tone.now()) + grooveOffset;
+    // Apply offset to the base schedule time
+    const safeTime = time + grooveOffset;
 
     // Get current pattern
     const patternNum = this.song.songPositions[this.songPos];
@@ -521,7 +529,6 @@ export class TrackerReplayer {
     if (!pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
-    // Use shifted time so cursor follows the groove
     if (this.currentTick === 0) {
       this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
     }
