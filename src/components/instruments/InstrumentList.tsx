@@ -4,9 +4,10 @@
  * Shows instrument number, name, and synth type
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
 import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
@@ -43,7 +44,8 @@ interface InstrumentListProps {
   onCreateNew?: () => void;
 }
 
-export const InstrumentList: React.FC<InstrumentListProps> = ({
+// PERFORMANCE: Memoize to prevent expensive re-renders on every scroll step
+export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   compact = false,
   maxHeight = '300px',
   showActions = true,
@@ -64,9 +66,20 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
     deleteInstrument,
     cloneInstrument,
     updateInstrument,
-  } = useInstrumentStore();
+  } = useInstrumentStore(useShallow((state) => ({
+    instruments: state.instruments,
+    currentInstrumentId: state.currentInstrumentId,
+    setCurrentInstrument: state.setCurrentInstrument,
+    createInstrument: state.createInstrument,
+    deleteInstrument: state.deleteInstrument,
+    cloneInstrument: state.cloneInstrument,
+    updateInstrument: state.updateInstrument,
+  })));
 
-  const { useHexNumbers, setShowSamplePackModal } = useUIStore();
+  const { useHexNumbers, setShowSamplePackModal } = useUIStore(useShallow(s => ({
+    useHexNumbers: s.useHexNumbers,
+    setShowSamplePackModal: s.setShowSamplePackModal
+  })));
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
@@ -457,4 +470,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = ({
       )}
     </div>
   );
-};
+});
+
+InstrumentList.displayName = 'InstrumentList';

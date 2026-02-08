@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@hooks/tracker/BlockOperations';
@@ -165,30 +166,52 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 }) => {
   const { isMobile, width: windowWidth } = useResponsive();
 
-  // PERFORMANCE OPTIMIZATION: Use individual selectors to prevent unnecessary re-renders
-  const patterns = useTrackerStore((state) => state.patterns);
-  const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
-  const cursor = useTrackerStore((state) => state.cursor);
-  const showGhostPatterns = useTrackerStore((state) => state.showGhostPatterns);
+  // PERFORMANCE OPTIMIZATION: Group selectors with useShallow to reduce re-render overhead
+  const { 
+    patterns, 
+    currentPatternIndex, 
+    cursor, 
+    showGhostPatterns,
+    loadPatterns,
+    setPatternOrder,
+    setOriginalModuleData,
+    setShowGhostPatterns,
+    scaleVolume,
+    fadeVolume,
+    remapInstrument
+  } = useTrackerStore(useShallow((state) => ({
+    patterns: state.patterns,
+    currentPatternIndex: state.currentPatternIndex,
+    cursor: state.cursor,
+    showGhostPatterns: state.showGhostPatterns,
+    loadPatterns: state.loadPatterns,
+    setPatternOrder: state.setPatternOrder,
+    setOriginalModuleData: state.setOriginalModuleData,
+    setShowGhostPatterns: state.setShowGhostPatterns,
+    scaleVolume: state.scaleVolume,
+    fadeVolume: state.fadeVolume,
+    remapInstrument: state.remapInstrument,
+  })));
 
-  // Get actions (these don't cause re-renders)
-  const loadPatterns = useTrackerStore((state) => state.loadPatterns);
-  const setPatternOrder = useTrackerStore((state) => state.setPatternOrder);
-  const setOriginalModuleData = useTrackerStore((state) => state.setOriginalModuleData);
-  const setShowGhostPatterns = useTrackerStore((state) => state.setShowGhostPatterns);
-  const scaleVolume = useTrackerStore((state) => state.scaleVolume);
-  const fadeVolume = useTrackerStore((state) => state.fadeVolume);
-  const remapInstrument = useTrackerStore((state) => state.remapInstrument);
-
-  const loadInstruments = useInstrumentStore((state) => state.loadInstruments);
-  const setMetadata = useProjectStore((state) => state.setMetadata);
-  const setBPM = useTransportStore((state) => state.setBPM);
-  const smoothScrolling = useTransportStore((state) => state.smoothScrolling);
-  const setSmoothScrolling = useTransportStore((state) => state.setSmoothScrolling);
-  const grooveTemplateId = useTransportStore((state) => state.grooveTemplateId);
-  const setGrooveTemplate = useTransportStore((state) => state.setGrooveTemplate);
-  const masterMuted = useAudioStore((state) => state.masterMuted);
-  const toggleMasterMute = useAudioStore((state) => state.toggleMasterMute);
+  const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
+  const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
+  const { 
+    setBPM, 
+    smoothScrolling, 
+    setSmoothScrolling, 
+    grooveTemplateId, 
+    setGrooveTemplate 
+  } = useTransportStore(useShallow((state) => ({
+    setBPM: state.setBPM,
+    smoothScrolling: state.smoothScrolling,
+    setSmoothScrolling: state.setSmoothScrolling,
+    grooveTemplateId: state.grooveTemplateId,
+    setGrooveTemplate: state.setGrooveTemplate,
+  })));
+  const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
+    masterMuted: state.masterMuted,
+    toggleMasterMute: state.toggleMasterMute,
+  })));
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';

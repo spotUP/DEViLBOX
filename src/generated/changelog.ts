@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-07T19:52:15.336Z
+ * Generated: 2026-02-08T00:41:16.196Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '308';
-export const BUILD_HASH = '313c685';
-export const BUILD_DATE = '2026-02-07';
+export const BUILD_NUMBER = '315';
+export const BUILD_HASH = '0f9f1f3';
+export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-07',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update song files with latest format and improvements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog and Open303 worklet"
+      },
+      {
+        type: 'improvement',
+        "description": "Improve engine systems and pattern handling"
+      },
+      {
+        type: 'improvement',
+        "description": "Consolidate tracker cells into unified FlagCell component"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance DB303/TB303 pattern system with XML patterns and improved conversion"
+      },
+      {
+        type: 'feature',
+        "description": "Complete drum pad system Phase 3 & 4 improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Refactor drum pad kit loading to integrate with instrument system"
+      },
       {
         type: 'improvement',
         "description": "Add drum pad Phase 2 completion documentation"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve 38 failing effect tests (neural + sidechain)"
-      },
-      {
-        type: 'fix',
-        "description": "Calibrate volume normalization for all synths and add ensureInitialized"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 26 new synths to UI, rebuild buzzmachines with MDK fix, add Makk M4"
-      },
-      {
-        type: 'feature',
-        "description": "Add WASM synth engines, MAME chip ports, new controls, and test infrastructure"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore juce-wasm build artifacts"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove unused K051649Synth.ts"
-      },
-      {
-        type: 'fix',
-        "description": "Align VU meters to channels and improve sync"
-      },
-      {
-        type: 'improvement',
-        "description": "Clean up TrackerReplayer types, dead code, and duplication"
       }
     ]
   }

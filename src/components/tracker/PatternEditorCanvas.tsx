@@ -97,7 +97,8 @@ const StatusBar: React.FC<{
 });
 StatusBar.displayName = 'StatusBar';
 
-export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcidGenerator }) => {
+// PERFORMANCE: Memoize to prevent re-renders on every scroll step
+export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({ onAcidGenerator }) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -552,8 +553,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
     const isPlaying = transportState.isPlaying;
     const useHex = uiState.useHexNumbers;
     const blankEmpty = uiState.blankEmptyCells;
-    const speed = transportState.speed;
-    const bpm = transportState.bpm;
+    const audioSpeed = transportState.speed;
+    const audioBpm = transportState.bpm;
 
     const { width, height } = dimensions;
     const patternLength = pattern.length;
@@ -578,7 +579,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
         if (smoothScrolling) {
           // Calculate smooth offset based on time elapsed within current row
           const timeSinceRowStart = audioTime - audioState.time;
-          const secondsPerRow = (2.5 / bpm) * speed;
+          const secondsPerRow = (2.5 / audioBpm) * audioSpeed;
 
           // Progress through current row (0 to 1)
           const progress = Math.min(Math.max(timeSinceRowStart / secondsPerRow, 0), 1);
@@ -754,13 +755,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
       // Mode-dependent caret color
       const isRecording = state.recordMode;
+      const isPlayingCaret = transportState.isPlaying;
       let caretBg: string;
       if (isRecording) {
         caretBg = '#ef4444'; // Red for record mode
-      } else if (isPlaying) {
+      } else if (isPlayingCaret) {
         caretBg = '#22c55e'; // Green for playback
       } else {
-        caretBg = isCyanTheme ? '#00ffff' : '#ef4444'; // Theme default
+        caretBg = isCyanTheme ? '#00ffff' : '#3b82f6'; // Cyan or Blue for idle
       }
 
       // Caret dimensions: same height as the row highlight bar
@@ -832,36 +834,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
 
     // Draw fade overlays
     const gradient1 = ctx.createLinearGradient(0, 0, 0, 60);
-    gradient1.addColorStop(0, 'rgba(10,10,11,0.98)');
-    gradient1.addColorStop(1, 'rgba(10,10,11,0)');
+    gradient1.addColorStop(0, colors.bg);
+    gradient1.addColorStop(1, 'transparent');
     ctx.fillStyle = gradient1;
     ctx.fillRect(0, 0, width, 60);
 
     const gradient2 = ctx.createLinearGradient(0, height - 60, 0, height);
-    gradient2.addColorStop(0, 'rgba(10,10,11,0)');
-    gradient2.addColorStop(1, 'rgba(10,10,11,0.98)');
+    gradient2.addColorStop(0, 'transparent');
+    gradient2.addColorStop(1, colors.bg);
     ctx.fillStyle = gradient2;
     ctx.fillRect(0, height - 60, width, 60);
 
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme]);
 
-  // Track last render time for frame skipping during playback
-  const lastRenderTimeRef = useRef<number>(0);
-
-  // Animation loop - throttle to 30fps during playback to give audio priority
+  // Animation loop - unlocked framerate for maximum smoothness
   const animate = useCallback(() => {
-    const now = performance.now();
-    const isPlaying = useTransportStore.getState().isPlaying;
-
-    // During playback, throttle to ~30fps (33ms) to reduce main thread load
-    // This gives audio scheduling more CPU time
-    const minFrameTime = isPlaying ? 33 : 16; // 30fps during playback, 60fps otherwise
-
-    if (now - lastRenderTimeRef.current >= minFrameTime) {
-      lastRenderTimeRef.current = now;
-      render();
-    }
-
+    render();
     rafRef.current = requestAnimationFrame(animate);
   }, [render]);
 
@@ -1201,6 +1189,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = ({ onAcid
       <StatusBar patternLength={pattern.length} channelCount={pattern.channels.length} />
     </div>
   );
-};
+});
 
 export default PatternEditorCanvas;
