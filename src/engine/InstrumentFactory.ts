@@ -20,9 +20,15 @@ import {
   DEFAULT_WAVETABLE,
   DEFAULT_FURNACE,
   DEFAULT_SPACE_LASER,
+  DEFAULT_DUB_SIREN,
   DEFAULT_DEXED,
   DEFAULT_OBXD,
   DEFAULT_TB303,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_ENVELOPE,
+  DEFAULT_FILTER,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
@@ -45,8 +51,7 @@ import { SynareSynth } from './SynareSynth';
 import { SAMSynth } from './sam/SAMSynth';
 import { V2Synth } from './v2/V2Synth';
 import { V2SpeechSynth } from './v2/V2SpeechSynth';
-import { JC303Synth } from './open303/Open303Synth';
-import { DB303Synth } from './db303/DB303Synth';
+import { DB303Synth, DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
@@ -1563,90 +1568,17 @@ export class InstrumentFactory {
     });
   }
 
-  private static createTB303(config: InstrumentConfig): JC303Synth | DB303Synth {
+  private static createTB303(config: InstrumentConfig): DB303Synth {
     const tb303Config = config.tb303 || { ...DEFAULT_TB303 };
-    const engineType = tb303Config.engineType || 'jc303';
-
-    // Use selected WASM engine for authentic TB-303 sound
-    // engineType: 'jc303' = Open303 engine, 'db303' = db303 variant with additional tweaks
     // Apply normalized volume boost for TB303
     const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
 
-    if (engineType === 'db303') {
-      console.log('[InstrumentFactory] Creating DB303 synth');
-      return this.createDB303(tb303Config, normalizedVolume);
-    }
-    console.log('[InstrumentFactory] Creating JC303 synth');
-    return this.createJC303(tb303Config, normalizedVolume);
-  }
-
-  private static createJC303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): JC303Synth {
-    const synth = new JC303Synth();
-
-    // Calibration constants for normalization
-    const CUTOFF_MIN = 314;
-    const CUTOFF_MAX = 2394;
-    const DECAY_MIN = 200;
-    const DECAY_MAX = 2000;
-    const SLIDE_MIN = 2;
-    const SLIDE_MAX = 360;
-
-    // Helper to normalize value if it's outside 0-1 range
-    const norm = (v: number, min: number, max: number) => {
-      if (v >= 0 && v <= 1) return v;
-      // Assume logarithmic mapping for cutoff/decay if values are large
-      if (max > 100) return Math.log(v / min) / Math.log(max / min);
-      return (v - min) / (max - min);
-    };
-
-    // Apply parameters from TB303 config (normalizing if they are in Hz/ms)
-    synth.setCutoff(norm(tb.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
-    synth.setResonance(tb.filter.resonance > 1 ? tb.filter.resonance / 100 : tb.filter.resonance);
-    synth.setEnvMod(tb.filterEnvelope.envMod > 1 ? tb.filterEnvelope.envMod / 100 : tb.filterEnvelope.envMod);
-    synth.setDecay(norm(tb.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
-    synth.setAccent(tb.accent.amount > 1 ? tb.accent.amount / 100 : tb.accent.amount);
-    synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
-
-    // Override C++ WASM VCA envelope to rosic's hardware-calibrated defaults.
-    // Normalized value for 1230ms
-    synth.setVegDecay(norm(1230, DECAY_MIN, DECAY_MAX));
-
-    if (tb.slide) {
-      synth.setSlideTime(norm(tb.slide.time, SLIDE_MIN, SLIDE_MAX));
-    }
-    if (tb.overdrive) {
-      synth.setOverdrive(tb.overdrive.amount > 1 ? tb.overdrive.amount / 100 : tb.overdrive.amount);
-    }
-
-    // Devil Fish mods
-    if (tb.devilFish) {
-      const df = tb.devilFish;
-      if (df.enabled) {
-        synth.enableDevilFish(true);
-      }
-      if (df.muffler) synth.setMuffler(df.muffler);
-      if (df.highResonance) synth.setHighResonanceEnabled(df.highResonance);
-      if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking > 1 ? df.filterTracking / 100 : df.filterTracking);
-      if (df.normalDecay !== undefined) synth.setNormalDecay(df.normalDecay > 1 ? df.normalDecay / 100 : df.normalDecay);
-      if (df.accentDecay !== undefined) synth.setAccentDecay(df.accentDecay > 1 ? df.accentDecay / 100 : df.accentDecay);
-      // Skip accentAttack for now as it's a raw param
-      if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay > 1 ? df.vegDecay / 100 : df.vegDecay);
-      if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain > 1 ? df.vegSustain / 100 : df.vegSustain);
-      if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack > 1 ? df.softAttack / 100 : df.softAttack);
-      if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
-      if (df.filterFmDepth !== undefined) synth.setFilterFmDepth(df.filterFmDepth > 1 ? df.filterFmDepth / 100 : df.filterFmDepth);
-      if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
-    }
-
-    if (volume !== undefined) {
-      synth.setVolume(volume > 1 ? (volume + 60) / 60 : volume);
-    }
-
-    return synth;
+    console.log('[InstrumentFactory] Creating DB303 synth');
+    return this.createDB303(tb303Config, normalizedVolume);
   }
 
   /**
-   * Create a DB303 (db303 variant TB-303) with tb303 config applied
+   * Create a DB303 (TB-303 WASM engine) with tb303 config applied
    */
   private static createDB303(tb: NonNullable<InstrumentConfig['tb303']>, volume?: number): DB303Synth {
     const synth = new DB303Synth();
@@ -1977,15 +1909,15 @@ export class InstrumentFactory {
 
     // Create a PolySynth with sawtooth and add unison effect via chorus
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 16,
+      maxPolyphony: 32,
       oscillator: {
         type: 'sawtooth',
       },
       envelope: {
-        attack: (ssConfig.envelope.attack || 10) / 1000,
-        decay: (ssConfig.envelope.decay || 100) / 1000,
-        sustain: (ssConfig.envelope.sustain || 80) / 100,
-        release: (ssConfig.envelope.release || 300) / 1000,
+        attack: (ssConfig.envelope?.attack || 10) / 1000,
+        decay: (ssConfig.envelope?.decay || 100) / 1000,
+        sustain: (ssConfig.envelope?.sustain ?? 80) / 100,
+        release: (ssConfig.envelope?.release || 300) / 1000,
       },
       volume: this.getNormalizedVolume('SuperSaw', config.volume),
     });
@@ -2086,13 +2018,13 @@ export class InstrumentFactory {
     const synth = new Tone.PolySynth(VoiceClass, {
       maxPolyphony: psConfig.voiceCount,
       oscillator: {
-        type: psConfig.oscillator.type || 'sawtooth',
+        type: psConfig.oscillator?.type || 'sawtooth',
       },
       envelope: {
-        attack: (psConfig.envelope.attack || 50) / 1000,
-        decay: (psConfig.envelope.decay || 200) / 1000,
-        sustain: (psConfig.envelope.sustain || 70) / 100,
-        release: (psConfig.envelope.release || 500) / 1000,
+        attack: (psConfig.envelope?.attack || 50) / 1000,
+        decay: (psConfig.envelope?.decay || 200) / 1000,
+        sustain: (psConfig.envelope?.sustain ?? 70) / 100,
+        release: (psConfig.envelope?.release || 500) / 1000,
       },
       volume: this.getNormalizedVolume('PolySynth', config.volume),
     });
@@ -2141,23 +2073,24 @@ export class InstrumentFactory {
    */
   private static createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
     const orgConfig = config.organ || DEFAULT_ORGAN;
+    const drawbars = orgConfig.drawbars || DEFAULT_ORGAN.drawbars;
     const output = new Tone.Gain(1);
 
     // Create polyphonic sine synth for organ tone
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: 'sine',
         partials: [
-          orgConfig.drawbars[0] / 8, // sub
-          orgConfig.drawbars[1] / 8, // fundamental
-          orgConfig.drawbars[2] / 8, // 3rd
-          orgConfig.drawbars[3] / 8, // 4th
-          orgConfig.drawbars[4] / 8, // 5th
-          orgConfig.drawbars[5] / 8, // 6th
-          orgConfig.drawbars[6] / 8, // 7th
-          orgConfig.drawbars[7] / 8, // 8th
-          orgConfig.drawbars[8] / 8, // 9th
+          drawbars[0] / 8, // sub
+          drawbars[1] / 8, // fundamental
+          drawbars[2] / 8, // 3rd
+          drawbars[3] / 8, // 4th
+          drawbars[4] / 8, // 5th
+          drawbars[5] / 8, // 6th
+          drawbars[6] / 8, // 7th
+          drawbars[7] / 8, // 8th
+          drawbars[8] / 8, // 9th
         ]
       },
       envelope: {
@@ -3381,10 +3314,10 @@ export class InstrumentFactory {
       const noise = new Tone.NoiseSynth({
         noise: { type: 'white' },
         envelope: {
-          attack: chipConfig.envelope.attack / 1000,
-          decay: chipConfig.envelope.decay / 1000,
-          sustain: chipConfig.envelope.sustain / 100,
-          release: chipConfig.envelope.release / 1000,
+          attack: (chipConfig.envelope?.attack || 5) / 1000,
+          decay: (chipConfig.envelope?.decay || 100) / 1000,
+          sustain: (chipConfig.envelope?.sustain ?? 0) / 100,
+          release: (chipConfig.envelope?.release || 50) / 1000,
         },
         volume: config.volume || -12,
       });
@@ -3434,7 +3367,7 @@ export class InstrumentFactory {
 
     // Square/Triangle channels
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: oscillatorType,
       },
@@ -3783,15 +3716,15 @@ export class InstrumentFactory {
 
     // Use square wave (Tone.Synth doesn't support true pulse width control)
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: 'square',
       },
       envelope: {
-        attack: pwmConfig.envelope.attack / 1000,
-        decay: pwmConfig.envelope.decay / 1000,
-        sustain: pwmConfig.envelope.sustain / 100,
-        release: pwmConfig.envelope.release / 1000,
+        attack: (pwmConfig.envelope?.attack || 10) / 1000,
+        decay: (pwmConfig.envelope?.decay || 200) / 1000,
+        sustain: (pwmConfig.envelope?.sustain ?? 70) / 100,
+        release: (pwmConfig.envelope?.release || 300) / 1000,
       },
       volume: this.getNormalizedVolume('PWMSynth', config.volume),
     });
@@ -3866,15 +3799,15 @@ export class InstrumentFactory {
 
     // Create polyphonic sawtooth synth
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: 'sawtooth',
       },
       envelope: {
-        attack: strConfig.attack / 1000,
+        attack: (strConfig.attack || 100) / 1000,
         decay: 0.2,
         sustain: 0.9,
-        release: strConfig.release / 1000,
+        release: (strConfig.release || 500) / 1000,
       },
       volume: this.getNormalizedVolume('StringMachine', config.volume),
     });
@@ -3940,19 +3873,19 @@ export class InstrumentFactory {
    */
   private static createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const fmtConfig = config.formantSynth || DEFAULT_FORMANT_SYNTH;
-    const formants = VOWEL_FORMANTS[fmtConfig.vowel];
+    const formants = VOWEL_FORMANTS[fmtConfig.vowel] || VOWEL_FORMANTS['a'];
 
     // Create source oscillator
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
-        type: fmtConfig.oscillator.type,
+        type: fmtConfig.oscillator?.type || 'sawtooth',
       },
       envelope: {
-        attack: fmtConfig.envelope.attack / 1000,
-        decay: fmtConfig.envelope.decay / 1000,
-        sustain: fmtConfig.envelope.sustain / 100,
-        release: fmtConfig.envelope.release / 1000,
+        attack: (fmtConfig.envelope?.attack || 10) / 1000,
+        decay: (fmtConfig.envelope?.decay || 200) / 1000,
+        sustain: (fmtConfig.envelope?.sustain ?? 70) / 100,
+        release: (fmtConfig.envelope?.release || 300) / 1000,
       },
       volume: this.getNormalizedVolume('FormantSynth', config.volume),
     });
@@ -4045,7 +3978,7 @@ export class InstrumentFactory {
 
     // Main oscillator 1 (with unison)
     const osc1 = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: wbConfig.osc1.type,
       },
@@ -4060,7 +3993,7 @@ export class InstrumentFactory {
 
     // Main oscillator 2 (slightly detuned for Reese)
     const osc2 = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 32,
       oscillator: {
         type: wbConfig.osc2.type,
       },
@@ -4081,7 +4014,7 @@ export class InstrumentFactory {
     let subOsc: Tone.PolySynth | null = null;
     if (wbConfig.sub.enabled) {
       subOsc = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 8,
+        maxPolyphony: 32,
         oscillator: { type: 'sine' },
         envelope: {
           attack: wbConfig.envelope.attack / 1000,
@@ -4104,7 +4037,7 @@ export class InstrumentFactory {
         const panAmount = ((i / voiceCount) - 0.5) * (wbConfig.unison.stereoSpread / 50);
 
         const voice = new Tone.PolySynth(Tone.Synth, {
-          maxPolyphony: 4,
+          maxPolyphony: 32,
           oscillator: { type: wbConfig.osc1.type },
           envelope: {
             attack: wbConfig.envelope.attack / 1000,
@@ -4128,7 +4061,7 @@ export class InstrumentFactory {
     let fmSynth: Tone.PolySynth | null = null;
     if (wbConfig.fm.enabled && wbConfig.fm.amount > 0) {
       fmSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 8,
+        maxPolyphony: 32,
         modulationIndex: wbConfig.fm.amount / 10,
         harmonicity: wbConfig.fm.ratio,
         envelope: {

@@ -5,8 +5,7 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
-import { Open303Synth as JC303Synth } from './open303';
-import { DB303Synth } from './db303';
+import { DB303Synth, DB303Synth as JC303Synth } from './db303';
 import { MAMESynth } from './MAMESynth';
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
@@ -1772,7 +1771,8 @@ export class ToneEngine {
     period?: number,
     accent?: boolean,
     slide?: boolean,
-    channelIndex?: number
+    channelIndex?: number,
+    hammer?: boolean
   ): void {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
@@ -1798,7 +1798,8 @@ export class ToneEngine {
       if (instrument instanceof JC303Synth) {
         instrument.triggerAttack(note, safeTime, velocity, accent, slide);
       } else if (instrument instanceof DB303Synth) {
-        instrument.triggerAttack(note, safeTime, velocity, accent, slide);
+        // DB303Synth supports hammer for legato without pitch glide (TT-303 extension)
+        instrument.triggerAttack(note, safeTime, velocity, accent, slide, hammer);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth.triggerAttack(time, velocity) - no note
         (instrument as Tone.NoiseSynth).triggerAttack(safeTime, velocity);
@@ -2270,7 +2271,8 @@ export class ToneEngine {
     channelIndex?: number,
     period?: number,
     sampleOffset?: number, // 9xx effect: start sample at byte offset
-    nnaAction: number = 0  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
+    nnaAction: number = 0,  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
+    hammer?: boolean        // TT-303 hammer: legato without pitch glide
   ): void {
     const safeTime = this.getSafeTime(time);
     if (safeTime === null) return;
@@ -2387,7 +2389,8 @@ export class ToneEngine {
       if (instrument instanceof JC303Synth) {
         instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
       } else if (instrument instanceof DB303Synth) {
-        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
+        // DB303Synth supports hammer for legato without pitch glide (TT-303 extension)
+        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide, hammer);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
         (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
@@ -3020,20 +3023,23 @@ export class ToneEngine {
       // Update Effects parameters if available
       if (tb303Config.chorus && typeof synth.setChorusMix === 'function') {
         synth.setChorusMode(tb303Config.chorus.mode);
-        synth.setChorusMix(tb303Config.chorus.enabled ? tb303Config.chorus.mix : 0);
+        const mix = tb303Config.chorus.mix > 1 ? tb303Config.chorus.mix / 100 : tb303Config.chorus.mix;
+        synth.setChorusMix(tb303Config.chorus.enabled ? mix : 0);
       }
       if (tb303Config.phaser && typeof synth.setPhaserMix === 'function') {
-        synth.setPhaserRate(tb303Config.phaser.rate);
-        synth.setPhaserWidth(tb303Config.phaser.depth);
-        synth.setPhaserFeedback(tb303Config.phaser.feedback);
-        synth.setPhaserMix(tb303Config.phaser.enabled ? tb303Config.phaser.mix : 0);
+        synth.setPhaserRate(tb303Config.phaser.rate > 1 ? tb303Config.phaser.rate / 100 : tb303Config.phaser.rate);
+        synth.setPhaserWidth(tb303Config.phaser.depth > 1 ? tb303Config.phaser.depth / 100 : tb303Config.phaser.depth);
+        synth.setPhaserFeedback(tb303Config.phaser.feedback > 1 ? tb303Config.phaser.feedback / 100 : tb303Config.phaser.feedback);
+        const mix = tb303Config.phaser.mix > 1 ? tb303Config.phaser.mix / 100 : tb303Config.phaser.mix;
+        synth.setPhaserMix(tb303Config.phaser.enabled ? mix : 0);
       }
       if (tb303Config.delay && typeof synth.setDelayMix === 'function') {
-        synth.setDelayTime(tb303Config.delay.time);
-        synth.setDelayFeedback(tb303Config.delay.feedback);
-        synth.setDelayTone(tb303Config.delay.tone);
-        synth.setDelayMix(tb303Config.delay.enabled ? tb303Config.delay.mix : 0);
-        synth.setDelaySpread(tb303Config.delay.stereo);
+        // Normalize delay time: if > 1, it's in ms (convert to 0-1), else already normalized
+        synth.setDelayTime(tb303Config.delay.time > 1 ? tb303Config.delay.time / 2000 : tb303Config.delay.time);
+        synth.setDelayFeedback(tb303Config.delay.feedback > 1 ? tb303Config.delay.feedback / 100 : tb303Config.delay.feedback);
+        synth.setDelayTone(tb303Config.delay.tone > 1 ? tb303Config.delay.tone / 100 : tb303Config.delay.tone);
+        synth.setDelayMix(tb303Config.delay.enabled ? (tb303Config.delay.mix > 1 ? tb303Config.delay.mix / 100 : tb303Config.delay.mix) : 0);
+        synth.setDelaySpread(tb303Config.delay.stereo > 1 ? tb303Config.delay.stereo / 100 : tb303Config.delay.stereo);
       }
     }); // End synths.forEach
   }

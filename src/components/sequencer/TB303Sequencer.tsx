@@ -10,9 +10,11 @@ import './TB303Sequencer.css';
 export interface TB303Step {
   active: boolean;
   note: string; // 'C', 'C#', 'D', etc.
-  octave: number; // 1, 2, or 3
+  octave: number; // 1, 2, or 3 (DN, MID, UP)
   accent: boolean;
   slide: boolean;
+  mute?: boolean;   // TT-303: Silent step (data preserved)
+  hammer?: boolean; // TT-303: Legato without pitch glide
 }
 
 interface TB303SequencerProps {

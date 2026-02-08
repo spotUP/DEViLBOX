@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/juce-wasm/open303/build/CMakeFiles/Open303WASM.dir
+/Users/spot/Code/DEViLBOX/juce-wasm/open303/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/juce-wasm/open303/build/CMakeFiles/rebuild_cache.dir

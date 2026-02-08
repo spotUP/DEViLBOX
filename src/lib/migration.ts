@@ -4,7 +4,131 @@
 
 import type { TrackerCell, Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import {
+  DEFAULT_TB303,
+  DEFAULT_DUB_SIREN,
+  DEFAULT_SPACE_LASER,
+  DEFAULT_V2,
+  DEFAULT_SAM,
+  DEFAULT_SYNARE,
+  DEFAULT_BUZZMACHINE,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_PWM_SYNTH,
+  DEFAULT_WAVETABLE,
+  DEFAULT_GRANULAR,
+  DEFAULT_SUPERSAW,
+  DEFAULT_POLYSYNTH,
+  DEFAULT_ORGAN,
+  DEFAULT_STRING_MACHINE,
+  DEFAULT_FORMANT_SYNTH,
+  DEFAULT_WOBBLE_BASS,
+  DEFAULT_DEXED,
+  DEFAULT_OBXD,
+  DEFAULT_DRUMKIT,
+  DEFAULT_FURNACE,
+} from '@typedefs/instrument';
 import { stringNoteToXM, effectStringToXM } from './xmConversions';
+
+/**
+ * Deep merge two objects, with source values taking precedence
+ */
+function deepMerge<T extends object>(target: T, source: Partial<T>): T {
+  const result = { ...target };
+  for (const key of Object.keys(source) as (keyof T)[]) {
+    const sourceVal = source[key];
+    const targetVal = target[key];
+    if (sourceVal !== undefined && sourceVal !== null) {
+      if (typeof sourceVal === 'object' && !Array.isArray(sourceVal) && typeof targetVal === 'object' && !Array.isArray(targetVal)) {
+        result[key] = deepMerge(targetVal as any, sourceVal as any);
+      } else {
+        result[key] = sourceVal as T[keyof T];
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Ensure an instrument has complete config for its synthType
+ */
+export function ensureCompleteInstrumentConfig(inst: InstrumentConfig): InstrumentConfig {
+  const result = { ...inst };
+  
+  switch (inst.synthType) {
+    case 'TB303':
+    case 'Buzz3o3':
+      result.tb303 = deepMerge(DEFAULT_TB303, inst.tb303 || {});
+      break;
+    case 'DrumMachine':
+      result.drumMachine = deepMerge(DEFAULT_DRUM_MACHINE, inst.drumMachine || {});
+      break;
+    case 'ChipSynth':
+      result.chipSynth = deepMerge(DEFAULT_CHIP_SYNTH, inst.chipSynth || {});
+      break;
+    case 'PWMSynth':
+      result.pwmSynth = deepMerge(DEFAULT_PWM_SYNTH, inst.pwmSynth || {});
+      break;
+    case 'Wavetable':
+      result.wavetable = deepMerge(DEFAULT_WAVETABLE, inst.wavetable || {});
+      break;
+    case 'GranularSynth':
+      result.granular = deepMerge(DEFAULT_GRANULAR, inst.granular || {});
+      break;
+    case 'SuperSaw':
+      result.superSaw = deepMerge(DEFAULT_SUPERSAW, inst.superSaw || {});
+      break;
+    case 'PolySynth':
+      result.polySynth = deepMerge(DEFAULT_POLYSYNTH, inst.polySynth || {});
+      break;
+    case 'Organ':
+      result.organ = deepMerge(DEFAULT_ORGAN, inst.organ || {});
+      break;
+    case 'StringMachine':
+      result.stringMachine = deepMerge(DEFAULT_STRING_MACHINE, inst.stringMachine || {});
+      break;
+    case 'FormantSynth':
+      result.formantSynth = deepMerge(DEFAULT_FORMANT_SYNTH, inst.formantSynth || {});
+      break;
+    case 'WobbleBass':
+      result.wobbleBass = deepMerge(DEFAULT_WOBBLE_BASS, inst.wobbleBass || {});
+      break;
+    case 'DubSiren':
+      result.dubSiren = deepMerge(DEFAULT_DUB_SIREN, inst.dubSiren || {});
+      break;
+    case 'SpaceLaser':
+      result.spaceLaser = deepMerge(DEFAULT_SPACE_LASER, inst.spaceLaser || {});
+      break;
+    case 'V2':
+      result.v2 = deepMerge(DEFAULT_V2, inst.v2 || {});
+      break;
+    case 'Sam':
+      result.sam = deepMerge(DEFAULT_SAM, inst.sam || {});
+      break;
+    case 'Synare':
+      result.synare = deepMerge(DEFAULT_SYNARE, inst.synare || {});
+      break;
+    case 'Buzzmachine':
+      result.buzzmachine = deepMerge(DEFAULT_BUZZMACHINE, inst.buzzmachine || {});
+      break;
+    case 'Dexed':
+      result.dexed = deepMerge(DEFAULT_DEXED, inst.dexed || {});
+      break;
+    case 'OBXd':
+      result.obxd = deepMerge(DEFAULT_OBXD, inst.obxd || {});
+      break;
+    case 'DrumKit':
+      result.drumKit = deepMerge(DEFAULT_DRUMKIT, inst.drumKit || {});
+      break;
+    case 'Furnace':
+      result.furnace = deepMerge(DEFAULT_FURNACE, inst.furnace || {});
+      break;
+    // Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, MetalSynth, MembraneSynth, NoiseSynth
+    // don't have specific config objects - they use Tone.js defaults
+  }
+  
+  return result;
+}
 
 /**
  * Detect if a TrackerCell uses the old string-based format
@@ -152,7 +276,7 @@ export function migrateInstruments(instruments: InstrumentConfig[]): InstrumentC
     }
   }
 
-  // Second pass: Apply ID mapping and add type field
+  // Second pass: Apply ID mapping, add type field, and ensure complete configs
   return instruments.map(inst => {
     const newId = idMapping.get(inst.id) ?? inst.id;
 
@@ -161,12 +285,58 @@ export function migrateInstruments(instruments: InstrumentConfig[]): InstrumentC
       ? 'sample' as const
       : 'synth' as const;
 
+    // Ensure the instrument has complete config for its synthType
+    const completeInst = ensureCompleteInstrumentConfig(inst);
+
     return {
-      ...inst,
+      ...completeInst,
       id: newId,
       type: (inst as any).type || type, // Preserve existing type or infer
     };
   });
+}
+
+/**
+ * Check if an instrument has incomplete config for its synthType
+ */
+function hasIncompleteConfig(inst: InstrumentConfig): boolean {
+  switch (inst.synthType) {
+    case 'TB303':
+    case 'Buzz3o3':
+      return !inst.tb303 || !inst.tb303.filter || !inst.tb303.filterEnvelope;
+    case 'DrumMachine':
+      return !inst.drumMachine;
+    case 'ChipSynth':
+      return !inst.chipSynth || !inst.chipSynth.envelope;
+    case 'PWMSynth':
+      return !inst.pwmSynth || !inst.pwmSynth.envelope;
+    case 'SuperSaw':
+      return !inst.superSaw || !inst.superSaw.envelope;
+    case 'PolySynth':
+      return !inst.polySynth || !inst.polySynth.envelope;
+    case 'Organ':
+      return !inst.organ || !inst.organ.drawbars;
+    case 'StringMachine':
+      return !inst.stringMachine;
+    case 'FormantSynth':
+      return !inst.formantSynth || !inst.formantSynth.envelope;
+    case 'WobbleBass':
+      return !inst.wobbleBass || !inst.wobbleBass.envelope;
+    case 'DubSiren':
+      return !inst.dubSiren || !inst.dubSiren.reverb;
+    case 'SpaceLaser':
+      return !inst.spaceLaser;
+    case 'Dexed':
+      return !inst.dexed;
+    case 'OBXd':
+      return !inst.obxd;
+    case 'DrumKit':
+      return !inst.drumKit;
+    case 'Furnace':
+      return !inst.furnace;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -189,7 +359,10 @@ export function needsMigration(
   // Check if any instrument is missing the type field
   const missingTypeField = instruments.some(inst => !(inst as any).type);
 
-  return hasOldCells || hasOldIds || missingTypeField;
+  // Check if any instrument has incomplete config
+  const hasIncomplete = instruments.some(inst => hasIncompleteConfig(inst));
+
+  return hasOldCells || hasOldIds || missingTypeField || hasIncomplete;
 }
 
 /**

@@ -1,10 +1,11 @@
 /**
- * AcidPatternEditor - 16-Step Pattern Editor for TB-303
+ * AcidPatternEditor - Up to 32-Step Pattern Editor for TB-303
  *
- * Classic acid bassline pattern editor with:
- * - 16 steps with note, octave, accent, slide, gate
+ * db303-style acid bassline pattern editor with:
+ * - Up to 32 steps with note, relative octave, accent, slide, gate, mute, hammer
  * - Visual step indicator during playback
  * - Pattern management (save/load/clear/randomize)
+ * - TT-303 extensions: mute (silent step) and hammer (legato without glide)
  */
 
 import React, { useState } from 'react';
@@ -50,6 +51,16 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
 
   const handleGateToggle = (step: number) => {
     pattern.setGate(step, !pattern.getGate(step));
+    if (onChange) onChange(pattern);
+  };
+
+  const handleMuteToggle = (step: number) => {
+    pattern.setMute(step, !pattern.getMute(step));
+    if (onChange) onChange(pattern);
+  };
+
+  const handleHammerToggle = (step: number) => {
+    pattern.setHammer(step, !pattern.getHammer(step));
     if (onChange) onChange(pattern);
   };
 
@@ -110,7 +121,7 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
 
               {/* Note */}
               <div className="text-sm text-ft2-text text-center font-mono">
-                {gate ? `${noteNames[note.key]}${note.octave + 2}` : '---'}
+                {gate && !note.mute ? `${noteNames[note.key]}${note.octave > 0 ? '+' : ''}${note.octave}` : note.mute ? 'MUT' : '---'}
               </div>
 
               {/* Flags */}
@@ -120,6 +131,12 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                 )}
                 {note.slide && (
                   <span className="text-xs text-ft2-highlight">S</span>
+                )}
+                {note.mute && (
+                  <span className="text-xs text-yellow-400">M</span>
+                )}
+                {note.hammer && (
+                  <span className="text-xs text-cyan-400">H</span>
                 )}
               </div>
             </div>
@@ -171,17 +188,16 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                 {/* Octave */}
                 <div>
                   <label className="block text-ft2-textDim text-sm mb-1">
-                    Octave
+                    Octave (relative)
                   </label>
                   <select
                     value={pattern.getOctave(selectedStep)}
                     onChange={(e) => handleOctaveChange(selectedStep, parseInt(e.target.value))}
                     className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded p-2"
                   >
-                    <option value="0">2 (C2-B2)</option>
-                    <option value="1">3 (C3-B3)</option>
-                    <option value="2">4 (C4-B4)</option>
-                    <option value="3">5 (C5-B5)</option>
+                    <option value="-1">-1 (Down)</option>
+                    <option value="0">0 (Root)</option>
+                    <option value="1">+1 (Up)</option>
                   </select>
                 </div>
 
@@ -208,6 +224,34 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                       className="w-4 h-4"
                     />
                     <span className="text-ft2-text">Slide</span>
+                  </label>
+                </div>
+
+                {/* Mute - TT-303 extension */}
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pattern.getMute(selectedStep)}
+                      onChange={() => handleMuteToggle(selectedStep)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-ft2-text">Mute</span>
+                    <span className="text-xs text-ft2-textDim">(silent step)</span>
+                  </label>
+                </div>
+
+                {/* Hammer - TT-303 extension */}
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pattern.getHammer(selectedStep)}
+                      onChange={() => handleHammerToggle(selectedStep)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-ft2-text">Hammer</span>
+                    <span className="text-xs text-ft2-textDim">(legato, no slide)</span>
                   </label>
                 </div>
               </>

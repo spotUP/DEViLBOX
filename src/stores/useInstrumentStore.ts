@@ -1104,29 +1104,36 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Migrate old instruments (backward compatibility)
-      const migratedInstruments = newInstruments.map(inst => ({
-        ...inst,
-        // Fix synthType for instruments with tb303 config (stale localStorage migration)
-        synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
-          ? 'TB303' as const
-          : inst.synthType,
-        // Add type field if missing (backward compatibility)
-        // Sampler = sample, everything else = synth
-        type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
-        // Migrate old effects without category field
-        effects: inst.effects?.map(effect => ({
-          ...effect,
-          // Add category if missing - default to 'tonejs' for old saved songs
-          category: effect.category || ('tonejs' as const),
-        })) || [],
-      }));
+      // Import migration function dynamically to avoid circular deps
+      import('@/lib/migration').then(({ ensureCompleteInstrumentConfig }) => {
+        // Migrate old instruments (backward compatibility)
+        const migratedInstruments = newInstruments.map(inst => {
+          // Ensure complete config for the synthType
+          const completeInst = ensureCompleteInstrumentConfig(inst);
+          
+          return {
+            ...completeInst,
+            // Fix synthType for instruments with tb303 config (stale localStorage migration)
+            synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
+              ? 'TB303' as const
+              : inst.synthType,
+            // Add type field if missing (backward compatibility)
+            // Sampler = sample, everything else = synth
+            type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
+            // Migrate old effects without category field
+            effects: inst.effects?.map(effect => ({
+              ...effect,
+              // Add category if missing - default to 'tonejs' for old saved songs
+              category: effect.category || ('tonejs' as const),
+            })) || [],
+          };
+        });
 
-      set((state) => {
-        state.instruments = migratedInstruments;
-        state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
+        set((state) => {
+          state.instruments = migratedInstruments;
+          state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
+        });
       });
-
     },
 
     loadFurnaceInstrument: (buffer) => {

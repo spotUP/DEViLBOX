@@ -654,10 +654,28 @@ export class TrackerReplayer {
   private processRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     if (!this.song) return;
 
-    // Compute accent/slide from flexible flag columns (0=none, 1=accent, 2=slide)
-    // Either flag1 or flag2 can contain accent or slide
+    // Compute accent/slide/mute/hammer from flexible flag columns
+    // Values: 0=none, 1=accent, 2=slide, 3=mute, 4=hammer
     const accent = (row.flag1 === 1 || row.flag2 === 1);
     const slide = (row.flag1 === 2 || row.flag2 === 2);
+    const mute = (row.flag1 === 3 || row.flag2 === 3);
+    const hammer = (row.flag1 === 4 || row.flag2 === 4);
+
+    // Mute: skip note entirely (TT-303 extension)
+    if (mute) {
+      // Stop any playing note on this channel by muting the gain
+      ch.gainNode.gain.setValueAtTime(0, time);
+      // Also stop the active player if one exists
+      if (ch.player) {
+        try {
+          ch.player.stop(time);
+        } catch (e) {
+          // Ignore errors if already stopped
+        }
+        ch.player = null;
+      }
+      return;
+    }
 
     // Get effect info
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
@@ -691,6 +709,12 @@ export class TrackerReplayer {
     const prob = row.probability;
     const probabilitySkip = prob !== undefined && prob > 0 && prob < 100 && Math.random() * 100 >= prob;
 
+    // Hammer: legato without pitch glide (TT-303 extension)
+    // For hammer: gate stays high (like slide) but pitch jumps instantly
+    // effectiveSlide controls gate timing (true for both slide and hammer)
+    // We need to track hammer separately for the synth to skip pitch glide
+    const effectiveSlide = slide || hammer; // Gate stays high for both
+
     if (noteValue && noteValue !== 0 && !probabilitySkip) {
       // For MOD files, use the raw period stored in the row (if available)
       // This is more accurate than converting XM note numbers
@@ -718,13 +742,18 @@ export class TrackerReplayer {
         // "Slide is ON on a step if the PREVIOUSLY played step had Slide AND the current step is a valid Note"
         // This means the slide flag on step N affects the transition FROM step N TO step N+1
         // So we check if the PREVIOUS row had slide, not the current row
-        const slideActive = ch.previousSlideFlag && noteValue !== null;
+        // For hammer: pitch should jump, not glide - use slideActive only if not hammer
+        const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
 
         // Trigger the note with proper 303 slide semantics
         // Pass accent directly (accent applies to current note)
         // Pass slideActive (computed from previous row's slide flag) for pitch glide
-        // Pass slide for gate timing (if this row has slide, gate stays high to slide to next)
-        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, slide);
+        //   - For hammer: slideActive is forced false so pitch doesn't glide
+        // Pass effectiveSlide for gate timing:
+        //   - slide: gate stays high, pitch glides to next note
+        //   - hammer: gate stays high, but NO pitch glide (just legato)
+        // Pass hammer flag so synth can handle it specially
+        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
         // Reset vibrato/tremolo positions
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
@@ -734,7 +763,8 @@ export class TrackerReplayer {
 
     // Update previous slide flag for next row (TB-303 semantics)
     // Store current row's slide flag to be used when processing the next note
-    ch.previousSlideFlag = slide ?? false;
+    // For hammer: keep gate high (like slide) but don't glide pitch
+    ch.previousSlideFlag = (slide || hammer) ?? false;
 
     // Handle note off
     if (noteValue === 97) {
@@ -948,9 +978,19 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private processEffectTick(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
-    // Compute accent/slide from flexible flag columns
+    // Compute accent/slide/mute/hammer from flexible flag columns
+    // Values: 0=none, 1=accent, 2=slide, 3=mute, 4=hammer
     const accent = (row.flag1 === 1 || row.flag2 === 1);
     const slide = (row.flag1 === 2 || row.flag2 === 2);
+    const mute = (row.flag1 === 3 || row.flag2 === 3);
+    const hammer = (row.flag1 === 4 || row.flag2 === 4);
+
+    // Mute: no effect processing for muted steps
+    if (mute) return;
+
+    // Hammer: treat as non-slide for effect processing
+    const effectiveSlide = hammer ? false : slide;
+    void effectiveSlide; // May be used in extended slide handling
 
     const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
     const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
@@ -1419,8 +1459,9 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean): void {
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, _slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
     // Skip note trigger if channel is muted
+    // Note: _slideActive is preserved for compatibility but not used - pitch glide is handled by the synth's slideTime
     if (channelIndex !== undefined) {
       const engine = getToneEngine();
       if (engine.isChannelMuted(channelIndex)) return;
@@ -1500,9 +1541,12 @@ export class TrackerReplayer {
         velocity,
         ch.instrument,
         accent, // accent
-        slideActive, // slideActive (computed from previous row, for pitch glide)
+        currentRowSlide, // gate timing: true for both slide and hammer (keeps gate high)
         undefined, // channelIndex (let engine allocate)
-        ch.period // period for MOD playback
+        ch.period, // period for MOD playback
+        undefined, // sampleOffset
+        0,         // nnaAction
+        hammer     // TT-303 hammer: legato without pitch glide (synth sets slideTime=0)
       );
       return;
     }

@@ -65,17 +65,40 @@ class DB303Processor extends AudioWorkletProcessor {
         break;
       case 'setParameter':
         if (this.synth) {
-          // If paramId is a string, try to use it as a named setter
-          if (typeof data.paramId === 'string') {
-            const setterName = 'set' + data.paramId.charAt(0).toUpperCase() + data.paramId.slice(1);
+          // Map string param names to numeric IDs (matches C++ DB303Param enum)
+          // WASM only exposes setParameter(int, float), not named setters
+          const paramNameToId = {
+            waveform: 0, tuning: 1, cutoff: 2, resonance: 3, envMod: 4, decay: 5, accent: 6, volume: 7,
+            ampSustain: 10, slideTime: 11, normalAttack: 12, accentAttack: 13, accentDecay: 14, ampDecay: 15, ampRelease: 16,
+            preFilterHp: 20, feedbackHp: 21, postFilterHp: 22, squarePhase: 23,
+            tanhDrive: 30, tanhOffset: 31,
+            // Aliases for UI param names
+            normalDecay: 5, // Same as decay
+            softAttack: 12, // Same as normalAttack
+            accentSoftAttack: 13, // Same as accentAttack
+          };
+          
+          let paramId = data.paramId;
+          let value = data.value;
+          
+          if (typeof paramId === 'string') {
+            // Try named setter first (in case WASM exports them)
+            const setterName = 'set' + paramId.charAt(0).toUpperCase() + paramId.slice(1);
             if (typeof this.synth[setterName] === 'function') {
-              this.synth[setterName](data.value);
+              this.synth[setterName](value);
+              break;
+            }
+            // Map string to numeric ID
+            paramId = paramNameToId[paramId];
+            if (paramId === undefined) {
+              // Unknown param, skip
               break;
             }
           }
-          // Fallback to setParameter(id, value)
+          
+          // Call setParameter with numeric ID
           if (typeof this.synth.setParameter === 'function') {
-            this.synth.setParameter(data.paramId, data.value);
+            this.synth.setParameter(paramId, value);
           }
         }
         break;
@@ -154,9 +177,11 @@ class DB303Processor extends AudioWorkletProcessor {
         }
         break;
       case 'gateOff':
+        // Use allNotesOff to clear the entire noteList - during slides, multiple notes
+        // accumulate in the WASM noteList, so we need to clear them all
         if (this.currentNote >= 0) {
-          if (DEBUG_NOTE_EVENTS) console.log('[DB303] GATE OFF: noteOff(' + this.currentNote + ') at ' + currentTime.toFixed(3));
-          this.synth.noteOff(this.currentNote);
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] GATE OFF: allNotesOff() at ' + currentTime.toFixed(3));
+          this.synth.allNotesOff();
           this.currentNote = -1;
         }
         break;
@@ -237,8 +262,12 @@ class DB303Processor extends AudioWorkletProcessor {
       }
       console.log('[DB303 Worklet] WASM loaded');
 
-      // Create synth instance
-      if (this.module.DB303Synth) {
+      // Create synth engine instance - db303 WASM exports DB303Engine class
+      if (this.module.DB303Engine) {
+        this.synth = new this.module.DB303Engine(Math.floor(sampleRate));
+        console.log('[DB303 Worklet] Created DB303Engine at', sampleRate, 'Hz');
+      } else if (this.module.DB303Synth) {
+        // Fallback for older WASM builds
         this.synth = new this.module.DB303Synth();
         this.synth.initialize(sampleRate);
       } else if (this.module._initSynth) {
@@ -278,7 +307,13 @@ class DB303Processor extends AudioWorkletProcessor {
           paramMap.set(msg.paramId, msg.value);
         }
         for (const [paramId, value] of paramMap) {
-          this.synth.setParameter(paramId, value);
+          // Use named setters (e.g., 'cutoff' -> 'setCutoff')
+          if (typeof paramId === 'string') {
+            const setterName = 'set' + paramId.charAt(0).toUpperCase() + paramId.slice(1);
+            if (typeof this.synth[setterName] === 'function') {
+              this.synth[setterName](value);
+            }
+          }
         }
         this.pendingMessages = [];
       }
@@ -338,17 +373,14 @@ class DB303Processor extends AudioWorkletProcessor {
     const blockLength = outputL.length;
     const numSamples = Math.min(blockLength, this.bufferSize);
 
-    // Check for WASM memory growth
-    this.updateBufferViews();
-
-    if (!this.outputBufferL || !this.outputBufferR) {
-      return true;
-    }
-
     // Process audio block with sample-accurate event handling
     const sampleTime = 1.0 / sampleRate;
     let processedSamples = 0;
     
+    // Get HEAPF32 for reading output
+    const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+    if (!heapF32) return true;
+
     // Process sub-blocks
     while (processedSamples < numSamples) {
       const blockStartTime = currentTime + processedSamples * sampleTime;
@@ -369,12 +401,27 @@ class DB303Processor extends AudioWorkletProcessor {
 
       // Render audio before the next event (if any)
       if (samplesToProcess > 0) {
-        this.synth.process(this.outputPtrL, this.outputPtrR, samplesToProcess);
-        
-        // Copy sub-block to output
-        for (let i = 0; i < samplesToProcess; i++) {
-          outputL[processedSamples + i] = this.outputBufferL[i];
-          outputR[processedSamples + i] = this.outputBufferR[i];
+        // DB303Engine API: process(numSamples) then getOutputBufferPtr()
+        if (typeof this.synth.process === 'function' && typeof this.synth.getOutputBufferPtr === 'function') {
+          this.synth.process(samplesToProcess);
+          const outputPtr = this.synth.getOutputBufferPtr();
+          const ptrIndex = outputPtr >> 2;  // Float32 offset
+          
+          // Copy interleaved stereo output to separate L/R channels
+          for (let i = 0; i < samplesToProcess; i++) {
+            outputL[processedSamples + i] = heapF32[ptrIndex + i * 2];
+            outputR[processedSamples + i] = heapF32[ptrIndex + i * 2 + 1];
+          }
+        } else {
+          // Fallback for other WASM builds using separate L/R pointers
+          this.updateBufferViews();
+          if (this.outputBufferL && this.outputBufferR) {
+            this.synth.process(this.outputPtrL, this.outputPtrR, samplesToProcess);
+            for (let i = 0; i < samplesToProcess; i++) {
+              outputL[processedSamples + i] = this.outputBufferL[i];
+              outputR[processedSamples + i] = this.outputBufferR[i];
+            }
+          }
         }
         
         processedSamples += samplesToProcess;

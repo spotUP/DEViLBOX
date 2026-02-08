@@ -15,10 +15,12 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 
 export interface GridStep {
   noteIndex: number | null;  // 0-11 (C to B), null = rest
-  octaveShift: number;       // -1, 0, or 1
-  accent: boolean;
-  slide: boolean;
-  tie: boolean;
+  octaveShift: number;       // -1, 0, or 1 (relative to base octave like db303)
+  accent: boolean;           // Louder note, filter opens more
+  slide: boolean;            // Glide pitch from previous note (no envelope retrigger)
+  tie: boolean;              // Note sustains from previous step
+  mute: boolean;             // TT-303: Silent step (data preserved)
+  hammer: boolean;           // TT-303: Legato without pitch glide
   velocity: number;          // 0-127 (MIDI velocity)
 }
 
@@ -34,6 +36,8 @@ const EMPTY_STEP: GridStep = {
   accent: false,
   slide: false,
   tie: false,
+  mute: false,
+  hammer: false,
   velocity: 100, // Default velocity
 };
 
@@ -127,6 +131,8 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
       accent: (cell.flag1 === 1 || cell.flag2 === 1),
       slide: (cell.flag1 === 2 || cell.flag2 === 2),
       tie: isTie,
+      mute: (cell.flag1 === 3 || cell.flag2 === 3),    // TT-303 mute flag
+      hammer: (cell.flag1 === 4 || cell.flag2 === 4),  // TT-303 hammer flag
       velocity: cell.volume ?? 100, // Convert volume (0-64) to velocity (0-127) - or use as-is if already MIDI velocity
     });
   }
@@ -148,6 +154,17 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
     const volumeValue = step.noteIndex !== null ? Math.round((step.velocity / 127) * 64) : 0;
     const volume = step.noteIndex !== null ? 0x10 + volumeValue : 0;
 
+    // Encode flags: 1=accent, 2=slide, 3=mute, 4=hammer
+    // Use flag1 for accent/mute, flag2 for slide/hammer
+    let flag1: number | undefined = undefined;
+    let flag2: number | undefined = undefined;
+
+    if (step.accent) flag1 = 1;
+    else if (step.mute) flag1 = 3;
+
+    if (step.slide) flag2 = 2;
+    else if (step.hammer) flag2 = 4;
+
     return {
       note,
       instrument: note !== 0 ? instrumentId : 0, // Use instrumentId for notes, 0 for empty cells
@@ -156,8 +173,8 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
       eff: 0,
       effTyp2: 0,
       eff2: 0,
-      flag1: step.accent ? 1 : undefined,
-      flag2: step.slide ? 2 : undefined,
+      flag1,
+      flag2,
     };
   });
 }
@@ -196,7 +213,7 @@ export function useGridPattern(channelIndex: number) {
 
       const note =
         noteIndex !== null
-          ? gridStepToTrackerNote({ noteIndex, octaveShift, accent: false, slide: false, tie: false, velocity: 100 }, baseOctave)
+          ? gridStepToTrackerNote({ noteIndex, octaveShift, accent: false, slide: false, tie: false, mute: false, hammer: false, velocity: 100 }, baseOctave)
           : 0; // 0 = empty cell
 
       // When setting a note, ensure instrument is set if currently 0 (no instrument)
@@ -247,7 +264,7 @@ export function useGridPattern(channelIndex: number) {
 
       // Calculate new note with shifted octave
       const newNote = gridStepToTrackerNote(
-        { noteIndex: parsed.noteIndex, octaveShift: shift, accent: false, slide: false, tie: false, velocity: 100 },
+        { noteIndex: parsed.noteIndex, octaveShift: shift, accent: false, slide: false, tie: false, mute: false, hammer: false, velocity: 100 },
         baseOctave
       );
 
@@ -282,6 +299,28 @@ export function useGridPattern(channelIndex: number) {
     [channelIndex, cells, setCell]
   );
 
+  // Toggle mute at step (TT-303 extension: silent step, data preserved)
+  const toggleMute = useCallback(
+    (stepIndex: number) => {
+      if (stepIndex < 0 || stepIndex >= cells.length) return;
+      const current = (cells[stepIndex]?.flag1 === 3 || cells[stepIndex]?.flag2 === 3);
+      // Mute uses flag1=3, clear accent if setting mute
+      setCell(channelIndex, stepIndex, { flag1: current ? 0 : 3 });
+    },
+    [channelIndex, cells, setCell]
+  );
+
+  // Toggle hammer at step (TT-303 extension: legato without pitch glide)
+  const toggleHammer = useCallback(
+    (stepIndex: number) => {
+      if (stepIndex < 0 || stepIndex >= cells.length) return;
+      const current = (cells[stepIndex]?.flag1 === 4 || cells[stepIndex]?.flag2 === 4);
+      // Hammer uses flag2=4, clear slide if setting hammer
+      setCell(channelIndex, stepIndex, { flag2: current ? 0 : 4 });
+    },
+    [channelIndex, cells, setCell]
+  );
+
   return {
     gridPattern,
     baseOctave,
@@ -292,6 +331,8 @@ export function useGridPattern(channelIndex: number) {
     setNote,
     toggleAccent,
     toggleSlide,
+    toggleMute,
+    toggleHammer,
     setOctaveShift,
     setVelocity,
     clearStep,

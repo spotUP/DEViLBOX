@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T14:33:19.680Z
+ * Generated: 2026-02-08T20:31:28.743Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '331';
-export const BUILD_HASH = '6f2819b';
+export const BUILD_NUMBER = '332';
+export const BUILD_HASH = '4f99105';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-08',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve WASM loading errors and update synth implementations"
+      },
       {
         type: 'improvement',
         "description": "Implement authentic ProTracker status messages in pattern header"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add drum machine auto-population to drumpad editor"
-      },
-      {
-        type: 'fix',
-        "description": "Replace isDark references with fixed colors in hardware UIs"
       }
     ]
   }

@@ -1057,6 +1057,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

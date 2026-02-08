@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.13)
+project(Open303 LANGUAGES C CXX)
+
 # Open303 (TB-303 Synthesizer) WASM Build
 # Based on the Open303 project by Robin Schmidt (rosic)
 

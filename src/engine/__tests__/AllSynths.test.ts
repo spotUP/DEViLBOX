@@ -2371,7 +2371,7 @@ describe('Fallback Detection Tests', () => {
     'MonoSynth': ['MonoSynth'],
     'FMSynth': ['PolySynth', 'FMSynth'], // Can be wrapped in PolySynth
     'AMSynth': ['PolySynth', 'AMSynth'],
-    'TB303': ['JC303Synth', 'Open303Synth', 'Object'],
+    'TB303': ['DB303Synth', 'Object'],
     'Furnace': ['FurnaceSynth', 'Object'],
     'FurnaceGB': ['FurnaceSynth', 'Object'],
     'FurnaceNES': ['FurnaceSynth', 'Object'],
@@ -2532,14 +2532,12 @@ describe('Fallback Detection Tests', () => {
       expect(true).toBe(true);
     });
 
-    it('should detect TB303 using fallback engine', () => {
+    it('should detect TB303 using DB303 engine', () => {
       testSynthCreation('TB303', (synth: any) => {
-        // Check for various TB303 engine indicators
+        // Check for TB303 engine indicators
         const engineInfo = {
           constructorName: synth.constructor?.name || 'Unknown',
-          hasAccurateEngine: 'accurateEngine' in synth,
-          hasOpen303: 'open303' in synth,
-          hasJC303: synth.constructor?.name?.includes('JC303'),
+          hasDB303: synth.constructor?.name?.includes('DB303'),
           hasWasmEngine: 'useWasmEngine' in synth ? synth.useWasmEngine : undefined,
           isReady: typeof synth.isReady === 'function' ? synth.isReady() : undefined,
         };

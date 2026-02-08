@@ -374,8 +374,8 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <div className="flex items-center gap-2">
             <div className="bg-accent-primary p-1 rounded"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg></div>
             <div className="flex flex-col -space-y-1">
-              <span className="text-white font-black italic text-xl tracking-tighter">{config.engineType === 'db303' ? 'DB-303' : 'JC-303'}</span>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">{config.engineType === 'db303' ? 'DB303 WASM Engine' : 'Open303 WASM Engine'}</span>
+              <span className="text-white font-black italic text-xl tracking-tighter">DB-303</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">TB-303 WASM Engine</span>
             </div>
           </div>
           <div className="h-8 w-px bg-gray-800"></div>
@@ -383,13 +383,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             <label className="text-[8px] font-bold text-gray-500 mb-1">PRESET</label>
             <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p?.tb303) onChange(p.tb303 as any); }} className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[120px]">
               <option value="" disabled>Load Preset...</option>{TB303_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
-            </select>
-          </div>
-          <div className="h-8 w-px bg-gray-800"></div>
-          <div className="flex flex-col">
-            <label className="text-[8px] font-bold text-gray-500 mb-1">ENGINE</label>
-            <select value={config.engineType || 'jc303'} onChange={(e) => onChange({ engineType: e.target.value as any })} className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors">
-              <option value="jc303">Open303 (JC-303)</option><option value="db303">DB303 (db303 variant)</option>
             </select>
           </div>
           <div className="h-8 w-px bg-gray-800"></div>

@@ -12,10 +12,12 @@
  */
 export class AcidNote {
   key: number = 0;           // 0-11 (C=0, C#=1, etc.)
-  octave: number = 0;        // 0 = C2-B2, 1 = C3-B3, etc.
+  octave: number = 0;        // -1, 0, +1 (relative to root note, db303 style)
   accent: boolean = false;   // Accent flag
   slide: boolean = false;    // Slide/portamento flag
   gate: boolean = false;     // Gate open/closed
+  mute: boolean = false;     // Mute flag (TT-303 extension) - step is silent but data preserved
+  hammer: boolean = false;   // Hammer-on flag (TT-303 extension) - legato without pitch glide
 
   constructor() {}
 
@@ -24,7 +26,9 @@ export class AcidNote {
            this.octave === 0 &&
            !this.accent &&
            !this.slide &&
-           !this.gate;
+           !this.gate &&
+           !this.mute &&
+           !this.hammer;
   }
 
   clone(): AcidNote {
@@ -34,25 +38,30 @@ export class AcidNote {
     note.accent = this.accent;
     note.slide = this.slide;
     note.gate = this.gate;
+    note.mute = this.mute;
+    note.hammer = this.hammer;
     return note;
   }
 
   /**
    * Convert to MIDI note number
-   * Octave 0 = C2 (MIDI 36)
+   * Uses relative octave from rootNote (db303 style)
+   * @param rootNote - Base MIDI note (default 36 = C2)
    */
-  toMidiNote(): number {
-    return 36 + this.octave * 12 + this.key;
+  toMidiNote(rootNote: number = 36): number {
+    return rootNote + this.octave * 12 + this.key;
   }
 
   /**
    * Create from MIDI note number
+   * @param midiNote - MIDI note number
+   * @param rootNote - Base MIDI note (default 36 = C2)
    */
-  static fromMidiNote(midiNote: number): AcidNote {
+  static fromMidiNote(midiNote: number, rootNote: number = 36): AcidNote {
     const note = new AcidNote();
-    const noteOffset = midiNote - 36;  // C2 = 36
+    const noteOffset = midiNote - rootNote;
     note.octave = Math.floor(noteOffset / 12);
-    note.key = noteOffset % 12;
+    note.key = ((noteOffset % 12) + 12) % 12;  // Handle negative modulo
     return note;
   }
 }
@@ -61,13 +70,13 @@ export class AcidNote {
  * 16-step acid pattern
  */
 export class AcidPattern {
-  private static readonly MAX_NUM_STEPS = 16;
+  private static readonly MAX_NUM_STEPS = 32;  // Extended to 32 steps (db303 style)
   private notes: AcidNote[] = [];
-  private numSteps: number = 16;
+  private numSteps: number = 16;  // Default to 16, can be set up to 32
   private stepLength: number = 1.0;  // In 16th note units
 
   constructor() {
-    // Initialize 16 steps
+    // Initialize 32 steps (max capacity)
     for (let i = 0; i < AcidPattern.MAX_NUM_STEPS; i++) {
       this.notes.push(new AcidNote());
     }
@@ -108,6 +117,18 @@ export class AcidPattern {
     }
   }
 
+  setMute(step: number, mute: boolean): void {
+    if (step >= 0 && step < this.numSteps) {
+      this.notes[step].mute = mute;
+    }
+  }
+
+  setHammer(step: number, hammer: boolean): void {
+    if (step >= 0 && step < this.numSteps) {
+      this.notes[step].hammer = hammer;
+    }
+  }
+
   setNote(step: number, note: AcidNote): void {
     if (step >= 0 && step < this.numSteps) {
       this.notes[step] = note.clone();
@@ -139,12 +160,29 @@ export class AcidPattern {
     return step >= 0 && step < this.numSteps ? this.notes[step].gate : false;
   }
 
+  getMute(step: number): boolean {
+    return step >= 0 && step < this.numSteps ? this.notes[step].mute : false;
+  }
+
+  getHammer(step: number): boolean {
+    return step >= 0 && step < this.numSteps ? this.notes[step].hammer : false;
+  }
+
   getNote(step: number): AcidNote | null {
     return step >= 0 && step < this.numSteps ? this.notes[step] : null;
   }
 
   getNumSteps(): number {
     return this.numSteps;
+  }
+
+  /**
+   * Set number of active steps (1-32)
+   */
+  setNumSteps(numSteps: number): void {
+    if (numSteps >= 1 && numSteps <= AcidPattern.MAX_NUM_STEPS) {
+      this.numSteps = numSteps;
+    }
   }
 
   static getMaxNumSteps(): number {
@@ -160,7 +198,7 @@ export class AcidPattern {
 
   randomize(): void {
     const keys = [0, 2, 3, 5, 7, 8, 10]; // Minor pentatonic scale
-    const octaves = [0, 1, 2];
+    const octaves = [-1, 0, 1]; // Relative octaves (db303-style)
 
     for (let i = 0; i < this.numSteps; i++) {
       this.notes[i].key = keys[Math.floor(Math.random() * keys.length)];
@@ -168,6 +206,8 @@ export class AcidPattern {
       this.notes[i].gate = Math.random() > 0.3;  // 70% chance of gate
       this.notes[i].accent = Math.random() > 0.7;  // 30% chance of accent
       this.notes[i].slide = Math.random() > 0.85;  // 15% chance of slide
+      this.notes[i].mute = false;  // Don't randomize mute
+      this.notes[i].hammer = false;  // Don't randomize hammer
     }
   }
 
@@ -220,6 +260,8 @@ export class AcidPattern {
         accent: note.accent,
         slide: note.slide,
         gate: note.gate,
+        mute: note.mute,
+        hammer: note.hammer,
       })),
     };
   }
@@ -239,6 +281,8 @@ export class AcidPattern {
         pattern.notes[i].accent = noteData.accent || false;
         pattern.notes[i].slide = noteData.slide || false;
         pattern.notes[i].gate = noteData.gate || false;
+        pattern.notes[i].mute = noteData.mute || false;
+        pattern.notes[i].hammer = noteData.hammer || false;
       }
     }
     return pattern;
@@ -265,14 +309,17 @@ export interface SequencerEvent {
   velocity?: number;
   accent?: boolean;
   slide?: boolean;
+  mute?: boolean;
+  hammer?: boolean;
   step?: number;
 }
 
 /**
  * Acid Sequencer
  *
- * Plays 16-step patterns with tempo sync.
+ * Plays up to 32-step patterns with tempo sync.
  * Triggers notes, accents, and slides based on pattern data.
+ * Supports TT-303 extensions: mute (silent step) and hammer (legato without glide).
  */
 export class AcidSequencer {
   private sampleRate: number = 44100;
@@ -457,6 +504,15 @@ export class AcidSequencer {
       this.eventCallback({ type: 'step', step: this.step });
     }
 
+    // Handle mute flag - skip note entirely (TT-303 extension)
+    if (note.mute) {
+      // Muted step - emit note off to silence any playing note
+      if (this.eventCallback) {
+        this.eventCallback({ type: 'noteOff' });
+      }
+      return;
+    }
+
     if (note.gate) {
       // Note on
       let midiNote = note.toMidiNote();
@@ -466,13 +522,21 @@ export class AcidSequencer {
         midiNote = this.findClosestPermissibleKey(note.key, note.octave);
       }
 
+      // Hammer flag: legato (like slide) but without pitch glide (TT-303 extension)
+      // - Slide: gate stays high + pitch glides to next note
+      // - Hammer: gate stays high + pitch jumps immediately (no glide)
+      // For the slide parameter, we pass TRUE for both slide and hammer (to keep gate high)
+      // The receiving engine must handle pitch glide differently based on the hammer flag
+      const legatoActive = note.slide || note.hammer;
+
       if (this.eventCallback) {
         this.eventCallback({
           type: 'noteOn',
           midiNote,
           velocity: note.accent ? 127 : 100,
           accent: note.accent,
-          slide: note.slide,
+          slide: legatoActive,  // True for both slide and hammer (keeps gate high)
+          hammer: note.hammer,  // Pass hammer flag so engine can skip pitch glide
         });
       }
     } else {

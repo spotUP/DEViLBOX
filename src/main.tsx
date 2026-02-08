@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { enableMapSet } from 'immer'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
@@ -7,6 +8,9 @@ import { ResponsiveProvider } from './contexts/ResponsiveContext.tsx'
 import { useSettingsStore } from './stores/useSettingsStore'
 import { useTransportStore } from './stores/useTransportStore'
 import { getToneEngine } from './engine/ToneEngine'
+
+// Enable Immer support for Map and Set (required for stores using these)
+enableMapSet();
 
 // Dev tools: synth tester (adds testAllSynths() etc. to window)
 import './utils/synthTester'
