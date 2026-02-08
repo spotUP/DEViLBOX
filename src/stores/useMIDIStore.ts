@@ -271,7 +271,7 @@ export const useMIDIStore = create<MIDIStore>()(
             midiOctaveOffset: 0,
         // Default: no octave transpose
       showPatternDialog: false,
-      showKnobBar: true,
+      showKnobBar: false, // Start hidden until device connected
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
       // Initialize MIDI
@@ -512,6 +512,11 @@ export const useMIDIStore = create<MIDIStore>()(
                 console.log('[useMIDIStore] Auto-connecting to first MIDI input:', state.inputDevices[0].name);
                 get().selectInput(state.inputDevices[0].id);
               }
+              
+              // Auto-show knob bar when devices are connected
+              set((state) => {
+                state.showKnobBar = state.inputDevices.length > 0;
+              });
             });
 
             // Initial device refresh
@@ -523,6 +528,11 @@ export const useMIDIStore = create<MIDIStore>()(
               console.log('[useMIDIStore] Auto-connecting to first MIDI input:', currentState.inputDevices[0].name);
               await get().selectInput(currentState.inputDevices[0].id);
             }
+            
+            // Auto-show knob bar if devices are connected
+            set((state) => {
+              state.showKnobBar = state.inputDevices.length > 0;
+            });
 
             // Initialize CCMapManager for generalized MIDI Learn
             const ccMapManager = getCCMapManager();

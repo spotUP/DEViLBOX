@@ -848,6 +848,7 @@ export const useTrackerInput = () => {
       if (key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         play();
+        useUIStore.getState().setStatusMessage('PLAYING');
         return;
       }
 

@@ -93,8 +93,8 @@ export const useUIStore = create<UIStore>()(
       performanceQuality: 'high',
 
       // Transient state
-      statusMessage: '',
-      prevStatusMessage: '',
+      statusMessage: 'All Right',
+      prevStatusMessage: 'All Right',
 
       // Actions
       togglePanel: (panel) =>
@@ -181,7 +181,8 @@ export const useUIStore = create<UIStore>()(
 
             (window as any)._statusTimeout = setTimeout(() => {
               // We need to use the store's set method directly here as we're in a timeout
-              useUIStore.getState().setStatusMessage(useUIStore.getState().prevStatusMessage, false, 0);
+              const prevMsg = useUIStore.getState().prevStatusMessage;
+              useUIStore.getState().setStatusMessage(prevMsg || 'All Right', false, 0);
               (window as any)._statusTimeout = null;
             }, timeout);
           }
