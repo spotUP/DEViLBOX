@@ -6,6 +6,9 @@
  * The WASM module JS is passed as a string and executed via Function constructor.
  */
 
+// Performance: Disable note event logging (causes severe slowdown if true)
+const DEBUG_NOTE_EVENTS = true;
+
 class DB303Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -22,6 +25,7 @@ class DB303Processor extends AudioWorkletProcessor {
     this.pendingMessages = []; // Queue messages received before WASM init completes
     this.initializing = false;
     this.eventQueue = []; // Queue for sample-accurate events
+    console.log('[DB303 Worklet] v1.1.1 (Sample-Accurate Queue Enabled)');
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -31,7 +35,6 @@ class DB303Processor extends AudioWorkletProcessor {
   async handleMessage(data) {
     // Queue non-init messages while WASM is still loading
     if (data.type !== 'init' && data.type !== 'dispose' && !this.synth && this.initializing) {
-      // Only queue setParameter (not notes - those are stale by the time init finishes)
       if (data.type === 'setParameter') {
         this.pendingMessages.push(data);
       }
@@ -54,6 +57,7 @@ class DB303Processor extends AudioWorkletProcessor {
         break;
       case 'allNotesOff':
         if (this.synth) {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] ALL NOTES OFF');
           this.synth.allNotesOff();
           this.currentNote = -1;
           this.eventQueue = [];
@@ -121,19 +125,26 @@ class DB303Processor extends AudioWorkletProcessor {
     switch (data.type) {
       case 'noteOn':
         if (!data.slide && this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + this.currentTime.toFixed(3));
           this.synth.noteOff(this.currentNote);
+        } else if (data.slide && this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity + ' at ' + this.currentTime.toFixed(3));
+        } else {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + this.currentTime.toFixed(3));
         }
         this.synth.noteOn(data.note, data.velocity);
         this.currentNote = data.note;
         break;
       case 'noteOff':
         if (data.note > 0 && data.note === this.currentNote) {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] RELEASE: noteOff(' + data.note + ') at ' + this.currentTime.toFixed(3));
           this.synth.noteOff(data.note);
           this.currentNote = -1;
         }
         break;
       case 'gateOff':
         if (this.currentNote >= 0) {
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] GATE OFF: noteOff(' + this.currentNote + ') at ' + this.currentTime.toFixed(3));
           this.synth.noteOff(this.currentNote);
           this.currentNote = -1;
         }
@@ -325,53 +336,55 @@ class DB303Processor extends AudioWorkletProcessor {
 
     // Process audio block with sample-accurate event handling
     const sampleTime = 1.0 / sampleRate;
-    
     let processedSamples = 0;
     
+    // Process sub-blocks
     while (processedSamples < numSamples) {
-      // Find events scheduled within this sub-block
-      let nextEventIndex = -1;
-      let samplesToNextEvent = numSamples - processedSamples;
+      const blockStartTime = this.currentTime + processedSamples * sampleTime;
       
-      const blockEndTime = currentTime + (processedSamples + samplesToNextEvent) * sampleTime;
-      
-      for (let i = 0; i < this.eventQueue.length; i++) {
-        if (this.eventQueue[i].time < blockEndTime) {
-          nextEventIndex = i;
-          const eventOffset = Math.max(0, this.eventQueue[i].time - (currentTime + processedSamples * sampleTime));
-          samplesToNextEvent = Math.floor(eventOffset / sampleTime);
-          break;
-        }
+      // Find the next event in this block
+      let nextEvent = null;
+      if (this.eventQueue.length > 0 && this.eventQueue[0].time <= this.currentTime + numSamples * sampleTime) {
+        nextEvent = this.eventQueue[0];
       }
-      
-      // Render sub-block before event
-      if (samplesToNextEvent > 0) {
-        this.synth.process(this.outputPtrL, this.outputPtrR, samplesToNextEvent);
+
+      let samplesToProcess;
+      if (nextEvent) {
+        const eventOffset = Math.max(0, nextEvent.time - blockStartTime);
+        samplesToProcess = Math.min(numSamples - processedSamples, Math.floor(eventOffset / sampleTime));
+      } else {
+        samplesToProcess = numSamples - processedSamples;
+      }
+
+      // Render audio before the next event (if any)
+      if (samplesToProcess > 0) {
+        this.synth.process(this.outputPtrL, this.outputPtrR, samplesToProcess);
         
         // Copy sub-block to output
-        for (let i = 0; i < samplesToNextEvent; i++) {
+        for (let i = 0; i < samplesToProcess; i++) {
           outputL[processedSamples + i] = this.outputBufferL[i];
           outputR[processedSamples + i] = this.outputBufferR[i];
         }
         
-        processedSamples += samplesToNextEvent;
+        processedSamples += samplesToProcess;
       }
-      
-      // Process the event
-      if (nextEventIndex >= 0) {
+
+      // If we reached an event, process it
+      if (nextEvent && processedSamples < numSamples) {
         const event = this.eventQueue.shift();
         this.processEvent(event);
-      } else {
-        // No more events in this block, process remaining samples
-        const remaining = numSamples - processedSamples;
-        if (remaining > 0) {
-          this.synth.process(this.outputPtrL, this.outputPtrR, remaining);
-          for (let i = 0; i < remaining; i++) {
-            outputL[processedSamples + i] = this.outputBufferL[i];
-            outputR[processedSamples + i] = this.outputBufferR[i];
-          }
-          processedSamples += remaining;
+        // Continue loop to process remaining samples or next events
+      } else if (nextEvent && processedSamples === numSamples) {
+        // Event is at the very end of or after this block, process it next time
+        // or process it now if it's exactly at block end
+        if (nextEvent.time <= this.currentTime + numSamples * sampleTime) {
+          const event = this.eventQueue.shift();
+          this.processEvent(event);
         }
+        break;
+      } else {
+        // No more events
+        break;
       }
     }
 

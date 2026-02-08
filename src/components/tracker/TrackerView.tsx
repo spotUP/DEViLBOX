@@ -202,7 +202,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     grooveTemplateId, 
     setGrooveTemplate,
     swing,
-    setSwing
+    setSwing,
+    grooveSteps,
+    setGrooveSteps
   } = useTransportStore(useShallow((state) => ({
     setBPM: state.setBPM,
     smoothScrolling: state.smoothScrolling,
@@ -211,6 +213,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setGrooveTemplate: state.setGrooveTemplate,
     swing: state.swing,
     setSwing: state.setSwing,
+    grooveSteps: state.grooveSteps,
+    setGrooveSteps: state.setGrooveSteps,
   })));
   const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
     masterMuted: state.masterMuted,
@@ -882,19 +886,32 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Swing Amount Slider (Compact) */}
           <div className="flex items-center gap-1 ml-1 pl-2 border-l border-dark-border">
-            <span className="text-[10px] text-text-muted font-mono">Swing:</span>
+            <span className="text-[10px] text-text-muted font-mono" title="Groove Amount / Intensity">Amt:</span>
             <input 
               type="range" 
               min="0" 
-              max="100" 
+              max="200" 
               value={swing} 
               onChange={(e) => setSwing(parseInt(e.target.value))}
-              className={`w-16 h-1 accent-accent-primary cursor-pointer ${grooveTemplateId !== 'straight' ? 'opacity-30 grayscale' : ''}`}
-              title="Adjust manual swing amount (0-100%). Only active when 'Straight' groove is selected."
+              className="w-16 h-1 accent-accent-primary cursor-pointer"
+              title="Adjust groove amount/intensity (0-200%). 100% is default."
             />
-            <span className={`text-[10px] font-mono w-6 ${swing > 0 && grooveTemplateId === 'straight' ? 'text-accent-primary font-bold' : 'text-text-muted'}`}>
+            <span className={`text-[10px] font-mono w-8 ${swing !== 100 ? 'text-accent-primary font-bold' : 'text-text-muted'}`}>
               {swing}%
             </span>
+            
+            <span className="text-[10px] text-text-muted font-mono ml-1">Steps:</span>
+            <select 
+              value={grooveSteps}
+              onChange={(e) => setGrooveSteps(parseInt(e.target.value))}
+              className="bg-dark-bgSecondary text-accent-primary border border-dark-border rounded px-0.5 text-[10px] font-mono outline-none cursor-pointer"
+              title="Groove Cycle Duration (steps). Only active when 'Straight' groove is selected."
+              disabled={grooveTemplateId !== 'straight'}
+            >
+              {[2, 4, 8, 16, 32, 64].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
         </div>
 

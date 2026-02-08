@@ -259,32 +259,27 @@ export class PatternScheduler {
 
     // First check for groove template (takes priority over swing)
     const grooveTemplate = transportState.getGrooveTemplate();
+    const intensity = transportState.swing / 100;
+
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      return getGrooveOffset(grooveTemplate, row, rowDuration);
+      return getGrooveOffset(grooveTemplate, row, rowDuration) * intensity;
     }
 
     // Fall back to legacy swing behavior
     const swingAmount = transportState.swing;
 
-    // No swing at 0 or 50 (neutral)
-    if (swingAmount === 0 || swingAmount === 50) return 0;
+    // No swing at 100 (neutral)
+    if (swingAmount === 100) return 0;
 
     // Swing affects every other row (odd rows in 2-row groupings)
-    // In standard 4-row beat: rows 1, 3 get swing; rows 0, 2 are on-beat
-    const rowsPerSwingGroup = 2;
-    const isSwungRow = (row % rowsPerSwingGroup) === 1;
+    const grooveSteps = transportState.grooveSteps || 2;
+    const isSwungRow = (row % grooveSteps) === (grooveSteps - 1);
 
     if (!isSwungRow) return 0;
 
-    // Calculate swing ratio (50 = no swing, 100 = full delay, 0 = early)
-    // swing > 50: delay the off-beat
-    // swing < 50: play off-beat earlier (less common but supported)
-
-    // Max swing is half a row's duration (creates triplet feel at 100)
+    // Normalize: 100 -> 0, 200 -> 1, 0 -> -1
+    const normalizedSwing = (swingAmount - 100) / 100;
     const maxSwingOffset = rowDuration * 0.5;
-
-    // Normalize swing from 0-100 to -1 to 1 (50 = 0)
-    const normalizedSwing = (swingAmount - 50) / 50;
 
     return normalizedSwing * maxSwingOffset;
   }

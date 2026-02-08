@@ -28,6 +28,8 @@ interface TransportStore extends TransportState {
   loopStartRow: number; // 0 = no loop, >0 = loop back to this row
   // Groove template for timing variations
   grooveTemplateId: string;
+  // Groove cycle length (for manual swing and custom grooves)
+  grooveSteps: number;
 
   // Actions
   setBPM: (bpm: number) => void;
@@ -49,6 +51,7 @@ interface TransportStore extends TransportState {
   setSpeed: (speed: number) => void;
   setLoopStartRow: (row: number) => void;
   setGrooveTemplate: (templateId: string) => void;
+  setGrooveSteps: (steps: number) => void;
   getGrooveTemplate: () => GrooveTemplate;
   reset: () => void;
 }
@@ -65,7 +68,7 @@ export const useTransportStore = create<TransportStore>()(
     // Initial state (125 BPM = ProTracker/Amiga default)
     bpm: 125,
     timeSignature: [4, 4],
-    swing: 0,
+    swing: 100, // 100 = neutral (for straight) or 1x (for templates)
     position: '0:0:0',
     isPlaying: false,
     isPaused: false,
@@ -79,6 +82,7 @@ export const useTransportStore = create<TransportStore>()(
     speed: 6, // Default speed (ticks per row) - ProTracker default
     loopStartRow: 0, // 0 = no loop point set
     grooveTemplateId: 'straight', // Default to straight timing (no groove)
+    grooveSteps: 2, // Default to 2 steps (standard 16th swing)
 
     // Actions
     setBPM: (bpm) =>
@@ -94,12 +98,11 @@ export const useTransportStore = create<TransportStore>()(
 
     setSwing: (swing) =>
       set((state) => {
-        state.swing = Math.max(0, Math.min(100, swing));
-        // Clear groove template when setting manual swing
-        state.grooveTemplateId = 'straight';
+        state.swing = Math.max(0, Math.min(200, swing));
+        // Swing now scales groove templates, so we don't clear them anymore
         
         // Log timing change recognition
-        console.log('[TransportStore] Swing changed, replayer will reflect on next lookahead');
+        console.log('[TransportStore] Swing changed to:', state.swing);
       }),
 
     setPosition: (position) =>
@@ -265,11 +268,15 @@ export const useTransportStore = create<TransportStore>()(
         const template = GROOVE_TEMPLATES.find(t => t.id === templateId);
         if (template) {
           state.grooveTemplateId = templateId;
-          // Also update swing to 0 when using groove template (they're alternatives)
-          state.swing = 0;
+          // Swing is now independent and acts as a multiplier
           
           console.log('[TransportStore] Groove template changed to:', templateId);
         }
+      }),
+
+    setGrooveSteps: (steps) =>
+      set((state) => {
+        state.grooveSteps = Math.max(1, Math.min(64, steps));
       }),
 
     getGrooveTemplate: () => {
@@ -282,7 +289,7 @@ export const useTransportStore = create<TransportStore>()(
       set((state) => {
         state.bpm = 125;
         state.timeSignature = [4, 4];
-        state.swing = 0;
+        state.swing = 100; // 100% intensity
         state.position = '0:0:0';
         state.isPlaying = false;
         state.isPaused = false;
@@ -293,6 +300,7 @@ export const useTransportStore = create<TransportStore>()(
         state.speed = 6;
         state.loopStartRow = 0;
         state.grooveTemplateId = 'straight';
+        state.grooveSteps = 2;
       }),
   }))
 );

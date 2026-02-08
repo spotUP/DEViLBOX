@@ -5,7 +5,7 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
-import { JC303Synth } from './open303';
+import { Open303Synth as JC303Synth } from './open303';
 import { DB303Synth } from './db303';
 import { MAMESynth } from './MAMESynth';
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
@@ -523,7 +523,9 @@ export class ToneEngine {
    * Creates instances if needed and waits for their AudioWorklet WASM to be ready.
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
-    const wasmConfigs = configs.filter((c) => c.synthType === 'TB303' || c.synthType === 'Buzz3o3');
+    const wasmConfigs = configs.filter((c) => 
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(c.synthType || '')
+    );
     if (wasmConfigs.length === 0) return;
 
     const promises: Promise<void>[] = [];

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T10:23:26.705Z
+ * Generated: 2026-02-08T10:57:06.702Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '318';
-export const BUILD_HASH = '0c286df';
+export const BUILD_NUMBER = '322';
+export const BUILD_HASH = '0bd64e6';
 export const BUILD_DATE = '2026-02-08';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-08',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused tickLoop property"
+      },
+      {
+        type: 'feature',
+        "description": "Add manual swing amount control to groove menu"
+      },
+      {
+        type: 'fix',
+        "description": "Implement sample-accurate groove and swing for 303 synths"
+      },
+      {
+        type: 'improvement',
+        "description": "Fix groove menu dividers and cleanup unused imports"
+      },
       {
         type: 'improvement',
         "description": "Comprehensive FT2 panel cleanup and reorganization"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Update WASM build configurations and source files"
-      },
-      {
-        type: 'improvement',
-        "description": "Build: rebuild WASM binaries for all synth engines"
-      },
-      {
-        type: 'fix',
-        "description": "Initialize TR-707 parameters after ROM load for sound output"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent per-channel instance creation for MAME/Furnace/Buzz synths"
-      },
-      {
-        type: 'feature',
-        "description": "Add TR-707 hardware UI with authentic Roland panel design"
       }
     ]
   }
