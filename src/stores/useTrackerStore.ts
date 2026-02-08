@@ -1504,6 +1504,12 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         const numChannels = state.patterns[0]?.channels.length || DEFAULT_NUM_CHANNELS;
         state.patterns.push(createEmptyPattern(length, numChannels));
+        // Add status message
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage('PATTERN ADDED');
+          });
+        }
       }),
 
     deletePattern: (index) =>
@@ -1512,6 +1518,12 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patterns.splice(index, 1);
           if (state.currentPatternIndex >= state.patterns.length) {
             state.currentPatternIndex = state.patterns.length - 1;
+          }
+          // Add status message
+          if (typeof window !== 'undefined') {
+            import('@stores/useUIStore').then(({ useUIStore }) => {
+              useUIStore.getState().setStatusMessage('PATTERN DELETED');
+            });
           }
         }
       }),
@@ -1524,6 +1536,12 @@ export const useTrackerStore = create<TrackerStore>()(
           cloned.id = idGenerator.generate('pattern');
           cloned.name = `${original.name} (Copy)`;
           state.patterns.splice(index + 1, 0, cloned);
+          // Add status message
+          if (typeof window !== 'undefined') {
+            import('@stores/useUIStore').then(({ useUIStore }) => {
+              useUIStore.getState().setStatusMessage('PATTERN CLONED');
+            });
+          }
         }
       }),
 
@@ -1706,6 +1724,12 @@ export const useTrackerStore = create<TrackerStore>()(
             });
           }
         });
+        // Add status message
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage('CHANNEL ADDED');
+          });
+        }
       }),
 
     removeChannel: (channelIndex) =>
@@ -1724,13 +1748,21 @@ export const useTrackerStore = create<TrackerStore>()(
         if (state.cursor.channelIndex >= state.patterns[0]?.channels.length) {
           state.cursor.channelIndex = Math.max(0, state.patterns[0].channels.length - 1);
         }
+        // Add status message
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage('CHANNEL REMOVED');
+          });
+        }
       }),
 
     toggleChannelMute: (channelIndex) => {
+      let isMuted = false;
       set((state) => {
         state.patterns.forEach((pattern) => {
           if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
             pattern.channels[channelIndex].muted = !pattern.channels[channelIndex].muted;
+            isMuted = pattern.channels[channelIndex].muted;
           }
         });
       });
@@ -1741,9 +1773,16 @@ export const useTrackerStore = create<TrackerStore>()(
         const engine = getToneEngine();
         engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
       }
+      // Add status message
+      if (typeof window !== 'undefined') {
+        import('@stores/useUIStore').then(({ useUIStore }) => {
+          useUIStore.getState().setStatusMessage(isMuted ? 'MUTED' : 'UNMUTED');
+        });
+      }
     },
 
     toggleChannelSolo: (channelIndex) => {
+      let isSolo = false;
       set((state) => {
         state.patterns.forEach((pattern) => {
           if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
@@ -1755,6 +1794,7 @@ export const useTrackerStore = create<TrackerStore>()(
             // Toggle the clicked channel (if it was solo, it's now off; if it wasn't, it's now on)
             if (!wasAlreadySolo) {
               pattern.channels[channelIndex].solo = true;
+              isSolo = true;
             }
           }
         });
@@ -1765,6 +1805,12 @@ export const useTrackerStore = create<TrackerStore>()(
       if (pattern) {
         const engine = getToneEngine();
         engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
+      }
+      // Add status message
+      if (typeof window !== 'undefined') {
+        import('@stores/useUIStore').then(({ useUIStore }) => {
+          useUIStore.getState().setStatusMessage(isSolo ? 'SOLO ON' : 'SOLO OFF');
+        });
       }
     },
 

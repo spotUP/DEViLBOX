@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
@@ -217,6 +217,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     masterMuted: state.masterMuted,
     toggleMasterMute: state.toggleMasterMute,
   })));
+  const statusMessage = useUIStore((state) => state.statusMessage);
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -855,6 +856,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             </button>
             {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
           </div>
+
+          {/* Status Message (ProTracker Style) */}
+          {statusMessage && (
+            <div className="flex items-center px-3 ml-2 pl-3 border-l border-dark-border">
+              <span className="text-accent-primary font-bold tracking-[0.3em] text-[11px] animate-pulse font-mono">
+                {statusMessage.toUpperCase()}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* FPS / Quality Indicator - Compact */}

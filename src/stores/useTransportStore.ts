@@ -7,6 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
+import { useUIStore } from './useUIStore';
 
 interface TransportStore extends TransportState {
   // State
@@ -97,6 +98,12 @@ export const useTransportStore = create<TransportStore>()(
       set((state) => {
         // Clamp BPM between MIN and MAX
         state.bpm = Math.max(20, Math.min(999, bpm));
+        // Add status message
+        try {
+          useUIStore.getState().setStatusMessage(`BPM ${state.bpm}`, false, 1500);
+        } catch (e) {
+          // Ignore errors if store is being cleaned up
+        }
       }),
 
     setTimeSignature: (numerator, denominator) =>
