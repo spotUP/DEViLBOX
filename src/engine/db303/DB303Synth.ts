@@ -341,9 +341,11 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // Pass slide flag to worklet for proper 303 slide behavior
     // When slide=true: worklet keeps previous note held → DB303 slideToNote (legato)
     // When slide=false: worklet releases previous note first → DB303 triggerNote (retrigger)
+    // Use Tone.now() as fallback to ensure consistent queuing with gateOff
+    const safeTime = _time ?? Tone.now();
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      time: _time, // Pass time for sample-accurate scheduling
+      time: safeTime, // Always pass time for consistent queuing
       note: midiNote,
       velocity: finalVelocity,
       slide: slide

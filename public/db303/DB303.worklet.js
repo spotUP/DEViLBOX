@@ -25,11 +25,42 @@ class DB303Processor extends AudioWorkletProcessor {
     this.pendingMessages = []; // Queue messages received before WASM init completes
     this.initializing = false;
     this.eventQueue = []; // Queue for sample-accurate events
-    console.log('[DB303 Worklet] v1.1.1 (Sample-Accurate Queue Enabled)');
+    
+    // Parameter smoothing for glitch-sensitive params (delay time, etc.)
+    // Rate is per audio block (~128 samples = 2.9ms at 44.1kHz)
+    // Higher rate = faster response, lower rate = smoother
+    // delayTime needs VERY slow smoothing to avoid tape-warble/garbage artifacts
+    this.smoothedParams = {
+      delayTime: { current: 0.3, target: 0.3, rate: 0.002 },  // VERY slow - delay time changes cause glitches
+      cutoff: { current: 0.5, target: 0.5, rate: 0.15 },      // Moderate - smooth but responsive
+    };
+    
+    console.log('[DB303 Worklet] v1.3.1 (Slower Delay Smoothing)');
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
+  }
+  
+  // Update smoothed parameters - called each process() block
+  updateSmoothedParams() {
+    if (!this.synth) return;
+    
+    for (const [paramId, state] of Object.entries(this.smoothedParams)) {
+      if (state.current !== state.target) {
+        const diff = state.target - state.current;
+        if (Math.abs(diff) < 0.0001) {
+          state.current = state.target;
+        } else {
+          state.current += diff * state.rate;
+        }
+        // Apply the smoothed value to WASM
+        const setterName = paramId === 'delayTime' ? 'setDelayTime' : 'setCutoff';
+        if (typeof this.synth[setterName] === 'function') {
+          this.synth[setterName](state.current);
+        }
+      }
+    }
   }
 
   async handleMessage(data) {
@@ -46,8 +77,19 @@ class DB303Processor extends AudioWorkletProcessor {
         await this.initSynth(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
       case 'noteOn':
+        // Real TB-303 behavior: new note trigger cancels any pending gate-off
+        // This ensures the sequencer's note always takes priority
+        this.eventQueue = this.eventQueue.filter(e => e.type !== 'gateOff');
+        if (data.time !== undefined) {
+          this.eventQueue.push(data);
+          this.eventQueue.sort((a, b) => a.time - b.time);
+        } else {
+          this.processEvent(data);
+        }
+        break;
       case 'noteOff':
       case 'gateOff':
+        // Queue for sample-accurate timing (authentic 303 sequencer behavior)
         if (data.time !== undefined) {
           this.eventQueue.push(data);
           this.eventQueue.sort((a, b) => a.time - b.time);
@@ -151,9 +193,11 @@ class DB303Processor extends AudioWorkletProcessor {
             // Effects - Chorus
             chorusMode: 'setChorusMode',
             chorusMix: 'setChorusMix',
-            // Effects - Phaser  
+            // Effects - Phaser (both naming conventions)
             phaserRate: 'setPhaserLfoRate',
+            phaserLfoRate: 'setPhaserLfoRate',  // Alias from TypeScript
             phaserWidth: 'setPhaserLfoWidth',
+            phaserLfoWidth: 'setPhaserLfoWidth',  // Alias from TypeScript
             phaserFeedback: 'setPhaserFeedback',
             phaserMix: 'setPhaserMix',
             // Effects - Delay
@@ -176,9 +220,51 @@ class DB303Processor extends AudioWorkletProcessor {
           if (typeof this.synth[setterName] === 'function') {
             // CRITICAL: Convert to number - values come as strings via postMessage
             const numericValue = parseFloat(data.value);
-            this.synth[setterName](numericValue);
+            
+            // Debug waveform specifically
+            if (data.paramId === 'waveform') {
+              console.log('[DB303] Setting waveform via', setterName, '=', numericValue);
+            }
+            
+            // Use smoothing for glitch-sensitive parameters
+            if (this.smoothedParams[data.paramId]) {
+              this.smoothedParams[data.paramId].target = numericValue;
+              // Don't set directly - updateSmoothedParams will ramp to target
+            } else {
+              this.synth[setterName](numericValue);
+            }
           } else {
-            console.warn('[DB303] Method not found:', setterName);
+            // Fallback: try numeric setParameter for known parameter IDs
+            const paramIdMap = {
+              waveform: 0,
+              tuning: 1,
+              cutoff: 2,
+              resonance: 3,
+              envMod: 4,
+              decay: 5,
+              accent: 6,
+              volume: 7
+            };
+            const numericId = paramIdMap[data.paramId];
+            if (numericId !== undefined && typeof this.synth.setParameter === 'function') {
+              const numericValue = parseFloat(data.value);
+              this.synth.setParameter(numericId, numericValue);
+              console.log('[DB303] Fallback setParameter(' + numericId + ', ' + numericValue + ') for ' + data.paramId);
+            } else {
+              // Special case: waveform might need different method name
+              if (data.paramId === 'waveform') {
+                console.warn('[DB303] Waveform: setWaveform not found, trying alternatives...');
+                const alts = ['setOscWaveform', 'setWaveForm', 'setOscillatorWaveform'];
+                for (const alt of alts) {
+                  if (typeof this.synth[alt] === 'function') {
+                    this.synth[alt](parseFloat(data.value));
+                    console.log('[DB303] Found waveform method:', alt);
+                    break;
+                  }
+                }
+              }
+              console.warn('[DB303] Method not found:', setterName, '(and no setParameter fallback)');
+            }
           }
         }
         break;
@@ -395,6 +481,15 @@ class DB303Processor extends AudioWorkletProcessor {
         this.synth = new this.module.DB303Engine(Math.floor(sampleRate));
         console.log('[DB303 Worklet] Created DB303Engine at', sampleRate, 'Hz');
         
+        // Log all available methods for debugging
+        const methods = [];
+        for (const key in this.synth) {
+          if (typeof this.synth[key] === 'function') {
+            methods.push(key);
+          }
+        }
+        console.log('[DB303 Worklet] Available methods:', methods.join(', '));
+        
         // Ensure filter is enabled
         if (typeof this.synth.setFilterSelect === 'function') {
           this.synth.setFilterSelect(0);
@@ -502,6 +597,9 @@ class DB303Processor extends AudioWorkletProcessor {
     if (!this.initialized || !this.synth) {
       return true;
     }
+    
+    // Update smoothed parameters for glitch-free ramping
+    this.updateSmoothedParams();
 
     const output = outputs[0];
     if (!output || output.length === 0) {
@@ -513,47 +611,44 @@ class DB303Processor extends AudioWorkletProcessor {
     const blockLength = outputL.length;
     const numSamples = Math.min(blockLength, this.bufferSize);
 
-    // Process audio block with sample-accurate event handling
-    const sampleTime = 1.0 / sampleRate;
-    let processedSamples = 0;
-    
     // Get HEAPF32 for reading output
     const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
     if (!heapF32) return true;
 
-    // Process sub-blocks
+    // Sample-accurate event processing (authentic TB-303 sequencer timing)
+    const sampleTime = 1.0 / sampleRate;
+    let processedSamples = 0;
+
     while (processedSamples < numSamples) {
-      const blockStartTime = currentTime + processedSamples * sampleTime;
-      
-      // Find the next event in this block
+      // Find the next event within this audio block
       let nextEvent = null;
-      if (this.eventQueue.length > 0 && this.eventQueue[0].time <= currentTime + numSamples * sampleTime) {
+      const blockEndTime = currentTime + numSamples * sampleTime;
+      
+      if (this.eventQueue.length > 0 && this.eventQueue[0].time <= blockEndTime) {
         nextEvent = this.eventQueue[0];
       }
 
       let samplesToProcess;
       if (nextEvent) {
-        const eventOffset = Math.max(0, nextEvent.time - blockStartTime);
-        samplesToProcess = Math.min(numSamples - processedSamples, Math.floor(eventOffset / sampleTime));
+        // Calculate samples to render before the event
+        const eventSampleOffset = Math.max(0, (nextEvent.time - currentTime) / sampleTime - processedSamples);
+        samplesToProcess = Math.min(numSamples - processedSamples, Math.floor(eventSampleOffset));
       } else {
         samplesToProcess = numSamples - processedSamples;
       }
 
-      // Render audio before the next event (if any)
+      // Render audio sub-block
       if (samplesToProcess > 0) {
-        // DB303Engine API: process(numSamples) then getOutputBufferPtr()
         if (typeof this.synth.process === 'function' && typeof this.synth.getOutputBufferPtr === 'function') {
           this.synth.process(samplesToProcess);
           const outputPtr = this.synth.getOutputBufferPtr();
-          const ptrIndex = outputPtr >> 2;  // Float32 offset
+          const ptrIndex = outputPtr >> 2;
           
-          // Copy interleaved stereo output to separate L/R channels
           for (let i = 0; i < samplesToProcess; i++) {
             outputL[processedSamples + i] = heapF32[ptrIndex + i * 2];
             outputR[processedSamples + i] = heapF32[ptrIndex + i * 2 + 1];
           }
         } else {
-          // Fallback for other WASM builds using separate L/R pointers
           this.updateBufferViews();
           if (this.outputBufferL && this.outputBufferR) {
             this.synth.process(this.outputPtrL, this.outputPtrR, samplesToProcess);
@@ -561,29 +656,17 @@ class DB303Processor extends AudioWorkletProcessor {
               outputL[processedSamples + i] = this.outputBufferL[i];
               outputR[processedSamples + i] = this.outputBufferR[i];
             }
-          } else {
-            console.error('[DB303] No output buffers available!');
           }
         }
-        
         processedSamples += samplesToProcess;
       }
 
-      // If we reached an event, process it
-      if (nextEvent && processedSamples < numSamples) {
+      // Process the event if we've reached it
+      if (nextEvent && this.eventQueue.length > 0) {
         const event = this.eventQueue.shift();
         this.processEvent(event);
-        // Continue loop to process remaining samples or next events
-      } else if (nextEvent && processedSamples === numSamples) {
-        // Event is at the very end of or after this block
-        if (nextEvent.time <= currentTime + numSamples * sampleTime) {
-          const event = this.eventQueue.shift();
-          this.processEvent(event);
-        }
-        break;
-      } else {
-        // No more events
-        break;
+      } else if (!nextEvent) {
+        break; // No more events, done with this block
       }
     }
 
