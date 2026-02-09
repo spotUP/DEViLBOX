@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { SpaceLaserConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
@@ -16,6 +16,10 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<SpaceLaserTab>('laser');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -32,27 +36,27 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
 
   // Helper to update nested configs
   const updateLaser = (updates: Partial<typeof config.laser>) => {
-    onChange({ laser: { ...config.laser, ...updates } });
+    onChange({ laser: { ...configRef.current.laser, ...updates } });
   };
 
   const updateFM = (updates: Partial<typeof config.fm>) => {
-    onChange({ fm: { ...config.fm, ...updates } });
+    onChange({ fm: { ...configRef.current.fm, ...updates } });
   };
 
   const updateNoise = (updates: Partial<typeof config.noise>) => {
-    onChange({ noise: { ...config.noise, ...updates } });
+    onChange({ noise: { ...configRef.current.noise, ...updates } });
   };
 
   const updateDelay = (updates: Partial<typeof config.delay>) => {
-    onChange({ delay: { ...config.delay, ...updates } });
+    onChange({ delay: { ...configRef.current.delay, ...updates } });
   };
 
   const updateReverb = (updates: Partial<typeof config.reverb>) => {
-    onChange({ reverb: { ...config.reverb, ...updates } });
+    onChange({ reverb: { ...configRef.current.reverb, ...updates } });
   };
 
   const updateFilter = (updates: Partial<typeof config.filter>) => {
-    onChange({ filter: { ...config.filter, ...updates } });
+    onChange({ filter: { ...configRef.current.filter, ...updates } });
   };
 
   const renderLaserTab = () => (
