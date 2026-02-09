@@ -14,7 +14,7 @@
  * - OomekAggressor
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import {
@@ -53,14 +53,17 @@ const useBuzzmachineParam = (
   config: InstrumentConfig,
   onChange: (updates: Partial<InstrumentConfig>) => void
 ) => {
+  const configRef = useRef(config);
+  configRef.current = config;
+  
   return useCallback(
     (paramIndex: number, value: number) => {
-      const currentParams = config.buzzmachine?.parameters || {};
-      const machineType = config.buzzmachine?.machineType || 'ArguruDistortion';
+      const currentParams = configRef.current.buzzmachine?.parameters || {};
+      const machineType = configRef.current.buzzmachine?.machineType || 'ArguruDistortion';
       onChange({
         buzzmachine: {
           machineType,
-          ...config.buzzmachine,
+          ...configRef.current.buzzmachine,
           parameters: {
             ...currentParams,
             [paramIndex]: value,
@@ -68,7 +71,7 @@ const useBuzzmachineParam = (
         },
       });
     },
-    [config.buzzmachine, onChange]
+    [onChange]
   );
 };
 

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { MAMEConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Database, Save, Activity, HardDrive } from 'lucide-react';
@@ -31,6 +31,10 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   const requiredZip = REQUIRED_ROMS[config.type] || 'roms.zip';
 
   const numVoices = config.type === 'swp30' ? 64 : config.type === 'rsa' ? 16 : 32;
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -93,9 +97,9 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
     if (handle === 0) return;
     engine.write(handle, offset, value);
     // Persist in config
-    const newRegs = { ...config.registers, [offset]: value };
+    const newRegs = { ...configRef.current.registers, [offset]: value };
     onChange({ registers: newRegs });
-  }, [handle, config.registers, engine, onChange]);
+  }, [handle, engine, onChange]);
 
   return (
     <div className="space-y-6">
