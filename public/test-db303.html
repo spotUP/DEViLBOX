@@ -637,10 +637,10 @@
         });
         workletNode.connect(audioContext.destination);
         
-        // Load WASM
-        const wasmResponse = await fetch('./db303/db303.wasm');
+        // Load WASM (use correct case-sensitive filenames)
+        const wasmResponse = await fetch('./db303/DB303.wasm');
         const wasmBinary = await wasmResponse.arrayBuffer();
-        const jsResponse = await fetch('./db303/db303.js');
+        const jsResponse = await fetch('./db303/DB303.js');
         const jsCode = await jsResponse.text();
         
         workletNode.port.postMessage({
