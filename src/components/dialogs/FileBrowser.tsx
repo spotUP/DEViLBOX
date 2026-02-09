@@ -35,7 +35,7 @@ interface FileBrowserProps {
   suggestedFilename?: string;
 }
 
-type ViewMode = 'library' | 'filesystem' | 'bundled';
+type ViewMode = 'filesystem' | 'bundled';
 
 interface FileItem {
   id: string;
@@ -72,6 +72,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>('');
 
   // Check filesystem access on mount
   useEffect(() => {
@@ -86,19 +87,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     try {
       let items: FileItem[] = [];
 
-      if (viewMode === 'library') {
-        // Load from IndexedDB
-        const projects = await projectLibrary.listProjects();
-        items = projects.map((p: ProjectMetadata) => ({
-          id: p.id,
-          name: p.name.endsWith('.dbx') ? p.name : `${p.name}.dbx`,
-          isDirectory: false,
-          path: `library/${p.name}`,
-          size: p.size,
-          modifiedAt: new Date(p.modifiedAt),
-          source: 'library' as const,
-        }));
-      } else if (viewMode === 'filesystem') {
+      if (viewMode === 'filesystem') {
         // Load from filesystem
         const dirHandle = getCurrentDirectory();
         if (dirHandle) {
@@ -117,37 +106,62 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       } else if (viewMode === 'bundled') {
         // Load bundled data directory structure
         const basePath = import.meta.env.BASE_URL || '/';
-        items = [
-          // Directories
-          { id: 'data/songs', name: '📁 songs', isDirectory: true, path: 'data/songs', source: 'bundled' as const },
-          { id: 'data/samples', name: '📁 samples', isDirectory: true, path: 'data/samples', source: 'bundled' as const },
-          { id: 'data/instruments', name: '📁 instruments', isDirectory: true, path: 'data/instruments', source: 'bundled' as const },
-        ];
         
-        // Load songs from modules.json
-        try {
-          const response = await fetch(`${basePath}data/songs/modules.json`);
-          if (response.ok) {
-            const data = await response.json();
-            const categories = data.categories || {};
-            const allModules: { file: string; name: string }[] = [];
-            for (const mods of Object.values(categories)) {
-              allModules.push(...(mods as { file: string; name: string }[]));
-            }
-            items.push(...allModules.map((m) => ({
-              id: `songs/${m.file}`,
-              name: m.name,
+        if (currentPath === '') {
+          // Root level - show directories and library items
+          items = [
+            { id: 'data/songs', name: 'songs', isDirectory: true, path: 'data/songs', source: 'bundled' as const },
+            { id: 'data/samples', name: 'samples', isDirectory: true, path: 'data/samples', source: 'bundled' as const },
+            { id: 'data/instruments', name: 'instruments', isDirectory: true, path: 'data/instruments', source: 'bundled' as const },
+          ];
+          
+          // Add library items at root level
+          try {
+            const projects = await projectLibrary.listProjects();
+            items.push(...projects.map((p: ProjectMetadata) => ({
+              id: p.id,
+              name: p.name.endsWith('.dbx') ? p.name : `${p.name}.dbx`,
               isDirectory: false,
-              path: `data/songs/${m.file}`,
-              source: 'bundled' as const,
+              path: `library/${p.name}`,
+              size: p.size,
+              modifiedAt: new Date(p.modifiedAt),
+              source: 'library' as const,
             })));
+          } catch {
+            // Library not available
           }
-        } catch {
-          // Fallback songs
-          items.push(
-            { id: 'songs/phuture-acid-tracks.dbx', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbx', source: 'bundled' as const },
-            { id: 'songs/hardfloor-funalogue.dbx', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbx', source: 'bundled' as const }
-          );
+        } else if (currentPath === 'data/songs') {
+          // Inside songs directory - load and show songs
+          try {
+            const response = await fetch(`${basePath}data/songs/modules.json`);
+            if (response.ok) {
+              const data = await response.json();
+              const categories = data.categories || {};
+              const allModules: { file: string; name: string }[] = [];
+              for (const mods of Object.values(categories)) {
+                allModules.push(...(mods as { file: string; name: string }[]));
+              }
+              items = allModules.map((m) => ({
+                id: `songs/${m.file}`,
+                name: m.name,
+                isDirectory: false,
+                path: `data/songs/${m.file}`,
+                source: 'bundled' as const,
+              }));
+            }
+          } catch {
+            // Fallback songs
+            items = [
+              { id: 'songs/phuture-acid-tracks.dbx', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbx', source: 'bundled' as const },
+              { id: 'songs/hardfloor-funalogue.dbx', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbx', source: 'bundled' as const }
+            ];
+          }
+        } else if (currentPath === 'data/samples') {
+          // Inside samples directory - placeholder for now
+          items = [];
+        } else if (currentPath === 'data/instruments') {
+          // Inside instruments directory - placeholder for now
+          items = [];
         }
       }
 
@@ -157,7 +171,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [viewMode]);
+  }, [viewMode, currentPath]);
 
   useEffect(() => {
     if (isOpen) {
@@ -220,8 +234,16 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         data = isXmlFile ? content : JSON.parse(content);
       } else if (selectedFile.source === 'bundled') {
         const basePath = import.meta.env.BASE_URL || '/';
-        const response = await fetch(`${basePath}${selectedFile.path}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const fullPath = `${basePath}${selectedFile.path}`;
+        console.log('Loading bundled file from:', fullPath);
+        const response = await fetch(fullPath);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${fullPath}`);
+        const contentType = response.headers.get('content-type');
+        console.log('Response content-type:', contentType);
+        // Check if we got HTML instead of expected content
+        if (contentType?.includes('text/html')) {
+          throw new Error(`Got HTML instead of file content. Path: ${fullPath}`);
+        }
         // XML files are passed as raw text, others are parsed as JSON
         data = isXmlFile ? await response.text() : await response.json();
       } else {
@@ -247,8 +269,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       const data = currentProjectData();
       const filename = saveFilename.endsWith('.dbx') ? saveFilename : `${saveFilename}.dbx`;
 
-      if (viewMode === 'library') {
-        // Save to IndexedDB
+      if (viewMode === 'bundled') {
+        // Save to IndexedDB (project library)
         await projectLibrary.saveProject(filename, data);
       } else if (viewMode === 'filesystem') {
         // Save to filesystem
@@ -324,19 +346,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
-              Data Files
+              Files
             </button>
           )}
-          <button
-            onClick={() => setViewMode('library')}
-            className={`px-4 py-2 text-sm font-medium ${
-              viewMode === 'library'
-                ? 'text-accent-primary border-b-2 border-accent-primary'
-                : 'text-text-muted hover:text-text-primary'
-            }`}
-          >
-            Project Library
-          </button>
           <button
             onClick={() => hasFilesystemAccess ? setViewMode('filesystem') : handleRequestFilesystemAccess()}
             className={`px-4 py-2 text-sm font-medium ${
@@ -364,17 +376,40 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           ) : files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-text-muted">
               <p className="mb-4">No files found</p>
-              {viewMode === 'library' && mode === 'load' && (
+              {viewMode === 'bundled' && mode === 'load' && (
                 <p className="text-sm">Save a project to see it here</p>
               )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2">
+              {/* Back button when in subdirectory */}
+              {viewMode === 'bundled' && currentPath !== '' && (
+                <div
+                  onClick={() => {
+                    setCurrentPath('');
+                    setSelectedFile(null);
+                  }}
+                  className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
+                >
+                  <div className="text-2xl">⬅️</div>
+                  <div className="flex-1">
+                    <div className="font-medium text-text-primary">.. (back)</div>
+                  </div>
+                </div>
+              )}
               {files.map((file) => (
                 <div
                   key={file.id}
                   onClick={() => setSelectedFile(file)}
                   onDoubleClick={() => {
+                    if (file.isDirectory) {
+                      // Navigate into directory in bundled mode
+                      if (viewMode === 'bundled') {
+                        setCurrentPath(file.path);
+                        setSelectedFile(null);
+                      }
+                      return;
+                    }
                     setSelectedFile(file);
                     if (mode === 'load') handleLoad();
                   }}
@@ -432,9 +467,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
           <button
             onClick={mode === 'load' ? handleLoad : handleSave}
-            disabled={mode === 'load' && !selectedFile}
+            disabled={mode === 'load' && (!selectedFile || selectedFile.isDirectory)}
             className={`px-6 py-2 rounded font-medium ${
-              (mode === 'load' && !selectedFile)
+              (mode === 'load' && (!selectedFile || selectedFile.isDirectory))
                 ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
                 : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
             }`}
