@@ -15,12 +15,15 @@ import { getNativeContext } from '@utils/audio-context';
  */
 const DB303Param = {
   CUTOFF: 'cutoff',
+  CUTOFF_HZ: 'cutoffHz',           // Extended mode: direct Hz (10-5000Hz)
   RESONANCE: 'resonance',
   ENV_MOD: 'envMod',
+  ENV_MOD_PERCENT: 'envModPercent', // Extended mode: 0-300%
   DECAY: 'decay',
   ACCENT: 'accent',
   WAVEFORM: 'waveform',
   PULSE_WIDTH: 'pulseWidth',
+  PITCH_TO_PW: 'pitchToPw',        // Pitch-to-pulse-width modulation
   SUB_OSC_GAIN: 'subOscGain',
   SUB_OSC_BLEND: 'subOscBlend',
   NORMAL_DECAY: 'normalDecay',
@@ -31,12 +34,23 @@ const DB303Param = {
   RES_TRACKING: 'resTracking',
   FILTER_INPUT_DRIVE: 'filterInputDrive',
   FILTER_SELECT: 'filterSelect',
-  // Korg filter parameters - use special WASM function names
-  DIODE_CHARACTER: 'korgWarmth',  // setKorgWarmth
-  DUFFING_AMOUNT: 'korgStiffness',  // setKorgStiffness (needs sticky-zero transform)
-  FILTER_FM_DEPTH: 'korgFilterFm',  // setKorgFilterFm
+  // Korg filter parameters - WASM has both aliases (diodeCharacter=korgWarmth, etc)
+  DIODE_CHARACTER: 'diodeCharacter',   // setDiodeCharacter (alias: setKorgWarmth)
+  DUFFING_AMOUNT: 'duffingAmount',     // setDuffingAmount (alias: setKorgStiffness)
+  FILTER_FM_DEPTH: 'filterFmDepth',    // setFilterFmDepth (alias: setKorgFilterFm)
+  KORG_IBIAS_SCALE: 'korgIbiasScale',  // setKorgIbiasScale (resTracking formula)
+  KORG_BITE: 'korgBite',               // setKorgBite - filter bite/edge
+  KORG_CLIP: 'korgClip',               // setKorgClip - soft clipping
+  KORG_CROSSMOD: 'korgCrossmod',       // setKorgCrossmod - cross modulation
+  KORG_Q_SAG: 'korgQSag',              // setKorgQSag - resonance sag
+  KORG_SHARPNESS: 'korgSharpness',     // setKorgSharpness - filter sharpness
+  KORG_WARMTH: 'korgWarmth',           // setKorgWarmth - alias for diodeCharacter
+  KORG_STIFFNESS: 'korgStiffness',     // setKorgStiffness - alias for duffingAmount
+  KORG_FILTER_FM: 'korgFilterFm',      // setKorgFilterFm - alias for filterFmDepth
   LP_BP_MIX: 'lpBpMix',
   FILTER_TRACKING: 'filterTracking',
+  STAGE_NL_AMOUNT: 'stageNLAmount',    // Per-stage non-linearity
+  ENSEMBLE_AMOUNT: 'ensembleAmount',   // Built-in ensemble effect
   SLIDE_TIME: 'slideTime',
   LFO_RATE: 'lfoRate',
   LFO_CONTOUR: 'lfoContour',
@@ -45,8 +59,8 @@ const DB303Param = {
   LFO_FILTER_DEPTH: 'lfoFilterDepth',
   LFO_STIFF_DEPTH: 'lfoStiffDepth',
   CHORUS_MIX: 'chorusMix',
-  PHASER_RATE: 'phaserLfoRate',  // Note: WASM uses 'setPhaserLfoRate'
-  PHASER_WIDTH: 'phaserLfoWidth',  // Note: WASM uses 'setPhaserLfoWidth'
+  PHASER_RATE: 'phaserLfoRate',        // WASM uses 'setPhaserLfoRate'
+  PHASER_WIDTH: 'phaserLfoWidth',      // WASM uses 'setPhaserLfoWidth'
   PHASER_FEEDBACK: 'phaserFeedback',
   PHASER_MIX: 'phaserMix',
   DELAY_TIME: 'delayTime',
@@ -368,6 +382,20 @@ export class DB303Synth extends Tone.ToneAudioNode {
     this.workletNode.port.postMessage({ type: 'allNotesOff' });
   }
 
+  /**
+   * SequencerEngine compatibility methods
+   * Maps MIDI-style noteOn/noteOff to TB-303 trigger methods
+   */
+  noteOn(midiNote: number, velocity: number, accent: boolean, slide: boolean): void {
+    // Convert MIDI note number to frequency for triggerAttack
+    const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
+    this.triggerAttack(freq, undefined, velocity / 127, accent, slide, false);
+  }
+
+  noteOff(): void {
+    this.triggerRelease();
+  }
+
   triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (this._disposed) return;
     
@@ -425,12 +453,15 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // This ensures transformations (like sticky-zero for duffing) are applied
     switch (param) {
       case 'cutoff': this.setCutoff(value); break;
+      case 'cutoff_hz': this.setCutoffHz(value); break;
       case 'resonance': this.setResonance(value); break;
       case 'env_mod': this.setEnvMod(value); break;
+      case 'env_mod_percent': this.setEnvModPercent(value); break;
       case 'decay': this.setDecay(value); break;
       case 'accent': this.setAccent(value); break;
       case 'waveform': this.setWaveform(value); break;
       case 'pulse_width': this.setPulseWidth(value); break;
+      case 'pitch_to_pw': this.setPitchToPw(value); break;
       case 'sub_osc_gain': this.setSubOscGain(value); break;
       case 'sub_osc_blend': this.setSubOscBlend(value); break;
       case 'normal_decay': this.setNormalDecay(value); break;
@@ -444,8 +475,15 @@ export class DB303Synth extends Tone.ToneAudioNode {
       case 'diode_character': this.setDiodeCharacter(value); break;
       case 'duffing_amount': this.setDuffingAmount(value); break;
       case 'filter_fm_depth': this.setFilterFmDepth(value); break;
+      case 'korg_bite': this.setKorgBite(value); break;
+      case 'korg_clip': this.setKorgClip(value); break;
+      case 'korg_crossmod': this.setKorgCrossmod(value); break;
+      case 'korg_q_sag': this.setKorgQSag(value); break;
+      case 'korg_sharpness': this.setKorgSharpness(value); break;
       case 'lp_bp_mix': this.setLpBpMix(value); break;
       case 'filter_tracking': this.setFilterTracking(value); break;
+      case 'stage_nl_amount': this.setStageNLAmount(value); break;
+      case 'ensemble_amount': this.setEnsembleAmount(value); break;
       case 'slide_time': this.setSlideTime(value); break;
       case 'lfo_rate': this.setLfoRate(value); break;
       case 'lfo_contour': this.setLfoContour(value); break;
@@ -473,35 +511,34 @@ export class DB303Synth extends Tone.ToneAudioNode {
     }
   }
 
-  // --- Core Setters (Converting 0-1 normalized values to WASM ranges) ---
-  // The C++ DB303Synth expects actual values, not normalized 0-1
+  // --- Core Setters ---
+  // The reference db303 WASM expects normalized 0-1 values for all parameters
+  // It handles Hz/ms/% conversion internally
   setCutoff(value: number): void {
-    // C++ expects Hz (20-20000), UI sends 0-1
-    // Clamp to prevent overflow if bogus values arrive
+    // Reference WASM expects 0-1 normalized, converts to Hz internally
     const clamped = Math.max(0, Math.min(1, value));
-    const hz = 20 + clamped * (5000 - 20);  // Map to reasonable 303 range
-    this.setParameterByName(DB303Param.CUTOFF, hz);
+    this.setParameterByName(DB303Param.CUTOFF, clamped);
   }
 
   setResonance(value: number): void {
-    // C++ expects 0-100%, UI sends 0-1
-    this.setParameterByName(DB303Param.RESONANCE, value * 100);
+    // Reference WASM expects 0-1 normalized
+    this.setParameterByName(DB303Param.RESONANCE, value);
   }
 
   setEnvMod(value: number): void {
-    // C++ expects 0-100%, UI sends 0-1
-    this.setParameterByName(DB303Param.ENV_MOD, value * 100);
+    // Reference WASM expects 0-1 normalized
+    this.setParameterByName(DB303Param.ENV_MOD, value);
   }
 
   setDecay(value: number): void {
-    // C++ expects ms (30-3000), UI sends 0-1
-    const ms = 30 + value * (3000 - 30);
-    this.setParameterByName(DB303Param.DECAY, ms);
+    // Reference WASM expects 0-1 normalized, converts to ms internally
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.DECAY, clamped);
   }
 
   setAccent(value: number): void {
-    // C++ expects 0-100%, UI sends 0-1
-    this.setParameterByName(DB303Param.ACCENT, value * 100);
+    // Reference WASM expects 0-1 normalized
+    this.setParameterByName(DB303Param.ACCENT, value);
   }
 
   setAccentAmount(value: number): void {
@@ -509,29 +546,26 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   setSlideTime(value: number): void {
-    // C++ expects ms (1-500), UI sends 0-1
-    const ms = 1 + value * 499;
+    // Reference WASM expects 0-1 normalized, converts to ms internally
+    const clamped = Math.max(0, Math.min(1, value));
     this._currentSlideTime = value;
-    this.setParameterByName(DB303Param.SLIDE_TIME, ms);
+    this.setParameterByName(DB303Param.SLIDE_TIME, clamped);
   }
 
   setVolume(value: number): void {
-    // C++ expects dB (around -12 default), UI sends 0-1
-    // Map 0-1 to -40dB to 0dB
-    const db = -40 + value * 40;
-    this.setParameterByName(DB303Param.VOLUME, db);
+    // Reference WASM expects 0-1 normalized, NOT dB
+    this.setParameterByName(DB303Param.VOLUME, value);
   }
 
   setWaveform(value: number): void {
-    // C++ expects 0-1 (saw to square blend) - same as UI
+    // 0-1 (saw to square blend)
     this.setParameterByName(DB303Param.WAVEFORM, value);
   }
 
   setTuning(value: number): void {
-    // C++ expects Hz (default 440)
-    // If value is 0-1, map to 415-466 (about +/- 1 semitone around 440)
-    const hz = value <= 1 ? 415 + value * 51 : value;
-    this.setParameterByName(DB303Param.TUNING, hz);
+    // Reference WASM expects raw tuning value
+    // Pass through - the WASM handles conversion
+    this.setParameterByName(DB303Param.TUNING, value);
   }
 
   // ============================================================================
@@ -603,13 +637,9 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   setResTracking(value: number): void {
-    // db303 reference: inverts the value then calls setKorgIbiasScale(0.1 + value * 3.9)
-    // The inversion happens in the parameter handler, so we apply both here:
-    // Invert: 1 - value, then scale: 0.1 + (1 - value) * 3.9
-    // This maps 0->4.0, 0.5->2.05, 1->0.1 (inverse tracking)
-    const inverted = 1 - value;
-    const scaled = 0.1 + inverted * 3.9;
-    this.setParameterByName('korgIbiasScale', scaled);
+    // Reference WASM has setResTracking - pass 0-1 normalized
+    // The inversion and korgIbiasScale formula is handled internally
+    this.setParameterByName(DB303Param.RES_TRACKING, value);
   }
 
   setFilterInputDrive(value: number): void {
@@ -654,6 +684,58 @@ export class DB303Synth extends Tone.ToneAudioNode {
   setFilterTracking(value: number): void {
     // 0-1 normalized
     this.setParameterByName(DB303Param.FILTER_TRACKING, value);
+  }
+
+  // Korg filter advanced parameters (for authentic 303 filter behavior)
+  setKorgBite(value: number): void {
+    // 0-1 normalized - filter "bite" or edge character
+    this.setParameterByName(DB303Param.KORG_BITE, value);
+  }
+
+  setKorgClip(value: number): void {
+    // 0-1 normalized - soft clipping in filter
+    this.setParameterByName(DB303Param.KORG_CLIP, value);
+  }
+
+  setKorgCrossmod(value: number): void {
+    // 0-1 normalized - cross modulation between filter stages
+    this.setParameterByName(DB303Param.KORG_CROSSMOD, value);
+  }
+
+  setKorgQSag(value: number): void {
+    // 0-1 normalized - resonance sag behavior
+    this.setParameterByName(DB303Param.KORG_Q_SAG, value);
+  }
+
+  setKorgSharpness(value: number): void {
+    // 0-1 normalized - filter sharpness/precision
+    this.setParameterByName(DB303Param.KORG_SHARPNESS, value);
+  }
+
+  setPitchToPw(value: number): void {
+    // 0-1 normalized - pitch-to-pulse-width modulation
+    this.setParameterByName(DB303Param.PITCH_TO_PW, value);
+  }
+
+  // Extended mode setters (for direct Hz/percent control)
+  setCutoffHz(value: number): void {
+    // Direct Hz value (10-5000Hz) - bypasses the normalized 0-1 conversion
+    this.setParameterByName(DB303Param.CUTOFF_HZ, Math.max(10, Math.min(5000, value)));
+  }
+
+  setEnvModPercent(value: number): void {
+    // Direct percent value (0-300%) - bypasses the normalized 0-1 conversion
+    this.setParameterByName(DB303Param.ENV_MOD_PERCENT, Math.max(0, Math.min(300, value)));
+  }
+
+  setStageNLAmount(value: number): void {
+    // 0-1 normalized - per-stage non-linearity in the filter
+    this.setParameterByName(DB303Param.STAGE_NL_AMOUNT, value);
+  }
+
+  setEnsembleAmount(value: number): void {
+    // 0-1 normalized - built-in ensemble/chorus effect amount
+    this.setParameterByName(DB303Param.ENSEMBLE_AMOUNT, value);
   }
 
   setChorusMode(mode: number): void {
@@ -735,9 +817,11 @@ export class DB303Synth extends Tone.ToneAudioNode {
   setDelayTime(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_TIME, clamped);
-    // Tone.js delayTime is in seconds, but the param expects 0-1
-    // Map 0-1 input to 0.01-1.0 seconds
-    const targetTime = 0.01 + clamped * 0.99;
+    // db303 delay time range: 0.25 to 16 seconds (beat-sync friendly)
+    // Map 0-1 input to 0.25-16 seconds
+    const DELAY_MIN = 0.25;
+    const DELAY_MAX = 16;
+    const targetTime = DELAY_MIN + clamped * (DELAY_MAX - DELAY_MIN);
     try {
       this.delay.delayTime.linearRampToValueAtTime(
         targetTime,

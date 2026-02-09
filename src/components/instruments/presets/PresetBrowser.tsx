@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface PresetBrowserProps {
@@ -24,7 +24,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
 
   // Filter presets based on search query
   const filteredPresets = useMemo(() => {
-    const categoryPresets = PRESET_CATEGORIES[activeCategory];
+    const categoryPresets = PRESET_CATEGORIES[activeCategory] as InstrumentPreset['config'][];
 
     if (!searchQuery.trim()) {
       return categoryPresets;
@@ -33,12 +33,12 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
     const query = searchQuery.toLowerCase();
     return categoryPresets.filter(
       (preset) =>
-        preset.name.toLowerCase().includes(query) ||
-        preset.synthType.toLowerCase().includes(query)
+        preset.name?.toLowerCase().includes(query) ||
+        preset.synthType?.toLowerCase().includes(query)
     );
   }, [activeCategory, searchQuery]);
 
-  const handleLoadPreset = (preset: Omit<InstrumentConfig, 'id'>) => {
+  const handleLoadPreset = (preset: InstrumentPreset['config']) => {
     // Load preset into current instrument while preserving ID
     updateInstrument(instrumentId, preset);
 
@@ -154,7 +154,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
               <button
                 key={preset.name}
                 onClick={() => handleLoadPreset(preset)}
-                onMouseEnter={() => setHoveredPreset(preset.name)}
+                onMouseEnter={() => setHoveredPreset(preset.name || null)}
                 onMouseLeave={() => setHoveredPreset(null)}
                 className={`
                   p-3 border text-left transition-all
@@ -182,7 +182,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
                   <span
                     className={`
                     text-xs font-mono
-                    ${hoveredPreset === preset.name ? 'text-ft2-bg opacity-80' : getSynthTypeColor(preset.synthType)}
+                    ${hoveredPreset === preset.name ? 'text-ft2-bg opacity-80' : getSynthTypeColor(preset.synthType || 'Synth')}
                   `}
                   >
                     {preset.synthType}

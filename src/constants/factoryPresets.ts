@@ -4,7 +4,7 @@
  * Includes all TB-303 presets from tb303Presets.ts
  */
 
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { VOWEL_FORMANTS } from '@typedefs/instrument';
 import { TB303_PRESETS } from './tb303Presets';
 import { FURNACE_PRESETS } from './furnacePresets';
@@ -16,11 +16,16 @@ import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from './drumnibusPresets';
 import { V2_FACTORY_PRESETS } from './v2FactoryPresets';
 import { SAM_PRESETS } from './samPresets';
 import { MAME_CHIP_PRESETS } from './mameChipPresets';
+import { DEXED_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from './jucePresets';
+import { FURNACE_CHIP_PRESETS } from './furnaceChipPresets';
+import { SAMPLE_PACK_PRESETS, WAVETABLE_PACK_PRESETS } from './samplePresets';
+import { BUZZMACHINE_FACTORY_PRESETS } from './buzzmachineFactoryPresets';
+import { MAKK_FACTORY_PRESETS } from './makkPresets';
 
 // BASS PRESETS (18)
 
 
-export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const BASS_PRESETS: InstrumentPreset['config'][] = [
   // Wobble Bass
   {
     type: 'synth' as const,
@@ -780,7 +785,7 @@ export const BASS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // LEAD PRESETS (15)
 // ============================================================================
 
-export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const LEAD_PRESETS: InstrumentPreset['config'][] = [
   // Pluck Synth
   {
     type: 'synth' as const,
@@ -1072,7 +1077,7 @@ export const LEAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // PAD PRESETS (4)
 // ============================================================================
 
-export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const PAD_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'Ambient Pad',
@@ -1288,7 +1293,7 @@ export const PAD_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // DRUM PRESETS (8)
 // ============================================================================
 
-export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const DRUM_PRESETS: InstrumentPreset['config'][] = [
   V2_PRESET_KICK,
   V2_PRESET_SNARE,
   V2_PRESET_HAT,
@@ -1420,7 +1425,7 @@ export const DRUM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // CHIPTUNE PRESETS (12) - 8-bit style with arpeggio patterns
 // ============================================================================
 
-export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const CHIP_PRESETS: InstrumentPreset['config'][] = [
   // Classic chiptune leads with arpeggios
   {
     type: 'synth' as const,
@@ -1631,7 +1636,7 @@ export const CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // Based on er-99 web emulator analysis with accurate synthesis parameters
 // ============================================================================
 
-export const TR909_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const TR909_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: '909 Kick',
@@ -1841,7 +1846,7 @@ export const TR909_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // - Cymbal: 6-oscillator bank with 3-band filtering
 // ============================================================================
 
-export const TR808_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const TR808_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: '808 Kick',
@@ -2144,7 +2149,7 @@ export const TR808_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // FX PRESETS (4)
 // ============================================================================
 
-export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const FX_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'Riser',
@@ -2196,7 +2201,7 @@ export const FX_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // Classic 12-bit digital drum sounds from 1986
 // ============================================================================
 
-export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const TR505_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: '505 Kick',
@@ -2492,7 +2497,7 @@ export const TR505_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // Classic digital drum sounds from 1985 with rumble variants
 // ============================================================================
 
-export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const TR707_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: '707 Kick',
@@ -2770,7 +2775,7 @@ export const TR707_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // Full pack available in Sample Packs browser (229 samples)
 // ============================================================================
 
-export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const DRUMNIBUS_PRESETS: InstrumentPreset['config'][] = [
   // Kicks
   {
     type: 'synth' as const,
@@ -3124,7 +3129,7 @@ export const DRUMNIBUS_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // MAME CLASSIC PRESETS (8) - Hardware-accurate classic synths
 // ============================================================================
 
-export const MAME_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const MAME_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'VFX Digital Pad',
@@ -3227,7 +3232,7 @@ export const MAME_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // ORGAN PRESETS (4) - Drawbar organ settings
 // ============================================================================
 
-export const ORGAN_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const ORGAN_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'Jazz Organ',
@@ -3294,7 +3299,7 @@ export const ORGAN_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // TRACKER MODULE PRESETS (1)
 // ============================================================================
 
-export const MODULE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const MODULE_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth' as const,
     name: 'Generic Module',
@@ -3309,7 +3314,7 @@ export const MODULE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
 // COMBINED FACTORY PRESETS
 // ============================================================================
 
-export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...BASS_PRESETS,
   ...LEAD_PRESETS,
   ...PAD_PRESETS,
@@ -3324,6 +3329,7 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...TR505_PRESETS,
   ...CHIP_PRESETS,
   ...FURNACE_PRESETS,
+  ...FURNACE_CHIP_PRESETS,
   ...FX_PRESETS,
   ...DUB_SIREN_PRESETS,
   ...SPACE_LASER_PRESETS,
@@ -3332,6 +3338,21 @@ export const FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
   ...SAM_PRESETS,
   ...DRUMNIBUS_PRESETS,
   ...DRUMNIBUS_KIT_PRESETS,
+  ...DEXED_FACTORY_PRESETS,
+  ...OBXD_FACTORY_PRESETS,
+  ...SAMPLE_PACK_PRESETS,
+  ...WAVETABLE_PACK_PRESETS,
+  ...BUZZMACHINE_FACTORY_PRESETS,
+  ...MAKK_FACTORY_PRESETS,
+  // Player Init
+  {
+    type: 'synth' as const,
+    name: 'Sample Player',
+    synthType: 'Player' as const,
+    volume: -6,
+    pan: 0,
+    effects: [],
+  },
 ];
 
 // Preset categories for browsing
@@ -3348,7 +3369,7 @@ export const PRESET_CATEGORIES = {
   'TR-707': TR707_PRESETS,
   'TR-505': TR505_PRESETS,
   Chip: CHIP_PRESETS,
-  Furnace: FURNACE_PRESETS,
+  Furnace: [...FURNACE_PRESETS, ...FURNACE_CHIP_PRESETS],
   FX: FX_PRESETS,
   Dub: [...DUB_SIREN_PRESETS, ...SPACE_LASER_PRESETS, ...V2_PRESETS, ...V2_FACTORY_PRESETS, ...SYNARE_PRESETS],
   DubSiren: DUB_SIREN_PRESETS,
@@ -3357,6 +3378,12 @@ export const PRESET_CATEGORIES = {
   Sam: SAM_PRESETS,
   Synare: SYNARE_PRESETS,
   Drumnibus: [...DRUMNIBUS_KIT_PRESETS, ...DRUMNIBUS_PRESETS],
+  Dexed: DEXED_FACTORY_PRESETS,
+  OBXd: OBXD_FACTORY_PRESETS,
+  Samples: SAMPLE_PACK_PRESETS,
+  Wavetables: WAVETABLE_PACK_PRESETS,
+  Buzz: BUZZMACHINE_FACTORY_PRESETS,
+  Makk: MAKK_FACTORY_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
@@ -3366,7 +3393,7 @@ export type PresetCategory = keyof typeof PRESET_CATEGORIES;
  * Used to auto-initialize new instruments with musically useful settings
  * so they produce sound immediately (e.g. V2 needs patch data, MAME chips need _program).
  */
-export function getFirstPresetForSynthType(synthType: string): Omit<InstrumentConfig, 'id'> | null {
+export function getFirstPresetForSynthType(synthType: string): InstrumentPreset['config'] | null {
   // Search category-specific collections first (preferred: sustaining/melodic presets)
   const categoryPresets = PRESET_CATEGORIES[synthType as keyof typeof PRESET_CATEGORIES];
   if (categoryPresets && categoryPresets.length > 0) {
@@ -3379,10 +3406,10 @@ export function getFirstPresetForSynthType(synthType: string): Omit<InstrumentCo
 
   // Check collections not included in FACTORY_PRESETS
   const fromTB303 = TB303_PRESETS.find(p => p.synthType === synthType);
-  if (fromTB303) return fromTB303 as Omit<InstrumentConfig, 'id'>;
+  if (fromTB303) return fromTB303 as InstrumentPreset['config'];
 
   const fromSynare = SYNARE_PRESETS.find(p => p.synthType === synthType);
-  if (fromSynare) return fromSynare as Omit<InstrumentConfig, 'id'>;
+  if (fromSynare) return fromSynare as InstrumentPreset['config'];
 
   return null;
 }

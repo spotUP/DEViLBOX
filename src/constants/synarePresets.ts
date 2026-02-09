@@ -1,8 +1,8 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { DEFAULT_SYNARE } from '@typedefs/instrument';
 
 // Classic Disco Tom
-export const SYNARE_DISCO_TOM: Omit<InstrumentConfig, 'id'> = {
+export const SYNARE_DISCO_TOM: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Disco Tom',
   synthType: 'Synare',
@@ -19,7 +19,7 @@ export const SYNARE_DISCO_TOM: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Dub Percussion (Short, resonant)
-export const SYNARE_DUB_PERC: Omit<InstrumentConfig, 'id'> = {
+export const SYNARE_DUB_PERC: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Dub Perc',
   synthType: 'Synare',
@@ -37,7 +37,7 @@ export const SYNARE_DUB_PERC: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Gritty Snare
-export const SYNARE_SNARE: Omit<InstrumentConfig, 'id'> = {
+export const SYNARE_SNARE: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Synare Snare',
   synthType: 'Synare',
@@ -55,7 +55,7 @@ export const SYNARE_SNARE: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Sci-Fi Zap
-export const SYNARE_ZAP: Omit<InstrumentConfig, 'id'> = {
+export const SYNARE_ZAP: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Space Zap',
   synthType: 'Synare',

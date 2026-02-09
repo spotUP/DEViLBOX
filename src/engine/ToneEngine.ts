@@ -2878,168 +2878,230 @@ export class ToneEngine {
    * Supports both JC303Synth (TB303) and BuzzmachineGenerator (Buzz3o3)
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
-    // Find all channel instances of this instrument (JC303Synth or BuzzmachineGenerator)
-    const synths: any[] = [];
+    // No throttling needed - parameter normalization prevents BiquadFilterNode instability
+    // Immediate updates provide responsive knob feel
+
+    // Find all DB303Synth instances for this instrument
+    const synths: DB303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
-        // Check for JC303Synth or BuzzmachineGenerator (Buzz3o3)
-        // Use instanceof with fallback to constructor.name (handles webpack chunking issues)
-        const isJC303 = instrument instanceof JC303Synth ||
-                        instrument.constructor?.name === 'Open303Synth' ||
-                        instrument.name === 'Open303Synth';
-        const isBuzz3o3 = instrument.constructor?.name === 'BuzzmachineGenerator';
-        if (isJC303 || isBuzz3o3) {
-          synths.push(instrument);
-        }
+      if (idPart === String(instrumentId) && instrument instanceof DB303Synth) {
+        synths.push(instrument);
       }
     });
 
     if (synths.length === 0) {
       // No instances yet - instrument will be created with correct config on next note
-      // Invalidate cached instrument so it's recreated with updated params
-      console.log(`[ToneEngine] updateTB303Parameters: no synth instances for instrument ${instrumentId} (${this.instruments.size} total instruments)`);
       this.invalidateInstrument(instrumentId);
       return;
     }
 
-    console.log(`[ToneEngine] updateTB303Parameters: cutoff=${tb303Config.filter?.cutoff} reso=${tb303Config.filter?.resonance} envMod=${tb303Config.filterEnvelope?.envMod} decay=${tb303Config.filterEnvelope?.decay} df=${tb303Config.devilFish?.enabled} (${synths.length} instances)`);
+    // Normalization constants (must match InstrumentFactory)
+    const CUTOFF_MIN = 314;
+    const CUTOFF_MAX = 2394;
+    const DECAY_MIN = 200;
+    const DECAY_MAX = 2000;
+    const SLIDE_MIN = 2;
+    const SLIDE_MAX = 360;
+    
+    // Normalization helper - converts raw values (Hz, ms, %) to 0-1 range
+    // Matches InstrumentFactory logic: accepts both normalized (0-1) and raw (Hz/ms/%) values
+    const norm = (v: number, min: number, max: number) => {
+      if (v >= 0 && v <= 1) return v; // Already normalized
+      const clamped = Math.max(min, Math.min(max, v)); // Clamp to range
+      return Math.log(clamped / min) / Math.log(max / min); // Logarithmic for frequency/time
+    };
+    
+    const normPercent = (v: number) => {
+      if (v >= 0 && v <= 1) return v; // Already normalized (0-1)
+      return Math.max(0, Math.min(1, v / 100)); // Convert 0-100% to 0-1
+    };
 
-    // Update all instances
+    // Logging disabled for performance (causes UI lag during knob dragging)
+    // Convert normalized value back to Hz/ms/% for logging
+    // const denorm = (v: number, min: number, max: number) => {
+    //   if (v > 1) return v; // Already in Hz/ms
+    //   return min * Math.pow(max / min, v);
+    // };
+    // const denormPercent = (v: number) => {
+    //   if (v > 1) return v; // Already in %
+    //   return v * 100;
+    // };
+    // const cutoffHz = tb303Config.filter?.cutoff !== undefined ? denorm(tb303Config.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX) : 0;
+    // const resoPercent = tb303Config.filter?.resonance !== undefined ? denormPercent(tb303Config.filter.resonance) : 0;
+    // const envModPercent = tb303Config.filterEnvelope?.envMod !== undefined ? denormPercent(tb303Config.filterEnvelope.envMod) : 0;
+    // const decayMs = tb303Config.filterEnvelope?.decay !== undefined ? denorm(tb303Config.filterEnvelope.decay, DECAY_MIN, DECAY_MAX) : 0;
+    // console.log(`[ToneEngine] updateTB303Parameters: cutoff=${cutoffHz.toFixed(1)}Hz reso=${resoPercent.toFixed(0)}% envMod=${envModPercent.toFixed(0)}% decay=${decayMs.toFixed(0)}ms (${synths.length} instances)`);
+
+    // Update all DB303Synth instances
     synths.forEach((synth) => {
-      // Update core TB303 parameters
+      // Core parameters
       if (tb303Config.tuning !== undefined) {
         synth.setTuning(tb303Config.tuning);
       }
+      
+      if (tb303Config.volume !== undefined) {
+        synth.setVolume(tb303Config.volume);
+      }
+      
       if (tb303Config.filter) {
-        synth.setCutoff(tb303Config.filter.cutoff);
-        synth.setResonance(tb303Config.filter.resonance);
+        synth.setCutoff(norm(tb303Config.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
+        synth.setResonance(normPercent(tb303Config.filter.resonance));
       }
+      
       if (tb303Config.filterEnvelope) {
-        synth.setEnvMod(tb303Config.filterEnvelope.envMod);
-        synth.setDecay(tb303Config.filterEnvelope.decay);
+        synth.setEnvMod(normPercent(tb303Config.filterEnvelope.envMod));
+        synth.setDecay(norm(tb303Config.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
       }
+      
       if (tb303Config.accent) {
-        synth.setAccentAmount(tb303Config.accent.amount);
+        synth.setAccentAmount(normPercent(tb303Config.accent.amount));
       }
+      
       if (tb303Config.slide) {
-        synth.setSlideTime(tb303Config.slide.time);
+        synth.setSlideTime(norm(tb303Config.slide.time, SLIDE_MIN, SLIDE_MAX));
       }
+      
       if (tb303Config.overdrive) {
-        synth.setOverdrive(tb303Config.overdrive.amount);
+        synth.setOverdrive(normPercent(tb303Config.overdrive.amount));
       }
+      
       if (tb303Config.oscillator) {
-        if (typeof synth.setWaveform === 'function') {
-          // If it's a blendable waveform (JC303/DB303), send the type
-          // The synth class handles string-to-blend-value conversion
-          synth.setWaveform(tb303Config.oscillator.type);
+        // Convert waveform type to number: 0.0 = saw, 1.0 = square
+        synth.setWaveform(tb303Config.oscillator.type === 'square' ? 1.0 : 0.0);
+        
+        if (tb303Config.oscillator.pulseWidth !== undefined) {
+          synth.setPulseWidth(normPercent(tb303Config.oscillator.pulseWidth));
+        }
+        if (tb303Config.oscillator.subOscGain !== undefined) {
+          synth.setSubOscGain(normPercent(tb303Config.oscillator.subOscGain));
+        }
+        if (tb303Config.oscillator.subOscBlend !== undefined) {
+          synth.setSubOscBlend(normPercent(tb303Config.oscillator.subOscBlend));
+        }
+        if (tb303Config.oscillator.pitchToPw !== undefined) {
+          synth.setPitchToPw(tb303Config.oscillator.pitchToPw);
+        }
+      }
+
+      // Devil Fish parameters
+      if (tb303Config.devilFish?.enabled) {
+        const df = tb303Config.devilFish;
+        synth.enableDevilFish(true);
+        
+        // Decay times
+        synth.setNormalDecay(norm(df.normalDecay, DECAY_MIN, DECAY_MAX));
+        synth.setAccentDecay(norm(df.accentDecay, DECAY_MIN, DECAY_MAX));
+        
+        // Attack
+        synth.setSoftAttack(normPercent(df.softAttack));
+        if (df.accentSoftAttack !== undefined) {
+          synth.setAccentSoftAttack(normPercent(df.accentSoftAttack));
         }
         
-        // Handle Oscillator enhancements if available
-        if (tb303Config.oscillator.pulseWidth !== undefined && typeof synth.setPulseWidth === 'function') {
-          synth.setPulseWidth(tb303Config.oscillator.pulseWidth);
+        // VEG (Volume Envelope Generator)
+        synth.setVegDecay(norm(df.vegDecay, DECAY_MIN, DECAY_MAX));
+        synth.setVegSustain(normPercent(df.vegSustain));
+        
+        // Filter enhancements
+        synth.setFilterTracking(normPercent(df.filterTracking));
+        synth.setFilterFmDepth(normPercent(df.filterFmDepth));
+        
+        if (df.filterInputDrive !== undefined) {
+          synth.setFilterInputDrive(normPercent(df.filterInputDrive));
         }
-        if (tb303Config.oscillator.subOscGain !== undefined && typeof synth.setSubOscGain === 'function') {
-          synth.setSubOscGain(tb303Config.oscillator.subOscGain);
+        if (df.passbandCompensation !== undefined) {
+          synth.setPassbandCompensation(normPercent(df.passbandCompensation));
         }
-        if (tb303Config.oscillator.subOscBlend !== undefined && typeof synth.setSubOscBlend === 'function') {
-          synth.setSubOscBlend(tb303Config.oscillator.subOscBlend);
+        if (df.resTracking !== undefined) {
+          synth.setResTracking(normPercent(df.resTracking));
         }
+        if (df.duffingAmount !== undefined) {
+          synth.setDuffingAmount(normPercent(df.duffingAmount));
+        }
+        if (df.lpBpMix !== undefined) {
+          synth.setLpBpMix(normPercent(df.lpBpMix));
+        }
+        if (df.filterSelect !== undefined) {
+          synth.setFilterSelect(df.filterSelect);
+        }
+        if (df.diodeCharacter !== undefined) {
+          synth.setDiodeCharacter(normPercent(df.diodeCharacter));
+        }
+        if (df.stageNLAmount !== undefined && typeof (synth as any).setStageNLAmount === 'function') {
+          (synth as any).setStageNLAmount(normPercent(df.stageNLAmount));
+        }
+        if (df.ensembleAmount !== undefined && typeof (synth as any).setEnsembleAmount === 'function') {
+          (synth as any).setEnsembleAmount(normPercent(df.ensembleAmount));
+        }
+        if (df.oversamplingOrder !== undefined && typeof (synth as any).setOversamplingOrder === 'function') {
+          (synth as any).setOversamplingOrder(df.oversamplingOrder);
+        }
+        
+        // Korg filter parameters (for Korg Ladder filter mode)
+        if (df.korgBite !== undefined) {
+          synth.setKorgBite(df.korgBite);
+        }
+        if (df.korgClip !== undefined) {
+          synth.setKorgClip(df.korgClip);
+        }
+        if (df.korgCrossmod !== undefined) {
+          synth.setKorgCrossmod(df.korgCrossmod);
+        }
+        if (df.korgQSag !== undefined) {
+          synth.setKorgQSag(df.korgQSag);
+        }
+        if (df.korgSharpness !== undefined) {
+          synth.setKorgSharpness(df.korgSharpness);
+        }
+        
+        if (typeof synth.setMuffler === 'function') {
+          synth.setMuffler(df.muffler);
+        }
+        if (typeof synth.setSweepSpeed === 'function') {
+          synth.setSweepSpeed(df.sweepSpeed);
+        }
+        if (typeof synth.setHighResonance === 'function') {
+          synth.setHighResonance(df.highResonance);
+        }
+      } else if (tb303Config.devilFish) {
+        synth.enableDevilFish(false);
       }
 
-      // Update Devil Fish parameters
-      if (tb303Config.devilFish) {
-        const df = tb303Config.devilFish;
-        if (typeof synth.enableDevilFish === 'function') {
-          synth.enableDevilFish(df.enabled);
-        }
-
-        if (df.enabled) {
-          // Normal note and accent note decay
-          if (typeof synth.setNormalDecay === 'function') synth.setNormalDecay(df.normalDecay);
-          if (typeof synth.setAccentDecay === 'function') synth.setAccentDecay(df.accentDecay);
-          
-          // Soft attack for normal and accented notes
-          if (typeof synth.setSoftAttack === 'function') synth.setSoftAttack(df.softAttack);
-          if (df.accentSoftAttack !== undefined && typeof synth.setAccentSoftAttack === 'function') {
-            synth.setAccentSoftAttack(df.accentSoftAttack);
-          }
-          
-          // VEG (Volume Envelope Generator) controls
-          if (typeof synth.setVegDecay === 'function') synth.setVegDecay(df.vegDecay);
-          if (typeof synth.setVegSustain === 'function') synth.setVegSustain(df.vegSustain);
-          
-          // Filter enhancements
-          if (typeof synth.setFilterTracking === 'function') synth.setFilterTracking(df.filterTracking);
-          if (typeof synth.setFilterFmDepth === 'function') synth.setFilterFmDepth(df.filterFmDepth);
-          if (df.passbandCompensation !== undefined && typeof synth.setPassbandCompensation === 'function') {
-            synth.setPassbandCompensation(df.passbandCompensation);
-          }
-          if (df.resTracking !== undefined && typeof synth.setResTracking === 'function') {
-            synth.setResTracking(df.resTracking);
-          }
-          if (df.duffingAmount !== undefined && typeof synth.setDuffingAmount === 'function') {
-            synth.setDuffingAmount(df.duffingAmount);
-          }
-          if (df.lpBpMix !== undefined && typeof synth.setLpBpMix === 'function') {
-            synth.setLpBpMix(df.lpBpMix);
-          }
-          if (df.filterSelect !== undefined && typeof synth.setFilterSelect === 'function') {
-            synth.setFilterSelect(df.filterSelect);
-          }
-          if (df.diodeCharacter !== undefined && typeof synth.setDiodeCharacter === 'function') {
-            synth.setDiodeCharacter(df.diodeCharacter);
-          }
-          
-          // Built-in ensemble/chorus
-          if (df.ensembleAmount !== undefined && typeof synth.setEnsembleAmount === 'function') {
-            synth.setEnsembleAmount(df.ensembleAmount);
-          }
-          
-          // Quality
-          if (df.oversamplingOrder !== undefined && typeof synth.setOversamplingOrder === 'function') {
-            synth.setOversamplingOrder(df.oversamplingOrder);
-          }
-          
-          if (typeof synth.setMuffler === 'function') synth.setMuffler(df.muffler);
-          if (typeof synth.setSweepSpeed === 'function') synth.setSweepSpeed(df.sweepSpeed);
-          if (typeof synth.setHighResonance === 'function') synth.setHighResonance(df.highResonance);
-        }
-      }
-
-      // Update LFO parameters if available
-      if (tb303Config.lfo && typeof synth.setLfoRate === 'function') {
+      // LFO parameters
+      if (tb303Config.lfo) {
         synth.setLfoWaveform(tb303Config.lfo.waveform);
         synth.setLfoRate(tb303Config.lfo.rate);
         synth.setLfoContour(tb303Config.lfo.contour);
         synth.setLfoPitchDepth(tb303Config.lfo.pitchDepth);
         synth.setLfoPwmDepth(tb303Config.lfo.pwmDepth);
         synth.setLfoFilterDepth(tb303Config.lfo.filterDepth);
-        if (tb303Config.lfo.stiffDepth !== undefined && typeof synth.setLfoStiffDepth === 'function') {
+        if (tb303Config.lfo.stiffDepth !== undefined) {
           synth.setLfoStiffDepth(tb303Config.lfo.stiffDepth);
         }
       }
 
-      // Update Effects parameters if available
-      if (tb303Config.chorus && typeof synth.setChorusMix === 'function') {
+      // Effects parameters
+      if (tb303Config.chorus) {
         synth.setChorusMode(tb303Config.chorus.mode);
-        const mix = tb303Config.chorus.mix > 1 ? tb303Config.chorus.mix / 100 : tb303Config.chorus.mix;
+        const mix = normPercent(tb303Config.chorus.mix);
         synth.setChorusMix(tb303Config.chorus.enabled ? mix : 0);
       }
-      if (tb303Config.phaser && typeof synth.setPhaserMix === 'function') {
-        synth.setPhaserRate(tb303Config.phaser.rate > 1 ? tb303Config.phaser.rate / 100 : tb303Config.phaser.rate);
-        synth.setPhaserWidth(tb303Config.phaser.depth > 1 ? tb303Config.phaser.depth / 100 : tb303Config.phaser.depth);
-        synth.setPhaserFeedback(tb303Config.phaser.feedback > 1 ? tb303Config.phaser.feedback / 100 : tb303Config.phaser.feedback);
-        const mix = tb303Config.phaser.mix > 1 ? tb303Config.phaser.mix / 100 : tb303Config.phaser.mix;
+      
+      if (tb303Config.phaser) {
+        synth.setPhaserRate(normPercent(tb303Config.phaser.rate));
+        synth.setPhaserWidth(normPercent(tb303Config.phaser.depth));
+        synth.setPhaserFeedback(normPercent(tb303Config.phaser.feedback));
+        const mix = normPercent(tb303Config.phaser.mix);
         synth.setPhaserMix(tb303Config.phaser.enabled ? mix : 0);
       }
-      if (tb303Config.delay && typeof synth.setDelayMix === 'function') {
-        // Normalize delay time: if > 1, it's in ms (convert to 0-1), else already normalized
+      
+      if (tb303Config.delay) {
         synth.setDelayTime(tb303Config.delay.time > 1 ? tb303Config.delay.time / 2000 : tb303Config.delay.time);
-        synth.setDelayFeedback(tb303Config.delay.feedback > 1 ? tb303Config.delay.feedback / 100 : tb303Config.delay.feedback);
-        synth.setDelayTone(tb303Config.delay.tone > 1 ? tb303Config.delay.tone / 100 : tb303Config.delay.tone);
-        synth.setDelayMix(tb303Config.delay.enabled ? (tb303Config.delay.mix > 1 ? tb303Config.delay.mix / 100 : tb303Config.delay.mix) : 0);
-        synth.setDelaySpread(tb303Config.delay.stereo > 1 ? tb303Config.delay.stereo / 100 : tb303Config.delay.stereo);
+        synth.setDelayFeedback(normPercent(tb303Config.delay.feedback));
+        synth.setDelayTone(normPercent(tb303Config.delay.tone));
+        synth.setDelayMix(tb303Config.delay.enabled ? normPercent(tb303Config.delay.mix) : 0);
+        synth.setDelaySpread(normPercent(tb303Config.delay.stereo));
       }
     }); // End synths.forEach
   }

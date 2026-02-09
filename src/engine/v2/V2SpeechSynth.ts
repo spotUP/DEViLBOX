@@ -50,6 +50,7 @@ export class V2SpeechSynth extends Tone.ToneAudioNode {
     });
 
     this._player = new Tone.Player().connect(this.output);
+    this._player.loop = this._config.singMode; // Loop in sing mode for continuous playback
 
     // Map V2 config to SAM parameters
     // V2 uses 0-127 range, SAM uses 0-255
@@ -132,6 +133,11 @@ export class V2SpeechSynth extends Tone.ToneAudioNode {
 
     this._config = { ...this._config, ...config };
 
+    // Update loop mode when singMode changes
+    if (config.singMode !== undefined) {
+      this._player.loop = config.singMode;
+    }
+
     if (hasParamsChanged || hasTextChanged) {
       // Throttled re-render to prevent UI/Audio lag during knob moves
       if (this._renderTimer) clearTimeout(this._renderTimer);
@@ -169,21 +175,28 @@ export class V2SpeechSynth extends Tone.ToneAudioNode {
 
     // Pitch tracking for Sing Mode - adjust playback rate based on MIDI note
     // MIDI 60 (C4) is our "base" pitch.
-    if (this._config.singMode && note && note !== 'C4') {
+    if (this._config.singMode) {
       const midi = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
       const ratio = Math.pow(2, (midi - 60) / 12);
       this._player.playbackRate = ratio;
+
+      // In sing mode, only start if not already playing (for continuous pitch tracking)
+      if (this._player.state !== 'started') {
+        this._player.start(time, 0);
+      }
+      this._player.volume.value = Tone.gainToDb(velocity);
     } else {
+      // In normal mode, restart on each note trigger
       this._player.playbackRate = 1.0;
+      
+      // Stop any current playback before starting new
+      if (this._player.state === 'started') {
+        this._player.stop();
+      }
+      
+      this._player.start(time, 0);
+      this._player.volume.value = Tone.gainToDb(velocity);
     }
-
-    // Stop any current playback before starting new
-    if (this._player.state === 'started') {
-      this._player.stop();
-    }
-
-    this._player.start(time, 0);
-    this._player.volume.value = Tone.gainToDb(velocity);
   }
 
   public triggerRelease(_time?: number) {

@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, Plus, Library, ChevronDown, ChevronRight } from 'lucide-react';
+import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, Plus, Library, ChevronDown, ChevronRight, FileUp } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
 import {
   getFurnaceWavetablesByCategory,
@@ -438,6 +438,59 @@ interface FurnaceEditorProps {
 export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrumentId, onChange }) => {
   const [activeTab, setActiveTab] = useState<'fm' | 'macros' | 'chip'>('fm');
   const [expandedOps, setExpandedOps] = useState<Set<number>>(new Set([0, 1, 2, 3]));
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.name.endsWith('.fuw')) {
+        // Parse Furnace .fuw (skipping header "-Furnace waveta-")
+        const arrayBuffer = await file.arrayBuffer();
+        const dataView = new DataView(arrayBuffer);
+        const wavetableData: number[] = [];
+        
+        // Skip 32-byte header
+        for (let i = 32; i < arrayBuffer.byteLength; i += 4) {
+          if (i + 4 <= arrayBuffer.byteLength) {
+            wavetableData.push(dataView.getUint32(i, true));
+          }
+        }
+        
+        if (wavetableData.length > 0) {
+          const newWavetables = [...config.wavetables, { 
+            id: config.wavetables.length, 
+            data: wavetableData,
+            len: wavetableData.length,
+            max: Math.max(...wavetableData) 
+          }];
+          onChange({ wavetables: newWavetables });
+        }
+      } else {
+        // Parse audio file
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const rawData = buffer.getChannelData(0);
+        
+        // Convert -1..1 float to 0..15 (standard 4-bit furnace height)
+        const values = Array.from(rawData).map(v => Math.round((v + 1) / 2 * 15));
+        
+        const newWavetables = [...config.wavetables, { 
+          id: config.wavetables.length, 
+          data: values,
+          len: values.length,
+          max: 15
+        }];
+        onChange({ wavetables: newWavetables });
+      }
+    } catch (err) {
+      console.error('Failed to import Furnace wavetable:', err);
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const updateOperator = useCallback((idx: number, updates: Partial<FurnaceOperatorConfig>) => {
     const newOps = [...config.operators];
@@ -688,6 +741,20 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
               Wavetable Editor ({config.wavetables.length} waves)
             </h3>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1 text-text-muted hover:text-cyan-400 transition-colors"
+              title="Import .wav or .fuw wave"
+            >
+              <FileUp size={14} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".wav,.fuw"
+              onChange={handleImport}
+              className="hidden"
+            />
             <span className="text-[9px] text-text-muted">Draw to edit waveforms</span>
           </div>
 

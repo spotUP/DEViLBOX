@@ -65,7 +65,7 @@ export function setCurrentDirectory(handle: FileSystemDirectoryHandle | null): v
  */
 export async function listDirectory(
   dirHandle?: FileSystemDirectoryHandle,
-  filter?: string[] // file extensions to filter, e.g., ['.dbox', '.mod', '.xm']
+  filter?: string[] // file extensions to filter, e.g., ['.dbx', '.mod', '.xm']
 ): Promise<FileEntry[]> {
   const handle = dirHandle || currentDirectoryHandle;
   if (!handle) throw new Error('No directory handle available');

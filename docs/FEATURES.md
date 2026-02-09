@@ -101,12 +101,12 @@ Single pattern with one instrument (for sound effects):
 }
 ```
 
-#### 3. Instrument Export (`.inst.json`)
+#### 3. Instrument Export (`.dbi`)
 
 Individual instrument preset:
 ```json
 {
-  "format": "scribbleton-instrument",
+  "format": "devilbox-instrument",
   "version": "1.0.0",
   "instrument": {
     "id": 0,

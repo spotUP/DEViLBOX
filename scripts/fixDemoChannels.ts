@@ -121,10 +121,10 @@ function fixChannelCounts(filepath: string): boolean {
 }
 
 const FILES_TO_FIX = [
-  '303-feature-test.dbox',
-  'comprehensive-feature-test.dbox',
-  'josh-wink-higher-state.dbox',
-  'mr-oizo-flat-beat.dbox',
+  '303-feature-test.dbx',
+  'comprehensive-feature-test.dbx',
+  'josh-wink-higher-state.dbx',
+  'mr-oizo-flat-beat.dbx',
 ];
 
 const songsDir = resolve(__dirname, '../public/data/songs');

@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Music, Tag } from 'lucide-react';
 import { FACTORY_PRESETS } from '@constants/factoryPresets';
-import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
+import type { SynthType, InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
 import { getSynthInfo } from '@constants/synthCategories';
 
 interface PresetDropdownProps {
@@ -39,7 +39,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   }, []);
 
   // Apply preset
-  const applyPreset = (preset: Omit<InstrumentConfig, 'id'>) => {
+  const applyPreset = (preset: InstrumentPreset['config']) => {
     // We can just pass the entire preset (minus name/type if we want to keep current)
     // but usually user wants the named preset.
     const { name: _name, type: _type, synthType: _synthType, ...config } = preset;

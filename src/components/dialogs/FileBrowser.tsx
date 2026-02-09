@@ -64,9 +64,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   onLoadTrackerModule,
   mode,
   currentProjectData,
-  suggestedFilename = 'untitled.dbox',
+  suggestedFilename = 'untitled.dbx',
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('library');
+  const [viewMode, setViewMode] = useState<ViewMode>('bundled');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         const projects = await projectLibrary.listProjects();
         items = projects.map((p: ProjectMetadata) => ({
           id: p.id,
-          name: p.name.endsWith('.dbox') ? p.name : `${p.name}.dbox`,
+          name: p.name.endsWith('.dbx') ? p.name : `${p.name}.dbx`,
           isDirectory: false,
           path: `library/${p.name}`,
           size: p.size,
@@ -103,7 +103,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         // Load from filesystem
         const dirHandle = getCurrentDirectory();
         if (dirHandle) {
-          const entries = await listDirectory(dirHandle, ['.dbox', ...TRACKER_EXTENSIONS]);
+          const entries = await listDirectory(dirHandle, ['.dbx', '.xml', ...TRACKER_EXTENSIONS]);
           items = entries.map((e: FileEntry) => ({
             id: e.path,
             name: e.name,
@@ -116,32 +116,39 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           }));
         }
       } else if (viewMode === 'bundled') {
-        // Load bundled modules list from unified modules.json
+        // Load bundled data directory structure
         const basePath = import.meta.env.BASE_URL || '/';
+        items = [
+          // Directories
+          { id: 'data/songs', name: '📁 songs', isDirectory: true, path: 'data/songs', source: 'bundled' as const },
+          { id: 'data/samples', name: '📁 samples', isDirectory: true, path: 'data/samples', source: 'bundled' as const },
+          { id: 'data/instruments', name: '📁 instruments', isDirectory: true, path: 'data/instruments', source: 'bundled' as const },
+        ];
+        
+        // Load songs from modules.json
         try {
           const response = await fetch(`${basePath}data/songs/modules.json`);
           if (response.ok) {
             const data = await response.json();
             const categories = data.categories || {};
-            // Flatten all categories into a single list
             const allModules: { file: string; name: string }[] = [];
             for (const mods of Object.values(categories)) {
               allModules.push(...(mods as { file: string; name: string }[]));
             }
-            items = allModules.map((m) => ({
-              id: m.file,
+            items.push(...allModules.map((m) => ({
+              id: `songs/${m.file}`,
               name: m.name,
               isDirectory: false,
               path: `data/songs/${m.file}`,
               source: 'bundled' as const,
-            }));
+            })));
           }
         } catch {
-          // Fall back to a few known modules
-          items = [
-            { id: 'phuture-acid-tracks.dbox', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbox', source: 'bundled' as const },
-            { id: 'hardfloor-funalogue.dbox', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbox', source: 'bundled' as const },
-          ];
+          // Fallback songs
+          items.push(
+            { id: 'songs/phuture-acid-tracks.dbx', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbx', source: 'bundled' as const },
+            { id: 'songs/hardfloor-funalogue.dbx', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbx', source: 'bundled' as const }
+          );
         }
       }
 
@@ -200,8 +207,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         return;
       }
 
-      // JSON project file
-      let data: object;
+      // Load file content
+      let data: any;
+      const isXmlFile = selectedFile.name.toLowerCase().endsWith('.xml');
 
       if (selectedFile.source === 'library') {
         const projectData = await projectLibrary.loadProject(selectedFile.id);
@@ -209,12 +217,14 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         data = projectData;
       } else if (selectedFile.source === 'filesystem' && selectedFile.handle) {
         const content = await readFile(selectedFile.handle as FileSystemFileHandle);
-        data = JSON.parse(content);
+        // XML files are passed as raw text, others are parsed as JSON
+        data = isXmlFile ? content : JSON.parse(content);
       } else if (selectedFile.source === 'bundled') {
         const basePath = import.meta.env.BASE_URL || '/';
         const response = await fetch(`${basePath}${selectedFile.path}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        data = await response.json();
+        // XML files are passed as raw text, others are parsed as JSON
+        data = isXmlFile ? await response.text() : await response.json();
       } else {
         throw new Error('Cannot load file');
       }
@@ -236,7 +246,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
     try {
       const data = currentProjectData();
-      const filename = saveFilename.endsWith('.dbox') ? saveFilename : `${saveFilename}.dbox`;
+      const filename = saveFilename.endsWith('.dbx') ? saveFilename : `${saveFilename}.dbx`;
 
       if (viewMode === 'library') {
         // Save to IndexedDB
@@ -295,10 +305,12 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         setError('Tracker module loading not supported in this context');
       }
     } else {
-      // JSON project file (.dbox)
+      // JSON project file (.dbx) or XML pattern file
       try {
         const content = await file.text();
-        const data = JSON.parse(content);
+        const isXmlFile = file.name.toLowerCase().endsWith('.xml');
+        // XML files are passed as raw text, others are parsed as JSON
+        const data = isXmlFile ? content : JSON.parse(content);
         onLoad(data, file.name);
         onClose();
       } catch {
@@ -317,7 +329,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           {
             description: 'All Supported Files',
             accept: {
-              'application/octet-stream': ['.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm'],
+              'application/octet-stream': ['.dbx', '.xml', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm'],
             },
           },
         ],
@@ -364,6 +376,18 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* View Mode Tabs */}
         <div className="flex border-b border-dark-border">
+          {mode === 'load' && (
+            <button
+              onClick={() => setViewMode('bundled')}
+              className={`px-4 py-2 text-sm font-medium ${
+                viewMode === 'bundled'
+                  ? 'text-accent-primary border-b-2 border-accent-primary'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Data Files
+            </button>
+          )}
           <button
             onClick={() => setViewMode('library')}
             className={`px-4 py-2 text-sm font-medium ${
@@ -383,25 +407,6 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             }`}
           >
             {hasFilesystemAccess ? 'Folder' : 'Open Folder...'}
-          </button>
-          {mode === 'load' && (
-            <button
-              onClick={() => setViewMode('bundled')}
-              className={`px-4 py-2 text-sm font-medium ${
-                viewMode === 'bundled'
-                  ? 'text-accent-primary border-b-2 border-accent-primary'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              Bundled Modules
-            </button>
-          )}
-          <div className="flex-1" />
-          <button
-            onClick={handleBrowseFiles}
-            className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary"
-          >
-            Browse Files...
           </button>
         </div>
 

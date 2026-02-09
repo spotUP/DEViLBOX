@@ -1567,7 +1567,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   Import File
                 </h3>
                 <p className="text-sm font-mono text-text-muted mb-6">
-                  Select a .song.json, .sfx.json, or .inst.json file
+                  Select a .dbx, .sfx.json, or .dbi file
                 </p>
                 <button
                   onClick={handleImportClick}
@@ -1599,7 +1599,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-accent-primary">•</span>
-                    <span><strong>.inst.json</strong> - Individual instrument preset</span>
+                    <span><strong>.dbi</strong> - Individual instrument preset</span>
                   </li>
                 </ul>
               </div>

@@ -1,11 +1,11 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { DEFAULT_V2 } from '@typedefs/instrument';
 
 // Modes: 0:Off, 1:Saw/Tri, 2:Pulse, 3:Sin, 4:Noise, 5:XX, 6:AuxA, 7:AuxB
 // Filters: 0:Off, 1:Low, 2:Band, 3:High, 4:Notch, 5:All, 6:MoogL, 7:MoogH
 
 // Classic Trance Lead
-export const V2_PRESET_TRANCE: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_TRANCE: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 Trance Lead',
   synthType: 'V2',
@@ -22,7 +22,7 @@ export const V2_PRESET_TRANCE: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Soft Intro Pad
-export const V2_PRESET_PAD: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_PAD: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 Silk Pad',
   synthType: 'V2',
@@ -39,7 +39,7 @@ export const V2_PRESET_PAD: Omit<InstrumentConfig, 'id'> = {
 };
 
 // 4k Intro Bass
-export const V2_PRESET_BASS: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_BASS: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 4k Bass',
   synthType: 'V2',
@@ -56,7 +56,7 @@ export const V2_PRESET_BASS: Omit<InstrumentConfig, 'id'> = {
 };
 
 // 4k Intro Kick
-export const V2_PRESET_KICK: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_KICK: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 4k Kick',
   synthType: 'V2',
@@ -72,7 +72,7 @@ export const V2_PRESET_KICK: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Noise Snare
-export const V2_PRESET_SNARE: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_SNARE: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 Noise Snare',
   synthType: 'V2',
@@ -88,7 +88,7 @@ export const V2_PRESET_SNARE: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Metallic Hat
-export const V2_PRESET_HAT: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_HAT: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 Metal Hat',
   synthType: 'V2',
@@ -104,7 +104,7 @@ export const V2_PRESET_HAT: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Demoscene Zap
-export const V2_PRESET_ZAP: Omit<InstrumentConfig, 'id'> = {
+export const V2_PRESET_ZAP: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'V2 Retro Zap',
   synthType: 'V2',
@@ -119,12 +119,40 @@ export const V2_PRESET_ZAP: Omit<InstrumentConfig, 'id'> = {
   pan: 0,
 };
 
-export const V2_PRESETS = [
+export const V2_PRESETS: InstrumentPreset['config'][] = [
+
   V2_PRESET_TRANCE,
+
   V2_PRESET_PAD,
+
   V2_PRESET_BASS,
+
   V2_PRESET_KICK,
+
   V2_PRESET_SNARE,
+
   V2_PRESET_HAT,
+
   V2_PRESET_ZAP,
+
+  {
+
+    name: 'V2 Speech',
+
+    type: 'synth' as const,
+
+    synthType: 'V2Speech' as const,
+
+    volume: -6,
+
+    pan: 0,
+
+    effects: [],
+
+    // V2Speech uses text input, no complex patch needed for init
+
+    parameters: { text: 'Ready' }, 
+
+  },
+
 ];

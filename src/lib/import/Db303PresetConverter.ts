@@ -84,6 +84,9 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
       filterFmDepth: getFloat('devilfish filterFmDepth', 0),
       lpBpMix: getFloat('devilfish lpBpMix', 0),
       filterTracking: getFloat('devilfish filterTracking', 0),
+      stageNLAmount: getFloat('devilfish stageNLAmount', 0),
+      ensembleAmount: getFloat('devilfish ensembleAmount', 0),
+      oversamplingOrder: getInt('devilfish oversamplingOrder', 2) as 0 | 1 | 2 | 3 | 4,
       accentSweepEnabled: true,
       sweepSpeed: 'normal',
       highResonance: config.filter?.resonance ? config.filter.resonance > 0.85 : false,
@@ -194,6 +197,9 @@ export function convertToDb303Preset(config: TB303Config): string {
     lines.push(`    <duffingAmount>${(df.duffingAmount ?? 0.03).toFixed(3)}</duffingAmount>`);
     lines.push(`    <filterFmDepth>${(df.filterFmDepth ?? 0).toFixed(3)}</filterFmDepth>`);
     lines.push(`    <lpBpMix>${(df.lpBpMix ?? 0).toFixed(3)}</lpBpMix>`);
+    lines.push(`    <stageNLAmount>${(df.stageNLAmount ?? 0).toFixed(3)}</stageNLAmount>`);
+    lines.push(`    <ensembleAmount>${(df.ensembleAmount ?? 0).toFixed(3)}</ensembleAmount>`);
+    lines.push(`    <oversamplingOrder>${df.oversamplingOrder ?? 2}</oversamplingOrder>`);
     lines.push(`    <filterTracking>${(df.filterTracking ?? 0).toFixed(3)}</filterTracking>`);
     lines.push(`    <slideTime>${(config.slide?.time ?? 0.17).toFixed(3)}</slideTime>`);
     lines.push('  </devilfish>');

@@ -12,12 +12,18 @@ interface Db303Step {
   gate: boolean;      // Note on/off
   accent: boolean;
   slide: boolean;
+  mute: boolean;      // Muted step (no sound)
+  hammer: boolean;    // Hammer-on (legato without pitch glide)
 }
 
 /**
  * Parse db303 pattern XML string into Pattern format
+ * @param xmlString - The XML string to parse
+ * @param patternName - Name for the pattern
+ * @param instrumentId - Optional instrument ID to assign to notes (default: 1)
+ * @returns Object with pattern and optional tempo/swing settings
  */
-export function parseDb303Pattern(xmlString: string, patternName: string = 'DB303 Pattern'): Pattern {
+export function parseDb303Pattern(xmlString: string, patternName: string = 'DB303 Pattern', instrumentId: number = 1): { pattern: Pattern; tempo?: number; swing?: number } {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'text/xml');
 
@@ -35,6 +41,14 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
   // Parse and validate numSteps (1-256 range)
   const rawNumSteps = parseInt(patternNode.getAttribute('numSteps') || '16', 10);
   const numSteps = Math.max(1, Math.min(256, isNaN(rawNumSteps) ? 16 : rawNumSteps));
+  
+  // Parse rootNote (default: 36 = C2)
+  const rootNote = parseInt(patternNode.getAttribute('rootNote') || '36', 10);
+  
+  // Parse tempo (BPM) and swing (0-1)
+  const tempo = patternNode.getAttribute('tempo') ? parseInt(patternNode.getAttribute('tempo')!, 10) : undefined;
+  const swing = patternNode.getAttribute('swing') ? parseFloat(patternNode.getAttribute('swing')!) : undefined;
+  
   const steps: Db303Step[] = [];
 
   // Parse all step elements
@@ -46,8 +60,10 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
     const gate = stepNode.getAttribute('gate') === 'true';
     const accent = stepNode.getAttribute('accent') === 'true';
     const slide = stepNode.getAttribute('slide') === 'true';
+    const mute = stepNode.getAttribute('mute') === 'true';
+    const hammer = stepNode.getAttribute('hammer') === 'true';
 
-    steps.push({ index, key, octave, gate, accent, slide });
+    steps.push({ index, key, octave, gate, accent, slide, mute, hammer });
   });
 
   // Sort by index to ensure correct order
@@ -62,13 +78,14 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
     const step = stepMap.get(i);
     if (step) {
       // Convert db303 format to tracker note format
-      // db303: octave -2 to +2, key 0-11
-      // Tracker: C-0 = 1, C-1 = 13, C-2 = 25, etc.
-      // Map db303 octave 0 to tracker octave 3 (C-3 = 37)
+      // db303: rootNote (MIDI note) + key (0-11) + octave (-2 to +2) * 12
+      // Tracker: MIDI note + 1 (C-0 = 1, C#0 = 2, etc.)
       let note: number = 0;
       if (step.gate) {
-        const trackerOctave = step.octave + 3; // -2 → 1, -1 → 2, 0 → 3, 1 → 4, 2 → 5
-        note = trackerOctave * 12 + step.key + 1;
+        // Calculate MIDI note: rootNote + key + (octave * 12)
+        const midiNote = rootNote + step.key + (step.octave * 12);
+        // Tracker note is MIDI note + 1
+        note = midiNote + 1;
 
         // Clamp to valid range (1-96)
         note = Math.max(1, Math.min(96, note));
@@ -76,14 +93,15 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
 
       rows.push({
         note: note as any,
-        instrument: 0,
+        instrument: instrumentId as any, // Set instrument for this note
         volume: 0,
         effTyp: 0,
         eff: 0,
         effTyp2: 0,
         eff2: 0,
-        flag1: step.accent ? 1 : undefined,
-        flag2: step.slide ? 2 : undefined,
+        // DB303 flags: 1=accent, 2=slide, 3=mute, 4=hammer
+        flag1: step.accent ? 1 : (step.mute ? 3 : (step.hammer ? 4 : undefined)),
+        flag2: step.slide ? 2 : (step.hammer && !step.accent && !step.mute ? 4 : undefined),
       });
     } else {
       // Empty step
@@ -100,6 +118,7 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
   }
 
   // Create pattern with single channel
+  // Note: instrumentId will be set by the loader to the first TB-303 instrument
   const pattern: Pattern = {
     id: `db303-${Date.now()}`,
     name: patternName,
@@ -114,13 +133,13 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
         collapsed: false,
         volume: 100,
         pan: 0,
-        instrumentId: null,
+        instrumentId: null, // Will be set by loader
         color: '#22c55e', // Green for 303
       },
     ],
   };
 
-  return pattern;
+  return { pattern, tempo, swing };
 }
 
 /**
@@ -154,6 +173,8 @@ export function convertToDb303Pattern(pattern: Pattern): string {
     const gate = hasNote;
     const accent = (cell.flag1 === 1 || cell.flag2 === 1);
     const slide = (cell.flag1 === 2 || cell.flag2 === 2);
+    const mute = (cell.flag1 === 3 || cell.flag2 === 3);
+    const hammer = (cell.flag1 === 4 || cell.flag2 === 4);
 
     let key = 0;
     let octave = 0;
@@ -171,7 +192,7 @@ export function convertToDb303Pattern(pattern: Pattern): string {
       octave = Math.max(-2, Math.min(2, octave));
     }
 
-    lines.push(`  <step index="${i}" key="${key}" octave="${octave}" gate="${gate}" accent="${accent}" slide="${slide}"/>`);
+    lines.push(`  <step index="${i}" key="${key}" octave="${octave}" gate="${gate}" accent="${accent}" slide="${slide}" mute="${mute}" hammer="${hammer}"/>`);
   }
 
   lines.push('</db303-pattern>');

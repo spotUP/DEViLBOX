@@ -1,6 +1,6 @@
 /**
  * Project Library - IndexedDB storage for persistent project management
- * Stores .dbox files locally in the browser with full CRUD operations
+ * Stores .dbx files locally in the browser with full CRUD operations
  */
 
 const DB_NAME = 'devilbox-library';

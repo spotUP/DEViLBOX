@@ -24,6 +24,15 @@ import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
+import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
+import { importMIDIFile } from '@lib/import/MIDIImporter';
+import { importSong, importInstrument } from '@lib/export/exporters';
+import { loadModuleFile } from '@lib/import/ModuleLoader';
+import { notify } from '@stores/useNotificationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useProjectStore } from '@stores/useProjectStore';
+import type { Pattern } from '@typedefs';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('@components/help/HelpModal').then(m => ({ default: m.HelpModal })));
@@ -67,6 +76,8 @@ function App() {
   const [tipsInitialTab, setTipsInitialTab] = useState<'tips' | 'changelog'>('tips');
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
+  const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
+  const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
@@ -329,6 +340,142 @@ function App() {
     };
   }, [contextState, setContextState]);
 
+  // Load song file after confirmation
+  const loadSongFile = useCallback(async (file: File) => {
+    const { loadPatterns, setPatternOrder } = useTrackerStore.getState();
+    const { loadInstruments } = useInstrumentStore.getState();
+    const { setBPM, setGrooveTemplate } = useTransportStore.getState();
+    const { setMetadata } = useProjectStore.getState();
+    
+    try {
+      const filename = file.name.toLowerCase();
+      
+      if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
+        // MIDI file
+        const midiResult = await importMIDIFile(file, {
+          quantize: 1, 
+          mergeChannels: false, 
+          velocityToVolume: true, 
+          defaultPatternLength: 64,
+        });
+        loadPatterns(midiResult.patterns);
+        const instruments = midiResult.patterns.map((_, i) => ({
+          id: i + 1,
+          name: `Track ${i + 1}`,
+          type: 'synth' as const,
+          synthType: 'Synth' as const,
+          effects: [],
+          volume: -6,
+          pan: 0,
+        }));
+        loadInstruments(instruments as any);
+        setMetadata({
+          name: midiResult.metadata.name,
+          author: '',
+          description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
+        });
+        setBPM(midiResult.bpm);
+        notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
+        
+      } else if (filename.match(/\.(mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/)) {
+        // Tracker module
+        const moduleInfo = await loadModuleFile(file);
+        
+        if (moduleInfo) {
+          notify.success(`Loaded module: ${moduleInfo.metadata.title || file.name}`, 3000);
+        } else {
+          notify.error(`Failed to load module: ${file.name}`);
+        }
+        
+      } else if (filename.endsWith('.dbx')) {
+        // DEViLBOX project file
+        const text = await file.text();
+        const songData = JSON.parse(text);
+        
+        const { needsMigration, migrateProject } = await import('@/lib/migration');
+        let patterns = songData.patterns;
+        let instruments = songData.instruments;
+        
+        if (needsMigration(patterns, instruments)) {
+          const migrated = migrateProject(patterns, instruments);
+          patterns = migrated.patterns;
+          instruments = migrated.instruments;
+        }
+        
+        loadPatterns(patterns);
+        
+        if (songData.sequence && Array.isArray(songData.sequence)) {
+          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
+          const order = songData.sequence
+            .map((patternId: string) => patternIdToIndex.get(patternId))
+            .filter((index: number | undefined): index is number => index !== undefined);
+          if (order.length > 0) setPatternOrder(order);
+        }
+        
+        if (instruments) loadInstruments(instruments);
+        if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
+        setBPM(songData.bpm);
+        setMetadata(songData.metadata);
+        setGrooveTemplate(songData.grooveTemplateId || 'straight');
+        notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
+      }
+    } catch (error) {
+      console.error('[FileDrop] Failed to load file:', error);
+      const { notify } = useNotificationStore.getState();
+      notify.error(`Failed to load ${file.name}`);
+    }
+  }, []);
+
+  // Unified file loading handler for drag and drop
+  const handleFileDrop = useCallback(async (file: File) => {
+    const { addInstrument } = useInstrumentStore.getState();
+    
+    try {
+      const filename = file.name.toLowerCase();
+      
+      // Check if it's a song format that will replace current project
+      const isSongFormat = filename.match(/\.(dbx|mid|midi|mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/);
+      
+      if (isSongFormat) {
+        // Show confirmation dialog for song formats
+        setPendingSongFile(file);
+        setShowSongLoadConfirm(true);
+        return;
+      }
+      
+      // Handle non-song formats immediately
+      if (filename.endsWith('.dbi')) {
+        // DEViLBOX instrument file
+        const instrumentData = await importInstrument(file);
+        if (instrumentData?.instrument) {
+          addInstrument(instrumentData.instrument as any);
+          notify.success(`Loaded instrument: ${instrumentData.instrument.name || 'Untitled'}`);
+        } else {
+          notify.error(`Failed to load instrument: ${file.name}`);
+        }
+        
+      } else if (filename.endsWith('.xml')) {
+        // XML file - could be DB303 pattern or preset
+        notify.info(`XML file detected: ${file.name}. Use Load button for pattern/preset import.`);
+        
+      } else if (filename.match(/\.(wav|mp3|ogg|flac|aiff|aif)$/)) {
+        // Audio sample - create new instrument
+        notify.info(`Audio sample: ${file.name}. Opening instrument editor...`);
+        // TODO: Create new instrument with this sample
+        // For now just show the instrument modal
+        setShowInstrumentModal(true);
+        
+      } else {
+        notify.warning(`Unsupported file format: ${file.name}`);
+      }
+      
+    } catch (error) {
+      console.error('[FileDrop] Failed to handle file:', error);
+      const { notify } = useNotificationStore.getState();
+      notify.error(`Failed to handle ${file.name}`);
+    }
+  }, []);
+
   // Handler to start audio context on user interaction
   const handleStartAudio = async () => {
     try {
@@ -459,8 +606,9 @@ function App() {
 
   // Show main tracker interface
   return (
-    <AppLayout>
-      <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
+    <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
+      <AppLayout>
+        <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
         <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">
           {/* Left side - Pattern Editor (expands when instrument panel is hidden) */}
@@ -527,6 +675,44 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Song Load Confirmation Dialog */}
+        {showSongLoadConfirm && pendingSongFile && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-dark-bgPrimary border-2 border-accent-primary rounded-xl p-6 max-w-md mx-4 animate-slide-in-up shadow-2xl">
+              <h2 className="text-xl font-bold text-white mb-4">Load Song File?</h2>
+              <p className="text-text-secondary mb-6">
+                Loading <span className="text-accent-primary font-mono">{pendingSongFile.name}</span> will replace your current project.
+              </p>
+              <p className="text-text-muted text-sm mb-6">
+                Make sure you've saved any unsaved changes before continuing.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowSongLoadConfirm(false);
+                    setPendingSongFile(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={async () => {
+                    if (pendingSongFile) {
+                      await loadSongFile(pendingSongFile);
+                    }
+                    setShowSongLoadConfirm(false);
+                    setPendingSongFile(null);
+                  }}
+                >
+                  Load File
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </Suspense>
 
       {/* Toast Notifications */}
@@ -545,6 +731,7 @@ function App() {
         />
       )}
     </AppLayout>
+    </GlobalDragDropHandler>
   );
 }
 

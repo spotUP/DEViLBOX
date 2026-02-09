@@ -1044,7 +1044,7 @@ export function useTrackerInput(containerRef: React.RefObject<HTMLDivElement>) {
 ### Phase 5: Export System
 - [ ] Export full song as .song.json
 - [ ] Export sound effects as .sfx.json
-- [ ] Export instrument presets as .inst.json
+- [ ] Export instrument presets as .dbi
 - [ ] Bundled Tone.js player library
 - [ ] BBS door integration examples
 

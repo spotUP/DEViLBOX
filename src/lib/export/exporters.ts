@@ -81,7 +81,7 @@ export function exportSong(
     : JSON.stringify(songData);
 
   const blob = new Blob([json], { type: 'application/json' });
-  const filename = `${sanitizeFilename(metadata.name)}.dbox`;
+  const filename = `${sanitizeFilename(metadata.name)}.dbx`;
 
   saveAs(blob, filename);
 }
@@ -133,7 +133,7 @@ export function exportInstrument(
     : JSON.stringify(instrumentData);
 
   const blob = new Blob([json], { type: 'application/json' });
-  const filename = `${sanitizeFilename(instrument.name)}.inst.json`;
+  const filename = `${sanitizeFilename(instrument.name)}.dbi`;
 
   saveAs(blob, filename);
 }

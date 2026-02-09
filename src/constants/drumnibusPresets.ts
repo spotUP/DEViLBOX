@@ -1,4 +1,4 @@
-import type { InstrumentConfig, DrumKitKeyMapping } from '@typedefs/instrument';
+import type { DrumKitKeyMapping, InstrumentPreset } from '@typedefs/instrument';
 
 // Helper to create a mapping
 const map = (note: number, name: string, path: string): DrumKitKeyMapping => ({
@@ -15,7 +15,7 @@ const map = (note: number, name: string, path: string): DrumKitKeyMapping => ({
 });
 
 // Helper to create a kit preset
-const createKit = (name: string, mappings: DrumKitKeyMapping[]): Omit<InstrumentConfig, 'id'> => ({
+const createKit = (name: string, mappings: DrumKitKeyMapping[]): InstrumentPreset['config'] => ({
   type: 'synth',
   name,
   // description field removed as it's not in InstrumentConfig

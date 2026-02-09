@@ -338,6 +338,12 @@ export class AcidSequencer {
   private countDown: number = 0;
   private driftError: number = 0.0;
 
+  // TB-303 slide timing state
+  // Real 303: Slide flag on step N means "slide FROM step N TO step N+1"
+  // So we track the PREVIOUS step's slide flag to apply at the current step
+  private previousSlideFlag: boolean = false;
+  private previousHammerFlag: boolean = false;
+
   // Key filtering (for scale quantization)
   private keyPermissible: boolean[] = new Array(13).fill(true);
 
@@ -415,6 +421,8 @@ export class AcidSequencer {
     this.countDown = -1;
     this.step = 0;
     this.driftError = 0.0;
+    this.previousSlideFlag = false;  // Reset slide state on start
+    this.previousHammerFlag = false;
 
     if (this.eventCallback) {
       this.eventCallback({ type: 'step', step: 0 });
@@ -433,6 +441,8 @@ export class AcidSequencer {
     this.step = 0;
     this.countDown = 0;
     this.driftError = 0.0;
+    this.previousSlideFlag = false;  // Reset slide state
+    this.previousHammerFlag = false;
   }
 
   isRunning(): boolean {
@@ -510,6 +520,9 @@ export class AcidSequencer {
       if (this.eventCallback) {
         this.eventCallback({ type: 'noteOff' });
       }
+      // Clear previous slide state - mute breaks the chain
+      this.previousSlideFlag = false;
+      this.previousHammerFlag = false;
       return;
     }
 
@@ -522,12 +535,20 @@ export class AcidSequencer {
         midiNote = this.findClosestPermissibleKey(note.key, note.octave);
       }
 
-      // Hammer flag: legato (like slide) but without pitch glide (TT-303 extension)
-      // - Slide: gate stays high + pitch glides to next note
-      // - Hammer: gate stays high + pitch jumps immediately (no glide)
-      // For the slide parameter, we pass TRUE for both slide and hammer (to keep gate high)
-      // The receiving engine must handle pitch glide differently based on the hammer flag
-      const legatoActive = note.slide || note.hammer;
+      // TB-303 SLIDE TIMING (critical for authentic 303 feel):
+      // Slide flag on step N means "slide FROM step N TO step N+1"
+      // So we check the PREVIOUS step's slide flag, not the current step's
+      //
+      // Example pattern: [C slide=ON] [E slide=OFF] [G slide=ON] [A slide=OFF]
+      //   Step 0 (C): Plays C, gate opens, NO slide (first note)
+      //   Step 1 (E): Pitch glides C→E because step 0 had slide=ON
+      //   Step 2 (G): New attack (gate re-triggers) because step 1 had slide=OFF
+      //   Step 3 (A): Pitch glides G→A because step 2 had slide=ON
+      //
+      // Hammer flag uses same timing but disables pitch glide (instant pitch change)
+      const slideActive = this.previousSlideFlag && !this.previousHammerFlag;
+      const hammerActive = this.previousHammerFlag;
+      const legatoActive = slideActive || hammerActive;  // Either keeps gate high
 
       if (this.eventCallback) {
         this.eventCallback({
@@ -536,14 +557,22 @@ export class AcidSequencer {
           velocity: note.accent ? 127 : 100,
           accent: note.accent,
           slide: legatoActive,  // True for both slide and hammer (keeps gate high)
-          hammer: note.hammer,  // Pass hammer flag so engine can skip pitch glide
+          hammer: hammerActive, // Pass hammer flag so engine can skip pitch glide
         });
       }
+
+      // Update previous slide/hammer flags for the NEXT step
+      // Current step's slide flag determines how the NEXT note will trigger
+      this.previousSlideFlag = note.slide;
+      this.previousHammerFlag = note.hammer;
     } else {
       // Gate closed - note off
       if (this.eventCallback) {
         this.eventCallback({ type: 'noteOff' });
       }
+      // Clear previous slide state - rest breaks the chain
+      this.previousSlideFlag = false;
+      this.previousHammerFlag = false;
     }
   }
 

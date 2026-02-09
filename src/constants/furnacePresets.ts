@@ -1,4 +1,4 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
 /**
  * Furnace Engine Factory Presets
@@ -20,7 +20,7 @@ const op = (overrides: Partial<{
 
 const disabledOp = () => op({ enabled: false, tl: 127, ar: 0, rr: 0 });
 
-export const FURNACE_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
   // SEGA GENESIS / MEGA DRIVE (YM2612 / OPN2)
   // ============================================

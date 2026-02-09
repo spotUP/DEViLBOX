@@ -2,9 +2,9 @@
  * V2 Factory Presets
  * Extracted from Farbrausch V2 presets.v2b
  */
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
-export const V2_FACTORY_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const V2_FACTORY_PRESETS: InstrumentPreset['config'][] = [
   {
     "type": "synth",
     "name": "SP_TheProduct",

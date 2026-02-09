@@ -29,7 +29,7 @@ const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
 describe('DB303 Pattern Converter', () => {
   describe('parseDb303Pattern', () => {
     it('should parse valid XML pattern', () => {
-      const pattern = parseDb303Pattern(sampleXml, 'Test Pattern');
+      const { pattern } = parseDb303Pattern(sampleXml, 'Test Pattern');
 
       expect(pattern).toBeDefined();
       expect(pattern.name).toBe('Test Pattern');
@@ -39,7 +39,7 @@ describe('DB303 Pattern Converter', () => {
     });
 
     it('should convert db303 notes to tracker format correctly', () => {
-      const pattern = parseDb303Pattern(sampleXml);
+      const { pattern } = parseDb303Pattern(sampleXml);
 
       // Step 0: key=0, octave=0, gate=true → C-3 (note 37)
       // db303 octave 0 = tracker octave 3
@@ -53,7 +53,7 @@ describe('DB303 Pattern Converter', () => {
     });
 
     it('should preserve accent and slide flags', () => {
-      const pattern = parseDb303Pattern(sampleXml);
+      const { pattern } = parseDb303Pattern(sampleXml);
 
       // Step 4 has accent=true and slide=true
       expect(pattern.channels[0].rows[4].flag1).toBe(1);
@@ -69,7 +69,7 @@ describe('DB303 Pattern Converter', () => {
     });
 
     it('should handle empty steps (gate=false)', () => {
-      const pattern = parseDb303Pattern(sampleXml);
+      const { pattern } = parseDb303Pattern(sampleXml);
 
       // Step 3 has gate=false → note should be 0
       expect(pattern.channels[0].rows[3].note).toBe(0);
@@ -87,7 +87,7 @@ describe('DB303 Pattern Converter', () => {
   describe('convertToDb303Pattern', () => {
     it('should convert tracker pattern to DB303 XML', () => {
       // First parse a pattern
-      const pattern = parseDb303Pattern(sampleXml, 'Test Pattern');
+      const { pattern } = parseDb303Pattern(sampleXml, 'Test Pattern');
 
       // Convert it back to XML
       const xml = convertToDb303Pattern(pattern);
@@ -98,9 +98,9 @@ describe('DB303 Pattern Converter', () => {
     });
 
     it('should preserve note data in round-trip conversion', () => {
-      const pattern = parseDb303Pattern(sampleXml);
+      const { pattern } = parseDb303Pattern(sampleXml);
       const xml = convertToDb303Pattern(pattern);
-      const pattern2 = parseDb303Pattern(xml);
+      const { pattern: pattern2 } = parseDb303Pattern(xml);
 
       // Check that notes match
       for (let i = 0; i < 16; i++) {
@@ -109,9 +109,9 @@ describe('DB303 Pattern Converter', () => {
     });
 
     it('should preserve accent and slide in round-trip conversion', () => {
-      const pattern = parseDb303Pattern(sampleXml);
+      const { pattern } = parseDb303Pattern(sampleXml);
       const xml = convertToDb303Pattern(pattern);
-      const pattern2 = parseDb303Pattern(xml);
+      const { pattern: pattern2 } = parseDb303Pattern(xml);
 
       // Check step 4 (has accent and slide)
       expect(pattern2.channels[0].rows[4].flag1).toBe(1);
