@@ -1604,7 +1604,6 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
   const osc2Wave = params[1] ?? 0;
   const mix = params[2] ?? 0x40;
   const detune = params[3] ?? 0x40;
-  const detuneFine = params[4] ?? 0x40;
   const glide = params[5] ?? 0;
   const cutoff = params[10] ?? 0xFF;
   const resonance = params[11] ?? 0;

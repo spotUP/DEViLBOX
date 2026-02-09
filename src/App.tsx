@@ -28,7 +28,7 @@ import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { importMIDIFile } from '@lib/import/MIDIImporter';
 import { importInstrument } from '@lib/export/exporters';
 import { loadModuleFile } from '@lib/import/ModuleLoader';
-import { useNotificationStore, notify } from '@stores/useNotificationStore';
+import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
@@ -421,7 +421,6 @@ function App() {
       }
     } catch (error) {
       console.error('[FileDrop] Failed to load file:', error);
-      const { notify } = useNotificationStore.getState();
       notify.error(`Failed to load ${file.name}`);
     }
   }, []);
@@ -471,7 +470,6 @@ function App() {
       
     } catch (error) {
       console.error('[FileDrop] Failed to handle file:', error);
-      const { notify } = useNotificationStore.getState();
       notify.error(`Failed to handle ${file.name}`);
     }
   }, []);

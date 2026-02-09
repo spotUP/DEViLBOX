@@ -20,7 +20,6 @@ import {
   writeFile,
   createFile,
   deleteFile,
-  pickFiles,
   pickSaveLocation,
 } from '@/lib/fileSystemAccess';
 import type { FileEntry } from '@/lib/fileSystemAccess';
@@ -290,66 +289,6 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       loadFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete file');
-    }
-  };
-
-  // Handle loading a file (detect type and use appropriate callback)
-  const handleFileLoaded = async (file: File) => {
-    if (isTrackerModule(file.name)) {
-      // Binary tracker module - use onLoadTrackerModule
-      if (onLoadTrackerModule) {
-        const buffer = await file.arrayBuffer();
-        await onLoadTrackerModule(buffer, file.name);
-        onClose();
-      } else {
-        setError('Tracker module loading not supported in this context');
-      }
-    } else {
-      // JSON project file (.dbx) or XML pattern file
-      try {
-        const content = await file.text();
-        const isXmlFile = file.name.toLowerCase().endsWith('.xml');
-        // XML files are passed as raw text, others are parsed as JSON
-        const data = isXmlFile ? content : JSON.parse(content);
-        onLoad(data, file.name);
-        onClose();
-      } catch {
-        setError('Failed to parse file as JSON');
-      }
-    }
-  };
-
-  // Use traditional file picker
-  const handleBrowseFiles = async () => {
-    if (isFileSystemAccessSupported()) {
-      // Use File System Access API with all files option
-      const handles = await pickFiles({
-        multiple: false,
-        types: [
-          {
-            description: 'All Supported Files',
-            accept: {
-              'application/octet-stream': ['.dbx', '.xml', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm'],
-            },
-          },
-        ],
-      });
-      if (handles.length > 0) {
-        const file = await handles[0].getFile();
-        await handleFileLoaded(file);
-      }
-    } else {
-      // Fallback to input element
-      const input = document.createElement('input');
-      input.type = 'file';
-      // Don't restrict - let user pick any file
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          await handleFileLoaded(file);
-        }
-      };
-      input.click();
     }
   };
 
