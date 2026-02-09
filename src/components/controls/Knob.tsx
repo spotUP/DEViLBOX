@@ -3,32 +3,8 @@
  * Supports automation, bipolar mode, logarithmic scaling, touch input, and more
  */
 
-import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useThemeStore } from '@stores';
-
-// Throttle function to limit how often a callback is called
-function throttle<T extends (...args: any[]) => void>(fn: T, limit: number): T {
-  let lastCall = 0;
-  let lastValue: any = undefined;
-  let rafId: number | null = null;
-
-  return ((...args: any[]) => {
-    const now = performance.now();
-    lastValue = args[0]; // Store latest value
-
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      fn(...args);
-    } else if (!rafId) {
-      // Schedule a final call with the last value when dragging stops
-      rafId = requestAnimationFrame(() => {
-        fn(lastValue);
-        rafId = null;
-        lastCall = performance.now();
-      });
-    }
-  }) as T;
-}
 
 interface KnobProps {
   // Core (both versions)
@@ -89,12 +65,11 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
   const dragStartY = useRef(0);
   const dragStartValue = useRef(0);
-
-  // Throttle onChange to ~60fps (16ms) to prevent audio glitches from too many rapid updates
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const throttledOnChange = useMemo(() => throttle(onChange, 16), [onChange]);
+  const rafRef = useRef<number | null>(null);
+  const pendingValueRef = useRef<number | null>(null);
 
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -186,6 +161,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     setIsDragging(true);
+    isDraggingRef.current = true;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartY.current = clientY;
     dragStartValue.current = getNormalized();
@@ -271,11 +247,11 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   // Handle mouse/touch move (global)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDragging) return;
+      if (!isDraggingRef.current) return;
 
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       const deltaY = dragStartY.current - clientY;
-      const sensitivity = 200; // pixels for full range
+      const sensitivity = 150; // pixels for full range
       const deltaNorm = deltaY / sensitivity;
       const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
 
@@ -289,37 +265,47 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       // Apply step if specified
       if (step !== undefined && step > 0) {
         newValue = Math.round(newValue / step) * step;
-      } else if (max - min > 100) {
-        newValue = Math.round(newValue);
       } else {
-        newValue = Math.round(newValue * 10) / 10;
+        // No step - use maximum precision for smooth movement
+        newValue = Math.round(newValue * 100) / 100;
       }
 
-      // Use throttled onChange during drag to prevent audio glitches
-      throttledOnChange(newValue);
+      // Schedule RAF update for smooth rendering
+      pendingValueRef.current = newValue;
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          if (pendingValueRef.current !== null) {
+            onChange(pendingValueRef.current);
+            pendingValueRef.current = null;
+          }
+          rafRef.current = null;
+        });
+      }
     };
 
     const handleMouseUp = () => {
-      if (isDragging) {
+      if (isDraggingRef.current) {
         setIsDragging(false);
+        isDraggingRef.current = false;
         document.body.style.cursor = '';
       }
     };
 
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.addEventListener('touchmove', handleMouseMove);
-      document.addEventListener('touchend', handleMouseUp);
-    }
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleMouseMove);
+    window.addEventListener('touchend', handleMouseUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('touchmove', handleMouseMove);
-      document.removeEventListener('touchend', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
     };
-  }, [isDragging, min, max, logarithmic, step, throttledOnChange]);
+  }, [min, max, logarithmic, step, onChange]);
 
   // Indicator line position
   const indicatorEnd = polarToCartesian(rotation);
