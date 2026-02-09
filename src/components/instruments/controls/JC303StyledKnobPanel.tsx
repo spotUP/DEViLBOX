@@ -29,7 +29,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   isBuzz3o3 = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
   const [sections, setSections] = useState({
     mods: false,    // Collapsed by default
     lfo: false,     // Collapsed by default

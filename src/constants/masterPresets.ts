@@ -1,4 +1,4 @@
-import type { InstrumentConfig, InstrumentPreset } from '../types/instrument';
+import type { InstrumentConfig } from '../types/instrument';
 import type { Pattern } from '../types/tracker';
 import { TB303_PRESETS } from './tb303Presets';
 
