@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-09T16:19:54.818Z
+ * Generated: 2026-02-09T16:59:34.929Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '351';
-export const BUILD_HASH = 'bf2e2b0';
+export const BUILD_NUMBER = '352';
+export const BUILD_HASH = 'bb80859';
 export const BUILD_DATE = '2026-02-09';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-09',
     changes: [
+      {
+        type: 'feature',
+        "description": "Comprehensive parameter testing with smoothing, retrigger, and auto-setup"
+      },
       {
         type: 'feature',
         "description": "Complete DB303 synth overhaul with full parameter test suite"
@@ -240,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add drum pad engine and TR-707 ROM loader"
-      },
-      {
-        type: 'feature',
-        "description": "Add drum pad UI components"
       }
     ]
   }
