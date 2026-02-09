@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { V2SpeechConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
@@ -16,6 +16,10 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
   onChange,
 }) => {
   const [showPhonemes, setShowPhonemes] = useState(false);
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -29,7 +33,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
   // Convert plain text to SAM phonemes
   const handleConvertToPhonemes = () => {
     try {
-      const phonetic = SamJs.convert(config.text);
+      const phonetic = SamJs.convert(configRef.current.text);
       if (phonetic) {
         onChange({ text: phonetic });
       }

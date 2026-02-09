@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { DubSirenConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
@@ -19,6 +19,10 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DubSirenTab>('main');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -35,11 +39,11 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
 
   // Helper to update nested configs
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {
-    onChange({ oscillator: { ...config.oscillator, ...updates } });
+    onChange({ oscillator: { ...configRef.current.oscillator, ...updates } });
   };
 
   const updateLFO = (updates: Partial<typeof config.lfo>) => {
-    onChange({ lfo: { ...config.lfo, ...updates } });
+    onChange({ lfo: { ...configRef.current.lfo, ...updates } });
   };
 
   const updateDelay = (updates: Partial<typeof config.delay>) => {
@@ -47,15 +51,15 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
     if (updates.time !== undefined) {
       updates.time = Math.max(0, Math.min(1, updates.time));
     }
-    onChange({ delay: { ...config.delay, ...updates } });
+    onChange({ delay: { ...configRef.current.delay, ...updates } });
   };
 
   const updateReverb = (updates: Partial<typeof config.reverb>) => {
-    onChange({ reverb: { ...config.reverb, ...updates } });
+    onChange({ reverb: { ...configRef.current.reverb, ...updates } });
   };
 
   const updateFilter = (updates: Partial<typeof config.filter>) => {
-    onChange({ filter: { ...config.filter, ...updates } });
+    onChange({ filter: { ...configRef.current.filter, ...updates } });
   };
 
   const handleThrow = (active: boolean) => {

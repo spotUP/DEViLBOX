@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
@@ -16,6 +16,10 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<V2Tab>('osc');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -32,31 +36,31 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
 
   // Helpers to update nested configs
   const updateOsc1 = (updates: Partial<typeof config.osc1>) => {
-    onChange({ osc1: { ...config.osc1, ...updates } });
+    onChange({ osc1: { ...configRef.current.osc1, ...updates } });
   };
 
   const updateOsc2 = (updates: Partial<typeof config.osc2>) => {
-    onChange({ osc2: { ...config.osc2, ...updates } });
+    onChange({ osc2: { ...configRef.current.osc2, ...updates } });
   };
 
   const updateOsc3 = (updates: Partial<typeof config.osc3>) => {
-    onChange({ osc3: { ...config.osc3, ...updates } });
+    onChange({ osc3: { ...configRef.current.osc3, ...updates } });
   };
 
   const updateFilter1 = (updates: Partial<typeof config.filter1>) => {
-    onChange({ filter1: { ...config.filter1, ...updates } });
+    onChange({ filter1: { ...configRef.current.filter1, ...updates } });
   };
 
   const updateFilter2 = (updates: Partial<typeof config.filter2>) => {
-    onChange({ filter2: { ...config.filter2, ...updates } });
+    onChange({ filter2: { ...configRef.current.filter2, ...updates } });
   };
 
   const updateRouting = (updates: Partial<typeof config.routing>) => {
-    onChange({ routing: { ...config.routing, ...updates } });
+    onChange({ routing: { ...configRef.current.routing, ...updates } });
   };
 
   const updateEnv = (updates: Partial<typeof config.envelope>) => {
-    onChange({ envelope: { ...config.envelope, ...updates } });
+    onChange({ envelope: { ...configRef.current.envelope, ...updates } });
   };
 
   const updateEnv2 = (updates: Partial<typeof config.envelope2>) => {
