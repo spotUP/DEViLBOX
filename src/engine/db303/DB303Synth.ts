@@ -150,6 +150,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
       delayTime: 0.25,
       feedback: 0.3,
       wet: 0,  // Start bypassed
+      maxDelay: 2,  // Max 2 seconds
     });
 
     this.effectsChain = new Tone.Gain(1);
@@ -512,33 +513,35 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   // --- Core Setters ---
-  // The reference db303 WASM expects normalized 0-1 values for all parameters
-  // It handles Hz/ms/% conversion internally
+  // Try sending normalized 0-1 values directly - the site-rip WASM may expect this
   setCutoff(value: number): void {
-    // Reference WASM expects 0-1 normalized, converts to Hz internally
+    // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.CUTOFF, clamped);
   }
 
   setResonance(value: number): void {
-    // Reference WASM expects 0-1 normalized
-    this.setParameterByName(DB303Param.RESONANCE, value);
+    // Send normalized 0-1 value directly
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.RESONANCE, clamped);
   }
 
   setEnvMod(value: number): void {
-    // Reference WASM expects 0-1 normalized
-    this.setParameterByName(DB303Param.ENV_MOD, value);
+    // Send normalized 0-1 value directly
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.ENV_MOD, clamped);
   }
 
   setDecay(value: number): void {
-    // Reference WASM expects 0-1 normalized, converts to ms internally
+    // Send normalized 0-1 value directly - WASM handles ms conversion
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DECAY, clamped);
   }
 
   setAccent(value: number): void {
-    // Reference WASM expects 0-1 normalized
-    this.setParameterByName(DB303Param.ACCENT, value);
+    // Send normalized 0-1 value directly
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.ACCENT, clamped);
   }
 
   setAccentAmount(value: number): void {
@@ -546,64 +549,69 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   setSlideTime(value: number): void {
-    // Reference WASM expects 0-1 normalized, converts to ms internally
+    // Send normalized 0-1 value directly - WASM handles ms conversion
     const clamped = Math.max(0, Math.min(1, value));
     this._currentSlideTime = value;
     this.setParameterByName(DB303Param.SLIDE_TIME, clamped);
   }
 
   setVolume(value: number): void {
-    // Reference WASM expects 0-1 normalized, NOT dB
-    this.setParameterByName(DB303Param.VOLUME, value);
+    // Convert normalized 0-1 to linear gain (0.0 to 1.0)
+    // WASM expects linear gain, not dB
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.VOLUME, clamped);
   }
 
   setWaveform(value: number): void {
-    // 0-1 (saw to square blend)
+    // 0-1 (saw to square blend) - this one stays normalized
     this.setParameterByName(DB303Param.WAVEFORM, value);
   }
 
   setTuning(value: number): void {
-    // Reference WASM expects raw tuning value
-    // Pass through - the WASM handles conversion
-    this.setParameterByName(DB303Param.TUNING, value);
+    // Send normalized 0-1 value directly - WASM handles Hz conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.TUNING, clamped);
   }
 
   // ============================================================================
   // LFO (Low Frequency Oscillator) Methods
+  // Note: Most LFO params can stay normalized 0-1 as they're modulation depths
+  // Only LFO rate needs Hz conversion
   // ============================================================================
 
   setLfoWaveform(waveform: number): void {
-    // 0 = sine, 1 = triangle, 2 = square
+    // 0 = sine, 1 = triangle, 2 = square - pass through as is
     this.setParameterByName(DB303Param.LFO_WAVEFORM, waveform);
   }
 
   setLfoRate(value: number): void {
-    // 0-1 normalized
-    this.setParameterByName(DB303Param.LFO_RATE, value);
+    // Send normalized 0-1 value directly - WASM handles Hz conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.LFO_RATE, clamped);
   }
 
   setLfoContour(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - modulation depth, keep as is
     this.setParameterByName(DB303Param.LFO_CONTOUR, value);
   }
 
   setLfoPitchDepth(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - modulation depth, keep as is
     this.setParameterByName(DB303Param.LFO_PITCH_DEPTH, value);
   }
 
   setLfoPwmDepth(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - modulation depth, keep as is
     this.setParameterByName(DB303Param.LFO_PWM_DEPTH, value);
   }
 
   setLfoFilterDepth(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - modulation depth, keep as is
     this.setParameterByName(DB303Param.LFO_FILTER_DEPTH, value);
   }
 
   setLfoStiffDepth(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - modulation depth, keep as is
     this.setParameterByName(DB303Param.LFO_STIFF_DEPTH, value);
   }
 
@@ -612,28 +620,38 @@ export class DB303Synth extends Tone.ToneAudioNode {
   // ============================================================================
 
   setNormalDecay(value: number): void {
-    // 0-1 normalized
-    this.setParameterByName(DB303Param.NORMAL_DECAY, value);
+    // Send normalized 0-1 value directly - WASM handles ms conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.NORMAL_DECAY, clamped);
   }
 
   setAccentDecay(value: number): void {
-    // 0-1 normalized
-    this.setParameterByName(DB303Param.ACCENT_DECAY, value);
+    // Send normalized 0-1 value directly - WASM handles ms conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.ACCENT_DECAY, clamped);
   }
 
   setSoftAttack(value: number): void {
-    // 0-1 normalized
-    this.setParameterByName(DB303Param.SOFT_ATTACK, value);
+    // Send normalized 0-1 value directly - WASM handles ms conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.SOFT_ATTACK, clamped);
   }
 
   setAccentSoftAttack(value: number): void {
-    // 0-1 normalized
-    this.setParameterByName(DB303Param.ACCENT_SOFT_ATTACK, value);
+    // Send normalized 0-1 value directly - WASM handles ms conversion
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName(DB303Param.ACCENT_SOFT_ATTACK, clamped);
   }
 
   setPassbandCompensation(value: number): void {
-    // 0-1 normalized
+    // 0-1 normalized - keep as is for now
     this.setParameterByName(DB303Param.PASSBAND_COMPENSATION, value);
+  }
+
+  setFeedbackHighpass(value: number): void {
+    // Send normalized 0-1 value directly
+    const clamped = Math.max(0, Math.min(1, value));
+    this.setParameterByName('feedbackHighpass', clamped);
   }
 
   setResTracking(value: number): void {
@@ -817,10 +835,10 @@ export class DB303Synth extends Tone.ToneAudioNode {
   setDelayTime(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_TIME, clamped);
-    // db303 delay time range: 0.25 to 16 seconds (beat-sync friendly)
-    // Map 0-1 input to 0.25-16 seconds
-    const DELAY_MIN = 0.25;
-    const DELAY_MAX = 16;
+    // db303 delay time range: 0.1 to 2 seconds (beat-sync friendly)
+    // Map 0-1 input to 0.1-2 seconds
+    const DELAY_MIN = 0.1;
+    const DELAY_MAX = 2;
     const targetTime = DELAY_MIN + clamped * (DELAY_MAX - DELAY_MIN);
     try {
       this.delay.delayTime.linearRampToValueAtTime(
@@ -897,14 +915,19 @@ export class DB303Synth extends Tone.ToneAudioNode {
     }
   }
 
-  setVegDecay(ms: number): void {
-    // Forward to the WASM normal decay parameter or a specific VEG param if available
-    this.setNormalDecay(ms / 3000); // Normalize assuming 3000ms max
+  setVegDecay(_ms: number): void {
+    // VEG (Volume Envelope Generator) decay - convert to ms (16-3000ms)
+    // NOTE: This WASM doesn't have ampDecay/VegDecay - amplitude uses filter envelope
+    // const clamped = Math.max(16, Math.min(3000, ms));
+    // this.setParameterByName('ampDecay', clamped);
   }
 
-  setVegSustain(percent: number): void {
-    // Forward to WASM if supported
-    this.setParameterByName(DB303Param.NORMAL_DECAY + 1, percent / 100); // Guessing index
+  setVegSustain(_percent: number): void {
+    // VEG sustain - convert percent to dB (0-100% = -60 to 0dB)
+    // NOTE: This WASM doesn't have ampSustain/VegSustain - amplitude uses filter envelope
+    // const clamped = Math.max(0, Math.min(100, percent));
+    // const db = clamped === 0 ? -60 : this.linToLin(clamped, 0, 100, -60.0, 0.0);
+    // this.setParameterByName('ampSustain', db);
   }
 
   setFilterFM(percent: number): void {
@@ -936,12 +959,11 @@ export class DB303Synth extends Tone.ToneAudioNode {
     }
   }
 
-  setSweepSpeed(mode: string): void {
-    // 0=fast, 1=normal, 2=slow
-    let val = 1;
-    if (mode === 'fast') val = 0;
-    else if (mode === 'slow') val = 2;
-    this.setParameterByName(DB303Param.NORMAL_DECAY + 7, val / 2); // Guessing index
+  setSweepSpeed(_mode: string): void {
+    // Sweep speed is not a native TB-303/DB303 parameter
+    // It's a UI abstraction for envelope attack/decay times
+    // The actual parameters (normalAttack, accentAttack, decay) are set separately
+    // This method is a no-op to maintain compatibility with the interface
   }
 
   setHighResonanceEnabled(_enabled: boolean): void {

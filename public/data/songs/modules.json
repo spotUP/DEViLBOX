@@ -2,36 +2,36 @@
   "version": "1.0.0",
   "categories": {
     "acid": [
-      { "file": "acid-core.dbox", "name": "Acid Core (TB-303 + TR-909)" },
-      { "file": "phuture-acid-tracks.dbox", "name": "Phuture - Acid Tracks" },
-      { "file": "hardfloor-funalogue.dbox", "name": "Hardfloor - Funalogue" },
-      { "file": "josh-wink-higher-state.dbox", "name": "Josh Wink - Higher State" },
-      { "file": "dittytoy-303.dbox", "name": "Dittytoy 303" },
-      { "file": "fatboy-slim-everyone-needs-303_.dbox", "name": "Fatboy Slim - Everyone Needs a 303" },
-      { "file": "fast-eddie-acid-thunder.dbox", "name": "Fast Eddie - Acid Thunder" },
-      { "file": "dj-tim-misjah-access.dbox", "name": "DJ Tim & Misjah - Access" },
-      { "file": "samplab-mathew-303.dbox", "name": "Samplab Mathew 303" },
-      { "file": "samplab-mathew-full.dbox", "name": "Samplab Mathew (Full)" },
-      { "file": "slow-creaky-acid-authentic.dbox", "name": "Slow Creaky (Authentic)" },
-      { "file": "slow-creaky-acid-tempo-relative.dbox", "name": "Slow Creaky (Tempo-Relative)" }
+      { "file": "acid-core.dbx", "name": "Acid Core (TB-303 + TR-909)" },
+      { "file": "phuture-acid-tracks.dbx", "name": "Phuture - Acid Tracks" },
+      { "file": "hardfloor-funalogue.dbx", "name": "Hardfloor - Funalogue" },
+      { "file": "josh-wink-higher-state.dbx", "name": "Josh Wink - Higher State" },
+      { "file": "dittytoy-303.dbx", "name": "Dittytoy 303" },
+      { "file": "fatboy-slim-everyone-needs-303_.dbx", "name": "Fatboy Slim - Everyone Needs a 303" },
+      { "file": "fast-eddie-acid-thunder.dbx", "name": "Fast Eddie - Acid Thunder" },
+      { "file": "dj-tim-misjah-access.dbx", "name": "DJ Tim & Misjah - Access" },
+      { "file": "samplab-mathew-303.dbx", "name": "Samplab Mathew 303" },
+      { "file": "samplab-mathew-full.dbx", "name": "Samplab Mathew (Full)" },
+      { "file": "slow-creaky-acid-authentic.dbx", "name": "Slow Creaky (Authentic)" },
+      { "file": "slow-creaky-acid-tempo-relative.dbx", "name": "Slow Creaky (Tempo-Relative)" }
     ],
     "tb303": [
-      { "file": "fatboy-slim-everybody-needs-a-303.dbox", "name": "Fatboy Slim - Everybody Needs a 303" },
-      { "file": "josh-wink-high-state-of-consciousness.dbox", "name": "Josh Wink - High State of Consciousness" },
-      { "file": "christophe-just-i-m-a-disco-dancer-part-1-.dbox", "name": "Christophe Just - Disco Dancer (Part 1)" },
-      { "file": "christophe-just-i-m-a-disco-dancer-part-2-.dbox", "name": "Christophe Just - Disco Dancer (Part 2)" },
-      { "file": "claustrophobic-sting-the-prodigy.dbox", "name": "Claustrophobic Sting - The Prodigy" },
-      { "file": "josh-wink-are-you-there.dbox", "name": "Josh Wink - Are You There" },
-      { "file": "cut-paste-forget-it-part-1-.dbox", "name": "Cut Paste - Forget It (Part 1)" },
-      { "file": "paste-forget-it-part-2-.dbox", "name": "Cut Paste - Forget It (Part 2)" },
-      { "file": "public-energy-three-o-three-part-1-.dbox", "name": "Public Energy - Three O Three (Part 1)" },
-      { "file": "public-energy-three-o-three-part-2-.dbox", "name": "Public Energy - Three O Three (Part 2)" }
+      { "file": "fatboy-slim-everybody-needs-a-303.dbx", "name": "Fatboy Slim - Everybody Needs a 303" },
+      { "file": "josh-wink-high-state-of-consciousness.dbx", "name": "Josh Wink - High State of Consciousness" },
+      { "file": "christophe-just-i-m-a-disco-dancer-part-1-.dbx", "name": "Christophe Just - Disco Dancer (Part 1)" },
+      { "file": "christophe-just-i-m-a-disco-dancer-part-2-.dbx", "name": "Christophe Just - Disco Dancer (Part 2)" },
+      { "file": "claustrophobic-sting-the-prodigy.dbx", "name": "Claustrophobic Sting - The Prodigy" },
+      { "file": "josh-wink-are-you-there.dbx", "name": "Josh Wink - Are You There" },
+      { "file": "cut-paste-forget-it-part-1-.dbx", "name": "Cut Paste - Forget It (Part 1)" },
+      { "file": "paste-forget-it-part-2-.dbx", "name": "Cut Paste - Forget It (Part 2)" },
+      { "file": "public-energy-three-o-three-part-1-.dbx", "name": "Public Energy - Three O Three (Part 1)" },
+      { "file": "public-energy-three-o-three-part-2-.dbx", "name": "Public Energy - Three O Three (Part 2)" }
     ],
     "general": [
-      { "file": "deep-house.dbox", "name": "Deep House (Atmospheric)" },
-      { "file": "mr-oizo-flat-beat.dbox", "name": "Mr Oizo - Flat Beat" },
-      { "file": "new-order-confusion.dbox", "name": "New Order - Confusion" },
-      { "file": "edge-of-motion-setup-707.dbox", "name": "Edge of Motion - 707 Setup" }
+      { "file": "deep-house.dbx", "name": "Deep House (Atmospheric)" },
+      { "file": "mr-oizo-flat-beat.dbx", "name": "Mr Oizo - Flat Beat" },
+      { "file": "new-order-confusion.dbx", "name": "New Order - Confusion" },
+      { "file": "edge-of-motion-setup-707.dbx", "name": "Edge of Motion - 707 Setup" }
     ]
   }
 }

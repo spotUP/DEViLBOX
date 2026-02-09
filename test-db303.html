@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DB303 Full Parameter Test Suite</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #00ff00;
+      padding: 20px;
+      line-height: 1.4;
+      margin: 0;
+    }
+    h1 { color: #ff00ff; border-bottom: 2px solid #ff00ff; padding-bottom: 10px; margin-top: 0; }
+    h2 { color: #00ffff; margin-top: 25px; margin-bottom: 10px; font-size: 16px; }
+    h3 { color: #ffaa00; margin: 15px 0 8px 0; font-size: 14px; }
+    button {
+      background: #1a1a1a;
+      color: #00ff00;
+      border: 2px solid #00ff00;
+      padding: 8px 16px;
+      margin: 3px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    button:hover { background: #2a2a2a; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.active { background: #003300; border-color: #00ff00; }
+    .success { color: #00ff00; }
+    .error { color: #ff0000; }
+    .warning { color: #ffaa00; }
+    .info { color: #00aaff; }
+    #log {
+      background: #0f0f0f;
+      border: 1px solid #333;
+      padding: 10px;
+      margin-top: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+    .log-entry { margin: 2px 0; }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .control-group {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .control-group.highlight { border-color: #ff00ff; }
+    .control-group label {
+      display: block;
+      margin-bottom: 4px;
+      color: #888;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .control-group .name {
+      color: #00ffff;
+      font-weight: bold;
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+    input[type="range"] {
+      width: 100%;
+      margin: 4px 0;
+    }
+    select {
+      width: 100%;
+      background: #222;
+      color: #00ff00;
+      border: 1px solid #444;
+      padding: 4px;
+      font-family: inherit;
+    }
+    .value-display {
+      color: #ffff00;
+      font-weight: bold;
+      text-align: right;
+      font-size: 12px;
+    }
+    .section {
+      background: #111;
+      border: 1px solid #333;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .section.filter { border-color: #ff6600; }
+    .section.osc { border-color: #00ff00; }
+    .section.lfo { border-color: #ff00ff; }
+    .section.devilfish { border-color: #ff0066; }
+    .section.fx { border-color: #00ffff; }
+    .button-row { margin: 10px 0; }
+    .note-buttons button { 
+      padding: 5px 10px; 
+      min-width: 40px;
+    }
+    .note-buttons button.black { 
+      background: #333; 
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎛️ DB303 Full Parameter Test</h1>
+  
+  <div class="button-row">
+    <button id="initBtn">▶ Initialize</button>
+    <button id="playBtn" disabled>🎹 Play C3</button>
+    <button id="stopBtn" disabled>⏹ Stop</button>
+    <button id="autoTestBtn" disabled>🔄 Auto-Test All Knobs</button>
+    <button id="stopAutoBtn" disabled style="border-color: #ff0000; color: #ff0000;">⛔ Stop Auto</button>
+    <button id="sweepBtn" disabled>〰️ Sweep Cutoff</button>
+    <button id="clearLogBtn">Clear Log</button>
+  </div>
+
+  <div class="button-row">
+    <button id="accentTestBtn" disabled style="border-color: #ff6600;">💥 Accent Test</button>
+    <button id="slideTestBtn" disabled style="border-color: #00ffff;">🎵 Slide Test</button>
+    <button id="glissandoTestBtn" disabled style="border-color: #ff00ff;">🎼 Glissando Test</button>
+    <button id="fullArticulationBtn" disabled style="border-color: #ffff00;">🎶 Full Articulation Demo</button>
+  </div>
+
+  <div class="note-buttons">
+    <button id="noteC" disabled>C</button>
+    <button id="noteCs" class="black" disabled>C#</button>
+    <button id="noteD" disabled>D</button>
+    <button id="noteDs" class="black" disabled>D#</button>
+    <button id="noteE" disabled>E</button>
+    <button id="noteF" disabled>F</button>
+    <button id="noteFs" class="black" disabled>F#</button>
+    <button id="noteG" disabled>G</button>
+    <button id="noteGs" class="black" disabled>G#</button>
+    <button id="noteA" disabled>A</button>
+    <button id="noteAs" class="black" disabled>A#</button>
+    <button id="noteB" disabled>B</button>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="section filter">
+    <h2>🎚️ FILTER (Core 303)</h2>
+    <div class="controls-grid">
+      <div class="control-group highlight">
+        <div class="name">Cutoff</div>
+        <label>Filter frequency (0-1)</label>
+        <input type="range" id="cutoff" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="cutoffVal">0.50</div>
+      </div>
+      <div class="control-group highlight">
+        <div class="name">Resonance</div>
+        <label>Q / Emphasis (0-1)</label>
+        <input type="range" id="resonance" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="resonanceVal">0.50</div>
+      </div>
+      <div class="control-group highlight">
+        <div class="name">Env Mod</div>
+        <label>Envelope → Filter (0-1)</label>
+        <input type="range" id="envMod" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="envModVal">0.50</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Decay</div>
+        <label>Envelope decay (0-1)</label>
+        <input type="range" id="decay" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="decayVal">0.30</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Accent</div>
+        <label>Accent amount (0-1)</label>
+        <input type="range" id="accent" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="accentVal">0.50</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OSCILLATOR SECTION -->
+  <div class="section osc">
+    <h2>🔊 OSCILLATOR</h2>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Waveform</div>
+        <label>Saw → Square (0-1)</label>
+        <input type="range" id="waveform" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="waveformVal">SAW</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Pulse Width</div>
+        <label>Square wave width (0-1)</label>
+        <input type="range" id="pulseWidth" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="pulseWidthVal">50%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Sub Osc Gain</div>
+        <label>Sub oscillator level (0-1)</label>
+        <input type="range" id="subOscGain" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="subOscGainVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Sub Osc Blend</div>
+        <label>Sub osc wave blend (0-1)</label>
+        <input type="range" id="subOscBlend" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="subOscBlendVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Tuning</div>
+        <label>Master tuning (0-1)</label>
+        <input type="range" id="tuning" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="tuningVal">440Hz</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Volume</div>
+        <label>Output level (0-1)</label>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" disabled>
+        <div class="value-display" id="volumeVal">80%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LFO SECTION -->
+  <div class="section lfo">
+    <h2>🌊 LFO</h2>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">LFO Waveform</div>
+        <label>Shape (0=Sine, 1=Tri, 2=Saw, 3=Sq)</label>
+        <select id="lfoWaveform" disabled>
+          <option value="0">Sine</option>
+          <option value="1">Triangle</option>
+          <option value="2">Sawtooth</option>
+          <option value="3">Square</option>
+          <option value="4">Sample&Hold</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO Rate</div>
+        <label>Speed (0-1)</label>
+        <input type="range" id="lfoRate" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="lfoRateVal">0.30</div>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO Contour</div>
+        <label>Shape contour (-1 to 1)</label>
+        <input type="range" id="lfoContour" min="-1" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lfoContourVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO → Pitch</div>
+        <label>Vibrato depth (0-1)</label>
+        <input type="range" id="lfoPitchDepth" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lfoPitchDepthVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO → PWM</div>
+        <label>Pulse width mod (0-1)</label>
+        <input type="range" id="lfoPwmDepth" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lfoPwmDepthVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO → Filter</div>
+        <label>Cutoff mod depth (0-1)</label>
+        <input type="range" id="lfoFilterDepth" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lfoFilterDepthVal">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEVILFISH SECTION -->
+  <div class="section devilfish">
+    <h2>😈 DEVILFISH MODS</h2>
+    <h3>Filter Character</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Filter Select</div>
+        <label>Filter topology (0-5)</label>
+        <select id="filterSelect" disabled>
+          <option value="0">0 - Classic</option>
+          <option value="1">1 - Smooth</option>
+          <option value="2">2 - Aggressive</option>
+          <option value="3">3 - Resonant</option>
+          <option value="4">4 - Vintage</option>
+          <option value="5">5 - Korg</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <div class="name">LP/BP Mix</div>
+        <label>Lowpass ↔ Bandpass (0-1)</label>
+        <input type="range" id="lpBpMix" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lpBpMixVal">LP</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Filter Tracking</div>
+        <label>Key → Cutoff (0-1)</label>
+        <input type="range" id="filterTracking" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="filterTrackingVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Filter Drive</div>
+        <label>Input saturation (0-1)</label>
+        <input type="range" id="filterInputDrive" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="filterInputDriveVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Passband Comp</div>
+        <label>Resonance compensation (0-1)</label>
+        <input type="range" id="passbandCompensation" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="passbandCompensationVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Res Tracking</div>
+        <label>Resonance tracking (0-1)</label>
+        <input type="range" id="resTracking" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="resTrackingVal">0%</div>
+      </div>
+    </div>
+    
+    <h3>Korg-Style Filter (Filter Select = 5)</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Diode Character</div>
+        <label>Warmth / Distortion (0-1)</label>
+        <input type="range" id="diodeCharacter" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="diodeCharacterVal">50%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Duffing Amount</div>
+        <label>Nonlinearity (-1 to 1)</label>
+        <input type="range" id="duffingAmount" min="-1" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="duffingAmountVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Filter FM</div>
+        <label>Filter FM depth (0-1)</label>
+        <input type="range" id="filterFmDepth" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="filterFmDepthVal">0%</div>
+      </div>
+    </div>
+
+    <h3>Envelope Mods</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Slide Time</div>
+        <label>Portamento (0-1)</label>
+        <input type="range" id="slideTime" min="0" max="1" step="0.01" value="0.17" disabled>
+        <div class="value-display" id="slideTimeVal">0.17</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Normal Decay</div>
+        <label>Non-accent decay (0-1)</label>
+        <input type="range" id="normalDecay" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="normalDecayVal">0.30</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Accent Decay</div>
+        <label>Accented note decay (0-1)</label>
+        <input type="range" id="accentDecay" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="accentDecayVal">0.30</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Soft Attack</div>
+        <label>Attack softness (0-1)</label>
+        <input type="range" id="softAttack" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="softAttackVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Accent Soft Attack</div>
+        <label>Accent attack (0-1)</label>
+        <input type="range" id="accentSoftAttack" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="accentSoftAttackVal">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EFFECTS SECTION -->
+  <div class="section fx">
+    <h2>✨ EFFECTS</h2>
+    <h3>Chorus</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Chorus Mode</div>
+        <label>Mode (0-3)</label>
+        <select id="chorusMode" disabled>
+          <option value="0">Off</option>
+          <option value="1">Mode 1</option>
+          <option value="2">Mode 2</option>
+          <option value="3">Mode 3</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <div class="name">Chorus Mix</div>
+        <label>Wet/Dry (0-1)</label>
+        <input type="range" id="chorusMix" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="chorusMixVal">0%</div>
+      </div>
+    </div>
+
+    <h3>Phaser</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Phaser Rate</div>
+        <label>LFO speed (0-1)</label>
+        <input type="range" id="phaserRate" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="phaserRateVal">50%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Phaser Width</div>
+        <label>Sweep width (0-1)</label>
+        <input type="range" id="phaserWidth" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="phaserWidthVal">50%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Phaser Feedback</div>
+        <label>Resonance (0-1)</label>
+        <input type="range" id="phaserFeedback" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="phaserFeedbackVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Phaser Mix</div>
+        <label>Wet/Dry (0-1)</label>
+        <input type="range" id="phaserMix" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="phaserMixVal">0%</div>
+      </div>
+    </div>
+
+    <h3>Delay</h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Delay Time</div>
+        <label>Time (0-1)</label>
+        <input type="range" id="delayTime" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="delayTimeVal">0.30</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Delay Feedback</div>
+        <label>Repeats (0-1)</label>
+        <input type="range" id="delayFeedback" min="0" max="1" step="0.01" value="0.3" disabled>
+        <div class="value-display" id="delayFeedbackVal">30%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Delay Tone</div>
+        <label>LP ↔ HP (0-1)</label>
+        <input type="range" id="delayTone" min="0" max="1" step="0.01" value="0.5" disabled>
+        <div class="value-display" id="delayToneVal">Bypass</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Delay Mix</div>
+        <label>Wet/Dry (0-1)</label>
+        <input type="range" id="delayMix" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="delayMixVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Delay Spread</div>
+        <label>Stereo spread (0-1)</label>
+        <input type="range" id="delaySpread" min="0" max="1" step="0.01" value="0.75" disabled>
+        <div class="value-display" id="delaySpreadVal">75%</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>📋 Log</h2>
+  <div id="log"></div>
+
+  <script type="module">
+    let db303Synth = null;
+    let audioContext = null;
+    let isPlaying = false;
+    let currentNote = null;
+
+    const log = (message, type = 'info') => {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    };
+
+    // Parameter definitions with display formatters
+    const params = {
+      // Core Filter
+      cutoff: { setter: 'setCutoff', format: v => v.toFixed(2) },
+      resonance: { setter: 'setResonance', format: v => `${(v*100).toFixed(0)}%` },
+      envMod: { setter: 'setEnvMod', format: v => `${(v*100).toFixed(0)}%` },
+      decay: { setter: 'setDecay', format: v => v.toFixed(2) },
+      accent: { setter: 'setAccent', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // Oscillator
+      waveform: { setter: 'setWaveform', format: v => v < 0.5 ? 'SAW' : 'SQR' },
+      pulseWidth: { setter: 'setPulseWidth', format: v => `${(50 + v*49).toFixed(0)}%` },
+      subOscGain: { setter: 'setSubOscGain', format: v => `${(v*100).toFixed(0)}%` },
+      subOscBlend: { setter: 'setSubOscBlend', format: v => `${(v*100).toFixed(0)}%` },
+      tuning: { setter: 'setTuning', format: v => `${(400 + v*80).toFixed(0)}Hz` },
+      volume: { setter: 'setVolume', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // LFO
+      lfoRate: { setter: 'setLfoRate', format: v => v.toFixed(2) },
+      lfoContour: { setter: 'setLfoContour', format: v => v.toFixed(2) },
+      lfoPitchDepth: { setter: 'setLfoPitchDepth', format: v => v.toFixed(2) },
+      lfoPwmDepth: { setter: 'setLfoPwmDepth', format: v => v.toFixed(2) },
+      lfoFilterDepth: { setter: 'setLfoFilterDepth', format: v => v.toFixed(2) },
+      
+      // DevilFish - Filter
+      lpBpMix: { setter: 'setLpBpMix', format: v => v < 0.1 ? 'LP' : v > 0.9 ? 'BP' : `${(v*100).toFixed(0)}%` },
+      filterTracking: { setter: 'setFilterTracking', format: v => `${(v*100).toFixed(0)}%` },
+      filterInputDrive: { setter: 'setFilterInputDrive', format: v => v.toFixed(2) },
+      passbandCompensation: { setter: 'setPassbandCompensation', format: v => `${(v*100).toFixed(0)}%` },
+      resTracking: { setter: 'setResTracking', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // DevilFish - Korg
+      diodeCharacter: { setter: 'setDiodeCharacter', format: v => `${(v*100).toFixed(0)}%` },
+      duffingAmount: { setter: 'setDuffingAmount', format: v => v.toFixed(2) },
+      filterFmDepth: { setter: 'setFilterFmDepth', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // DevilFish - Envelope
+      slideTime: { setter: 'setSlideTime', format: v => v.toFixed(2) },
+      normalDecay: { setter: 'setNormalDecay', format: v => v.toFixed(2) },
+      accentDecay: { setter: 'setAccentDecay', format: v => v.toFixed(2) },
+      softAttack: { setter: 'setSoftAttack', format: v => v.toFixed(2) },
+      accentSoftAttack: { setter: 'setAccentSoftAttack', format: v => v.toFixed(2) },
+      
+      // Effects - Chorus
+      chorusMix: { setter: 'setChorusMix', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // Effects - Phaser
+      phaserRate: { setter: 'setPhaserRate', format: v => `${(v*100).toFixed(0)}%` },
+      phaserWidth: { setter: 'setPhaserWidth', format: v => `${(v*100).toFixed(0)}%` },
+      phaserFeedback: { setter: 'setPhaserFeedback', format: v => `${(v*100).toFixed(0)}%` },
+      phaserMix: { setter: 'setPhaserMix', format: v => `${(v*100).toFixed(0)}%` },
+      
+      // Effects - Delay
+      delayTime: { setter: 'setDelayTime', format: v => v.toFixed(2) },
+      delayFeedback: { setter: 'setDelayFeedback', format: v => `${(v*100).toFixed(0)}%` },
+      delayTone: { setter: 'setDelayTone', format: v => v < 0.4 ? 'LP' : v > 0.6 ? 'HP' : 'Bypass' },
+      delayMix: { setter: 'setDelayMix', format: v => `${(v*100).toFixed(0)}%` },
+      delaySpread: { setter: 'setDelaySpread', format: v => `${(v*100).toFixed(0)}%` },
+    };
+
+    // Select parameters (integer values)
+    const selectParams = {
+      lfoWaveform: { setter: 'setLfoWaveform' },
+      filterSelect: { setter: 'setFilterSelect' },
+      chorusMode: { setter: 'setChorusMode' },
+    };
+
+    function setupSliders() {
+      Object.entries(params).forEach(([id, config]) => {
+        const slider = document.getElementById(id);
+        const display = document.getElementById(id + 'Val');
+        if (!slider) return;
+        
+        slider.disabled = false;
+        slider.addEventListener('input', (e) => {
+          const value = parseFloat(e.target.value);
+          if (display) display.textContent = config.format(value);
+          
+          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+            db303Synth[config.setter](value);
+            log(`${id}: ${config.format(value)}`, 'info');
+          }
+        });
+        
+        // Set initial display
+        if (display) display.textContent = config.format(parseFloat(slider.value));
+      });
+
+      // Setup select dropdowns
+      Object.entries(selectParams).forEach(([id, config]) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        
+        select.disabled = false;
+        select.addEventListener('change', (e) => {
+          const value = parseInt(e.target.value);
+          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+            db303Synth[config.setter](value);
+            log(`${id}: ${value}`, 'info');
+          }
+        });
+      });
+    }
+
+    function setupNoteButtons() {
+      const notes = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'];
+      const noteNames = ['C3', 'C#3', 'D3', 'D#3', 'E3', 'F3', 'F#3', 'G3', 'G#3', 'A3', 'A#3', 'B3'];
+      
+      notes.forEach((note, i) => {
+        const btn = document.getElementById('note' + note);
+        if (!btn) return;
+        
+        btn.disabled = false;
+        btn.addEventListener('mousedown', () => {
+          if (currentNote) db303Synth.triggerRelease();
+          currentNote = noteNames[i];
+          db303Synth.triggerAttack(currentNote);
+          btn.classList.add('active');
+        });
+        btn.addEventListener('mouseup', () => {
+          db303Synth.triggerRelease();
+          currentNote = null;
+          btn.classList.remove('active');
+        });
+        btn.addEventListener('mouseleave', () => {
+          if (btn.classList.contains('active')) {
+            db303Synth.triggerRelease();
+            currentNote = null;
+            btn.classList.remove('active');
+          }
+        });
+      });
+    }
+
+    // Initialize
+    document.getElementById('initBtn').addEventListener('click', async () => {
+      try {
+        log('Initializing...', 'warning');
+        
+        const Tone = await import('https://cdn.skypack.dev/tone@14.7.77');
+        await Tone.start();
+        audioContext = Tone.getContext();
+        log(`✓ Audio Context @ ${audioContext.sampleRate}Hz`, 'success');
+        
+        const { DB303Synth } = await import('./src/engine/db303/DB303Synth.ts');
+        db303Synth = new DB303Synth();
+        await db303Synth.ensureInitialized();
+        db303Synth.toDestination();
+        
+        log('✓ DB303Synth ready!', 'success');
+        
+        // Enable UI
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = false;
+        document.getElementById('sweepBtn').disabled = false;
+        document.getElementById('autoTestBtn').disabled = false;
+        document.getElementById('accentTestBtn').disabled = false;
+        document.getElementById('slideTestBtn').disabled = false;
+        document.getElementById('glissandoTestBtn').disabled = false;
+        document.getElementById('fullArticulationBtn').disabled = false;
+        
+        setupSliders();
+        setupNoteButtons();
+        
+        log('All controls enabled - tweak away! 🎛️', 'success');
+        
+      } catch (error) {
+        log(`✗ Error: ${error.message}`, 'error');
+        console.error(error);
+      }
+    });
+
+    // Play button
+    document.getElementById('playBtn').addEventListener('click', () => {
+      if (isPlaying) return;
+      isPlaying = true;
+      db303Synth.triggerAttack('C3');
+      log('Playing C3 - hold for filter sweep testing', 'info');
+    });
+
+    // Stop button  
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      db303Synth.triggerRelease();
+      isPlaying = false;
+      currentNote = null;
+      log('Stopped', 'warning');
+    });
+
+    // Sweep button
+    document.getElementById('sweepBtn').addEventListener('click', async () => {
+      log('Sweeping cutoff 0→1...', 'warning');
+      
+      // Setup for clear sweep
+      db303Synth.setCutoff(0);
+      db303Synth.setResonance(0.9);
+      db303Synth.setEnvMod(0);
+      
+      db303Synth.triggerAttack('C3');
+      
+      const steps = 20;
+      for (let i = 0; i <= steps; i++) {
+        const v = i / steps;
+        db303Synth.setCutoff(v);
+        document.getElementById('cutoff').value = v;
+        document.getElementById('cutoffVal').textContent = v.toFixed(2);
+        await new Promise(r => setTimeout(r, 75));
+      }
+      
+      db303Synth.triggerRelease();
+      log('Sweep complete!', 'success');
+    });
+
+    // Auto-test state
+    let autoTestRunning = false;
+    let autoTestAbort = false;
+
+    // Auto-test all knobs button
+    document.getElementById('autoTestBtn').addEventListener('click', async () => {
+      if (autoTestRunning) return;
+      autoTestRunning = true;
+      autoTestAbort = false;
+      document.getElementById('autoTestBtn').disabled = true;
+      document.getElementById('stopAutoBtn').disabled = false;
+      
+      log('🔄 Starting auto-test of ALL parameters...', 'warning');
+      
+      // Reset to baseline
+      db303Synth.setCutoff(0.5);
+      db303Synth.setResonance(0.7);
+      db303Synth.setEnvMod(0.3);
+      
+      const paramList = Object.entries(params);
+      const sweepSteps = 10;
+      const stepDelay = 50; // ms per step
+      
+      for (let p = 0; p < paramList.length; p++) {
+        if (autoTestAbort) break;
+        
+        const [id, config] = paramList[p];
+        const slider = document.getElementById(id);
+        const display = document.getElementById(id + 'Val');
+        if (!slider) continue;
+        
+        // Get slider range
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        const originalValue = parseFloat(slider.value);
+        
+        log(`Testing: ${id} (${p+1}/${paramList.length})`, 'warning');
+        
+        // Highlight current control
+        slider.parentElement.style.boxShadow = '0 0 10px #ff00ff';
+        
+        // Trigger a new note for this parameter test
+        db303Synth.triggerAttack('C3');
+        isPlaying = true;
+        
+        // Sweep from min to max
+        for (let i = 0; i <= sweepSteps; i++) {
+          if (autoTestAbort) break;
+          const v = min + (max - min) * (i / sweepSteps);
+          slider.value = v;
+          if (display) display.textContent = config.format(v);
+          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+            db303Synth[config.setter](v);
+          }
+          await new Promise(r => setTimeout(r, stepDelay));
+        }
+        
+        // Sweep back to original
+        for (let i = sweepSteps; i >= 0; i--) {
+          if (autoTestAbort) break;
+          const v = min + (max - min) * (i / sweepSteps);
+          slider.value = v;
+          if (display) display.textContent = config.format(v);
+          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+            db303Synth[config.setter](v);
+          }
+          await new Promise(r => setTimeout(r, stepDelay));
+        }
+        
+        // Release note after this parameter
+        db303Synth.triggerRelease();
+        isPlaying = false;
+        
+        // Restore original value
+        slider.value = originalValue;
+        if (display) display.textContent = config.format(originalValue);
+        if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+          db303Synth[config.setter](originalValue);
+        }
+        
+        // Remove highlight
+        slider.parentElement.style.boxShadow = '';
+        
+        // Small pause between parameters
+        await new Promise(r => setTimeout(r, 100));
+      }
+      
+      // Make sure note is stopped
+      db303Synth.triggerRelease();
+      isPlaying = false;
+      
+      autoTestRunning = false;
+      document.getElementById('autoTestBtn').disabled = false;
+      document.getElementById('stopAutoBtn').disabled = true;
+      
+      if (autoTestAbort) {
+        log('⛔ Auto-test stopped by user', 'warning');
+      } else {
+        log('✅ Auto-test complete!', 'success');
+      }
+    });
+
+    // Stop auto-test button
+    document.getElementById('stopAutoBtn').addEventListener('click', () => {
+      autoTestAbort = true;
+      db303Synth.triggerRelease();
+      isPlaying = false;
+      log('Stopping auto-test...', 'warning');
+    });
+
+    // Accent Test - plays notes with and without accent
+    document.getElementById('accentTestBtn').addEventListener('click', async () => {
+      log('💥 Testing ACCENT...', 'warning');
+      
+      // Set up for accent test
+      db303Synth.setCutoff(0.3);
+      db303Synth.setResonance(0.8);
+      db303Synth.setEnvMod(0.7);
+      db303Synth.setAccent(0.9);
+      
+      const notes = ['C3', 'E3', 'G3', 'C4'];
+      
+      // Play without accent
+      log('Playing WITHOUT accent...', 'info');
+      for (const note of notes) {
+        db303Synth.triggerAttack(note, undefined, 1, false, false); // velocity=1, accent=false, slide=false
+        await new Promise(r => setTimeout(r, 200));
+        db303Synth.triggerRelease();
+        await new Promise(r => setTimeout(r, 50));
+      }
+      
+      await new Promise(r => setTimeout(r, 300));
+      
+      // Play WITH accent
+      log('Playing WITH accent...', 'info');
+      for (const note of notes) {
+        db303Synth.triggerAttack(note, undefined, 1, true, false); // velocity=1, accent=true, slide=false
+        await new Promise(r => setTimeout(r, 200));
+        db303Synth.triggerRelease();
+        await new Promise(r => setTimeout(r, 50));
+      }
+      
+      log('✅ Accent test complete!', 'success');
+    });
+
+    // Slide Test - plays legato notes with slide enabled
+    document.getElementById('slideTestBtn').addEventListener('click', async () => {
+      log('🎵 Testing SLIDE (portamento)...', 'warning');
+      
+      // Set up for slide test
+      db303Synth.setCutoff(0.5);
+      db303Synth.setResonance(0.7);
+      db303Synth.setEnvMod(0.5);
+      db303Synth.setSlideTime(0.5); // Medium slide time
+      
+      // Play ascending slide
+      log('Sliding UP: C3 → E3 → G3 → C4', 'info');
+      db303Synth.triggerAttack('C3', undefined, 1, false, false);
+      await new Promise(r => setTimeout(r, 400));
+      
+      // Slide to next notes (legato - don't release between)
+      db303Synth.triggerAttack('E3', undefined, 1, false, true); // slide=true
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerAttack('G3', undefined, 1, false, true);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerAttack('C4', undefined, 1, false, true);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerRelease();
+      
+      await new Promise(r => setTimeout(r, 300));
+      
+      // Play descending slide
+      log('Sliding DOWN: C4 → G3 → E3 → C3', 'info');
+      db303Synth.triggerAttack('C4', undefined, 1, false, false);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerAttack('G3', undefined, 1, false, true);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerAttack('E3', undefined, 1, false, true);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerAttack('C3', undefined, 1, false, true);
+      await new Promise(r => setTimeout(r, 400));
+      
+      db303Synth.triggerRelease();
+      
+      log('✅ Slide test complete!', 'success');
+    });
+
+    // Glissando Test - rapid chromatic run
+    document.getElementById('glissandoTestBtn').addEventListener('click', async () => {
+      log('🎼 Testing GLISSANDO (chromatic run)...', 'warning');
+      
+      // Set up for glissando
+      db303Synth.setCutoff(0.6);
+      db303Synth.setResonance(0.6);
+      db303Synth.setEnvMod(0.4);
+      db303Synth.setSlideTime(0.1); // Fast slide for glissando effect
+      
+      // Chromatic notes from C3 to C4
+      const chromaticUp = ['C3', 'C#3', 'D3', 'D#3', 'E3', 'F3', 'F#3', 'G3', 'G#3', 'A3', 'A#3', 'B3', 'C4'];
+      
+      log('Glissando UP: C3 → C4', 'info');
+      db303Synth.triggerAttack(chromaticUp[0], undefined, 1, false, false);
+      await new Promise(r => setTimeout(r, 80));
+      
+      for (let i = 1; i < chromaticUp.length; i++) {
+        db303Synth.triggerAttack(chromaticUp[i], undefined, 1, false, true);
+        await new Promise(r => setTimeout(r, 80));
+      }
+      
+      await new Promise(r => setTimeout(r, 200));
+      
+      log('Glissando DOWN: C4 → C3', 'info');
+      for (let i = chromaticUp.length - 2; i >= 0; i--) {
+        db303Synth.triggerAttack(chromaticUp[i], undefined, 1, false, true);
+        await new Promise(r => setTimeout(r, 80));
+      }
+      
+      db303Synth.triggerRelease();
+      
+      log('✅ Glissando test complete!', 'success');
+    });
+
+    // Full Articulation Demo - combines all techniques
+    document.getElementById('fullArticulationBtn').addEventListener('click', async () => {
+      log('🎶 Full articulation demo...', 'warning');
+      
+      db303Synth.setCutoff(0.4);
+      db303Synth.setResonance(0.85);
+      db303Synth.setEnvMod(0.6);
+      db303Synth.setAccent(0.8);
+      db303Synth.setSlideTime(0.3);
+      
+      // Classic 303 acid pattern
+      const pattern = [
+        { note: 'C3', accent: true, slide: false },
+        { note: 'C3', accent: false, slide: false },
+        { note: 'D#3', accent: false, slide: true },
+        { note: 'F3', accent: true, slide: false },
+        { note: 'F#3', accent: false, slide: true },
+        { note: 'G3', accent: true, slide: false },
+        { note: 'C3', accent: false, slide: false },
+        { note: 'C4', accent: true, slide: false },
+        { note: 'G3', accent: false, slide: true },
+        { note: 'D#3', accent: false, slide: true },
+        { note: 'C3', accent: true, slide: false },
+      ];
+      
+      log('Playing acid pattern with mixed articulations...', 'info');
+      
+      for (let i = 0; i < pattern.length; i++) {
+        const step = pattern[i];
+        const isFirst = i === 0;
+        
+        if (isFirst || !pattern[i-1].slide) {
+          // New note (not sliding from previous)
+          db303Synth.triggerAttack(step.note, undefined, 1, step.accent, false);
+        } else {
+          // Slide from previous note
+          db303Synth.triggerAttack(step.note, undefined, 1, step.accent, true);
+        }
+        
+        const emoji = step.accent ? '💥' : (step.slide ? '🎵' : '♪');
+        log(`${emoji} ${step.note} ${step.accent ? '[ACCENT]' : ''} ${step.slide ? '[SLIDE]' : ''}`, 'info');
+        
+        await new Promise(r => setTimeout(r, 180));
+        
+        // Release if next note doesn't slide
+        if (i < pattern.length - 1 && !pattern[i+1].slide) {
+          db303Synth.triggerRelease();
+          await new Promise(r => setTimeout(r, 40));
+        }
+      }
+      
+      db303Synth.triggerRelease();
+      
+      log('✅ Full articulation demo complete!', 'success');
+    });
+
+    // Clear log
+    document.getElementById('clearLogBtn').addEventListener('click', () => {
+      document.getElementById('log').innerHTML = '';
+    });
+
+    log('DB303 Test Suite loaded. Click Initialize to begin.', 'info');
+  </script>
+</body>
+</html>

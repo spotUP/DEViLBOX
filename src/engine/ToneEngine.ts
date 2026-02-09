@@ -3058,9 +3058,7 @@ export class ToneEngine {
         if (typeof synth.setMuffler === 'function') {
           synth.setMuffler(df.muffler);
         }
-        if (typeof synth.setSweepSpeed === 'function') {
-          synth.setSweepSpeed(df.sweepSpeed);
-        }
+        // Note: sweepSpeed is not a native DB303 parameter - it's handled by normalAttack/accentAttack/decay
         if (typeof synth.setHighResonance === 'function') {
           synth.setHighResonance(df.highResonance);
         }

@@ -371,11 +371,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
           const { id: _ignoredId, ...safeUpdates } = updates as any;
 
           // Deep merge nested objects to preserve existing fields
+          // IMPORTANT: Create new objects instead of mutating for React/Zustand change detection
           Object.keys(safeUpdates).forEach(key => {
             const value = safeUpdates[key];
             if (value && typeof value === 'object' && !Array.isArray(value) && instrument[key as keyof InstrumentConfig]) {
-              // Merge nested objects (oscillator, envelope, filter, etc.)
-              Object.assign(instrument[key as keyof InstrumentConfig] as any, value);
+              // Merge nested objects - create new object to trigger re-render
+              (instrument as any)[key] = { ...(instrument[key as keyof InstrumentConfig] as any), ...value };
             } else {
               // Direct assignment for primitives and new objects
               (instrument as any)[key] = value;

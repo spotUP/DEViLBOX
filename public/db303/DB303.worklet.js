@@ -65,40 +65,120 @@ class DB303Processor extends AudioWorkletProcessor {
         break;
       case 'setParameter':
         if (this.synth) {
-          // Map string param names to numeric IDs (matches C++ DB303Param enum)
-          // WASM only exposes setParameter(int, float), not named setters
-          const paramNameToId = {
-            waveform: 0, tuning: 1, cutoff: 2, resonance: 3, envMod: 4, decay: 5, accent: 6, volume: 7,
-            ampSustain: 10, slideTime: 11, normalAttack: 12, accentAttack: 13, accentDecay: 14, ampDecay: 15, ampRelease: 16,
-            preFilterHp: 20, feedbackHp: 21, postFilterHp: 22, squarePhase: 23,
-            tanhDrive: 30, tanhOffset: 31,
-            // Aliases for UI param names
-            normalDecay: 5, // Same as decay
-            softAttack: 12, // Same as normalAttack
-            accentSoftAttack: 13, // Same as accentAttack
+          // Convert string to number
+          const numericValue = parseFloat(data.value);
+          
+          // Try BOTH approaches:
+          // 1. Named setters (setCutoff, etc.)
+          // 2. Numeric setParameter(id, value) if it exists
+          
+          // Numeric parameter IDs (from JUCE source)
+          const paramIdMap = {
+            cutoff: 2,
+            resonance: 3,
+            envMod: 4,
+            decay: 5,
+            accent: 6,
+            volume: 7,
+            waveform: 0,
+            tuning: 1
           };
           
-          let paramId = data.paramId;
-          let value = data.value;
-          
-          if (typeof paramId === 'string') {
-            // Try named setter first (in case WASM exports them)
-            const setterName = 'set' + paramId.charAt(0).toUpperCase() + paramId.slice(1);
-            if (typeof this.synth[setterName] === 'function') {
-              this.synth[setterName](value);
-              break;
-            }
-            // Map string to numeric ID
-            paramId = paramNameToId[paramId];
-            if (paramId === undefined) {
-              // Unknown param, skip
-              break;
+          // Try numeric setParameter first (if it exists)
+          const numericId = paramIdMap[data.paramId];
+          if (numericId !== undefined && typeof this.synth.setParameter === 'function') {
+            try {
+              this.synth.setParameter(numericId, numericValue);
+            } catch (e) {
+              // setParameter not supported, will use named setters below
             }
           }
           
-          // Call setParameter with numeric ID
-          if (typeof this.synth.setParameter === 'function') {
-            this.synth.setParameter(paramId, value);
+          // Also try named setter
+          const setterMap = {
+            // Core 303 Parameters
+            cutoff: 'setCutoff',
+            resonance: 'setResonance',
+            envMod: 'setEnvMod',
+            decay: 'setDecay',
+            accent: 'setAccent',
+            volume: 'setVolume',
+            waveform: 'setWaveform',
+            tuning: 'setTuning',
+            // Oscillator
+            pulseWidth: 'setPulseWidth',
+            subOscGain: 'setSubOscGain',
+            subOscBlend: 'setSubOscBlend',
+            pitchToPw: 'setPitchToPw',
+            // Alternative name formats
+            cutoffHz: 'setCutoffHz',
+            envModPercent: 'setEnvModPercent',
+            // DevilFish mods - Envelope
+            slideTime: 'setSlideTime',
+            normalDecay: 'setNormalDecay',
+            accentDecay: 'setAccentDecay',
+            softAttack: 'setSoftAttack',
+            normalAttack: 'setSoftAttack', // Alias
+            accentSoftAttack: 'setAccentSoftAttack',
+            accentAttack: 'setAccentSoftAttack', // Alias
+            ampSustain: 'setAmpSustain',
+            ampDecay: 'setAmpDecay',
+            ampRelease: 'setAmpRelease',
+            // DevilFish mods - Filter
+            filterTracking: 'setFilterTracking',
+            filterInputDrive: 'setFilterInputDrive',
+            passbandCompensation: 'setPassbandCompensation',
+            resTracking: 'setResTracking',
+            filterSelect: 'setFilterSelect',
+            lpBpMix: 'setLpBpMix',
+            // DevilFish mods - Korg-style filter params
+            diodeCharacter: 'setDiodeCharacter',
+            duffingAmount: 'setDuffingAmount',
+            filterFmDepth: 'setFilterFmDepth',
+            stageNLAmount: 'setStageNLAmount',
+            korgWarmth: 'setKorgWarmth',
+            korgStiffness: 'setKorgStiffness',
+            korgFilterFm: 'setKorgFilterFm',
+            korgIbiasScale: 'setKorgIbiasScale',
+            // LFO Parameters
+            lfoWaveform: 'setLfoWaveform',
+            lfoRate: 'setLfoRate',
+            lfoContour: 'setLfoContour',
+            lfoPitchDepth: 'setLfoPitchDepth',
+            lfoPwmDepth: 'setLfoPwmDepth',
+            lfoFilterDepth: 'setLfoFilterDepth',
+            lfoStiffDepth: 'setLfoStiffDepth',
+            // Effects - Chorus
+            chorusMode: 'setChorusMode',
+            chorusMix: 'setChorusMix',
+            // Effects - Phaser  
+            phaserRate: 'setPhaserLfoRate',
+            phaserWidth: 'setPhaserLfoWidth',
+            phaserFeedback: 'setPhaserFeedback',
+            phaserMix: 'setPhaserMix',
+            // Effects - Delay
+            delayTime: 'setDelayTime',
+            delayFeedback: 'setDelayFeedback',
+            delayTone: 'setDelayTone',
+            delayMix: 'setDelayMix',
+            delaySpread: 'setDelaySpread',
+            // Misc
+            ensembleAmount: 'setEnsembleAmount',
+            oversamplingOrder: 'setOversamplingOrder',
+          };
+          
+          let setterName = setterMap[data.paramId];
+          if (!setterName) {
+            console.warn('[DB303] Unknown parameter:', data.paramId);
+            break;
+          }
+          
+          if (typeof this.synth[setterName] === 'function') {
+            // CRITICAL: Convert to number - values come as strings via postMessage
+            const numericValue = parseFloat(data.value);
+            this.synth[setterName](numericValue);
+          } else {
+            console.warn('[DB303] Method not found:', setterName);
           }
         }
         break;
@@ -198,6 +278,54 @@ class DB303Processor extends AudioWorkletProcessor {
       if (jsCode && !globalThis.DB303) {
         console.log('[DB303 Worklet] Loading JS module...');
 
+        // Polyfills for DOM objects that Emscripten expects
+        if (typeof globalThis.document === 'undefined') {
+          globalThis.document = {
+            createElement: () => ({
+              relList: { supports: () => false },
+              tagName: 'DIV',
+              rel: '',
+              addEventListener: () => {},
+              removeEventListener: () => {}
+            }),
+            getElementById: () => null,
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            getElementsByTagName: () => [],
+            head: { appendChild: () => {} },
+            addEventListener: () => {},
+            removeEventListener: () => {}
+          };
+        }
+
+        if (typeof globalThis.window === 'undefined') {
+          globalThis.window = {
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => {},
+            customElements: { whenDefined: () => Promise.resolve() },
+            location: { href: '', pathname: '' }
+          };
+        }
+
+        // Polyfill MutationObserver
+        if (typeof globalThis.MutationObserver === 'undefined') {
+          globalThis.MutationObserver = class MutationObserver {
+            constructor() {}
+            observe() {}
+            disconnect() {}
+          };
+        }
+
+        // Polyfill DOMParser
+        if (typeof globalThis.DOMParser === 'undefined') {
+          globalThis.DOMParser = class DOMParser {
+            parseFromString() {
+              return { querySelector: () => null, querySelectorAll: () => [] };
+            }
+          };
+        }
+
         // Polyfill URL if not available in AudioWorklet scope
         if (typeof globalThis.URL === 'undefined') {
           globalThis.URL = class URL {
@@ -266,13 +394,23 @@ class DB303Processor extends AudioWorkletProcessor {
       if (this.module.DB303Engine) {
         this.synth = new this.module.DB303Engine(Math.floor(sampleRate));
         console.log('[DB303 Worklet] Created DB303Engine at', sampleRate, 'Hz');
+        
+        // Ensure filter is enabled
+        if (typeof this.synth.setFilterSelect === 'function') {
+          this.synth.setFilterSelect(0);
+        }
+        
+        // DB303Engine/DB303Synth are Emscripten classes - methods are on the object directly
+        // No need to wrap, just use them as-is
       } else if (this.module.DB303Synth) {
         // Fallback for older WASM builds
         this.synth = new this.module.DB303Synth();
         this.synth.initialize(sampleRate);
+        console.log('[DB303 Worklet] Created DB303Synth');
       } else if (this.module._initSynth) {
-        // Alternative API: direct function calls
+        // Alternative API: direct function calls (C-style, not class-based)
         this.module._initSynth(sampleRate);
+        // Create wrapper object for C-style functions
         this.synth = {
           noteOn: (note, vel) => this.module._noteOn(note, vel),
           noteOff: (note) => this.module._noteOff(note),
@@ -283,6 +421,8 @@ class DB303Processor extends AudioWorkletProcessor {
           programChange: (prog) => this.module._programChange && this.module._programChange(prog),
           process: (ptrL, ptrR, n) => this.module._render ? this.module._render(ptrL, ptrR, n) : this.module._process && this.module._process(ptrL, ptrR, n)
         };
+      } else {
+        throw new Error('No DB303 WASM interface found');
       }
 
       // Allocate output buffers in WASM memory (4 bytes per float)
@@ -421,6 +561,8 @@ class DB303Processor extends AudioWorkletProcessor {
               outputL[processedSamples + i] = this.outputBufferL[i];
               outputR[processedSamples + i] = this.outputBufferR[i];
             }
+          } else {
+            console.error('[DB303] No output buffers available!');
           }
         }
         
