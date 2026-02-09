@@ -5,7 +5,7 @@
  * (knobs, selects, toggles) grouped by section. Supports operator tabs for FM synths.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameters';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
@@ -36,6 +36,10 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
 
   const chipDef = useMemo(() => getChipSynthDef(synthType), [synthType]);
   const [activeOpTab, setActiveOpTab] = useState(0); // 0 = Global, 1-N = Operators
+  
+  // Use ref to prevent stale closures in callbacks
+  const parametersRef = useRef(parameters);
+  parametersRef.current = parameters;
 
   if (!chipDef) return null;
 
