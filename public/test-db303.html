@@ -628,8 +628,9 @@
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         log(`✓ Audio Context @ ${audioContext.sampleRate}Hz`, 'success');
         
-        // Load DB303 worklet directly
-        await audioContext.audioWorklet.addModule('./db303/DB303.worklet.js');
+        // Load DB303 worklet directly (use absolute path for GitHub Pages)
+        const basePath = window.location.pathname.includes('/DEViLBOX/') ? '/DEViLBOX' : '';
+        await audioContext.audioWorklet.addModule(`${basePath}/db303/DB303.worklet.js`);
         
         // Create worklet node
         const workletNode = new AudioWorkletNode(audioContext, 'db303-processor', {
@@ -637,10 +638,11 @@
         });
         workletNode.connect(audioContext.destination);
         
-        // Load WASM (use correct case-sensitive filenames)
-        const wasmResponse = await fetch('./db303/DB303.wasm');
+        // Load WASM (use absolute paths for GitHub Pages)
+        const basePath = window.location.pathname.includes('/DEViLBOX/') ? '/DEViLBOX' : '';
+        const wasmResponse = await fetch(`${basePath}/db303/DB303.wasm`);
         const wasmBinary = await wasmResponse.arrayBuffer();
-        const jsResponse = await fetch('./db303/DB303.js');
+        const jsResponse = await fetch(`${basePath}/db303/DB303.js`);
         const jsCode = await jsResponse.text();
         
         workletNode.port.postMessage({
