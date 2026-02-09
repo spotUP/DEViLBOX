@@ -27,6 +27,8 @@ import {
   Cpu,
   Zap,
   Radio,
+  FileUp,
+  Layers,
 } from 'lucide-react';
 
 interface GeneratorEditorProps {
@@ -1588,6 +1590,185 @@ export const JeskolaDistortionEditor: React.FC<GeneratorEditorProps> = ({ config
 };
 
 // ============================================================================
+// MAKK M4 - 2-Oscillator Wavetable Synth
+// ============================================================================
+
+export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange }) => {
+  const updateParam = useBuzzmachineParam(config, onChange);
+  const params = config.buzzmachine?.parameters || {};
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Parameters: Osc1_Wave(0), Osc2_Wave(1), Mix(2), Detune(3), DetuneFine(4),
+  //   Glide(5), Attack(6), Decay(7), Sustain(8), Release(9), Cutoff(10), Resonance(11)
+  const osc1Wave = params[0] ?? 0;
+  const osc2Wave = params[1] ?? 0;
+  const mix = params[2] ?? 0x40;
+  const detune = params[3] ?? 0x40;
+  const detuneFine = params[4] ?? 0x40;
+  const glide = params[5] ?? 0;
+  const cutoff = params[10] ?? 0xFF;
+  const resonance = params[11] ?? 0;
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      let wavetableData: number[] = [];
+      if (file.name.endsWith('.h')) {
+        const text = await file.text();
+        wavetableData = text.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+      } else {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const rawData = buffer.getChannelData(0);
+        wavetableData = Array.from(rawData).map(v => Math.round((v + 1) / 2 * 255));
+      }
+
+      if (wavetableData.length > 0) {
+        // Store in config for the engine to pick up
+        onChange({
+          buzzmachine: {
+            ...config.buzzmachine!,
+            customWaves: {
+              ...(config.buzzmachine?.customWaves || {}),
+              [osc1Wave]: wavetableData
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to import M4 wave:', err);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  return (
+    <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+      {/* Header */}
+      <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">
+            <Layers size={20} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Makk M4</h2>
+            <p className="text-xs text-gray-400">2-Osc Wavetable Synth by MAKK</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Oscillators */}
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <SectionHeader color="#8b5cf6" title="Oscillators" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-2 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-[10px] font-bold uppercase hover:bg-indigo-500/30 transition-colors"
+            >
+              <FileUp size={12} />
+              Import Wave
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".wav,.h"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Osc 1 Wave</label>
+              <Knob
+                value={osc1Wave}
+                min={0}
+                max={127}
+                onChange={(v) => updateParam(0, Math.round(v))}
+                label="Wave Index"
+                color="#8b5cf6"
+                formatValue={(v) => `Index ${Math.round(v)}`}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Osc 2 Wave</label>
+              <Knob
+                value={osc2Wave}
+                min={0}
+                max={127}
+                onChange={(v) => updateParam(1, Math.round(v))}
+                label="Wave Index"
+                color="#a855f7"
+                formatValue={(v) => `Index ${Math.round(v)}`}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-6 items-end mt-6">
+            <Knob
+              value={mix}
+              min={0}
+              max={127}
+              onChange={(v) => updateParam(2, Math.round(v))}
+              label="Mix"
+              color="#8b5cf6"
+              formatValue={(v) => `${Math.round(v / 1.27)}%`}
+            />
+            <Knob
+              value={detune}
+              min={0}
+              max={127}
+              onChange={(v) => updateParam(3, Math.round(v))}
+              label="Detune"
+              color="#8b5cf6"
+              bipolar
+              formatValue={(v) => `${Math.round(v - 64)}`}
+            />
+            <Knob
+              value={glide}
+              min={0}
+              max={127}
+              onChange={(v) => updateParam(5, Math.round(v))}
+              label="Glide"
+              color="#8b5cf6"
+              formatValue={(v) => Math.round(v).toString()}
+            />
+          </div>
+        </section>
+
+        {/* Filter */}
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <SectionHeader color="#ec4899" title="Filter" />
+          <div className="flex flex-wrap gap-6 items-end">
+            <Knob
+              value={cutoff}
+              min={0}
+              max={255}
+              onChange={(v) => updateParam(10, Math.round(v))}
+              label="Cutoff"
+              color="#ec4899"
+              formatValue={(v) => `${Math.round(v / 2.55)}%`}
+            />
+            <Knob
+              value={resonance}
+              min={0}
+              max={255}
+              onChange={(v) => updateParam(11, Math.round(v))}
+              label="Resonance"
+              color="#ec4899"
+              formatValue={(v) => `${Math.round(v / 2.55)}%`}
+            />
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // FACTORY FUNCTION - Returns the appropriate editor for a machine type
 // ============================================================================
 
@@ -1604,6 +1785,7 @@ const BUZZMACHINE_EDITORS: Record<string, EditorComponent> = {
   'MadBrain4FM2F': MadBrain4FM2FEditor,
   'MadBrainDynamite6': MadBrainDynamite6Editor,
   'MakkM3': MakkM3Editor,
+  'MakkM4': MakkM4Editor,
   'OomekAggressor': OomekAggressorEditor,
   // Effects (Jeskola)
   'JeskolaDelay': JeskolaDelayEditor,

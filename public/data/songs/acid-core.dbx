@@ -18,19 +18,26 @@
       "type": "synth",
       "synthType": "TB303",
       "tb303": {
-        "oscillator": { "type": "sawtooth" },
+        "oscillator": {
+          "type": "sawtooth"
+        },
         "filter": {
           "cutoff": 600,
           "resonance": 67
         },
         "filterEnvelope": {
           "envMod": 13,
-          "decay": 2300
+          "decay": 1.0606978403536116
         },
-        "accent": { "amount": 85 },
-        "slide": { "time": 60, "mode": "exponential" },
+        "accent": {
+          "amount": 85
+        },
+        "slide": {
+          "time": 60,
+          "mode": "exponential"
+        },
         "overdrive": {
-          "amount": 73,
+          "amount": 0.73,
           "modelIndex": 0,
           "drive": 73,
           "dryWet": 100
@@ -45,7 +52,9 @@
       "name": "909 Kick",
       "type": "synth",
       "synthType": "DrumMachine",
-      "drumMachine": { "drumType": "kick" },
+      "drumMachine": {
+        "drumType": "kick"
+      },
       "effects": [],
       "volume": -6,
       "pan": 0
@@ -55,7 +64,9 @@
       "name": "909 Snare",
       "type": "synth",
       "synthType": "DrumMachine",
-      "drumMachine": { "drumType": "snare" },
+      "drumMachine": {
+        "drumType": "snare"
+      },
       "effects": [],
       "volume": -10,
       "pan": 0
@@ -65,7 +76,9 @@
       "name": "909 Open Hihat",
       "type": "synth",
       "synthType": "DrumMachine",
-      "drumMachine": { "drumType": "hihat" },
+      "drumMachine": {
+        "drumType": "hihat"
+      },
       "effects": [],
       "volume": -12,
       "pan": 0

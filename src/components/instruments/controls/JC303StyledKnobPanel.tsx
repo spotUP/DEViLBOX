@@ -6,7 +6,6 @@ import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { clsx } from 'clsx';
 import { CURRENT_VERSION } from '@generated/changelog';
-import { parseDb303Preset, convertToDb303Preset } from '@lib/import/Db303PresetConverter';
 
 interface JC303StyledKnobPanelProps {
   config: TB303Config;
@@ -32,32 +31,29 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [sections, setSections] = useState({
-    mods: true,
-    lfo: true,
-    effects: true
+    mods: false,    // Collapsed by default
+    lfo: false,     // Collapsed by default
+    effects: false  // Collapsed by default
   });
   
   // Use ref for config to prevent stale closures in throttled callbacks
   const configRef = useRef(config);
   configRef.current = config;
 
-  // Auto-scale to fit parent width
+  // Track container width for responsive layout
+  const [containerWidth, setContainerWidth] = useState(1200);
+
   useLayoutEffect(() => {
-    const updateScale = () => {
+    const updateWidth = () => {
       if (containerRef.current?.parentElement) {
-        const parentWidth = containerRef.current.parentElement.clientWidth;
-        const panelWidth = 1080 + 32; // width + padding
-        if (parentWidth < panelWidth) {
-          setScale(parentWidth / panelWidth);
-        } else {
-          setScale(1);
-        }
+        const parentWidth = containerRef.current.parentElement.clientWidth - 32; // minus padding
+        setContainerWidth(Math.max(1000, parentWidth)); // min 1000px
       }
     };
 
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
   // Update helpers - all receiving 0-1 from knobs now
@@ -134,16 +130,17 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         left: `${x}px`, top: `${y}px`, width: `${width}px`,
         position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: '4px', cursor: 'pointer', zIndex: 10,
+        pointerEvents: 'auto',
       }}
       onClick={onToggle}
       className="group"
     >
       <div className={clsx(
-        "flex items-center gap-1 px-3 py-0.5 rounded-full bg-black/40 border border-transparent group-hover:border-white/20 transition-all",
-        colorClass, expanded ? "opacity-100" : "opacity-60"
+        "flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 group-hover:border-white/30 group-hover:bg-black/80 transition-all shadow-lg",
+        colorClass, expanded ? "opacity-100" : "opacity-70"
       )}>
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em]">{label}</span>
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span className="text-[11px] font-bold uppercase tracking-[0.15em]">{label}</span>
       </div>
     </div>
   );
@@ -162,7 +159,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
   // Section heights
   const ROW1_H = 285;
-  const MODS_H = 165;
+  const MODS_H = 230; // Increased for Korg filter params row
   const LFO_H = 165;
   const FX_H = 175;
 
@@ -178,53 +175,18 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     (showLfo ? LFO_H : 0) + 
     (showFx ? FX_H : 0);
 
-  // Import/Export Handlers
-  const handleImportPreset = () => {
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = '.xml';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const parsed = parseDb303Preset(event.target?.result as string);
-          onChange({ ...configRef.current, ...parsed } as any);
-        } catch (error) {
-          alert('Failed to import preset.');
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
-
-  const handleExportPreset = () => {
-    try {
-      const xml = convertToDb303Preset(configRef.current);
-      const blob = new Blob([xml], { type: 'application/xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `db303-preset-${Date.now()}.xml`;
-      a.click(); URL.revokeObjectURL(url);
-    } catch (error) {
-      alert('Failed to export preset.');
-    }
-  };
-
   return (
     <div
       ref={containerRef}
       className="w-full overflow-visible flex justify-center py-4 select-none"
-      style={{ minHeight: `${totalHeight * scale + 32}px`, transition: 'min-height 0.3s ease-out' }}
+      style={{ minHeight: `${totalHeight + 32}px`, transition: 'min-height 0.3s ease-out' }}
     >
       <div
         className="relative bg-[#1a1a1a] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-b-8 border-r-4 border-black/40 overflow-hidden"
         style={{
-          width: '1080px', height: `${totalHeight}px`, 
-          transform: `scale(${scale})`, transformOrigin: 'top center',
+          width: `${containerWidth}px`, height: `${totalHeight}px`,
           background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
-          transition: 'height 0.3s ease-out',
+          transition: 'all 0.3s ease-out',
         }}
       >
         {/* --- PANEL DECORATIONS --- */}
@@ -232,16 +194,16 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <div className="absolute top-0 left-0 right-0 h-1 bg-black/20"></div>
           <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
           
-          <div style={labelStyle(40, 115, 120)} className="text-accent-primary opacity-80">Oscillator</div>
-          <div style={labelStyle(200, 115, 680)} className="text-accent-primary opacity-80">Filter & Envelope</div>
-          <div style={labelStyle(940, 115, 100)} className="text-accent-primary opacity-80">Output</div>
+          <div style={labelStyle(40, 115, 400)} className="text-accent-primary opacity-80">Filter & Envelope</div>
+          <div style={labelStyle(670, 115, 80)} className="text-accent-primary opacity-80">Output</div>
+          <div style={{ ...labelStyle(containerWidth - 360, 115, 320), textAlign: 'right', paddingRight: '20px' }} className="text-cyan-400 opacity-80">Oscillator</div>
 
           {/* Modifications Header */}
           <div className="absolute left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]" style={{ top: '285px' }}></div>
           <SectionHeader 
             label="Modifications" expanded={showMods} 
             onToggle={() => setSections(s => ({ ...s, mods: !s.mods }))}
-            x={40} y={292} width={1000} colorClass="text-red-500"
+            x={40} y={292} width={containerWidth - 80} colorClass="text-red-500"
           />
 
           {/* LFO Header */}
@@ -252,7 +214,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <SectionHeader 
                 label="LFO (Modulation)" expanded={sections.lfo} 
                 onToggle={() => setSections(s => ({ ...s, lfo: !s.lfo }))}
-                x={40} y={292 + (showMods ? MODS_H : 0)} width={1000} colorClass="text-purple-500"
+                x={40} y={292 + (showMods ? MODS_H : 0)} width={containerWidth - 80} colorClass="text-purple-500"
               />
             </>
           )}
@@ -265,32 +227,34 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <SectionHeader 
                 label="Built-in Effects" expanded={sections.effects} 
                 onToggle={() => setSections(s => ({ ...s, effects: !s.effects }))}
-                x={40} y={292 + (showMods ? MODS_H : 0) + (showLfo ? LFO_H : 0)} width={1000} colorClass="text-green-500"
+                x={40} y={292 + (showMods ? MODS_H : 0) + (showLfo ? LFO_H : 0)} width={containerWidth - 80} colorClass="text-green-500"
               />
             </>
           )}
         </div>
 
         {/* --- ROW 1: Main Controls (Always Visible) --- */}
-        <div style={style(60, 140, 80, 80)} className="flex flex-col items-center justify-center">
-          <span className={clsx("text-[9px] font-bold mb-1 transition-colors", config.oscillator.type === 'sawtooth' ? "text-cyan-400" : "text-gray-600")}>SAW</span>
-          <Toggle label="" value={config.oscillator.type === 'square'} onChange={(v) => updateOscillator(v ? 'square' : 'sawtooth')} color="#00ffff" size="sm" />
-          <span className={clsx("text-[9px] font-bold mt-1 transition-colors", config.oscillator.type === 'square' ? "text-cyan-400" : "text-gray-600")}>SQR</span>
-        </div>
-
-        {/* Oscillator Enhancements */}
-        <div style={style(24, 225, 35, 35)}><Knob value={config.oscillator.pulseWidth ?? 1} min={0} max={1} onChange={(v) => updateOscillatorParam('pulseWidth', v)} label="PWM" size="sm" color="#00cccc" formatValue={v => Math.round(50 + v * 49) + '%'} /></div>
-        <div style={style(74, 225, 35, 35)}><Knob value={config.oscillator.subOscGain ?? 0} min={0} max={1} onChange={(v) => updateOscillatorParam('subOscGain', v)} label="SubG" size="sm" color="#00cccc" formatValue={v => Math.round(v * 100) + '%'} /></div>
-        <div style={style(124, 225, 35, 35)}><Knob value={config.oscillator.subOscBlend ?? 1} min={0} max={1} onChange={(v) => updateOscillatorParam('subOscBlend', v)} label="SubB" size="sm" color="#00cccc" formatValue={v => v < 0.5 ? 'Mix' : 'Add'} /></div>
+        {/* Main 303 Knobs (Left Side) */}
+        <div style={style(40, 145, 65, 65)}><Knob value={config.tuning ?? 0.5} min={0} max={1} bipolar onChange={updateTuning} label="Tune" size="md" color="#ffcc00" formatValue={v => (v - 0.5 > 0 ? '+' : '') + Math.round((v - 0.5) * 100) + 'c'} /></div>
+        <div style={style(145, 145, 65, 65)}><Knob value={config.filter.cutoff} min={0} max={1} onChange={(v) => updateFilter('cutoff', v)} label="Cutoff" size="md" color="#ffcc00" formatValue={v => Math.round(CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, v)) + ' Hz'} /></div>
+        <div style={style(250, 145, 65, 65)}><Knob value={config.filter.resonance} min={0} max={1} onChange={(v) => updateFilter('resonance', v)} label="Reso" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(355, 145, 65, 65)}><Knob value={config.filterEnvelope.envMod} min={0} max={1} onChange={(v) => updateFilterEnvelope('envMod', v)} label="EnvMod" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(460, 145, 65, 65)}><Knob value={config.filterEnvelope.decay} min={0} max={1} onChange={(v) => updateFilterEnvelope('decay', v)} label="Decay" size="md" color="#ffcc00" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+        <div style={style(565, 145, 65, 65)}><Knob value={config.accent.amount} min={0} max={1} onChange={(v) => updateAccent('amount', v)} label="Accent" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(670, 145, 80, 80)}><Knob value={config.volume ?? 0.75} min={0} max={1} onChange={(v) => onChange({ volume: v })} label="Level" size="lg" color="#00ffff" formatValue={v => Math.round(v * 100) + '%'} /></div>
         
-        {/* Main 303 Knobs */}
-        <div style={style(210, 145, 65, 65)}><Knob value={config.tuning ?? 0.5} min={0} max={1} bipolar onChange={updateTuning} label="Tune" size="md" color="#ffcc00" formatValue={v => (v - 0.5 > 0 ? '+' : '') + Math.round((v - 0.5) * 100) + 'c'} /></div>
-        <div style={style(320, 145, 65, 65)}><Knob value={config.filter.cutoff} min={0} max={1} onChange={(v) => updateFilter('cutoff', v)} label="Cutoff" size="md" color="#ffcc00" formatValue={v => Math.round(CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, v)) + ' Hz'} /></div>
-        <div style={style(430, 145, 65, 65)}><Knob value={config.filter.resonance} min={0} max={1} onChange={(v) => updateFilter('resonance', v)} label="Reso" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
-        <div style={style(540, 145, 65, 65)}><Knob value={config.filterEnvelope.envMod} min={0} max={1} onChange={(v) => updateFilterEnvelope('envMod', v)} label="EnvMod" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
-        <div style={style(650, 145, 65, 65)}><Knob value={config.filterEnvelope.decay} min={0} max={1} onChange={(v) => updateFilterEnvelope('decay', v)} label="Decay" size="md" color="#ffcc00" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-        <div style={style(760, 145, 65, 65)}><Knob value={config.accent.amount} min={0} max={1} onChange={(v) => updateAccent('amount', v)} label="Accent" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
-        <div style={style(950, 145, 80, 80)}><Knob value={config.volume ?? 0.75} min={0} max={1} onChange={(v) => onChange({ volume: v })} label="Level" size="lg" color="#00ffff" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        {/* Oscillator Controls (Right Side - Horizontal Layout) */}
+        <div style={{ ...style(containerWidth - 360, 145, 320, 80), display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end', paddingRight: '20px' }}>
+          <div style={{ width: '40px' }}><Knob value={config.oscillator.pulseWidth ?? 1} min={0} max={1} onChange={(v) => updateOscillatorParam('pulseWidth', v)} label="PWM" size="sm" color="#00cccc" formatValue={v => Math.round(50 + v * 49) + '%'} /></div>
+          <div style={{ width: '40px' }}><Knob value={config.oscillator.subOscGain ?? 0} min={0} max={1} onChange={(v) => updateOscillatorParam('subOscGain', v)} label="SubG" size="sm" color="#00cccc" formatValue={v => Math.round(v * 100) + '%'} /></div>
+          <div style={{ width: '40px' }}><Knob value={config.oscillator.subOscBlend ?? 1} min={0} max={1} onChange={(v) => updateOscillatorParam('subOscBlend', v)} label="SubB" size="sm" color="#00cccc" formatValue={v => v < 0.5 ? 'Mix' : 'Add'} /></div>
+          <div style={{ width: '40px' }}><Knob value={config.oscillator.pitchToPw ?? 0} min={0} max={1} onChange={(v) => updateOscillatorParam('pitchToPw', v)} label="P→PW" size="sm" color="#00cccc" formatValue={v => Math.round(v * 100) + '%'} /></div>
+          <div className="flex flex-col items-center justify-center" style={{ minWidth: '60px' }}>
+            <span className={clsx("text-[9px] font-bold mb-1 transition-colors", config.oscillator.type === 'sawtooth' ? "text-cyan-400" : "text-gray-600")}>SAW</span>
+            <Toggle label="" value={config.oscillator.type === 'square'} onChange={(v) => updateOscillator(v ? 'square' : 'sawtooth')} color="#00ffff" size="sm" />
+            <span className={clsx("text-[9px] font-bold mt-1 transition-colors", config.oscillator.type === 'square' ? "text-cyan-400" : "text-gray-600")}>SQR</span>
+          </div>
+        </div>
 
         {/* --- ROW 2: Modifications --- */}
         {showMods && (
@@ -323,6 +287,26 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <option value={1}>303 Lowpass</option><option value={5}>Korg Ladder</option>
               </select>
             </div>
+            
+            {/* --- ROW 2b: Korg Filter Params (shown when Korg filter selected) + Quality/Extras --- */}
+            <div style={labelStyle(40, 380, 200)} className="text-cyan-400/60 text-[9px]">KORG FILTER</div>
+            <div style={style(60, 395, 40, 40)}><Knob value={config.devilFish?.korgBite ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('korgBite', v)} label="Bite" size="sm" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} disabled={config.devilFish?.filterSelect !== 5} /></div>
+            <div style={style(120, 395, 40, 40)}><Knob value={config.devilFish?.korgClip ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('korgClip', v)} label="Clip" size="sm" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} disabled={config.devilFish?.filterSelect !== 5} /></div>
+            <div style={style(180, 395, 40, 40)}><Knob value={config.devilFish?.korgCrossmod ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('korgCrossmod', v)} label="XMod" size="sm" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} disabled={config.devilFish?.filterSelect !== 5} /></div>
+            <div style={style(240, 395, 40, 40)}><Knob value={config.devilFish?.korgQSag ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('korgQSag', v)} label="Q.Sag" size="sm" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} disabled={config.devilFish?.filterSelect !== 5} /></div>
+            <div style={style(300, 395, 40, 40)}><Knob value={config.devilFish?.korgSharpness ?? 0.5} min={0} max={1} onChange={(v) => updateDevilFish('korgSharpness', v)} label="Sharp" size="sm" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} disabled={config.devilFish?.filterSelect !== 5} /></div>
+            
+            <div style={labelStyle(400, 380, 200)} className="text-yellow-400/60 text-[9px]">EXTRAS</div>
+            <div style={style(420, 395, 40, 40)}><Knob value={config.devilFish?.stageNLAmount ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('stageNLAmount', v)} label="StgNL" size="sm" color="#eab308" formatValue={v => Math.round(v * 100) + '%'} /></div>
+            <div style={style(480, 395, 40, 40)}><Knob value={config.devilFish?.ensembleAmount ?? 0} min={0} max={1} onChange={(v) => updateDevilFish('ensembleAmount', v)} label="Ensem" size="sm" color="#eab308" formatValue={v => Math.round(v * 100) + '%'} /></div>
+            
+            <div style={labelStyle(560, 380, 200)} className="text-gray-400/60 text-[9px]">QUALITY</div>
+            <div style={style(580, 390, 90, 45)} className="flex flex-col">
+              <label className="text-[8px] font-bold text-gray-400/70 mb-1">OVERSAMPLE</label>
+              <select value={config.devilFish?.oversamplingOrder ?? 0} onChange={(e) => updateDevilFish('oversamplingOrder', parseInt(e.target.value))} className="bg-[#111] text-[9px] text-gray-300 border border-gray-700 rounded px-1 py-0.5 outline-none focus:border-gray-500">
+                <option value={0}>Off</option><option value={1}>2×</option><option value={2}>4×</option><option value={3}>8×</option><option value={4}>16×</option>
+              </select>
+            </div>
           </>
         )}
 
@@ -352,7 +336,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <>
             <div style={labelStyle(40, 615, 120, lfoShift)} className="text-green-400/60 text-[10px]">CHORUS</div>
             <div style={style(60, 635, 40, 40, lfoShift)}><Toggle value={config.chorus?.enabled ?? false} onChange={(v) => updateChorus('enabled', v)} label="On" size="sm" /></div>
-            <div style={style(110, 635, 40, 40, lfoShift)}><Knob value={config.chorus?.mix ?? 0.5} min={0} max={1} onChange={(v) => updateChorus('mix', v)} label="Mix" size="sm" color="#22c55e" formatValue={v => Math.round(v * 100) + '%'} /></div>
+            <div style={style(100, 632, 50, 45, lfoShift)} className="flex flex-col">
+              <select value={config.chorus?.mode ?? 1} onChange={(e) => updateChorus('mode', parseInt(e.target.value))} className="bg-[#111] text-[9px] text-green-400 border border-green-900/30 rounded px-1 py-0.5 outline-none focus:border-green-500">
+                <option value={0}>Subtle</option><option value={1}>Medium</option><option value={2}>Wide</option>
+              </select>
+              <span className="text-[7px] text-gray-500 mt-0.5 text-center">MODE</span>
+            </div>
+            <div style={style(155, 635, 40, 40, lfoShift)}><Knob value={config.chorus?.mix ?? 0.5} min={0} max={1} onChange={(v) => updateChorus('mix', v)} label="Mix" size="sm" color="#22c55e" formatValue={v => Math.round(v * 100) + '%'} /></div>
             
             <div style={labelStyle(200, 615, 120, lfoShift)} className="text-green-400/60 text-[10px]">PHASER</div>
             <div style={style(220, 635, 40, 40, lfoShift)}><Knob value={config.phaser?.rate ?? 0.5} min={0} max={1} onChange={(v) => updatePhaser('rate', v)} label="Rate" size="sm" color="#22c55e" formatValue={v => Math.round(v * 100) + '%'} /></div>
@@ -384,11 +374,6 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p?.tb303) onChange(p.tb303 as any); }} className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[120px]">
               <option value="" disabled>Load Preset...</option>{TB303_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
             </select>
-          </div>
-          <div className="h-8 w-px bg-gray-800"></div>
-          <div className="flex gap-2">
-            <button onClick={handleImportPreset} className="bg-[#111] text-[10px] text-green-500 border border-gray-800 rounded px-3 py-1 hover:bg-gray-900 hover:border-green-500/50 transition-colors font-bold">IMPORT</button>
-            <button onClick={handleExportPreset} className="bg-[#111] text-[10px] text-blue-500 border border-gray-800 rounded px-3 py-1 hover:bg-gray-900 hover:border-blue-500/50 transition-colors font-bold">EXPORT</button>
           </div>
         </div>
         <div className="absolute bottom-2 right-4 text-[8px] text-gray-600 font-mono">V{CURRENT_VERSION}-WASM</div>

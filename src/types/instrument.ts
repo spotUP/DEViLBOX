@@ -264,10 +264,15 @@ export interface DevilFishConfig {
   // Audio quality
   oversamplingOrder?: 0 | 1 | 2 | 3 | 4; // 0=none, 1=2x, 2=4x, 3=8x, 4=16x oversampling
 
-  // Korg/Advanced Filter
-  korgStiffness?: number; // 0-1
-  korgWarmth?: number;    // 0-1
-  korgFilterFm?: number;  // 0-1
+  // Korg/Advanced Filter (exposed when filterSelect = 5 for Korg Ladder)
+  korgBite?: number;      // 0-1 - filter bite/edge character
+  korgClip?: number;      // 0-1 - soft clipping amount
+  korgCrossmod?: number;  // 0-1 - cross modulation depth
+  korgQSag?: number;      // 0-1 - resonance sag amount
+  korgSharpness?: number; // 0-1 - filter sharpness/slope
+  korgStiffness?: number; // 0-1 - (alias for duffingAmount)
+  korgWarmth?: number;    // 0-1 - (alias for diodeCharacter)
+  korgFilterFm?: number;  // 0-1 - (alias for filterFmDepth)
 
   // Accent controls
   sweepSpeed: 'fast' | 'normal' | 'slow'; // Accent sweep circuit behavior
@@ -301,6 +306,7 @@ export interface TB303Config {
     pulseWidth?: number;      // 0-100 (pulse width modulation control)
     subOscGain?: number;      // 0-100 (sub-oscillator level)
     subOscBlend?: number;     // 0-100 (sub-oscillator mix with main oscillator)
+    pitchToPw?: number;       // 0-1 (pitch-to-pulse-width modulation)
   };
   filter: {
     cutoff: number; // Stock: 314-2394Hz (exponential) | Devil Fish: 157-4788Hz (2× range)
@@ -1336,6 +1342,7 @@ export const DEFAULT_WOBBLE_BASS: WobbleBassConfig = {
 
 
 
+
 /**
  * Buzzmachine Configuration
  * For Jeskola Buzz machine effects used as synths/generators
@@ -1388,6 +1395,7 @@ export type BuzzmachineType =
 export interface BuzzmachineConfig {
   machineType: BuzzmachineType;
   parameters: Record<number, number>;  // Parameter index -> value
+  customWaves?: Record<number, number[]>; // Custom wavetables (index -> samples)
 }
 
 export const DEFAULT_BUZZMACHINE: BuzzmachineConfig = {
@@ -1846,21 +1854,21 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
  * DX7 Operator Configuration
  */
 export interface DexedOperatorConfig {
-  level: number;           // 0-99 output level
-  coarse: number;          // 0-31 coarse frequency ratio
-  fine: number;            // 0-99 fine frequency
-  detune: number;          // 0-14 (7 = center)
-  mode: 'ratio' | 'fixed'; // Frequency mode
-  egRates: [number, number, number, number];   // 0-99 for R1-R4
-  egLevels: [number, number, number, number];  // 0-99 for L1-L4
-  breakPoint: number;      // 0-99 (A-1 to C8)
-  leftDepth: number;       // 0-99 keyboard scaling
-  rightDepth: number;      // 0-99 keyboard scaling
-  leftCurve: number;       // 0-3
-  rightCurve: number;      // 0-3
-  rateScaling: number;     // 0-7
-  ampModSens: number;      // 0-3
-  velocitySens: number;    // 0-7
+  level?: number;           // 0-99 output level
+  coarse?: number;          // 0-31 coarse frequency ratio
+  fine?: number;            // 0-99 fine frequency
+  detune?: number;          // 0-14 (7 = center)
+  mode?: 'ratio' | 'fixed' | number; // Frequency mode
+  egRates?: [number, number, number, number];   // 0-99 for R1-R4
+  egLevels?: [number, number, number, number];  // 0-99 for L1-L4
+  breakPoint?: number;      // 0-99 (A-1 to C8)
+  leftDepth?: number;       // 0-99 keyboard scaling
+  rightDepth?: number;      // 0-99 keyboard scaling
+  leftCurve?: number;       // 0-3
+  rightCurve?: number;      // 0-3
+  rateScaling?: number;     // 0-7
+  ampModSens?: number;      // 0-3
+  velocitySens?: number;    // 0-7
 }
 
 /**
@@ -1887,7 +1895,7 @@ export interface DexedConfig {
   lfoPitchModDepth: number; // 0-99
   lfoAmpModDepth: number;   // 0-99
   lfoSync: boolean;
-  lfoWave: 'triangle' | 'sawDown' | 'sawUp' | 'square' | 'sine' | 'sampleHold';
+  lfoWave: 'triangle' | 'sawDown' | 'sawUp' | 'square' | 'sine' | 'sampleHold' | number;
   lfoPitchModSens: number; // 0-7
 
   // Transpose (-24 to +24)
@@ -1939,14 +1947,14 @@ export const DEFAULT_DEXED: DexedConfig = {
  */
 export interface OBXdConfig {
   // Oscillator 1
-  osc1Waveform: 'saw' | 'pulse' | 'triangle' | 'noise';
+  osc1Waveform: 'saw' | 'pulse' | 'triangle' | 'noise' | number;
   osc1Octave: number;        // -2 to +2
   osc1Detune: number;        // -1 to +1 semitones
   osc1PulseWidth: number;    // 0-1
   osc1Level: number;         // 0-1
 
   // Oscillator 2
-  osc2Waveform: 'saw' | 'pulse' | 'triangle' | 'noise';
+  osc2Waveform: 'saw' | 'pulse' | 'triangle' | 'noise' | number;
   osc2Octave: number;
   osc2Detune: number;
   osc2PulseWidth: number;
@@ -1959,7 +1967,7 @@ export interface OBXdConfig {
   // Filter
   filterCutoff: number;      // 0-1 (maps to 20-20000 Hz)
   filterResonance: number;   // 0-1
-  filterType: 'lp24' | 'lp12' | 'hp' | 'bp' | 'notch';
+  filterType: 'lp24' | 'lp12' | 'hp' | 'bp' | 'notch' | number;
   filterEnvAmount: number;   // 0-1
   filterKeyTrack: number;    // 0-1
   filterVelocity: number;    // 0-1
@@ -1978,7 +1986,7 @@ export interface OBXdConfig {
 
   // LFO
   lfoRate: number;           // 0-1 (maps to 0.1-20 Hz)
-  lfoWaveform: 'sine' | 'triangle' | 'saw' | 'square' | 'sampleHold';
+  lfoWaveform: 'sine' | 'triangle' | 'saw' | 'square' | 'sampleHold' | number;
   lfoDelay: number;          // 0-1
   lfoOscAmount: number;      // 0-1
   lfoFilterAmount: number;   // 0-1
@@ -1997,7 +2005,7 @@ export interface OBXdConfig {
   // Extended
   noiseLevel: number;        // 0-1
   subOscLevel: number;       // 0-1
-  subOscOctave: -1 | -2;
+  subOscOctave: -1 | -2 | number;
   drift: number;             // 0-1 analog drift
 }
 
@@ -2700,6 +2708,15 @@ export const DEFAULT_SYNARE: SynareConfig = {
 };
 
 /**
+ * DeepPartial Helper
+ */
+export type DeepPartial<T> = T extends Array<infer U>
+  ? Array<DeepPartial<U>>
+  : T extends object
+  ? { [P in keyof T]?: DeepPartial<T[P]> }
+  : T;
+
+/**
  * Instrument type discriminator for XM compatibility
  * - 'sample': Standard XM sampled instrument
  * - 'synth': DEViLBOX synthesizer (extension)
@@ -2744,9 +2761,9 @@ export interface InstrumentConfig {
   // Buzzmachines
   buzzmachine?: BuzzmachineConfig;
   // JUCE WASM Synths
-  dexed?: Partial<DexedConfig>;
-  obxd?: Partial<OBXdConfig>;
-  rdpiano?: Partial<RdPianoConfig>;
+  dexed?: DexedConfig;
+  obxd?: OBXdConfig;
+  rdpiano?: RdPianoConfig;
   // Drumkit/Keymap (multi-sample)
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
@@ -2769,7 +2786,7 @@ export interface InstrumentPreset {
   category: 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX';
   tags: string[];
   author?: string;
-  config: Omit<InstrumentConfig, 'id'>;
+  config: DeepPartial<Omit<InstrumentConfig, 'id'>>;
 }
 
 export interface InstrumentState {
@@ -2799,127 +2816,131 @@ export const DEFAULT_FILTER: FilterConfig = {
 };
 
 export const DEFAULT_TB303: TB303Config = {
-  engineType: 'jc303',
+  engineType: 'db303',  // Use db303 engine by default for better sound
+  volume: 0.8,          // 80% volume (safe default)
   oscillator: {
-    type: 'sawtooth',
-    pulseWidth: 0,          // 0% (pure sawtooth, matches db303-default-preset.xml)
-    subOscGain: 0,          // Sub-oscillator off by default (TB-303 didn't have one)
-    subOscBlend: 100,       // Full blend when enabled (matches db303-default-preset.xml)
+    type: 'sawtooth',   // db303 default: waveform=0 (sawtooth)
+    pulseWidth: 1,      // db303 default: pulseWidth=1 (100% = full square when waveform=1)
+    subOscGain: 0,      // db303 default: subOscGain=0
+    subOscBlend: 1,     // db303 default: subOscBlend=1 (100% blend)
   },
   filter: {
-    cutoff: 1000,           // ~1000 Hz (matches db303-default-preset.xml: 0.5 normalized)
-    resonance: 50,          // 50% (matches db303-default-preset.xml: 0.5 normalized)
+    cutoff: 0.5,        // db303 default: cutoff=0.5 (normalized 0-1)
+    resonance: 0.5,     // db303 default: resonance=0.5 (normalized 0-1)
   },
   filterEnvelope: {
-    envMod: 50,             // 50% (matches db303-default-preset.xml: 0.5 normalized)
-    decay: 300,             // ~300ms (matches db303-default-preset.xml: 0.5 normalized on log scale)
+    envMod: 0.5,        // db303 default: envMod=0.5 (normalized 0-1)
+    decay: 0.4,         // db303 default: decay=0.4 (normalized 0-1)
   },
   accent: {
-    amount: 50,             // 50% (matches db303-default-preset.xml: 0.5 normalized)
+    amount: 0.5,        // db303 default: accent=0.5 (normalized 0-1)
   },
   slide: {
-    time: 51,               // ~51ms (matches db303-default-preset.xml: 0.17 normalized)
+    time: 0.17,         // db303 default: slideTime=0.17 (normalized 0-1)
     mode: 'exponential',
   },
   overdrive: {
     amount: 0,
   },
-  // Devil Fish parameters from db303-default-preset.xml
+  // Devil Fish parameters - matching db303 defaults exactly (all normalized 0-1)
   devilFish: {
     enabled: true,
-    normalDecay: 16.4,           // 0.164 * 100
-    accentDecay: 0.6,            // 0.006 * 100
-    softAttack: 0,               // 0 * 100
-    accentSoftAttack: 10,        // 0.1 * 100
-    passbandCompensation: 9,     // 0.09 * 100
-    resTracking: 74.3,           // 0.743 * 100
-    filterSelect: 255,           // 255 (full)
-    diodeCharacter: 1,           // 1.0 = authentic
-    duffingAmount: 3,            // 0.03 * 100
-    lpBpMix: 0,                  // 0% bandpass
-    stageNLAmount: 0,            // 0% nonlinearity
-    ensembleAmount: 0,           // 0% ensemble
-    oversamplingOrder: 2,        // 4x oversampling
-    filterTracking: 0,           // 0% tracking
-    filterFmDepth: 0,                 // 0% filter FM
+    normalDecay: 0.5,            // db303 default: normalDecay=0.5
+    accentDecay: 0.1,            // db303 default: accentDecay=0.1 - SHORTER than normal!
+    softAttack: 0,               // db303 default: softAttack=0
+    accentSoftAttack: 0.5,       // db303 default: accentSoftAttack=0.5
+    passbandCompensation: 0.9,   // db303 default: passbandCompensation=0.9 (90%)
+    resTracking: 0.7,            // db303 default: resTracking=0.7 (70%)
+    filterInputDrive: 0,         // db303 default: filterInputDrive=0
+    filterSelect: 1,             // db303 default: filterSelect=1 (not 0!)
+    diodeCharacter: 0,           // db303 default: diodeCharacter=0
+    duffingAmount: 0,            // db303 default: duffingAmount=0
+    filterFmDepth: 0,            // db303 default: filterFmDepth=0
+    lpBpMix: 0,                  // db303 default: lpBpMix=0
+    filterTracking: 0,           // db303 default: filterTracking=0
+    stageNLAmount: 0,            // db303 default: stageNLAmount=0
+    ensembleAmount: 0,           // db303 default: ensembleAmount=0
+    oversamplingOrder: 2,        // db303 default: oversamplingOrder=2 (4x)
     // Required defaults for other Devil Fish parameters
     accentSweepEnabled: true,
     sweepSpeed: 'normal',
     highResonance: false,
-    muffler: 'soft',
-    vegDecay: 1230,
+    muffler: 'off',
+    vegDecay: 0.5,               // db303 default: vegDecay=0.5
     vegSustain: 0,
   },
   lfo: {
-    waveform: 0,        // Sine wave (smoothest modulation)
-    rate: 0,            // LFO off by default
-    contour: 0,         // No envelope contour
-    pitchDepth: 0,      // No pitch modulation
-    pwmDepth: 0,        // No PWM modulation
-    filterDepth: 0,     // No filter modulation
+    waveform: 0,        // db303 default: lfoWaveform=0 (triangle)
+    rate: 0,            // db303 default: lfoRate=0
+    contour: 0,         // db303 default: lfoContour=0
+    pitchDepth: 0,      // db303 default: lfoPitchDepth=0
+    pwmDepth: 0,        // db303 default: lfoPwmDepth=0
+    filterDepth: 0,     // db303 default: lfoFilterDepth=0
+    stiffDepth: 0,      // db303 default: lfoStiffDepth=0
   },
   chorus: {
-    enabled: false,     // Chorus off by default
-    mode: 0,            // Mode 1 (matches db303-default-preset.xml)
-    mix: 50,            // 50% wet mix (matches db303-default-preset.xml)
+    enabled: false,     // db303 default: chorusMode=0 (off)
+    mode: 0,
+    mix: 0.5,           // db303 default: chorusMix=0.5
   },
   phaser: {
-    enabled: false,     // Phaser off by default
-    rate: 50,           // Medium rate (matches db303-default-preset.xml: 0.5 normalized)
-    depth: 70,          // 70% depth (matches db303-default-preset.xml: 0.7 normalized as "width")
-    feedback: 0,        // No feedback (matches db303-default-preset.xml)
-    mix: 0,             // 0% wet mix (matches db303-default-preset.xml)
+    enabled: false,     // db303 default: phaserMix=0 (disabled)
+    rate: 0.5,          // db303 default: phaserRate=0.5
+    depth: 0.7,         // db303 default: phaserWidth=0.7
+    feedback: 0,        // db303 default: phaserFeedback=0
+    mix: 0,
   },
   delay: {
-    enabled: false,     // Delay off by default
-    time: 300,          // 300ms (matches db303-default-preset.xml: 3 = 300ms)
-    feedback: 30,       // 30% feedback (matches db303-default-preset.xml)
-    tone: 50,           // 50% tone (matches db303-default-preset.xml: 0.5 normalized)
-    mix: 0,             // 0% wet mix (matches db303-default-preset.xml)
-    stereo: 50,         // 50% stereo spread (matches db303-default-preset.xml: 0.5 normalized as "spread")
+    enabled: false,     // db303 default: delayMix=0 (disabled)
+    time: 0.5,          // db303 default: delayTime=0.5
+    feedback: 0,        // db303 default: delayFeedback=0
+    tone: 0.5,          // db303 default: delayTone=0.5
+    mix: 0,
+    stereo: 0.75,       // db303 default: delaySpread=0.75
   },
 };
 
 /**
- * Default Devil Fish settings that produce TB-303-compatible sound
- * Based on manual's "Limiting the Devil Fish to TB-303 sounds" section
+ * Default Devil Fish settings matching db303 defaults
+ * All values are normalized 0-1 (matching db303.pages.dev)
  */
 export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
-  enabled: false,
+  enabled: true,         // db303 always has Devil Fish enabled
 
-  // Envelope defaults (TB-303 compatible)
-  normalDecay: 200,      // Standard MEG decay
-  accentDecay: 200,      // Accented notes fixed at ~200ms in TB-303
-  accentAttack: 3.0,     // 3ms (matches TB-303 default accent attack)
-  vegDecay: 3000,        // TB-303 had fixed ~3-4 second VEG decay
-  vegSustain: 0,         // No sustain in TB-303
-  softAttack: 0.3,       // Minimum (instant attack) - stock TB-303 had fixed ~4ms, DF makes it variable
-  accentSoftAttack: 0.1, // Minimal soft attack for accented notes
+  // Envelope defaults (matching db303 exactly)
+  normalDecay: 0.5,      // db303 default: normalDecay=0.5
+  accentDecay: 0.1,      // db303 default: accentDecay=0.1 - SHORTER than normal!
+  accentAttack: 3.0,     // 3ms attack
+  vegDecay: 0.5,         // db303 default: vegDecay=0.5
+  vegSustain: 0,         // db303 default: vegSustain=0
+  softAttack: 0,         // db303 default: softAttack=0
+  accentSoftAttack: 0.5, // db303 default: accentSoftAttack=0.5
 
-  // Filter defaults (TB-303 compatible)
-  filterTracking: 0,     // TB-303 filter didn't track pitch
-  filterFmDepth: 0,           // No filter FM in TB-303
-  passbandCompensation: 9,  // 9% compensation (from db303 default preset)
-  resTracking: 74.3,     // 74.3% resonance tracking (from db303 default preset)
-  duffingAmount: 3,      // 3% non-linear filter effect (from db303 default preset)
-  lpBpMix: 0,            // 100% lowpass (TB-303 had only LP filter)
-  stageNLAmount: 0,      // No per-stage non-linearity in TB-303
-  filterSelect: 255,     // Default filter mode
-  diodeCharacter: 100,   // Full diode ladder character
+  // Filter defaults (matching db303 exactly)
+  filterTracking: 0,     // db303 default: filterTracking=0
+  filterFmDepth: 0,      // db303 default: filterFmDepth=0
+  passbandCompensation: 0.9, // db303 default: passbandCompensation=0.9
+  resTracking: 0.7,      // db303 default: resTracking=0.7
+  duffingAmount: 0,      // db303 default: duffingAmount=0
+  lpBpMix: 0,            // db303 default: lpBpMix=0 (100% lowpass)
+  stageNLAmount: 0,      // db303 default: stageNLAmount=0
+  filterSelect: 1,       // db303 default: filterSelect=1 (NOT 0 or 255!)
+  diodeCharacter: 0,     // db303 default: diodeCharacter=0
+  filterInputDrive: 0,   // db303 default: filterInputDrive=0
 
-  // Effects defaults (TB-303 compatible)
-  ensembleAmount: 0,     // No ensemble effect in TB-303
+  // Effects defaults (matching db303 exactly)
+  ensembleAmount: 0,     // db303 default: ensembleAmount=0
 
   // Audio quality defaults
-  oversamplingOrder: 2,  // 4x oversampling (2 = 4x from db303 default preset)
+  oversamplingOrder: 2,  // db303 default: oversamplingOrder=2 (4x)
 
-  // Accent defaults (TB-303 compatible)
-  sweepSpeed: 'normal',  // Standard TB-303 accent behavior
+  // Accent defaults
+  sweepSpeed: 'normal',  // Standard accent behavior
   accentSweepEnabled: true,
 
-  // Resonance mode (TB-303 compatible)
+  // Resonance mode
   highResonance: false,  // Normal resonance range
 
-  // Output (TB-303 compatible)
-  muffler: 'off',        // No muffler in TB-303
+  // Output
+  muffler: 'off',        // No muffler
 };

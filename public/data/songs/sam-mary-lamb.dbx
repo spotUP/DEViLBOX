@@ -1,0 +1,808 @@
+{
+  "metadata": {
+    "id": "demo-sam-mary-lamb",
+    "name": "SAM Sings Mary",
+    "author": "DEViLBOX Demo",
+    "description": "Demo of SAM speech synth in Sing Mode - Mary Had a Little Lamb",
+    "createdAt": "2026-02-03T00:00:00.000Z",
+    "modifiedAt": "2026-02-03T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 100,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "SAM Singer",
+      "synthType": "Sam",
+      "sam": {
+        "text": "Mary had a little lamb",
+        "pitch": 64,
+        "speed": 72,
+        "mouth": 128,
+        "throat": 128,
+        "singmode": true,
+        "phonetic": false
+      },
+      "effects": [],
+      "volume": -6,
+      "pan": 0,
+      "type": "synth"
+    },
+    {
+      "id": 2,
+      "name": "Bass TB303",
+      "synthType": "TB303",
+      "tb303": {
+        "oscillator": {
+          "type": "sawtooth"
+        },
+        "filter": {
+          "cutoff": 800,
+          "resonance": 60
+        },
+        "filterEnvelope": {
+          "attack": 3,
+          "decay": 200,
+          "envMod": 50
+        },
+        "accent": {
+          "amount": 50
+        },
+        "slide": {
+          "time": 60
+        },
+        "distortion": {
+          "amount": 10
+        }
+      },
+      "effects": [],
+      "volume": -12,
+      "pan": 0,
+      "type": "synth"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-0",
+      "name": "Verse 1",
+      "length": 32,
+      "channels": [
+        {
+          "id": "channel-0",
+          "name": "SAM Voice",
+          "rows": [
+            {
+              "note": 53,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 51,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 49,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 51,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 53,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 53,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 53,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 51,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 51,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 51,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 53,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 56,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 56,
+              "instrument": 1,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "volume": 80,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": "#ff6b6b"
+        },
+        {
+          "id": "channel-1",
+          "name": "Bass",
+          "rows": [
+            {
+              "note": 37,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 37,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 44,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 37,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 39,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 39,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 37,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 44,
+              "instrument": 2,
+              "volume": 48,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effect": null,
+              "effect2": null,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "volume": 70,
+          "pan": 0,
+          "instrumentId": 2,
+          "color": "#4ecdc4"
+        }
+      ]
+    }
+  ],
+  "sequence": [
+    "pattern-0",
+    "pattern-0"
+  ],
+  "automation": [],
+  "masterEffects": [],
+  "grooveTemplateId": "straight"
+}

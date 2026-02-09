@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-08T23:17:46.751Z
+ * Generated: 2026-02-09T11:55:23.362Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '333';
-export const BUILD_HASH = '7a9a4ed';
-export const BUILD_DATE = '2026-02-08';
+export const BUILD_NUMBER = '347';
+export const BUILD_HASH = 'c2f5757';
+export const BUILD_DATE = '2026-02-09';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -31,6 +31,68 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-09',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Optimize engine and shared control components"
+      },
+      {
+        type: 'improvement',
+        "description": "Optimize effect and specialty synth controls"
+      },
+      {
+        type: 'improvement',
+        "description": "Add refs to high-complexity synth controls"
+      },
+      {
+        type: 'improvement',
+        "description": "Prevent knob handler re-creation with refs"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate stale state bug preventing first drag response"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: Add demo channel fix script and update build"
+      },
+      {
+        type: 'fix',
+        "description": "Improve VU meter timing and visibility"
+      },
+      {
+        type: 'feature',
+        "description": "Add ProTracker-style status messages"
+      },
+      {
+        type: 'feature',
+        "description": "Add ghost patterns and automation integration"
+      },
+      {
+        type: 'feature',
+        "description": "Update visualizer integration and logo animation"
+      },
+      {
+        type: 'feature',
+        "description": "Add classic demoscene sine scroller with starfield"
+      },
+      {
+        type: 'feature',
+        "description": "Add 5 per-channel visualizers"
+      },
+      {
+        type: 'feature',
+        "description": "Add 3 new global audio visualizers"
+      },
+      {
+        type: 'feature',
+        "description": "Add mouse interaction to automation lanes"
+      }
+    ]
+  },
+  {
+    version: '2026-02-08',
     date: '2026-02-08',
     changes: [
       {
@@ -182,62 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Remove MSM5232 and TIA synth implementations"
-      },
-      {
-        type: 'improvement',
-        "description": "Build: update WASM modules and build configuration"
-      },
-      {
-        type: 'feature',
-        "description": "Add demo songs and reference images"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive documentation for new features"
-      },
-      {
-        type: 'improvement',
-        "description": "Update type definitions and test infrastructure"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance constants, stores, and utility functions"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve UI components and tracker interface"
-      },
-      {
-        type: 'improvement',
-        "description": "Update synth engines for compatibility and consistency"
-      },
-      {
-        type: 'feature',
-        "description": "Implement DB303/JC303 synth engine with full parameter control"
-      },
-      {
-        type: 'feature',
-        "description": "Add DB303 pattern import/export and auto-load default presets"
-      },
-      {
-        type: 'fix',
-        "description": "Add hardware UI toggle to generic editor for DrumMachine"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename Drum Machine to Roland TR-808/909 in UI"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename TR-808 UI to TR-808/909 to reflect support for both machines"
-      },
-      {
-        type: 'feature',
-        "description": "Add authentic TR-808 hardware UI based on io-808 design"
-      },
-      {
-        type: 'feature',
-        "description": "Make hardware UI default for synths with hardware UI available"
       }
     ]
   }

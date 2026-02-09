@@ -11,7 +11,7 @@ import { getSynthInfo } from '@constants/synthCategories';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as LucideIcons from 'lucide-react';
 import { X, Search, Check, Zap, Trash2, Download, Upload, Tag } from 'lucide-react';
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
 
 type BrowseMode = 'factory' | 'user';
 
@@ -65,7 +65,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       return userPreset ? userPreset.config : null;
     }
     if (browseMode === 'factory' && selectedPresetName) {
-      return (PRESET_CATEGORIES[activeCategory] as Omit<InstrumentConfig, 'id'>[]).find(p => p.name === selectedPresetName) || null;
+      return (PRESET_CATEGORIES[activeCategory] as InstrumentPreset['config'][]).find(p => p.name === selectedPresetName) || null;
     }
     return null;
   }, [browseMode, selectedPresetName, activeCategory, selectedUserPresetId, userPresets]);
@@ -89,7 +89,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         ...selectedPreset,
         id: 999,
         isLive: true,
-      } as any;
+      } as any; // Cast as any because selectedPreset is partial but ToneEngine needs full
 
       setPreviewInstrument(previewConfig);
       try {
@@ -168,8 +168,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
     if (!searchQuery.trim()) return categoryPresets;
     const query = searchQuery.toLowerCase();
     return categoryPresets.filter((preset) =>
-      preset.name.toLowerCase().includes(query) ||
-      preset.synthType.toLowerCase().includes(query)
+      preset.name?.toLowerCase().includes(query) ||
+      preset.synthType?.toLowerCase().includes(query)
     );
   }, [activeCategory, searchQuery]);
 
@@ -189,14 +189,14 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   }, [userPresets, userFilterCategory, searchQuery]);
 
   // Handle loading a preset
-  const handleLoadPreset = (preset: Omit<InstrumentConfig, 'id'>) => {
+  const handleLoadPreset = (preset: InstrumentPreset['config']) => {
     if (currentInstrumentId === null) return;
     updateInstrument(currentInstrumentId, preset);
     onClose();
   };
 
   // Handle loading a user preset
-  const handleLoadUserPreset = (presetId: string, config: Omit<InstrumentConfig, 'id'>) => {
+  const handleLoadUserPreset = (presetId: string, config: InstrumentPreset['config']) => {
     if (currentInstrumentId === null) return;
     addToRecent(presetId);
     updateInstrument(currentInstrumentId, config);
@@ -204,8 +204,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   };
 
   // Auto-preview on click (factory)
-  const handleFactoryPresetClick = (preset: Omit<InstrumentConfig, 'id'>) => {
-    setSelectedPresetName(preset.name);
+  const handleFactoryPresetClick = (preset: InstrumentPreset['config']) => {
+    setSelectedPresetName(preset.name || null);
     setSelectedUserPresetId(null);
 
     const engine = getToneEngine();
@@ -217,7 +217,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   };
 
   // Auto-preview on click (user)
-  const handleUserPresetClick = (presetId: string, config: Omit<InstrumentConfig, 'id'>) => {
+  const handleUserPresetClick = (presetId: string, config: InstrumentPreset['config']) => {
     setSelectedUserPresetId(presetId);
     setSelectedPresetName(null);
 
@@ -454,7 +454,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {filteredFactoryPresets.map((preset, index) => {
-                  const synthInfo = getSynthInfo(preset.synthType);
+                  const synthInfo = getSynthInfo(preset.synthType || 'Synth');
                   const IconComponent = getIcon(synthInfo.icon);
                   const isSelected = selectedPresetName === preset.name;
 

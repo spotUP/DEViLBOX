@@ -678,11 +678,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (currentPatternIndex > 0) {
             ghostPattern = patterns[currentPatternIndex - 1];
             rowIndex = ghostPattern.length + i; // i is negative
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else if (patterns.length > 1) {
             // Wraparound to last pattern
             ghostPattern = patterns[patterns.length - 1];
             rowIndex = ghostPattern.length + i;
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else {
             continue;
@@ -692,11 +700,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (currentPatternIndex < patterns.length - 1) {
             ghostPattern = patterns[currentPatternIndex + 1];
             rowIndex = i - patternLength;
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else if (patterns.length > 1) {
             // Wraparound to first pattern
             ghostPattern = patterns[0];
             rowIndex = i - patternLength;
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else {
             continue;
@@ -714,11 +730,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (currentPatternIndex > 0) {
             ghostPattern = patterns[currentPatternIndex - 1];
             rowIndex = ghostPattern.length + i; // i is negative, so this wraps
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else if (patterns.length > 1) {
             // Wraparound to last pattern
             ghostPattern = patterns[patterns.length - 1];
             rowIndex = ghostPattern.length + i; // i is negative, so this wraps
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else {
             continue; // Only one pattern
@@ -728,11 +752,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (currentPatternIndex < patterns.length - 1) {
             ghostPattern = patterns[currentPatternIndex + 1];
             rowIndex = i - patternLength;
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else if (patterns.length > 1) {
             // Wraparound to first pattern
             ghostPattern = patterns[0];
             rowIndex = i - patternLength;
+            // Validate rowIndex is within pattern bounds
+            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
+              continue;
+            }
             isGhostRow = true;
           } else {
             continue; // Only one pattern
@@ -791,6 +823,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         // Get cell from source pattern
         const cell = sourcePattern.channels[ch].rows[rowIndex];
+        
+        // Safety check: skip if row doesn't exist (can happen with ghost patterns of different lengths)
+        if (!cell) {
+          continue;
+        }
+        if (!cell) {
+          continue;
+        }
 
         // Note - flash white on current playing row (but not ghost rows)
         const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;

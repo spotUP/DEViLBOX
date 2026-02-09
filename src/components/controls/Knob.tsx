@@ -17,6 +17,7 @@ interface KnobProps {
   size?: 'sm' | 'md' | 'lg';
   color?: string;
   title?: string; // Tooltip text on hover
+  disabled?: boolean; // Disable interaction and dim appearance
 
   // From controls/Knob (TB303 automation)
   logarithmic?: boolean;
@@ -62,6 +63,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   bipolar = false,
   formatValue: customFormatValue,
   step,
+  disabled = false,
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -159,6 +161,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 
   // Handle mouse/touch down
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (disabled) return;
     e.preventDefault();
     setIsDragging(true);
     isDraggingRef.current = true;
@@ -166,10 +169,11 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     dragStartY.current = clientY;
     dragStartValue.current = getNormalized();
     document.body.style.cursor = 'ns-resize';
-  }, [getNormalized]);
+  }, [getNormalized, disabled]);
 
   // Handle double-click to reset
   const handleDoubleClick = useCallback(() => {
+    if (disabled) return;
     if (defaultValue !== undefined) {
       onChange(defaultValue);
     } else if (bipolar) {
@@ -179,11 +183,12 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       // Reset to min for unipolar
       onChange(min);
     }
-  }, [defaultValue, bipolar, min, max, onChange]);
+  }, [defaultValue, bipolar, min, max, onChange, disabled]);
 
   // Handle right-click to reset
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); // Prevent default context menu
+    if (disabled) return;
     if (defaultValue !== undefined) {
       onChange(defaultValue);
     } else if (bipolar) {
@@ -193,7 +198,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       // Reset to min for unipolar
       onChange(min);
     }
-  }, [defaultValue, bipolar, min, max, onChange]);
+  }, [defaultValue, bipolar, min, max, onChange, disabled]);
 
   // Handle keyboard navigation for accessibility
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -315,7 +320,15 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   };
 
   return (
-    <div className="knob-container" style={{ width: knobSize + 20 }} title={title}>
+    <div 
+      className="knob-container" 
+      style={{ 
+        width: knobSize + 20,
+        opacity: disabled ? 0.4 : 1,
+        pointerEvents: disabled ? 'none' : 'auto',
+      }} 
+      title={title}
+    >
       {/* Label */}
       {label && (
         <div

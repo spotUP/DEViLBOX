@@ -4,9 +4,9 @@
  * All values are 0-1 normalized matching the db303-pages-dev source truth.
  */
 
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
-export const TB303_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const TB303_PRESETS: InstrumentPreset['config'][] = [
   // === DEFAULT JC303/DB303 PRESET ===
   // Based on db303-default-preset.xml
   {

@@ -9,6 +9,7 @@ import type {
   InstrumentPreset,
   EffectConfig,
   FurnaceConfig,
+  DeepPartial,
 } from '@typedefs/instrument';
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import {
@@ -48,6 +49,7 @@ import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
+import { deepMerge } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
 /**
@@ -202,8 +204,8 @@ interface InstrumentStore {
   setCurrentInstrument: (id: number) => void;
   setPreviewInstrument: (instrument: InstrumentConfig | null) => void;
   getInstrument: (id: number) => InstrumentConfig | undefined;
-  updateInstrument: (id: number, updates: Partial<InstrumentConfig>) => void;
-  createInstrument: (config?: Partial<InstrumentConfig>) => number;
+  updateInstrument: (id: number, updates: DeepPartial<InstrumentConfig>) => void;
+  createInstrument: (config?: DeepPartial<InstrumentConfig>) => number;
   addInstrument: (config: InstrumentConfig) => void;
   deleteInstrument: (id: number) => void;
   cloneInstrument: (id: number) => number;
@@ -561,11 +563,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const newId = findNextId(existingIds);
 
       set((state) => {
-        const newInstrument: InstrumentConfig = {
-          ...createDefaultInstrument(newId),
-          ...config,
-          id: newId,
-        };
+        const defaultInst = createDefaultInstrument(newId);
+        // Use deepMerge to properly merge partial config into default
+        // Cast config to any because DeepPartial structure mismatch with strict types
+        const newInstrument: InstrumentConfig = config 
+          ? deepMerge(defaultInst, config as any) 
+          : defaultInst;
+        
+        // Ensure ID is correct (deepMerge might have overwritten it if config had id)
+        newInstrument.id = newId;
 
         state.instruments.push(newInstrument);
         state.currentInstrumentId = newId;

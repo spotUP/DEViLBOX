@@ -48,7 +48,7 @@ Created 9 new files implementing 4 major features for the Scribbleton tracker.
 - Uses @dnd-kit for accessibility-first drag and drop
 
 ### Export System
-- Three export formats: Song (.song.json), SFX (.sfx.json), Instrument (.inst.json)
+- Three export formats: Song (.dbx), SFX (.sfx.json), Instrument (.dbi)
 - Import detection and parsing
 - Export options: automation, compression, prettification
 - File download via FileSaver
@@ -174,7 +174,7 @@ scribbleton-react/
 ### Export/Import
 - [ ] Export full song as .song.json
 - [ ] Export single pattern as .sfx.json
-- [ ] Export instrument as .inst.json
+- [ ] Export instrument as .dbi
 - [ ] Import each format
 - [ ] Verify prettified JSON
 - [ ] Test with/without automation

@@ -1,8 +1,8 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { DEFAULT_SPACE_LASER } from '@typedefs/instrument';
 
 // Standard Zap
-export const SPACE_LASER_STANDARD: Omit<InstrumentConfig, 'id'> = {
+export const SPACE_LASER_STANDARD: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Standard Zap',
   synthType: 'SpaceLaser',
@@ -19,7 +19,7 @@ export const SPACE_LASER_STANDARD: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Cosmic Burst
-export const SPACE_LASER_COSMIC: Omit<InstrumentConfig, 'id'> = {
+export const SPACE_LASER_COSMIC: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Cosmic Burst',
   synthType: 'SpaceLaser',
@@ -38,7 +38,7 @@ export const SPACE_LASER_COSMIC: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Anime Pew
-export const SPACE_LASER_ANIME: Omit<InstrumentConfig, 'id'> = {
+export const SPACE_LASER_ANIME: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Anime Pew',
   synthType: 'SpaceLaser',
@@ -57,7 +57,7 @@ export const SPACE_LASER_ANIME: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Dub Blaster
-export const SPACE_LASER_DUB: Omit<InstrumentConfig, 'id'> = {
+export const SPACE_LASER_DUB: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Dub Blaster',
   synthType: 'SpaceLaser',

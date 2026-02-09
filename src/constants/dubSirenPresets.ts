@@ -1,8 +1,8 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 import { DEFAULT_DUB_SIREN } from '@typedefs/instrument';
 
 // Classic Dub Siren
-export const DUB_SIREN_CLASSIC: Omit<InstrumentConfig, 'id'> = {
+export const DUB_SIREN_CLASSIC: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Classic Siren',
   synthType: 'DubSiren',
@@ -20,7 +20,7 @@ export const DUB_SIREN_CLASSIC: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Fast Alert Siren
-export const DUB_SIREN_ALERT: Omit<InstrumentConfig, 'id'> = {
+export const DUB_SIREN_ALERT: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Code Red',
   synthType: 'DubSiren',
@@ -38,7 +38,7 @@ export const DUB_SIREN_ALERT: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Space Echo Siren
-export const DUB_SIREN_SPACE: Omit<InstrumentConfig, 'id'> = {
+export const DUB_SIREN_SPACE: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Space Echo',
   synthType: 'DubSiren',
@@ -56,7 +56,7 @@ export const DUB_SIREN_SPACE: Omit<InstrumentConfig, 'id'> = {
 };
 
 // Air Horn Style
-export const DUB_SIREN_HORN: Omit<InstrumentConfig, 'id'> = {
+export const DUB_SIREN_HORN: InstrumentPreset['config'] = {
   type: 'synth',
   name: 'Air Horn',
   synthType: 'DubSiren',

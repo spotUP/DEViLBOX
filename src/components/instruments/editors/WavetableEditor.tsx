@@ -11,7 +11,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Waves, Plus, RotateCcw, Trash2, Copy, Wand2 } from 'lucide-react';
+import { Waves, Plus, RotateCcw, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -98,11 +98,64 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   color = '#06b6d4',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
 
   const maxValue = wavetable.max ?? 15;
   const length = wavetable.data.length || 32;
+
+  // Handle file import (.wav or .h)
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.name.endsWith('.h')) {
+        // Parse Makk .h format (comma separated numbers)
+        const text = await file.text();
+        const values = text.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+        if (values.length > 0) {
+          const importMax = Math.max(...values);
+          // Scale to current editor height
+          const scaled = values.map(v => Math.round((v / importMax) * maxValue));
+          // Resize to current editor length
+          const resampled = resampleData(scaled, length);
+          onChange({ ...wavetable, data: resampled });
+        }
+      } else {
+        // Parse audio file
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const rawData = buffer.getChannelData(0);
+        
+        // Convert -1..1 float to 0..maxValue
+        const values = Array.from(rawData).map(v => Math.round((v + 1) / 2 * maxValue));
+        const resampled = resampleData(values, length);
+        onChange({ ...wavetable, data: resampled });
+      }
+    } catch (err) {
+      console.error('Failed to import wavetable:', err);
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const resampleData = (data: number[], targetLen: number): number[] => {
+    if (data.length === targetLen) return data;
+    const result: number[] = [];
+    const ratio = data.length / targetLen;
+    for (let i = 0; i < targetLen; i++) {
+      const srcPos = i * ratio;
+      const srcIndex = Math.floor(srcPos);
+      const frac = srcPos - srcIndex;
+      const a = data[srcIndex];
+      const b = data[(srcIndex + 1) % data.length];
+      result.push(Math.round(a + (b - a) * frac));
+    }
+    return result;
+  };
 
   // Draw the wavetable
   const drawWavetable = useCallback(() => {
@@ -269,6 +322,22 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Import */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-1 text-cyan-400 hover:bg-cyan-500/20 rounded"
+            title="Import .wav or .h wave"
+          >
+            <FileUp size={14} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".wav,.h"
+            onChange={handleImport}
+            className="hidden"
+          />
+
           {/* Generator dropdown */}
           <div className="relative">
             <button

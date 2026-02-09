@@ -154,7 +154,7 @@ export interface OBXdConfig {
   lfoOscAmount?: number;
   lfoFilterAmount?: number;
   lfoAmpAmount?: number;    // 0-1
-  lfoPWAmount?: number;
+  lfoPwAmount?: number;
 
   // Global
   masterVolume?: number;
@@ -221,7 +221,7 @@ export const OBXD_PRESETS: Record<string, Partial<OBXdConfig>> = {
     ampSustain: 0.7,
     ampRelease: 1.0,
     lfoRate: 0.15,
-    lfoPWAmount: 0.3,
+    lfoPwAmount: 0.3,
   },
   'Sync Lead': {
     osc1Waveform: OBXdWaveform.SAW,
@@ -445,7 +445,7 @@ export class OBXdSynth extends Tone.ToneAudioNode {
       ['lfoOscAmount', OBXdParam.LFO_OSC_AMOUNT],
       ['lfoFilterAmount', OBXdParam.LFO_FILTER_AMOUNT],
       ['lfoAmpAmount', OBXdParam.LFO_AMP_AMOUNT],
-      ['lfoPWAmount', OBXdParam.LFO_PW_AMOUNT],
+      ['lfoPwAmount', OBXdParam.LFO_PW_AMOUNT],
       // Global
       ['masterVolume', OBXdParam.MASTER_VOLUME],
       ['voices', OBXdParam.VOICES],

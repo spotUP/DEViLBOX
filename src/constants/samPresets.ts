@@ -1,6 +1,6 @@
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
-export const SAM_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const SAM_PRESETS: InstrumentPreset['config'][] = [
   {
     type: 'synth',
     name: 'SAM_Classic',

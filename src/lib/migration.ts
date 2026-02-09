@@ -33,7 +33,7 @@ import { stringNoteToXM, effectStringToXM } from './xmConversions';
 /**
  * Deep merge two objects, with source values taking precedence
  */
-function deepMerge<T extends object>(target: T, source: Partial<T>): T {
+export function deepMerge<T extends object>(target: T, source: Partial<T>): T {
   const result = { ...target };
   for (const key of Object.keys(source) as (keyof T)[]) {
     const sourceVal = source[key];

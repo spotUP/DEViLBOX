@@ -4,9 +4,9 @@
  * Uses _program parameter for built-in WASM preset selection.
  */
 
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
-export const MAME_CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
+export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
   // ASTROCADE - Bally Astrocade custom sound
   // ============================================
@@ -610,6 +610,72 @@ export const MAME_CHIP_PRESETS: Omit<InstrumentConfig, 'id'>[] = [
     name: 'K054539 Default',
     synthType: 'MAMEK054539',
     parameters: { volume: 0.8 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+
+  // ============================================
+  // CEM3394 - Curtis Electromusic Analog Voice
+  // ============================================
+  {
+    type: 'synth',
+    name: 'CEM3394 Bass',
+    synthType: 'CEM3394',
+    parameters: { _program: 0, volume: 0.8 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth',
+    name: 'CEM3394 Lead',
+    synthType: 'CEM3394',
+    parameters: { _program: 1, volume: 0.8 },
+    effects: [],
+    volume: -10,
+    pan: 0,
+  },
+  {
+    type: 'synth',
+    name: 'CEM3394 Pad',
+    synthType: 'CEM3394',
+    parameters: { _program: 2, volume: 0.8 },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+
+  // ============================================
+  // SCSP - Sega Saturn 32-voice sound processor
+  // ============================================
+  {
+    type: 'synth',
+    name: 'SCSP Synth Bass',
+    synthType: 'SCSP',
+    parameters: { _program: 0, volume: 0.8 },
+    effects: [],
+    volume: -8,
+    pan: 0,
+  },
+  {
+    type: 'synth',
+    name: 'SCSP Poly Pad',
+    synthType: 'SCSP',
+    parameters: { _program: 1, volume: 0.8 },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  },
+
+  // ============================================
+  // AICA - Sega Dreamcast sound processor
+  // ============================================
+  {
+    type: 'synth',
+    name: 'AICA FM Piano',
+    synthType: 'MAMEAICA',
+    parameters: { _program: 0, volume: 0.8 },
     effects: [],
     volume: -10,
     pan: 0,

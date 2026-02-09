@@ -24,6 +24,7 @@ export class SAMSynth extends Tone.ToneAudioNode {
     this.output = new Tone.Gain();
     this._config = { ...config };
     this._player = new Tone.Player().connect(this.output);
+    this._player.loop = this._config.singmode; // Loop in sing mode for continuous playback
 
     // Create ready promise for async initialization
     this._readyPromise = new Promise<void>((resolve) => {
@@ -109,6 +110,11 @@ export class SAMSynth extends Tone.ToneAudioNode {
 
     this._config = { ...this._config, ...config };
 
+    // Update loop mode when singmode changes
+    if (config.singmode !== undefined) {
+      this._player.loop = config.singmode;
+    }
+
     if (hasParamsChanged || hasTextChanged) {
       // Throttled re-render to prevent UI/Audio lag during knob moves
       if (this._renderTimer) clearTimeout(this._renderTimer);
@@ -132,23 +138,30 @@ export class SAMSynth extends Tone.ToneAudioNode {
       return;
     }
 
-    // Note tracking: If we are in "Sing Mode", we can adjust playbackRate based on the note
+    // Note tracking: If we are in "Sing Mode", adjust playbackRate and keep playing continuously
     // MIDI 60 (C4) is our "base" pitch.
-    if (note && note !== 'C4') {
+    if (this._config.singmode) {
       const midi = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
       const ratio = Math.pow(2, (midi - 60) / 12);
       this._player.playbackRate = ratio;
+
+      // In sing mode, only start if not already playing (for continuous pitch tracking)
+      if (this._player.state !== 'started') {
+        this._player.start(time, 0);
+      }
+      this._player.volume.value = Tone.gainToDb(velocity);
     } else {
+      // In normal mode, restart on each note trigger
       this._player.playbackRate = 1.0;
+      
+      // Stop any current playback before starting new
+      if (this._player.state === 'started') {
+        this._player.stop();
+      }
+      
+      this._player.start(time, 0);
+      this._player.volume.value = Tone.gainToDb(velocity);
     }
-
-    // Stop any current playback before starting new
-    if (this._player.state === 'started') {
-      this._player.stop();
-    }
-
-    this._player.start(time, 0);
-    this._player.volume.value = Tone.gainToDb(velocity);
   }
 
   public triggerAttackRelease(note: string | number, _duration: Tone.Unit.Time, time?: number, velocity: number = 1) {

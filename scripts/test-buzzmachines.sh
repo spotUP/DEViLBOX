@@ -23,7 +23,7 @@ echo "2️⃣  Checking source files..."
 REQUIRED_FILES=(
     "src/engine/buzzmachines/BuzzmachineEngine.ts"
     "src/engine/buzzmachines/BuzzmachineSynth.ts"
-    "src/components/instruments/BuzzmachineEditor.tsx"
+    "src/components/instruments/editors/BuzzmachineEditor.tsx"
     "public/Buzzmachine.worklet.js"
 )
 

@@ -14,8 +14,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
-  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM
 } from '@typedefs/instrument';
+import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
@@ -622,7 +623,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // FURNACE CHIP EDITOR
   // ============================================================================
   if (editorMode === 'furnace') {
-    const furnaceConfig = instrument.furnace || DEFAULT_FURNACE;
+    const furnaceConfig = deepMerge(DEFAULT_FURNACE, instrument.furnace || {});
 
     // Determine channel names for oscilloscope based on synth type
     const isNativeDispatch = instrument.synthType === 'FurnaceGB';
@@ -722,12 +723,14 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // ============================================================================
   // DUB SIREN EDITOR
   // ============================================================================
-  if (editorMode === 'dubsiren' && instrument.dubSiren) {
+  if (editorMode === 'dubsiren') {
+    const dubSirenConfig = deepMerge(DEFAULT_DUB_SIREN, instrument.dubSiren || {});
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderDubSirenHeader()}
         <DubSirenControls
-          config={instrument.dubSiren}
+          config={dubSirenConfig}
           instrumentId={instrument.id}
           onChange={handleDubSirenChange}
         />
@@ -738,12 +741,14 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // ============================================================================
   // SPACE LASER EDITOR
   // ============================================================================
-  if (editorMode === 'spacelaser' && instrument.spaceLaser) {
+  if (editorMode === 'spacelaser') {
+    const spaceLaserConfig = deepMerge(DEFAULT_SPACE_LASER, instrument.spaceLaser || {});
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderSpaceLaserHeader()}
         <SpaceLaserControls
-          config={instrument.spaceLaser}
+          config={spaceLaserConfig}
           onChange={handleSpaceLaserChange}
         />
       </div>
@@ -822,7 +827,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             }
           />
           <V2SpeechControls
-            config={instrument.v2Speech}
+            config={deepMerge(DEFAULT_V2_SPEECH, instrument.v2Speech || {})}
             onChange={(updates) => onChange({ v2Speech: { ...instrument.v2Speech!, ...updates } })}
           />
         </div>
@@ -833,7 +838,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderV2Header()}
         <V2Controls
-          config={instrument.v2 || DEFAULT_V2}
+          config={deepMerge(DEFAULT_V2, instrument.v2 || {})}
           onChange={handleV2Change}
         />
       </div>
@@ -843,11 +848,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // ============================================================================
   // SAM SPEECH EDITOR
   // ============================================================================
-  if (editorMode === 'sam' && instrument.sam) {
+  if (editorMode === 'sam') {
     const accentColor = isCyanTheme ? '#00ffff' : '#ffcc33';
     const headerBg = isCyanTheme
       ? 'bg-[#041010] border-b-2 border-cyan-500'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc33]';
+
+    const samConfig = deepMerge(DEFAULT_SAM, instrument.sam || {});
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -897,18 +904,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <SAMControls
-          config={instrument.sam}
+          config={samConfig}
           onChange={(updates) => onChange({ sam: { ...instrument.sam!, ...updates } })}
         />
       </div>
     );
   }
-  if (editorMode === 'synare' && instrument.synare) {
+  if (editorMode === 'synare') {
+    const synareConfig = deepMerge(DEFAULT_SYNARE, instrument.synare || {});
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderSynareHeader()}
         <SynareControls
-          config={instrument.synare}
+          config={synareConfig}
           instrumentId={instrument.id}
           onChange={handleSynareChange}
         />
@@ -1049,10 +1058,8 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // MAME SYNTH EDITOR
   // ============================================================================
   if (editorMode === 'mame') {
-    const mameConfig = instrument.mame || (
-      instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC :
-      DEFAULT_MAME_VFX
-    );
+    const defaultMame = instrument.synthType === 'MAMEDOC' ? DEFAULT_MAME_DOC : DEFAULT_MAME_VFX;
+    const mameConfig = deepMerge(defaultMame, instrument.mame || {});
 
     const mameHandle = getToneEngine().getMAMESynthHandle(instrument.id);
 
@@ -1083,7 +1090,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // DEXED (DX7) EDITOR
   // ============================================================================
   if (editorMode === 'dexed') {
-    const dexedConfig = instrument.dexed || DEFAULT_DEXED;
+    const dexedConfig = deepMerge(DEFAULT_DEXED, instrument.dexed || {});
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
@@ -1116,7 +1123,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // OBXd (OBERHEIM) EDITOR
   // ============================================================================
   if (editorMode === 'obxd') {
-    const obxdConfig = instrument.obxd || DEFAULT_OBXD;
+    const obxdConfig = deepMerge(DEFAULT_OBXD, instrument.obxd || {});
 
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
