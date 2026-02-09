@@ -228,7 +228,7 @@
 
   <!-- LFO SECTION -->
   <div class="section lfo">
-    <h2>🌊 LFO</h2>
+    <h2>🌊 LFO <span style="color:#888;font-size:12px">(Set Rate > 0 to hear depth params)</span></h2>
     <div class="controls-grid">
       <div class="control-group">
         <div class="name">LFO Waveform</div>
@@ -243,7 +243,7 @@
       </div>
       <div class="control-group">
         <div class="name">LFO Rate</div>
-        <label>Speed (0-1)</label>
+        <label>Speed (0-1) - auto-enabled in test</label>
         <input type="range" id="lfoRate" min="0" max="1" step="0.01" value="0.3" disabled>
         <div class="value-display" id="lfoRateVal">0.30</div>
       </div>
@@ -323,7 +323,7 @@
       </div>
     </div>
     
-    <h3>Korg-Style Filter (Filter Select = 5)</h3>
+    <h3>Korg-Style Filter <span style="color:#ff0066;font-size:11px">(Set Filter Select = 5 to hear these)</span></h3>
     <div class="controls-grid">
       <div class="control-group">
         <div class="name">Diode Character</div>
@@ -345,35 +345,35 @@
       </div>
     </div>
 
-    <h3>Envelope Mods</h3>
+    <h3>Envelope Mods <span style="color:#888;font-size:12px">(Use Slide/Accent buttons below to hear these)</span></h3>
     <div class="controls-grid">
       <div class="control-group">
         <div class="name">Slide Time</div>
-        <label>Portamento (0-1)</label>
+        <label>Portamento - needs SLID notes</label>
         <input type="range" id="slideTime" min="0" max="1" step="0.01" value="0.17" disabled>
         <div class="value-display" id="slideTimeVal">0.17</div>
       </div>
       <div class="control-group">
         <div class="name">Normal Decay</div>
-        <label>Non-accent decay (0-1)</label>
+        <label>Non-accented notes only</label>
         <input type="range" id="normalDecay" min="0" max="1" step="0.01" value="0.3" disabled>
         <div class="value-display" id="normalDecayVal">0.30</div>
       </div>
       <div class="control-group">
         <div class="name">Accent Decay</div>
-        <label>Accented note decay (0-1)</label>
+        <label>ACCENTED notes only</label>
         <input type="range" id="accentDecay" min="0" max="1" step="0.01" value="0.3" disabled>
         <div class="value-display" id="accentDecayVal">0.30</div>
       </div>
       <div class="control-group">
         <div class="name">Soft Attack</div>
-        <label>Attack softness (0-1)</label>
+        <label>Non-accented notes only</label>
         <input type="range" id="softAttack" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="softAttackVal">0</div>
       </div>
       <div class="control-group">
         <div class="name">Accent Soft Attack</div>
-        <label>Accent attack (0-1)</label>
+        <label>ACCENTED notes only</label>
         <input type="range" id="accentSoftAttack" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="accentSoftAttackVal">0</div>
       </div>
@@ -382,7 +382,7 @@
 
   <!-- EFFECTS SECTION -->
   <div class="section fx">
-    <h2>✨ EFFECTS</h2>
+    <h2>✨ EFFECTS <span style="color:#888;font-size:12px">(Set Mix > 0 to hear each effect)</span></h2>
     <h3>Chorus</h3>
     <div class="controls-grid">
       <div class="control-group">
@@ -397,7 +397,7 @@
       </div>
       <div class="control-group">
         <div class="name">Chorus Mix</div>
-        <label>Wet/Dry (0-1)</label>
+        <label>Wet/Dry (0-1) - auto-enabled in test</label>
         <input type="range" id="chorusMix" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="chorusMixVal">0%</div>
       </div>
@@ -425,7 +425,7 @@
       </div>
       <div class="control-group">
         <div class="name">Phaser Mix</div>
-        <label>Wet/Dry (0-1)</label>
+        <label>Wet/Dry (0-1) - auto-enabled in test</label>
         <input type="range" id="phaserMix" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="phaserMixVal">0%</div>
       </div>
@@ -453,7 +453,7 @@
       </div>
       <div class="control-group">
         <div class="name">Delay Mix</div>
-        <label>Wet/Dry (0-1)</label>
+        <label>Wet/Dry (0-1) - auto-enabled in test</label>
         <input type="range" id="delayMix" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="delayMixVal">0%</div>
       </div>
@@ -711,14 +711,75 @@
       
       log('🔄 Starting auto-test of ALL parameters...', 'warning');
       
-      // Reset to baseline
+      // Reset to baseline with good audible settings
       db303Synth.setCutoff(0.5);
       db303Synth.setResonance(0.7);
       db303Synth.setEnvMod(0.3);
+      db303Synth.setDecay(0.3);
+      
+      // Parameter groups - we'll set up "parent" params before testing children
+      const paramGroups = {
+        // LFO params need LFO rate to be audible
+        lfo: ['lfoRate', 'lfoContour', 'lfoPitchDepth', 'lfoPwmDepth', 'lfoFilterDepth'],
+        // Korg filter params need filterSelect=5
+        korg: ['diodeCharacter', 'duffingAmount', 'filterFmDepth'],
+        // Chorus needs mix > 0
+        chorus: ['chorusMix'],
+        // Phaser needs mix > 0
+        phaser: ['phaserRate', 'phaserWidth', 'phaserFeedback', 'phaserMix'],
+        // Delay needs mix > 0
+        delay: ['delayTime', 'delayFeedback', 'delayTone', 'delayMix', 'delaySpread'],
+        // Slide params need legato notes to hear
+        slide: ['slideTime'],
+        // Accent params need accented notes (includes accent AMOUNT param)
+        accent: ['accent', 'accentDecay', 'accentSoftAttack'],
+        // Normal (non-accent) envelope params
+        normalEnv: ['normalDecay', 'softAttack'],
+        // Trigger-time params: effect only heard on note attack, need multiple notes
+        triggerTime: ['softAttack', 'accentSoftAttack', 'normalDecay', 'accentDecay', 'decay', 'accent', 'envMod'],
+      };
       
       const paramList = Object.entries(params);
-      const sweepSteps = 10;
-      const stepDelay = 50; // ms per step
+      const sweepSteps = 60;  // More steps for smooth sweeps
+      const stepDelay = 16;   // ~60fps for butter-smooth animation
+      
+      // Parameters that need special handling
+      const getSweepConfig = (id) => {
+        // Delay time: use discrete steps with long pauses (changing delay time causes artifacts)
+        if (id === 'delayTime') {
+          return { steps: 4, delay: 600, discrete: true }; // 4 discrete values, long settle time
+        }
+        // Cutoff/resonance: extra smooth continuous sweep
+        if (id === 'cutoff' || id === 'resonance') {
+          return { steps: 120, delay: 8 };
+        }
+        // Trigger-time params: fewer steps but retrigger notes
+        if (paramGroups.triggerTime.includes(id)) {
+          return { steps: 5, delay: 50, retrigger: true }; // 5 notes at different values
+        }
+        return { steps: sweepSteps, delay: stepDelay };
+      };
+      
+      // Helper to play notes with specific articulation
+      const playTestNote = async (id) => {
+        if (paramGroups.slide.includes(id)) {
+          // Play legato/slid notes to hear slide time
+          log('  (Playing SLID notes for this test)', 'info');
+          db303Synth.triggerAttack('C3', undefined, 0.8, false, true); // slide=true
+          await new Promise(r => setTimeout(r, 200));
+          db303Synth.triggerAttack('E3', undefined, 0.8, false, true); // slide to next
+          return 'slide';
+        }
+        if (paramGroups.accent.includes(id)) {
+          // Play accented note
+          log('  (Playing ACCENTED note for this test)', 'info');
+          db303Synth.triggerAttack('C3', undefined, 1.0, true, false); // accent=true
+          return 'accent';
+        }
+        // Default: regular note
+        db303Synth.triggerAttack('C3');
+        return 'normal';
+      };
       
       for (let p = 0; p < paramList.length; p++) {
         if (autoTestAbort) break;
@@ -728,46 +789,145 @@
         const display = document.getElementById(id + 'Val');
         if (!slider) continue;
         
+        // Set up parent params to make this test audible
+        // LFO tests: need rate AND depth to hear anything
+        if (paramGroups.lfo.includes(id) || id === 'lfoRate') {
+          log('  (Enabling LFO modulation for this test)', 'info');
+          if (id !== 'lfoRate') db303Synth.setLfoRate(0.4);
+          // Set all depths so any LFO param is audible
+          db303Synth.setLfoFilterDepth(0.5);
+          db303Synth.setLfoPitchDepth(0.2);
+          db303Synth.setLfoPwmDepth(0.3);
+        }
+        if (paramGroups.korg.includes(id)) {
+          log('  (Setting up Korg filter mode for this test)', 'info');
+          db303Synth.setFilterSelect(5);
+          document.getElementById('filterSelect').value = 5;
+          // Korg params need filter in active range with high resonance
+          db303Synth.setCutoff(0.4);      // Mid-range cutoff
+          db303Synth.setResonance(0.85);  // High resonance to hear character
+          db303Synth.setEnvMod(0.5);      // Some envelope sweep
+          // For Filter FM, we need depth set
+          if (id === 'filterFmDepth') {
+            db303Synth.setFilterFmDepth(0.5);
+          }
+        }
+        // Chorus tests: need mix > 0
+        if (paramGroups.chorus.includes(id) || id === 'chorusMix' || id === 'chorusMode') {
+          log('  (Enabling Chorus for this test)', 'info');
+          if (id !== 'chorusMix') db303Synth.setChorusMix(0.6);
+          if (id !== 'chorusMode') db303Synth.setChorusMode(1);
+        }
+        // Phaser tests: need mix > 0 and rate > 0
+        if (paramGroups.phaser.includes(id) || id === 'phaserMix' || id === 'phaserRate') {
+          log('  (Enabling Phaser for this test)', 'info');
+          if (id !== 'phaserMix') db303Synth.setPhaserMix(0.6);
+          if (id !== 'phaserRate') db303Synth.setPhaserRate(0.4);
+          db303Synth.setPhaserFeedback(0.5);
+        }
+        // Delay tests: need mix > 0, time > 0, feedback > 0
+        if (paramGroups.delay.includes(id) || id === 'delayMix') {
+          log('  (Enabling Delay for this test)', 'info');
+          if (id !== 'delayMix') db303Synth.setDelayMix(0.5);
+          if (id !== 'delayTime') db303Synth.setDelayTime(0.35);
+          if (id !== 'delayFeedback') db303Synth.setDelayFeedback(0.4);
+        }
+        
         // Get slider range
         const min = parseFloat(slider.min);
         const max = parseFloat(slider.max);
         const originalValue = parseFloat(slider.value);
         
-        log(`Testing: ${id} (${p+1}/${paramList.length})`, 'warning');
+        // Get sweep config for this parameter (smoother for sensitive params)
+        const sweepConfig = getSweepConfig(id);
+        const { steps, delay } = sweepConfig;
+        const retrigger = sweepConfig.retrigger || false;
+        
+        if (retrigger) {
+          log(`Testing: ${id} (${p+1}/${paramList.length}) - ${steps} notes (retrigger mode)`, 'warning');
+        } else {
+          log(`Testing: ${id} (${p+1}/${paramList.length}) - ${steps} steps`, 'warning');
+        }
         
         // Highlight current control
         slider.parentElement.style.boxShadow = '0 0 10px #ff00ff';
         
-        // Trigger a new note for this parameter test
-        db303Synth.triggerAttack('C3');
-        isPlaying = true;
-        
-        // Sweep from min to max
-        for (let i = 0; i <= sweepSteps; i++) {
-          if (autoTestAbort) break;
-          const v = min + (max - min) * (i / sweepSteps);
-          slider.value = v;
-          if (display) display.textContent = config.format(v);
-          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-            db303Synth[config.setter](v);
+        if (retrigger) {
+          // RETRIGGER MODE: Play separate notes at different param values
+          // This is for envelope/attack params that only affect note onset
+          const notes = ['C3', 'D3', 'E3', 'F3', 'G3', 'A3'];
+          for (let i = 0; i <= steps; i++) {
+            if (autoTestAbort) break;
+            const v = min + (max - min) * (i / steps);
+            slider.value = v;
+            if (display) display.textContent = config.format(v);
+            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+              db303Synth[config.setter](v);
+            }
+            // Wait a tiny bit for param to take effect
+            await new Promise(r => setTimeout(r, 20));
+            // Play note with appropriate articulation
+            await playTestNote(id);
+            isPlaying = true;
+            // Hold note to hear envelope
+            await new Promise(r => setTimeout(r, 400));
+            db303Synth.triggerRelease();
+            await new Promise(r => setTimeout(r, 150));
           }
-          await new Promise(r => setTimeout(r, stepDelay));
-        }
-        
-        // Sweep back to original
-        for (let i = sweepSteps; i >= 0; i--) {
-          if (autoTestAbort) break;
-          const v = min + (max - min) * (i / sweepSteps);
-          slider.value = v;
-          if (display) display.textContent = config.format(v);
-          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-            db303Synth[config.setter](v);
+        } else if (sweepConfig.discrete) {
+          // DISCRETE MODE: Set param, wait for it to settle, listen to effect
+          // Used for params like delay time that glitch when changed continuously
+          log('  (Discrete steps - delay time glitches when swept)', 'info');
+          await playTestNote(id);
+          isPlaying = true;
+          
+          for (let i = 0; i <= steps; i++) {
+            if (autoTestAbort) break;
+            const v = min + (max - min) * (i / steps);
+            slider.value = v;
+            if (display) display.textContent = config.format(v);
+            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+              db303Synth[config.setter](v);
+            }
+            log(`    Step ${i+1}/${steps+1}: ${config.format(v)}`, 'info');
+            // Long wait for param to settle and hear the effect
+            await new Promise(r => setTimeout(r, delay));
           }
-          await new Promise(r => setTimeout(r, stepDelay));
+          
+          db303Synth.triggerRelease();
+        } else {
+          // SWEEP MODE: Continuous parameter change during sustained note
+          // Trigger appropriate note for this parameter (slide/accent/normal)
+          await playTestNote(id);
+          isPlaying = true;
+          
+          // Sweep from min to max
+          for (let i = 0; i <= steps; i++) {
+            if (autoTestAbort) break;
+            const v = min + (max - min) * (i / steps);
+            slider.value = v;
+            if (display) display.textContent = config.format(v);
+            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+              db303Synth[config.setter](v);
+            }
+            await new Promise(r => setTimeout(r, delay));
+          }
+          
+          // Sweep back to original
+          for (let i = steps; i >= 0; i--) {
+            if (autoTestAbort) break;
+            const v = min + (max - min) * (i / steps);
+            slider.value = v;
+            if (display) display.textContent = config.format(v);
+            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
+              db303Synth[config.setter](v);
+            }
+            await new Promise(r => setTimeout(r, delay));
+          }
+          
+          // Release note after this parameter
+          db303Synth.triggerRelease();
         }
-        
-        // Release note after this parameter
-        db303Synth.triggerRelease();
         isPlaying = false;
         
         // Restore original value
@@ -775,6 +935,26 @@
         if (display) display.textContent = config.format(originalValue);
         if (db303Synth && typeof db303Synth[config.setter] === 'function') {
           db303Synth[config.setter](originalValue);
+        }
+        
+        // Reset parent params after testing to avoid affecting next tests
+        if (paramGroups.lfo.includes(id)) {
+          db303Synth.setLfoRate(0);
+          db303Synth.setLfoPitchDepth(0);
+          db303Synth.setLfoFilterDepth(0);
+        }
+        if (paramGroups.korg.includes(id)) {
+          db303Synth.setFilterSelect(0);
+          document.getElementById('filterSelect').value = 0;
+        }
+        if (paramGroups.chorus.includes(id)) {
+          db303Synth.setChorusMix(0);
+        }
+        if (paramGroups.phaser.includes(id)) {
+          db303Synth.setPhaserMix(0);
+        }
+        if (paramGroups.delay.includes(id)) {
+          db303Synth.setDelayMix(0);
         }
         
         // Remove highlight
