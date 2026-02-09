@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Waves, Settings, Music } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -31,6 +31,10 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DexedTab>('global');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
@@ -44,7 +48,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
     : 'bg-[#1a1a2e] border-blue-900/50';
 
   const updateOperator = (index: number, updates: Partial<DexedOperatorConfig>) => {
-    const operators = [...(config.operators || [])];
+    const operators = [...(configRef.current.operators || [])];
     while (operators.length <= index) {
       operators.push({
         level: 99,

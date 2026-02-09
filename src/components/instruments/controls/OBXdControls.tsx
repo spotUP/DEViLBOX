@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Filter, Zap, Activity, Volume2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -20,6 +20,10 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<OBXdTab>('osc');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
