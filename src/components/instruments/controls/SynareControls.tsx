@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { SynareConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Drum, Activity, Waves, MoveDown, Speaker, Wind } from 'lucide-react';
@@ -19,6 +19,10 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<SynareTab>('main');
+  
+  // Use ref to prevent stale closures in callbacks
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -41,27 +45,27 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
 
   // Helpers
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {
-    onChange({ oscillator: { ...config.oscillator, ...updates } });
+    onChange({ oscillator: { ...configRef.current.oscillator, ...updates } });
   };
 
   const updateOsc2 = (updates: Partial<typeof config.oscillator2>) => {
-    onChange({ oscillator2: { ...config.oscillator2, ...updates } });
+    onChange({ oscillator2: { ...configRef.current.oscillator2, ...updates } });
   };
 
   const updateNoise = (updates: Partial<typeof config.noise>) => {
-    onChange({ noise: { ...config.noise, ...updates } });
+    onChange({ noise: { ...configRef.current.noise, ...updates } });
   };
 
   const updateFilter = (updates: Partial<typeof config.filter>) => {
-    onChange({ filter: { ...config.filter, ...updates } });
+    onChange({ filter: { ...configRef.current.filter, ...updates } });
   };
 
   const updateEnv = (updates: Partial<typeof config.envelope>) => {
-    onChange({ envelope: { ...config.envelope, ...updates } });
+    onChange({ envelope: { ...configRef.current.envelope, ...updates } });
   };
 
   const updateSweep = (updates: Partial<typeof config.sweep>) => {
-    onChange({ sweep: { ...config.sweep, ...updates } });
+    onChange({ sweep: { ...configRef.current.sweep, ...updates } });
   };
 
   const handleThrow = (active: boolean) => {
