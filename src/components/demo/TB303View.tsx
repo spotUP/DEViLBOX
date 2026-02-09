@@ -4,7 +4,7 @@
  * Connected to tracker pattern data
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SequencerEngine } from '@engine/SequencerEngine';
 import { TB303Sequencer, type TB303Step } from '@components/sequencer/TB303Sequencer';
 import { Knob } from '@components/controls/Knob';
@@ -13,6 +13,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { Play, Square, Shuffle, Trash2, Wand2 } from 'lucide-react';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
+import type { InstrumentConfig } from '@typedefs/instrument';
 import './TB303View.css';
 
 // Note name to MIDI note number mapping (C3 = middle C = 60)
@@ -99,13 +100,31 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Acid pattern generator state
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
-  // Get TB-303 parameters from instrument config
+  // Refs for latest values without triggering dependency updates
+  const instrumentRef = useRef(instrument);
+  const tb303ConfigRef = useRef(instrument?.tb303);
+  instrumentRef.current = instrument;
+  tb303ConfigRef.current = instrument?.tb303;
+
+  // Debounced store update to prevent re-render spam during knob dragging
+  const storeUpdateTimerRef = useRef<number | null>(null);
+  const debouncedStoreUpdate = useCallback((updates: Partial<InstrumentConfig>) => {
+    if (storeUpdateTimerRef.current) {
+      clearTimeout(storeUpdateTimerRef.current);
+    }
+    storeUpdateTimerRef.current = window.setTimeout(() => {
+      updateInstrument(instrumentId, updates);
+      storeUpdateTimerRef.current = null;
+    }, 300); // Longer debounce - only update store 300ms after user stops dragging
+  }, [instrumentId, updateInstrument]);
+
+  // Get TB-303 parameters from instrument config (stored as Hz/ms/%)
   const tb303Config = instrument?.tb303;
   const waveform = tb303Config?.oscillator.type === 'square' ? 1.0 : 0.0;
-  const cutoff = tb303Config?.filter.cutoff ?? 800;
-  const resonance = tb303Config?.filter.resonance ?? 70;
-  const envMod = tb303Config?.filterEnvelope.envMod ?? 60;
-  const decay = tb303Config?.filterEnvelope.decay ?? 400;
+  const cutoff = tb303Config?.filter.cutoff ?? 1000;
+  const resonance = tb303Config?.filter.resonance ?? 50;
+  const envMod = tb303Config?.filterEnvelope.envMod ?? 50;
+  const decay = tb303Config?.filterEnvelope.decay ?? 300;
   const accent = tb303Config?.accent.amount ?? 50;
 
   // Convert tracker pattern data to TB303Step format
@@ -240,69 +259,80 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   }, [instrumentId, instrument, tb303Config, updateInstrument]);
 
   const handleCutoffChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        filter: {
-          ...tb303Config.filter,
-          cutoff: value,
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    // Store Hz value directly (no conversion needed)
+    const updatedConfig = {
+      ...config,
+      filter: {
+        ...config.filter,
+        cutoff: value,
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   const handleResonanceChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        filter: {
-          ...tb303Config.filter,
-          resonance: value,
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    const updatedConfig = {
+      ...config,
+      filter: {
+        ...config.filter,
+        resonance: value,
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   const handleEnvModChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        filterEnvelope: {
-          ...tb303Config.filterEnvelope,
-          envMod: value,
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    const updatedConfig = {
+      ...config,
+      filterEnvelope: {
+        ...config.filterEnvelope,
+        envMod: value,
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   const handleDecayChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        filterEnvelope: {
-          ...tb303Config.filterEnvelope,
-          decay: value,
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    const updatedConfig = {
+      ...config,
+      filterEnvelope: {
+        ...config.filterEnvelope,
+        decay: value,
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   const handleAccentChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        accent: {
-          ...tb303Config.accent,
-          amount: value,
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    const updatedConfig = {
+      ...config,
+      accent: {
+        ...config.accent,
+        amount: value,
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   // Transport controls
   const handlePlayPause = () => {
@@ -477,7 +507,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   bipolar={false}
                   size="md"
                 />
-                <div className="param-value">{cutoff}Hz</div>
+                <div className="param-value">{Math.round(cutoff)}Hz</div>
               </div>
 
               <div className="param-item">
@@ -486,7 +516,6 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   value={resonance}
                   min={0}
                   max={100}
-                  step={1}
                   onChange={handleResonanceChange}
                   bipolar={false}
                   size="md"
@@ -500,7 +529,6 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   value={envMod}
                   min={0}
                   max={100}
-                  step={1}
                   onChange={handleEnvModChange}
                   bipolar={false}
                   size="md"
@@ -519,7 +547,7 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   bipolar={false}
                   size="md"
                 />
-                <div className="param-value">{decay}ms</div>
+                <div className="param-value">{Math.round(decay)}ms</div>
               </div>
 
               <div className="param-item">
@@ -528,7 +556,6 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   value={accent}
                   min={0}
                   max={100}
-                  step={1}
                   onChange={handleAccentChange}
                   bipolar={false}
                   size="md"
