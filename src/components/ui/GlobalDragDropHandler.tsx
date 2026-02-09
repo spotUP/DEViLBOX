@@ -44,7 +44,7 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragCount, setDragCount] = useState(0);
+  const [_dragCount, setDragCount] = useState(0);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();

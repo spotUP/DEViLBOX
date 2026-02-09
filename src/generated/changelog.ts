@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-09T11:55:23.362Z
+ * Generated: 2026-02-09T12:23:11.679Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '347';
-export const BUILD_HASH = 'c2f5757';
+export const BUILD_NUMBER = '349';
+export const BUILD_HASH = '530f314';
 export const BUILD_DATE = '2026-02-09';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-09',
     changes: [
+      {
+        type: 'improvement',
+        "description": "303 UI improvements: full-width responsive layout with collapsible sections"
+      },
+      {
+        type: 'fix',
+        "description": "Rebrand file formats: .dbx for songs, .dbi for instruments + fix speech synth singing modes"
+      },
       {
         type: 'improvement',
         "description": "Optimize engine and shared control components"
@@ -236,14 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add DB303 WASM source files (RoSiC library)"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add ROM and test artifact exclusions to .gitignore"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove MSM5232 and TIA synth implementations"
       }
     ]
   }
