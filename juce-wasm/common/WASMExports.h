@@ -46,8 +46,34 @@
             .function("process", &ClassName::processJS); \
     }
 
+// Macro for synths using the VSTBridge framework (param metadata + extension commands)
+#define EXPORT_WASM_SYNTH_EXTENDED(ClassName) \
+    EMSCRIPTEN_BINDINGS(ClassName##_bindings) { \
+        emscripten::class_<ClassName>(#ClassName) \
+            .constructor<>() \
+            .function("initialize", &ClassName::initialize) \
+            .function("isInitialized", &ClassName::isInitialized) \
+            .function("getSampleRate", &ClassName::getSampleRate) \
+            .function("noteOn", &ClassName::noteOn) \
+            .function("noteOff", &ClassName::noteOff) \
+            .function("allNotesOff", &ClassName::allNotesOff) \
+            .function("setParameter", &ClassName::setParameter) \
+            .function("getParameter", &ClassName::getParameter) \
+            .function("controlChange", &ClassName::controlChange) \
+            .function("pitchBend", &ClassName::pitchBend) \
+            .function("programChange", &ClassName::programChange) \
+            .function("getParameterCount", &ClassName::getParameterCount) \
+            .function("getParameterName", &ClassName::getParameterNameJS) \
+            .function("getParameterMin", &ClassName::getParameterMin) \
+            .function("getParameterMax", &ClassName::getParameterMax) \
+            .function("getParameterDefault", &ClassName::getParameterDefault) \
+            .function("handleCommand", &ClassName::handleCommandJS) \
+            .function("process", &ClassName::processJS); \
+    }
+
 #else
 // No-op when not building with Emscripten
 #define EXPORT_WASM_SYNTH(ClassName)
 #define EXPORT_WASM_SYNTH_WITH_SYSEX(ClassName)
+#define EXPORT_WASM_SYNTH_EXTENDED(ClassName)
 #endif
