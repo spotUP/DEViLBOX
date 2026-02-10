@@ -34,6 +34,9 @@ import { MAMEControls } from '../controls/MAMEControls';
 import { ChipSynthControls } from '../controls/ChipSynthControls';
 import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
+import { WAMControls } from '../controls/WAMControls';
+import { VSTBridgePanel } from '../controls/VSTBridgePanel';
+import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
 import { MAMEMacroEditor, type MacroData } from './MAMEMacroEditor';
@@ -52,7 +55,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'vstbridge';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -128,6 +131,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isMAMEType(synthType)) return 'mame';
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
+  if (synthType === 'WAM') return 'wam';
+  if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }
 
@@ -1146,6 +1151,57 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <OBXdControls
             config={obxdConfig}
             onChange={handleOBXdChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // VST BRIDGE EDITOR (auto-generated parameter knobs from WASM metadata)
+  // ============================================================================
+  if (editorMode === 'vstbridge') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          <VSTBridgePanel
+            instrument={instrument}
+            onChange={onChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // WAM EDITOR (Web Audio Modules)
+  // ============================================================================
+  if (editorMode === 'wam') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={onChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+        />
+        <div className="synth-editor-content overflow-hidden">
+          <WAMControls
+            instrument={instrument}
+            onChange={onChange}
           />
         </div>
       </div>

@@ -365,6 +365,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     const { useLibopenmpt } = options;
 
+    // Always clean up engine state before import to prevent stale instruments/state
+    getToneEngine().releaseAll();
+
     // Check if native parser data is available (XM/MOD)
     if (info.nativeData) {
       const { format, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
@@ -397,7 +400,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
         const patternOrder = importMetadata.modData?.patternOrderTable || [];
         const patLen = patterns[0]?.length || 64;
-        const numChannels = patterns[0]?.[0]?.length || 4;
+        const numChannels = importMetadata.originalChannelCount || patterns[0]?.[0]?.length || 4;
         console.log(`[Import] ${format} pattern structure: ${patterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
 
         result = {
@@ -405,6 +408,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             id: `pattern-${idx}`,
             name: `Pattern ${idx}`,
             length: patLen,
+            importMetadata,
             channels: Array.from({ length: numChannels }, (_, ch) => ({
               id: `channel-${ch}`,
               name: `Channel ${ch + 1}`,
@@ -423,8 +427,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   volume: cell.volume || 0,
                   effTyp: cell.effectType || 0,
                   eff: cell.effectParam || 0,
-                  effTyp2: 0,
-                  eff2: 0,
+                  effTyp2: cell.effectType2 || 0,
+                  eff2: cell.effectParam2 || 0,
                 };
               }),
             })),

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-10T11:53:38.476Z
+ * Generated: 2026-02-10T22:12:40.705Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '356';
-export const BUILD_HASH = 'ddecc91';
+export const BUILD_NUMBER = '361';
+export const BUILD_HASH = '5f3671a';
 export const BUILD_DATE = '2026-02-10';
 
 // Full semantic version with build number
@@ -31,6 +31,32 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-10',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Chore(infra): update electron, packages, and local debug tools"
+      },
+      {
+        type: 'improvement',
+        "description": "Enhance audio engine and fix multiple stability issues"
+      },
+      {
+        type: 'feature',
+        "description": "Add new channel visualizers and standardize styling"
+      },
+      {
+        type: 'feature',
+        "description": "Implement 1:1 logic port of FT2 Nibbles"
+      },
+      {
+        type: 'feature',
+        "description": "Improve TD-3 pattern import/export and audit .seq format"
+      }
+    ]
+  },
+  {
+    version: '2026-02-09',
     date: '2026-02-09',
     changes: [
       {
@@ -224,26 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Consolidate tracker cells into unified FlagCell component"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance DB303/TB303 pattern system with XML patterns and improved conversion"
-      },
-      {
-        type: 'feature',
-        "description": "Complete drum pad system Phase 3 & 4 improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Refactor drum pad kit loading to integrate with instrument system"
-      },
-      {
-        type: 'improvement',
-        "description": "Add drum pad Phase 2 completion documentation"
-      },
-      {
-        type: 'fix',
-        "description": "Improve ROM archive ignore pattern"
       }
     ]
   }

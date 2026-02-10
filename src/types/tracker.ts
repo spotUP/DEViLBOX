@@ -196,6 +196,8 @@ export interface FurnaceMacroData {
   loop: number;      // Loop point (-1 = no loop)
   release: number;   // Release point (-1 = none)
   speed: number;     // Macro speed (1 = every tick, 2 = every 2 ticks, etc.)
+  mode?: number;     // Macro mode (0=sequence, 1=ADSR, 2=LFO)
+  delay?: number;    // Macro start delay in ticks
 }
 
 /**

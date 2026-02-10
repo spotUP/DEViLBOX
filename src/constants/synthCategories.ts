@@ -1123,6 +1123,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Drum',
     color: 'text-yellow-500',
   },
+  WAM: {
+    type: 'WAM',
+    name: 'Web Audio Module',
+    shortName: 'WAM',
+    description: 'Load external audio plugins from URL (standard WAM 2.0 format)',
+    bestFor: ['External plugins', 'Community synths', 'Rich UI'],
+    icon: 'Globe',
+    color: 'text-cyan-400',
+  },
   Dexed: {
     type: 'Dexed',
     name: 'Dexed (DX7)',
@@ -1140,6 +1149,16 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     bestFor: ['Pads', 'Brass', 'Strings', 'Warm leads', 'Analog sounds'],
     icon: 'Waves',
     color: 'text-amber-400',
+  },
+  // VST Bridge synths
+  DexedBridge: {
+    type: 'DexedBridge',
+    name: 'Dexed DX7 (Bridge)',
+    shortName: 'DX7B',
+    description: 'Dexed DX7 via VSTBridge generic framework - test/validation of the bridge',
+    bestFor: ['FM Bass', 'Electric Piano', 'Bells', 'Bridge testing'],
+    icon: 'Plug',
+    color: 'text-purple-400',
   },
   // Buzzmachine Generators (new)
   Buzz3o3DF: {
@@ -1426,6 +1445,12 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player],
   },
   {
+    id: 'plugins',
+    name: 'Plugins',
+    description: 'External Web Audio Modules (WAM 2.0)',
+    synths: [SYNTH_INFO.WAM],
+  },
+  {
     id: 'fx',
     name: 'FX',
     description: 'Sound effects and noise generators',
@@ -1702,6 +1727,14 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     synths: [
       SYNTH_INFO.Dexed,
       SYNTH_INFO.OBXd,
+    ],
+  },
+  {
+    id: 'vstbridge',
+    name: '🔌 VST Bridge',
+    description: 'Open-source synths ported via the generic VSTBridge framework',
+    synths: [
+      SYNTH_INFO.DexedBridge,
     ],
   },
 ];

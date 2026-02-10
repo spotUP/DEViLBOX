@@ -42,6 +42,7 @@ import {
   DEFAULT_MAME_SWP30,
   DEFAULT_RDPIANO,
   DEFAULT_CHIPTUNE_MODULE,
+  DEFAULT_WAM,
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
@@ -49,7 +50,7 @@ import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
-import { deepMerge } from '@/lib/migration';
+import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
 /**
@@ -133,6 +134,9 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       break;
     case 'Synare':
       base.synare = { ...DEFAULT_SYNARE };
+      break;
+    case 'WAM':
+      base.wam = { ...DEFAULT_WAM };
       break;
     case 'Buzz3o3':
       base.tb303 = { ...DEFAULT_TB303 };
@@ -361,7 +365,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.tb303 ||
         updates.buzzmachine ||
         updates.spaceLaser ||
-        updates.v2
+        updates.v2 ||
+        updates.wam
       );
 
       set((state) => {
@@ -533,6 +538,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             if ((updatedInstrument.synthType === 'Furnace' || updatedInstrument.synthType.startsWith('Furnace')) && updatedInstrument.furnace && updates.furnace) {
               engine.updateFurnaceParameters(id, updatedInstrument.furnace);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'WAM' && updatedInstrument.wam && updates.wam) {
+              engine.updateWAMParameters(id, updatedInstrument.wam);
               return; // Handled
             }
 
@@ -1118,35 +1128,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       });
 
-      // Import migration function dynamically to avoid circular deps
-      import('@/lib/migration').then(({ ensureCompleteInstrumentConfig }) => {
-        // Migrate old instruments (backward compatibility)
-        const migratedInstruments = newInstruments.map(inst => {
-          // Ensure complete config for the synthType
-          const completeInst = ensureCompleteInstrumentConfig(inst);
-          
-          return {
-            ...completeInst,
-            // Fix synthType for instruments with tb303 config (stale localStorage migration)
-            synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
-              ? 'TB303' as const
-              : inst.synthType,
-            // Add type field if missing (backward compatibility)
-            // Sampler = sample, everything else = synth
-            type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
-            // Migrate old effects without category field
-            effects: inst.effects?.map(effect => ({
-              ...effect,
-              // Add category if missing - default to 'tonejs' for old saved songs
-              category: effect.category || ('tonejs' as const),
-            })) || [],
-          };
-        });
+      // Migrate old instruments (backward compatibility)
+      const migratedInstruments = newInstruments.map(inst => {
+        // Ensure complete config for the synthType
+        const completeInst = ensureCompleteInstrumentConfig(inst);
 
-        set((state) => {
-          state.instruments = migratedInstruments;
-          state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
-        });
+        return {
+          ...completeInst,
+          // Fix synthType for instruments with tb303 config (stale localStorage migration)
+          synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
+            ? 'TB303' as const
+            : inst.synthType,
+          // Add type field if missing (backward compatibility)
+          // Sampler = sample, everything else = synth
+          type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
+          // Migrate old effects without category field
+          effects: inst.effects?.map(effect => ({
+            ...effect,
+            // Add category if missing - default to 'tonejs' for old saved songs
+            category: effect.category || ('tonejs' as const),
+          })) || [],
+        };
+      });
+
+      set((state) => {
+        state.instruments = migratedInstruments;
+        state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
       });
     },
 

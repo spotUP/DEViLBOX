@@ -725,6 +725,12 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   // Korg filter advanced parameters (for authentic 303 filter behavior)
+  setKorgIbiasScale(value: number): void {
+    // Controls resonance tracking bias current scaling
+    // db303 web app: 0.1 + resTrackingKnob * 3.9 (range 0.1-4.0)
+    this.setParameterByName(DB303Param.KORG_IBIAS_SCALE, value);
+  }
+
   setKorgBite(value: number): void {
     // 0-1 normalized - filter "bite" or edge character
     this.setParameterByName(DB303Param.KORG_BITE, value);

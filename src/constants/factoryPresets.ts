@@ -2196,6 +2196,18 @@ export const FX_PRESETS: InstrumentPreset['config'][] = [
   },
 ];
 
+export const WAM_PRESETS: InstrumentPreset['config'][] = [
+  {
+    type: 'synth' as const,
+    name: 'Web Audio Module (WAM)',
+    synthType: 'WAM',
+    wam: { moduleUrl: '', pluginState: null },
+    effects: [],
+    volume: -12,
+    pan: 0,
+  }
+];
+
 // ============================================================================
 // TR-505 PRESETS (16) - Roland TR-505 sample-based drum machine
 // Classic 12-bit digital drum sounds from 1986
@@ -3331,6 +3343,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...FURNACE_PRESETS,
   ...FURNACE_CHIP_PRESETS,
   ...FX_PRESETS,
+  ...WAM_PRESETS,
   ...DUB_SIREN_PRESETS,
   ...SPACE_LASER_PRESETS,
   ...V2_PRESETS,
@@ -3371,6 +3384,7 @@ export const PRESET_CATEGORIES = {
   Chip: CHIP_PRESETS,
   Furnace: [...FURNACE_PRESETS, ...FURNACE_CHIP_PRESETS],
   FX: FX_PRESETS,
+  WAM: WAM_PRESETS,
   Dub: [...DUB_SIREN_PRESETS, ...SPACE_LASER_PRESETS, ...V2_PRESETS, ...V2_FACTORY_PRESETS, ...SYNARE_PRESETS],
   DubSiren: DUB_SIREN_PRESETS,
   SpaceLaser: SPACE_LASER_PRESETS,

@@ -385,10 +385,11 @@ function App() {
         const module = await parseFurnaceSong(buffer);
         const result = convertFurnaceToDevilbox(module);
         
-        // Convert instruments
-        const instruments = result.instruments.map((inst, idx) => 
+        // Convert instruments — re-assign sequential IDs after flat() to prevent
+        // duplicates when one source instrument produces multiple configs (chip + samples)
+        const instruments = result.instruments.map((inst, idx) =>
           convertToInstrument(inst, idx + 1, 'FUR')
-        ).flat();
+        ).flat().map((inst, i) => ({ ...inst, id: i + 1 }));
         
         // Convert patterns (already in [pattern][row][channel] format)
         const patternOrder = result.metadata.modData?.patternOrderTable || [];
