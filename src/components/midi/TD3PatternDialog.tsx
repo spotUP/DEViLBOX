@@ -6,6 +6,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Upload, Download, AlertTriangle, Check, Loader2, FileUp, FileDown } from 'lucide-react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
+import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { createDefaultTB303Instrument } from '../../lib/instrumentFactory';
 import { getMIDIManager } from '../../midi/MIDIManager';
 import { encodePattern, encodePatternRequest, formatPatternLocation } from '../../midi/sysex/TD3SysExEncoder';
 import { decodePattern, isTD3PatternResponse } from '../../midi/sysex/TD3SysExDecoder';
@@ -18,7 +20,8 @@ import {
 import { parseTD3File } from '../../lib/import/TD3PatternLoader';
 import type { TD3PatternData, MIDIMessage } from '../../midi/types';
 import type { TrackerCell } from '@typedefs/tracker';
-import { saveAs } from 'file-saver';
+import * as FileSaver from 'file-saver';
+import { exportTD3PatternToSeq } from '../../lib/export/TD3PatternExporter';
 
 interface TD3PatternDialogProps {
   isOpen: boolean;
@@ -166,12 +169,41 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
     };
 
     const blob = new Blob([JSON.stringify(patternData, null, 2)], { type: 'application/json' });
-    saveAs(blob, `td3-pattern-${formatPatternLocation(selectedGroup, selectedPattern).replace(' ', '')}.json`);
+    FileSaver.saveAs(blob, `td3-pattern-${formatPatternLocation(selectedGroup, selectedPattern).replace(' ', '')}.json`);
     
     setSendResult({
       success: true,
       message: 'Pattern exported to JSON file',
     });
+  };
+
+  const handleExportSeq = () => {
+    const cells = getExportCells();
+    const { steps } = trackerPatternToTD3Steps(cells, baseOctave);
+    
+    const patternData: TD3PatternData = {
+      group: selectedGroup,
+      pattern: selectedPattern,
+      steps,
+      triplet: false,
+      activeSteps: Math.min(16, cells.length),
+    };
+
+    try {
+      const bytes = exportTD3PatternToSeq(patternData);
+      const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+      FileSaver.saveAs(blob, `td3-pattern-${formatPatternLocation(selectedGroup, selectedPattern).replace(' ', '')}.seq`);
+      
+      setSendResult({
+        success: true,
+        message: 'Pattern exported to .seq file',
+      });
+    } catch (error) {
+      setSendResult({
+        success: false,
+        message: 'Failed to export .seq file',
+      });
+    }
   };
 
   // Handle file import
@@ -185,22 +217,14 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
       if (file.name.toLowerCase().endsWith('.sqs')) {
         const td3File = await parseTD3File(buffer);
         if (td3File.patterns.length > 0) {
-          // Take the first pattern from the .sqs file
+          // Take the first pattern from the .sqs/ .seq file
           const firstPatt = td3File.patterns[0];
           
-          // Map TD3Step from loader to TD3Step from types (they differ slightly in structure but represent same data)
-          const mappedSteps: any[] = firstPatt.steps.map(s => ({
-            note: s.rest ? null : { value: s.note, octave: s.octave, upperC: false },
-            flag1: s.accent ? 1 : undefined,
-            flag2: s.slide ? 2 : undefined,
-            tie: s.tie
-          }));
-
           setReceivedPattern({
             group: 0,
             pattern: 0,
-            steps: mappedSteps,
-            triplet: false,
+            steps: firstPatt.steps,
+            triplet: firstPatt.triplet || false,
             activeSteps: firstPatt.length
           });
           
@@ -288,6 +312,20 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
   const handleImportIntoPattern = () => {
     if (!receivedPattern) return;
 
+    // Find or create TB-303 instrument
+    const { instruments, addInstrument } = useInstrumentStore.getState();
+    let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+    if (!tb303Instrument) {
+      // Auto-create TB-303 instrument
+      const newInst = createDefaultTB303Instrument();
+      addInstrument(newInst);
+      tb303Instrument = newInst;
+      console.log('[TD3Import] Auto-created TB-303 instrument:', newInst.id);
+    }
+    
+    // Get instrument index (1-based for tracker)
+    const instrumentIndex = instruments.findIndex(i => i.id === tb303Instrument!.id) + 1;
+
     const cells = td3StepsToTrackerCells(receivedPattern.steps, baseOctave);
     const stepsToImport = Math.min(receivedPattern.activeSteps, cells.length);
 
@@ -296,15 +334,15 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
       const cell = cells[i];
       setCell(selectedChannel, i, {
         note: cell.note,
+        instrument: cell.note ? instrumentIndex : undefined, // Set instrument for notes
         flag1: cell.flag1,
         flag2: cell.flag2,
-        // Keep existing instrument, volume, and effect values
       });
     }
 
     setSendResult({
       success: true,
-      message: `Imported ${stepsToImport} steps into channel ${selectedChannel + 1}`,
+      message: `Imported ${stepsToImport} steps into channel ${selectedChannel + 1} with TB-303`,
     });
 
     // Clear received pattern to allow another import
@@ -552,13 +590,22 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
               </>
             )}
             {activeTab === 'export' && (
-              <button
-                onClick={handleExportFile}
-                className="px-3 py-2 text-xs font-bold bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-2"
-              >
-                <FileDown size={14} />
-                SAVE AS JSON
-              </button>
+              <>
+                <button
+                  onClick={handleExportFile}
+                  className="px-3 py-2 text-xs font-bold bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-2"
+                >
+                  <FileDown size={14} />
+                  SAVE AS JSON
+                </button>
+                <button
+                  onClick={handleExportSeq}
+                  className="px-3 py-2 text-xs font-bold bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-2"
+                >
+                  <FileDown size={14} />
+                  SAVE AS .SEQ
+                </button>
+              </>
             )}
           </div>
 

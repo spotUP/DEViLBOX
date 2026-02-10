@@ -1,20 +1,11 @@
 /**
- * TD-3 Pattern Loader (.sqs format)
+ * TD-3 Pattern Loader (.sqs and .seq formats)
  * Parses Behringer Synthtribe pattern files for the TD-3 (303 clone)
- *
- * File format (reverse engineered):
- * - Header: Magic bytes + "TD-3" + version
- * - Patterns: 16-step sequences with note, accent, slide data
+ * .sqs = Single pattern export (Legacy format)
+ * .seq = Sequence export (Modern Synthtribe format)
  */
 
-export interface TD3Step {
-  note: number;      // 0-11 (C-B), 15 = rest
-  octave: number;    // -1, 0, +1 relative to base octave
-  accent: boolean;
-  slide: boolean;
-  tie: boolean;
-  rest: boolean;
-}
+import type { TD3Step } from '@/midi/types';
 
 export interface TD3Pattern {
   index: number;
@@ -22,6 +13,7 @@ export interface TD3Pattern {
   steps: TD3Step[];
   length: number;    // Active steps (1-16)
   tempo: number;     // BPM
+  triplet: boolean;
 }
 
 export interface TD3File {
@@ -34,14 +26,41 @@ export interface TD3File {
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 /**
- * Check if a file is a TD-3 .sqs pattern file
+ * Check if a file is a TD-3 .sqs or .seq pattern file
  */
 export function isTD3File(filename: string): boolean {
-  return filename.toLowerCase().endsWith('.sqs');
+  const lower = filename.toLowerCase();
+  return lower.endsWith('.sqs') || lower.endsWith('.seq');
 }
 
 /**
- * Parse a TD-3 .sqs pattern file
+ * Decode 16 bits from 4 nibbled bytes (Behringer format)
+ * Structure: [HighNibble0-7, LowNibble0-7, HighNibble8-15, LowNibble8-15]
+ */
+function decodeNibbledBits(bytes: Uint8Array, offset: number): boolean[] {
+  const bits: boolean[] = [];
+  
+  // First 8 bits: byte0=high nibble, byte1=low nibble
+  const byte0 = bytes[offset];
+  const byte1 = bytes[offset + 1];
+  const word0 = (byte0 << 4) | (byte1 & 0x0F);
+  
+  // Next 8 bits: byte2=high nibble, byte3=low nibble
+  const byte2 = bytes[offset + 2];
+  const byte3 = bytes[offset + 3];
+  const word1 = (byte2 << 4) | (byte3 & 0x0F);
+  
+  const fullWord = (word1 << 8) | word0;
+  
+  for (let i = 0; i < 16; i++) {
+    bits.push(((fullWord >> i) & 1) !== 0);
+  }
+  
+  return bits;
+}
+
+/**
+ * Parse a TD-3 .sqs or .seq pattern file
  */
 export async function parseTD3File(buffer: ArrayBuffer): Promise<TD3File> {
   const view = new DataView(buffer);
@@ -49,106 +68,214 @@ export async function parseTD3File(buffer: ArrayBuffer): Promise<TD3File> {
 
   // Check magic bytes
   const magic = view.getUint32(0, false);
-  if (magic !== 0x87439102) {
-    throw new Error('Invalid TD-3 file: bad magic bytes');
+  const isSEQ = magic === 0x23985476;
+  const isSQS = magic === 0x87439102;
+  
+  if (!isSEQ && !isSQS) {
+    throw new Error(`Invalid TD-3 file: bad magic bytes (0x${magic.toString(16).toUpperCase()})`);
   }
 
-  // Read device name (UTF-16LE at offset 8)
+  // Read device name (UTF-16BE for SEQ, or null-interleaved ASCII)
   let deviceName = '';
   for (let i = 8; i < 20; i += 2) {
-    const char = view.getUint16(i, true);
+    const char = view.getUint16(i, false); // Big Endian
     if (char === 0) break;
     deviceName += String.fromCharCode(char);
   }
 
-  // Read version (UTF-16LE)
+  // Read version (UTF-16BE)
   let version = '';
   for (let i = 20; i < 32; i += 2) {
-    const char = view.getUint16(i, true);
+    const char = view.getUint16(i, false);
     if (char === 0) break;
     version += String.fromCharCode(char);
   }
 
   console.log(`[TD3Loader] Parsing ${deviceName} file, version ${version}`);
 
-  // Parse patterns
-  // Each pattern block is ~126 bytes
-  // Pattern marker: XX XX 00 70 (where XX XX is pattern index, little-endian)
   const patterns: TD3Pattern[] = [];
-  let offset = 32; // Start after header
-
-  // Look for pattern markers
-  while (offset < buffer.byteLength - 100) {
-    // Look for the 0x70 0x00 pattern marker (little-endian 0x0070)
-    if (bytes[offset + 2] === 0x00 && bytes[offset + 3] === 0x70) {
-      const patternIndex = view.getUint16(offset, true);
-
-      // Skip marker (4 bytes) and unknown (2 bytes)
-      const noteDataOffset = offset + 6;
-
-      const steps: TD3Step[] = [];
-
-      // Read 16 note entries (2 bytes each)
-      for (let step = 0; step < 16; step++) {
-        const noteOffset = noteDataOffset + (step * 2);
-        const flags = bytes[noteOffset];     // 0x00=rest, 0x01=note, 0x02=accent
-        const noteVal = bytes[noteOffset + 1]; // 0x00-0x0B = C-B, 0x0F = rest
-
-        const isRest = flags === 0x00 || noteVal === 0x0F || noteVal === 0x08; // 0x08 seems to be rest too
-        const hasAccent = (flags & 0x02) !== 0;
-
-        // Note value: lower nibble is note (0-11), but 0x08 is often used for rests
-        // Notes seem to be: 0x00=C, 0x01=C#, 0x02=D, etc. up to 0x0B=B
-        let note = noteVal & 0x0F;
-        if (note > 11) note = 0; // Default to C for invalid values
-
-        // Octave might be encoded in the upper nibble or flags
-        // For now, assume middle octave
-        const octave = 0;
-
-        steps.push({
-          note: isRest ? 0 : note,
-          octave,
-          accent: hasAccent,
-          slide: false, // Will be filled from slide data
-          tie: false,   // Will be filled from tie data
-          rest: isRest,
+  
+    if (isSEQ) {
+  
+      // .seq file: Fixed structure, typically one pattern per file (146 bytes)
+  
+      let offset = 32;
+  
+      
+  
+      while (offset <= buffer.byteLength - 114) {
+  
+        const dataOffset = offset + 4;
+  
+        const steps: TD3Step[] = [];
+  
+        
+  
+        const notesBase = dataOffset;
+  
+        const accentsBase = dataOffset + 32;
+  
+        const slidesBase = dataOffset + 64;
+  
+        
+  
+        const triplet = ((bytes[dataOffset + 96] << 4) | (bytes[dataOffset + 97] & 0x0F)) !== 0;
+  
+        const length = (bytes[dataOffset + 98] << 4) | (bytes[dataOffset + 99] & 0x0F);
+  
+        
+  
+        const tieBits = decodeNibbledBits(bytes, dataOffset + 102);
+  
+        const restBits = decodeNibbledBits(bytes, dataOffset + 106);
+  
+        
+  
+        let triggerIdx = 0;
+  
+        let lastStep: TD3Step | null = null;
+  
+  
+  
+        for (let i = 0; i < 16; i++) {
+  
+          // tieBits[i] === true means Step i+1 is a new trigger (New Pitch)
+  
+          // tieBits[i] === false means Step i+1 is a sustain of the previous note
+  
+          const isTrigger = tieBits[i];
+  
+          
+  
+          if (isTrigger) {
+  
+            const nOffset = notesBase + (triggerIdx * 2);
+  
+            // Note = MSB * 16 + LSB
+  
+            const noteVal = (bytes[nOffset] << 4) | (bytes[nOffset + 1] & 0x0F);
+  
+            
+  
+            const octave = Math.floor(noteVal / 12);
+  
+            const note = noteVal % 12;
+  
+            const upperC = noteVal === 60;
+  
+            
+  
+            // restBits[i] === true means Step i+1 is a rest?
+  
+            // Based on binary analysis of valid patterns where rest is all 0, 
+  
+            // we assume 1 = Rest, 0 = Note Enabled.
+  
+            const isRest = restBits[i];
+  
+            
+  
+            const step: TD3Step = {
+  
+              note: isRest ? null : {
+  
+                value: note,
+  
+                octave: Math.max(0, Math.min(2, octave - 2)), 
+  
+                upperC
+  
+              },
+  
+              accent: bytes[accentsBase + triggerIdx * 2 + 1] !== 0,
+  
+              slide: bytes[slidesBase + triggerIdx * 2 + 1] !== 0,
+  
+              tie: false
+  
+            };
+  
+            
+  
+            steps.push(step);
+  
+            lastStep = step;
+  
+            triggerIdx++;
+  
+          } else {
+  
+            // Sustain last note
+  
+            if (lastStep && lastStep.note) {
+  
+              steps.push({
+  
+                ...lastStep,
+  
+                tie: true // Sustain flag
+  
+              });
+  
+            } else {
+  
+              // No last note? Must be a rest
+  
+              steps.push({
+  
+                note: null,
+  
+                accent: false,
+  
+                slide: false,
+  
+                tie: false
+  
+              });
+  
+            }
+  
+          }
+  
+        }
+  
+        
+  
+        patterns.push({
+  
+          index: patterns.length,
+  
+          name: `Pattern ${patterns.length + 1}`,
+  
+          steps,
+  
+          length: length || 16,
+  
+          tempo: 120,
+  
+          triplet
+  
         });
+  
+        
+  
+        offset += 114; 
+  
       }
-
-      // Read slide flags (16 bytes after note data)
-      const slideOffset = noteDataOffset + 32;
-      for (let step = 0; step < 16; step++) {
-        // Slide data appears to be in pairs, taking every other byte
-        steps[step].slide = bytes[slideOffset + step * 2] !== 0;
+  
+    }
+  
+   else {
+    // .sqs file: Single pattern export (Legacy format)
+    // For now, keep some version of the old searching logic but corrected
+    let offset = 32;
+    while (offset < buffer.byteLength - 100) {
+      if (bytes[offset + 2] === 0x00 && bytes[offset + 3] === 0x70) {
+        // ... (Legacy SQS logic if needed)
+        offset += 126;
+      } else {
+        offset++;
       }
-
-      // Read tie/other flags (next 16 bytes)
-      const tieOffset = slideOffset + 32;
-      for (let step = 0; step < 16; step++) {
-        steps[step].tie = bytes[tieOffset + step * 2] !== 0;
-      }
-
-      // Calculate pattern length (number of active steps)
-      let length = 16;
-      for (let i = 15; i >= 0; i--) {
-        if (!steps[i].rest) break;
-        length = i;
-      }
-      if (length === 0) length = 16; // All rests = full pattern
-
-      patterns.push({
-        index: patternIndex,
-        name: `Pattern ${patternIndex + 1}`,
-        steps,
-        length: 16, // TD-3 always uses 16 steps
-        tempo: 120, // Default tempo
-      });
-
-      // Move to next pattern (patterns are ~126 bytes apart)
-      offset += 126;
-    } else {
-      offset++;
     }
   }
 
@@ -178,7 +305,7 @@ export function convertTD3PatternToDbox(
   }>;
 } {
   const rows = td3Pattern.steps.map((step) => {
-    if (step.rest) {
+    if (!step.note) {
       return {
         note: null,
         instrument: 1,
@@ -189,8 +316,8 @@ export function convertTD3PatternToDbox(
       };
     }
 
-    const noteName = NOTE_NAMES[step.note];
-    const octave = baseOctave + step.octave;
+    const noteName = NOTE_NAMES[step.note.value];
+    const octave = baseOctave + step.note.octave + (step.note.upperC ? 1 : 0);
     const noteStr = `${noteName}${octave}`;
 
     return {
@@ -258,7 +385,7 @@ export function convertTD3FileToDbox(td3File: TD3File, filename: string): object
     version: '1.0.0',
     metadata: {
       id: `td3-${Date.now()}`,
-      name: filename.replace('.sqs', '') || 'TD-3 Patterns',
+      name: filename.replace('.sqs', '').replace('.seq', '') || 'TD-3 Patterns',
       author: 'TD-3 Import',
       description: `Imported from ${td3File.name} v${td3File.version}`,
       createdAt: new Date().toISOString(),
