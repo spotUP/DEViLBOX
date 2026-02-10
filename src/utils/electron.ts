@@ -8,6 +8,26 @@ declare global {
       isElectron: boolean;
       platform: string;
       onMenuAction: (callback: (action: string) => void) => void;
+      fs?: {
+        openDirectory: () => Promise<string | null>;
+        readdir: (dirPath: string, extensions?: string[]) => Promise<Array<{
+          name: string;
+          path: string;
+          isDirectory: boolean;
+          size?: number;
+          modifiedAt?: string;
+        }>>;
+        readFile: (filePath: string) => Promise<ArrayBuffer>;
+        writeFile: (filePath: string, data: ArrayBuffer | Uint8Array) => Promise<boolean>;
+        showSaveDialog: (options: {
+          defaultPath?: string;
+          filters?: Array<{ name: string; extensions: string[] }>;
+        }) => Promise<string | null>;
+        showOpenDialog: (options: {
+          properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>;
+          filters?: Array<{ name: string; extensions: string[] }>;
+        }) => Promise<string[] | null>;
+      };
     };
   }
 }
@@ -31,4 +51,11 @@ export const isElectron = (): boolean => {
  */
 export const getPlatform = (): string | null => {
   return window.electron?.platform || null;
+};
+
+/**
+ * Returns true if Electron native file system is available
+ */
+export const hasElectronFS = (): boolean => {
+  return isElectron() && !!window.electron?.fs;
 };

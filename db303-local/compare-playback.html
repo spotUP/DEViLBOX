@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DB303 vs DEViLBOX Playback Comparison</title>
+  <style>
+    body {
+      font-family: 'Monaco', 'Consolas', monospace;
+      background: #1a1a1a;
+      color: #eee;
+      padding: 20px;
+    }
+    h1 {
+      color: #0f0;
+      margin-bottom: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #333;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0f0;
+      color: #000;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .log-container {
+      display: flex;
+      gap: 20px;
+    }
+    .log-panel {
+      flex: 1;
+      background: #000;
+      border: 1px solid #333;
+      padding: 10px;
+      height: 500px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    .log-panel h2 {
+      color: #0ff;
+      margin-bottom: 10px;
+      position: sticky;
+      top: 0;
+      background: #000;
+      padding-bottom: 5px;
+    }
+    .log-entry {
+      margin: 2px 0;
+      padding: 2px 4px;
+    }
+    .note-on { color: #0f0; }
+    .note-off { color: #f60; }
+    .slide { color: #0ff; }
+    .accent { color: #f0f; }
+    .step { color: #ff0; }
+    .match { background: #030; }
+    .mismatch { background: #300; color: #f00; }
+    .pattern-display {
+      margin: 20px 0;
+      background: #000;
+      padding: 10px;
+      border: 1px solid #333;
+    }
+    .pattern-display pre {
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .comparison-result {
+      margin-top: 20px;
+      padding: 15px;
+      border: 2px solid #333;
+      font-size: 14px;
+    }
+    .comparison-result.pass { border-color: #0f0; background: #030; }
+    .comparison-result.fail { border-color: #f00; background: #300; }
+    #status {
+      margin: 10px 0;
+      padding: 10px;
+      background: #222;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔬 DB303 vs DEViLBOX Playback Comparison</h1>
+  
+  <div id="status">Loading...</div>
+  
+  <div class="controls">
+    <button id="btnSimulateDevilbox">Simulate DEViLBOX</button>
+    <button id="btnRunDb303">Run DB303 Internal</button>
+    <button id="btnCompare">Compare Logs</button>
+    <button id="btnClear">Clear Logs</button>
+  </div>
+  
+  <div class="pattern-display">
+    <h3>Test Pattern (from your XML):</h3>
+    <pre id="patternDisplay"></pre>
+  </div>
+  
+  <div class="log-container">
+    <div class="log-panel" id="devilboxLog">
+      <h2>DEViLBOX TrackerReplayer</h2>
+      <div id="devilboxLogContent"></div>
+    </div>
+    <div class="log-panel" id="db303Log">
+      <h2>DB303 Internal Sequencer</h2>
+      <div id="db303LogContent"></div>
+    </div>
+  </div>
+  
+  <div id="comparisonResult" class="comparison-result" style="display:none;"></div>
+
+<script>
+// Test pattern from the user's XML
+const testPattern = [
+  { step: 0, key: 6, octave: 0, gate: true, accent: false, slide: false },
+  { step: 1, key: 0, octave: 0, gate: true, accent: false, slide: false },
+  { step: 2, key: 6, octave: 0, gate: true, accent: false, slide: true },
+  { step: 3, key: 11, octave: 1, gate: false, accent: false, slide: false },
+  { step: 4, key: 11, octave: 1, gate: true, accent: true, slide: true },
+  { step: 5, key: 0, octave: 0, gate: true, accent: false, slide: false },
+  { step: 6, key: 9, octave: 1, gate: true, accent: false, slide: false },
+  { step: 7, key: 6, octave: 1, gate: true, accent: true, slide: true },
+  { step: 8, key: 6, octave: 0, gate: true, accent: false, slide: true },
+  { step: 9, key: 6, octave: 1, gate: true, accent: false, slide: false },
+  { step: 10, key: 10, octave: 1, gate: false, accent: false, slide: false },
+  { step: 11, key: 6, octave: 0, gate: true, accent: true, slide: true },
+  { step: 12, key: 6, octave: 1, gate: true, accent: true, slide: false },
+  { step: 13, key: 6, octave: 0, gate: true, accent: false, slide: true },
+  { step: 14, key: 6, octave: 1, gate: true, accent: false, slide: false },
+  { step: 15, key: 6, octave: 0, gate: false, accent: false, slide: false },
+];
+
+const rootNote = 36; // C2 in MIDI
+const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function midiToName(midi) {
+  return noteNames[midi % 12] + (Math.floor(midi / 12) - 1);
+}
+
+function keyOctaveToMidi(key, octave) {
+  return rootNote + key + (octave * 12);
+}
+
+// Event logs
+let devilboxEvents = [];
+let db303Events = [];
+
+// Display pattern
+function displayPattern() {
+  let html = 'Step | Note  | Gate | Acc | Slide\n';
+  html +=    '-----|-------|------|-----|------\n';
+  
+  for (const step of testPattern) {
+    const midi = keyOctaveToMidi(step.key, step.octave);
+    const note = midiToName(midi);
+    html += `${step.step.toString().padStart(4)} | ${note.padEnd(5)} | ${step.gate ? ' ✓  ' : '    '} | ${step.accent ? ' A ' : '   '} | ${step.slide ? ' S ' : '   '}\n`;
+  }
+  
+  document.getElementById('patternDisplay').textContent = html;
+}
+
+// DEViLBOX simulation (TrackerReplayer logic)
+function simulateDevilbox() {
+  devilboxEvents = [];
+  let previousSlideFlag = false;
+  let currentNote = -1;
+  
+  const log = (type, msg, data = {}) => {
+    devilboxEvents.push({ step: data.step, type, msg, ...data });
+    const el = document.createElement('div');
+    el.className = `log-entry ${type}`;
+    el.textContent = `[${data.step?.toString().padStart(2) ?? '--'}] ${msg}`;
+    document.getElementById('devilboxLogContent').appendChild(el);
+  };
+  
+  for (const step of testPattern) {
+    const midi = keyOctaveToMidi(step.key, step.octave);
+    const noteName = midiToName(midi);
+    
+    const hasNote = step.gate;
+    const hasSlideFlag = step.slide;
+    
+    // slideActive = previous row had slide AND current row has a note
+    const slideActive = previousSlideFlag && hasNote;
+    
+    if (!hasNote) {
+      // Rest/empty row
+      log('step', `Step ${step.step}: REST (no gate)`, { step: step.step });
+      // NEW FIX: preserve previousSlideFlag through rests
+      // Only update if there's a note or explicit slide flag
+      if (hasSlideFlag) {
+        previousSlideFlag = true;
+      }
+      // else: preserve previous value
+    } else {
+      // Has note
+      if (slideActive) {
+        // Slide: don't release previous note, glide to new pitch
+        if (currentNote !== midi) {
+          log('slide', `Step ${step.step}: SLIDE ${midiToName(currentNote)} → ${noteName} (midi ${midi})${step.accent ? ' +ACCENT' : ''}`, 
+            { step: step.step, midi, accent: step.accent, slide: true, fromMidi: currentNote });
+        } else {
+          log('slide', `Step ${step.step}: SAME-PITCH SLIDE sustain ${noteName}${step.accent ? ' +ACCENT' : ''}`,
+            { step: step.step, midi, accent: step.accent, slide: true, samePitch: true });
+        }
+      } else {
+        // No slide: release previous, trigger new
+        if (currentNote >= 0) {
+          log('note-off', `Step ${step.step}: noteOff(${currentNote}) ${midiToName(currentNote)}`, 
+            { step: step.step, midi: currentNote, isRelease: true });
+        }
+        log('note-on', `Step ${step.step}: noteOn(${midi}) ${noteName} vel=${step.accent ? 127 : 100}${step.accent ? ' +ACCENT' : ''}`,
+          { step: step.step, midi, accent: step.accent, slide: false });
+      }
+      currentNote = midi;
+      
+      // Update previousSlideFlag based on current row's slide
+      previousSlideFlag = hasSlideFlag;
+    }
+  }
+  
+  // Final note off
+  if (currentNote >= 0) {
+    log('note-off', `END: noteOff(${currentNote}) ${midiToName(currentNote)}`, { step: 'END', midi: currentNote });
+  }
+  
+  log('step', '--- DEViLBOX simulation complete ---', { step: 'END' });
+}
+
+// DB303 internal sequencer simulation
+// This simulates what db303's WASM sequencer does internally
+function simulateDb303Internal() {
+  db303Events = [];
+  let currentNote = -1;
+  
+  const log = (type, msg, data = {}) => {
+    db303Events.push({ step: data.step, type, msg, ...data });
+    const el = document.createElement('div');
+    el.className = `log-entry ${type}`;
+    el.textContent = `[${data.step?.toString().padStart(2) ?? '--'}] ${msg}`;
+    document.getElementById('db303LogContent').appendChild(el);
+  };
+  
+  for (let i = 0; i < testPattern.length; i++) {
+    const step = testPattern[i];
+    const prevStep = i > 0 ? testPattern[i - 1] : null;
+    const midi = keyOctaveToMidi(step.key, step.octave);
+    const noteName = midiToName(midi);
+    
+    // DB303 internal sequencer logic:
+    // - If previous step had SLIDE and current step has GATE, it's a slide
+    // - Gate=false means rest (no note trigger)
+    
+    const prevHadSlide = prevStep?.slide && prevStep?.gate;
+    
+    if (!step.gate) {
+      // Rest - DB303 might release here or sustain if previous had slide
+      if (prevHadSlide && currentNote >= 0) {
+        // Previous had slide but we're on a rest - sustain through?
+        // DB303 internal sequencer behavior here is key
+        log('step', `Step ${step.step}: REST (sustaining from slide?)`, { step: step.step });
+      } else if (currentNote >= 0) {
+        log('note-off', `Step ${step.step}: REST → noteOff(${currentNote}) ${midiToName(currentNote)}`, 
+          { step: step.step, midi: currentNote });
+        currentNote = -1;
+      } else {
+        log('step', `Step ${step.step}: REST (already silent)`, { step: step.step });
+      }
+    } else {
+      // Has gate - trigger or slide
+      if (prevHadSlide && currentNote >= 0) {
+        // Slide from previous note
+        if (currentNote !== midi) {
+          log('slide', `Step ${step.step}: SLIDE ${midiToName(currentNote)} → ${noteName} (midi ${midi})${step.accent ? ' +ACCENT' : ''}`,
+            { step: step.step, midi, accent: step.accent, slide: true, fromMidi: currentNote });
+        } else {
+          log('slide', `Step ${step.step}: SAME-PITCH SLIDE sustain ${noteName}${step.accent ? ' +ACCENT' : ''}`,
+            { step: step.step, midi, accent: step.accent, slide: true, samePitch: true });
+        }
+        currentNote = midi;
+      } else {
+        // New note trigger
+        if (currentNote >= 0) {
+          log('note-off', `Step ${step.step}: noteOff(${currentNote}) ${midiToName(currentNote)}`,
+            { step: step.step, midi: currentNote, isRelease: true });
+        }
+        log('note-on', `Step ${step.step}: noteOn(${midi}) ${noteName} vel=${step.accent ? 127 : 100}${step.accent ? ' +ACCENT' : ''}`,
+          { step: step.step, midi, accent: step.accent, slide: false });
+        currentNote = midi;
+      }
+    }
+  }
+  
+  // Final note off
+  if (currentNote >= 0) {
+    log('note-off', `END: noteOff(${currentNote}) ${midiToName(currentNote)}`, { step: 'END', midi: currentNote });
+  }
+  
+  log('step', '--- DB303 simulation complete ---', { step: 'END' });
+}
+
+// Compare the two logs
+function compareLogs() {
+  const result = document.getElementById('comparisonResult');
+  result.style.display = 'block';
+  
+  // Filter to only note events (noteOn, noteOff, slide)
+  const devilboxNotes = devilboxEvents.filter(e => e.type !== 'step');
+  const db303Notes = db303Events.filter(e => e.type !== 'step');
+  
+  let differences = [];
+  const maxLen = Math.max(devilboxNotes.length, db303Notes.length);
+  
+  for (let i = 0; i < maxLen; i++) {
+    const dv = devilboxNotes[i];
+    const db = db303Notes[i];
+    
+    if (!dv && db) {
+      differences.push(`Event ${i}: DEViLBOX missing, DB303 has: ${db.msg}`);
+    } else if (dv && !db) {
+      differences.push(`Event ${i}: DB303 missing, DEViLBOX has: ${dv.msg}`);
+    } else if (dv && db) {
+      // Compare key properties
+      if (dv.type !== db.type) {
+        differences.push(`Event ${i} type mismatch: DEViLBOX=${dv.type}, DB303=${db.type}`);
+      } else if (dv.midi !== db.midi) {
+        differences.push(`Event ${i} MIDI mismatch: DEViLBOX=${dv.midi} (${midiToName(dv.midi)}), DB303=${db.midi} (${midiToName(db.midi)})`);
+      } else if (dv.slide !== db.slide) {
+        differences.push(`Event ${i} slide mismatch at step ${dv.step}: DEViLBOX.slide=${dv.slide}, DB303.slide=${db.slide}`);
+      }
+    }
+  }
+  
+  if (differences.length === 0) {
+    result.className = 'comparison-result pass';
+    result.innerHTML = `<strong>✅ PASS!</strong> Both players produce identical note events (${devilboxNotes.length} events)`;
+  } else {
+    result.className = 'comparison-result fail';
+    result.innerHTML = `<strong>❌ ${differences.length} DIFFERENCES FOUND:</strong><br><br>` + 
+      differences.map(d => `• ${d}`).join('<br>');
+  }
+}
+
+// Clear logs
+function clearLogs() {
+  document.getElementById('devilboxLogContent').innerHTML = '';
+  document.getElementById('db303LogContent').innerHTML = '';
+  document.getElementById('comparisonResult').style.display = 'none';
+  devilboxEvents = [];
+  db303Events = [];
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  displayPattern();
+  document.getElementById('status').textContent = 'Ready. Click buttons to run simulations.';
+  
+  document.getElementById('btnSimulateDevilbox').onclick = () => {
+    document.getElementById('devilboxLogContent').innerHTML = '';
+    simulateDevilbox();
+  };
+  
+  document.getElementById('btnRunDb303').onclick = () => {
+    document.getElementById('db303LogContent').innerHTML = '';
+    simulateDb303Internal();
+  };
+  
+  document.getElementById('btnCompare').onclick = compareLogs;
+  document.getElementById('btnClear').onclick = clearLogs;
+});
+</script>
+</body>
+</html>

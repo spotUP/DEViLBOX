@@ -1,5 +1,6 @@
-const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs').promises;
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
@@ -194,6 +195,98 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // IPC handlers for native file system access
+  
+  // Show open directory dialog
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (result.canceled) {
+      return null;
+    }
+    return result.filePaths[0];
+  });
+
+  // List directory contents
+  ipcMain.handle('fs:readdir', async (event, dirPath, extensions = []) => {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      const items = await Promise.all(
+        entries.map(async (entry) => {
+          const fullPath = path.join(dirPath, entry.name);
+          let stats = null;
+          try {
+            stats = await fs.stat(fullPath);
+          } catch {
+            // Ignore stat errors
+          }
+          
+          // Filter by extensions if provided
+          if (!entry.isDirectory() && extensions.length > 0) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (!extensions.includes(ext)) {
+              return null;
+            }
+          }
+          
+          return {
+            name: entry.name,
+            path: fullPath,
+            isDirectory: entry.isDirectory(),
+            size: stats?.size,
+            modifiedAt: stats?.mtime?.toISOString(),
+          };
+        })
+      );
+      
+      return items.filter(item => item !== null);
+    } catch (error) {
+      console.error('Error reading directory:', error);
+      throw error;
+    }
+  });
+
+  // Read file
+  ipcMain.handle('fs:readFile', async (event, filePath) => {
+    try {
+      const buffer = await fs.readFile(filePath);
+      return buffer;
+    } catch (error) {
+      console.error('Error reading file:', error);
+      throw error;
+    }
+  });
+
+  // Write file
+  ipcMain.handle('fs:writeFile', async (event, filePath, data) => {
+    try {
+      await fs.writeFile(filePath, Buffer.from(data));
+      return true;
+    } catch (error) {
+      console.error('Error writing file:', error);
+      throw error;
+    }
+  });
+
+  // Show save dialog
+  ipcMain.handle('dialog:save', async (event, options) => {
+    const result = await dialog.showSaveDialog(mainWindow, options);
+    if (result.canceled) {
+      return null;
+    }
+    return result.filePath;
+  });
+
+  // Show open file dialog
+  ipcMain.handle('dialog:openFile', async (event, options) => {
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    if (result.canceled) {
+      return null;
+    }
+    return result.filePaths;
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

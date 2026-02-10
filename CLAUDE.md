@@ -55,3 +55,35 @@ When debugging or implementing Furnace chip synths (GB, NES, OPN2, OPM, etc.):
 Reference code location: `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/engine/platform/`
 
 *** IMPORTANT ***
+
+---
+
+## localStorage Schema Versioning
+
+### The Problem
+localStorage auto-persistence can cause stale/buggy data to persist across app updates.
+For example, `filterSelect=255` was an invalid value that caused muffled audio - once
+saved to localStorage, it kept corrupting the synth on every page load.
+
+### The Solution
+Schema versioning in `src/hooks/useProjectPersistence.ts`:
+
+```typescript
+const SCHEMA_VERSION = 2;  // Bump this for breaking changes
+```
+
+**How it works:**
+1. Every save includes `schemaVersion: N`
+2. On load, if saved `schemaVersion < SCHEMA_VERSION`, data is discarded
+3. User gets a fresh start with correct defaults
+
+**When to bump SCHEMA_VERSION:**
+- Fixed a bug in default instrument config values
+- Changed the structure of stored data
+- Any change that would cause old saved data to misbehave
+
+**Version History:**
+- 1: Initial (implicit, no schemaVersion field)
+- 2: Fixed `filterSelect=255` bug in TB303 config (2026-02-09)
+
+---
