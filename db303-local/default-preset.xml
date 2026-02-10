@@ -21,7 +21,7 @@
     <passbandCompensation>0.09</passbandCompensation>
     <resTracking>0.743</resTracking>
     <filterInputDrive>0.169</filterInputDrive>
-    <filterSelect>1</filterSelect>
+    <filterSelect>255</filterSelect>
     <diodeCharacter>1</diodeCharacter>
     <duffingAmount>0.03</duffingAmount>
     <filterFmDepth>0</filterFmDepth>

@@ -1,0 +1,2601 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>DB-303 Web Synthesizer</title>
+
+    <link rel="icon" href="favicon.ico">
+
+    <script src="webaudio-controls.js"></script>
+    <script src="logging-wrapper.js"></script>
+
+    <style>
+        @font-face {
+            font-family: 'DS-DIGIT';
+            src: url('DS-DIGIT.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Audiowide';
+            src: url('Audiowide-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #000;
+            color: #fff;            
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+            zoom: 0.60;
+        }
+
+        #shaderCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        :root {
+            --synth-bg-opacity: 0.4;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+        }
+
+        footer a {
+            color: #fff;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            max-width: 120px;
+            height: auto;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+            animation: inchworm 3s ease-in-out infinite;
+            animation-play-state: paused;
+            transform-origin: bottom center;
+        }
+
+        @keyframes inchworm {
+            /* Vertical jump phase (~1s) */
+            0% {
+                transform: scaleY(1) scaleX(1) translateY(0);
+            }
+            8% {
+                transform: scaleY(0.8) scaleX(1.15) translateY(8px);
+            }
+            16% {
+                transform: scaleY(1.2) scaleX(0.9) translateY(-12px);
+            }
+            24% {
+                transform: scaleY(1) scaleX(1) translateY(0);
+            }
+            /* Horizontal stretch phase (~2s) - extend right first, then scrunch left, return */
+            33% {
+                transform: scaleY(1) scaleX(1) translateY(0) translateX(0);
+            }
+            45% {
+                transform: scaleY(0.85) scaleX(1.25) translateY(3px) translateX(12px);
+            }
+            60% {
+                transform: scaleY(1.15) scaleX(0.75) translateY(-5px) translateX(-12px);
+            }
+            80% {
+                transform: scaleY(1.05) scaleX(0.95) translateY(-1px) translateX(-4px);
+            }
+            100% {
+                transform: scaleY(1) scaleX(1) translateY(0) translateX(0);
+            }
+        }
+
+        h1, h2 {
+            font-family: 'Audiowide', sans-serif;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .status {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+            z-index: 100;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .status.fade-out {
+            opacity: 0;
+            transform: translate(-50%, -55%);
+        }
+
+        #startButton {
+            font-size: 1.5em;
+            padding: 15px 40px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s, opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+
+        #startButton.fade-out {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        #startButton:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.4);
+        }
+
+        #startButton:disabled {
+            background: #888;
+            cursor: not-allowed;
+        }
+
+        #startSensitive:hover:not(:disabled) {
+            background: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(33, 150, 243, 0.4);
+        }
+
+        #startTrippy:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(76, 175, 80, 0.4);
+        }
+
+        #startSensitive:disabled,
+        #startTrippy:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .synth-panel {
+            background: rgba(0,0,0,var(--synth-bg-opacity));
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .viz-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            min-width: 200px;
+            max-width: 250px;
+        }
+
+        .viz-controls details {
+            border: none;
+        }
+
+        .viz-controls summary {
+            cursor: pointer;
+            padding: 8px 10px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            user-select: none;
+            list-style: none;
+        }
+
+        .viz-controls summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .viz-controls summary::before {
+            content: '▼ ';
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        .viz-controls details:not([open]) summary::before {
+            transform: rotate(-90deg);
+        }
+
+        .viz-controls summary:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .viz-controls .details-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 0 10px 10px 10px;
+        }
+
+        .viz-controls label {
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .viz-controls input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .viz-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .viz-controls input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .viz-controls .value-display {
+            font-size: 0.8em;
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            padding-bottom: 10px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .knob {
+            text-align: center;
+        }
+
+        .knob label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+
+        .knob webaudio-knob {
+            margin: 0 auto;
+            display: block;
+        }
+
+        .knob .param-label {
+            margin-top: 8px;
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .knob input[type="range"] {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .knob input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .knob input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: none;
+        }
+
+        .knob .value {
+            margin-top: 8px;
+            font-size: 0.9em;
+            opacity: 0.7;
+            font-family: monospace;
+        }
+
+        .keyboard {
+            display: flex;
+            gap: 0;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+
+        .key {
+            flex: 1;
+            max-width: 80px;
+            padding: 60px 10px 20px;
+            background: linear-gradient(180deg, #ffffff 0%, #f0f0f0 100%);
+            color: #333;
+            border: 1px solid #999;
+            border-radius: 0 0 8px 8px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s;
+            position: relative;
+            box-shadow: 0 4px 0 #666;
+            z-index: 1;
+        }
+
+        .key.black {
+            background: linear-gradient(180deg, #333 0%, #000 100%);
+            color: #fff;
+            border-color: #000;
+            margin: 0 -20px;
+            z-index: 2;
+            height: 35%;
+            padding-top: 20px;
+            padding-bottom: 10px;
+            box-shadow: 0 4px 0 #222;
+            max-width: 40px;
+        }
+
+        .key:active,
+        .key.active {
+            background: linear-gradient(180deg, #e0e0e0 0%, #d0d0d0 100%);
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #666;
+        }
+
+        .key.black:active,
+        .key.black.active {
+            background: linear-gradient(180deg, #444 0%, #222 100%);
+            box-shadow: 0 2px 0 #222;
+        }
+
+        .key .note-name {
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .info {
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.7;
+        }
+
+        .info a {
+            color: #7fffb0;
+        }
+
+        .info a:hover {
+            color: #90ffcc;
+        }
+
+        .filter-select {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .filter-select button {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-select button.active {
+            background: #4CAF50;
+            border-color: #45a049;
+        }
+
+        .octave-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+
+        .octave-selector button {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .octave-selector button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .octave-selector .octave-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .selector-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .selector-group button {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        .selector-group button.active {
+            background: #4CAF50;
+            border-color: #45a049;
+        }
+
+        /* LFO waveform visual buttons */
+        .lfo-waveforms {
+            gap: 8px;
+            margin-top: -40px;
+            margin-bottom: 40px;
+        }
+
+        .lfo-waveforms .lfo-wave-btn {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lfo-waveforms .lfo-wave-btn svg {
+            display: block;
+        }
+
+        .sequencer-grid {
+            display: grid;
+            grid-template-columns: repeat(32, 56px);
+            gap: 4px;
+        }
+        
+        .seq-step {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 2px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .seq-step.selected {
+            border-color: #4CAF50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .seq-step.gate-off {
+            opacity: 0.4;
+        }
+
+        .seq-step.gate-off .piano-roll,
+        .seq-step.gate-off .note-name-display,
+        .seq-step.gate-off .octave-radios,
+        .seq-step.gate-off .seq-btn.accent,
+        .seq-step.gate-off .seq-btn.slide {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .seq-btn {
+            width: 100%;
+            height: 20px;
+            border: none;
+            border-radius: 2px;
+            background: #444;
+            color: transparent;
+            cursor: pointer;
+        }
+
+        /* Gate button - full width clickable area with centered LED */
+        .seq-btn.gate {
+            width: 100%;
+            height: 20px;
+            background: #111;
+            border: none;
+            border-radius: 2px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .seq-btn.gate.active {
+            background: #111;
+            box-shadow: none;
+        }
+
+        .seq-btn.gate::after {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #444, #1a1a1a);
+            border: 1px solid #222;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+
+        .seq-btn.gate.active::after {
+            background: radial-gradient(circle at 30% 30%, #81C784, #2E7D32);
+            border-color: #1B5E20;
+            box-shadow:
+                inset 0 1px 2px rgba(255,255,255,0.3),
+                0 0 6px #4CAF50,
+                0 0 12px rgba(76, 175, 80, 0.4);
+        }
+
+        /* Turn gate LED red when step is currently playing */
+        .seq-step.current .seq-btn.gate.active::after {
+            background: radial-gradient(circle at 30% 30%, #FF5252, #C62828);
+            border-color: #8B0000;
+            box-shadow:
+                inset 0 1px 2px rgba(255,255,255,0.3),
+                0 0 6px #FF1744,
+                0 0 12px rgba(255, 23, 68, 0.6);
+        }
+
+        .seq-btn.active {
+            background: #4CAF50;
+            box-shadow: 0 0 5px #4CAF50;
+        }
+
+        .seq-btn.accent.active { background: #8B3A3A; box-shadow: 0 0 5px #8B3A3A; }
+        .seq-btn.slide.active { background: #FFC107; box-shadow: 0 0 5px #FFC107; }
+
+        /* Mute state (TT-03 extension) - darker purple/blue color */
+        .seq-btn.accent.mute { background: #5C6BC0; box-shadow: 0 0 5px #5C6BC0; }
+
+        /* Hammer state (TT-03 extension) - orange color to distinguish from slide */
+        .seq-btn.slide.hammer { background: #FF7043; box-shadow: 0 0 5px #FF7043; }
+
+        /* Piano roll grid for note selection */
+        .piano-roll {
+            display: flex;
+            flex-direction: column-reverse; /* C at bottom, B at top */
+            gap: 1px;
+            background: #222;
+            border-radius: 2px;
+            overflow: hidden;
+            width: 100%;
+            align-self: stretch;
+        }
+
+        .piano-key {
+            width: 100%;
+            height: 18px;
+            min-height: 18px;
+            background: #444;
+            cursor: pointer;
+            transition: background 0.1s;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .piano-key.black-key {
+            background: #222;
+        }
+
+        .piano-key:hover {
+            background: #666;
+        }
+
+        .piano-key.black-key:hover {
+            background: #444;
+        }
+
+        .piano-key.selected {
+            background: #4CAF50;
+            box-shadow: inset 0 0 3px rgba(255,255,255,0.5);
+        }
+
+        .piano-key.black-key.selected {
+            background: #388E3C;
+        }
+
+        /* Disabled piano keys (out of scale) */
+        .piano-key.disabled {
+            background: #000;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .piano-key.black-key.disabled {
+            background: #000;
+            opacity: 0.6;
+        }
+
+        .piano-key.disabled:hover {
+            background: #000;
+        }
+
+        .piano-key.black-key.disabled:hover {
+            background: #000;
+        }
+
+        /* Out-of-scale selected notes show a warning color */
+        .piano-key.selected.out-of-scale {
+            background: #8B4513;
+            box-shadow: inset 0 0 3px rgba(255,165,0,0.6);
+        }
+
+        .piano-key.black-key.selected.out-of-scale {
+            background: #6B3410;
+        }
+
+        /* Note name display */
+        .note-name-display {
+            width: 100%;
+            text-align: center;
+            font-family: 'DS-DIGIT', monospace;
+            font-size: 18px;
+            font-weight: normal;
+            color: #7fffb0;
+            text-shadow: 0 0 4px rgba(127, 255, 176, 0.3);
+            background: #111;
+            padding: 4px 0;
+            border-radius: 2px;
+            margin: 2px 0;
+        }
+
+        .note-name-display.hovering {
+            color: #90ffcc;
+            text-shadow: 0 0 6px rgba(127, 255, 176, 0.5);
+        }
+
+        /* Octave radio buttons */
+        .octave-radios {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 4px;
+            width: 100%;
+            align-self: stretch;
+        }
+
+        .octave-radio {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .octave-radio input[type="radio"] {
+            display: none;
+        }
+
+        .octave-radio label {
+            width: 100%;
+            padding: 2px 0;
+            text-align: center;
+            font-size: 9px;
+            background: #333;
+            color: #888;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.1s;
+        }
+
+        .octave-radio input[type="radio"]:checked + label {
+            background: #666;
+            color: #fff;
+        }
+
+        .octave-radio label:hover {
+            background: #555;
+        }
+
+        .filter-btn {
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.1em;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-2px);
+        }
+
+        .filter-btn.active {
+            background: #4CAF50;
+            border-color: #45a049;
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+        }
+
+        .filter-btn.copied {
+            background: #4CAF50;
+            border-color: #45a049;
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+        }
+
+        #globalShare {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+        }
+
+        #globalShare svg {
+            flex-shrink: 0;
+        }
+
+        #seqPlayStop {
+            padding: 20px 40px;
+            font-size: 1.4em;
+            min-width: 160px;
+        }
+
+        /* D-pad style controls for sequence manipulation */
+        .dpad-container {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left center right"
+                ". down .";
+            grid-template-columns: 28px 28px 28px;
+            grid-template-rows: 28px 28px 28px;
+            gap: 2px;
+        }
+
+        .dpad-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            padding: 0;
+        }
+
+        .dpad-btn:hover {
+            background: rgba(255,255,255,0.25);
+            transform: scale(1.05);
+        }
+
+        .dpad-btn:active {
+            background: #4CAF50;
+            transform: scale(0.95);
+        }
+
+        .dpad-btn.up { grid-area: up; }
+        .dpad-btn.down { grid-area: down; }
+        .dpad-btn.left { grid-area: left; }
+        .dpad-btn.right { grid-area: right; }
+
+        .dpad-label {
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.7;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        @media (max-width: 768px), (max-height: 550px) {
+            .controls {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .keyboard {
+                overflow-x: auto;
+            }
+
+            .viz-controls {
+                display: none !important;
+            }
+
+            .status {
+                top: 50%;
+                transform: translate(-50%, -50%);
+                max-width: 90%;
+                max-height: 70vh;
+                padding: 12px;
+                overflow-y: auto;
+            }
+
+            .status h2 {
+                font-size: 1.3em !important;
+                margin-bottom: 10px !important;
+            }
+
+            .status p {
+                font-size: 0.9em;
+                margin-bottom: 15px !important;
+            }
+
+            /* Reorganize sequencer controls for mobile */
+            .synth-panel .controls:has(#seqPlayStop) {
+                display: flex !important;
+                flex-wrap: wrap;
+                justify-content: space-evenly;
+                gap: 15px !important;
+                row-gap: 10px !important;
+            }
+
+            /* Top row items - same width */
+            .synth-panel .controls:has(#seqPlayStop) > * {
+                flex: 0 1 auto;
+                min-width: 65px;
+                max-width: 80px;
+            }
+
+            /* Make buttons container full width and centered */
+            .synth-panel .controls:has(#seqPlayStop) > div:has(#seqRandom) {
+                flex: 1 1 100% !important;
+                max-width: 100% !important;
+                flex-direction: row !important;
+                justify-content: center !important;
+                align-items: center !important;
+                gap: 12px !important;
+                margin-top: 8px;
+            }
+
+            /* Play button styling */
+            #seqPlayStop {
+                padding: 8px 10px !important;
+                font-size: 0.8em !important;
+                min-width: 65px !important;
+            }
+
+            /* Knob labels smaller on mobile */
+            .synth-panel .controls:has(#seqPlayStop) .knob label {
+                font-size: 0.65em !important;
+                margin-bottom: 4px !important;
+            }
+
+            /* Knob values smaller */
+            .synth-panel .controls:has(#seqPlayStop) .param-label {
+                font-size: 0.7em !important;
+                margin-top: 2px !important;
+            }
+
+            /* Make knobs smaller on mobile */
+            .synth-panel .controls:has(#seqPlayStop) webaudio-knob {
+                transform: scale(0.85);
+            }
+
+            /* Pattern length input */
+            #patternLength {
+                height: 28px !important;
+                width: 50px !important;
+                font-size: 0.85em !important;
+            }
+
+            /* Random/Shuffle/Presets buttons */
+            #seqRandom, #seqShuffle, #seqPresets {
+                width: auto !important;
+                min-width: 48px !important;
+                padding: 8px 12px !important;
+                font-size: 1.2em !important;
+            }
+
+            .dpad-container {
+                transform: scale(0.8);
+            }
+
+            /* Hide desktop D-pad on mobile, show header D-pad */
+            .dpad-desktop {
+                display: none !important;
+            }
+
+            .dpad-header-wrapper {
+                display: flex !important;
+                margin-top: 10px;
+            }
+
+            .seq-header-right {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 5px;
+            }
+
+            /* Float play button left on mobile */
+            .synth-panel .controls:has(#seqPlayStop) > div:has(#seqPlayStop) {
+                order: -1;
+                margin-right: auto;
+            }
+
+        }
+
+        /* Confirm tooltip for reset buttons */
+        .confirm-tooltip {
+            position: absolute;
+            background: #222;
+            border: 1px solid #ff6600;
+            border-radius: 8px;
+            padding: 10px 14px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            font-size: 0.9em;
+        }
+        .confirm-tooltip span {
+            color: #fff;
+            margin-right: 4px;
+        }
+        .confirm-tooltip button {
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .confirm-tooltip .confirm-yes {
+            background: #ff6600;
+            color: #000;
+        }
+        .confirm-tooltip .confirm-no {
+            background: #444;
+            color: #fff;
+        }
+
+        /* Preset dropdown menu */
+        .preset-dropdown {
+            position: absolute;
+            background: #222;
+            border: 1px solid #ff6600;
+            border-radius: 8px;
+            padding: 8px 0;
+            z-index: 1000;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .preset-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            color: #fff;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .preset-dropdown-item:hover {
+            background: #ff6600;
+            color: #000;
+        }
+
+        /* Silver toggle switch (Devil Fish style) - horizontal */
+        .toggle-switch {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .toggle-switch label {
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.4;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .toggle-switch input[type="checkbox"]:checked + label {
+            opacity: 1.0;
+        }
+
+        .toggle-switch input[type="checkbox"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 36px;
+            height: 18px;
+            background: linear-gradient(90deg, #555 0%, #444 50%, #555 100%);
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.1);
+            transition: background 0.15s ease-out, box-shadow 0.15s ease-out;
+        }
+
+        .toggle-switch input[type="checkbox"]:checked {
+            background: linear-gradient(90deg, #996600 0%, #cc8800 50%, #996600 100%);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.3), 0 0 8px rgba(255,170,0,0.5);
+        }
+
+        .toggle-switch input[type="checkbox"]::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 12px;
+            background: linear-gradient(180deg, #e0e0e0 0%, #b0b0b0 50%, #909090 100%);
+            border: 1px solid #666;
+            border-radius: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 2px;
+            transition: left 0.1s ease-out;
+            box-shadow: 1px 0 2px rgba(0,0,0,0.3);
+        }
+
+        .toggle-switch input[type="checkbox"]:checked::after {
+            left: 18px;
+            background: linear-gradient(180deg, #fff 0%, #e0e0e0 50%, #c0c0c0 100%);
+        }
+    </style>
+    <script type="module" crossorigin src="db303-index.js"></script>
+  </head>
+
+  <body>
+    <canvas id="shaderCanvas"></canvas>
+
+    <!-- Visualizer Controls -->
+    <div class="viz-controls" id="vizControls" style="display: none;">
+      <details open>
+        <summary>Background</summary>
+
+        <div class="details-content">
+          <label>Intensity</label>
+
+          <input
+            type="range"
+            id="vizBrightness"
+            min="0"
+            max="100"
+            value="40"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="brightnessValue">40</span>%</div>
+
+          <label style="margin-top: 15px;">Fade Speed</label>
+
+          <input
+            type="range"
+            id="fadeSpeed"
+            min="0"
+            max="100"
+            value="50"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display">
+            <span id="fadeSpeedValue">Medium</span>
+          </div>
+
+          <label style="margin-top: 15px;">Kaleidoscope</label>
+
+          <input
+            type="range"
+            id="vizSegments"
+            min="4"
+            max="32"
+            value="12"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="segmentsValue">12</span></div>
+
+          <label style="margin-top: 15px;">Rotation Speed</label>
+
+          <input
+            type="range"
+            id="vizRotation"
+            min="0"
+            max="200"
+            value="100"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="rotationValue">100</span>%</div>
+
+          <label style="margin-top: 15px;">Spin Speed</label>
+
+          <input
+            type="range"
+            id="vizSpin"
+            min="-100"
+            max="100"
+            value="-5"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="spinValue">0</span>%</div>
+
+          <label style="margin-top: 15px;">Color Speed</label>
+
+          <input
+            type="range"
+            id="vizColorSpeed"
+            min="0"
+            max="200"
+            value="100"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display">
+            <span id="colorSpeedValue">100</span>%
+          </div>
+
+          <label style="margin-top: 15px;">Tile Size</label>
+
+          <input
+            type="range"
+            id="vizTileSize"
+            min="50"
+            max="200"
+            value="100"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="tileSizeValue">100</span>%</div>
+
+          <label style="margin-top: 15px;">Panel Opacity</label>
+
+          <input
+            type="range"
+            id="bgOpacity"
+            min="0"
+            max="100"
+            value="45"
+            step="1"
+            autocomplete="off"
+          >
+
+          <div class="value-display"><span id="opacityValue">45</span>%</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <img src="acid_worm_small.png" alt="Acid Worm" class="logo">
+
+          <div>
+            <h1>🎹 DB-303</h1>
+            <p class="subtitle">Diode Bass Synthesizer</p>
+          </div>
+
+          <button
+            id="globalShare"
+            class="filter-btn"
+            style="margin-left: auto; display: none;"
+            title="Copy Share Link"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            <span class="share-label">Share the fun</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="status" id="warningModal">
+        <h2 style="margin-bottom: 20px; font-size: 1.8em;">
+          ⚠️ Visual Warning
+        </h2>
+
+        <p style="margin-bottom: 30px; max-width: 500px; line-height: 1.6;">
+          This synthesizer features animated background visuals with flashing
+          lights and patterns.
+        </p>
+
+        <div
+          style="display: flex; flex-direction: column; gap: 15px; width: 100%;"
+        >
+          <button
+            id="startSensitive"
+            style="font-size: 1.3em; padding: 15px 30px; background: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.3s;"
+          >
+            I'm sensitive to flashing lights
+          </button>
+
+          <button
+            id="startTrippy"
+            style="font-size: 1.3em; padding: 15px 30px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.3s;"
+          >
+            I want trippy visuals ✨
+          </button>
+        </div>
+
+        <p id="status" style="margin-top: 20px;">
+          Click an option to initialize audio...
+        </p>
+      </div>
+
+      <div id="synthContainer" style="display: none;">
+        <!-- Sequencer -->
+        <div class="synth-panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"
+          >
+            <!-- <h2 class="panel-title" style="margin-bottom: 0;">Sequencer</h2> -->
+
+            <div class="seq-header-right" style="margin-left: auto;">
+              <div style="display: flex; gap: 10px;">
+                <button
+                  id="seqExport"
+                  class="filter-btn"
+                  style="padding: 10px 15px;"
+                  title="Export Pattern"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+
+                    <line
+                      x1="12"
+                      y1="15"
+                      x2="12"
+                      y2="3"
+                    ></line>
+                  </svg>
+                </button>
+
+                <button
+                  id="seqImport"
+                  class="filter-btn"
+                  style="padding: 10px 15px;"
+                  title="Import Pattern"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+
+                    <line
+                      x1="12"
+                      y1="3"
+                      x2="12"
+                      y2="15"
+                    ></line>
+                  </svg>
+                </button>
+
+                <button
+                  id="seqClear"
+                  class="filter-btn"
+                  style="padding: 10px 15px;"
+                  title="Clear Pattern"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                  </svg>
+                </button>
+
+                <input
+                  type="file"
+                  id="patternFileInput"
+                  accept=".xml"
+                  style="display: none;"
+                >
+              </div>
+
+              <div class="dpad-header-wrapper" style="display: none;">
+                <div class="dpad-container">
+                  <button
+                    id="seqTransposeUpMobile"
+                    class="dpad-btn up"
+                    title="Transpose Up (+1 semitone)"
+                  >
+                    ▲
+                  </button>
+
+                  <button
+                    id="seqShiftLeftMobile"
+                    class="dpad-btn left"
+                    title="Shift Left (rotate steps)"
+                  >
+                    ◀
+                  </button>
+
+                  <button
+                    id="seqShiftRightMobile"
+                    class="dpad-btn right"
+                    title="Shift Right (rotate steps)"
+                  >
+                    ▶
+                  </button>
+
+                  <button
+                    id="seqTransposeDownMobile"
+                    class="dpad-btn down"
+                    title="Transpose Down (-1 semitone)"
+                  >
+                    ▼
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="controls"
+            style="margin-bottom: 20px; justify-content: center;"
+          >
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="seqPlayStop" class="filter-btn">▶</button>
+            </div>
+
+            <div class="knob">
+              <label>Tempo</label>
+
+              <webaudio-knob
+                id="tempo"
+                src="knobs/LittlePhatty.png"
+                value="120"
+                min="60"
+                max="200"
+                step="1"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="tempoValue">120 BPM</div>
+            </div>
+
+            <div class="knob">
+              <label>Swing</label>
+
+              <webaudio-knob
+                id="swing"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="swingValue">0%</div>
+            </div>
+
+            <div class="knob">
+              <label>Pattern Steps</label>
+
+              <input
+                type="number"
+                id="patternLength"
+                min="1"
+                max="32"
+                value="16"
+                autocomplete="off"
+                style="width: 64px; height: 32px; text-align: center; font-size: 1.1em; background: #333; color: #fff; border: 1px solid #666; border-radius: 4px;"
+              >
+            </div>
+
+            <div class="knob">
+              <label>Root</label>
+
+              <webaudio-knob
+                id="transpose"
+                src="knobs/LittlePhatty.png"
+                value="36"
+                min="24"
+                max="48"
+                step="1"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="transposeValue">C2</div>
+
+              <select id="scaleMode" style="
+                background: #222;
+                color: #fff;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                cursor: pointer;
+                min-width: 90px;
+                margin-top: 8px;
+              ">
+                <option value="none">Chromatic</option>
+                <option value="ionian">Ionian</option>
+                <option value="dorian">Dorian</option>
+                <option value="phrygian">Phrygian</option>
+                <option value="lydian">Lydian</option>
+                <option value="mixolydian">Mixolydian</option>
+                <option value="aeolian">Aeolian</option>
+                <option value="locrian">Locrian</option>
+              </select>
+            </div>
+
+            <div
+              style="display: flex; flex-direction: column; justify-content: center; gap: 10px;"
+            >
+              <button
+                id="seqRandom"
+                class="filter-btn"
+                style="width: 50%"
+                title="Randomize"
+              >
+                🎲
+              </button>
+
+              <button
+                id="seqShuffle"
+                class="filter-btn"
+                style="width: 50%"
+                title="Shuffle"
+              >
+                🔀
+              </button>
+
+              <button
+                id="seqPresets"
+                class="filter-btn"
+                style="width: 50%; position: relative;"
+                title="Load Pattern Preset"
+              >
+                💾
+              </button>
+            </div>
+
+            <div
+              class="dpad-desktop"
+              style="display: flex; flex-direction: column; align-items: center;"
+            >
+              <div class="dpad-label">Shift</div>
+
+              <div class="dpad-container">
+                <button
+                  id="seqTransposeUp"
+                  class="dpad-btn up"
+                  title="Transpose Up (+1 semitone)"
+                >
+                  ▲
+                </button>
+
+                <button
+                  id="seqShiftLeft"
+                  class="dpad-btn left"
+                  title="Shift Left (rotate steps)"
+                >
+                  ◀
+                </button>
+
+                <button
+                  id="seqShiftRight"
+                  class="dpad-btn right"
+                  title="Shift Right (rotate steps)"
+                >
+                  ▶
+                </button>
+
+                <button
+                  id="seqTransposeDown"
+                  class="dpad-btn down"
+                  title="Transpose Down (-1 semitone)"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="sequencer-grid"
+            id="sequencerGrid"
+            style="overflow-x: auto; padding-bottom: 10px;"
+          >
+            <!-- Generated by JS -->
+          </div>
+
+          <p style="text-align: center; margin-top: 15px; opacity: 0.7;">
+            Keyboard: A-K for notes; arrows to select step and octave up/down.
+            Spacebar for pause/play.
+          </p>
+        </div>
+
+        <!-- Oscillator Controls -->
+        <div class="synth-panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"
+          >
+            <h2 class="panel-title" style="margin-bottom: 0;">OSC</h2>
+
+            <div style="display: flex; gap: 10px;">
+              <button
+                id="presetExport"
+                class="filter-btn"
+                style="padding: 10px 15px;"
+                title="Export Preset"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+
+                  <line
+                    x1="12"
+                    y1="15"
+                    x2="12"
+                    y2="3"
+                  ></line>
+                </svg>
+              </button>
+
+              <button
+                id="presetImport"
+                class="filter-btn"
+                style="padding: 10px 15px;"
+                title="Import Preset"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+
+                  <line
+                    x1="12"
+                    y1="3"
+                    x2="12"
+                    y2="15"
+                  ></line>
+                </svg>
+              </button>
+
+              <button
+                id="presetReset"
+                class="filter-btn"
+                style="padding: 10px 15px;"
+                title="Reset to Defaults"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                </svg>
+              </button>
+
+              <input
+                type="file"
+                id="presetFileInput"
+                accept=".xml"
+                style="display: none;"
+              >
+            </div>
+          </div>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Waveform</label>
+
+              <webaudio-knob
+                id="waveform"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label">Saw ↔ Square</div>
+            </div>
+
+            <div class="knob">
+              <label>Pulse Width</label>
+
+              <webaudio-knob
+                id="pulseWidth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="pulseWidthValue">50%</div>
+            </div>
+
+            <div class="knob">
+              <label>Sub Osc</label>
+
+              <webaudio-knob
+                id="subOscGain"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="subOscGainValue">0%</div>
+            </div>
+
+            <div class="knob">
+              <label>Sub Wave</label>
+
+              <webaudio-knob
+                id="subOscBlend"
+                src="knobs/LittlePhatty.png"
+                value="1"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label">-2 Oct ↔ -1 Oct</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Controls -->
+        <div class="synth-panel">
+          <h2 class="panel-title">CLASSIC</h2>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Cutoff</label>
+
+              <webaudio-knob
+                id="cutoff"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="cutoffValue">1000 Hz</div>
+
+              <div class="toggle-switch" style="margin-top: 18px;">
+                <input type="checkbox" id="extendedCutoff" title="Wide Cutoff: 10 Hz - 5 kHz">
+                <label>Wide</label>
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Resonance</label>
+
+              <webaudio-knob
+                id="resonance"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="resonanceValue">50%</div>
+            </div>
+
+            <div class="knob">
+              <label>Env Mod</label>
+
+              <webaudio-knob
+                id="envMod"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="envModValue">50%</div>
+
+              <div class="toggle-switch" style="margin-top: 18px;">
+                <input type="checkbox" id="extendedEnvMod" title="Wide Env Mod: 0-300%">
+                <label>Wide</label>
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Decay</label>
+
+              <webaudio-knob
+                id="decay"
+                src="knobs/LittlePhatty.png"
+                value="0.4"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="decayValue">600 ms</div>
+            </div>
+
+            <div class="knob">
+              <label>Accent</label>
+
+              <webaudio-knob
+                id="accent"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="accentValue">50%</div>
+            </div>
+          </div>
+        </div>
+
+                <!-- Custom Mods -->
+        <div class="synth-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 10px;">
+            <h2 class="panel-title" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">MOJO</h2>
+
+            <!-- Filter Type Selector -->
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <label style="font-size: 12px; color: #ccc;">Filter:</label>
+              <select id="filterSelect" style="
+                background: #222;
+                color: #fff;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 6px 10px;
+                font-size: 12px;
+                cursor: pointer;
+                min-width: 140px;
+              ">
+                <option value="0">DiodeLadder</option>
+                <option value="5">MissThang-20</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Bass Boost</label>
+
+              <webaudio-knob
+                id="passbandCompensation"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="passbandCompensationValue">80%</div>
+            </div>
+
+            <div class="knob">
+              <label>Rez Boost</label>
+
+              <webaudio-knob
+                id="resTracking"
+                src="knobs/LittlePhatty.png"
+                value="0.7"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="resTrackingValue">70%</div>
+            </div>
+
+            <div class="knob">
+              <label>Saturation</label>
+
+              <webaudio-knob
+                id="filterInputDrive"
+                src="knobs/LittlePhatty.png"
+                value="0.0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="filterInputDriveValue">0</div>
+            </div>
+
+            <div class="knob">
+              <label>Bite</label>
+
+              <webaudio-knob
+                id="diodeCharacter"
+                src="knobs/LittlePhatty.png"
+                value="0.0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="diodeCharacterValue">0%</div>
+            </div>
+
+            <div class="knob">
+              <label>Tension</label>
+
+              <webaudio-knob
+                id="duffingAmount"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="-1"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="duffingAmountValue">0%</div>
+            </div>
+
+            <div class="knob" id="lpBpMixKnob">
+              <label id="lpBpMixLabel">LP/BP</label>
+
+              <webaudio-knob
+                id="lpBpMix"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lpBpMixValue">LP</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LFO Controls -->
+        <div class="synth-panel">
+          <h2 class="panel-title">LFO</h2>
+
+          <h3 style="margin-bottom: 15px;">Waveform</h3>
+
+          <div class="selector-group lfo-waveforms">
+            <button class="lfo-wave-btn active" data-wave="0" title="Triangle">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,20 10,4 20,20 30,4 40,20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="lfo-wave-btn" data-wave="1" title="Saw Up">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,20 20,4 20,20 40,4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="lfo-wave-btn" data-wave="2" title="Saw Down">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,4 20,20 20,4 40,20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="lfo-wave-btn" data-wave="3" title="Square">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,20 0,4 10,4 10,20 20,20 20,4 30,4 30,20 40,20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="lfo-wave-btn" data-wave="4" title="Random (S&amp;H)">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,16 8,16 8,6 16,6 16,18 24,18 24,10 32,10 32,14 40,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="lfo-wave-btn" data-wave="5" title="Noise">
+              <svg viewBox="0 0 40 24" width="40" height="24">
+                <polyline points="0,12 3,8 6,16 9,6 12,18 15,10 18,14 21,4 24,20 27,8 30,16 33,6 36,14 40,12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Rate</label>
+
+              <webaudio-knob
+                id="lfoRate"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoRateValue">0.1 Hz</div>
+            </div>
+
+            <div class="knob">
+              <label>Contour</label>
+
+              <webaudio-knob
+                id="lfoContour"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="-1"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoContourValue">0%</div>
+            </div>
+
+            <div class="knob">
+              <label>PWM Mod</label>
+
+              <webaudio-knob
+                id="lfoPwmDepth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoPwmDepthValue">0%</div>
+            </div>
+
+            <div class="knob">
+              <label>Pitch Mod</label>
+
+              <webaudio-knob
+                id="lfoPitchDepth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoPitchDepthValue">0 semi</div>
+            </div>
+
+            <div class="knob">
+              <label>Filter Mod</label>
+
+              <webaudio-knob
+                id="lfoFilterDepth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoFilterDepthValue">0 oct</div>
+            </div>
+
+            <div class="knob">
+              <label>Tension Mod</label>
+
+              <webaudio-knob
+                id="lfoStiffDepth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="lfoStiffDepthValue">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="synth-panel">
+          <h2 class="panel-title">DEVILFISH</h2>
+
+          <!-- <h3 style="margin-bottom: 15px; margin-top: 20px;">Devil Fish</h3> -->
+
+          <div class="controls">
+            <!-- Filter FM knob -->
+            <div class="knob">
+              <label>Filter FM</label>
+
+              <webaudio-knob
+                id="filterFmDepth"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="filterFmDepthValue">0%</div>
+            </div>
+
+            <!-- Filter Tracking knob -->
+            <div class="knob">
+              <label>Filter Track</label>
+
+              <webaudio-knob
+                id="filterTracking"
+                src="knobs/LittlePhatty.png"
+                value="0"
+                min="0"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="filterTrackingValue">0%</div>
+            </div>
+
+            <!-- Slide Time knob -->
+            <div class="knob">
+              <label>Slide Time</label>
+
+              <webaudio-knob
+                id="slideTime"
+                src="knobs/LittlePhatty.png"
+                value="0.17"
+                min="0"
+                max="1"
+                step="0.01"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="slideTimeValue">60 ms</div>
+            </div>
+
+            <div class="knob">
+              <label>Soft Attack</label>
+
+              <webaudio-knob
+                id="softAttack"
+                src="knobs/LittlePhatty.png"
+                value="0.0"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="softAttackValue">0.3 ms</div>
+            </div>
+
+            <div class="knob">
+              <label>Normal Decay</label>
+
+              <webaudio-knob
+                id="normalDecay"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="normalDecayValue">300 ms</div>
+            </div>
+
+            <div class="knob">
+              <label>Accent Decay</label>
+
+              <webaudio-knob
+                id="accentDecay"
+                src="knobs/LittlePhatty.png"
+                value="0.1"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="accentDecayValue">50 ms</div>
+            </div>
+
+            <div class="knob">
+              <label>Accent Soft</label>
+
+              <webaudio-knob
+                id="accentSoftAttack"
+                src="knobs/LittlePhatty.png"
+                value="0.5"
+                min="0"
+                max="1"
+                step="0.001"
+                diameter="64"
+                sprites="100"
+              ></webaudio-knob>
+
+              <div class="param-label" id="accentSoftAttackValue">13 ms</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Effects -->
+        <div class="synth-panel">
+          <h2 class="panel-title">FX</h2>
+
+          <h3 style="margin-bottom: 15px;">Dimension</h3>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Mode</label>
+
+              <div class="selector-group" id="chorusModeSelect" style="margin: 0; gap: 5px;">
+                <button class="active" data-mode="0" title="Off">Off</button>
+                <button data-mode="1" title="Subtle">1</button>
+                <button data-mode="2" title="Standard">2</button>
+                <button data-mode="3" title="Rich">3</button>
+                <button data-mode="4" title="Dramatic">4</button>
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Mix</label>
+
+              <input
+                type="range"
+                id="chorusMix"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.5"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="chorusMixDisplay">50</span>%
+              </div>
+            </div>
+          </div>
+
+          <!-- Phaser temporarily disabled - needs debugging -->
+          <div id="phaser-section" style="display: none;">
+            <h3 style="margin-bottom: 15px; margin-top: 20px;">Phaser</h3>
+
+            <div class="controls">
+              <div class="knob">
+                <label>Rate</label>
+
+                <input
+                  type="range"
+                  id="phaserRate"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.5"
+                  autocomplete="off"
+                >
+
+                <div class="param-label">
+                  <span id="phaserRateDisplay">50</span>%
+                </div>
+              </div>
+
+              <div class="knob">
+                <label>Width</label>
+
+                <input
+                  type="range"
+                  id="phaserWidth"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.7"
+                  autocomplete="off"
+                >
+
+                <div class="param-label">
+                  <span id="phaserWidthDisplay">70</span>%
+                </div>
+              </div>
+
+              <div class="knob">
+                <label>Feedback</label>
+
+                <input
+                  type="range"
+                  id="phaserFeedback"
+                  min="-1"
+                  max="1"
+                  step="0.01"
+                  value="0"
+                  autocomplete="off"
+                >
+
+                <div class="param-label">
+                  <span id="phaserFeedbackDisplay">0</span>%
+                </div>
+              </div>
+
+              <div class="knob">
+                <label>Mix</label>
+
+                <input
+                  type="range"
+                  id="phaserMix"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0"
+                  autocomplete="off"
+                >
+
+                <div class="param-label">
+                  <span id="phaserMixDisplay">0</span>%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3 style="margin-bottom: 15px; margin-top: 20px;">Delay</h3>
+
+          <div class="controls">
+            <div class="knob">
+              <label>Time (16ths)</label>
+
+              <input
+                type="range"
+                id="delayTime"
+                min="0.0"
+                max="16"
+                step="1.0"
+                value="3"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="delayTimeDisplay">3</span> 16ths
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Feedback</label>
+
+              <input
+                type="range"
+                id="delayFeedback"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.3"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="delayFeedbackDisplay">30</span>%
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Tone</label>
+
+              <input
+                type="range"
+                id="delayTone"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.5"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="delayToneDisplay">Bypass</span>
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Mix</label>
+
+              <input
+                type="range"
+                id="delayMix"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.2"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="delayMixDisplay">20</span>%
+              </div>
+            </div>
+
+            <div class="knob">
+              <label>Spread</label>
+
+              <input
+                type="range"
+                id="delaySpread"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.75"
+                autocomplete="off"
+              >
+
+              <div class="param-label">
+                <span id="delaySpreadDisplay">75</span>%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keyboard -->
+        <div class="synth-panel">
+          <h2 class="panel-title">Transpose</h2>
+
+          <div class="octave-selector">
+            <button id="octaveDown">-</button>
+
+            <div class="octave-display">
+              Octave: <span id="octaveDisplay">2</span>
+            </div>
+
+            <button id="octaveUp">+</button>
+          </div>
+
+          <div class="keyboard" id="keyboard"></div>
+
+          <p></p>
+        </div>
+
+        <div class="info">
+          <p>
+            Built with WebAssembly + SIMD • Modern browsers required (Chrome
+            91+, Firefox 89+, Safari 16.4+)
+          </p>
+
+          <p style="margin-top: 10px;">
+            DB-303 by <a href="hhttps://dfl.github.io/lowenlabs-audio/" target="_blank">Löwen Labs</a> • Inspired by Open303 and <a href="https://github.com/jc-303" target="_blank">JC-303</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+
+    <footer>
+      by <a href="https://github.com/dfl" target="_blank">David Lowenfels</a>
+      <p>
+        <a href="https://www.buymeacoffee.com/davidlowenk" target="_blank">
+          <img
+            src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+            style="height: 3em; display: inline; margin-top: 1em;"
+            alt="Buy me a coffee"
+          >
+        </a>
+      </p>
+
+      <a href="https://dfl.github.io/lowenlabs-audio/" target="_blank" style="position: absolute; bottom: 10px; left: 15px; opacity: 0.5;">
+        <img src="/lion.png" alt="Löwen Labs" style="width: 48px; height: 48px;">
+      </a>
+      <a href="https://github.com/dfl/lowenlabs-audio/issues" target="_blank" style="position: absolute; bottom: 35px; right: 15px; opacity: 0.5; font-size: 0.7em;">Bugs &amp; Ideas</a>
+      <div id="footer-version" style="position: absolute; bottom: 10px; right: 15px; opacity: 0.4; font-size: 0.7em;"></div>
+    </footer>
+  </body>
+</html>

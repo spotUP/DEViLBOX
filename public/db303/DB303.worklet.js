@@ -35,7 +35,7 @@ class DB303Processor extends AudioWorkletProcessor {
       cutoff: { current: 0.5, target: 0.5, rate: 0.15 },      // Moderate - smooth but responsive
     };
     
-    console.log('[DB303 Worklet] v1.3.1 (Slower Delay Smoothing)');
+    console.log('[DB303 Worklet] v1.3.2 (FilterSelect Validation)');
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -219,11 +219,29 @@ class DB303Processor extends AudioWorkletProcessor {
           
           if (typeof this.synth[setterName] === 'function') {
             // CRITICAL: Convert to number - values come as strings via postMessage
-            const numericValue = parseFloat(data.value);
+            let numericValue = parseFloat(data.value);
+            
+            // Safety check: Clamp filterSelect to valid range (0-5)
+            if (data.paramId === 'filterSelect') {
+              if (numericValue > 5 || numericValue < 0) {
+                console.warn('[DB303] Invalid filterSelect:', numericValue, '- clamping to 1');
+                numericValue = 1;
+              }
+            }
             
             // Debug waveform specifically
             if (data.paramId === 'waveform') {
               console.log('[DB303] Setting waveform via', setterName, '=', numericValue);
+              // ALSO try setParameter fallback since setWaveform may not work
+              if (typeof this.synth.setParameter === 'function') {
+                this.synth.setParameter(0, numericValue);
+                console.log('[DB303] Also calling setParameter(0, ' + numericValue + ') for waveform');
+              }
+              // Try getting waveform back to verify
+              if (typeof this.synth.getParameter === 'function') {
+                const readBack = this.synth.getParameter(0);
+                console.log('[DB303] Waveform readback:', readBack);
+              }
             }
             
             // Use smoothing for glitch-sensitive parameters
@@ -328,6 +346,14 @@ class DB303Processor extends AudioWorkletProcessor {
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
           this.synth.noteOff(this.currentNote);
         } else if (data.slide && this.currentNote >= 0) {
+          // FIX: Skip noteOn entirely for same-pitch slides
+          // When sliding to the same pitch, just sustain the note without any WASM call.
+          // This prevents artifacts from calling noteOn for an already-playing note.
+          if (data.note === this.currentNote) {
+            if (DEBUG_NOTE_EVENTS) console.log('[DB303] SAME-PITCH SLIDE: sustaining note ' + this.currentNote + ' (no WASM call) at ' + currentTime.toFixed(3));
+            // Gate stays high, pitch stays same, no action needed
+            return;
+          }
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
         } else {
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));

@@ -1,6 +1,15 @@
 {
   "version": "1.0.0",
   "categories": {
+    "db303-presets": [
+      { "file": "db303-default-preset.xml", "name": "DB303 Default Preset" },
+      { "file": "classic-303.xml", "name": "Classic 303 Preset" }
+    ],
+    "db303-patterns": [
+      { "file": "db303-default-pattern.xml", "name": "DB303 Default Pattern" },
+      { "file": "acid-bassline.xml", "name": "Acid Bassline Pattern" },
+      { "file": "sliding-sequence.xml", "name": "Sliding Sequence Pattern" }
+    ],
     "acid": [
       { "file": "acid-core.dbx", "name": "Acid Core (TB-303 + TR-909)" },
       { "file": "phuture-acid-tracks.dbx", "name": "Phuture - Acid Tracks" },
@@ -31,7 +40,14 @@
       { "file": "deep-house.dbx", "name": "Deep House (Atmospheric)" },
       { "file": "mr-oizo-flat-beat.dbx", "name": "Mr Oizo - Flat Beat" },
       { "file": "new-order-confusion.dbx", "name": "New Order - Confusion" },
-      { "file": "edge-of-motion-setup-707.dbx", "name": "Edge of Motion - 707 Setup" }
+      { "file": "edge-of-motion-setup-707.dbx", "name": "Edge of Motion - 707 Setup" },
+      { "file": "sam-mary-lamb.dbx", "name": "Mary Had a Little Lamb" },
+      { "file": "speech-duet.dbx", "name": "Speech Duet" },
+      { "file": "v2-twinkle-star.dbx", "name": "Twinkle Twinkle Little Star" }
+    ],
+    "demos": [
+      { "file": "303-feature-test.dbx", "name": "TB-303 Feature Test" },
+      { "file": "comprehensive-feature-test.dbx", "name": "Comprehensive Feature Test" }
     ]
   }
 }

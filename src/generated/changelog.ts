@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-09T17:07:02.120Z
+ * Generated: 2026-02-10T11:53:38.476Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '353';
-export const BUILD_HASH = 'fc75b86';
-export const BUILD_DATE = '2026-02-09';
+export const BUILD_NUMBER = '356';
+export const BUILD_HASH = 'ddecc91';
+export const BUILD_DATE = '2026-02-10';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-09',
     changes: [
+      {
+        type: 'fix',
+        "description": "Use absolute paths for worklet/wasm loading on GitHub Pages"
+      },
+      {
+        type: 'fix',
+        "description": "Test page uses direct worklet loading + correct case-sensitive filenames"
+      },
+      {
+        type: 'fix',
+        "description": "Test page now uses direct worklet loading instead of TypeScript imports"
+      },
       {
         type: 'fix',
         "description": "Tracker knobs now update live synth + improve test page tracking params"
@@ -232,18 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Improve ROM archive ignore pattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add ROM directory structure"
-      },
-      {
-        type: 'improvement',
-        "description": "Add development progress snapshots and reference images"
-      },
-      {
-        type: 'feature',
-        "description": "Add AudioContext singleton for shared audio resources"
       }
     ]
   }

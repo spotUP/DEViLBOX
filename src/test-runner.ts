@@ -782,7 +782,11 @@ async function testMethodAvailability() {
   logHtml('<h2>Method Availability</h2>');
 
   const tb303Methods = ['setCutoff', 'setResonance', 'setEnvMod', 'setDecay', 'setAccent'];
-  const devilFishMethods = ['enableDevilFish', 'setMuffler', 'setFilterTracking', 'setSoftAttack', 'setSubOsc'];
+  const devilFishMethods = [
+    'enableDevilFish', 'setMuffler', 'setFilterTracking', 'setSoftAttack', 'setSubOsc',
+    'setFilterInputDrive', 'setStageNLAmount', 'setEnsembleAmount', 'setOversamplingOrder',
+    'setLfoStiffDepth', 'setDiodeCharacter'
+  ];
   const coreMethods = ['triggerAttack', 'triggerRelease', 'dispose', 'connect'];
   // Player and GranularSynth use start()/stop() instead of triggerAttack/triggerRelease
   const samplePlayerMethods = ['start', 'stop', 'dispose', 'connect'];
