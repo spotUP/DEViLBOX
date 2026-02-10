@@ -224,8 +224,8 @@ class DB303Processor extends AudioWorkletProcessor {
             // Safety check: Clamp filterSelect to valid range (0-5)
             if (data.paramId === 'filterSelect') {
               if (numericValue > 5 || numericValue < 0) {
-                console.warn('[DB303] Invalid filterSelect:', numericValue, '- clamping to 1');
-                numericValue = 1;
+                console.warn('[DB303] Invalid filterSelect:', numericValue, '- clamping to 0');
+                numericValue = 0;
               }
             }
             

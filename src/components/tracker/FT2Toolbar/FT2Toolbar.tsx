@@ -307,10 +307,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handleModuleImport = async (moduleInfo: ModuleInfo) => {
-    if (isPlaying) {
-      stop();
-      engine.releaseAll();
-    }
+    // Always clean up before import to prevent stale state from previous imports
+    if (isPlaying) stop();
+    engine.releaseAll();
     setIsLoading(true);
     try {
       let result;
@@ -327,7 +326,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
           const patternOrder = importMetadata.modData?.patternOrderTable || [];
           const patLen = nativePatterns[0]?.length || 64;
-          const numChannels = nativePatterns[0]?.[0]?.length || 4;
+          const numChannels = importMetadata.originalChannelCount || nativePatterns[0]?.[0]?.length || 4;
           console.log(`[Import] ${format} pattern structure: ${nativePatterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
 
           result = {
@@ -335,6 +334,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               id: `pattern-${idx}`,
               name: `Pattern ${idx}`,
               length: patLen,
+              importMetadata,
               channels: Array.from({ length: numChannels }, (_, ch) => ({
                 id: `channel-${ch}`,
                 name: `Channel ${ch + 1}`,
@@ -353,8 +353,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                     volume: cell.volume || 0,
                     effTyp: cell.effectType || 0,
                     eff: cell.effectParam || 0,
-                    effTyp2: 0,
-                    eff2: 0,
+                    effTyp2: cell.effectType2 || 0,
+                    eff2: cell.effectParam2 || 0,
                   };
                 }),
               })),
@@ -394,6 +394,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       setMetadata({ name: moduleInfo.metadata.title, author: '', description: `Imported from ${moduleInfo.metadata.type}` });
       const initialBPM = moduleInfo.nativeData?.importMetadata.modData?.initialBPM;
       if (initialBPM) setBPM(initialBPM);
+      const initialSpeed = moduleInfo.nativeData?.importMetadata.modData?.initialSpeed;
+      if (initialSpeed) setSpeed(initialSpeed);
       notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
       await engine.preloadInstruments(instruments);
     } catch (err) {

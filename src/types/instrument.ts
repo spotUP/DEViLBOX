@@ -165,9 +165,12 @@ export type SynthType =
   | 'V2Speech'         // Farbrausch V2 Speech Synth
   | 'Sam'              // Commodore SAM Speech Synth
   | 'Synare'           // Synare 3 (Electronic Percussion)
+  | 'WAM'              // Web Audio Module (External Plugin)
   // JUCE WASM Synths
   | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
-  | 'OBXd';            // Oberheim OB-X Analog Synthesizer
+  | 'OBXd'             // Oberheim OB-X Analog Synthesizer
+  // VST Bridge (dynamically registered WASM synths)
+  | 'DexedBridge';     // Dexed DX7 via VSTBridge (test/validation)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -1496,7 +1499,8 @@ export interface FurnaceOperatorConfig {
 }
 
 export interface FurnaceMacro {
-  type: number;      // FurnaceMacroType
+  code?: number;     // Macro slot (0=vol, 1=arp, 2=duty, 3=wave, 4=pitch, etc.)
+  type: number;      // FurnaceMacroType / word size flags
   data: number[];    // Up to 256 steps
   loop: number;      // Loop point (-1 = no loop)
   release: number;   // Release point (-1 = no release)
@@ -2552,6 +2556,24 @@ export const DEFAULT_SAM: SamConfig = {
   singmode: false,
   phonetic: false,
 };
+
+/**
+ * Web Audio Module (WAM) Configuration
+ */
+export interface WAMConfig {
+  moduleUrl: string;              // URL to the WAM entry point (e.g. index.js)
+  pluginState: any;               // Serialized state of the plugin
+  pluginStateVersion?: number;    // Tracks state schema for staleness detection
+  pluginStateTimestamp?: number;  // When state was last saved
+  parameterValues?: Record<string, number>;  // Individual parameter overrides
+}
+
+export const DEFAULT_WAM: WAMConfig = {
+  moduleUrl: '',
+  pluginState: null,
+  pluginStateVersion: 1,
+  pluginStateTimestamp: 0,
+};
 export interface V2Config {
   osc1: {
     mode: number; // Off, Saw/Tri, Pulse, Sin, Noise, XX, AuxA, AuxB
@@ -2761,6 +2783,7 @@ export interface InstrumentConfig {
   v2Speech?: V2SpeechConfig;
   sam?: SamConfig;
   synare?: SynareConfig;
+  wam?: WAMConfig;
   // MAME synths
   mame?: MAMEConfig;
   // Buzzmachines

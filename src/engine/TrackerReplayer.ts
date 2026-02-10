@@ -507,15 +507,18 @@ export class TrackerReplayer {
 
   private calculateGrooveOffset(row: number, rowDuration: number, state: any): number {
     const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId);
-    
-    // Swing is 0-200 where 100 = straight (no swing)
-    // Normalize to 0-1 range where 0 = straight, 1 = full swing
-    const intensity = (state.swing - 100) / 100;
 
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      return getGrooveOffset(grooveTemplate, row, rowDuration) * intensity;
+      // For TEMPLATES: swing is 0-200 where 100 = full template effect
+      // This allows scaling the template groove up or down
+      const templateIntensity = state.swing / 100;
+      const offset = getGrooveOffset(grooveTemplate, row, rowDuration) * templateIntensity;
+      return offset;
     } else {
-      // MANUAL SWING: Apply swing to alternating steps
+      // For MANUAL SWING: swing is 0-200 where 100 = straight (no swing)
+      // Normalize to 0-1 range where 0 = straight, 1 = full swing
+      const swingIntensity = (state.swing - 100) / 100;
+      
       // grooveSteps determines the swing resolution (2 = 16th notes, 3 = 8th note triplets, etc.)
       const grooveSteps = state.grooveSteps || 2;
       const isSwungHalf = (row % grooveSteps) >= (grooveSteps / 2);
@@ -525,7 +528,8 @@ export class TrackerReplayer {
         // At 50% swing (state.swing=150), shift by 16.7%
         // At 0% swing (state.swing=100), shift by 0% (straight)
         const tripletShift = 0.3333;
-        return intensity * tripletShift * rowDuration;
+        const offset = swingIntensity * tripletShift * rowDuration;
+        return offset;
       }
     }
     return 0;
@@ -563,7 +567,8 @@ export class TrackerReplayer {
     // Apply micro-timing jitter (Humanization)
     if (transportState.jitter > 0) {
       const jitterMs = (transportState.jitter / 100) * 0.01;
-      safeTime += (Math.random() * 2 - 1) * jitterMs;
+      const jitterOffset = (Math.random() * 2 - 1) * jitterMs;
+      safeTime += jitterOffset;
     }
 
     // Get current pattern

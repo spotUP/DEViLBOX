@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File } from 'lucide-react';
 import { FileManager as _FileManager } from '@cubone/react-file-manager';
 import '@cubone/react-file-manager/dist/style.css';
 import {
@@ -349,9 +350,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="text-text-muted hover:text-text-primary text-xl leading-none"
+            className="text-text-muted hover:text-text-primary"
+            aria-label="Close"
           >
-            x
+            <X size={18} />
           </button>
         </div>
 
@@ -372,8 +374,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         {/* Breadcrumb / Current Path */}
         {currentPath && (
           <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
-            <div className="text-xs text-text-muted font-mono truncate">
-              📂 {currentPath}
+            <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono truncate">
+              <FolderOpen size={14} /> {currentPath}
             </div>
           </div>
         )}
@@ -439,7 +441,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   }}
                   className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
                 >
-                  <div className="text-2xl">⬅️</div>
+                  <ArrowLeft size={18} className="text-text-muted" />
                   <div className="flex-1">
                     <div className="font-medium text-text-primary">.. (back)</div>
                   </div>
@@ -473,8 +475,12 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-transparent'
                   }`}
                 >
-                  <div className="text-2xl">
-                    {file.isDirectory ? '📁' : '🎵'}
+                  <div className="text-text-muted flex-shrink-0">
+                    {file.isDirectory
+                      ? <Folder size={18} />
+                      : isTrackerModule(file.name)
+                        ? <FileAudio size={18} />
+                        : <File size={18} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-text-primary truncate">{file.name}</div>
@@ -490,8 +496,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     }}
                     className="text-text-muted hover:text-red-400 p-1"
                     title="Delete"
+                    aria-label="Delete"
                   >
-                    🗑️
+                    <Trash2 size={14} />
                   </button>
                 </div>
               ))}

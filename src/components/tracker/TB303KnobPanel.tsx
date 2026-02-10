@@ -33,14 +33,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
     ? instruments.find(i => i.id === controlledInstrumentId && i.synthType === 'TB303')
     : instruments.find(i => i.synthType === 'TB303');
 
-  // DEBUG: Log when tb303 config changes
-  console.log('[TB303KnobPanel] Rendering with config:', targetInstrument?.tb303 ? {
-    cutoff: targetInstrument.tb303.filter?.cutoff,
-    resonance: targetInstrument.tb303.filter?.resonance,
-    envMod: targetInstrument.tb303.filterEnvelope?.envMod,
-    decay: targetInstrument.tb303.filterEnvelope?.decay,
-  } : 'no config');
-
   // Handle config updates - hook must be called before any returns
   const handleConfigChange = useCallback(async (updates: Partial<TB303Config>) => {
     if (!targetInstrument) return;
@@ -98,6 +90,16 @@ export const TB303KnobPanel: React.FC = memo(() => {
         if ('lpBpMix' in val) synth.setLpBpMix(val.lpBpMix);
         if ('filterTracking' in val) synth.setFilterTracking(val.filterTracking);
         if ('filterSelect' in val) synth.setFilterSelect(val.filterSelect);
+        // Korg filter params
+        if ('korgBite' in val) synth.setKorgBite(val.korgBite);
+        if ('korgClip' in val) synth.setKorgClip(val.korgClip);
+        if ('korgCrossmod' in val) synth.setKorgCrossmod(val.korgCrossmod);
+        if ('korgQSag' in val) synth.setKorgQSag(val.korgQSag);
+        if ('korgSharpness' in val) synth.setKorgSharpness(val.korgSharpness);
+        // Extras
+        if ('stageNLAmount' in val) synth.setStageNLAmount(val.stageNLAmount);
+        if ('ensembleAmount' in val) synth.setEnsembleAmount(val.ensembleAmount);
+        if ('oversamplingOrder' in val) synth.setOversamplingOrder(val.oversamplingOrder);
       } else if (key === 'lfo') {
         if ('waveform' in val) synth.setLfoWaveform(val.waveform);
         if ('rate' in val) synth.setLfoRate(val.rate);
@@ -111,7 +113,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
         if ('mix' in val) synth.setChorusMix(val.mix);
       } else if (key === 'phaser') {
         if ('rate' in val) synth.setPhaserRate(val.rate);
-        if ('depth' in val) synth.setPhaserDepth(val.depth);
+        if ('depth' in val) synth.setPhaserWidth(val.depth);
         if ('feedback' in val) synth.setPhaserFeedback(val.feedback);
         if ('mix' in val) synth.setPhaserMix(val.mix);
       } else if (key === 'delay') {
