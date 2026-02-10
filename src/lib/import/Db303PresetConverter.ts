@@ -75,10 +75,12 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   // Parse devilfish section
   const dfNode = doc.querySelector('devilfish');
   if (dfNode) {
-    // filterSelect: 255 means "default" in DB303, map to 1 (Moog ladder)
-    let filterSelect = getInt('devilfish filterSelect', 1);
+    // filterSelect: 255 means "default" in DB303, map to 0 (default filter)
+    // The web app's engine initializes with filterSelect=0 before loading presets.
+    // Invalid values (>5) are ignored by the WASM, keeping the previous value (0).
+    let filterSelect = getInt('devilfish filterSelect', 0);
     if (filterSelect < 0 || filterSelect > 5) {
-      filterSelect = 1; // Default to Moog ladder filter
+      filterSelect = 0; // Default filter (matches web app behavior)
     }
     
     config.devilFish = {

@@ -157,10 +157,13 @@ function convertFurnaceInstrument(
 
     // Convert macros from FurnaceMacroData to FurnaceMacro
     macros: furnaceData.macros.map(m => ({
+      code: m.type,
       type: m.type,
       data: [...m.data],
       loop: m.loop,
       release: m.release,
+      mode: m.mode ?? 0,
+      delay: m.delay,
       speed: m.speed,
     } as FurnaceMacro)),
 
