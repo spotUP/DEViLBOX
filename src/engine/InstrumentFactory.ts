@@ -1,11 +1,13 @@
 // @ts-nocheck - Tone.js API type issues need resolution
 /**
- * InstrumentFactory - Creates and manages Tone.js synth instances
- * Factory class to create all 12 synth types from InstrumentConfig
+ * InstrumentFactory - Creates and manages synth instances
+ * Factory class to create all synth types from InstrumentConfig.
+ * Returns Tone.ToneAudioNode for Tone.js synths, or DevilboxSynth for native synths.
  */
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig, PitchEnvelopeConfig } from '@typedefs/instrument';
+import type { DevilboxSynth } from '@typedefs/synth';
 import {
   DEFAULT_SYNARE,
   DEFAULT_SAM,
@@ -86,6 +88,9 @@ import { VotraxSynth } from './votrax/VotraxSynth';
 import { YMF271Synth } from './ymf271/YMF271Synth';
 import { YMOPQSynth } from './ymopq/YMOPQSynth';
 import { VASynthSynth } from './vasynth/VASynthSynth';
+import { WAMSynth } from './wam/WAMSynth';
+import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
+import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 
 /** Map synthType strings to FurnaceDispatchPlatform values for non-FM chips */
 const SYNTH_TO_DISPATCH: Record<string, number> = {
@@ -321,10 +326,11 @@ export class InstrumentFactory {
   }
 
   /**
-   * Create a synth instance based on InstrumentConfig
+   * Create a synth instance based on InstrumentConfig.
+   * Returns a Tone.ToneAudioNode for Tone.js synths, or a DevilboxSynth for native synths (e.g. WAM).
    */
-  public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode {
-    let instrument: Tone.ToneAudioNode;
+  public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode | DevilboxSynth {
+    let instrument: Tone.ToneAudioNode | DevilboxSynth;
 
     switch (config.synthType) {
       case 'Synth':
@@ -545,6 +551,10 @@ export class InstrumentFactory {
         instrument = this.createSynare(config);
         break;
 
+      case 'WAM':
+        instrument = this.createWAM(config);
+        break;
+
       // JUCE WASM Synths
       case 'Dexed':
         instrument = this.createDexed(config);
@@ -698,9 +708,16 @@ export class InstrumentFactory {
         instrument = this.createSynth(config);
         break;
 
-      default:
-        console.warn(`Unknown synth type: ${config.synthType}, defaulting to Synth`);
-        instrument = this.createSynth(config);
+      default: {
+        // Check VSTBridge registry for dynamically registered synths
+        const desc = SYNTH_REGISTRY.get(config.synthType);
+        if (desc) {
+          instrument = new VSTBridgeSynth(desc, config);
+        } else {
+          console.warn(`Unknown synth type: ${config.synthType}, defaulting to Synth`);
+          instrument = this.createSynth(config);
+        }
+      }
     }
 
     // Apply volume normalization for Furnace WASM synths
@@ -1592,6 +1609,16 @@ export class InstrumentFactory {
     return this.createDB303(tb303Config, normalizedVolume);
   }
 
+  private static createWAM(config: InstrumentConfig): WAMSynth {
+    const wamConfig = config.wam || { moduleUrl: '', pluginState: null };
+    const synth = new WAMSynth(wamConfig);
+
+    // WAMs usually have their own internal gain — set the native GainNode level
+    synth.output.gain.value = Tone.dbToGain(config.volume ?? -12);
+
+    return synth;
+  }
+
   /**
    * Create a DB303 (TB-303 WASM engine) with tb303 config applied
    */
@@ -1674,8 +1701,22 @@ export class InstrumentFactory {
 
       // Extended Devil Fish parameters
       if (df.accentSoftAttack !== undefined) synth.setAccentSoftAttack(df.accentSoftAttack > 1 ? df.accentSoftAttack / 100 : df.accentSoftAttack);
-      if (df.passbandCompensation !== undefined) synth.setPassbandCompensation(df.passbandCompensation > 1 ? df.passbandCompensation / 100 : df.passbandCompensation);
-      if (df.resTracking !== undefined) synth.setResTracking(df.resTracking > 1 ? df.resTracking / 100 : df.resTracking);
+      // passbandCompensation: db303 web app inverts UI value before sending to engine
+      // XML stores the knob position (e.g. 0.09), engine expects inverted (0.91)
+      if (df.passbandCompensation !== undefined) {
+        const pbcNorm = df.passbandCompensation > 1 ? df.passbandCompensation / 100 : df.passbandCompensation;
+        synth.setPassbandCompensation(1 - pbcNorm);
+      }
+      // resTracking: Db303PresetConverter already inverts XML value (1 - xmlValue).
+      // db303 web app then inverts AGAIN in the UI handler before sending to engine.
+      // Net effect: engine gets the original XML value. So we invert the stored value.
+      if (df.resTracking !== undefined) {
+        const rtNorm = df.resTracking > 1 ? df.resTracking / 100 : df.resTracking;
+        synth.setResTracking(1 - rtNorm);
+        // db303 web app also calls setKorgIbiasScale with a 0.1-4.0 transform
+        // using the converter's stored value (the knob position)
+        synth.setKorgIbiasScale(0.1 + rtNorm * 3.9);
+      }
       if (df.duffingAmount !== undefined) synth.setDuffingAmount(df.duffingAmount > 1 ? df.duffingAmount / 100 : df.duffingAmount);
       if (df.lpBpMix !== undefined) synth.setLpBpMix(df.lpBpMix > 1 ? df.lpBpMix / 100 : df.lpBpMix);
       if (df.filterSelect !== undefined) synth.setFilterSelect(df.filterSelect);

@@ -1,5 +1,7 @@
 import * as Tone from 'tone';
 import type { SynareConfig } from '@/types/instrument';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, getNativeAudioNode, audioNow, noteToFrequency } from '@/utils/audio-context';
 
 /**
  * Synare 3 Percussion Synth Engine
@@ -13,18 +15,20 @@ import type { SynareConfig } from '@/types/instrument';
  * - Pitch Envelope (Sweep)
  * - LFO (Pitch/Filter modulation)
  */
-export class SynareSynth {
+export class SynareSynth implements DevilboxSynth {
+  readonly name = 'SynareSynth';
+  readonly output: GainNode;
   private osc1: Tone.Oscillator;
   private osc2: Tone.Oscillator;
   private noise: Tone.Noise;
-  
+
   private osc1Gain: Tone.Gain;
   private osc2Gain: Tone.Gain;
   private noiseGain: Tone.Gain;
-  
+
   private filter: Tone.Filter;
   private ampEnv: Tone.AmplitudeEnvelope;
-  private output: Tone.Volume;
+  private _toneOutput: Tone.Volume;
   
   // Envelopes for modulation
   private filterFreqEnv: Tone.Envelope;
@@ -75,7 +79,10 @@ export class SynareSynth {
       release: 0.1
     });
 
-    this.output = new Tone.Volume(0);
+    this.output = getDevilboxAudioContext().createGain();
+    this._toneOutput = new Tone.Volume(0);
+    const nativeOut = getNativeAudioNode(this._toneOutput);
+    if (nativeOut) nativeOut.connect(this.output);
 
     // 4. Modulation Sources
     this.filterFreqEnv = new Tone.Envelope({
@@ -113,7 +120,7 @@ export class SynareSynth {
 
     mixBus.connect(this.filter);
     this.filter.connect(this.ampEnv);
-    this.ampEnv.connect(this.output);
+    this.ampEnv.connect(this._toneOutput);
 
     // 6. Parameter Initialization
     this.applyConfig(config);
@@ -148,10 +155,10 @@ export class SynareSynth {
   }
 
   triggerAttack(note?: string | number, time?: number, velocity?: number) {
-    const t = time || Tone.now();
-    
+    const t = time || audioNow();
+
     if (note) {
-      const freq = Tone.Frequency(note).toFrequency();
+      const freq = noteToFrequency(note);
       this.osc1.frequency.setValueAtTime(freq, t);
       this.osc2.frequency.setValueAtTime(freq * Math.pow(2, this.config.oscillator2.detune / 12), t);
     }
@@ -170,7 +177,7 @@ export class SynareSynth {
 
     // Pitch Sweep
     if (this.config.sweep.enabled) {
-      const baseFreq = note ? Tone.Frequency(note).toFrequency() : this.config.oscillator.tune;
+      const baseFreq = note ? noteToFrequency(note) : this.config.oscillator.tune;
       const sweepFreq = baseFreq * Math.pow(2, this.config.sweep.amount / 12);
       
       this.osc1.frequency.cancelScheduledValues(t);
@@ -185,7 +192,7 @@ export class SynareSynth {
   }
 
   triggerRelease(time?: number) {
-    const t = time || Tone.now();
+    const t = time || audioNow();
     this.ampEnv.triggerRelease(t);
   }
 
@@ -195,16 +202,7 @@ export class SynareSynth {
     this.applyConfig(this.config);
   }
 
-  // Connection
-  connect(dest: Tone.InputNode) {
-    this.output.connect(dest);
-  }
-
-  disconnect() {
-    this.output.disconnect();
-  }
-
-  dispose() {
+  dispose(): void {
     this.osc1.dispose();
     this.osc2.dispose();
     this.noise.dispose();
@@ -217,10 +215,11 @@ export class SynareSynth {
     this.pitchEnv.dispose();
     this.lfo.dispose();
     this.lfoGain.dispose();
-    this.output.dispose();
+    this._toneOutput.dispose();
+    this.output.disconnect();
   }
 
   get volume() {
-    return this.output.volume;
+    return this._toneOutput.volume;
   }
 }

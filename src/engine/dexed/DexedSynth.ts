@@ -9,8 +9,8 @@
  * - 6 operators per voice
  */
 
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 
 /**
  * DX7 Algorithm definitions
@@ -159,10 +159,9 @@ export const DEXED_PRESETS: Record<string, Partial<DexedConfig>> = {
 /**
  * DexedSynth - DX7 FM Synthesizer
  */
-export class DexedSynth extends Tone.ToneAudioNode {
+export class DexedSynth implements DevilboxSynth {
   readonly name = 'DexedSynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
   private config: DexedConfig;
@@ -176,8 +175,7 @@ export class DexedSynth extends Tone.ToneAudioNode {
   private _initPromise: Promise<void>;
 
   constructor(config: Partial<DexedConfig> = {}) {
-    super();
-    this.output = new Tone.Gain(1);
+    this.output = getDevilboxAudioContext().createGain();
 
     this.config = {
       algorithm: 0,
@@ -198,9 +196,8 @@ export class DexedSynth extends Tone.ToneAudioNode {
    */
   private async initialize(): Promise<void> {
     try {
-      // Get native AudioContext from Tone.js context
-      const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
+      // Get native AudioContext
+      const rawContext = getDevilboxAudioContext();
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       // Load worklet module (once per session)
@@ -242,8 +239,8 @@ export class DexedSynth extends Tone.ToneAudioNode {
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
         .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
 
-      // Create worklet node using Tone.js's createAudioWorkletNode (standardized-audio-context)
-      this._worklet = toneCreateAudioWorkletNode(rawContext, 'dexed-processor');
+      // Create worklet node using native AudioWorkletNode constructor
+      this._worklet = new AudioWorkletNode(rawContext, 'dexed-processor');
 
       // Set up message handler
       this._worklet.port.onmessage = (event) => {
@@ -270,9 +267,8 @@ export class DexedSynth extends Tone.ToneAudioNode {
         jsCode
       });
 
-      // Connect worklet to Tone.js output - use the input property which is the native GainNode
-      const targetNode = this.output.input as AudioNode;
-      this._worklet.connect(targetNode);
+      // Connect worklet to native GainNode output
+      this._worklet.connect(this.output);
 
       // CRITICAL: Connect through silent keepalive to destination to force process() calls
       try {
@@ -545,10 +541,7 @@ export class DexedSynth extends Tone.ToneAudioNode {
     _time?: number,
     velocity = 1
   ): this {
-    const midiNote =
-      typeof frequency === 'string'
-        ? Tone.Frequency(frequency).toMidi()
-        : Tone.Frequency(frequency, 'hz').toMidi();
+    const midiNote = noteToMidi(frequency);
 
     const vel = Math.round(velocity * 127);
 
@@ -573,10 +566,7 @@ export class DexedSynth extends Tone.ToneAudioNode {
     if (!this._worklet) return this;
 
     if (frequency !== undefined) {
-      const midiNote =
-        typeof frequency === 'string'
-          ? Tone.Frequency(frequency).toMidi()
-          : Tone.Frequency(frequency, 'hz').toMidi();
+      const midiNote = noteToMidi(frequency);
 
       this._worklet.port.postMessage({
         type: 'noteOff',
@@ -614,12 +604,11 @@ export class DexedSynth extends Tone.ToneAudioNode {
   /**
    * Clean up resources
    */
-  dispose(): this {
+  dispose(): void {
     this._worklet?.port.postMessage({ type: 'allNotesOff' });
     this._worklet?.disconnect();
     this._worklet = null;
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }
 

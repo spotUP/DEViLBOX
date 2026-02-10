@@ -1,14 +1,42 @@
 // Cache native constructor for performance
-const NativeBaseAudioContext = (globalThis as any).BaseAudioContext || 
-                               (globalThis as any).AudioContext || 
+const NativeBaseAudioContext = (globalThis as any).BaseAudioContext ||
+                               (globalThis as any).AudioContext ||
                                (globalThis as any).webkitAudioContext;
+
+// ── DEViLBOX-owned AudioContext ──────────────────────────────────────────
+// Module-level registration: ToneEngine sets this in its constructor,
+// and any synth (WAM, WASM, etc.) can read it without importing ToneEngine
+// (avoiding circular dependency issues).
+let _devilboxAudioContext: AudioContext | null = null;
+
+/**
+ * Register the DEViLBOX-owned native AudioContext.
+ * Called once by ToneEngine constructor before any Tone.js nodes are created.
+ */
+export function setDevilboxAudioContext(ctx: AudioContext): void {
+  _devilboxAudioContext = ctx;
+}
+
+/**
+ * Get the DEViLBOX-owned native AudioContext.
+ * Available after ToneEngine is instantiated. Synths should use this
+ * instead of extracting rawContext from Tone.js.
+ */
+export function getDevilboxAudioContext(): AudioContext {
+  if (!_devilboxAudioContext) {
+    throw new Error('[audio-context] AudioContext not initialized — ToneEngine must be created first');
+  }
+  return _devilboxAudioContext;
+}
 
 /**
  * Robustly retrieve the native BaseAudioContext/AudioContext from any wrapper.
  * CRITICAL: This must return the browser's true native context object.
  */
 export function getNativeContext(context: any): AudioContext {
-  if (!context) return null as any;
+  if (!context) {
+    throw new Error('[audio-context] getNativeContext called with null/undefined context');
+  }
 
   // Faster direct check
   if (NativeBaseAudioContext && (context instanceof NativeBaseAudioContext)) {
@@ -181,4 +209,73 @@ export function getNativeAudioNode(toneNode: any): AudioNode | null {
   }
 
   return null;
+}
+
+// ── Tone.js-free audio utilities ──────────────────────────────────────
+// Thin replacements for Tone.Frequency(), Tone.now(), Tone.Time() so synths
+// don't need to import Tone.js just for note/time conversions.
+
+const NOTE_REGEX = /^([A-Ga-g])([#b]?)(-?\d+)$/;
+const NOTE_SEMITONES: Record<string, number> = {
+  'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11,
+};
+
+/**
+ * Convert a note name (e.g. "C4") or Hz frequency to a MIDI note number.
+ * Replaces Tone.Frequency(note).toMidi() and Tone.Frequency(freq, 'hz').toMidi().
+ */
+export function noteToMidi(note: string | number): number {
+  if (typeof note === 'number') {
+    return Math.max(0, Math.min(127, Math.round(12 * Math.log2(note / 440) + 69)));
+  }
+  const match = note.match(NOTE_REGEX);
+  if (!match) return 60; // default C4
+  const [, letter, accidental, octaveStr] = match;
+  const base = NOTE_SEMITONES[letter.toUpperCase()] ?? 0;
+  const acc = accidental === '#' ? 1 : accidental === 'b' ? -1 : 0;
+  const octave = parseInt(octaveStr);
+  return Math.max(0, Math.min(127, (octave + 1) * 12 + base + acc));
+}
+
+/**
+ * Convert a note name (e.g. "C4") or MIDI number to a frequency in Hz.
+ * Replaces Tone.Frequency(note).toFrequency().
+ */
+export function noteToFrequency(note: string | number): number {
+  if (typeof note === 'number') {
+    // If it looks like a MIDI note (0-127), convert; otherwise assume Hz
+    if (note >= 0 && note <= 127 && Number.isInteger(note)) {
+      return 440 * Math.pow(2, (note - 69) / 12);
+    }
+    return note; // already Hz
+  }
+  const midi = noteToMidi(note);
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/**
+ * Get the current audio context time.
+ * Replaces Tone.now().
+ */
+export function audioNow(): number {
+  if (!_devilboxAudioContext) return 0;
+  return _devilboxAudioContext.currentTime;
+}
+
+/**
+ * Convert a duration value to seconds.
+ * Supports numeric seconds (pass-through) and Tone.js time notation strings.
+ * Replaces Tone.Time(duration).toSeconds().
+ */
+export function timeToSeconds(duration: number | string, bpm: number = 120): number {
+  if (typeof duration === 'number') return duration;
+  // Handle basic time notation: "4n", "8n", "16n", etc.
+  const notationMatch = duration.match(/^(\d+)n$/);
+  if (notationMatch) {
+    const div = parseInt(notationMatch[1]);
+    return (4 / div) * (60 / bpm);
+  }
+  // Try parsing as float (e.g. "0.5")
+  const parsed = parseFloat(duration);
+  return isNaN(parsed) ? 0 : parsed;
 }

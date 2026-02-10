@@ -1,11 +1,10 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 import type { V2Config } from '@/types/instrument';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 
-export class V2Synth extends Tone.ToneAudioNode {
+export class V2Synth implements DevilboxSynth {
   public readonly name: string = 'V2Synth';
-  public readonly input: undefined = undefined;
-  public readonly output: Tone.Gain;
+  public readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
   private _initialized: boolean = false;
@@ -15,20 +14,14 @@ export class V2Synth extends Tone.ToneAudioNode {
   private _initialConfig?: V2Config;
 
   constructor(config?: V2Config) {
-    super();
-    this.output = new Tone.Gain();
+    this.output = getDevilboxAudioContext().createGain();
     this._initialConfig = config;
     this._initPromise = this._initialize();
   }
 
   private async _initialize() {
-    // Get the TRUE native context from Tone.js
-    const toneContext = this.context as any;
-    const nativeCtx = toneContext.rawContext || toneContext._context;
-
-    if (!nativeCtx) {
-      throw new Error('Could not get native AudioContext from Tone.js');
-    }
+    // Get native AudioContext
+    const nativeCtx = getDevilboxAudioContext();
 
     // Ensure context is running before loading worklet
     if ((nativeCtx.state as string) !== 'running') {
@@ -90,8 +83,8 @@ export class V2Synth extends Tone.ToneAudioNode {
       .replace(/(_malloc=wasmExports\["\w+"\])/, '$1;Module["_malloc"]=_malloc')
       .replace(/(_free=wasmExports\["\w+"\])/, '$1;Module["_free"]=_free');
 
-    // Create worklet using Tone.js's createAudioWorkletNode (standardized-audio-context)
-    this._worklet = toneCreateAudioWorkletNode(nativeCtx, 'v2-synth-processor', {
+    // Create worklet using native AudioWorkletNode constructor
+    this._worklet = new AudioWorkletNode(nativeCtx, 'v2-synth-processor', {
       outputChannelCount: [2]
     });
 
@@ -126,9 +119,8 @@ export class V2Synth extends Tone.ToneAudioNode {
       });
     });
 
-    // Connect worklet to Tone.js output - use the native GainNode
-    const nativeOutput = this.output.input as AudioNode;
-    this._worklet.connect(nativeOutput);
+    // Connect worklet to native GainNode output
+    this._worklet.connect(this.output);
 
     // CRITICAL: Connect worklet through a silent keepalive to destination.
     // Without a path to destination, the browser never calls process().
@@ -151,7 +143,7 @@ export class V2Synth extends Tone.ToneAudioNode {
   }
 
   public triggerAttack(note: string | number, _time?: number, velocity: number = 1) {
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const vel = Math.floor(velocity * 127);
 
     if (!this._initialized) {
@@ -171,11 +163,11 @@ export class V2Synth extends Tone.ToneAudioNode {
     // For now, we'll send All Notes Off if needed or handle via explicit note.
   }
 
-  public triggerAttackRelease(note: string | number, duration: Tone.Unit.Time, _time?: number, velocity: number = 1) {
+  public triggerAttackRelease(note: string | number, duration: number, _time?: number, velocity: number = 1) {
     this.triggerAttack(note, undefined, velocity);
     // V2 is polyphonic and stateful, better to send Note Off
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
-    const d = this.toSeconds(duration);
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+    const d = typeof duration === 'number' ? duration : parseFloat(String(duration));
     const timer = setTimeout(() => {
       this._releaseTimers.delete(timer);
       // Only send if still initialized (not disposed)
@@ -279,17 +271,15 @@ export class V2Synth extends Tone.ToneAudioNode {
     }
   }
 
-  public dispose() {
+  public dispose(): void {
     // Clear all pending release timers to prevent memory leaks
     this._releaseTimers.forEach(timer => clearTimeout(timer));
     this._releaseTimers.clear();
     this._initialized = false;
 
-    super.dispose();
     if (this._worklet) {
       this._worklet.disconnect();
     }
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }

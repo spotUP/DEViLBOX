@@ -1,6 +1,6 @@
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToFrequency } from '@/utils/audio-context';
 import { MAMEEngine } from './MAMEEngine';
-import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -20,13 +20,11 @@ interface MAMEVoice {
 /**
  * MAMESynth - Tone.js node wrapper for MAME-based synth engines
  */
-export class MAMESynth extends Tone.ToneAudioNode {
+export class MAMESynth implements DevilboxSynth {
   readonly name = 'MAMESynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   private engine = MAMEEngine.getInstance();
-  private outputGain: Tone.Gain;
   private config: MAMESynthConfig;
   private isInitialized: boolean = false;
   private initInProgress: boolean = false;
@@ -37,10 +35,8 @@ export class MAMESynth extends Tone.ToneAudioNode {
   private numHardwareVoices: number = 32;
 
   constructor(config: MAMESynthConfig) {
-    super();
+    this.output = getDevilboxAudioContext().createGain();
     this.config = config;
-    this.outputGain = new Tone.Gain(1);
-    this.output = this.outputGain;
 
     if (config.type === 'rsa') this.numHardwareVoices = 16;
     else if (config.type === 'swp30') this.numHardwareVoices = 64;
@@ -112,8 +108,7 @@ export class MAMESynth extends Tone.ToneAudioNode {
   private startRendering(): void {
     const bufferSize = 512; // Minimum 256 for ScriptProcessor
 
-    // Get the TRUE native context using the robust extractor
-    const rawContext = getNativeContext(this.context);
+    const rawContext = getDevilboxAudioContext();
 
     if (!rawContext || !rawContext.createScriptProcessor) {
       console.warn('[MAMESynth] ScriptProcessorNode not available, audio rendering disabled');
@@ -135,29 +130,8 @@ export class MAMESynth extends Tone.ToneAudioNode {
       outR.set(right);
     };
 
-    // ScriptProcessorNode lives in the native AudioContext but Tone.js nodes
-    // live in standardized-audio-context (SAC). Native nodes can't connect to
-    // SAC-wrapped nodes. Bridge through a native GainNode in the same context.
-    const nativeGain = rawContext.createGain();
-    processor.connect(nativeGain);
-
-    // Now connect the native gain to the Tone.js output via getNativeAudioNode.
-    // If that fails, fall back to connecting directly to destination.
-    const toneTarget = getNativeAudioNode(this.outputGain);
-    if (toneTarget) {
-      try {
-        nativeGain.connect(toneTarget);
-      } catch {
-        // SAC bridge failed — connect directly to native destination
-        console.warn('[MAMESynth] SAC bridge failed, routing to native destination');
-        nativeGain.connect(rawContext.destination);
-      }
-    } else {
-      nativeGain.connect(rawContext.destination);
-    }
-
-    // Store reference for volume control
-    (this as any)._nativeGain = nativeGain;
+    // Connect ScriptProcessor directly to the native GainNode output
+    processor.connect(this.output);
   }
 
   public getHandle(): number {
@@ -207,7 +181,7 @@ export class MAMESynth extends Tone.ToneAudioNode {
   public triggerAttack(note: string, _time?: number, velocity: number = 1.0): this {
     if (!this.isInitialized || this.handle === 0) return this;
 
-    const freq = Tone.Frequency(note).toFrequency();
+    const freq = noteToFrequency(note);
     const voice = this.findFreeVoice();
     
     voice.note = note;
@@ -290,13 +264,11 @@ export class MAMESynth extends Tone.ToneAudioNode {
     return this;
   }
 
-  public dispose(): this {
+  public dispose(): void {
     if (this.handle !== 0) {
       this.engine.deleteInstance(this.handle);
       this.handle = 0;
     }
-    super.dispose();
-    this.outputGain.dispose();
-    return this;
+    this.output.disconnect();
   }
 }

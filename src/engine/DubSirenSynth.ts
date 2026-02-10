@@ -1,5 +1,7 @@
 import * as Tone from 'tone';
 import type { DubSirenConfig } from '@/types/instrument';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, getNativeAudioNode, audioNow, noteToFrequency } from '@/utils/audio-context';
 
 // Default config values for defensive initialization
 const DEFAULT_CONFIG: DubSirenConfig = {
@@ -10,14 +12,16 @@ const DEFAULT_CONFIG: DubSirenConfig = {
   reverb: { enabled: true, decay: 1.5, wet: 0.1 },
 };
 
-export class DubSirenSynth {
+export class DubSirenSynth implements DevilboxSynth {
+  readonly name = 'DubSirenSynth';
+  readonly output: GainNode;
   private osc: Tone.Oscillator;
   private filter: Tone.Filter;
   private reverb: Tone.Reverb;
   private delay: Tone.FeedbackDelay;
   private distortion: Tone.Distortion;
   private gate: Tone.Gain;
-  private output: Tone.Volume;
+  private _toneOutput: Tone.Volume;
   private signal: Tone.Signal<"frequency">;
   private lfo: Tone.LFO;
 
@@ -31,8 +35,11 @@ export class DubSirenSynth {
       reverb: { ...DEFAULT_CONFIG.reverb, ...config?.reverb },
     };
 
-    // Output Volume
-    this.output = new Tone.Volume(0);
+    // Output: native GainNode bridged from Tone.js Volume
+    this.output = getDevilboxAudioContext().createGain();
+    this._toneOutput = new Tone.Volume(0);
+    const nativeOut = getNativeAudioNode(this._toneOutput);
+    if (nativeOut) nativeOut.connect(this.output);
 
     // Effects Chain
     this.reverb = new Tone.Reverb({
@@ -98,7 +105,7 @@ export class DubSirenSynth {
     this.filter.connect(this.distortion);
     this.distortion.connect(this.delay);
     this.delay.connect(this.reverb);
-    this.reverb.connect(this.output);
+    this.reverb.connect(this._toneOutput);
 
     // Start oscillator immediately (it's gated)
     this.osc.start();
@@ -146,10 +153,10 @@ export class DubSirenSynth {
    * @param velocity Volume/Velocity
    */
   triggerAttack(note?: string | number, time?: number, _velocity?: number) {
-    const t = time || Tone.now();
-    
+    const t = time || audioNow();
+
     if (note) {
-      const freq = Tone.Frequency(note).toFrequency();
+      const freq = noteToFrequency(note);
       this.signal.setValueAtTime(freq, t);
     }
 
@@ -162,7 +169,7 @@ export class DubSirenSynth {
    * Stop the siren
    */
   triggerRelease(time?: number) {
-    const t = time || Tone.now();
+    const t = time || audioNow();
     // Close gate instantly (button release)
     this.gate.gain.cancelScheduledValues(t);
     this.gate.gain.setValueAtTime(0, t);
@@ -209,28 +216,20 @@ export class DubSirenSynth {
     this.filter.frequency.rampTo(hz, 0.1);
   }
 
-  // Connection
-  connect(dest: Tone.InputNode) {
-    this.output.connect(dest);
-  }
-
-  disconnect() {
-    this.output.disconnect();
-  }
-
-  dispose() {
+  dispose(): void {
     this.osc.dispose();
     this.gate.dispose();
     this.filter.dispose();
     this.distortion.dispose();
     this.reverb.dispose();
     this.delay.dispose();
-    this.output.dispose();
+    this._toneOutput.dispose();
+    this.output.disconnect();
     this.signal.dispose();
     this.lfo.dispose();
   }
 
   get volume() {
-    return this.output.volume;
+    return this._toneOutput.volume;
   }
 }

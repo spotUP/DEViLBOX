@@ -5,6 +5,8 @@
 
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import type { DevilboxSynth } from '@typedefs/synth';
+import { isDevilboxSynth } from '@typedefs/synth';
 import { DB303Synth, DB303Synth as JC303Synth } from './db303';
 import { MAMESynth } from './MAMESynth';
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
@@ -19,13 +21,15 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
 import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
 import { reportSynthError } from '../stores/useSynthErrorStore';
+import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
+import { WAMSynth } from './wam/WAMSynth';
 
 interface VoiceState {
   instrument: any;
@@ -58,6 +62,10 @@ export class ToneEngine {
   // FFT for frequency visualization
   public fft: Tone.FFT;
   
+  // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
+  // This allows WASM/WAM synths to use the real BaseAudioContext directly.
+  private _nativeContext: AudioContext | null = null;
+
   // High-performance WASM instance for DSP and scheduling
   private wasmInstance: any = null;
 
@@ -170,6 +178,15 @@ export class ToneEngine {
   private instrumentAnalysers: Map<number, InstrumentAnalyser> = new Map();
 
   private constructor() {
+    // === Phase 1: DEViLBOX owns the native AudioContext ===
+    // Create the native AudioContext FIRST, before any Tone.js nodes.
+    // This ensures all Tone.js nodes are created on the same context as native synths.
+    // The context starts in 'suspended' state — init() resumes it after user interaction.
+    this._nativeContext = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
+    Tone.setContext(this._nativeContext);
+    // Register globally so WAM/WASM synths can access it without importing ToneEngine
+    setDevilboxAudioContext(this._nativeContext);
+
     // Master input (where all instruments connect)
     this.masterInput = new Tone.Gain(1);
 
@@ -212,6 +229,33 @@ export class ToneEngine {
       ToneEngine.instance = new ToneEngine();
     }
     return ToneEngine.instance;
+  }
+
+  /**
+   * Get the native AudioContext owned by DEViLBOX.
+   * Always available — created in the constructor before any Tone.js nodes.
+   * WASM/WAM synths should use getDevilboxAudioContext() from audio-context.ts
+   * to avoid circular imports. This accessor is for ToneEngine-internal use.
+   */
+  public get nativeContext(): AudioContext {
+    return this._nativeContext!;
+  }
+
+  /**
+   * Connect a native AudioNode (from a DevilboxSynth) into a Tone.js effect chain.
+   * Bridges the native → Tone.js boundary using getNativeAudioNode().
+   */
+  public connectNativeSynth(synthOutput: AudioNode, destination: Tone.ToneAudioNode): void {
+    const nativeDestination = getNativeAudioNode(destination);
+    if (nativeDestination) {
+      synthOutput.connect(nativeDestination);
+    } else {
+      console.warn('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');
+      // Last resort: try connecting to Tone.js input property
+      if ((destination as any).input) {
+        synthOutput.connect((destination as any).input);
+      }
+    }
   }
 
   /**
@@ -266,18 +310,10 @@ export class ToneEngine {
 
   /**
    * Initialize audio context (must be called after user interaction)
+   * Native AudioContext was already created in the constructor and passed to Tone.js.
+   * This method resumes the context (which starts suspended until user gesture).
    */
   public async init(): Promise<void> {
-    // Ensure we are using the lowest latency context possible
-    // Note: Tone.js context defaults to 'interactive' but we ensure it here
-    if (Tone.getContext().latencyHint !== 'interactive') {
-      console.log('[ToneEngine] Reconfiguring Tone.js context for interactive latency');
-      Tone.setContext(new Tone.Context({ 
-        latencyHint: 'interactive',
-        lookAhead: 0.05 // Default to 50ms, will be updated by setAudioLatency
-      }));
-    }
-
     if (Tone.getContext().state === 'suspended') {
       await Tone.start();
     }
@@ -291,7 +327,7 @@ export class ToneEngine {
 
     // Wait for context to actually be running
     const toneCtx = Tone.getContext() as any;
-    const nativeCtx = getNativeContext(toneCtx);
+    const nativeCtx = this._nativeContext!;
     // rawContext is the standardized-audio-context context (needed for toneCreateAudioWorkletNode)
     const rawContext = toneCtx.rawContext || toneCtx._context;
     
@@ -489,7 +525,7 @@ export class ToneEngine {
       if (warmUpTypes.includes(config.synthType || '')) {
         const key = this.getInstrumentKey(config.id, -1);
         const instrument = this.instruments.get(key);
-        if (instrument) {
+        if (instrument && !isDevilboxSynth(instrument)) {
           try {
             // Save original volume, set to silent
             const originalVol = instrument.volume.value;
@@ -758,8 +794,9 @@ export class ToneEngine {
     const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
     const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
     const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
-    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd'].includes(config.synthType || '');
-    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || isMAME || isFurnace || isBuzzmachine || isWASMSynth;
+    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM'].includes(config.synthType || '');
+    const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
+    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
     const key = isSharedType
       ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
       : this.getInstrumentKey(instrumentId, channelIndex);
@@ -1353,6 +1390,7 @@ export class ToneEngine {
       case 'V2':
       case 'Sam':
       case 'Synare':
+      case 'WAM':
       case 'Buzzmachine': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
@@ -1473,21 +1511,34 @@ export class ToneEngine {
 
     // Re-route instrument directly (bypass analyser)
     if (instrument) {
+      const isNative = isDevilboxSynth(instrument);
       try {
-        instrument.disconnect();
+        if (isNative) {
+          instrument.output.disconnect();
+        } else {
+          instrument.disconnect();
+        }
       } catch {
         // May not be connected
       }
 
       const effectChain = this.instrumentEffectChains.get(sharedKey);
+      const connectTo = (dest: Tone.ToneAudioNode) => {
+        if (isNative) {
+          this.connectNativeSynth(instrument.output, dest);
+        } else {
+          instrument.connect(dest);
+        }
+      };
+
       if (effectChain) {
         if (effectChain.effects.length > 0) {
-          instrument.connect(effectChain.effects[0]);
+          connectTo(effectChain.effects[0]);
         } else {
-          instrument.connect(effectChain.output);
+          connectTo(effectChain.output);
         }
       } else {
-        instrument.connect(this.masterInput);
+        connectTo(this.masterInput);
       }
     }
 
@@ -1572,7 +1623,13 @@ export class ToneEngine {
         case 'volume':
           // Map 0-1 to -40dB to 0dB
           const volumeDb = -40 + value * 40;
-          instrument.volume.setValueAtTime(volumeDb, now);
+          if (isDevilboxSynth(instrument)) {
+            // DevilboxSynth: set gain on native GainNode output
+            const gain = Math.pow(10, volumeDb / 20); // dB to linear
+            (instrument.output as GainNode).gain.setValueAtTime(gain, now);
+          } else if (instrument.volume) {
+            instrument.volume.setValueAtTime(volumeDb, now);
+          }
           break;
 
         case 'pan':
@@ -1674,6 +1731,12 @@ export class ToneEngine {
           break;
 
         default:
+          // Handle WAM parameters or generic setParam
+          if (instrument instanceof WAMSynth) {
+            instrument.setParameter(parameter, value);
+          } else if (typeof instrument.setParam === 'function') {
+            instrument.setParam(parameter, value);
+          }
           break;
       }
     } catch (error) {
@@ -1945,6 +2008,8 @@ export class ToneEngine {
       } else if (instrument.constructor.name === 'BuzzmachineGenerator') {
         // Buzzmachine generators support accent/slide for 303 behavior
         (instrument as any).triggerAttack(note, safeTime, velocity, accent, slide);
+      } else if (instrument instanceof WAMSynth) {
+        instrument.triggerAttack(note, safeTime, velocity);
       } else {
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = Tone.Frequency(note).toFrequency();
@@ -2604,6 +2669,8 @@ export class ToneEngine {
           );
           instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
         }
+      } else if (instrument instanceof WAMSynth) {
+        instrument.triggerAttackRelease(note, duration, safeTime, velocity);
       } else if (config.synthType === 'DrumMachine') {
         // DrumMachine - some drum types don't take note parameter
         // Apply accent (velocity boost) but not slide (drums don't pitch slide)
@@ -2674,6 +2741,9 @@ export class ToneEngine {
         } else if (instrument.releaseAll) {
           // Synths and Samplers use releaseAll()
           instrument.releaseAll(now);
+        } else if (isDevilboxSynth(instrument) && instrument.triggerRelease) {
+          // DevilboxSynths don't have releaseAll(), use triggerRelease()
+          instrument.triggerRelease(undefined, now);
         }
 
         // CRITICAL: Force immediate silence by ramping volume to -Infinity
@@ -2691,6 +2761,19 @@ export class ToneEngine {
               // Instrument may be disposed
             }
           }, 100);
+        } else if (isDevilboxSynth(instrument)) {
+          // DevilboxSynths without .volume: ramp native GainNode to silence
+          const outputGain = (instrument.output as GainNode).gain;
+          const currentGain = outputGain.value;
+          outputGain.setValueAtTime(currentGain, now);
+          outputGain.linearRampToValueAtTime(0, now + 0.05);
+          setTimeout(() => {
+            try {
+              outputGain.value = currentGain;
+            } catch {
+              // Instrument may be disposed
+            }
+          }, 100);
         }
       } catch (e) {
         console.warn(`[ToneEngine] Error releasing instrument ${key}:`, e);
@@ -2700,6 +2783,7 @@ export class ToneEngine {
     // Also clear pitch state and active player tracking for all channels
     this.channelPitchState.clear();
     this.channelActivePlayer.clear();
+
   }
 
   /**
@@ -2892,6 +2976,37 @@ export class ToneEngine {
   }
 
   /**
+   * Update WAM parameters in real-time
+   */
+  public updateWAMParameters(instrumentId: number, wamConfig: NonNullable<InstrumentConfig['wam']>): void {
+    const synths: WAMSynth[] = [];
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId) && instrument instanceof WAMSynth) {
+        synths.push(instrument);
+      }
+    });
+
+    if (synths.length === 0) {
+      this.invalidateInstrument(instrumentId);
+      return;
+    }
+
+    synths.forEach((synth) => {
+      // Handle individual parameter updates (from fallback UI)
+      if (wamConfig.parameterValues) {
+        Object.entries(wamConfig.parameterValues).forEach(([id, value]) => {
+          synth.setParameter(id, value);
+        });
+      }
+      // Handle full state replacement
+      if (wamConfig.pluginState) {
+        synth.setPluginState(wamConfig.pluginState);
+      }
+    });
+  }
+
+  /**
    * Update TB303 parameters in real-time without recreating the synth
    * Supports both JC303Synth (TB303) and BuzzmachineGenerator (Buzz3o3)
    */
@@ -3032,10 +3147,14 @@ export class ToneEngine {
           synth.setFilterInputDrive(normPercent(df.filterInputDrive));
         }
         if (df.passbandCompensation !== undefined) {
-          synth.setPassbandCompensation(normPercent(df.passbandCompensation));
+          // db303 web app inverts knob value before sending to engine
+          synth.setPassbandCompensation(1 - normPercent(df.passbandCompensation));
         }
         if (df.resTracking !== undefined) {
-          synth.setResTracking(normPercent(df.resTracking));
+          // Config stores inverted XML value (knob position). Engine needs 1 - knobPos.
+          const rtNorm = normPercent(df.resTracking);
+          synth.setResTracking(1 - rtNorm);
+          synth.setKorgIbiasScale(0.1 + rtNorm * 3.9);
         }
         if (df.duffingAmount !== undefined) {
           synth.setDuffingAmount(normPercent(df.duffingAmount));
@@ -4006,12 +4125,13 @@ export class ToneEngine {
   /**
    * Build or rebuild an instrument's effect chain (now async for neural effects)
    * Route: instrument → effects → masterInput
+   * Supports both Tone.js ToneAudioNodes and native DevilboxSynths.
    * @param key - Composite key (instrumentId-channelIndex) for per-channel chains
    */
   private async buildInstrumentEffectChain(
     key: string | number,
     effects: EffectConfig[],
-    instrument: Tone.ToneAudioNode
+    instrument: Tone.ToneAudioNode | DevilboxSynth
   ): Promise<void> {
     // Dispose existing effect chain if any
     const existing = this.instrumentEffectChains.get(key);
@@ -4031,13 +4151,27 @@ export class ToneEngine {
     // Create output gain node
     const output = new Tone.Gain(1);
 
+    // Detect if this is a native DevilboxSynth (non-Tone.js) or a Tone.js node
+    const isNativeSynth = isDevilboxSynth(instrument);
+
+    // Helper: connect instrument to a Tone.js destination node
+    const connectInstrumentTo = (dest: Tone.ToneAudioNode) => {
+      if (isNativeSynth) {
+        // Native AudioNode → Tone.js node bridge
+        this.connectNativeSynth((instrument as DevilboxSynth).output, dest);
+      } else {
+        // Tone.js → Tone.js (existing path)
+        (instrument as Tone.ToneAudioNode).connect(dest);
+      }
+    };
+
     // Filter to only enabled effects
     const enabledEffects = effects.filter((fx) => fx.enabled);
 
     if (enabledEffects.length === 0) {
       // No effects - direct connection
-      instrument.connect(output);
-      
+      connectInstrumentTo(output);
+
       // Determine destination: use instrument analyser if active, otherwise master input
       const [idPart] = String(key).split('-');
       const instrumentId = parseInt(idPart);
@@ -4061,7 +4195,7 @@ export class ToneEngine {
     // Build full chain: instrument → effect[0] → effect[1] → ... → effect[N-1] → output → destination
     if (effectNodes.length > 0) {
       // Connect instrument to first effect
-      instrument.connect(effectNodes[0]);
+      connectInstrumentTo(effectNodes[0]);
       // Chain effects together
       for (let i = 0; i < effectNodes.length - 1; i++) {
         effectNodes[i].connect(effectNodes[i + 1]);
@@ -4069,7 +4203,7 @@ export class ToneEngine {
       // Connect last effect to output
       effectNodes[effectNodes.length - 1].connect(output);
     } else {
-      instrument.connect(output);
+      connectInstrumentTo(output);
     }
 
     // Determine destination: use instrument analyser if active, otherwise master input
@@ -4099,7 +4233,12 @@ export class ToneEngine {
 
     // Disconnect instrument from current chain
     try {
-      instrument.disconnect();
+      if (isDevilboxSynth(instrument)) {
+        // Native synth — disconnect the AudioNode output
+        instrument.output.disconnect();
+      } else {
+        instrument.disconnect();
+      }
     } catch (e) {
       // May not be connected
     }
