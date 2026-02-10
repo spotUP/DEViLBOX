@@ -68,6 +68,37 @@ public:
         // Default implementation - override in subclasses
     }
 
+    // --- Parameter metadata (for auto-generated UIs) ---
+    virtual int getParameterCount() const { return 0; }
+    virtual const char* getParameterName(int paramId) const { return ""; }
+    virtual float getParameterMin(int paramId) const { return 0.0f; }
+    virtual float getParameterMax(int paramId) const { return 1.0f; }
+    virtual float getParameterDefault(int paramId) const { return 0.0f; }
+
+    // Extension hook — synths can handle arbitrary typed commands
+    // (SysEx loading, wavetable data, patch formats, etc.)
+    // Returns true if handled, false if unknown command
+    virtual bool handleCommand(const char* commandType, const uint8_t* data, int length) {
+        return false;
+    }
+
+#ifdef __EMSCRIPTEN__
+    // JS-callable wrapper for handleCommand (accepts emscripten::val)
+    bool handleCommandJS(const std::string& commandType, emscripten::val jsData) {
+        auto length = jsData["length"].as<int>();
+        std::vector<uint8_t> buf(length);
+        for (int i = 0; i < length; i++) {
+            buf[i] = jsData[i].as<uint8_t>();
+        }
+        return handleCommand(commandType.c_str(), buf.data(), length);
+    }
+
+    // JS-callable wrapper for getParameterName (returns std::string)
+    std::string getParameterNameJS(int paramId) const {
+        return std::string(getParameterName(paramId));
+    }
+#endif
+
 protected:
     int sampleRate_;
     bool isInitialized_;
