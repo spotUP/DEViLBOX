@@ -208,7 +208,6 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
     <div ref={containerRef} className={width === 'auto' ? 'w-full' : ''}>
       <canvas
         ref={canvasRef}
-        className="rounded-md border border-dark-border"
         style={{ width: '100%', height: `${height}px` }}
       />
     </div>
