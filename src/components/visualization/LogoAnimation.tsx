@@ -134,16 +134,14 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
     onCompleteRef.current?.();
   };
 
-  const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
   const defaultColor = isCyanTheme ? '#00ffff' : '#00d4aa';
 
   return (
     <div
       ref={containerRef}
-      className="w-full flex items-center justify-center rounded-md border border-dark-border overflow-hidden"
+      className="w-full flex items-center justify-center overflow-hidden"
       style={{
         height: `${height}px`,
-        backgroundColor: bgColor,
       }}
       onClick={handleClick}
       title="Click to skip"

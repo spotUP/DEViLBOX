@@ -109,7 +109,7 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
   }, [width, height]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-dark-bgPrimary rounded-md border border-dark-border">
+    <div className="w-full h-full flex items-center justify-center">
       <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px` }} />
     </div>
   );
