@@ -39,15 +39,23 @@ function getFullNoteName(note: string, octaveUp: boolean, octaveDown: boolean, b
 
 /**
  * Convert TB-303 pattern to TrackerCell array
+ * 
+ * DB303 BEHAVIOR: A REST (gate=false) immediately releases the note.
+ * We insert note-off (97) on REST steps that follow gated notes.
  */
 export function convertTB303Pattern(pattern: TB303Pattern, instrumentId: number = 0): TrackerCell[] {
   const baseOctave = 2; // TB-303 typically plays in octave 2-3 range
+  let lastGatedStepIndex = -1;
 
-  return pattern.steps.map((step): TrackerCell => {
-    // Empty step (rest)
-    if (!step.note || !step.gate) {
+  return pattern.steps.map((step, index): TrackerCell => {
+    const hasGate = step.note && step.gate;
+    
+    // Empty step (rest) - check if we need to insert note-off
+    if (!hasGate) {
+      // DB303 behavior: REST after a gated note releases immediately
+      const needsNoteOff = lastGatedStepIndex >= 0;
       return {
-        note: 0,
+        note: needsNoteOff ? 97 : 0, // 97 = note-off, 0 = empty
         instrument: 0,
         volume: 0,
         effTyp: 0,
@@ -57,8 +65,11 @@ export function convertTB303Pattern(pattern: TB303Pattern, instrumentId: number 
       };
     }
 
-    // Note step
-    const noteName = getFullNoteName(step.note, step.octaveUp, step.octaveDown, baseOctave);
+    // Track gated steps for note-off insertion
+    lastGatedStepIndex = index;
+    
+    // Note step - step.note is guaranteed non-null here since hasGate was true
+    const noteName = getFullNoteName(step.note!, step.octaveUp, step.octaveDown, baseOctave);
     const xmNote = stringNoteToXM(noteName);
     const volumeValue = step.accent ? 64 : 48; // 0x40 (max) : 0x30 (normal)
     const volume = 0x10 + volumeValue; // 0x10-0x50 = XM set volume range
