@@ -40,12 +40,16 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   // Parse oscillator section
   const oscNode = doc.querySelector('oscillator');
   if (oscNode) {
+    // DB303 waveform: 0.0 = pure sawtooth, 1.0 = pure square, values between = morph
+    const waveformValue = getFloat('oscillator waveform', 0);
     config.oscillator = {
-      type: getInt('oscillator waveform') === 0 ? 'sawtooth' : 'square',
+      type: waveformValue >= 0.5 ? 'square' : 'sawtooth',
+      waveformBlend: waveformValue, // Store actual blend value
       pulseWidth: getFloat('oscillator pulseWidth', 0),
       subOscGain: getFloat('oscillator subOscGain', 0),
       subOscBlend: getFloat('oscillator subOscBlend', 1),
     };
+    console.log('[Db303PresetConverter] Parsed oscillator:', { waveformValue, waveformBlend: waveformValue, type: config.oscillator.type });
   }
 
   // Parse filter section
@@ -64,11 +68,19 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
     config.accent = {
       amount: getFloat('filter accent', 0.5),
     };
+    
+    console.log('[Db303PresetConverter] Parsed filter:', config.filter, 'envMod:', config.filterEnvelope.envMod);
   }
 
   // Parse devilfish section
   const dfNode = doc.querySelector('devilfish');
   if (dfNode) {
+    // filterSelect: 255 means "default" in DB303, map to 1 (Moog ladder)
+    let filterSelect = getInt('devilfish filterSelect', 1);
+    if (filterSelect < 0 || filterSelect > 5) {
+      filterSelect = 1; // Default to Moog ladder filter
+    }
+    
     config.devilFish = {
       enabled: true,
       normalDecay: getFloat('devilfish normalDecay', 0.5),
@@ -76,9 +88,9 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
       softAttack: getFloat('devilfish softAttack', 0),
       accentSoftAttack: getFloat('devilfish accentSoftAttack', 0.5),
       passbandCompensation: getFloat('devilfish passbandCompensation', 0.09),
-      resTracking: 1 - getFloat('devilfish resTracking', 0.743), // Inverted in XML
-      filterInputDrive: getFloat('devilfish filterInputDrive', 0.169),
-      filterSelect: getInt('devilfish filterSelect', 1),
+      resTracking: 1 - getFloat('devilfish resTracking', 0.257), // XML stores inverted value (db303 format)
+      filterInputDrive: getFloat('devilfish filterInputDrive', 0),
+      filterSelect,
       diodeCharacter: getFloat('devilfish diodeCharacter', 1),
       duffingAmount: getFloat('devilfish duffingAmount', 0.03),
       filterFmDepth: getFloat('devilfish filterFmDepth', 0),
@@ -105,7 +117,7 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   const lfoNode = doc.querySelector('lfo');
   if (lfoNode) {
     config.lfo = {
-      waveform: getInt('lfo waveform', 0) as 0 | 1 | 2,
+      waveform: getInt('lfo waveform', 0),
       rate: getFloat('lfo rate', 0.5),
       contour: getFloat('lfo contour', 0),
       pitchDepth: getFloat('lfo pitchDepth', 0),
@@ -119,10 +131,11 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   const chorusNode = doc.querySelector('chorus');
   if (chorusNode) {
     const mix = getFloat('chorus mix', 0.5);
+    const mode = getInt('chorus mode', 0);
     config.chorus = {
-      enabled: mix > 0.01,
-      mode: getInt('chorus mode', 0) as 0 | 1 | 2,
-      mix: mix,
+      enabled: mode > 0, // Mode 0 = Off, regardless of mix value
+      mode: mode as 0 | 1 | 2 | 3 | 4,
+      mix: mode > 0 ? mix : 0, // If mode is Off, mix should be 0
     };
   }
 
@@ -143,9 +156,11 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   const delayNode = doc.querySelector('delay');
   if (delayNode) {
     const mix = getFloat('delay mix', 0);
+    // DB303 delay time is in sixteenths (0-16), convert to normalized 0-1
+    const timeSixteenths = getFloat('delay time', 4);
     config.delay = {
       enabled: mix > 0.01,
-      time: getFloat('delay time', 0.25),
+      time: timeSixteenths / 16, // Normalize: 16 sixteenths = 1.0
       feedback: getFloat('delay feedback', 0.3),
       tone: getFloat('delay tone', 0.5),
       mix: mix,

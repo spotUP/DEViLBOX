@@ -44,7 +44,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         accentSoftAttack: 0.1,
         passbandCompensation: 0.09,
         resTracking: 0.743,
-        filterSelect: 255,
+        filterSelect: 1,
         diodeCharacter: 1,
         duffingAmount: 0.03,
         lpBpMix: 0,

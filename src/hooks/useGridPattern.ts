@@ -146,13 +146,30 @@ export function trackerCellsToGrid(cells: TrackerCell[], baseOctave: number, max
 
 /**
  * Convert GridPattern to TrackerCell[]
+ * 
+ * DB303 BEHAVIOR: A REST (empty step) immediately releases the note.
+ * We insert note-off (97) on REST steps that follow gated notes.
  */
 export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 1): TrackerCell[] {
-  return pattern.steps.map((step) => {
-    const note = gridStepToTrackerNote(step, pattern.baseOctave);
+  let lastGatedStepIndex = -1;
+  
+  return pattern.steps.map((step, index) => {
+    const hasNote = step.noteIndex !== null;
+    let note = gridStepToTrackerNote(step, pattern.baseOctave);
+    
+    // DB303 behavior: REST after a gated note releases immediately
+    if (!hasNote && lastGatedStepIndex >= 0) {
+      note = 97; // Note-off
+    }
+    
+    // Track gated steps for note-off insertion
+    if (hasNote) {
+      lastGatedStepIndex = index;
+    }
+    
     // Convert velocity to XM volume (0-127 -> 0x10-0x50)
-    const volumeValue = step.noteIndex !== null ? Math.round((step.velocity / 127) * 64) : 0;
-    const volume = step.noteIndex !== null ? 0x10 + volumeValue : 0;
+    const volumeValue = hasNote ? Math.round((step.velocity / 127) * 64) : 0;
+    const volume = hasNote ? 0x10 + volumeValue : 0;
 
     // Encode flags: 1=accent, 2=slide, 3=mute, 4=hammer
     // Use flag1 for accent/mute, flag2 for slide/hammer
@@ -167,7 +184,7 @@ export function gridToTrackerCells(pattern: GridPattern, instrumentId: number = 
 
     return {
       note,
-      instrument: note !== 0 ? instrumentId : 0, // Use instrumentId for notes, 0 for empty cells
+      instrument: hasNote ? instrumentId : 0, // Use instrumentId for notes, 0 for empty/note-off cells
       volume,
       effTyp: 0,
       eff: 0,

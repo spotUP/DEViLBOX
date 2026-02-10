@@ -493,6 +493,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            // Furnace instruments - re-encode and re-upload when parameters change
+            if (updatedInstrument.synthType?.startsWith('Furnace') && updatedInstrument.furnace && updates.furnace) {
+              console.log('[InstrumentStore] Furnace parameters changed, re-encoding instrument');
+              engine.updateFurnaceInstrument(id, updatedInstrument);
+              return; // Handled
+            }
+
             if (updatedInstrument.synthType === 'Buzz3o3' && updatedInstrument.tb303 && updates.tb303) {
               // Sync TB303 config back to Buzz parameters
               const tb303 = updatedInstrument.tb303;

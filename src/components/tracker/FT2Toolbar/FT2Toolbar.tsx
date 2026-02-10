@@ -13,11 +13,11 @@ import React, { useRef, useState, useCallback } from 'react';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { InstrumentSelector } from './InstrumentSelector';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useTabsStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
-import { ChevronDown, ChevronUp, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePlus, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
@@ -29,6 +29,10 @@ import { ChannelActivityGrid } from '@components/visualization/ChannelActivityGr
 import { ChannelSpectrums } from '@components/visualization/ChannelSpectrums';
 import { ChannelCircularVU } from '@components/visualization/ChannelCircularVU';
 import { ChannelParticles } from '@components/visualization/ChannelParticles';
+import { ChannelRings } from '@components/visualization/ChannelRings';
+import { ChannelTunnel } from '@components/visualization/ChannelTunnel';
+import { ChannelRadar } from '@components/visualization/ChannelRadar';
+import { NibblesGame } from '@components/visualization/NibblesGame';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
@@ -39,12 +43,11 @@ import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
-import { parseDb303Pattern } from '@lib/import/Db303PatternConverter';
+import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
@@ -140,17 +143,13 @@ interface FT2ToolbarProps {
 }
 
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
-  onShowPatterns,
   onShowExport,
   onShowHelp,
   onShowMasterFX,
-  onShowInstrumentFX,
   onShowInstruments,
   onShowPatternOrder,
   onShowDrumpads,
-  showPatterns,
   showMasterFX,
-  showInstrumentFX,
 }) => {
   const {
     patterns,
@@ -188,22 +187,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     grooveTemplateId,
     setGrooveTemplate,
     swing,
-    setSwing,
-    setGrooveSteps,
     jitter,
     useMpcScale,
+    reset: resetTransport,
   } = useTransportStore();
 
   const { isDirty, setMetadata, metadata } = useProjectStore();
-  const { instruments, loadInstruments, updateInstrument, reset: resetInstruments } = useInstrumentStore();
+  const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
   const { curves } = useAutomationStore();
+  const addTab = useTabsStore((state) => state.addTab);
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'>('logo');
+  const [vizMode, setVizMode] = useState<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'>('logo');
 
   // Tap Tempo
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
@@ -219,7 +218,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   // PERF: Memoize logo animation complete callback to prevent re-renders
   const handleLogoAnimationComplete = useCallback(() => {
     // Auto-cycle to next visualizer after logo animation completes
-    const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'sineScroll'];
+    const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
     const currentIndex = modes.indexOf('logo');
     const nextIndex = (currentIndex + 1) % modes.length;
     setVizMode(modes[nextIndex]);
@@ -232,6 +231,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Register db303 export function for console access
+  React.useEffect(() => {
+    // Reference the function to prevent tree-shaking
+    void exportCurrentPatternToDb303;
   }, []);
 
   const toggleFullscreen = async () => {
@@ -247,27 +252,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
   
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
-  const fxPresetsButtonRef = useRef<HTMLDivElement>(null);
-
-  const [fxPresetsMenuPosition, setFxPresetsMenuPosition] = useState({ top: 0, left: 0 });
-
-
-  const handleLoadMasterFxPreset = (preset: MasterFxPreset) => {
-    setShowFxPresetsMenu(false);
-    const effects = preset.effects.map((fx, index) => ({
-      ...fx,
-      id: `master-fx-${Date.now()}-${index}`,
-    }));
-    useAudioStore.getState().setMasterEffects(effects as any);
-    notify.success(`Applied FX: ${preset.name}`);
-  };
-
-  React.useEffect(() => {
-    if (showFxPresetsMenu && fxPresetsButtonRef.current) {
-      const rect = fxPresetsButtonRef.current.getBoundingClientRect();
-      setFxPresetsMenuPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [showFxPresetsMenu]);
 
   React.useEffect(() => {
     if (!showFxPresetsMenu) return;
@@ -674,29 +658,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
               <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
+              <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
+              <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
+              <Button variant="ghost" size="sm" onClick={() => addTab()} icon={<FilePlus size={14} />} iconPosition="left">New</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
-              <Button variant={showPatterns ? 'primary' : 'ghost'} size="sm" onClick={onShowPatterns}>Patterns</Button>
               <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
-              <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instr</Button>
-                            <Button variant={showInstrumentFX ? 'primary' : 'ghost'} size="sm" onClick={onShowInstrumentFX}>Instrument FX</Button>
-                            <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>
-                            <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>                        
-                        <div ref={fxPresetsButtonRef}>
-                          <Button variant={showFxPresetsMenu ? 'primary' : 'ghost'} size="sm" onClick={() => setShowFxPresetsMenu(!showFxPresetsMenu)}>FX Presets</Button>
-                        </div>
-                        {showFxPresetsMenu && (
-                          <div ref={fxPresetsMenuRef} className="fixed flex flex-col bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-[9999] min-w-[260px] max-h-[400px] overflow-y-auto" style={{ top: `${fxPresetsMenuPosition.top}px`, left: `${fxPresetsMenuPosition.left}px` }}>
-                            <div className="px-3 py-1 text-xs font-bold text-text-muted border-b border-dark-border">Master FX Presets</div>
-                            {MASTER_FX_PRESETS.map((preset) => (
-                              <button key={preset.name} onClick={() => handleLoadMasterFxPreset(preset)} className="w-full text-left px-3 py-2 text-sm font-mono text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex flex-col">
-                                <span className="font-bold">{preset.name}</span>
-                                <span className="text-[10px] opacity-60">{preset.description}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-              
-                        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
+              <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
+              <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
+              <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
               
               <Button variant="ghost" size="sm" onClick={onShowHelp}>Help</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
@@ -712,8 +681,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 min-w-[120px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group" onClick={() => {
-          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'sineScroll'];
+        <div className="flex-1 min-w-[120px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group bg-black overflow-hidden rounded-[6px] m-1" onClick={() => {
+          const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
           const currentIndex = modes.indexOf(vizMode);
           const nextIndex = (currentIndex + 1) % modes.length;
           setVizMode(modes[nextIndex]);
@@ -736,6 +705,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               {vizMode === 'chanSpectrum' && <ChannelSpectrums height={compactToolbar ? 70 : 100} />}
               {vizMode === 'chanCircular' && <ChannelCircularVU height={compactToolbar ? 70 : 100} />}
               {vizMode === 'chanParticles' && <ChannelParticles height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanRings' && <ChannelRings height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanTunnel' && <ChannelTunnel height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanRadar' && <ChannelRadar height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'chanNibbles' && (
+                <NibblesGame 
+                  height={compactToolbar ? 70 : 100} 
+                  onExit={() => {
+                    const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
+                    const currentIndex = modes.indexOf('chanNibbles');
+                    const nextIndex = (currentIndex + 1) % modes.length;
+                    setVizMode(modes[nextIndex]);
+                  }}
+                />
+              )}
               {vizMode === 'sineScroll' && <SineScroller height={compactToolbar ? 70 : 100} />}
             </>
           )}
@@ -759,17 +742,28 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 const { parseDb303Preset } = await import('@lib/import/Db303PresetConverter');
                 const presetConfig = parseDb303Preset(data);
                 
-                // Find first TB-303 instrument and apply preset
-                const tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+                // Find or create TB-303 instrument and apply preset
+                let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
                 if (!tb303Instrument) {
-                  notify.error('No TB-303 instrument found. Please create one first.');
-                  return;
+                  // Auto-create TB-303 instrument
+                  const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+                  const newInst = createDefaultTB303Instrument();
+                  addInstrument(newInst);
+                  tb303Instrument = newInst;
+                  console.log('[XML Import] Auto-created TB-303 instrument:', newInst.id);
                 }
                 
                 // Update the instrument with the preset using updateInstrument
-                updateInstrument(tb303Instrument.id, {
-                  tb303: { ...tb303Instrument.tb303, ...presetConfig } as TB303Config
-                });
+                const mergedConfig = { ...tb303Instrument.tb303, ...presetConfig } as TB303Config;
+                console.log('[XML Import] Before update - tb303Instrument.tb303:', JSON.stringify(tb303Instrument.tb303, null, 2));
+                console.log('[XML Import] Parsed presetConfig:', JSON.stringify(presetConfig, null, 2));
+                console.log('[XML Import] Merged config:', JSON.stringify(mergedConfig, null, 2));
+                
+                updateInstrument(tb303Instrument.id, { tb303: mergedConfig });
+                
+                // Verify the update worked
+                const updatedInstrument = instruments.find(inst => inst.id === tb303Instrument.id);
+                console.log('[XML Import] After update - instrument.tb303:', JSON.stringify(updatedInstrument?.tb303, null, 2));
                 
                 notify.success(`Loaded DB303 preset: ${filename.replace('.xml', '')}`);
                 console.log('[XML Import] Applied preset to instrument:', tb303Instrument.id, presetConfig);
@@ -778,15 +772,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 // Import as TB-303 pattern
                 const patternName = filename.replace('.xml', '') || 'Imported Pattern';
                 
-                // Find first TB-303 instrument
-                const tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+                // Find or create TB-303 instrument
+                let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
                 if (!tb303Instrument) {
-                  notify.error('No TB-303 instrument found. Please create one first.');
-                  return;
+                  // Auto-create TB-303 instrument
+                  const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+                  const newInst = createDefaultTB303Instrument();
+                  addInstrument(newInst);
+                  tb303Instrument = newInst;
+                  console.log('[XML Import] Auto-created TB-303 instrument:', newInst.id);
                 }
                 
                 // Parse pattern with instrument ID
-                const { pattern: importedPattern, tempo, swing } = parseDb303Pattern(data, patternName, tb303Instrument.id);
+                const { pattern: importedPattern, tempo } = parseDb303Pattern(data, patternName, tb303Instrument.id);
                 
                 console.log('[XML Import] Parsed pattern:', {
                   name: importedPattern.name,
@@ -794,8 +792,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   channels: importedPattern.channels.length,
                   rows: importedPattern.channels[0]?.rows.length,
                   instrumentId: tb303Instrument.id,
-                  tempo,
-                  swing
+                  tempo
                 });
                 
                 // Assign instrument to channel
@@ -814,15 +811,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   setBPM(tempo);
                   console.log('[XML Import] Set tempo to:', tempo);
                 }
-                if (swing !== undefined) {
-                  // db303 swing is 0-1 (0=straight, 1=max triplet)
-                  // Our swing is 0-200 (100=straight, 200=max)
-                  // Conversion: ourSwing = 100 + (db303Swing * 100)
-                  const swingValue = 100 + (swing * 100);
-                  setSwing(swingValue);
-                  setGrooveSteps(2); // DB303 uses 16th note swing (2 steps)
-                  console.log('[XML Import] Set swing:', swing, '→', swingValue);
-                }
+                // NOTE: We intentionally DO NOT apply swing from DB303 XML to avoid
+                // double-swing with tracker's global groove/swing system.
+                // Users can manually adjust swing via the tracker's transport settings.
+                // The swing parameter in DB303 XML affects slide timing in the original,
+                // but applying it here would conflict with tracker groove and cause
+                // incorrect slide behavior.
+                // Original code (now disabled):
+                // if (swing !== undefined) {
+                //   const swingValue = 100 + (swing * 100);
+                //   setSwing(swingValue);
+                //   setGrooveSteps(2);
+                //   console.log('[XML Import] Set swing:', swing, '→', swingValue);
+                // }
+                
                 
                 notify.success(`Loaded DB303 pattern: ${importedPattern.name} (${importedPattern.length} steps${tempo ? `, ${tempo} BPM` : ''})`);
                 return;
@@ -899,7 +901,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 Clear Song Data
               </Button>
               <Button
-                variant="danger"
+                variant="default"
                 size="sm"
                 onClick={() => {
                   if (isPlaying) { stop(); engine.releaseAll(); }
@@ -910,6 +912,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 }}
               >
                 Clear Both
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  if (isPlaying) { stop(); engine.releaseAll(); }
+                  resetInstruments();
+                  resetTracker();
+                  resetTransport();
+                  setShowClearModal(false);
+                  notify.success('Reset to defaults');
+                }}
+              >
+                Reset to Defaults
               </Button>
               <Button
                 variant="ghost"

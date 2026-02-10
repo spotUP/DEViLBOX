@@ -330,6 +330,20 @@ export class DB303Synth extends Tone.ToneAudioNode {
     if (accent && finalVelocity < 100) finalVelocity = 127;
     if (!accent && finalVelocity >= 100) finalVelocity = 99;
 
+    // DEBUG LOGGING for worklet message
+    if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED) {
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const octave = Math.floor(midiNote / 12) - 1;
+      const semitone = midiNote % 12;
+      const noteName = `${noteNames[semitone]}${octave}`;
+      console.log(
+        `%c    └─► WORKLET: noteOn(%cmidi=${midiNote} (${noteName}), vel=${finalVelocity}, slide=${slide}, accent=${accent}, hammer=${hammer}%c)`,
+        'color: #f80',
+        'color: #fca',
+        'color: #f80'
+      );
+    }
+
     // Hammer: temporarily set slideTime to 0 for instant pitch change
     // TT-303 Hammer = legato but NO pitch glide
     // When hammer is set, we want instant pitch (no glide), but slide=true keeps gate high
@@ -519,18 +533,21 @@ export class DB303Synth extends Tone.ToneAudioNode {
   setCutoff(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
+    console.log('[DB303Synth] setCutoff:', clamped);
     this.setParameterByName(DB303Param.CUTOFF, clamped);
   }
 
   setResonance(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
+    console.log('[DB303Synth] setResonance:', clamped);
     this.setParameterByName(DB303Param.RESONANCE, clamped);
   }
 
   setEnvMod(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
+    console.log('[DB303Synth] setEnvMod:', clamped);
     this.setParameterByName(DB303Param.ENV_MOD, clamped);
   }
 
@@ -566,6 +583,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   setWaveform(value: number): void {
     // 0-1 (saw to square blend) - this one stays normalized
+    console.log('[DB303Synth] setWaveform:', value);
     this.setParameterByName(DB303Param.WAVEFORM, value);
   }
 
@@ -759,8 +777,12 @@ export class DB303Synth extends Tone.ToneAudioNode {
   }
 
   setChorusMode(mode: number): void {
-    // 0-3 chorus mode
+    // 0-4 chorus mode (0=Off, 1=Subtle, 2=Standard, 3=Rich, 4=Dramatic)
     this.setParameterByName(DB303Param.CHORUS_MODE, mode);
+    // When mode is 0 (Off), bypass the Tone.js chorus effect
+    if (mode === 0) {
+      this.chorus.wet.value = 0;
+    }
   }
 
   setOversamplingOrder(order: number): void {

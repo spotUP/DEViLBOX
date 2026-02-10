@@ -93,6 +93,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
   private platformType: number;
   private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
   private _volumeOffsetDb = 0; // Volume normalization offset in dB
+  private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
 
   constructor(platformType: number = FurnaceDispatchPlatform.GB) {
     super();
@@ -112,6 +113,46 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
 
   public async ensureInitialized(): Promise<void> {
     return this._readyPromise;
+  }
+
+  /**
+   * Set which Furnace instrument index this synth uses (0-255).
+   */
+  public setFurnaceInstrumentIndex(index: number): void {
+    this.furnaceInstrumentIndex = index;
+  }
+
+  /**
+   * Upload Furnace instrument from config by encoding to FINS format
+   * @param config - FurnaceConfig to encode
+   * @param name - Instrument name
+   */
+  public async uploadInstrumentFromConfig(config: any, name: string): Promise<void> {
+    await this.ensureInitialized();
+    console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
+    
+    // Encode from config using our encoder
+    // The raw binary data from .fur files is in INS2 format, but the WASM expects
+    // the 0xF0 0xB1 format with proper offsets. Our encoder handles this conversion.
+    const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
+    const binaryData = updateFurnaceInstrument(config, name, this.furnaceInstrumentIndex);
+    console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
+    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData);
+  }
+
+  /**
+   * Upload Furnace instrument binary data to the engine (legacy)
+   * @param rawData - Raw binary instrument data from .fur file
+   * @deprecated Use uploadInstrumentFromConfig instead
+   */
+  public async uploadInstrumentData(rawData: Uint8Array): Promise<void> {
+    if (!rawData || rawData.length === 0) {
+      console.warn(`[FurnaceDispatchSynth] No instrument data to upload for index ${this.furnaceInstrumentIndex}`);
+      return;
+    }
+    await this.ensureInitialized();
+    console.log(`[FurnaceDispatchSynth] Uploading instrument ${this.furnaceInstrumentIndex} (${rawData.length} bytes) to platform ${this.platformType}`);
+    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, rawData);
   }
 
   /**
@@ -140,7 +181,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
 
       // Create the chip and wait for worklet to confirm creation
       const engineSampleRate = this.engine.getNativeCtx()?.sampleRate ?? nativeCtx.sampleRate;
-      this.engine.createChip(this.platformType, engineSampleRate);
+      await this.engine.createChip(this.platformType, engineSampleRate);
       await this.engine.waitForChipCreated();
 
       // Connect worklet output through a native GainNode for volume control.
@@ -547,6 +588,9 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     // For GB: channels 0-1 are pulse, 2 is wave, 3 is noise
     // Use channel 0 for now (can be made smarter later)
     const chan = this.currentChannel;
+
+    // Set the instrument for this channel BEFORE playing the note
+    this.engine.setInstrument(chan, this.furnaceInstrumentIndex);
 
     // Set volume based on velocity
     const maxVol = getMaxVolume(this.platformType);

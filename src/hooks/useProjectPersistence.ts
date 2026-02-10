@@ -1,5 +1,8 @@
 /**
  * useProjectPersistence - Auto-save and load project from localStorage
+ * 
+ * SCHEMA VERSIONING: When making breaking changes to instrument configs,
+ * bump SCHEMA_VERSION to invalidate old cached data.
  */
 
 import { useEffect, useCallback, useRef } from 'react';
@@ -11,8 +14,18 @@ import { needsMigration, migrateProject } from '@/lib/migration';
 const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
+/**
+ * SCHEMA VERSION - Bump this when making breaking changes to stored data format.
+ * This will cause old localStorage data to be discarded on load.
+ * 
+ * History:
+ * - 2: Fixed filterSelect=255 bug (was invalid, now defaults to 1)
+ */
+const SCHEMA_VERSION = 2;
+
 interface SavedProject {
   version: string;
+  schemaVersion?: number; // Schema version for breaking change detection
   savedAt: string;
   metadata: ReturnType<typeof useProjectStore.getState>['metadata'];
   bpm: number;
@@ -38,6 +51,7 @@ export function saveProjectToStorage(): boolean {
 
     const savedProject: SavedProject = {
       version: '1.0.0',
+      schemaVersion: SCHEMA_VERSION,
       savedAt: new Date().toISOString(),
       metadata: projectState.metadata,
       bpm: transportState.bpm,
@@ -59,26 +73,19 @@ export function saveProjectToStorage(): boolean {
       ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
     };
 
-    // CRITICAL FIX: Filter out MOD/XM imported instruments with samples
-    // AudioBuffers and blob URLs can't be serialized to JSON
-    // These instruments will be silent when loaded from localStorage
-    const modInstruments = savedProject.instruments.filter(
-      (inst) => inst.metadata?.importedFrom === 'MOD' || inst.metadata?.importedFrom === 'XM'
+    // Don't save projects with MOD/XM/IT/S3M imported instruments
+    // Sample data (AudioBuffers, blob URLs) can't be serialized to JSON
+    // Better to not save at all than to save broken/silent data
+    const hasImportedModules = savedProject.instruments.some(
+      (inst) => inst.metadata?.importedFrom === 'MOD' || 
+                inst.metadata?.importedFrom === 'XM' ||
+                inst.metadata?.importedFrom === 'IT' ||
+                inst.metadata?.importedFrom === 'S3M'
     );
 
-    if (modInstruments.length > 0) {
-      console.warn(
-        `[Persistence] WARNING: ${modInstruments.length} MOD/XM instruments will lose audio data in localStorage.`,
-        'Re-import the MOD/XM file after page reload to restore audio.'
-      );
-
-      // Option 1: Remove MOD/XM instruments from save (user must re-import)
-      // savedProject.instruments = savedProject.instruments.filter(
-      //   (inst) => !inst.metadata?.importedFrom
-      // );
-
-      // Option 2: Keep them but they'll be silent (current behavior)
-      // User will need to re-import after reload
+    if (hasImportedModules) {
+      console.log('[Persistence] Skipping save: project contains imported module data that cannot persist');
+      return false;
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
@@ -105,6 +112,16 @@ export function loadProjectFromStorage(): boolean {
     // Validate structure
     if (!project.version || !project.patterns || !project.instruments) {
       console.warn('[Persistence] Invalid saved project structure');
+      return false;
+    }
+
+    // SCHEMA VERSION CHECK: Discard old data if schema is outdated
+    if (!project.schemaVersion || project.schemaVersion < SCHEMA_VERSION) {
+      console.warn(
+        `[Persistence] Discarding outdated localStorage data (schema ${project.schemaVersion || 1} < ${SCHEMA_VERSION}). ` +
+        'This happens after app updates that fix data bugs. Your work was auto-saved but needs to be re-imported.'
+      );
+      localStorage.removeItem(STORAGE_KEY);
       return false;
     }
 

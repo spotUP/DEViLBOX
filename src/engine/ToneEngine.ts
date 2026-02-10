@@ -1796,8 +1796,26 @@ export class ToneEngine {
     try {
       // Handle TB-303 with JC303 or DB303 engine (both support accent/slide)
       if (instrument instanceof JC303Synth) {
+        // DEBUG LOGGING for JC303 synth calls
+        if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED) {
+          console.log(
+            `%c  └─► JC303.triggerAttack(%c"${note}", t=${safeTime.toFixed(3)}, vel=${velocity.toFixed(2)}, acc=${accent}, sld=${slide}%c)`,
+            'color: #66f',
+            'color: #aaa',
+            'color: #66f'
+          );
+        }
         instrument.triggerAttack(note, safeTime, velocity, accent, slide);
       } else if (instrument instanceof DB303Synth) {
+        // DEBUG LOGGING for DB303 synth calls
+        if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED) {
+          console.log(
+            `%c  └─► DB303.triggerAttack(%c"${note}", t=${safeTime.toFixed(3)}, vel=${velocity.toFixed(2)}, acc=${accent}, sld=${slide}, ham=${hammer}%c)`,
+            'color: #66f',
+            'color: #aaa',
+            'color: #66f'
+          );
+        }
         // DB303Synth supports hammer for legato without pitch glide (TT-303 extension)
         instrument.triggerAttack(note, safeTime, velocity, accent, slide, hammer);
       } else if (config.synthType === 'NoiseSynth') {
@@ -2967,8 +2985,11 @@ export class ToneEngine {
       }
       
       if (tb303Config.oscillator) {
-        // Convert waveform type to number: 0.0 = saw, 1.0 = square
-        synth.setWaveform(tb303Config.oscillator.type === 'square' ? 1.0 : 0.0);
+        // Use waveformBlend if available (0-1 continuous), otherwise fall back to type
+        const waveformValue = tb303Config.oscillator.waveformBlend !== undefined 
+          ? tb303Config.oscillator.waveformBlend 
+          : (tb303Config.oscillator.type === 'square' ? 1.0 : 0.0);
+        synth.setWaveform(waveformValue);
         
         if (tb303Config.oscillator.pulseWidth !== undefined) {
           synth.setPulseWidth(normPercent(tb303Config.oscillator.pulseWidth));
@@ -3102,6 +3123,47 @@ export class ToneEngine {
         synth.setDelaySpread(normPercent(tb303Config.delay.stereo));
       }
     }); // End synths.forEach
+  }
+
+  /**
+   * Update Furnace instrument parameters in real-time
+   * Re-encodes the instrument config to binary format and re-uploads to WASM
+   */
+  public updateFurnaceInstrument(instrumentId: number, config: InstrumentConfig): void {
+    if (!config.furnace || !config.synthType?.startsWith('Furnace')) {
+      console.warn('[ToneEngine] updateFurnaceInstrument called on non-Furnace instrument');
+      return;
+    }
+
+    // Find all FurnaceDispatchSynth instances for this instrument
+    const synths: any[] = [];
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId) && (instrument as any).uploadInstrumentData) {
+        synths.push(instrument);
+      }
+    });
+
+    if (synths.length === 0) {
+      // No instances yet - instrument will be created with correct config on next note
+      this.invalidateInstrument(instrumentId);
+      return;
+    }
+
+    // Dynamically import the encoder (code-split to reduce main bundle)
+    import('@lib/export/FurnaceInstrumentEncoder').then(({ updateFurnaceInstrument }) => {
+      const furnaceIndex = config.furnace!.furnaceIndex ?? 0;
+      const binaryData = updateFurnaceInstrument(config.furnace!, config.name, furnaceIndex);
+      
+      // Update all synth instances
+      synths.forEach((synth) => {
+        synth.uploadInstrumentData(binaryData);
+      });
+      
+      console.log(`[ToneEngine] Updated ${synths.length} Furnace synth instance(s) for instrument ${instrumentId}`);
+    }).catch(err => {
+      console.error('[ToneEngine] Failed to encode Furnace instrument:', err);
+    });
   }
 
   /**

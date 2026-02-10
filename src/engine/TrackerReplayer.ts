@@ -98,6 +98,19 @@ const PERIOD_TABLE = [
 
 // Note names for period-to-note conversion
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const NOTE_NAMES_CLEAN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** Convert XM note number to note name (e.g. "C2")
+ * XM note format: 1 = C-0, 13 = C-1, 25 = C-2, etc.
+ * Maps to MIDI: XM + 11 = MIDI (so XM 25 = MIDI 36 = C2)
+ */
+function xmNoteToNoteName(xmNote: number): string {
+  if (xmNote <= 0 || xmNote > 96) return 'C4'; // Invalid note, return default
+  const midi = xmNote + 11; // Convert XM to MIDI
+  const octave = Math.floor(midi / 12) - 1; // MIDI 12 = C0, MIDI 24 = C1, MIDI 36 = C2
+  const semitone = midi % 12;
+  return `${NOTE_NAMES_CLEAN[semitone]}${octave}`;
+}
 
 /** Convert Amiga period to note name (e.g. "C4") */
 function periodToNoteName(period: number): string {
@@ -166,6 +179,8 @@ interface ChannelState {
   // TB-303 specific state
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
   gateHigh: boolean;             // Current gate state for 303-style gate handling
+  lastPlayedNoteName: string | null; // Last triggered note name for same-pitch slide detection
+  xmNote: number;                // Original XM note number (for synth instruments, avoids period conversion)
 
   // Audio nodes - player pool (pre-allocated, pre-connected)
   player: Tone.Player | null;       // Active player reference (for updatePeriod compatibility)
@@ -348,6 +363,8 @@ export class TrackerReplayer {
       macroWaveform: 0,
       previousSlideFlag: false,
       gateHigh: false,
+      lastPlayedNoteName: null,
+      xmNote: 0,
       player: null,
       playerPool,
       activePlayerIdx: 0,
@@ -490,21 +507,25 @@ export class TrackerReplayer {
 
   private calculateGrooveOffset(row: number, rowDuration: number, state: any): number {
     const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId);
-    const intensity = state.swing / 100;
+    
+    // Swing is 0-200 where 100 = straight (no swing)
+    // Normalize to 0-1 range where 0 = straight, 1 = full swing
+    const intensity = (state.swing - 100) / 100;
 
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
       return getGrooveOffset(grooveTemplate, row, rowDuration) * intensity;
     } else {
-      // MANUAL SWING AUDIT FIX:
-      // Use 'Second Half' logic for correct resolution feel
+      // MANUAL SWING: Apply swing to alternating steps
+      // grooveSteps determines the swing resolution (2 = 16th notes, 3 = 8th note triplets, etc.)
       const grooveSteps = state.grooveSteps || 2;
       const isSwungHalf = (row % grooveSteps) >= (grooveSteps / 2);
       
       if (state.swing !== 100 && isSwungHalf) {
-        // Standard Triplet (100% swing) = 33.3% of row duration shift
+        // At 100% swing (state.swing=200), shift by 33.3% of row duration (triplet timing)
+        // At 50% swing (state.swing=150), shift by 16.7%
+        // At 0% swing (state.swing=100), shift by 0% (straight)
         const tripletShift = 0.3333;
-        const shiftFactor = (state.swing / 100) * tripletShift;
-        return shiftFactor * rowDuration;
+        return intensity * tripletShift * rowDuration;
       }
     }
     return 0;
@@ -526,9 +547,9 @@ export class TrackerReplayer {
     // --- Groove & Swing Support ---
     const transportState = useTransportStore.getState();
     
-    // Sync BPM and Speed from UI if they changed
+    // Sync BPM from UI if user changed it manually (but NOT speed - Fxx effects control that during playback)
     if (transportState.bpm !== this.bpm) this.bpm = transportState.bpm;
-    if (transportState.speed !== this.speed) this.speed = transportState.speed;
+    // Note: Speed is controlled by Fxx effects during playback, don't override from UI
 
     const tickInterval = 2.5 / this.bpm;
     let safeTime = time;
@@ -715,7 +736,10 @@ export class TrackerReplayer {
     // We need to track hammer separately for the synth to skip pitch glide
     const effectiveSlide = slide || hammer; // Gate stays high for both
 
-    if (noteValue && noteValue !== 0 && !probabilitySkip) {
+    if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
+      // Store the original XM note for synth instruments (avoids period table issues)
+      ch.xmNote = noteValue;
+      
       // For MOD files, use the raw period stored in the row (if available)
       // This is more accurate than converting XM note numbers
       const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune);
@@ -745,6 +769,49 @@ export class TrackerReplayer {
         // For hammer: pitch should jump, not glide - use slideActive only if not hammer
         const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
 
+        // Check for 303 synth type early (needed for logging and same-pitch slide detection)
+        const is303Synth = ch.instrument?.synthType === 'TB303' ||
+                           ch.instrument?.synthType === 'Buzz3o3';
+
+        // DEBUG LOGGING - Enable with window.TB303_DEBUG_ENABLED = true in browser console
+        if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303Synth) {
+          const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          const midi = noteValue ? noteValue + 11 : 0;
+          const octave = Math.floor(midi / 12) - 1;
+          const semitone = midi % 12;
+          const noteName = noteValue ? `${noteNames[semitone]}${octave}` : '...';
+          console.log(
+            `%c[Row ${this.pattPos.toString().padStart(2)}] %c${noteName.padEnd(5)} %c${accent ? '●ACC' : '    '} %c${slideActive ? '►SLD' : '    '} %c[prev:${ch.previousSlideFlag ? '1' : '0'} curr:${slide ? '1' : '0'}] %c→ ${slideActive ? 'SLIDE' : 'TRIGGER'}`,
+            'color: #888',
+            'color: #0ff; font-weight: bold',
+            accent ? 'color: #f0f' : 'color: #444',
+            slideActive ? 'color: #ff0' : 'color: #444',
+            'color: #666',
+            'color: #0f0'
+          );
+        }
+
+        // FIX: Detect same-pitch slides for TB-303 synths
+        // When sliding to the same note, we need to:
+        // 1. Cancel any pending release from the previous note
+        // 2. NOT retrigger the envelope (let note sustain)
+        // We do this by still calling triggerNote with slide=true - the worklet
+        // will just keep the note going without retriggering.
+        // Use xmNoteToNoteName for 303 synths (avoids period table issues)
+        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue) : periodToNoteName(usePeriod);
+        const isSamePitchSlide = slideActive &&
+                                  ch.lastPlayedNoteName !== null &&
+                                  newNoteName === ch.lastPlayedNoteName;
+
+        if (is303Synth && isSamePitchSlide) {
+          // Same pitch slide on 303: trigger with slide=true to cancel pending release
+          // The synth will receive noteOn for the same pitch with slide, which sustains the note
+          console.log(`[TrackerReplayer] Same-pitch slide on 303: ${newNoteName} → ${newNoteName}, sustaining with slide=true`);
+        }
+
+        // Update last played note name for next comparison
+        ch.lastPlayedNoteName = newNoteName;
+
         // Trigger the note with proper 303 slide semantics
         // Pass accent directly (accent applies to current note)
         // Pass slideActive (computed from previous row's slide flag) for pitch glide
@@ -753,6 +820,7 @@ export class TrackerReplayer {
         //   - slide: gate stays high, pitch glides to next note
         //   - hammer: gate stays high, but NO pitch glide (just legato)
         // Pass hammer flag so synth can handle it specially
+        // NOTE: For same-pitch slides, slideActive=true ensures the synth doesn't retrigger
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
         // Reset vibrato/tremolo positions
@@ -764,12 +832,33 @@ export class TrackerReplayer {
     // Update previous slide flag for next row (TB-303 semantics)
     // Store current row's slide flag to be used when processing the next note
     // For hammer: keep gate high (like slide) but don't glide pitch
-    ch.previousSlideFlag = (slide || hammer) ?? false;
+    //
+    // DB303 BEHAVIOR: A rest (empty row) breaks the slide chain.
+    // When gate=false, the note is released and previousSlideFlag is cleared.
+    // Only rows with valid notes (not note-off) can have slide flags that affect the next row.
+    if (noteValue && noteValue !== 97) {
+      ch.previousSlideFlag = (slide || hammer) ?? false;
+    }
 
     // Handle note off
     if (noteValue === 97) {
+      // Clear slide flag - note-off breaks the slide chain
+      ch.previousSlideFlag = false;
+      
+      // DEBUG LOGGING for note-off
+      const is303ForLog = ch.instrument?.synthType === 'TB303' || ch.instrument?.synthType === 'Buzz3o3';
+      if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303ForLog) {
+        console.log(
+          `%c[Row ${this.pattPos.toString().padStart(2)}] %c===   %cNOTE OFF %c(prevSlide cleared)`,
+          'color: #888',
+          'color: #f00; font-weight: bold',
+          'color: #f88',
+          'color: #666'
+        );
+      }
       this.releaseMacros(ch);
       this.stopChannel(ch);
+      ch.lastPlayedNoteName = null; // Clear for next note sequence
     }
 
     // Handle volume column (XM)
@@ -885,9 +974,19 @@ export class TrackerReplayer {
         if (param === 0) {
           // F00 = stop in some trackers
         } else if (param < 0x20) {
-          this.speed = param;
+          if (this.speed !== param) {
+            console.log(`[TrackerReplayer] Fxx effect: setting speed to ${param} (was ${this.speed})`);
+            this.speed = param;
+            // Update UI to reflect the speed change from the module
+            useTransportStore.getState().setSpeed(param);
+          }
         } else {
-          this.bpm = param;
+          if (this.bpm !== param) {
+            console.log(`[TrackerReplayer] Fxx effect: setting BPM to ${param} (was ${this.bpm})`);
+            this.bpm = param;
+            // Update UI to reflect the BPM change from the module
+            useTransportStore.getState().setBPM(param);
+          }
         }
         break;
 
@@ -1459,9 +1558,10 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
-  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, _slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
+  private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
     // Skip note trigger if channel is muted
-    // Note: _slideActive is preserved for compatibility but not used - pitch glide is handled by the synth's slideTime
+    // slideActive = from PREVIOUS row's slide flag, determines pitch glide behavior
+    // currentRowSlide = CURRENT row's slide flag, determines gate timing (sustain into next note)
     if (channelIndex !== undefined) {
       const engine = getToneEngine();
       if (engine.isChannelMuted(channelIndex)) return;
@@ -1486,12 +1586,27 @@ export class TrackerReplayer {
     ch.macroArpNote = 0;
 
     if (!ch.instrument) {
-      console.log('[TrackerReplayer] No instrument assigned to channel');
-      return;
+      // No instrument assigned - try to use the first available instrument
+      if (this.song && this.song.instruments.length > 0) {
+        console.log(`[TrackerReplayer] No instrument on ch${channelIndex}, assigning default instrument ${this.song.instruments[0].id}`);
+        ch.instrument = this.song.instruments[0];
+        ch.sampleNum = this.song.instruments[0].id;
+        ch.volume = 64;
+        ch.finetune = ch.instrument.metadata?.modPlayback?.finetune ?? 0;
+      } else {
+        console.log('[TrackerReplayer] No instrument assigned to channel and no instruments available');
+        return;
+      }
     }
 
     const engine = getToneEngine();
-    const noteName = periodToNoteName(ch.period);
+    
+    // For synth instruments, use XM note directly (avoids period table issues)
+    // For sample-based, use period-to-note conversion
+    const isSynthInstrument = ch.instrument.synthType && ch.instrument.synthType !== 'Sampler';
+    const noteName = isSynthInstrument && ch.xmNote > 0 && ch.xmNote < 97
+      ? xmNoteToNoteName(ch.xmNote)
+      : periodToNoteName(ch.period);
     
     // --- Groove Velocity/Dynamics ---
     const transportState = useTransportStore.getState();
@@ -1505,6 +1620,11 @@ export class TrackerReplayer {
     }
     
     const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
+    
+    // Debug log if swing is unusual (not 100)
+    if (transportState.swing !== 100 && this.pattPos === 0) {
+      console.log(`[TrackerReplayer] Swing debug: swing=${transportState.swing} intensity=${intensity.toFixed(2)} velocityOffset=${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
+    }
 
     // Schedule VU meter trigger at exact audio playback time for tight sync
     if (channelIndex !== undefined) {
@@ -1515,6 +1635,8 @@ export class TrackerReplayer {
 
     // Check if this is a synth instrument (has synthType) or sample-based
     if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
+      console.log(`[TrackerReplayer] Triggering synth note: inst=${ch.instrument.id} type=${ch.instrument.synthType} note=${noteName} xmNote=${ch.xmNote} vel=${velocity.toFixed(2)}`);
+      
       // Use ToneEngine for synth instruments (TB303, drums, etc.)
       // Calculate duration based on speed/BPM (one row duration as default)
       const rowDuration = (2.5 / this.bpm) * this.speed;
@@ -1528,6 +1650,7 @@ export class TrackerReplayer {
       // For 303 synths: use 80% duration for standard notes to ensure the gate
       // drops before the next tick starts (prevents unintentional slides).
       // Use 105% (slight overlap) for sliding notes to guarantee legato.
+      // Note: currentRowSlide controls gate timing, slideActive controls pitch glide
       const noteDuration = is303Synth && !currentRowSlide
         ? rowDuration * 0.8  // 80% gate for punchy retrigger
         : rowDuration * 1.05; // 105% gate for guaranteed slide overlap
@@ -1539,13 +1662,13 @@ export class TrackerReplayer {
         safeTime,
         velocity,
         ch.instrument,
-        accent, // accent
-        currentRowSlide, // gate timing: true for both slide and hammer (keeps gate high)
-        undefined, // channelIndex (let engine allocate)
-        ch.period, // period for MOD playback
-        undefined, // sampleOffset
-        0,         // nnaAction
-        hammer     // TT-303 hammer: legato without pitch glide (synth sets slideTime=0)
+        accent,      // accent: applies to current note
+        slideActive, // slide: from PREVIOUS row's slide flag - controls pitch glide!
+        undefined,   // channelIndex (let engine allocate)
+        ch.period,   // period for MOD playback
+        undefined,   // sampleOffset
+        0,           // nnaAction
+        hammer       // TT-303 hammer: legato without pitch glide (synth sets slideTime=0)
       );
       return;
     }
@@ -1648,6 +1771,7 @@ export class TrackerReplayer {
       } catch (e) {}
     }
     ch.player = null;
+    ch.lastPlayedNoteName = null; // Clear for next note sequence
   }
 
   private updatePeriod(ch: ChannelState): void {

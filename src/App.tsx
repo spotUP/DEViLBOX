@@ -27,7 +27,6 @@ import { useVersionCheck } from '@hooks/useVersionCheck';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { importMIDIFile } from '@lib/import/MIDIImporter';
 import { importInstrument } from '@lib/export/exporters';
-import { loadModuleFile } from '@lib/import/ModuleLoader';
 import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -377,15 +376,73 @@ function App() {
         setBPM(midiResult.bpm);
         notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
         
-      } else if (filename.match(/\.(mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/)) {
-        // Tracker module
-        const moduleInfo = await loadModuleFile(file);
+      } else if (filename.endsWith('.fur') || filename.endsWith('.dmf')) {
+        // Furnace/DefleMask - import directly (no libopenmpt dialog needed)
+        const { parseFurnaceSong, convertFurnaceToDevilbox } = await import('@lib/import/formats/FurnaceSongParser');
+        const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
         
-        if (moduleInfo) {
-          notify.success(`Loaded module: ${moduleInfo.metadata.title || file.name}`, 3000);
-        } else {
-          notify.error(`Failed to load module: ${file.name}`);
-        }
+        const buffer = await file.arrayBuffer();
+        const module = await parseFurnaceSong(buffer);
+        const result = convertFurnaceToDevilbox(module);
+        
+        // Convert instruments
+        const instruments = result.instruments.map((inst, idx) => 
+          convertToInstrument(inst, idx + 1, 'FUR')
+        ).flat();
+        
+        // Convert patterns (already in [pattern][row][channel] format)
+        const patternOrder = result.metadata.modData?.patternOrderTable || [];
+        const patterns = result.patterns;
+        const patLen = patterns[0]?.length || 64;
+        const numChannels = patterns[0]?.[0]?.length || 4;
+        
+        const convertedPatterns = patterns.map((pat: any[][], idx: number) => ({
+          id: `pattern-${idx}`,
+          name: `Pattern ${idx}`,
+          length: patLen,
+          channels: Array.from({ length: numChannels }, (_, ch) => ({
+            id: `channel-${ch}`,
+            name: `Channel ${ch + 1}`,
+            muted: false,
+            solo: false,
+            collapsed: false,
+            volume: 100,
+            pan: 0,
+            instrumentId: null,
+            color: null,
+            rows: pat.map((row: any[]) => {
+              const cell = row[ch] || {};
+              return {
+                note: cell.note || 0,
+                instrument: cell.instrument || 0,
+                volume: cell.volume || 0,
+                effTyp: cell.effectType || 0,
+                eff: cell.effectParam || 0,
+                effTyp2: 0,
+                eff2: 0,
+              };
+            }),
+          })),
+        }));
+        
+        loadInstruments(instruments as any);
+        loadPatterns(convertedPatterns);
+        if (patternOrder.length > 0) setPatternOrder(patternOrder);
+        
+        setBPM(result.metadata.modData?.initialBPM || 150);
+        setMetadata({
+          name: result.metadata.sourceFile.replace(/\.[^/.]+$/, ''),
+          author: '',
+          description: `Imported from ${file.name} (Furnace)`,
+        });
+        
+        notify.success(`Loaded Furnace: ${file.name} (${instruments.length} instruments, ${convertedPatterns.length} patterns)`);
+        
+      } else if (filename.match(/\.(mod|xm|it|s3m|mptm|669|amf|ams|dbm|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/)) {
+        // Tracker module - pass to TrackerView's import mechanism via store
+        // This triggers the Import Module dialog which handles everything correctly
+        useUIStore.getState().setPendingModuleFile(file);
+        notify.info(`Opening import dialog for ${file.name}...`);
         
       } else if (filename.endsWith('.dbx')) {
         // DEViLBOX project file
@@ -455,7 +512,144 @@ function App() {
         
       } else if (filename.endsWith('.xml')) {
         // XML file - could be DB303 pattern or preset
-        notify.info(`XML file detected: ${file.name}. Use Load button for pattern/preset import.`);
+        const text = await file.text();
+        const isPreset = text.includes('<db303-preset');
+        const isPattern = text.includes('<db303-pattern');
+        
+        if (isPreset) {
+          // Import preset - find or create TB-303 instrument and apply
+          const { parseDb303Preset } = await import('@lib/import/Db303PresetConverter');
+          const { instruments, updateInstrument, addInstrument: addInst } = useInstrumentStore.getState();
+          const presetConfig = parseDb303Preset(text);
+          
+          let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+          if (!tb303Instrument) {
+            // Auto-create TB-303 instrument
+            const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+            const newInst = createDefaultTB303Instrument();
+            addInst(newInst);
+            tb303Instrument = newInst;
+            console.log('[FileDrop] Auto-created TB-303 instrument:', newInst.id);
+          }
+          
+          updateInstrument(tb303Instrument.id, {
+            tb303: { ...tb303Instrument.tb303, ...presetConfig } as any
+          });
+          
+          notify.success(`Loaded DB303 preset: ${file.name}`);
+          console.log('[FileDrop] Applied preset to instrument:', tb303Instrument.id, presetConfig);
+          
+        } else if (isPattern) {
+          // Import pattern - find or create TB-303 instrument
+          const { parseDb303Pattern } = await import('@lib/import/Db303PatternConverter');
+          const { patterns, loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
+          const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
+          const { setBPM } = useTransportStore.getState();
+          
+          let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+          if (!tb303Instrument) {
+            // Auto-create TB-303 instrument
+            const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+            const newInst = createDefaultTB303Instrument();
+            addInst(newInst);
+            tb303Instrument = newInst;
+            console.log('[FileDrop] Auto-created TB-303 instrument:', newInst.id);
+          }
+          
+          const patternName = file.name.replace('.xml', '') || 'Imported Pattern';
+          const { pattern: importedPattern, tempo } = parseDb303Pattern(text, patternName, tb303Instrument.id);
+          
+          importedPattern.channels[0].instrumentId = tb303Instrument.id;
+          
+          const newPatterns = [...patterns, importedPattern];
+          loadPatterns(newPatterns);
+          setCurrentPattern(newPatterns.length - 1);
+          setPatternOrder([newPatterns.length - 1]);
+          
+          if (tempo !== undefined) setBPM(tempo);
+          // NOTE: We intentionally DO NOT apply swing from DB303 XML to avoid
+          // double-swing with tracker's global groove/swing system.
+          // Users can manually adjust swing via the tracker's transport settings.
+          // The swing parameter in DB303 XML affects slide timing in the original,
+          // but applying it here would conflict with tracker groove and cause
+          // incorrect slide behavior.
+          // Original code (now disabled):
+          // if (swing !== undefined) {
+          //   setSwing(100 + (swing * 100));
+          //   setGrooveSteps(2);
+          // }
+          
+          notify.success(`Loaded DB303 pattern: ${importedPattern.name}`);
+          
+        } else {
+          notify.error('Unknown XML format. Expected db303-pattern or db303-preset.');
+        }
+        
+      } else if (filename.endsWith('.sqs') || filename.endsWith('.seq')) {
+        // Behringer TD-3 / Synthtribe pattern file (.sqs = single, .seq = sequence/multiple patterns)
+        const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
+        const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
+        const { patterns, loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
+        const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
+        
+        // Find or create TB-303 instrument
+        let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+        if (!tb303Instrument) {
+          const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+          const newInst = createDefaultTB303Instrument();
+          addInst(newInst);
+          tb303Instrument = newInst;
+          console.log('[FileDrop] Auto-created TB-303 instrument for SQS:', newInst.id);
+        }
+        
+        const buffer = await file.arrayBuffer();
+        const td3File = await parseTD3File(buffer);
+        
+        if (td3File.patterns.length === 0) {
+          notify.error('No patterns found in SQS file');
+          return;
+        }
+        
+        // Get instrument index (1-based for tracker) - recalculate after potential add
+        const currentInstruments = useInstrumentStore.getState().instruments;
+        const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument!.id) + 1 || 1;
+        
+        // Import all patterns from the file
+        const importedPatterns: Pattern[] = td3File.patterns.map((td3Pattern, idx) => {
+          // td3Pattern.steps is already in the correct format (TD3Step[])
+          const cells = td3StepsToTrackerCells(td3Pattern.steps, 2); // Base octave 2
+          const patternLength = td3Pattern.length || 16;
+          
+          // Create a new pattern
+          const patternId = `td3-${Date.now()}-${idx}`;
+          return {
+            id: patternId,
+            name: td3Pattern.name || `TD-3 Pattern ${idx + 1}`,
+            length: patternLength,
+            channels: [{
+              id: `ch-${tb303Instrument!.id}-${idx}`,
+              name: 'TB-303',
+              muted: false,
+              solo: false,
+              collapsed: false,
+              volume: 100,
+              pan: 0,
+              instrumentId: tb303Instrument!.id,
+              color: '#ec4899',
+              rows: cells.slice(0, patternLength).map(cell => ({
+                ...cell,
+                instrument: cell.note ? instrumentIndex : 0
+              }))
+            }]
+          };
+        });
+        
+        const newPatterns = [...patterns, ...importedPatterns];
+        loadPatterns(newPatterns);
+        setCurrentPattern(patterns.length); // First imported pattern
+        setPatternOrder(importedPatterns.map((_, i) => patterns.length + i));
+        
+        notify.success(`Loaded ${importedPatterns.length} TD-3 pattern(s) from ${file.name}`);
         
       } else if (filename.match(/\.(wav|mp3|ogg|flac|aiff|aif)$/)) {
         // Audio sample - create new instrument

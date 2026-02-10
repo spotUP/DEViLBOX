@@ -11,6 +11,16 @@
  * - Old (PATR) and new (PATN) pattern formats
  * - Old (SMPL) and new (SMP2) sample formats
  * - All chip types and configurations
+ *
+ * TIMING FORMULA (CRITICAL):
+ * Furnace uses hz (ticks per second, typically 50 or 60) and speed (ticks per row).
+ * Our replayer uses ProTracker timing: tickInterval = 2.5 / BPM
+ * Conversion: BPM = 2.5 * hz / speed * (virtualTempo / virtualTempoD)
+ * 
+ * PATTERN NOTE FORMAT:
+ * - New format (PATN): 0=C-(-5), 179=B-9, 180=note off, 181=note release, 182=macro release
+ * - Old format (PATR): 1=C#, 2=D, ..., 11=B, 12=C (next octave, legacy), 100=off, 101=release, 102=macro release
+ *   Octave is signed byte (255=-1, 254=-2, etc.)
  */
 
 import { BinaryReader } from '../../../utils/BinaryReader';
@@ -319,6 +329,7 @@ export interface FurnaceInstrument {
   macros: FurnaceMacro[];
   samples: number[];
   wavetables: number[];
+  rawBinaryData?: Uint8Array;  // Raw binary instrument data for upload to WASM
 }
 
 // Macro
@@ -650,9 +661,21 @@ async function parseNewFormat(
   }
 
   // Parse instruments
-  for (const ptr of insPtr) {
+  for (let i = 0; i < insPtr.length; i++) {
+    const ptr = insPtr[i];
     reader.seek(ptr);
+    const startOffset = reader.getOffset();
     const inst = parseInstrument(reader, version);
+    const endOffset = reader.getOffset();
+    
+    // Capture raw binary data for upload to WASM
+    const rawDataSize = endOffset - startOffset;
+    console.log(`[FurnaceParser] Inst ${i} "${inst.name}": capturing ${rawDataSize} bytes from offset ${startOffset}`);
+    reader.seek(startOffset);
+    const rawData = reader.readBytes(rawDataSize);
+    inst.rawBinaryData = rawData;
+    console.log(`[FurnaceParser] Inst ${i} rawBinaryData captured: ${inst.rawBinaryData?.length ?? 0} bytes`);
+    
     module.instruments.push(inst);
   }
 
@@ -853,8 +876,12 @@ async function parseOldFormat(
   module.chans = tchans;
 
   // Read pattern pointers
-  const patternCount = reader.readUint32 ? reader.readUint32() : 0;
-  void patternCount; // Pattern count for validation
+  // In old format, patterns come after samples. The number of patterns is already known from numberOfPats.
+  // Pattern pointers follow the sample pointers.
+  for (let i = 0; i < numberOfPats; i++) {
+    patPtr.push(reader.readUint32());
+  }
+  console.log(`[FurnaceSongParser] Old format: ${numberOfPats} pattern pointers read`);
 
   // Orders
   subsong.orders = [];
@@ -906,11 +933,24 @@ async function parseOldFormat(
   module.subsongs.push(subsong);
 
   // Parse instruments
-  for (const ptr of insPtr) {
+  for (let i = 0; i < insPtr.length; i++) {
+    const ptr = insPtr[i];
     if (ptr === 0) continue;
     reader.seek(ptr);
+    const startOffset = reader.getOffset();
     try {
       const inst = parseInstrument(reader, version);
+      const endOffset = reader.getOffset();
+      
+      // Capture raw binary data for upload to WASM
+      const rawDataSize = endOffset - startOffset;
+      console.log(`[FurnaceParser OLD] Inst ${i} "${inst.name}": capturing ${rawDataSize} bytes from offset ${startOffset}`);
+      console.log(`[FurnaceParser OLD] Inst ${i} parsed ${inst.macros.length} macros`);
+      reader.seek(startOffset);
+      const rawData = reader.readBytes(rawDataSize);
+      inst.rawBinaryData = rawData;
+      console.log(`[FurnaceParser OLD] Inst ${i} rawBinaryData captured: ${inst.rawBinaryData?.length ?? 0} bytes, first 4 bytes: ${Array.from(inst.rawBinaryData.slice(0, 4)).map(b => String.fromCharCode(b)).join('')}`);
+      
       module.instruments.push(inst);
     } catch (e) {
       console.warn('[FurnaceSongParser] Error parsing instrument:', e);
@@ -1637,15 +1677,37 @@ function parsePattern(
         effects: [],
       };
 
-      // Note conversion for old format
+      // Note conversion for old format (PATR)
+      // According to format.md:
+      // - 0: empty/invalid (with octave 0)
+      // - 1: C#, 2: D, 3: D#, 4: E, 5: F, 6: F#, 7: G, 8: G#, 9: A, 10: A#, 11: B
+      // - 12: C (of next octave) - leftover from .dmf format
+      // - 100: note off, 101: note release, 102: macro release
+      // - octave is signed char (255 = -1)
       if (cell.note === 0 && cell.octave === 0) {
+        // Empty note
         cell.note = -1;
       } else if (cell.note === 100) {
         cell.note = NOTE_OFF;
+        cell.octave = 0;
       } else if (cell.note === 101) {
         cell.note = NOTE_RELEASE;
+        cell.octave = 0;
       } else if (cell.note === 102) {
         cell.note = MACRO_RELEASE;
+        cell.octave = 0;
+      } else if (cell.note === 12) {
+        // C of next octave (legacy .dmf format)
+        cell.note = 12;
+        cell.octave++;
+      } else if (cell.note >= 1 && cell.note <= 11) {
+        // Standard notes: 1=C#, 2=D, etc.
+        // Note: cell.note is already correct (1-12 maps to our note system)
+        // Just need to handle signed octave
+        if (cell.octave >= 128) {
+          // Signed char stored as short: 255 = -1, 254 = -2, etc.
+          cell.octave = cell.octave - 256;
+        }
       }
 
       // Read effects
@@ -1685,6 +1747,11 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     // Map Furnace instrument type to SynthType
     const synthType = mapFurnaceInstrumentType(inst.type);
     const isSampleBased = synthType === 'Sampler' || synthType === 'Player';
+
+    // Debug: Log instrument type mapping
+    if (idx < 3) {
+      console.log(`[FurnaceSongParser] Inst ${idx} "${inst.name}": type=${inst.type} -> synthType="${synthType}" samples=${inst.samples.length} wavetables=${inst.wavetables.length}`);
+    }
 
     // Convert samples referenced by this instrument
     if (inst.samples && inst.samples.length > 0) {
@@ -1735,7 +1802,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
         ops: inst.fm.ops,
         opllPreset: inst.fm.opllPreset,
         operators: inst.fm.operators.map((op: any) => ({
-          enabled: op.enable,
+          enabled: op.enabled,
           mult: op.mult,
           tl: op.tl,
           ar: op.ar,
@@ -1765,6 +1832,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
       volumeType: 'none' as const,
       panningType: 'none' as const,
       furnace: furnaceData,
+      rawBinaryData: inst.rawBinaryData,  // Pass through raw binary data
     };
   });
 
@@ -1846,6 +1914,41 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
 function createMetadata(module: FurnaceModule): ImportMetadata {
   const subsong = module.subsongs[0];
 
+  // Calculate BPM from Furnace's timing system
+  // 
+  // Furnace timing:
+  //   - hz = ticks per second (50 PAL, 60 NTSC)
+  //   - speed = ticks per row
+  //   - Row rate = hz / speed (rows per second)
+  //
+  // Our replayer timing (ProTracker-style):
+  //   - tickInterval = 2.5 / BPM (seconds per tick)
+  //   - rowDuration = tickInterval * speed (seconds per row)
+  //   - Simplify: rowDuration = (2.5 / BPM) * speed
+  //
+  // Match Furnace row rate:
+  //   - Furnace rowDuration = speed / hz
+  //   - Set equal: speed / hz = (2.5 / BPM) * speed
+  //   - Simplify: 1 / hz = 2.5 / BPM
+  //   - BPM = 2.5 * hz
+  //
+  // Apply virtual tempo multiplier: BPM = 2.5 * hz * (virtualTempo / virtualTempoD)
+  //
+  // Example: hz=60, speed=6, virtualTempo=150/150
+  //   - BPM = 2.5 * 60 * 1 = 150
+  //   - tickInterval = 2.5 / 150 = 0.01667 seconds per tick
+  //   - rowDuration = 0.01667 * 6 = 0.1 seconds per row
+  //   - Row rate = 10 rows/second (matches Furnace's 60/6 = 10)
+  
+  const virtualTempo = subsong?.virtualTempo || 150;
+  const virtualTempoD = subsong?.virtualTempoD || 150;
+  const hz = subsong?.hz || 60;
+  const speed = subsong?.speed1 || 6;
+  
+  // Calculate BPM for ProTracker-compatible playback
+  // Note: speed is NOT in the formula because the replayer multiplies by speed in rowDuration
+  const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
+  
   return {
     sourceFormat: 'XM', // Use XM as closest equivalent for effect handling
     sourceFile: module.name || 'Furnace Module',
@@ -1855,8 +1958,8 @@ function createMetadata(module: FurnaceModule): ImportMetadata {
     originalInstrumentCount: module.instruments.length,
     modData: {
       moduleType: 'FUR',
-      initialSpeed: subsong?.speed1 || 6,
-      initialBPM: Math.round(((subsong?.virtualTempo || 150) * (subsong?.hz || 60)) / ((subsong?.speed1 || 6) * 2.5)),
+      initialSpeed: speed,
+      initialBPM: bpm,
       amigaPeriods: false,
       channelNames: subsong?.channelNames || Array.from({ length: module.chans }, (_, i) => `Ch ${i + 1}`),
       songLength: subsong?.ordersLen || 1,

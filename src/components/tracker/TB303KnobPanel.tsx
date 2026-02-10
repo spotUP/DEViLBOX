@@ -33,6 +33,14 @@ export const TB303KnobPanel: React.FC = memo(() => {
     ? instruments.find(i => i.id === controlledInstrumentId && i.synthType === 'TB303')
     : instruments.find(i => i.synthType === 'TB303');
 
+  // DEBUG: Log when tb303 config changes
+  console.log('[TB303KnobPanel] Rendering with config:', targetInstrument?.tb303 ? {
+    cutoff: targetInstrument.tb303.filter?.cutoff,
+    resonance: targetInstrument.tb303.filter?.resonance,
+    envMod: targetInstrument.tb303.filterEnvelope?.envMod,
+    decay: targetInstrument.tb303.filterEnvelope?.decay,
+  } : 'no config');
+
   // Handle config updates - hook must be called before any returns
   const handleConfigChange = useCallback(async (updates: Partial<TB303Config>) => {
     if (!targetInstrument) return;
@@ -44,9 +52,9 @@ export const TB303KnobPanel: React.FC = memo(() => {
     });
     
     // CRITICAL: Also update live synth directly for immediate response
-    const ToneEngineModule = await import('@engine/ToneEngine');
-    const ToneEngine = (ToneEngineModule as any).default || ToneEngineModule;
-    const synth = ToneEngine.getInstrument(targetInstrument.id, targetInstrument);
+    const { getToneEngine } = await import('@engine/ToneEngine');
+    const engine = getToneEngine();
+    const synth = engine.getInstrument(targetInstrument.id, targetInstrument);
     if (!synth || !('setCutoff' in synth)) return; // Not a DB303Synth
     
     // Apply each changed parameter directly to WASM (all values are 0-1)

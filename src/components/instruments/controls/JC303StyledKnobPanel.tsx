@@ -158,6 +158,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
   // Section heights
   const ROW1_H = 285;
+  const HEADER_H = 40; // Height for collapsed section header button
   const MODS_H = 230; // Increased for Korg filter params row
   const LFO_H = 165;
   const FX_H = 175;
@@ -166,13 +167,17 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   const showLfo = !isBuzz3o3 && sections.lfo;
   const showFx = !isBuzz3o3 && sections.effects;
 
+  // Shift values to move content up when sections above are collapsed
+  // modsShift affects LFO position based on whether mods section content is showing
   const modsShift = showMods ? 0 : -MODS_H;
+  // lfoShift affects FX position based on whether mods+lfo content is showing  
   const lfoShift = modsShift + (showLfo ? 0 : -LFO_H);
   
+  // Always include header height for each section so buttons remain visible when collapsed
   const totalHeight = ROW1_H + 
-    (showMods ? MODS_H : 0) + 
-    (showLfo ? LFO_H : 0) + 
-    (showFx ? FX_H : 0);
+    HEADER_H + (showMods ? MODS_H : 0) + 
+    (!isBuzz3o3 ? HEADER_H + (showLfo ? LFO_H : 0) : 0) + 
+    (!isBuzz3o3 ? HEADER_H + (showFx ? FX_H : 0) : 0);
 
   return (
     <div
@@ -209,11 +214,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           {!isBuzz3o3 && (
             <>
               <div className="absolute left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]" 
-                style={{ top: `${285 + (showMods ? MODS_H : 0)}px`, transition: 'top 0.3s ease-out' }}></div>
+                style={{ top: `${285 + HEADER_H + (showMods ? MODS_H : 0)}px`, transition: 'top 0.3s ease-out' }}></div>
               <SectionHeader 
                 label="LFO (Modulation)" expanded={sections.lfo} 
                 onToggle={() => setSections(s => ({ ...s, lfo: !s.lfo }))}
-                x={40} y={292 + (showMods ? MODS_H : 0)} width={containerWidth - 80} colorClass="text-purple-500"
+                x={40} y={292 + HEADER_H + (showMods ? MODS_H : 0)} width={containerWidth - 80} colorClass="text-purple-500"
               />
             </>
           )}
@@ -222,11 +227,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           {!isBuzz3o3 && (
             <>
               <div className="absolute left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]" 
-                style={{ top: `${285 + (showMods ? MODS_H : 0) + (showLfo ? LFO_H : 0)}px`, transition: 'top 0.3s ease-out' }}></div>
+                style={{ top: `${285 + HEADER_H + (showMods ? MODS_H : 0) + HEADER_H + (showLfo ? LFO_H : 0)}px`, transition: 'top 0.3s ease-out' }}></div>
               <SectionHeader 
                 label="Built-in Effects" expanded={sections.effects} 
                 onToggle={() => setSections(s => ({ ...s, effects: !s.effects }))}
-                x={40} y={292 + (showMods ? MODS_H : 0) + (showLfo ? LFO_H : 0)} width={containerWidth - 80} colorClass="text-green-500"
+                x={40} y={292 + HEADER_H + (showMods ? MODS_H : 0) + HEADER_H + (showLfo ? LFO_H : 0)} width={containerWidth - 80} colorClass="text-green-500"
               />
             </>
           )}

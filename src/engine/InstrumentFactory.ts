@@ -431,6 +431,15 @@ export class InstrumentFactory {
         const dispatchPlatform = SYNTH_TO_DISPATCH[config.synthType];
         if (dispatchPlatform !== undefined) {
           instrument = new FurnaceDispatchSynth(dispatchPlatform);
+          // Set the Furnace instrument index and upload encoded instrument
+          if (config.furnace?.furnaceIndex !== undefined) {
+            (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(config.furnace.furnaceIndex);
+            // Encode and upload instrument from config (converts to FINS format)
+            console.log(`[InstrumentFactory] Queuing upload for instrument ${config.name}, furnaceIndex=${config.furnace.furnaceIndex}`);
+            (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace, config.name).catch(err => {
+              console.error(`[InstrumentFactory] Failed to upload instrument data for ${config.name}:`, err);
+            });
+          }
         } else {
           instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN2);
         }
@@ -1573,7 +1582,13 @@ export class InstrumentFactory {
     // Apply normalized volume boost for TB303
     const normalizedVolume = this.getNormalizedVolume('TB303', config.volume);
 
-    console.log('[InstrumentFactory] Creating DB303 synth');
+    console.log('[InstrumentFactory] Creating DB303 synth with config:', JSON.stringify({
+      filter: tb303Config.filter,
+      filterEnvelope: tb303Config.filterEnvelope,
+      oscillator: tb303Config.oscillator,
+      accent: tb303Config.accent,
+      volume: normalizedVolume,
+    }, null, 2));
     return this.createDB303(tb303Config, normalizedVolume);
   }
 
@@ -1597,13 +1612,45 @@ export class InstrumentFactory {
       return (v - min) / (max - min);
     };
 
+    // DEBUG: Log all TB-303 parameters for comparison with db303.pages.dev
+    if ((window as unknown as { DEBUG_TB303_PARAMS?: boolean }).DEBUG_TB303_PARAMS) {
+      console.group('[DB303 Factory] Parameter values being applied:');
+      console.log('Oscillator:', {
+        waveformBlend: tb.oscillator.waveformBlend,
+        type: tb.oscillator.type,
+        pulseWidth: tb.oscillator.pulseWidth,
+        subOscGain: tb.oscillator.subOscGain,
+        subOscBlend: tb.oscillator.subOscBlend,
+      });
+      console.log('Filter:', {
+        cutoff: tb.filter.cutoff,
+        cutoffNorm: norm(tb.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX),
+        resonance: tb.filter.resonance,
+      });
+      console.log('Envelope:', {
+        envMod: tb.filterEnvelope.envMod,
+        decay: tb.filterEnvelope.decay,
+        decayNorm: norm(tb.filterEnvelope.decay, DECAY_MIN, DECAY_MAX),
+      });
+      console.log('Accent:', { amount: tb.accent.amount });
+      console.log('DevilFish:', tb.devilFish);
+      console.log('LFO:', tb.lfo);
+      console.log('Chorus:', tb.chorus);
+      console.log('Delay:', tb.delay);
+      console.groupEnd();
+    }
+
     // Core 303 parameters
     synth.setCutoff(norm(tb.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
     synth.setResonance(tb.filter.resonance > 1 ? tb.filter.resonance / 100 : tb.filter.resonance);
     synth.setEnvMod(tb.filterEnvelope.envMod > 1 ? tb.filterEnvelope.envMod / 100 : tb.filterEnvelope.envMod);
     synth.setDecay(norm(tb.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
     synth.setAccent(tb.accent.amount > 1 ? tb.accent.amount / 100 : tb.accent.amount);
-    synth.setWaveform(tb.oscillator.type === 'square' ? 1.0 : 0.0);
+    // Use waveformBlend if available (0-1 continuous), otherwise fall back to type
+    const waveformValue = tb.oscillator.waveformBlend !== undefined 
+      ? tb.oscillator.waveformBlend 
+      : (tb.oscillator.type === 'square' ? 1.0 : 0.0);
+    synth.setWaveform(waveformValue);
 
     // Oscillator enhancements
     if (tb.oscillator.pulseWidth !== undefined) synth.setPulseWidth(tb.oscillator.pulseWidth > 1 ? tb.oscillator.pulseWidth / 100 : tb.oscillator.pulseWidth);
@@ -1620,7 +1667,9 @@ export class InstrumentFactory {
     // Devil Fish enhanced parameters (if present)
     const df = tb.devilFish;
     if (df) {
-      if (df.filterFmDepth !== undefined) synth.setFilterFM(df.filterFmDepth > 1 ? df.filterFmDepth / 100 : df.filterFmDepth);
+      // NOTE: DB303 preset values are already 0-1 normalized, so we pass them directly
+      // to the synth methods that expect 0-1. Don't use wrapper methods that divide by 100.
+      if (df.filterFmDepth !== undefined) synth.setFilterFmDepth(df.filterFmDepth);
       if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
 
       // Extended Devil Fish parameters
@@ -1631,6 +1680,11 @@ export class InstrumentFactory {
       if (df.lpBpMix !== undefined) synth.setLpBpMix(df.lpBpMix > 1 ? df.lpBpMix / 100 : df.lpBpMix);
       if (df.filterSelect !== undefined) synth.setFilterSelect(df.filterSelect);
       if (df.diodeCharacter !== undefined) synth.setDiodeCharacter(df.diodeCharacter > 1 ? df.diodeCharacter / 100 : df.diodeCharacter);
+      if (df.filterInputDrive !== undefined) synth.setFilterInputDrive(df.filterInputDrive > 1 ? df.filterInputDrive / 100 : df.filterInputDrive);
+      if (df.filterTracking !== undefined) synth.setFilterTracking(df.filterTracking > 1 ? df.filterTracking / 100 : df.filterTracking);
+      if (df.stageNLAmount !== undefined) synth.setStageNLAmount(df.stageNLAmount > 1 ? df.stageNLAmount / 100 : df.stageNLAmount);
+      if (df.ensembleAmount !== undefined) synth.setEnsembleAmount(df.ensembleAmount > 1 ? df.ensembleAmount / 100 : df.ensembleAmount);
+      if (df.oversamplingOrder !== undefined) synth.setOversamplingOrder(df.oversamplingOrder);
       
       if (df.normalDecay !== undefined) synth.setNormalDecay(norm(df.normalDecay, DECAY_MIN, DECAY_MAX));
       if (df.accentDecay !== undefined) synth.setAccentDecay(norm(df.accentDecay, DECAY_MIN, DECAY_MAX));
@@ -1646,10 +1700,12 @@ export class InstrumentFactory {
     if (lfo) {
       if (lfo.waveform !== undefined) synth.setLfoWaveform(lfo.waveform);
       if (lfo.rate !== undefined) synth.setLfoRate(lfo.rate > 1 ? lfo.rate / 100 : lfo.rate);
-      if (lfo.contour !== undefined) synth.setLfoContour(lfo.contour > 1 ? lfo.contour / 100 : lfo.contour);
+      // lfoContour is bipolar (-1 to +1), don't normalize
+      if (lfo.contour !== undefined) synth.setLfoContour(lfo.contour);
       if (lfo.pitchDepth !== undefined) synth.setLfoPitchDepth(lfo.pitchDepth > 1 ? lfo.pitchDepth / 100 : lfo.pitchDepth);
       if (lfo.pwmDepth !== undefined) synth.setLfoPwmDepth(lfo.pwmDepth > 1 ? lfo.pwmDepth / 100 : lfo.pwmDepth);
       if (lfo.filterDepth !== undefined) synth.setLfoFilterDepth(lfo.filterDepth > 1 ? lfo.filterDepth / 100 : lfo.filterDepth);
+      if (lfo.stiffDepth !== undefined) synth.setLfoStiffDepth(lfo.stiffDepth > 1 ? lfo.stiffDepth / 100 : lfo.stiffDepth);
     }
 
     // Built-in effects (Tone.js effects)

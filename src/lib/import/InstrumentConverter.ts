@@ -58,8 +58,11 @@ export function convertToInstrument(
           instruments.push(sampleInst);
         }
       } else {
-        // No samples - create a placeholder instrument
-        console.warn(`[InstrumentConverter] Furnace Sampler instrument ${instrumentId} "${parsed.name}" has no samples`);
+        // Sample-based instrument but no samples - treat as chip synth with macros instead
+        // This can happen when Furnace files reference samples that aren't included
+        console.log(`[InstrumentConverter] Sample-based Furnace instrument ${instrumentId} "${parsed.name}" has no samples, treating as chip synth`);
+        const furnaceInst = convertFurnaceInstrument(parsed, instrumentId);
+        instruments.push(furnaceInst);
       }
       return instruments;
     }
@@ -115,6 +118,12 @@ function convertFurnaceInstrument(
   // Build FurnaceConfig from FurnaceInstrumentData
   const furnaceConfig: FurnaceConfig = {
     chipType: furnaceData.chipType,
+
+    // Preserve the original Furnace instrument index (0-based in file)
+    furnaceIndex: parsed.id - 1,  // parsed.id is 1-based, Furnace uses 0-based
+    
+    // Preserve raw binary data for upload to WASM
+    rawBinaryData: parsed.rawBinaryData,
 
     // FM parameters (default to safe values if not present)
     algorithm: furnaceData.fm?.algorithm ?? 0,
@@ -189,7 +198,7 @@ function convertFurnaceInstrument(
     parameters: {},
   };
 
-  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}`);
+  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
 
   return instrument;
 }
