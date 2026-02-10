@@ -37,7 +37,7 @@ import type { FurnaceConfig, FurnaceOperatorConfig, SynthType } from '../../../t
 import { DEFAULT_FURNACE } from '../../../types/instrument';
 
 // Format version constants
-const DIV_ENGINE_VERSION = 228;
+const DIV_ENGINE_VERSION = 231;
 
 /**
  * Furnace instrument type (DIV_INS_*) to DEViLBOX SynthType mapping
@@ -173,6 +173,39 @@ const DIV_ELEMENT_PATTERN = 0x07;
 const DIV_ELEMENT_COMPAT_FLAGS = 0x08;
 const DIV_ELEMENT_COMMENTS = 0x09;
 const DIV_ELEMENT_GROOVE = 0x0a;
+
+/**
+ * Chip file ID → default instrument type (DIV_INS_*)
+ * From Furnace sysDef.cpp channel definitions
+ */
+const CHIP_DEFAULT_INS_TYPE: Record<number, number> = {
+  0x02: 1,    // Genesis → DIV_INS_FM
+  0x03: 0,    // SN76489/SMS → DIV_INS_STD
+  0x04: 2,    // Game Boy → DIV_INS_GB
+  0x05: 5,    // PC Engine → DIV_INS_PCE
+  0x06: 34,   // NES → DIV_INS_NES
+  0x07: 3,    // C64 (8580) → DIV_INS_C64
+  0x47: 3,    // C64 (6581) → DIV_INS_C64
+  0x80: 6,    // AY-3-8910 → DIV_INS_AY
+  0x81: 4,    // Amiga → DIV_INS_AMIGA
+  0x82: 33,   // YM2151 → DIV_INS_OPM
+  0x83: 1,    // YM2612 → DIV_INS_FM
+  0x84: 8,    // TIA → DIV_INS_TIA
+  0x85: 10,   // VIC-20 → DIV_INS_VIC
+  0x87: 29,   // SNES → DIV_INS_SNES
+  0x88: 12,   // VRC6 → DIV_INS_VRC6
+  0x89: 13,   // OPLL → DIV_INS_OPLL
+  0x8a: 15,   // FDS → DIV_INS_FDS
+  0x8d: 1,    // YM2203 → DIV_INS_FM
+  0x8e: 1,    // YM2608 → DIV_INS_FM
+  0x8f: 14,   // OPL → DIV_INS_OPL
+  0x90: 14,   // OPL2 → DIV_INS_OPL
+  0x91: 14,   // OPL3 → DIV_INS_OPL
+  0x97: 9,    // SAA1099 → DIV_INS_SAA1099
+  0x98: 19,   // OPZ → DIV_INS_OPZ
+  0x9a: 7,    // AY8930 → DIV_INS_AY8930
+  0xa0: 1,    // YM2612 ext → DIV_INS_FM
+};
 
 // Chip ID mapping
 const CHIP_CHANNELS: Record<number, number> = {
@@ -321,6 +354,32 @@ export interface FurnaceSubSong {
   channelShortNames: string[];
 }
 
+// Chip-specific configs parsed from feature blocks
+export interface FurnaceGBData {
+  envVol: number; envDir: number; envLen: number; soundLen: number;
+  softEnv: boolean; alwaysInit: boolean; doubleWave: boolean;
+  hwSeqLen: number; hwSeq: Array<{ cmd: number; data: number }>;
+}
+export interface FurnaceC64Data {
+  triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
+  toFilter: boolean; initFilter: boolean; dutyIsAbs: boolean;
+  lp: boolean; bp: boolean; hp: boolean; ch3off: boolean;
+  filterIsAbs: boolean; noTest: boolean; ringMod: boolean; oscSync: boolean;
+  a: number; d: number; s: number; r: number;
+  duty: number; cut: number; res: number;
+}
+export interface FurnaceSNESData {
+  a: number; d: number; s: number; r: number;
+  useEnv: boolean; sus: number; gainMode: number; gain: number; d2: number;
+}
+export interface FurnaceN163Data {
+  wave: number; wavePos: number; waveLen: number; waveMode: number;
+}
+export interface FurnaceFDSData {
+  modSpeed: number; modDepth: number; initModTableWithFirstWave: boolean;
+  modTable: number[];
+}
+
 // Instrument
 export interface FurnaceInstrument {
   name: string;
@@ -330,6 +389,19 @@ export interface FurnaceInstrument {
   samples: number[];
   wavetables: number[];
   rawBinaryData?: Uint8Array;  // Raw binary instrument data for upload to WASM
+  gb?: FurnaceGBData;
+  c64?: FurnaceC64Data;
+  snes?: FurnaceSNESData;
+  n163?: FurnaceN163Data;
+  fds?: FurnaceFDSData;
+  amiga?: {
+    initSample: number;
+    useNoteMap: boolean;
+    useSample: boolean;
+    useWave: boolean;
+    waveLen: number;
+    noteMap?: Array<{ freq: number; map: number }>;
+  };
 }
 
 // Macro
@@ -679,6 +751,20 @@ async function parseNewFormat(
     module.instruments.push(inst);
   }
 
+  // Create default instrument if none defined (valid in Furnace — chip uses defaults)
+  if (module.instruments.length === 0 && module.systems.length > 0) {
+    const chipId = module.systems[0];
+    const defaultInsType = CHIP_DEFAULT_INS_TYPE[chipId] ?? 0;
+    console.log(`[FurnaceSongParser] No instruments in file, creating default for chip 0x${chipId.toString(16)} -> insType=${defaultInsType}`);
+    module.instruments.push({
+      name: 'Default',
+      type: defaultInsType,
+      macros: [],
+      samples: [],
+      wavetables: [],
+    });
+  }
+
   // Parse wavetables
   for (const ptr of wavePtr) {
     reader.seek(ptr);
@@ -782,6 +868,7 @@ async function parseOldFormat(
   const sampleLen = reader.readUint16();
   const numberOfPats = reader.readUint32();
   void numberOfPats; // Pattern count for allocation hints
+  console.log(`[FurnaceSongParser] Old format header: insLen=${insLen}, waveLen=${waveLen}, sampleLen=${sampleLen}, numberOfPats=${numberOfPats}, patLen=${subsong.patLen}, ordersLen=${subsong.ordersLen}, hz=${subsong.hz}, speed1=${subsong.speed1}, speed2=${subsong.speed2}`);
 
   // Sound chips (32 bytes)
   const chips: number[] = [];
@@ -824,31 +911,12 @@ async function parseOldFormat(
   // A-4 tuning
   module.tuning = reader.readFloat32();
 
-  // Compatibility flags (skip based on version)
-  if (version >= 36) reader.readUint8(); // limitSlides
-  if (version >= 36) reader.readUint8(); // linearPitch
-  if (version >= 36) reader.readUint8(); // loopModality
-  if (version >= 42) reader.readUint8(); // properNoiseLayout
-  if (version >= 42) reader.readUint8(); // waveDutyIsVol
-  if (version >= 45) {
-    reader.readUint8(); // resetMacroOnPorta
-    reader.readUint8(); // legacyVolumeSlides
-    reader.readUint8(); // compatibleArpeggio
-    reader.readUint8(); // noteOffResetsSlides
-    reader.readUint8(); // targetResetsSlides
-  }
-  if (version >= 47) {
-    reader.readUint8(); // arpNonPorta
-    reader.readUint8(); // algMacroBehavior
-  }
-  if (version >= 49) reader.readUint8(); // brokenShortcutSlides
-  if (version >= 50) reader.readUint8(); // ignoreDuplicateSlides
-  if (version >= 62) reader.readUint8(); // stopPortaOnNoteOff
-  if (version >= 62) reader.readUint8(); // continuousVibrato
-  if (version >= 64) reader.readUint8(); // brokenDACMode
-  if (version >= 65) reader.readUint8(); // oneTickCut
-  if (version >= 66) reader.readUint8(); // newInsTriggersInPorta
-  if (version >= 69) reader.readUint8(); // arp0Reset
+  // Compatibility flags
+  // Reference: fur.cpp:1258-1348
+  // This block always reads exactly 20 bytes for any version (v37+ reads
+  // flags with else clauses that skip; v<37 reads 20 padding bytes).
+  // Our parser doesn't use these flags, so just consume the fixed 20 bytes.
+  reader.skip(20);
 
   // Pointers
   const insPtr: number[] = [];
@@ -899,35 +967,109 @@ async function parseOldFormat(
     subsong.effectColumns.push(reader.readUint8());
   }
 
-  // Channel hide/collapse (skip)
-  reader.skip(module.chans * 2);
+  // Reference: fur.cpp:1383-1414
+  // Channel show, collapse, names, short names, and song notes are gated on v39+
+  if (version >= 39) {
+    // Channel show + collapse (1 byte each per channel = 2 * tchans)
+    reader.skip(module.chans * 2);
 
-  // Channel names
-  for (let ch = 0; ch < module.chans; ch++) {
-    subsong.channelNames.push(readString(reader));
+    // Channel names
+    for (let ch = 0; ch < module.chans; ch++) {
+      subsong.channelNames.push(readString(reader));
+    }
+    for (let ch = 0; ch < module.chans; ch++) {
+      subsong.channelShortNames.push(readString(reader));
+    }
+
+    // Song notes (ds.notes in reference)
+    module.comment = readString(reader);
   }
-  for (let ch = 0; ch < module.chans; ch++) {
-    subsong.channelShortNames.push(readString(reader));
-  }
 
-  // Song comment
-  module.comment = readString(reader);
-
-  // Master volume
+  // Reference: fur.cpp:1416-1420
   if (version >= 59) {
     module.masterVol = reader.readFloat32();
   } else {
     module.masterVol = 2.0;
   }
 
-  // Extended compat flags (skip based on version)
-  if (version >= 70) reader.readUint8(); // brokenSpeedSelection
-  // ... many more compat flags, skipped for brevity
+  // Extended compat flags block 1
+  // Reference: fur.cpp:1422-1542
+  // Every version gate reads the same byte count via else clauses,
+  // totaling 28 bytes for any version >= 70.
+  if (version >= 70) {
+    reader.skip(28); // 28 bytes of compat flags (all with else skip clauses)
+  }
 
   // Virtual tempo
+  // Reference: fur.cpp:1544-1553
+  // Always reads 4 bytes: either 2×readS (v96+) or 1×readI (else)
   if (version >= 96) {
     subsong.virtualTempo = reader.readUint16();
     subsong.virtualTempoD = reader.readUint16();
+  } else {
+    reader.skip(4); // readI() placeholder — present for all old format versions
+  }
+
+  // Subsongs
+  // Reference: fur.cpp:1555-1567
+  if (version >= 95) {
+    readString(reader); // subSong name
+    readString(reader); // subSong notes
+    const numberOfSubSongs = reader.readUint8();
+    reader.skip(3); // reserved
+    for (let i = 0; i < numberOfSubSongs; i++) {
+      reader.readUint32(); // subSong pointers (we don't parse additional subsongs)
+    }
+  }
+
+  // Additional metadata
+  // Reference: fur.cpp:1569-1580
+  if (version >= 103) {
+    readString(reader); // systemName
+    readString(reader); // category
+    readString(reader); // nameJ
+    readString(reader); // authorJ
+    readString(reader); // systemNameJ
+    readString(reader); // categoryJ
+  }
+
+  // System output config
+  // Reference: fur.cpp:1582-1596
+  if (version >= 135) {
+    for (let i = 0; i < module.systems.length; i++) {
+      reader.skip(12); // systemVol(f32) + systemPan(f32) + systemPanFR(f32)
+    }
+    // Patchbay connections
+    const patchbayConns = reader.readUint32();
+    reader.skip(patchbayConns * 4);
+  }
+
+  // Reference: fur.cpp:1598
+  if (version >= 136) {
+    reader.readUint8(); // patchbayAuto
+  }
+
+  // Extended compat flags block 2
+  // Reference: fur.cpp:1600-1637
+  // 8 bytes total (all with else skip clauses)
+  if (version >= 138) {
+    reader.skip(8); // brokenPortaLegato + 7 more compat flags
+  }
+
+  // Speeds and grooves
+  // Reference: fur.cpp:1639-1659
+  if (version >= 139) {
+    reader.skip(17); // speeds.len (1) + speeds.val (16)
+    const grooveCount = reader.readUint8();
+    for (let i = 0; i < grooveCount; i++) {
+      reader.skip(17); // groove.len (1) + groove.val (16)
+    }
+  }
+
+  // Asset directory pointers
+  // Reference: fur.cpp:1665-1669
+  if (version >= 156) {
+    reader.skip(12); // 3 × readI (asset dir pointers)
   }
 
   module.subsongs.push(subsong);
@@ -962,6 +1104,21 @@ async function parseOldFormat(
         wavetables: [],
       });
     }
+  }
+
+  // Create default instrument if none defined (valid in Furnace — chip uses defaults)
+  // Reference: Furnace allows songs with 0 instruments; playback uses default chip params
+  if (module.instruments.length === 0 && module.systems.length > 0) {
+    const chipId = module.systems[0];
+    const defaultInsType = CHIP_DEFAULT_INS_TYPE[chipId] ?? 0; // Fall back to DIV_INS_STD
+    console.log(`[FurnaceSongParser] No instruments in file, creating default for chip 0x${chipId.toString(16)} -> insType=${defaultInsType}`);
+    module.instruments.push({
+      name: 'Default',
+      type: defaultInsType,
+      macros: [],
+      samples: [],
+      wavetables: [],
+    });
   }
 
   // Parse wavetables
@@ -1126,7 +1283,10 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
 
   if (magic === 'INS2' || magic === 'FINS') {
     // New instrument format
-    reader.readUint32(); // Block size (INS2 only, FINS doesn't have it)
+    // INS2 has a block size field; FINS does NOT (reference: fur.cpp readInsData)
+    if (magic === 'INS2') {
+      reader.readUint32(); // Block size
+    }
     const insVersion = reader.readUint16();
     inst.type = reader.readUint16();
 
@@ -1148,13 +1308,47 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
         case 'MA':
           parseMacroData(reader, inst, insVersion);
           break;
-        case 'SM':
-          // Sample data
-          reader.readUint16(); // initialSample
-          reader.readUint8(); // flags
-          reader.readUint8(); // waveLen
-          // Skip sample map
+        case 'SM': {
+          // Sample/Amiga data — Reference: instrument.cpp:2031-2057
+          const initSample = reader.readInt16();
+          const smFlags = reader.readUint8();
+          const smWaveLen = reader.readUint8();
+          const smUseNoteMap = (smFlags & 1) !== 0;
+          const smUseSample = (smFlags & 2) !== 0;
+          const smUseWave = (smFlags & 4) !== 0;
+
+          // Store initSample as a sample reference so the instrument gets its sample data
+          if (initSample >= 0) {
+            inst.samples.push(initSample);
+          }
+
+          // Store amiga/sample config on the instrument
+          inst.amiga = {
+            initSample,
+            useNoteMap: smUseNoteMap,
+            useSample: smUseSample,
+            useWave: smUseWave,
+            waveLen: smWaveLen,
+          };
+
+          // Parse note map if present (120 entries × 4 bytes)
+          if (smUseNoteMap) {
+            inst.amiga.noteMap = [];
+            const seenSamples = new Set(inst.samples);
+            for (let note = 0; note < 120; note++) {
+              const freq = reader.readInt16();
+              const map = reader.readInt16();
+              inst.amiga.noteMap.push({ freq, map });
+              // Collect unique sample indices from the note map
+              if (map >= 0 && !seenSamples.has(map)) {
+                seenSamples.add(map);
+                inst.samples.push(map);
+              }
+            }
+          }
+          // reader.seek(featEnd) handles any remaining bytes
           break;
+        }
         case 'SL':
         case 'LS': {
           // Sample list
@@ -1181,8 +1375,84 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
           }
           break;
         }
+        case 'GB': {
+          // Game Boy instrument — Reference: instrument.cpp:2007-2028
+          const gbFlags = reader.readUint8();
+          const soundLen = reader.readUint8();
+          const gbFlags2 = reader.readUint8();
+          const hwSeqLen = reader.readUint8();
+          const hwSeq: Array<{ cmd: number; data: number }> = [];
+          for (let i = 0; i < hwSeqLen; i++) {
+            hwSeq.push({ cmd: reader.readUint8(), data: reader.readInt16() });
+          }
+          inst.gb = {
+            envVol: gbFlags & 0x0F,
+            envDir: (gbFlags & 0x10) ? 1 : 0,
+            envLen: (gbFlags >> 5) & 0x07,
+            soundLen,
+            softEnv: !!(gbFlags2 & 1),
+            alwaysInit: !!(gbFlags2 & 2),
+            doubleWave: !!(gbFlags2 & 4),
+            hwSeqLen, hwSeq,
+          };
+          break;
+        }
+        case '64': {
+          // C64 SID — Reference: instrument.cpp:1958-2004
+          const c64f1 = reader.readUint8();
+          const c64f2 = reader.readUint8();
+          const adsr1 = reader.readUint8();
+          const adsr2 = reader.readUint8();
+          const duty = reader.readUint16() & 0xFFF;
+          const cutRes = reader.readUint16();
+          inst.c64 = {
+            triOn: !!(c64f1 & 1), sawOn: !!(c64f1 & 2), pulseOn: !!(c64f1 & 4),
+            noiseOn: !!(c64f1 & 8), toFilter: !!(c64f1 & 16),
+            initFilter: !!(c64f1 & 64), dutyIsAbs: !!(c64f1 & 128),
+            lp: !!(c64f2 & 1), bp: !!(c64f2 & 4), hp: !!(c64f2 & 2),
+            ch3off: !!(c64f2 & 8), filterIsAbs: !!(c64f2 & 16),
+            noTest: !!(c64f2 & 32), ringMod: !!(c64f2 & 64), oscSync: !!(c64f2 & 128),
+            a: (adsr1 >> 4) & 0x0F, d: adsr1 & 0x0F,
+            s: (adsr2 >> 4) & 0x0F, r: adsr2 & 0x0F,
+            duty, cut: cutRes & 0xFFF, res: cutRes >> 12,
+          };
+          break;
+        }
+        case 'SN': {
+          // SNES — Reference: instrument.cpp:2208-2234
+          const snByte1 = reader.readUint8();
+          const snByte2 = reader.readUint8();
+          const snByte3 = reader.readUint8();
+          const gain = reader.readUint8();
+          inst.snes = {
+            a: snByte1 & 0x0F, d: (snByte1 >> 4) & 0x07,
+            s: (snByte2 >> 5) & 0x07, r: snByte2 & 0x1F,
+            useEnv: !!(snByte3 & 0x10), sus: (snByte3 & 0x08) ? 1 : 0,
+            gainMode: snByte3 & 0x07, gain, d2: 0,
+          };
+          break;
+        }
+        case 'N1': {
+          // Namco 163 — Reference: instrument.cpp:2237-2257
+          const n163wave = reader.readInt32();
+          const n163wavePos = reader.readUint8();
+          const n163waveLen = reader.readUint8();
+          const n163waveMode = reader.readUint8();
+          inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode };
+          break;
+        }
+        case 'FD': {
+          // FDS / Virtual Boy — Reference: instrument.cpp:2260-2268
+          const modSpeed = reader.readInt32();
+          const modDepth = reader.readInt32();
+          const initMod = reader.readUint8() !== 0;
+          const modTable: number[] = [];
+          for (let i = 0; i < 32; i++) modTable.push(reader.readUint8());
+          inst.fds = { modSpeed, modDepth, initModTableWithFirstWave: initMod, modTable };
+          break;
+        }
         default:
-          // Unknown feature, skip
+          // Unknown feature, skip (reader.seek(featEnd) handles it)
           break;
       }
 
@@ -1227,14 +1497,20 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
 
   // Base data
   const algFb = reader.readUint8();
-  config.algorithm = algFb & 0x07;
-  config.feedback = (algFb >> 3) & 0x07;
+  // Reference: instrument.cpp:1753 — fm.alg=(next>>4)&7; fm.fb=next&7;
+  config.algorithm = (algFb >> 4) & 0x07;
+  config.feedback = algFb & 0x07;
 
+  // Reference: instrument.cpp:1756-1758
   const fmsAms = reader.readUint8();
-  config.fms = fmsAms & 0x07;
+  config.fms2 = (fmsAms >> 5) & 0x07;
   config.ams = (fmsAms >> 3) & 0x03;
+  config.fms = fmsAms & 0x07;
 
+  // Reference: instrument.cpp:1762-1764
   const llPatchAm2 = reader.readUint8();
+  config.ams2 = (llPatchAm2 >> 6) & 0x03;
+  // ops is set from flags byte above (opCount), this byte has a 4/2 mode flag at bit 5
   config.opllPreset = llPatchAm2 & 0x1F;
 
   // Read operators
@@ -1248,6 +1524,7 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
     const dvbSsg = reader.readUint8();
     const damDt2Ws = reader.readUint8();
 
+    // Reference: instrument.cpp:1775-1811
     const op: FurnaceOperatorConfig = {
       enabled: ((opEnabled >> i) & 1) !== 0,
       mult: dtMult & 0x0F,
@@ -1261,12 +1538,16 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
       dr: amDr & 0x1F,
       ksl: (amDr >> 5) & 0x03,
       am: ((amDr >> 7) & 1) !== 0,
+      egt: ((egtD2r >> 7) & 1) !== 0,
+      kvs: (egtD2r >> 5) & 0x03,
       d2r: egtD2r & 0x1F,
       sl: (slRr >> 4) & 0x0F,
       rr: slRr & 0x0F,
+      dvb: (dvbSsg >> 4) & 0x0F,
       ssg: dvbSsg & 0x0F,
-      ws: damDt2Ws & 0x07,
+      dam: (damDt2Ws >> 5) & 0x07,
       dt2: (damDt2Ws >> 3) & 0x03,
+      ws: damDt2Ws & 0x07,
     };
 
     config.operators.push(op);
@@ -1511,12 +1792,8 @@ function parsePattern(
     reader.readUint32(); // Block size
     pat.subsong = reader.readUint8();
 
-    if (version >= 240) {
-      pat.channel = reader.readUint16();
-    } else {
-      pat.channel = reader.readUint8();
-      reader.readUint8(); // padding
-    }
+    // Channel is always 1 byte (reference: readC() / writeC())
+    pat.channel = reader.readUint8();
 
     pat.index = reader.readUint16();
 
@@ -1621,10 +1898,10 @@ function parsePattern(
         reader.readUint8(); // Skip orphan value
       }
 
-      // Read effects 1-3
+      // Read effects 1-3 (bits 2-7 of effMask03; bits 0-1 are effect 0, handled above)
       for (let fx = 1; fx <= 3; fx++) {
-        const hasEff = (effMask03 & (1 << ((fx - 1) * 2))) !== 0;
-        const hasVal = (effMask03 & (1 << ((fx - 1) * 2 + 1))) !== 0;
+        const hasEff = (effMask03 & (1 << (fx * 2))) !== 0;
+        const hasVal = (effMask03 & (1 << (fx * 2 + 1))) !== 0;
 
         if (hasEff) {
           const effType = reader.readUint8();
@@ -1778,6 +2055,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
         loop: m.loop,
         release: m.release,
         speed: m.speed,
+        mode: m.mode,
+        delay: m.delay,
       })),
       wavetables: inst.wavetables
         .filter(wIdx => wIdx < module.wavetables.length)
@@ -1820,8 +2099,23 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
           vib: op.vib,
           ws: op.ws,
           ssg: op.ssg,
+          egt: op.egt,
+          kvs: op.kvs,
+          dvb: op.dvb,
+          dam: op.dam,
         })),
       };
+    }
+
+    // Pass through chip-specific data
+    const chipConfig: Record<string, any> = {};
+    if (inst.gb) chipConfig.gb = inst.gb;
+    if (inst.c64) chipConfig.c64 = inst.c64;
+    if (inst.snes) chipConfig.snes = inst.snes;
+    if (inst.n163) chipConfig.n163 = inst.n163;
+    if (inst.fds) chipConfig.fds = inst.fds;
+    if (Object.keys(chipConfig).length > 0) {
+      furnaceData.chipConfig = chipConfig;
     }
 
     return {
@@ -1843,36 +2137,30 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     return { instruments, patterns: [], metadata: createMetadata(module) };
   }
 
-  // Find max pattern index
-  const maxPatIdx = Math.max(
-    ...subsong.orders.flat().filter(n => !isNaN(n) && n >= 0),
-    0
-  );
-
   // Debug: Log pattern map keys
   console.log('[FurnaceParser] Pattern map size:', module.patterns.size);
-  console.log('[FurnaceParser] Pattern keys (first 20):', Array.from(module.patterns.keys()).slice(0, 20));
-  console.log('[FurnaceParser] Looking for patterns 0 to', maxPatIdx, 'with', module.chans, 'channels');
-  console.log('[FurnaceParser] Subsong patLen:', subsong.patLen);
-  console.log('[FurnaceParser] Orders:', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
+  console.log('[FurnaceParser] Subsong patLen:', subsong.patLen, 'ordersLen:', subsong.ordersLen);
+  console.log('[FurnaceParser] Orders (first 3 channels):', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
 
-  for (let patIdx = 0; patIdx <= maxPatIdx; patIdx++) {
+  // CRITICAL: Create combined patterns by ORDER POSITION, not by pattern index.
+  // Furnace has per-channel order tables: orders[channel][orderPos] = patternIndex
+  // Each channel can play a different pattern at each song position.
+  // We must look up each channel's pattern from its own order table.
+  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
     const patternRows: any[][] = [];
 
     for (let row = 0; row < subsong.patLen; row++) {
       const rowCells: any[] = [];
 
       for (let ch = 0; ch < module.chans; ch++) {
+        // Look up this channel's pattern index for this order position
+        const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
         const key = `0_${ch}_${patIdx}`;
         const pattern = module.patterns.get(key);
 
         if (pattern && pattern.rows[row]) {
           const cell = pattern.rows[row];
           const converted = convertFurnaceCell(cell);
-          // Debug first non-empty cell per pattern
-          if (patIdx === 0 && row < 5 && ch === 0 && (cell.note >= 0 || cell.instrument >= 0)) {
-            console.log(`[FurnaceParser] Pat ${patIdx} Row ${row} Ch ${ch}: raw`, cell, '-> converted', converted);
-          }
           rowCells.push(converted);
         } else {
           rowCells.push({
@@ -1881,6 +2169,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
             volume: 0,
             effectType: 0,
             effectParam: 0,
+            effectType2: 0,
+            effectParam2: 0,
           });
         }
       }
@@ -1895,11 +2185,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   const nonEmptyPatterns = patterns.filter(pat =>
     pat.some(row => row.some(cell => cell.note > 0 || cell.instrument > 0 || cell.effectType > 0))
   );
-  console.log(`[FurnaceParser] Converted ${patterns.length} patterns, ${nonEmptyPatterns.length} have data`);
-  if (patterns.length > 0 && patterns[0].length > 0) {
-    console.log('[FurnaceParser] First pattern row 0:', patterns[0][0]);
-    console.log('[FurnaceParser] First pattern row 1:', patterns[0][1]);
-  }
+  console.log(`[FurnaceParser] Converted ${patterns.length} patterns (by order position), ${nonEmptyPatterns.length} have data`);
 
   return {
     instruments,
@@ -1964,7 +2250,9 @@ function createMetadata(module: FurnaceModule): ImportMetadata {
       channelNames: subsong?.channelNames || Array.from({ length: module.chans }, (_, i) => `Ch ${i + 1}`),
       songLength: subsong?.ordersLen || 1,
       restartPosition: 0,
-      patternOrderTable: subsong?.orders[0] || [],
+      // Sequential order: patterns are already flattened by order position
+      // (each combined pattern contains each channel's correct pattern data for that position)
+      patternOrderTable: Array.from({ length: subsong?.ordersLen || 1 }, (_, i) => i),
       songMessage: module.comment,
     },
   };
@@ -2029,8 +2317,11 @@ function convertFurnaceCell(cell: FurnacePatternCell): any {
     // Adjust octave for C (note 12) - Furnace stores it one lower
     const adjustedOctave = cell.note === 12 ? cell.octave + 1 : cell.octave;
     const finalOctave = adjustedOctave < 0 ? 0 : adjustedOctave;
-    // XM note: octave * 12 + semitone + 1 (XM notes are 1-96)
-    note = (finalOctave * 12) + semitone + 1;
+    // Furnace octaves are 2 higher than XM/MOD convention:
+    // Furnace C-4 = MOD/XM C-2 (period 428, natural Amiga rate)
+    // Reference: Furnace fur.cpp MOD import uses note+72 offset
+    // XM note: octave * 12 + semitone + 1 - 24 (subtract 2 octaves)
+    note = (finalOctave * 12) + semitone + 1 - 24;
     if (note > 96) note = 96;
     if (note < 1) note = 0;
   }
@@ -2041,13 +2332,33 @@ function convertFurnaceCell(cell: FurnacePatternCell): any {
     volume = 0x10 + Math.min(64, Math.floor(cell.volume / 2));
   }
 
-  // Convert first effect
+  // Convert effects (up to 2 — our internal format supports 2 per cell)
   let effectType = 0;
   let effectParam = 0;
+  let effectType2 = 0;
+  let effectParam2 = 0;
   if (cell.effects.length > 0) {
     const fx = cell.effects[0];
     effectType = mapFurnaceEffect(fx.type);
     effectParam = fx.value & 0xFF;
+    // Split composite XM extended effects (E1x, E2x, E9x, EAx, EBx, ECx, EDx, EEx)
+    // The mapping returns e.g. 0xE9 for retrigger, but the replayer expects
+    // effectType=0x0E with sub-command in param high nibble: param = 0x9y
+    if (effectType >= 0xE0 && effectType <= 0xEF) {
+      const subCmd = effectType & 0x0F;
+      effectType = 0x0E;
+      effectParam = (subCmd << 4) | (effectParam & 0x0F);
+    }
+  }
+  if (cell.effects.length > 1) {
+    const fx = cell.effects[1];
+    effectType2 = mapFurnaceEffect(fx.type);
+    effectParam2 = fx.value & 0xFF;
+    if (effectType2 >= 0xE0 && effectType2 <= 0xEF) {
+      const subCmd = effectType2 & 0x0F;
+      effectType2 = 0x0E;
+      effectParam2 = (subCmd << 4) | (effectParam2 & 0x0F);
+    }
   }
 
   return {
@@ -2056,6 +2367,8 @@ function convertFurnaceCell(cell: FurnacePatternCell): any {
     volume,
     effectType,
     effectParam,
+    effectType2,
+    effectParam2,
   };
 }
 

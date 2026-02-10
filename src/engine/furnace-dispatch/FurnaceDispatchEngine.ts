@@ -896,9 +896,11 @@ export class FurnaceDispatchEngine {
   private _nativeCtx: AudioContext | null = null;
   private initialized = false;
   private initializing = false;
-  private numChannels = 0;
-  private platformType = 0;
-  private dispatchHandle = 0;
+  // Multi-chip tracking — Map<platformType, chipInfo>
+  // Mirrors Furnace's disCont[] array
+  private chips: Map<number, { handle: number; numChannels: number }> = new Map();
+  private _audioRouted = false;
+  private _sharedGain: GainNode | null = null;
 
   // Promise for worklet WASM ready
   private _wasmReadyResolve: (() => void) | null = null;
@@ -932,9 +934,39 @@ export class FurnaceDispatchEngine {
   }
 
   get isInitialized(): boolean { return this.initialized; }
-  get channelCount(): number { return this.numChannels; }
-  get platform(): number { return this.platformType; }
-  get handle(): number { return this.dispatchHandle; }
+  /** Channel count for a specific platform (or first chip if unspecified) */
+  getChannelCount(platformType?: number): number {
+    if (platformType !== undefined) return this.chips.get(platformType)?.numChannels ?? 0;
+    return this.chips.values().next().value?.numChannels ?? 0;
+  }
+  /** @deprecated Use getChannelCount(platformType) */
+  get channelCount(): number { return this.getChannelCount(); }
+  get platform(): number {
+    return this.chips.keys().next().value ?? 0;
+  }
+  get handle(): number {
+    return this.chips.values().next().value?.handle ?? 0;
+  }
+  /** Check if a chip for the given platform type exists */
+  hasChip(platformType: number): boolean {
+    return this.chips.has(platformType);
+  }
+
+  /** Whether audio is already routed from the worklet to destination */
+  get audioRouted(): boolean { return this._audioRouted; }
+
+  /** Get (or create) the shared gain node for worklet output */
+  getOrCreateSharedGain(): GainNode | null {
+    if (this._sharedGain) return this._sharedGain;
+    const workletNode = this.getWorkletNode();
+    const engineCtx = this.getNativeCtx();
+    if (!workletNode || !engineCtx) return null;
+    this._sharedGain = engineCtx.createGain();
+    workletNode.connect(this._sharedGain);
+    this._sharedGain.connect(engineCtx.destination);
+    this._audioRouted = true;
+    return this._sharedGain;
+  }
 
   /**
    * Initialize the engine with the given AudioContext.
@@ -1108,11 +1140,16 @@ export class FurnaceDispatchEngine {
         break;
 
       case 'chipCreated':
-        this.dispatchHandle = data.handle;
-        this.numChannels = data.numChannels;
-        this.platformType = data.platformType;
-        this.latestOscData = new Array(this.numChannels).fill(null);
-        console.log(`[FurnaceDispatch] Chip created: platform=${data.platformType}, channels=${data.numChannels}`);
+        // Track chip in multi-chip map (Furnace disCont[] pattern)
+        this.chips.set(data.platformType, {
+          handle: data.handle,
+          numChannels: data.numChannels
+        });
+        // Rebuild osc data array for total channels across all chips
+        let totalOscChannels = 0;
+        for (const chip of this.chips.values()) totalOscChannels += chip.numChannels;
+        this.latestOscData = new Array(totalOscChannels).fill(null);
+        console.log(`[FurnaceDispatch] Chip created: platform=${data.platformType}, channels=${data.numChannels}, total chips=${this.chips.size}`);
         if (this._chipCreatedResolve) {
           this._chipCreatedResolve();
           this._chipCreatedResolve = null;
@@ -1139,6 +1176,7 @@ export class FurnaceDispatchEngine {
 
   /**
    * Create a chip dispatch instance for the given platform.
+   * The worklet handles reuse if the same platform already exists.
    */
   async createChip(platformType: number, sampleRate?: number): Promise<void> {
     // Ensure the worklet module is loaded first
@@ -1173,65 +1211,63 @@ export class FurnaceDispatchEngine {
   }
 
   /**
-   * Send a raw dispatch command.
+   * Send a raw dispatch command, routed to the correct chip by platformType.
    */
-  dispatch(cmd: number, chan: number, val1: number = 0, val2: number = 0): void {
+  dispatch(cmd: number, chan: number, val1: number = 0, val2: number = 0, platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({
       type: 'dispatch',
-      cmd, chan, val1, val2
+      cmd, chan, val1, val2, platformType
     });
   }
 
   /**
    * Send a note on command.
    */
-  noteOn(chan: number, note: number): void {
-    this.dispatch(DivCmd.NOTE_ON, chan, note, 0);
+  noteOn(chan: number, note: number, platformType?: number): void {
+    this.dispatch(DivCmd.NOTE_ON, chan, note, 0, platformType);
   }
 
   /**
    * Send a note off command.
    */
-  noteOff(chan: number): void {
-    this.dispatch(DivCmd.NOTE_OFF, chan, 0, 0);
+  noteOff(chan: number, platformType?: number): void {
+    this.dispatch(DivCmd.NOTE_OFF, chan, 0, 0, platformType);
   }
 
   /**
    * Set the instrument on a channel.
    */
-  setInstrument(chan: number, insIndex: number): void {
-    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, 0);
+  setInstrument(chan: number, insIndex: number, platformType?: number): void {
+    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, 0, platformType);
   }
 
   /**
    * Set channel volume.
    */
-  setVolume(chan: number, volume: number): void {
-    this.dispatch(DivCmd.VOLUME, chan, volume, 0);
+  setVolume(chan: number, volume: number, platformType?: number): void {
+    this.dispatch(DivCmd.VOLUME, chan, volume, 0, platformType);
   }
 
   /**
    * Set a Game Boy instrument via binary data.
    */
-  setGBInstrument(insIndex: number, insData: Uint8Array): void {
+  setGBInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({
       type: 'setGBInstrument',
-      insIndex,
-      insData
+      insIndex, insData, platformType
     });
   }
 
   /**
    * Set a wavetable via binary data.
    */
-  setWavetable(waveIndex: number, waveData: Uint8Array): void {
+  setWavetable(waveIndex: number, waveData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({
       type: 'setWavetable',
-      waveIndex,
-      waveData
+      waveIndex, waveData, platformType
     });
   }
 
@@ -1242,194 +1278,108 @@ export class FurnaceDispatchEngine {
    * @param insIndex - Instrument slot (0-255)
    * @param insData - Binary FM instrument data
    */
-  setFMInstrument(insIndex: number, insData: Uint8Array): void {
+  setFMInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setFMInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setFMInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a C64/SID instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary C64 instrument data
-   */
-  setC64Instrument(insIndex: number, insData: Uint8Array): void {
+  setC64Instrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setC64Instrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setC64Instrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a NES instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary NES instrument data
-   */
-  setNESInstrument(insIndex: number, insData: Uint8Array): void {
+  setNESInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setNESInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setNESInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a SNES instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary SNES instrument data
-   */
-  setSNESInstrument(insIndex: number, insData: Uint8Array): void {
+  setSNESInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setSNESInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setSNESInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a Namco 163 instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary N163 instrument data
-   */
-  setN163Instrument(insIndex: number, insData: Uint8Array): void {
+  setN163Instrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setN163Instrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setN163Instrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a Famicom Disk System instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary FDS instrument data
-   */
-  setFDSInstrument(insIndex: number, insData: Uint8Array): void {
+  setFDSInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setFDSInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setFDSInstrument', insIndex, insData, platformType });
   }
 
   /**
    * Upload a generic Furnace instrument (any chip type)
-   * Uses the raw binary data from the .fur file
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Raw binary instrument data from Furnace file
    */
-  uploadFurnaceInstrument(insIndex: number, insData: Uint8Array): void {
+  uploadFurnaceInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) {
       console.error(`[FurnaceDispatch] Cannot upload instrument ${insIndex}: workletNode is null!`);
       return;
     }
-    console.log(`[FurnaceDispatch] Uploading instrument ${insIndex}, ${insData.length} bytes`);
-    this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData });
+    console.log(`[FurnaceDispatch] Uploading instrument ${insIndex}, ${insData.length} bytes, platform=${platformType}`);
+    this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData, platformType });
   }
 
-  /**
-   * Set an Amiga/sample instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary Amiga instrument data
-   */
-  setAmigaInstrument(insIndex: number, insData: Uint8Array): void {
+  setAmigaInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setAmigaInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setAmigaInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set a MultiPCM instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary MultiPCM instrument data
-   */
-  setMultiPCMInstrument(insIndex: number, insData: Uint8Array): void {
+  setMultiPCMInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setMultiPCMInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setMultiPCMInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set an ES5506 instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary ES5506 instrument data
-   */
-  setES5506Instrument(insIndex: number, insData: Uint8Array): void {
+  setES5506Instrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setES5506Instrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setES5506Instrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set an ESFM instrument (ESS technology FM)
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary ESFM instrument data
-   */
-  setESFMInstrument(insIndex: number, insData: Uint8Array): void {
+  setESFMInstrument(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setESFMInstrument', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setESFMInstrument', insIndex, insData, platformType });
   }
 
-  /**
-   * Set wave synth configuration for an instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Binary wave synth data
-   */
-  setWaveSynth(insIndex: number, insData: Uint8Array): void {
+  setWaveSynth(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setWaveSynth', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setWaveSynth', insIndex, insData, platformType });
   }
 
-  /**
-   * Set macro data for an instrument
-   * @param insIndex - Instrument slot (0-255)
-   * @param macroData - Binary macro data
-   */
-  setMacro(insIndex: number, macroData: Uint8Array): void {
+  setMacro(insIndex: number, macroData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setMacro', insIndex, macroData });
+    this.workletNode.port.postMessage({ type: 'setMacro', insIndex, macroData, platformType });
   }
 
-  /**
-   * Set a complete instrument with all chip-specific data
-   * @param insIndex - Instrument slot (0-255)
-   * @param insData - Full binary instrument data
-   */
-  setInstrumentFull(insIndex: number, insData: Uint8Array): void {
+  setInstrumentFull(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData });
+    this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData, platformType });
   }
 
-  /**
-   * Upload a sample to the WASM engine
-   * @param sampleIndex - Sample slot (0-255)
-   * @param sampleData - Binary sample data with header
-   */
-  setSample(sampleIndex: number, sampleData: Uint8Array): void {
+  setSample(sampleIndex: number, sampleData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setSample', sampleIndex, sampleData });
+    this.workletNode.port.postMessage({ type: 'setSample', sampleIndex, sampleData, platformType });
   }
 
-  /**
-   * Copy sample data into the chip's internal sample memory.
-   * Must be called after all samples are uploaded via setSample().
-   * Many sample-based chips (Amiga, SEGAPCM, QSound, etc.) require this
-   * to populate their internal sampleMem before they can play audio.
-   */
-  renderSamples(): void {
+  renderSamples(platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'renderSamples' });
+    this.workletNode.port.postMessage({ type: 'renderSamples', platformType });
   }
 
   // ========== Macro Control ==========
 
-  /**
-   * Enable or disable macro processing
-   * @param enabled - Whether macros should be processed during tick
-   */
-  setMacrosEnabled(enabled: boolean): void {
+  setMacrosEnabled(enabled: boolean, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setMacrosEnabled', enabled });
+    this.workletNode.port.postMessage({ type: 'setMacrosEnabled', enabled, platformType });
   }
 
-  /**
-   * Clear all macros for an instrument
-   * @param insIndex - Instrument slot to clear macros from
-   */
-  clearMacros(insIndex: number): void {
+  clearMacros(insIndex: number, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'clearMacros', insIndex });
+    this.workletNode.port.postMessage({ type: 'clearMacros', insIndex, platformType });
   }
 
-  /**
-   * Manually trigger macro release for a channel
-   * @param chan - Channel number to release macros on
-   */
-  releaseMacros(chan: number): void {
+  releaseMacros(chan: number, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'releaseMacros', chan });
+    this.workletNode.port.postMessage({ type: 'releaseMacros', chan, platformType });
   }
 
   // ========== Compatibility Flags ==========
@@ -1438,7 +1388,7 @@ export class FurnaceDispatchEngine {
    * Set all compatibility flags at once
    * @param flags - Object with flag values
    */
-  setCompatFlags(flags: CompatFlags): void {
+  setCompatFlags(flags: CompatFlags, platformType?: number): void {
     if (!this.workletNode) return;
 
     // Convert flags object to byte array in struct order
@@ -1501,65 +1451,41 @@ export class FurnaceDispatchEngine {
     flagArray[55] = flags.oldCenterRate ? 1 : 0;
     flagArray[56] = flags.noVolSlideReset ? 1 : 0;
 
-    this.workletNode.port.postMessage({ type: 'setCompatFlags', flags: flagArray });
+    this.workletNode.port.postMessage({ type: 'setCompatFlags', flags: flagArray, platformType });
   }
 
-  /**
-   * Set a single compatibility flag
-   * @param flagIndex - Flag index from CompatFlag enum
-   * @param value - Flag value (0/1 for bool, 0-3 for multi-value)
-   */
-  setCompatFlag(flagIndex: number, value: number): void {
+  setCompatFlag(flagIndex: number, value: number, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setCompatFlag', flagIndex, value });
+    this.workletNode.port.postMessage({ type: 'setCompatFlag', flagIndex, value, platformType });
   }
 
-  /**
-   * Reset all compatibility flags to defaults (new-style behavior)
-   */
-  resetCompatFlags(): void {
+  resetCompatFlags(platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'resetCompatFlags' });
+    this.workletNode.port.postMessage({ type: 'resetCompatFlags', platformType });
   }
 
-  /**
-   * Set linear pitch mode
-   * @param mode - 0=old non-linear, 1=linear, 2=full linear (default)
-   */
-  setLinearPitch(mode: 0 | 1 | 2): void {
-    this.setCompatFlag(CompatFlag.LINEAR_PITCH, mode);
+  setLinearPitch(mode: 0 | 1 | 2, platformType?: number): void {
+    this.setCompatFlag(CompatFlag.LINEAR_PITCH, mode, platformType);
   }
 
-  /**
-   * Set the engine tick rate.
-   */
   setTickRate(hz: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setTickRate', hz });
   }
 
-  /**
-   * Reset the dispatch instance.
-   */
-  reset(): void {
+  reset(platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'reset' });
+    this.workletNode.port.postMessage({ type: 'reset', platformType });
   }
 
-  /**
-   * Force re-send instruments on all channels.
-   */
-  forceIns(): void {
+  forceIns(platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'forceIns' });
+    this.workletNode.port.postMessage({ type: 'forceIns', platformType });
   }
 
-  /**
-   * Mute/unmute a channel.
-   */
-  mute(chan: number, muted: boolean): void {
+  mute(chan: number, muted: boolean, platformType?: number): void {
     if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'mute', chan, mute: muted });
+    this.workletNode.port.postMessage({ type: 'mute', chan, mute: muted, platformType });
   }
 
   /**
@@ -1599,89 +1525,44 @@ export class FurnaceDispatchEngine {
    * @param chan - Channel number
    * @param command - Command object from FMCommands
    */
-  dispatchFM(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchFM(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a C64/SID command using the C64Commands helper
-   * @param chan - Channel number
-   * @param command - Command object from C64Commands
-   */
-  dispatchC64(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchC64(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a SNES command using the SNESCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from SNESCommands
-   */
-  dispatchSNES(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchSNES(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a Game Boy command using the GBCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from GBCommands
-   */
-  dispatchGB(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchGB(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a NES command using the NESCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from NESCommands
-   */
-  dispatchNES(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchNES(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send an AY command using the AYCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from AYCommands
-   */
-  dispatchAY(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchAY(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send an ES5506 command using the ES5506Commands helper
-   * @param chan - Channel number
-   * @param command - Command object from ES5506Commands
-   */
-  dispatchES5506(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchES5506(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send an N163 command using the N163Commands helper
-   * @param chan - Channel number
-   * @param command - Command object from N163Commands
-   */
-  dispatchN163(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchN163(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a sample command using the SampleCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from SampleCommands
-   */
-  dispatchSample(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchSample(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
-  /**
-   * Send a macro control command using the MacroCommands helper
-   * @param chan - Channel number
-   * @param command - Command object from MacroCommands
-   */
-  dispatchMacro(chan: number, command: { cmd: number; val1: number; val2: number }): void {
-    this.dispatch(command.cmd, chan, command.val1, command.val2);
+  dispatchMacro(chan: number, command: { cmd: number; val1: number; val2: number }, platformType?: number): void {
+    this.dispatch(command.cmd, chan, command.val1, command.val2, platformType);
   }
 
   // ========== Effect Routing ==========
@@ -1693,37 +1574,27 @@ export class FurnaceDispatchEngine {
    * @param effect - Effect code (0x00-0xFF)
    * @param param - Effect parameter (0x00-0xFF)
    */
-  applyEffect(chan: number, effect: number, param: number): void {
-    const commands = this.effectRouter.routeEffect(this.platformType, chan, effect, param);
+  applyEffect(chan: number, effect: number, param: number, platformType?: number): void {
+    const pt = platformType ?? this.platform;
+    const commands = this.effectRouter.routeEffect(pt, chan, effect, param);
     for (const cmd of commands) {
-      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2);
+      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
     }
   }
 
-  /**
-   * Apply an extended effect (Exy format) to the appropriate dispatch commands.
-   * @param chan - Channel number
-   * @param x - Effect subtype (0x0-0xF)
-   * @param y - Effect value (0x0-0xF)
-   */
-  applyExtendedEffect(chan: number, x: number, y: number): void {
-    const commands = this.effectRouter.routeExtendedEffect(this.platformType, chan, x, y);
+  applyExtendedEffect(chan: number, x: number, y: number, platformType?: number): void {
+    const pt = platformType ?? this.platform;
+    const commands = this.effectRouter.routeExtendedEffect(pt, chan, x, y);
     for (const cmd of commands) {
-      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2);
+      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
     }
   }
 
-  /**
-   * Apply a platform-specific effect to dispatch commands.
-   * This is for effects in the 20xx-2Fxx range that vary by chip type.
-   * @param chan - Channel number
-   * @param effect - Effect code
-   * @param param - Effect parameter
-   */
-  applyPlatformEffect(chan: number, effect: number, param: number): void {
-    const commands = this.effectRouter.routePlatformEffect(this.platformType, chan, effect, param);
+  applyPlatformEffect(chan: number, effect: number, param: number, platformType?: number): void {
+    const pt = platformType ?? this.platform;
+    const commands = this.effectRouter.routePlatformEffect(pt, chan, effect, param);
     for (const cmd of commands) {
-      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2);
+      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
     }
   }
 
@@ -1751,8 +1622,12 @@ export class FurnaceDispatchEngine {
       this.workletNode = null;
     }
     this.initialized = false;
-    this.dispatchHandle = 0;
-    this.numChannels = 0;
+    this.chips.clear();
+    this._audioRouted = false;
+    if (this._sharedGain) {
+      try { this._sharedGain.disconnect(); } catch { /* already disconnected */ }
+      this._sharedGain = null;
+    }
     this.oscCallbacks.clear();
     this.latestOscData = [];
     FurnaceDispatchEngine.instance = null;
