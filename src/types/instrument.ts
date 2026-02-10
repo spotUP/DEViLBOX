@@ -303,6 +303,7 @@ export interface TB303Config {
 
   oscillator: {
     type: 'sawtooth' | 'square';
+    waveformBlend?: number;  // 0-1 continuous blend (0=saw, 1=square) - overrides type if set
     pulseWidth?: number;      // 0-100 (pulse width modulation control)
     subOscGain?: number;      // 0-100 (sub-oscillator level)
     subOscBlend?: number;     // 0-100 (sub-oscillator mix with main oscillator)
@@ -338,7 +339,7 @@ export interface TB303Config {
 
   // LFO (Low Frequency Oscillator) - for modulation
   lfo?: {
-    waveform: 0 | 1 | 2;      // 0=sine, 1=triangle, 2=square
+    waveform: number;         // 0=triangle, 1=saw up, 2=saw down, 3=square, 4=random(S&H), 5=noise
     rate: number;              // 0-100 (LFO speed/frequency)
     contour: number;           // 0-100 (envelope contour amount)
     pitchDepth: number;        // 0-100 (pitch modulation depth)
@@ -350,7 +351,7 @@ export interface TB303Config {
   // Built-in effects
   chorus?: {
     enabled: boolean;         // Enable/disable chorus effect
-    mode: 0 | 1 | 2;          // 0=subtle, 1=medium, 2=wide (chorus mode/type)
+    mode: 0 | 1 | 2 | 3 | 4;  // 0=off, 1=subtle, 2=standard, 3=rich, 4=dramatic
     mix: number;              // 0-100 (dry/wet mix)
   };
   phaser?: {
@@ -1662,6 +1663,10 @@ export interface FurnaceES5506Config {
 // Main Furnace Config (expanded)
 export interface FurnaceConfig {
   chipType: number;
+
+  // Furnace file metadata
+  furnaceIndex?: number;  // Original instrument index in the Furnace file (0-based)
+  rawBinaryData?: Uint8Array;  // Original binary instrument data for upload to WASM
 
   // FM parameters
   algorithm: number;     // 0-7 (operator connection algorithm)

@@ -1,16 +1,14 @@
 /**
  * FileBrowser - Unified file browser for DEViLBOX
  * Combines:
- * - IndexedDB project library (persistent local storage)
  * - File System Access API (direct filesystem access in Chrome/Edge)
- * - Traditional file picker fallback
+ * - Electron IPC (native OS filesystem access)
+ * - Server API (jailed to data/ directory)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileManager as _FileManager } from '@cubone/react-file-manager';
 import '@cubone/react-file-manager/dist/style.css';
-import { projectLibrary } from '@/lib/projectLibrary';
-import type { ProjectMetadata } from '@/lib/projectLibrary';
 import {
   isFileSystemAccessSupported,
   requestDirectoryAccess,
@@ -23,6 +21,14 @@ import {
   pickSaveLocation,
 } from '@/lib/fileSystemAccess';
 import type { FileEntry } from '@/lib/fileSystemAccess';
+import { hasElectronFS } from '@utils/electron';
+import {
+  isServerFSAvailable,
+  listServerDirectory,
+  readServerFile,
+  writeServerFile,
+  type ServerFileEntry,
+} from '@/lib/serverFS';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -35,8 +41,6 @@ interface FileBrowserProps {
   suggestedFilename?: string;
 }
 
-type ViewMode = 'filesystem' | 'bundled';
-
 interface FileItem {
   id: string;
   name: string;
@@ -44,7 +48,7 @@ interface FileItem {
   path: string;
   size?: number;
   modifiedAt?: Date;
-  source: 'library' | 'filesystem' | 'bundled';
+  source: 'filesystem';
   handle?: FileSystemFileHandle | FileSystemDirectoryHandle;
 }
 
@@ -65,18 +69,29 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   currentProjectData,
   suggestedFilename = 'untitled.dbx',
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('bundled');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
+  const [hasServerFS, setHasServerFS] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>('');
+  const [electronDirectory, setElectronDirectory] = useState<string | null>(null);
 
   // Check filesystem access on mount
   useEffect(() => {
-    setHasFilesystemAccess(isFileSystemAccessSupported() && !!getCurrentDirectory());
+    const checkAccess = () => {
+      const hasElectron = hasElectronFS();
+      const hasWebFS = isFileSystemAccessSupported() && !!getCurrentDirectory();
+      
+      setHasFilesystemAccess(hasElectron || hasWebFS);
+      // Don't check server FS on mount - will be checked when loading files
+    };
+    
+    if (isOpen) {
+      checkAccess();
+    }
   }, [isOpen]);
 
   // Load files based on view mode
@@ -87,83 +102,87 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     try {
       let items: FileItem[] = [];
 
-      if (viewMode === 'filesystem') {
-        // Load from filesystem
-        const dirHandle = getCurrentDirectory();
-        if (dirHandle) {
-          const entries = await listDirectory(dirHandle, ['.dbx', '.xml', ...TRACKER_EXTENSIONS]);
-          items = entries.map((e: FileEntry) => ({
+      // Check if Electron FS is available
+      if (hasElectronFS() && window.electron?.fs) {
+        // Use Electron native file system
+        if (!electronDirectory) {
+          // Need to pick a directory first
+          setIsLoading(false);
+          return;
+        }
+        
+        const targetPath = electronDirectory || currentPath;
+        if (targetPath) {
+          // Get all entries, not just filtered ones (user can navigate all folders)
+          const entries = await window.electron.fs.readdir(targetPath, []);
+          items = entries.map((e) => ({
             id: e.path,
             name: e.name,
             isDirectory: e.isDirectory,
             path: e.path,
             size: e.size,
-            modifiedAt: e.modifiedAt,
+            modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
             source: 'filesystem' as const,
-            handle: e.handle as FileSystemFileHandle,
           }));
-        }
-      } else if (viewMode === 'bundled') {
-        // Load bundled data directory structure
-        const basePath = import.meta.env.BASE_URL || '/';
-        
-        if (currentPath === '') {
-          // Root level - show directories and library items
-          items = [
-            { id: 'data/songs', name: 'songs', isDirectory: true, path: 'data/songs', source: 'bundled' as const },
-            { id: 'data/samples', name: 'samples', isDirectory: true, path: 'data/samples', source: 'bundled' as const },
-            { id: 'data/instruments', name: 'instruments', isDirectory: true, path: 'data/instruments', source: 'bundled' as const },
-          ];
           
-          // Add library items at root level
+          // Sort: directories first, then files
+          items.sort((a, b) => {
+            if (a.isDirectory && !b.isDirectory) return -1;
+            if (!a.isDirectory && b.isDirectory) return 1;
+            return a.name.localeCompare(b.name);
+          });
+        }
+      } else {
+        // Check if server FS is available (lazy check to avoid console errors on startup)
+        if (!hasServerFS) {
+          const serverFS = await isServerFSAvailable();
+          setHasServerFS(serverFS);
+        }
+        
+        if (hasServerFS) {
+          // Use server file system (jailed to data/)
           try {
-            const projects = await projectLibrary.listProjects();
-            items.push(...projects.map((p: ProjectMetadata) => ({
-              id: p.id,
-              name: p.name.endsWith('.dbx') ? p.name : `${p.name}.dbx`,
-              isDirectory: false,
-              path: `library/${p.name}`,
-              size: p.size,
-              modifiedAt: new Date(p.modifiedAt),
-              source: 'library' as const,
-            })));
-          } catch {
-            // Library not available
+            const targetPath = currentPath || 'songs';
+            const entries = await listServerDirectory(targetPath);
+            items = entries.map((e: ServerFileEntry) => ({
+            id: e.path,
+            name: e.name,
+            isDirectory: e.isDirectory,
+            path: e.path,
+            size: e.size,
+            modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
+            source: 'filesystem' as const,
+          }));
+          
+          // Sort: directories first, then files
+          items.sort((a, b) => {
+            if (a.isDirectory && !b.isDirectory) return -1;
+            if (!a.isDirectory && b.isDirectory) return 1;
+            return a.name.localeCompare(b.name);
+          });
+        } catch (err) {
+          // Server may not be available, fall through to empty items
+          setHasServerFS(false);
+        }
+        } else {
+          // Use Web File System Access API
+          const dirHandle = getCurrentDirectory();
+          if (dirHandle) {
+            const entries = await listDirectory(dirHandle, []);
+            items = entries.map((e: FileEntry) => ({
+              id: e.path,
+              name: e.name,
+              isDirectory: e.isDirectory,
+              path: e.path,
+              size: e.size,
+              modifiedAt: e.modifiedAt,
+              source: 'filesystem' as const,
+              handle: e.handle as FileSystemFileHandle,
+            }));
           }
-        } else if (currentPath === 'data/songs') {
-          // Inside songs directory - load and show songs
-          try {
-            const response = await fetch(`${basePath}data/songs/modules.json`);
-            if (response.ok) {
-              const data = await response.json();
-              const categories = data.categories || {};
-              const allModules: { file: string; name: string }[] = [];
-              for (const mods of Object.values(categories)) {
-                allModules.push(...(mods as { file: string; name: string }[]));
-              }
-              items = allModules.map((m) => ({
-                id: `songs/${m.file}`,
-                name: m.name,
-                isDirectory: false,
-                path: `data/songs/${m.file}`,
-                source: 'bundled' as const,
-              }));
-            }
-          } catch {
-            // Fallback songs
-            items = [
-              { id: 'songs/phuture-acid-tracks.dbx', name: 'Phuture - Acid Tracks', isDirectory: false, path: 'data/songs/phuture-acid-tracks.dbx', source: 'bundled' as const },
-              { id: 'songs/hardfloor-funalogue.dbx', name: 'Hardfloor - Funalogue', isDirectory: false, path: 'data/songs/hardfloor-funalogue.dbx', source: 'bundled' as const }
-            ];
-          }
-        } else if (currentPath === 'data/samples') {
-          // Inside samples directory - placeholder for now
-          items = [];
-        } else if (currentPath === 'data/instruments') {
-          // Inside instruments directory - placeholder for now
-          items = [];
         }
       }
+      
 
       setFiles(items);
     } catch (err) {
@@ -171,20 +190,19 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [viewMode, currentPath]);
+  }, [currentPath, electronDirectory, hasServerFS]);
 
   useEffect(() => {
     if (isOpen) {
       loadFiles();
     }
-  }, [isOpen, viewMode, loadFiles]);
+  }, [isOpen, loadFiles]);
 
   // Request filesystem access
   const handleRequestFilesystemAccess = async () => {
     const handle = await requestDirectoryAccess();
     if (handle) {
       setHasFilesystemAccess(true);
-      setViewMode('filesystem');
     }
   };
 
@@ -203,16 +221,20 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         let buffer: ArrayBuffer;
 
-        if (selectedFile.source === 'filesystem' && selectedFile.handle) {
-          const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
-          buffer = await file.arrayBuffer();
-        } else if (selectedFile.source === 'bundled') {
-          const basePath = import.meta.env.BASE_URL || '/';
-          const response = await fetch(`${basePath}${selectedFile.path}`);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          buffer = await response.arrayBuffer();
+        if (selectedFile.source === 'filesystem') {
+          // Check if Electron or Web FS API or Server FS
+          if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
+            buffer = await window.electron.fs.readFile(selectedFile.path);
+          } else if (hasServerFS && selectedFile.path) {
+            buffer = await readServerFile(selectedFile.path);
+          } else if (selectedFile.handle) {
+            const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
+            buffer = await file.arrayBuffer();
+          } else {
+            throw new Error('Cannot read tracker module');
+          }
         } else {
-          throw new Error('Cannot load tracker module from this source');
+          throw new Error('Cannot read tracker module');
         }
 
         await onLoadTrackerModule(buffer, selectedFile.name);
@@ -224,30 +246,21 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       let data: any;
       const isXmlFile = selectedFile.name.toLowerCase().endsWith('.xml');
 
-      if (selectedFile.source === 'library') {
-        const projectData = await projectLibrary.loadProject(selectedFile.id);
-        if (!projectData) throw new Error('Project not found');
-        data = projectData;
-      } else if (selectedFile.source === 'filesystem' && selectedFile.handle) {
+      // Check if Electron or Web FS API or Server FS
+      if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
+        const buffer = await window.electron.fs.readFile(selectedFile.path);
+        const text = new TextDecoder().decode(buffer);
+        data = isXmlFile ? text : JSON.parse(text);
+      } else if (hasServerFS && selectedFile.path) {
+        const buffer = await readServerFile(selectedFile.path);
+        const text = new TextDecoder().decode(buffer);
+        data = isXmlFile ? text : JSON.parse(text);
+      } else if (selectedFile.handle) {
         const content = await readFile(selectedFile.handle as FileSystemFileHandle);
         // XML files are passed as raw text, others are parsed as JSON
         data = isXmlFile ? content : JSON.parse(content);
-      } else if (selectedFile.source === 'bundled') {
-        const basePath = import.meta.env.BASE_URL || '/';
-        const fullPath = `${basePath}${selectedFile.path}`;
-        console.log('Loading bundled file from:', fullPath);
-        const response = await fetch(fullPath);
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${fullPath}`);
-        const contentType = response.headers.get('content-type');
-        console.log('Response content-type:', contentType);
-        // Check if we got HTML instead of expected content
-        if (contentType?.includes('text/html')) {
-          throw new Error(`Got HTML instead of file content. Path: ${fullPath}`);
-        }
-        // XML files are passed as raw text, others are parsed as JSON
-        data = isXmlFile ? await response.text() : await response.json();
       } else {
-        throw new Error('Cannot load file');
+        throw new Error('Cannot read file');
       }
 
       onLoad(data, selectedFile.name);
@@ -269,11 +282,22 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       const data = currentProjectData();
       const filename = saveFilename.endsWith('.dbx') ? saveFilename : `${saveFilename}.dbx`;
 
-      if (viewMode === 'bundled') {
-        // Save to IndexedDB (project library)
-        await projectLibrary.saveProject(filename, data);
-      } else if (viewMode === 'filesystem') {
-        // Save to filesystem
+      // Check which filesystem to use
+      if (hasElectronFS() && window.electron?.fs) {
+        // Save via Electron
+        const targetPath = electronDirectory || currentPath;
+        const fullPath = `${targetPath}/${filename}`;
+        const jsonData = JSON.stringify(data, null, 2);
+        const buffer = new TextEncoder().encode(jsonData);
+        await window.electron.fs.writeFile(fullPath, buffer);
+      } else if (hasServerFS) {
+        // Save to server filesystem (jailed to data/)
+        const targetPath = currentPath ? `${currentPath}/${filename}` : `songs/${filename}`;
+        const jsonData = JSON.stringify(data, null, 2);
+        const buffer = new TextEncoder().encode(jsonData);
+        await writeServerFile(targetPath, buffer);
+      } else {
+        // Use Web FS API
         const dirHandle = getCurrentDirectory();
         if (dirHandle) {
           await createFile(filename, JSON.stringify(data, null, 2), dirHandle);
@@ -300,13 +324,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     if (!confirm(`Delete "${file.name}"?`)) return;
 
     try {
-      if (file.source === 'library') {
-        await projectLibrary.deleteProject(file.id);
-      } else if (file.source === 'filesystem') {
-        const dirHandle = getCurrentDirectory();
-        if (dirHandle) {
-          await deleteFile(file.name, dirHandle);
-        }
+      const dirHandle = getCurrentDirectory();
+      if (dirHandle) {
+        await deleteFile(file.name, dirHandle);
       }
       loadFiles();
     } catch (err) {
@@ -337,29 +357,26 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* View Mode Tabs */}
         <div className="flex border-b border-dark-border">
-          {mode === 'load' && (
-            <button
-              onClick={() => setViewMode('bundled')}
-              className={`px-4 py-2 text-sm font-medium ${
-                viewMode === 'bundled'
-                  ? 'text-accent-primary border-b-2 border-accent-primary'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              Files
-            </button>
-          )}
           <button
-            onClick={() => hasFilesystemAccess ? setViewMode('filesystem') : handleRequestFilesystemAccess()}
+            onClick={() => hasFilesystemAccess ? null : handleRequestFilesystemAccess()}
             className={`px-4 py-2 text-sm font-medium ${
-              viewMode === 'filesystem'
+              hasFilesystemAccess
                 ? 'text-accent-primary border-b-2 border-accent-primary'
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            {hasFilesystemAccess ? 'Folder' : 'Open Folder...'}
+            {hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
           </button>
         </div>
+
+        {/* Breadcrumb / Current Path */}
+        {currentPath && (
+          <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
+            <div className="text-xs text-text-muted font-mono truncate">
+              📂 {currentPath}
+            </div>
+          </div>
+        )}
 
         {/* File List */}
         <div className="flex-1 overflow-auto p-4">
@@ -376,17 +393,48 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           ) : files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-text-muted">
               <p className="mb-4">No files found</p>
-              {viewMode === 'bundled' && mode === 'load' && (
-                <p className="text-sm">Save a project to see it here</p>
+              {!hasElectronFS() && !hasServerFS && !hasFilesystemAccess && (
+                <button
+                  onClick={handleRequestFilesystemAccess}
+                  className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                >
+                  Open Folder
+                </button>
+              )}
+              {hasElectronFS() && !electronDirectory && (
+                <button
+                  onClick={async () => {
+                    if (window.electron?.fs) {
+                      const dir = await window.electron.fs.openDirectory();
+                      if (dir) {
+                        setElectronDirectory(dir);
+                        setCurrentPath(dir);
+                        loadFiles();
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                >
+                  Select Folder
+                </button>
               )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2">
               {/* Back button when in subdirectory */}
-              {viewMode === 'bundled' && currentPath !== '' && (
+              {currentPath !== '' && (hasElectronFS() || hasServerFS) && (
                 <div
                   onClick={() => {
-                    setCurrentPath('');
+                    if (hasElectronFS() && currentPath) {
+                      // Navigate to parent directory in Electron
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
+                      setCurrentPath(parentPath);
+                      setElectronDirectory(parentPath);
+                    } else if (hasServerFS && currentPath) {
+                      // Navigate to parent directory on server
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || 'songs';
+                      setCurrentPath(parentPath);
+                    }
                     setSelectedFile(null);
                   }}
                   className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
@@ -403,8 +451,14 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   onClick={() => setSelectedFile(file)}
                   onDoubleClick={() => {
                     if (file.isDirectory) {
-                      // Navigate into directory in bundled mode
-                      if (viewMode === 'bundled') {
+                      // Navigate into directory
+                      if (hasElectronFS()) {
+                        // Navigate into directory in Electron
+                        setCurrentPath(file.path);
+                        setElectronDirectory(file.path);
+                        setSelectedFile(null);
+                      } else if (hasServerFS) {
+                        // Navigate into directory on server
                         setCurrentPath(file.path);
                         setSelectedFile(null);
                       }
@@ -429,18 +483,16 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       {file.modifiedAt && ` • ${file.modifiedAt.toLocaleDateString()}`}
                     </div>
                   </div>
-                  {(file.source === 'library' || file.source === 'filesystem') && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(file);
-                      }}
-                      className="text-text-muted hover:text-red-400 p-1"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(file);
+                    }}
+                    className="text-text-muted hover:text-red-400 p-1"
+                    title="Delete"
+                  >
+                    🗑️
+                  </button>
                 </div>
               ))}
             </div>

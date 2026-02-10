@@ -269,6 +269,7 @@ export interface ParsedInstrument {
 
   // Furnace-specific data (for .fur imports)
   furnace?: FurnaceInstrumentData;
+  rawBinaryData?: Uint8Array;  // Raw binary instrument data for upload to WASM
 }
 
 /**

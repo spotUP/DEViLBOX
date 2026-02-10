@@ -73,27 +73,44 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
   const stepMap = new Map(steps.map(s => [s.index, s]));
 
   // Convert steps to TrackerCell format
+  // DB303 behavior: gate=false (REST) immediately releases the note.
+  // We insert note-off (value 97) on REST steps to match this behavior.
   const rows: TrackerCell[] = [];
+  let lastGatedStep = -1; // Track if we need to release on REST
+  
   for (let i = 0; i < numSteps; i++) {
     const step = stepMap.get(i);
     if (step) {
       // Convert db303 format to tracker note format
       // db303: rootNote (MIDI note) + key (0-11) + octave (-2 to +2) * 12
-      // Tracker: MIDI note + 1 (C-0 = 1, C#0 = 2, etc.)
+      // 
+      // XM note format: 1 = C-0 (MIDI 12), so XM = MIDI - 11
+      // Example: MIDI 36 (C2) → XM 25 (C-2)
       let note: number = 0;
+      
       if (step.gate) {
         // Calculate MIDI note: rootNote + key + (octave * 12)
         const midiNote = rootNote + step.key + (step.octave * 12);
-        // Tracker note is MIDI note + 1
-        note = midiNote + 1;
+        // Convert MIDI to XM note: MIDI 12 = XM 1 (C-0)
+        note = midiNote - 11;
 
         // Clamp to valid range (1-96)
         note = Math.max(1, Math.min(96, note));
+        lastGatedStep = i;
+      } else {
+        // REST (gate=false) - ALWAYS releases the note in DB303!
+        // DB303 sequencer behavior: A rest immediately releases regardless of slide flag.
+        // The slide flag on the previous step doesn't cause sustain through a rest.
+        if (lastGatedStep >= 0) {
+          // Insert note-off (97) to release the note
+          note = 97;
+        }
+        // else: leave as 0 (empty) if we're already silent
       }
 
       rows.push({
         note: note as any,
-        instrument: instrumentId as any, // Set instrument for this note
+        instrument: step.gate ? instrumentId as any : 0, // Only set instrument on gated notes
         volume: 0,
         effTyp: 0,
         eff: 0,
@@ -145,8 +162,17 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
 /**
  * Convert DEViLBOX Pattern to db303 XML pattern string
  * Takes the first channel's data
+ * @param pattern - The pattern to convert
+ * @param tempo - BPM (default: 120)
+ * @param swing - Swing amount 0-1 (default: 0)
+ * @param rootNote - MIDI root note (default: 36 = C2)
  */
-export function convertToDb303Pattern(pattern: Pattern): string {
+export function convertToDb303Pattern(
+  pattern: Pattern,
+  tempo: number = 120,
+  swing: number = 0,
+  rootNote: number = 36
+): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
 
@@ -158,14 +184,17 @@ export function convertToDb303Pattern(pattern: Pattern): string {
 
   const numSteps = Math.min(pattern.length, 32); // db303 supports up to 32 steps
 
-  lines.push(`<db303-pattern version="1.0" numSteps="${numSteps}">`);
+  // Format swing to 2 decimal places if non-zero
+  const swingStr = swing > 0 ? ` swing="${swing.toFixed(2)}"` : '';
+  
+  lines.push(`<db303-pattern version="1.0" numSteps="${numSteps}" tempo="${Math.round(tempo)}"${swingStr} rootNote="${rootNote}">`);
 
   // Convert each row to a step
   for (let i = 0; i < numSteps; i++) {
     const cell = channel?.rows[i];
     if (!cell) {
       // Empty step
-      lines.push(`  <step index="${i}" key="0" octave="0" gate="false" accent="false" slide="false"/>`);
+      lines.push(`  <step index="${i}" key="0" octave="0" gate="false" accent="false" slide="false" mute="false" hammer="false"/>`);
       continue;
     }
 
@@ -181,15 +210,17 @@ export function convertToDb303Pattern(pattern: Pattern): string {
 
     if (hasNote) {
       // Convert tracker note to db303 format
-      // Tracker: C-0 = 1, C-1 = 13, C-2 = 25, etc.
-      // db303: octave -2 to +2, key 0-11
-      const noteValue = cell.note - 1; // Convert to 0-based
-      const trackerOctave = Math.floor(noteValue / 12);
-      key = noteValue % 12;
-      octave = trackerOctave - 3; // Map tracker octave 3 to db303 octave 0
-
-      // Clamp octave to valid range
-      octave = Math.max(-2, Math.min(2, octave));
+      // Tracker note is 1-based MIDI note (C-0 = 1)
+      // db303: key (0-11) + octave relative to rootNote
+      const midiNote = cell.note - 1; // Convert to 0-based MIDI
+      
+      // Calculate relative to rootNote
+      const relativeNote = midiNote - rootNote;
+      octave = Math.floor(relativeNote / 12);
+      key = ((relativeNote % 12) + 12) % 12; // Handle negative modulo
+      
+      // Clamp octave to valid range (-1 to +1 for db303 standard)
+      octave = Math.max(-1, Math.min(1, octave));
     }
 
     lines.push(`  <step index="${i}" key="${key}" octave="${octave}" gate="${gate}" accent="${accent}" slide="${slide}" mute="${mute}" hammer="${hammer}"/>`);
@@ -197,6 +228,33 @@ export function convertToDb303Pattern(pattern: Pattern): string {
 
   lines.push('</db303-pattern>');
   return lines.join('\n');
+}
+
+/**
+ * Download a pattern as db303 XML file
+ * @param pattern - The pattern to export
+ * @param filename - Filename (without extension)
+ * @param tempo - BPM
+ * @param swing - Swing amount 0-1
+ * @param rootNote - MIDI root note (default: 36 = C2)
+ */
+export function downloadDb303Pattern(
+  pattern: Pattern,
+  filename: string = 'pattern',
+  tempo: number = 120,
+  swing: number = 0,
+  rootNote: number = 36
+): void {
+  const xml = convertToDb303Pattern(pattern, tempo, swing, rootNote);
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.xml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -235,4 +293,68 @@ export function createEmptyDb303Pattern(numSteps: number = 16, name: string = 'N
       },
     ],
   };
+}
+
+/**
+ * Export the current pattern from the tracker to db303 XML format.
+ * Call from browser console: exportCurrentPatternToDb303()
+ * 
+ * @param channelIndex - Which channel to export (default: 0, the first 303 channel)
+ * @param filename - Optional filename (default: pattern name)
+ */
+export async function exportCurrentPatternToDb303(
+  channelIndex: number = 0,
+  filename?: string
+): Promise<void> {
+  // Dynamically import stores to avoid circular dependencies
+  const { useTrackerStore } = await import('@stores/useTrackerStore');
+  const { useTransportStore } = await import('@stores/useTransportStore');
+  
+  const trackerState = useTrackerStore.getState();
+  const transportState = useTransportStore.getState();
+  
+  const patterns = trackerState.patterns;
+  const currentPatternIndex = trackerState.currentPatternIndex;
+  
+  if (!patterns || patterns.length === 0) {
+    console.error('No patterns loaded');
+    return;
+  }
+  
+  const pattern = patterns[currentPatternIndex];
+  if (!pattern) {
+    console.error(`Pattern ${currentPatternIndex} not found`);
+    return;
+  }
+  
+  // If channelIndex is specified and > 0, create a modified pattern with just that channel
+  let exportPattern = pattern;
+  if (channelIndex > 0 && pattern.channels[channelIndex]) {
+    exportPattern = {
+      ...pattern,
+      channels: [pattern.channels[channelIndex]]
+    };
+  }
+  
+  const tempo = transportState.bpm || 120;
+  const swing = transportState.swing || 0;
+  
+  // Use rootNote 36 (C2) as default - this matches the db303 default
+  const rootNote = 36;
+  
+  const exportFilename = filename || pattern.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'pattern';
+  
+  console.log(`Exporting pattern "${pattern.name}" (${pattern.length} steps) at ${tempo} BPM, swing ${(swing * 100).toFixed(0)}%`);
+  
+  downloadDb303Pattern(exportPattern, exportFilename, tempo, swing, rootNote);
+  
+  console.log(`Downloaded: ${exportFilename}.xml`);
+  console.log('You can import this file at https://db303.pages.dev/');
+}
+
+// Expose export function to browser console
+if (typeof window !== 'undefined') {
+  (window as any).exportCurrentPatternToDb303 = exportCurrentPatternToDb303;
+  (window as any).convertToDb303Pattern = convertToDb303Pattern;
+  (window as any).downloadDb303Pattern = downloadDb303Pattern;
 }

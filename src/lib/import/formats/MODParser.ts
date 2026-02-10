@@ -90,6 +90,10 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     offset += 64 * header.channelCount * 4;
   }
 
+  // Scan patterns for initial speed/tempo (Fxx effect)
+  // MOD files typically set speed/tempo in the first rows of the song
+  const { initialSpeed, initialBPM } = scanForInitialTempo(patterns, header.patternOrderTable);
+
   // Read sample data
   const instruments: ParsedInstrument[] = [];
   for (let i = 0; i < 31; i++) {
@@ -146,8 +150,8 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     originalInstrumentCount: instruments.length,
     modData: {
       moduleType: header.formatTag,
-      initialSpeed: 6, // Classic ProTracker speed
-      initialBPM: 125, // Classic ProTracker BPM
+      initialSpeed, // Scanned from pattern data (Fxx effect)
+      initialBPM,   // Scanned from pattern data (Fxx effect)
       amigaPeriods: true, // MOD always uses Amiga periods
       channelNames: Array.from({ length: header.channelCount }, (_, i) => `Channel ${i + 1}`),
       songLength: header.songLength,
@@ -166,6 +170,107 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
   });
 
   return { header, patterns, instruments, metadata };
+}
+
+/**
+ * Scan pattern data for initial speed/tempo (Fxx effect)
+ * MOD files typically set speed in the first few rows of the song.
+ * 
+ * In ProTracker:
+ * - Fxx where xx < 0x20 (32) sets speed (ticks per row)
+ * - Fxx where xx >= 0x20 sets BPM directly
+ * 
+ * This scans the first pattern in song order to find these commands.
+ */
+function scanForInitialTempo(
+  patterns: MODNote[][][],
+  patternOrderTable: number[]
+): { initialSpeed: number; initialBPM: number } {
+  // Defaults (classic ProTracker)
+  let speed = 6;
+  let bpm = 125;
+  let foundSpeed = false;
+  let foundBPM = false;
+  
+  // Collect all Fxx effects for debugging
+  const allFxxEffects: Array<{pat: number, row: number, ch: number, param: number}> = [];
+  
+  // Scan ALL patterns to find Fxx effects for debugging
+  for (let patIdx = 0; patIdx < patterns.length; patIdx++) {
+    const pattern = patterns[patIdx];
+    if (!pattern) continue;
+    
+    for (let row = 0; row < pattern.length; row++) {
+      const rowData = pattern[row];
+      if (!rowData) continue;
+      
+      for (let ch = 0; ch < rowData.length; ch++) {
+        const note = rowData[ch];
+        if (note.effect === 0x0F && note.effectParam !== 0) {
+          allFxxEffects.push({ pat: patIdx, row, ch, param: note.effectParam });
+        }
+      }
+    }
+  }
+  
+  // Log all Fxx effects found
+  if (allFxxEffects.length > 0) {
+    console.log(`[MODParser] Found ${allFxxEffects.length} Fxx effects:`, 
+      allFxxEffects.slice(0, 10).map(f => 
+        `Pat${f.pat} Row${f.row} Ch${f.ch}: F${f.param.toString(16).padStart(2, '0').toUpperCase()}`
+      )
+    );
+  } else {
+    console.log('[MODParser] No Fxx effects found in any pattern - using defaults');
+  }
+  
+  // Get the first pattern in the song order
+  const firstPatternIndex = patternOrderTable[0];
+  const firstPattern = patterns[firstPatternIndex];
+  
+  if (!firstPattern) {
+    console.log(`[MODParser] First pattern (${firstPatternIndex}) not found!`);
+    return { initialSpeed: speed, initialBPM: bpm };
+  }
+  
+  // Scan the first few rows for Fxx commands
+  // Check up to 16 rows as some MODs set tempo later
+  const rowsToScan = Math.min(16, firstPattern.length);
+  
+  for (let row = 0; row < rowsToScan && !(foundSpeed && foundBPM); row++) {
+    const rowData = firstPattern[row];
+    if (!rowData) continue;
+    
+    for (const note of rowData) {
+      // Effect F = Set Speed/Tempo
+      if (note.effect === 0x0F) {
+        const param = note.effectParam;
+        
+        if (param === 0) {
+          // F00 = stop song, ignore
+          continue;
+        } else if (param < 0x20) {
+          // Fxx < 32 = set speed (ticks per row)
+          if (!foundSpeed) {
+            speed = param;
+            foundSpeed = true;
+            console.log(`[MODParser] Found speed ${speed} at row ${row}`);
+          }
+        } else {
+          // Fxx >= 32 = set BPM
+          if (!foundBPM) {
+            bpm = param;
+            foundBPM = true;
+            console.log(`[MODParser] Found BPM ${bpm} at row ${row}`);
+          }
+        }
+      }
+    }
+  }
+  
+  console.log(`[MODParser] Initial tempo: speed=${speed}, BPM=${bpm} (foundSpeed=${foundSpeed}, foundBPM=${foundBPM})`);
+  
+  return { initialSpeed: speed, initialBPM: bpm };
 }
 
 /**

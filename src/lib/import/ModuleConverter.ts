@@ -415,8 +415,11 @@ export function convertXMModule(
   // Build pattern order from metadata (NOT sequential!)
   // XM files use a pattern order table - patterns can repeat
   // e.g., patternOrderTable = [0, 1, 0, 2] means pattern 0 plays twice
-  const order = metadata.modData?.patternOrderTable ||
+  // IMPORTANT: Slice to songLength to avoid playing beyond the song
+  const fullOrder = metadata.modData?.patternOrderTable ||
     Array.from({ length: convertedPatterns.length }, (_, i) => i);
+  const songLength = metadata.modData?.songLength || fullOrder.length;
+  const order = fullOrder.slice(0, songLength);
 
   // Store original module data for libopenmpt playback if provided
   let originalModuleData: ConversionResult['originalModuleData'];
@@ -519,8 +522,11 @@ export function convertMODModule(
   // Build pattern order from metadata (NOT sequential!)
   // MOD files use a pattern order table - patterns can repeat
   // e.g., patternOrderTable = [0, 1, 0, 2] means pattern 0 plays twice
-  const order = metadata.modData?.patternOrderTable ||
+  // IMPORTANT: Slice to songLength to avoid playing silent patterns beyond the song
+  const fullOrder = metadata.modData?.patternOrderTable ||
     Array.from({ length: convertedPatterns.length }, (_, i) => i);
+  const songLength = metadata.modData?.songLength || fullOrder.length;
+  const order = fullOrder.slice(0, songLength);
 
   console.log('[ModuleConverter] Pattern order from metadata:', {
     hasModData: !!metadata.modData,

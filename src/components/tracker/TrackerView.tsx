@@ -37,6 +37,7 @@ import { InstrumentList } from '@components/instruments/InstrumentList';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
+import { notify } from '@stores/useNotificationStore';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
@@ -197,7 +198,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
   const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
   const { 
-    setBPM, 
+    setBPM,
+    setSpeed,
     smoothScrolling, 
     setSmoothScrolling, 
     grooveTemplateId,
@@ -206,6 +208,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     useMpcScale
   } = useTransportStore(useShallow((state) => ({
     setBPM: state.setBPM,
+    setSpeed: state.setSpeed,
     smoothScrolling: state.smoothScrolling,
     setSmoothScrolling: state.setSmoothScrolling,
     grooveTemplateId: state.grooveTemplateId,
@@ -218,6 +221,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     toggleMasterMute: state.toggleMasterMute,
   })));
   const statusMessage = useUIStore((state) => state.statusMessage);
+  const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
+  const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -340,6 +345,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     return () => window.removeEventListener('keydown', handleDialogShortcuts);
   }, [handleDialogShortcuts]);
 
+  // React to pending module file (set by drag-drop in App.tsx)
+  useEffect(() => {
+    if (pendingModuleFile) {
+      console.log('[TrackerView] Pending module file detected, opening import dialog:', pendingModuleFile.name);
+      setShowImportModule(true);
+      // Don't clear yet - ImportModuleDialog needs it
+    }
+  }, [pendingModuleFile, setShowImportModule]);
+
   // Enable keyboard input
   useTrackerInput();
   const blockOps = useBlockOperations();
@@ -431,7 +445,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       }
 
       if (result.patterns.length === 0) {
-        alert(`Module "${info.metadata.title}" contains no patterns to import.`);
+        notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
         return;
       }
 
@@ -474,6 +488,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       // Set BPM from module (or default to 125)
       setBPM(importMetadata.modData?.initialBPM || 125);
+      // Set Speed from module (or default to 6)
+      setSpeed(importMetadata.modData?.initialSpeed || 6);
 
       const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
       console.log('Imported module:', info.metadata.title, {
@@ -491,24 +507,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         console.log('[Import] Samples ready for playback');
       }
 
-      const libopenmptNote = result.originalModuleData
-        ? `\n\n🎵 libopenmpt playback available - sample-accurate effects!`
-        : '';
-
-      alert(`Module "${info.metadata.title}" imported!\n\n` +
-        `Format: ${format}\n` +
-        `Patterns: ${result.patterns.length}\n` +
-        `Channels: ${importMetadata.originalChannelCount}\n` +
-        `Instruments: ${instruments.length}\n` +
-        `Samplers: ${samplerCount}\n\n` +
-        `✨ Native parser used - full sample extraction and FT2 effects preserved!${libopenmptNote}`);
+      notify.success(`Imported "${info.metadata.title}" - ${result.patterns.length} patterns, ${instruments.length} instruments`);
 
       return;
     }
 
     // Fallback to libopenmpt path for other formats (IT, S3M, etc.)
     if (!info.metadata.song) {
-      alert(`Module "${info.metadata.title}" loaded but no pattern data found.\n\nThe module metadata was extracted but pattern data is not available.`);
+      notify.error(`Module "${info.metadata.title}" loaded but no pattern data found.`);
       return;
     }
 
@@ -518,7 +524,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     const result = convertModule(info.metadata.song);
 
     if (result.patterns.length === 0) {
-      alert(`Module "${info.metadata.title}" contains no patterns to import.`);
+      notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
       return;
     }
 
@@ -586,12 +592,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       console.log('[Import] Samples ready for playback');
     }
 
-    alert(`Module "${info.metadata.title}" imported!\n\n` +
-      `Patterns: ${result.patterns.length}\n` +
-      `Channels: ${result.channelCount}\n` +
-      `Instruments: ${instruments.length}\n` +
-      `Samplers: ${samplerCount}`);
-  }, [loadInstruments, loadPatterns, setMetadata, setBPM, setPatternOrder, setOriginalModuleData]);
+    notify.success(`Imported "${info.metadata.title}" - ${result.patterns.length} patterns, ${instruments.length} instruments`);
+  }, [loadInstruments, loadPatterns, setMetadata, setBPM, setSpeed, setPatternOrder, setOriginalModuleData]);
 
   // Acid generator handler
   const handleAcidGenerator = useCallback((channelIndex: number) => {
@@ -641,8 +643,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
         <ImportModuleDialog
           isOpen={showImportModule}
-          onClose={() => setShowImportModule(false)}
+          onClose={() => {
+            setShowImportModule(false);
+            setPendingModuleFile(null); // Clear pending file on close
+          }}
           onImport={handleModuleImport}
+          initialFile={pendingModuleFile}
         />
         {/* FT2 Dialogs */}
         {showScaleVolume && (
@@ -967,8 +973,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
       <ImportModuleDialog
         isOpen={showImportModule}
-        onClose={() => setShowImportModule(false)}
+        onClose={() => {
+          setShowImportModule(false);
+          setPendingModuleFile(null);
+        }}
         onImport={handleModuleImport}
+        initialFile={pendingModuleFile}
       />
 
       {/* FT2 Dialogs */}

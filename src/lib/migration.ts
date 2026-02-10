@@ -59,6 +59,10 @@ export function ensureCompleteInstrumentConfig(inst: InstrumentConfig): Instrume
     case 'TB303':
     case 'Buzz3o3':
       result.tb303 = deepMerge(DEFAULT_TB303, inst.tb303 || {});
+      // MIGRATION FIX: filterSelect=255 was an old invalid value, fix to valid default
+      if (result.tb303?.devilFish && (result.tb303.devilFish.filterSelect === undefined || result.tb303.devilFish.filterSelect > 5)) {
+        result.tb303.devilFish.filterSelect = 1;
+      }
       break;
     case 'DrumMachine':
       result.drumMachine = deepMerge(DEFAULT_DRUM_MACHINE, inst.drumMachine || {});

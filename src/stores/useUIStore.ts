@@ -36,6 +36,7 @@ interface UIStore {
   // Transient UI state (not persisted)
   statusMessage: string;
   prevStatusMessage: string;
+  pendingModuleFile: File | null; // Module file pending import (set by drag-drop, consumed by TrackerView)
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -64,6 +65,9 @@ interface UIStore {
 
   // Performance actions
   setPerformanceQuality: (quality: PerformanceQuality) => void;
+
+  // Module import actions
+  setPendingModuleFile: (file: File | null) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -95,6 +99,7 @@ export const useUIStore = create<UIStore>()(
       // Transient state
       statusMessage: 'All Right',
       prevStatusMessage: 'All Right',
+      pendingModuleFile: null,
 
       // Actions
       togglePanel: (panel) =>
@@ -255,6 +260,12 @@ export const useUIStore = create<UIStore>()(
       setPerformanceQuality: (quality) =>
         set((state) => {
           state.performanceQuality = quality;
+        }),
+
+      // Module import actions
+      setPendingModuleFile: (file) =>
+        set((state) => {
+          state.pendingModuleFile = file;
         }),
     })),
     {

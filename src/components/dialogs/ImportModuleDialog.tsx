@@ -3,7 +3,7 @@
  * Uses chiptune3/libopenmpt for parsing and playback preview
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Upload, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
@@ -23,12 +23,14 @@ interface ImportModuleDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (info: ModuleInfo, options: ImportOptions) => void;
+  initialFile?: File | null; // Pre-loaded file (from drag-drop)
 }
 
 export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   isOpen,
   onClose,
   onImport,
+  initialFile,
 }) => {
   const [moduleInfo, setModuleInfo] = useState<ModuleInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +58,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       setIsLoading(false);
     }
   }, []);
+
+  // Auto-load file if provided (from drag-drop)
+  useEffect(() => {
+    if (initialFile && isOpen) {
+      handleFileSelect(initialFile);
+    }
+  }, [initialFile, isOpen, handleFileSelect]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

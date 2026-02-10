@@ -121,11 +121,17 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               return;
             }
           } catch (nativeError) {
-            console.warn(`[ModuleLoader] Native parser failed, falling back to libopenmpt:`, nativeError);
+            console.warn(`[ModuleLoader] Native parser failed:`, nativeError);
+            // Don't fall back to libopenmpt for formats it doesn't support
+            if (ext === '.fur' || ext === '.dmf') {
+              reject(new Error(`Failed to parse ${ext} file: ${nativeError instanceof Error ? nativeError.message : 'unknown error'}`));
+              return;
+            }
+            console.log('[ModuleLoader] Falling back to libopenmpt...');
           }
         }
 
-        // Fall back to libopenmpt
+        // Fall back to libopenmpt (only for supported formats)
         const player = await loadWithLibopenmpt(arrayBuffer, file);
 
         // Set up metadata handler

@@ -1140,7 +1140,12 @@ export class FurnaceDispatchEngine {
   /**
    * Create a chip dispatch instance for the given platform.
    */
-  createChip(platformType: number, sampleRate?: number): void {
+  async createChip(platformType: number, sampleRate?: number): Promise<void> {
+    // Ensure the worklet module is loaded first
+    if (this._nativeCtx) {
+      await FurnaceDispatchEngine.ensureModuleLoaded(this._nativeCtx);
+    }
+
     if (!this.workletNode) {
       console.error(`[FurnaceDispatch] createChip(${platformType}): workletNode is NULL!`);
       return;
@@ -1290,6 +1295,21 @@ export class FurnaceDispatchEngine {
   setFDSInstrument(insIndex: number, insData: Uint8Array): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setFDSInstrument', insIndex, insData });
+  }
+
+  /**
+   * Upload a generic Furnace instrument (any chip type)
+   * Uses the raw binary data from the .fur file
+   * @param insIndex - Instrument slot (0-255)
+   * @param insData - Raw binary instrument data from Furnace file
+   */
+  uploadFurnaceInstrument(insIndex: number, insData: Uint8Array): void {
+    if (!this.workletNode) {
+      console.error(`[FurnaceDispatch] Cannot upload instrument ${insIndex}: workletNode is null!`);
+      return;
+    }
+    console.log(`[FurnaceDispatch] Uploading instrument ${insIndex}, ${insData.length} bytes`);
+    this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData });
   }
 
   /**

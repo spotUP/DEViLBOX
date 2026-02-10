@@ -3,6 +3,7 @@
  * Supports:
  * - .dbx files (DEViLBOX projects)
  * - .xml files (DB303 patterns/presets)
+ * - .sqs/.seq files (Behringer TD-3 patterns)
  * - Tracker modules (.mod, .xm, .it, .s3m, .fur, .mptm, etc.)
  * - MIDI files (.mid, .midi)
  * - Audio samples (.wav, .mp3, .ogg, .flac)
@@ -24,6 +25,8 @@ const SUPPORTED_EXTENSIONS = [
   '.dbi',
   // DB303 patterns/presets
   '.xml',
+  // Behringer TD-3 patterns
+  '.sqs', '.seq',
   // Tracker modules
   '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', 
   '.dbm', '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', 

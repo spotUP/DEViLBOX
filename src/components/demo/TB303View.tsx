@@ -1,26 +1,19 @@
 /**
  * TB303View - Modern TB-303 interface
- * Integrates new TB303Sequencer with ToneEngine
- * Connected to tracker pattern data
+ * Displays pattern from tracker store and syncs with global transport
+ * All playback handled by TrackerReplayer
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { SequencerEngine } from '@engine/SequencerEngine';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { TB303Sequencer, type TB303Step } from '@components/sequencer/TB303Sequencer';
 import { Knob } from '@components/controls/Knob';
-import { useTrackerStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useTransportStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
-import { Play, Square, Shuffle, Trash2, Wand2 } from 'lucide-react';
+import { Shuffle, Trash2, Wand2 } from 'lucide-react';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import './TB303View.css';
-
-// Note name to MIDI note number mapping (C3 = middle C = 60)
-const NOTE_TO_MIDI: Record<string, number> = {
-  'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-  'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
-};
 
 // Parse tracker note (numeric XM or legacy string) to TB303Step format
 const parseTrackerNote = (noteValue: number | string | null): { note: string; octave: number } => {
@@ -86,6 +79,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Get tracker store and instrument store
   const { patterns, currentPatternIndex, setCell } = useTrackerStore();
   const { instruments, updateInstrument } = useInstrumentStore();
+  // Use global transport for playback state (TrackerReplayer handles actual playback)
+  const { isPlaying, currentRow, bpm } = useTransportStore();
   const currentPattern = patterns[currentPatternIndex];
   const channel = currentPattern?.channels[channelIndex];
 
@@ -93,9 +88,8 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const instrumentId = channel?.instrumentId ?? 0;
   const instrument = instruments.find((inst) => inst.id === instrumentId);
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentStep, setCurrentStep] = useState(-1);
-  const [bpm, setBpm] = useState(130);
+  // Current step syncs with global transport (mod 16 for 16-step view)
+  const currentStep = isPlaying ? currentRow % 16 : -1;
 
   // Acid pattern generator state
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
@@ -161,88 +155,6 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
 
     return result;
   }, [currentPattern, channelIndex]);
-
-  // Sequencer ref for playback loop (still needed for 16-step pattern loop)
-  const sequencerRef = React.useRef<SequencerEngine | null>(null);
-
-  // Initialize sequencer engine with ToneEngine's TB303 instance
-  useEffect(() => {
-    const initSequencer = async () => {
-      try {
-        const toneEngine = getToneEngine();
-
-        // Ensure audio context is initialized
-        await toneEngine.init();
-
-        // Get the TB303 instrument for this channel
-        const tb303Inst = toneEngine.getInstrument(instrumentId, instrument!, channelIndex);
-
-        // Create sequencer engine (reuses Tone.js context)
-        // Note: Tone.js uses BaseContext which extends AudioContext
-        const sequencer = new SequencerEngine(toneEngine.masterInput.context as unknown as AudioContext, { bpm });
-
-        // Connect to ToneEngine's TB303 instance
-        sequencer.connectToTB303(tb303Inst);
-
-        // Set up callbacks
-        sequencer.onStep((step) => setCurrentStep(step));
-
-        sequencerRef.current = sequencer;
-
-        // Load initial pattern
-        updateAcidPattern();
-      } catch (err) {
-        console.error('[TB303View] Init error:', err);
-      }
-    };
-
-    if (instrument && (instrument.synthType === 'TB303' || instrument.synthType === 'Buzz3o3' || instrument.tb303)) {
-      initSequencer();
-    }
-
-    return () => {
-      if (sequencerRef.current) {
-        sequencerRef.current.dispose();
-        sequencerRef.current = null;
-      }
-    };
-  }, [instrumentId, channelIndex, instrument]);
-
-  // Convert our TB303Step to AcidPattern note
-  const updateAcidPattern = useCallback(() => {
-    if (!sequencerRef.current) return;
-
-    const pattern = sequencerRef.current.getActivePattern();
-    for (let i = 0; i < 16; i++) {
-      const step = steps[i];
-      pattern.setGate(i, step.active);
-
-      if (step.active) {
-        // Convert note name to MIDI note number (0-11)
-        const noteNum = NOTE_TO_MIDI[step.note] ?? 0;
-        pattern.setKey(i, noteNum);
-
-        // Convert octave (1=down, 2=mid, 3=up) to (-1, 0, 1)
-        const octave = step.octave - 2;
-        pattern.setOctave(i, octave);
-
-        pattern.setAccent(i, step.accent);
-        pattern.setSlide(i, step.slide);
-      }
-    }
-  }, [steps]);
-
-  // Update pattern when steps change
-  useEffect(() => {
-    updateAcidPattern();
-  }, [steps, updateAcidPattern]);
-
-  // Update sequencer BPM
-  useEffect(() => {
-    if (sequencerRef.current) {
-      sequencerRef.current.setTempo(bpm);
-    }
-  }, [bpm]);
 
   // Parameter setters - update instrument store which will update ToneEngine
   const handleWaveformChange = useCallback((value: number) => {
@@ -334,20 +246,6 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     debouncedStoreUpdate({ tb303: updatedConfig });
   }, [instrumentId, debouncedStoreUpdate]);
 
-  // Transport controls
-  const handlePlayPause = () => {
-    if (!sequencerRef.current) return;
-
-    if (isPlaying) {
-      sequencerRef.current.stop();
-      setIsPlaying(false);
-      setCurrentStep(-1);
-    } else {
-      sequencerRef.current.start();
-      setIsPlaying(true);
-    }
-  };
-
   // Pattern controls
   const handleClearPattern = () => {
     // Clear first 16 rows of the current channel
@@ -418,30 +316,11 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     <div className="tb303-view">
       {/* Content starts here */}
       <>
-          {/* Transport Bar */}
+          {/* Transport Bar - Pattern controls only (playback via main transport) */}
           <div className="tb303-transport">
-            <button
-              onClick={handlePlayPause}
-              className={`transport-btn ${isPlaying ? 'stop' : 'play'}`}
-            >
-              {isPlaying ? <Square size={16} /> : <Play size={16} />}
-              <span>{isPlaying ? 'Stop' : 'Play'}</span>
-            </button>
-
-            <div className="transport-bpm">
-              <label>BPM</label>
-              <input
-                type="number"
-                value={bpm}
-                onChange={(e) => setBpm(parseInt(e.target.value) || 130)}
-                min="60"
-                max="200"
-              />
-            </div>
-
             {isPlaying && (
               <div className="transport-step">
-                Step {(currentStep + 1).toString().padStart(2, '0')}/16
+                Step {(currentStep + 1).toString().padStart(2, '0')}/16 @ {bpm} BPM
               </div>
             )}
 
