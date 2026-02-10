@@ -10,7 +10,8 @@
  * - Gate enforcement
  */
 
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, audioNow, timeToSeconds } from '@/utils/audio-context';
 import { ensureMAMEModuleLoaded, createMAMEWorkletNode } from './mame-wasm-loader';
 import type {
   MacroState,
@@ -47,11 +48,9 @@ export interface MAMEMacroConfig {
 /**
  * Abstract base class for all MAME synths
  */
-export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEffectTarget {
-  // ToneAudioNode interface
+export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   abstract readonly name: string;
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   // WASM worklet
   protected workletNode: AudioWorkletNode | null = null;
@@ -98,8 +97,7 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
   protected oscCallbacks: Set<OscDataCallback> = new Set();
 
   constructor() {
-    super();
-    this.output = new Tone.Gain(1);
+    this.output = getDevilboxAudioContext().createGain();
     this.effectRouter = new MAMEEffectRouter();
 
     // Set capabilities after chipName is defined by subclass
@@ -135,15 +133,14 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
    */
   protected async initialize(): Promise<void> {
     try {
-      const toneContext = this.context as any;
-      const rawContext = toneContext.rawContext || toneContext._context;
+      const rawContext = getDevilboxAudioContext();
 
       const { wasmBinary, jsCode } = await ensureMAMEModuleLoaded(
         rawContext, this.chipName, this.workletFile
       );
       if (this._disposed) return;
 
-      const targetNode = this.output.input as AudioNode;
+      const targetNode = this.output as AudioNode;
       const { workletNode, readyPromise } = createMAMEWorkletNode(
         rawContext, this.processorName, wasmBinary, jsCode, targetNode
       );
@@ -264,7 +261,7 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
     if (this._disposed) return;
     this.triggerAttack(note, time, velocity || 1);
 
-    const d = Tone.Time(duration).toSeconds();
+    const d = timeToSeconds(duration);
     setTimeout(() => {
       if (!this._disposed) {
         this.triggerRelease();
@@ -595,7 +592,7 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
    *
    * Advances macros and applies their values to the synth.
    */
-  processTick(_time: number = Tone.now()): void {
+  processTick(_time: number = audioNow()): void {
     if (!this.isNoteOn) return;
 
     // Process each active macro
@@ -961,7 +958,7 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
   /**
    * Dispose of the synth
    */
-  dispose(): this {
+  dispose(): void {
     this._disposed = true;
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
@@ -969,8 +966,6 @@ export abstract class MAMEBaseSynth extends Tone.ToneAudioNode implements MAMEEf
       this.workletNode = null;
     }
     this.oscCallbacks.clear();
-    this.output.dispose();
-    super.dispose();
-    return this;
+    this.output.disconnect();
   }
 }

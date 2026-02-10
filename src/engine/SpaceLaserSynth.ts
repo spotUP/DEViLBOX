@@ -1,21 +1,28 @@
 import * as Tone from 'tone';
 import type { SpaceLaserConfig } from '@/types/instrument';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, getNativeAudioNode, audioNow, noteToFrequency } from '@/utils/audio-context';
 
-export class SpaceLaserSynth {
+export class SpaceLaserSynth implements DevilboxSynth {
+  readonly name = 'SpaceLaserSynth';
+  readonly output: GainNode;
   private synth: Tone.FMSynth;
   private filter: Tone.Filter;
   private noise: Tone.Noise;
   private noiseGain: Tone.Gain;
   private reverb: Tone.Reverb;
   private delay: Tone.FeedbackDelay;
-  private output: Tone.Volume;
+  private _toneOutput: Tone.Volume;
   private config: SpaceLaserConfig;
 
   constructor(config: SpaceLaserConfig) {
     this.config = config;
 
-    // Output Volume
-    this.output = new Tone.Volume(0);
+    // Output: native GainNode bridged from Tone.js Volume
+    this.output = getDevilboxAudioContext().createGain();
+    this._toneOutput = new Tone.Volume(0);
+    const nativeOut = getNativeAudioNode(this._toneOutput);
+    if (nativeOut) nativeOut.connect(this.output);
 
     // Effects Chain
     this.reverb = new Tone.Reverb({
@@ -68,7 +75,7 @@ export class SpaceLaserSynth {
     this.noiseGain.connect(this.filter);
     this.filter.connect(this.delay);
     this.delay.connect(this.reverb);
-    this.reverb.connect(this.output);
+    this.reverb.connect(this._toneOutput);
 
     // Start background nodes
     this.noise.start();
@@ -105,11 +112,11 @@ export class SpaceLaserSynth {
    * Trigger the space laser
    */
   triggerAttack(note?: string | number, time?: number, velocity: number = 1) {
-    const t = time || Tone.now();
+    const t = time || audioNow();
     const duration = this.config.laser.sweepTime / 1000;
 
     // Use note if provided, otherwise start frequency
-    const startFreq = note ? Tone.Frequency(note).toFrequency() : this.config.laser.startFreq;
+    const startFreq = note ? noteToFrequency(note) : this.config.laser.startFreq;
     const endFreq = this.config.laser.endFreq;
 
     // Trigger envelope and set initial frequency (triggerAttack sets frequency internally)
@@ -133,20 +140,11 @@ export class SpaceLaserSynth {
    */
   triggerRelease(time?: number) {
     // If time is null or undefined, use immediate time to prevent Tone.js ReferenceError/AssertionError
-    const t = time === null || time === undefined ? Tone.now() : time;
+    const t = time === null || time === undefined ? audioNow() : time;
     this.synth.triggerRelease(t);
   }
 
-  // Connection
-  connect(dest: Tone.InputNode) {
-    this.output.connect(dest);
-  }
-
-  disconnect() {
-    this.output.disconnect();
-  }
-
-  dispose() {
+  dispose(): void {
     // Stop noise before disposing to ensure clean shutdown
     this.noise.stop();
 
@@ -156,10 +154,11 @@ export class SpaceLaserSynth {
     this.noiseGain.dispose();
     this.reverb.dispose();
     this.delay.dispose();
-    this.output.dispose();
+    this._toneOutput.dispose();
+    this.output.disconnect();
   }
 
   get volume() {
-    return this.output.volume;
+    return this._toneOutput.volume;
   }
 }

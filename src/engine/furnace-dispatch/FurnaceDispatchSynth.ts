@@ -1,12 +1,12 @@
 /**
- * FurnaceDispatchSynth - Tone.js ToneAudioNode wrapper for Furnace chip dispatch
+ * FurnaceDispatchSynth - DevilboxSynth wrapper for Furnace chip dispatch
  *
  * Provides a standard synth interface (triggerAttack/triggerRelease) backed by
  * the native Furnace dispatch WASM engine. Supports 57+ platforms.
  */
 
-import * as Tone from 'tone';
-import { getNativeContext } from '@utils/audio-context';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import {
   FurnaceDispatchEngine,
   FurnaceDispatchPlatform,
@@ -79,10 +79,9 @@ function getMaxVolume(platform: number): number {
   return PLATFORM_VOL_MAX[platform] ?? 127;
 }
 
-export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
+export class FurnaceDispatchSynth implements DevilboxSynth {
   readonly name = 'FurnaceDispatchSynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   private engine: FurnaceDispatchEngine;
   private _disposed = false;
@@ -92,12 +91,12 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
   private currentChannel = 0;
   private platformType: number;
   private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
+  private _releaseTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map(); // chan -> pending release timeout
   private _volumeOffsetDb = 0; // Volume normalization offset in dB
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
 
   constructor(platformType: number = FurnaceDispatchPlatform.GB) {
-    super();
-    this.output = new Tone.Gain(1);
+    this.output = getDevilboxAudioContext().createGain();
     this.platformType = platformType;
     this.engine = FurnaceDispatchEngine.getInstance();
     this._readyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
@@ -137,7 +136,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
     const binaryData = updateFurnaceInstrument(config, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
-    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData);
+    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
   }
 
   /**
@@ -152,7 +151,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     }
     await this.ensureInitialized();
     console.log(`[FurnaceDispatchSynth] Uploading instrument ${this.furnaceInstrumentIndex} (${rawData.length} bytes) to platform ${this.platformType}`);
-    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, rawData);
+    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, rawData, this.platformType);
   }
 
   /**
@@ -169,12 +168,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      const toneContext = this.context as any;
-      const nativeCtx = toneContext.rawContext || toneContext._context || getNativeContext(this.context);
-
-      if (!nativeCtx) {
-        throw new Error('Could not get native AudioContext');
-      }
+      const nativeCtx = getDevilboxAudioContext();
 
       await this.engine.init(nativeCtx);
       if (this._disposed) return;
@@ -184,23 +178,20 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
       await this.engine.createChip(this.platformType, engineSampleRate);
       await this.engine.waitForChipCreated();
 
-      // Connect worklet output through a native GainNode for volume control.
+      // Connect worklet output through a shared native GainNode.
       // The worklet lives in the engine's true native AudioContext. Tone.js uses
       // standardized-audio-context (SAC) which wraps native nodes — cross-context
       // connect() calls fail or silently don't route audio. We route entirely
-      // through native nodes: worklet → nativeGain → destination.
-      const workletNode = this.engine.getWorkletNode();
-      const engineCtx = this.engine.getNativeCtx();
-      if (workletNode && engineCtx) {
-        const nativeGain = engineCtx.createGain();
-        workletNode.connect(nativeGain);
-        nativeGain.connect(engineCtx.destination);
-
-        // Store for volume control and cleanup
-        (this as any)._nativeGain = nativeGain;
-        // Apply any pending volume normalization offset
+      // through native nodes: worklet → sharedGain → destination.
+      // Multiple FurnaceDispatchSynths share one chip/worklet, so only one
+      // audio route should exist (managed by the engine).
+      const sharedGain = this.engine.getOrCreateSharedGain();
+      if (sharedGain) {
+        (this as any)._nativeGain = sharedGain;
+        // Apply volume normalization (last writer wins — acceptable since
+        // all instruments share the same chip output)
         if (this._volumeOffsetDb !== 0) {
-          nativeGain.gain.value = Math.pow(10, this._volumeOffsetDb / 20);
+          sharedGain.gain.value = Math.pow(10, this._volumeOffsetDb / 20);
         }
       }
 
@@ -229,75 +220,61 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
 
   private setupDefaultInstrument(): void {
     const P = FurnaceDispatchPlatform;
-    const numCh = this.engine.channelCount || 4;
-    const maxVol = getMaxVolume(this.platformType);
+    const pt = this.platformType;
+    const numCh = this.engine.getChannelCount(pt) || 4;
+    const maxVol = getMaxVolume(pt);
+
+    // Helper: dispatch with platformType
+    const disp = (cmd: number, ch: number, v1 = 0, v2 = 0) => this.engine.dispatch(cmd, ch, v1, v2, pt);
+    const setIns = (ch: number, ins: number) => this.engine.setInstrument(ch, ins, pt);
+    const setVol = (ch: number, vol: number) => this.engine.setVolume(ch, vol, pt);
 
     // Platform-specific setup
-    switch (this.platformType) {
-      // === Game Boy (already has custom setup) ===
+    switch (pt) {
       case P.GB:
         this.setupDefaultGBInstrument();
         break;
 
-      // === Wavetable chips: need wavetable + WAVE command ===
+      // === Wavetable chips ===
       case P.PCE:
-        this.setupDefaultWavetable(32, 31); // 5-bit, 32 samples
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        this.setupDefaultWavetable(32, 31);
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.SCC:
       case P.SCC_PLUS:
-        this.setupDefaultWavetable(32, 255); // 8-bit, 32 samples
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        this.setupDefaultWavetable(32, 255);
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.VBOY:
-        this.setupDefaultWavetable(32, 63); // 6-bit, 32 samples
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        this.setupDefaultWavetable(32, 63);
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.NAMCO:
       case P.NAMCO_15XX:
       case P.NAMCO_CUS30:
       case P.BUBSYS_WSG:
-        this.setupDefaultWavetable(32, 15); // 4-bit, 32 samples
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        this.setupDefaultWavetable(32, 15);
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.SWAN:
-        // WonderSwan: 4-bit wavetable, 32 samples
         this.setupDefaultWavetable(32, 15);
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.FDS:
-        // FDS: 6-bit wavetable, 64 samples
         this.setupDefaultWavetable(64, 63);
-        this.engine.dispatch(DivCmd.WAVE, 0, 0, 0);
+        disp(DivCmd.WAVE, 0, 0, 0);
         break;
       case P.N163:
-        // N163: 4-bit wavetable, 32 samples
         this.setupDefaultWavetable(32, 15);
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.X1_010:
       case P.SOUND_UNIT:
-        // X1-010 and Sound Unit have wavetable mode
         this.setupDefaultWavetable(32, 255);
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.dispatch(DivCmd.WAVE, ch, 0, 0);
-        }
+        for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
 
-      // === Sample-based chips: need test sample + renderSamples ===
-      // IMPORTANT: Load samples FIRST (creates default instrument), then set instrument on channels
+      // === Sample-based chips ===
       case P.AMIGA:
       case P.SEGAPCM:
       case P.SEGAPCM_COMPAT:
@@ -312,99 +289,67 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
       case P.YMZ280B:
       case P.QSOUND:
       case P.MULTIPCM:
-        this.loadTestSample8bit();          // Creates instrument 0 in WASM
-        this.engine.renderSamples();
-        // NOW set instrument on all channels (instrument 0 exists now)
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.setInstrument(ch, 0);
-          this.engine.setVolume(ch, maxVol);
-        }
+        this.loadTestSample8bit();
+        this.engine.renderSamples(pt);
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.MSM6258:
-        // MSM6258 requires VOX ADPCM format (4-bit)
-        this.loadTestSampleVOX();           // Creates instrument 0 in WASM
-        this.engine.renderSamples();
-        // NOW set instrument on all channels
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.setInstrument(ch, 0);
-          this.engine.setVolume(ch, maxVol);
-        }
+        this.loadTestSampleVOX();
+        this.engine.renderSamples(pt);
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.ES5506:
       case P.C140:
       case P.C219:
       case P.PCM_DAC:
-        this.loadTestSample16bit();         // Creates instrument 0 in WASM
-        this.engine.renderSamples();
-        // NOW set instrument on all channels
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.setInstrument(ch, 0);
-          this.engine.setVolume(ch, maxVol);
-        }
+        this.loadTestSample16bit();
+        this.engine.renderSamples(pt);
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.SNES:
-        // SNES uses BRR format - load a BRR test sample
-        this.loadTestSampleBRR();           // Creates instrument 0 in WASM
-        this.engine.renderSamples();
-        // NOW set instrument on all channels
-        for (let ch = 0; ch < numCh; ch++) {
-          this.engine.setInstrument(ch, 0);
-          this.engine.setVolume(ch, maxVol);
-        }
+        this.loadTestSampleBRR();
+        this.engine.renderSamples(pt);
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
     }
 
     // For non-sample chips, set instrument and volume normally
-    // (These chips don't need the instrument to exist first)
     const sampleBasedChips: number[] = [
       P.AMIGA, P.SEGAPCM, P.SEGAPCM_COMPAT, P.RF5C68, P.K007232, P.K053260,
       P.GA20, P.GBA_DMA, P.GBA_MINMOD, P.NDS, P.MSM6295, P.YMZ280B,
       P.QSOUND, P.MULTIPCM, P.MSM6258, P.ES5506, P.C140, P.C219, P.PCM_DAC, P.SNES
     ];
-    if (!sampleBasedChips.includes(this.platformType)) {
-      for (let ch = 0; ch < numCh; ch++) {
-        this.engine.setInstrument(ch, 0);
-        this.engine.setVolume(ch, maxVol);
-      }
+    if (!sampleBasedChips.includes(pt)) {
+      for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
     }
   }
 
   private setupDefaultGBInstrument(): void {
-    // Default GB instrument: envVol=15, envDir=0(down), envLen=2, soundLen=0
-    // No hw sequence
+    const pt = this.platformType;
     const data = new Uint8Array([
-      15,  // envVol
-      0,   // envDir (0=decrease)
-      2,   // envLen
-      0,   // soundLen (0=infinite)
-      0,   // softEnv
-      1,   // alwaysInit
-      0,   // doubleWave
-      0,   // hwSeqLen
+      15, 0, 2, 0, 0, 1, 0, 0, // envVol, envDir, envLen, soundLen, softEnv, alwaysInit, doubleWave, hwSeqLen
     ]);
-    this.engine.setGBInstrument(0, data);
+    this.engine.setGBInstrument(0, data, pt);
 
-    // Set all channels to instrument 0 and full volume
     for (let ch = 0; ch < 4; ch++) {
-      this.engine.setInstrument(ch, 0);
-      this.engine.setVolume(ch, 15);
+      this.engine.setInstrument(ch, 0, pt);
+      this.engine.setVolume(ch, 15, pt);
     }
 
-    // Set up a default wavetable for channel 2 (WAV)
+    // Default wavetable for channel 2 (WAV)
     const waveLen = 32;
     const waveMax = 15;
     const waveData = new Uint8Array(8 + waveLen * 4);
     const view = new DataView(waveData.buffer);
     view.setInt32(0, waveLen, true);
     view.setInt32(4, waveMax, true);
-    // Triangle wave
     for (let i = 0; i < waveLen; i++) {
       const val = i < waveLen / 2
         ? Math.round((i / (waveLen / 2)) * waveMax)
         : Math.round(((waveLen - i) / (waveLen / 2)) * waveMax);
       view.setInt32(8 + i * 4, val, true);
     }
-    this.engine.setWavetable(0, waveData);
+    this.engine.setWavetable(0, waveData, pt);
   }
 
   /**
@@ -422,7 +367,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
       const val = Math.round((i / (waveLen - 1)) * waveMax);
       view.setInt32(8 + i * 4, val, true);
     }
-    this.engine.setWavetable(0, waveData);
+    this.engine.setWavetable(0, waveData, this.platformType);
   }
 
   /**
@@ -464,7 +409,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     for (let i = 0; i < sampleLen; i++) {
       data[headerSize + i] = i < sampleLen / 2 ? 0x7F : 0x80; // 127, -128 signed
     }
-    this.engine.setSample(0, data);
+    this.engine.setSample(0, data, this.platformType);
   }
 
   /**
@@ -484,7 +429,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
       const val = i < sampleLen / 2 ? 32767 : -32768;
       view.setInt16(headerSize + i * 2, val, true);
     }
-    this.engine.setSample(0, data);
+    this.engine.setSample(0, data, this.platformType);
   }
 
   /**
@@ -517,7 +462,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
         data[offset + 1 + i] = ((hi & 0x0F) << 4) | (lo & 0x0F);
       }
     }
-    this.engine.setSample(0, data);
+    this.engine.setSample(0, data, this.platformType);
   }
 
   /**
@@ -540,7 +485,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
       const lo = (sampleIdx + 1) < sampleLen / 2 ? 0xF : 0x0;
       data[headerSize + i] = (hi << 4) | lo;
     }
-    this.engine.setSample(0, data);
+    this.engine.setSample(0, data, this.platformType);
   }
 
   /**
@@ -550,7 +495,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     const known = PLATFORM_CHANNELS[this.platformType];
     if (known) return known;
     // Generate fallback channel names from engine channel count
-    const numCh = this.engine.channelCount || 1;
+    const numCh = this.engine.getChannelCount(this.platformType) || 1;
     return Array.from({ length: numCh }, (_, i) => `CH${i + 1}`);
   }
 
@@ -558,7 +503,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
    * Get the number of channels.
    */
   getNumChannels(): number {
-    return this.engine.channelCount;
+    return this.engine.getChannelCount(this.platformType);
   }
 
   /**
@@ -579,7 +524,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     if (!this._ready || this._disposed) return;
 
     const midiNote = typeof note === 'string'
-      ? Tone.Frequency(note).toMidi()
+      ? noteToMidi(note)
       : (note > 127
         ? Math.round(12 * Math.log2(note / 440) + 69)
         : note);
@@ -589,20 +534,51 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     // Use channel 0 for now (can be made smarter later)
     const chan = this.currentChannel;
 
+    // Cancel any pending release timeout on this channel.
+    // Without this, the PREVIOUS note's scheduled noteOff kills the
+    // CURRENT note because they share the same chip channel.
+    const pendingRelease = this._releaseTimeouts.get(chan);
+    if (pendingRelease) {
+      clearTimeout(pendingRelease);
+      this._releaseTimeouts.delete(chan);
+    }
+
+    const pt = this.platformType;
     // Set the instrument for this channel BEFORE playing the note
-    this.engine.setInstrument(chan, this.furnaceInstrumentIndex);
+    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt);
 
     // Set volume based on velocity
-    const maxVol = getMaxVolume(this.platformType);
+    const maxVol = getMaxVolume(pt);
     const vol = Math.round(velocity * maxVol);
-    this.engine.setVolume(chan, vol);
+    this.engine.setVolume(chan, vol, pt);
 
     // Furnace dispatch uses (midiNote - 12) as the note value
     // The dispatch expects 12 = C-1, so MIDI 60 (C4) = note 60
-    this.engine.noteOn(chan, midiNote);
+    this.engine.noteOn(chan, midiNote, pt);
 
     // Track active note
     this.activeNotes.set(midiNote, chan);
+  }
+
+  triggerAttackRelease(
+    note: string | number,
+    duration: number,
+    time?: number,
+    velocity: number = 1,
+  ): void {
+    this.triggerAttack(note, time, velocity);
+    // Schedule release after duration
+    const ctx = this.engine.getNativeCtx();
+    if (ctx) {
+      const chan = this.currentChannel;
+      const releaseTime = (time ?? ctx.currentTime) + duration;
+      const timeoutId = setTimeout(() => {
+        this._releaseTimeouts.delete(chan);
+        this.triggerRelease(note);
+      }, Math.max(0, (releaseTime - ctx.currentTime) * 1000));
+      // Store so triggerAttack can cancel if a new note arrives before release
+      this._releaseTimeouts.set(chan, timeoutId);
+    }
   }
 
   triggerRelease(note?: string | number, _time?: number): void {
@@ -611,20 +587,20 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     if (note !== undefined) {
       // Release a specific note
       const midiNote = typeof note === 'string'
-        ? Tone.Frequency(note).toMidi()
+        ? noteToMidi(note)
         : (note > 127
           ? Math.round(12 * Math.log2(note / 440) + 69)
           : note);
 
       const chan = this.activeNotes.get(midiNote);
       if (chan !== undefined) {
-        this.engine.noteOff(chan);
+        this.engine.noteOff(chan, this.platformType);
         this.activeNotes.delete(midiNote);
       }
     } else {
       // Release all active notes
       for (const [, chan] of this.activeNotes) {
-        this.engine.noteOff(chan);
+        this.engine.noteOff(chan, this.platformType);
       }
       this.activeNotes.clear();
     }
@@ -646,40 +622,22 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
    */
   sendCommand(cmd: number, chan: number, val1: number = 0, val2: number = 0): void {
     if (!this._ready || this._disposed) return;
-    this.engine.dispatch(cmd, chan, val1, val2);
+    this.engine.dispatch(cmd, chan, val1, val2, this.platformType);
   }
 
-  /**
-   * Apply a tracker effect command, translating it to dispatch commands.
-   * @param effect Effect code (0x00-0xFF)
-   * @param param Effect parameter (0x00-0xFF)
-   * @param chan Optional channel (defaults to currentChannel)
-   */
   applyEffect(effect: number, param: number, chan?: number): void {
     if (!this._ready || this._disposed) return;
-    this.engine.applyEffect(chan ?? this.currentChannel, effect, param);
+    this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
-  /**
-   * Apply an extended effect (Exy format).
-   * @param x Effect subtype (0x0-0xF)
-   * @param y Effect value (0x0-0xF)
-   * @param chan Optional channel (defaults to currentChannel)
-   */
   applyExtendedEffect(x: number, y: number, chan?: number): void {
     if (!this._ready || this._disposed) return;
-    this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y);
+    this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.platformType);
   }
 
-  /**
-   * Apply a platform-specific effect.
-   * @param effect Effect code
-   * @param param Effect parameter
-   * @param chan Optional channel (defaults to currentChannel)
-   */
   applyPlatformEffect(effect: number, param: number, chan?: number): void {
     if (!this._ready || this._disposed) return;
-    this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param);
+    this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
   /**
@@ -693,22 +651,15 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
    * Set a Game Boy instrument.
    */
   setGBInstrument(insIndex: number, insData: Uint8Array): void {
-    this.engine.setGBInstrument(insIndex, insData);
+    this.engine.setGBInstrument(insIndex, insData, this.platformType);
   }
 
-  /**
-   * Set a wavetable.
-   */
   setWavetable(waveIndex: number, waveData: Uint8Array): void {
-    this.engine.setWavetable(waveIndex, waveData);
+    this.engine.setWavetable(waveIndex, waveData, this.platformType);
   }
 
-  /**
-   * Copy uploaded samples into chip's internal memory.
-   * Must be called after setSample() for sample-based chips.
-   */
   renderSamples(): void {
-    this.engine.renderSamples();
+    this.engine.renderSamples(this.platformType);
   }
 
   /**
@@ -718,7 +669,7 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     // Map param names to dispatch commands
     switch (param) {
       case 'volume':
-        this.engine.setVolume(this.currentChannel, value);
+        this.engine.setVolume(this.currentChannel, value, this.platformType);
         break;
       case 'channel':
         this.currentChannel = value;
@@ -726,20 +677,20 @@ export class FurnaceDispatchSynth extends Tone.ToneAudioNode {
     }
   }
 
-  dispose(): this {
+  dispose(): void {
     this._disposed = true;
     this.activeNotes.clear();
-
-    // Disconnect our native gain from the worklet and destination
-    const nativeGain = (this as any)._nativeGain as GainNode | undefined;
-    if (nativeGain) {
-      try { nativeGain.disconnect(); } catch {}
-      (this as any)._nativeGain = null;
+    // Cancel all pending release timeouts
+    for (const timeout of this._releaseTimeouts.values()) {
+      clearTimeout(timeout);
     }
+    this._releaseTimeouts.clear();
+
+    // The _nativeGain is the engine's shared gain node — don't disconnect it
+    // here as other synths may still be using it. The engine manages its lifecycle.
+    (this as any)._nativeGain = null;
 
     // Don't dispose the engine singleton — other synths may use it
-    this.output.dispose();
-    super.dispose();
-    return this;
+    this.output.disconnect();
   }
 }

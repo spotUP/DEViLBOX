@@ -1,6 +1,7 @@
-import * as Tone from 'tone';
 import type { FurnaceConfig } from '../types/instrument';
+import type { DevilboxSynth } from '../types/synth';
 import { DEFAULT_FURNACE } from '../types/instrument';
+import { getDevilboxAudioContext, audioNow, noteToFrequency } from '../utils/audio-context';
 import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceRegisterMapper } from '../lib/import/formats/FurnaceRegisterMapper';
 import { FurnacePitchUtils } from '../lib/import/formats/FurnacePitchUtils';
@@ -11,13 +12,11 @@ import { reportSynthError } from '../stores/useSynthErrorStore';
  * 
  * Uses WASM-based chip emulators for cycle-accurate sound.
  */
-export class FurnaceSynth extends Tone.ToneAudioNode {
+export class FurnaceSynth implements DevilboxSynth {
   readonly name = 'FurnaceSynth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   private chipEngine = FurnaceChipEngine.getInstance();
-  private outputGain: Tone.Gain;
   private config: FurnaceConfig;
   private channelIndex: number = 0;
 
@@ -49,7 +48,6 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   private _volumeOffsetDb = 0; // Volume normalization offset in dB
 
   constructor(config: FurnaceConfig = DEFAULT_FURNACE, channelIndex: number = 0) {
-    super();
     // Deep clone config to allow velocity-based TL modifications
     this.config = {
       ...config,
@@ -58,8 +56,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.channelIndex = channelIndex;
 
     // Output
-    this.outputGain = new Tone.Gain(1);
-    this.output = this.outputGain;
+    this.output = getDevilboxAudioContext().createGain();
 
     // Re-fetch chipEngine to ensure we have the globalThis singleton
     this.chipEngine = FurnaceChipEngine.getInstance();
@@ -126,25 +123,15 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     this.initInProgress = true;
 
     try {
-      // Get the Tone.js context and pass it to the chip engine
-      // The chip engine will handle extracting the native AudioContext
-      const toneContext = Tone.getContext();
+      // Get the native AudioContext
+      const nativeCtx = getDevilboxAudioContext();
 
-      // Check if context is in a usable state
-      if (!toneContext) {
-        this.reportInitError('audio', 'No Tone.js AudioContext available. Audio may not be initialized.');
-        this.initInProgress = false;
-        return;
-      }
-
-      // Wait for Tone.js context to be running (with timeout)
-      const state = (toneContext as any).state || (toneContext as any)._context?.state;
-      if (state !== 'running') {
+      // Wait for context to be running (with timeout)
+      if (nativeCtx.state !== 'running') {
         const started = await Promise.race([
           new Promise<boolean>((resolve) => {
             const checkState = () => {
-              const currentState = (toneContext as any).state || (toneContext as any)._context?.state;
-              if (currentState === 'running') {
+              if (nativeCtx.state === 'running') {
                 resolve(true);
               } else {
                 setTimeout(checkState, 100);
@@ -162,8 +149,8 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         }
       }
 
-      // Initialize chip engine - pass Tone.js context, engine will extract native context
-      await this.chipEngine.init(toneContext);
+      // Initialize chip engine with native AudioContext
+      await this.chipEngine.init(nativeCtx);
 
       // Check if WASM engine is actually available
       if (this.chipEngine.isInitialized()) {
@@ -172,7 +159,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
         // This avoids native→SAC connection issues that cause silent failures.
         // FurnaceSynth controls volume via chipEngine.setOutputGain().
         //
-        // NOTE: This means Tone.js effects/metering on this.outputGain won't receive
+        // NOTE: This means Tone.js effects/metering on this.output won't receive
         // the Furnace audio. For effects support, we'd need a different approach.
         this.useWasmEngine = true;
         // Apply any pending volume normalization offset
@@ -232,7 +219,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
    *   0 = Volume, 1 = Arpeggio, 2 = Duty/Noise, 3 = Wave, 4 = Pitch, 5 = Panning
    *   6 = Phase Reset, 7 = Extra 1, 8 = Extra 2, etc.
    */
-  public processTick(time: number = Tone.now()): void {
+  public processTick(time: number = audioNow()): void {
     if (!this.isNoteOn) return;
 
     // 1. Global Macros (Volume, Arp, Duty, Pitch, Panning)
@@ -246,7 +233,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
       switch (macro.type) {
         case 0: // Volume (0-127) with velocity scaling
           const volGain = Math.max(0, (val / 127) * this.velocity);
-          this.outputGain.gain.setValueAtTime(volGain, time);
+          this.output.gain.setValueAtTime(volGain, time);
           break;
 
         case 1: // Arpeggio (relative semitones)
@@ -1037,17 +1024,17 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
   }
 
   public triggerAttack(note: string, time?: number, velocity?: number): this {
-    const freq = Tone.Frequency(note).toFrequency();
+    const freq = noteToFrequency(note);
     this.activeNoteFreq = freq;
     this.isNoteOn = true;
 
     // Store velocity for macro modulation (0.0 to 1.0)
     this.velocity = velocity !== undefined ? velocity : 1.0;
 
-    const scheduledTime = time || Tone.now();
+    const scheduledTime = time || audioNow();
 
     // Record note on time for minimum gate enforcement
-    this.noteOnTime = Tone.now();
+    this.noteOnTime = audioNow();
 
     // Try to use WASM if available (check even if initInProgress - engine may be pre-initialized)
     if (!this.useWasmEngine) {
@@ -2176,7 +2163,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     }
 
     // Enforce minimum gate time to ensure audio has time to render
-    const now = Tone.now();
+    const now = audioNow();
     const timeSinceNoteOn = now - this.noteOnTime;
     console.log(`[FurnaceSynth] Gate check: now=${now.toFixed(3)}, noteOnTime=${this.noteOnTime.toFixed(3)}, elapsed=${(timeSinceNoteOn * 1000).toFixed(0)}ms, min=${FurnaceSynth.MIN_GATE_TIME * 1000}ms`);
     if (timeSinceNoteOn < FurnaceSynth.MIN_GATE_TIME) {
@@ -2685,9 +2672,7 @@ export class FurnaceSynth extends Tone.ToneAudioNode {
     }
   }
 
-  dispose(): this {
-    this.outputGain.dispose();
-    super.dispose();
-    return this;
+  dispose(): void {
+    this.output.disconnect();
   }
 }
