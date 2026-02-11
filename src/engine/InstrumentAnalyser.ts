@@ -10,6 +10,9 @@
  */
 
 import * as Tone from 'tone';
+import type { DevilboxSynth } from '@typedefs/synth';
+import { isDevilboxSynth } from '@typedefs/synth';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 export class InstrumentAnalyser {
   public input: Tone.Gain;
@@ -124,18 +127,27 @@ export class InstrumentAnalyser {
   /**
    * Connect an instrument to this analyser
    */
-  connectInstrument(instrument: Tone.ToneAudioNode): void {
+  connectInstrument(instrument: Tone.ToneAudioNode | DevilboxSynth): void {
     if (this.disposed) return;
-    instrument.connect(this.input);
+    if (isDevilboxSynth(instrument)) {
+      const nativeInput = getNativeAudioNode(this.input);
+      if (nativeInput) instrument.output.connect(nativeInput);
+    } else {
+      instrument.connect(this.input);
+    }
   }
 
   /**
    * Disconnect an instrument from this analyser
    */
-  disconnectInstrument(instrument: Tone.ToneAudioNode): void {
+  disconnectInstrument(instrument: Tone.ToneAudioNode | DevilboxSynth): void {
     if (this.disposed) return;
     try {
-      instrument.disconnect(this.input);
+      if (isDevilboxSynth(instrument)) {
+        instrument.output.disconnect();
+      } else {
+        instrument.disconnect(this.input);
+      }
     } catch {
       // Ignore disconnect errors
     }

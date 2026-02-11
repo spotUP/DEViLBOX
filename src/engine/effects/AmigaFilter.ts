@@ -11,7 +11,6 @@
  */
 
 import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 
 export class AmigaFilter extends Tone.ToneAudioNode {
   readonly name: string = 'AmigaFilter';
@@ -147,9 +146,10 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       // Wait for module to be loaded
       await loadPromise;
 
-      // Use Tone.js's createAudioWorkletNode for context compatibility
+      // Use native AudioWorkletNode directly (not Tone.js wrapper) since
+      // addModule was called on the native context. Matches DB303/FurnaceChip pattern.
       try {
-        this._worklet = toneCreateAudioWorkletNode(workletContext, 'amiga-filter-processor');
+        this._worklet = new AudioWorkletNode(workletContext, 'amiga-filter-processor');
       } catch (e: any) {
         if (e?.name === 'InvalidStateError') {
           // This usually means the processor name is unknown, meaning addModule failed silently

@@ -12,6 +12,8 @@
 import * as Tone from 'tone';
 import { ALL_SYNTH_TYPES, SYNTH_INFO } from '@constants/synthCategories';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
+import { isDevilboxSynth } from '@typedefs/synth';
+import { getNativeAudioNode } from '@utils/audio-context';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
 
 export interface SynthTestResult {
@@ -92,7 +94,12 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
 
     // Connect to destination with an analyser to detect sound
     const analyser = new Tone.Analyser('waveform', 256);
-    (instrument as any).connect(analyser);
+    if (isDevilboxSynth(instrument)) {
+      const nativeInput = getNativeAudioNode(analyser);
+      if (nativeInput) instrument.output.connect(nativeInput);
+    } else {
+      (instrument as any).connect(analyser);
+    }
     analyser.toDestination();
 
     // Try to trigger a note
@@ -133,7 +140,11 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
     // Cleanup
     await new Promise((resolve) => setTimeout(resolve, 50));
     try {
-      (instrument as any).disconnect();
+      if (isDevilboxSynth(instrument)) {
+        try { instrument.output.disconnect(); } catch {}
+      } else {
+        (instrument as any).disconnect();
+      }
       analyser.disconnect();
       if ('dispose' in instrument && typeof instrument.dispose === 'function') {
         instrument.dispose();
