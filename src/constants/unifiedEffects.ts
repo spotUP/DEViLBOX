@@ -191,6 +191,34 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Filter',
     description: 'Envelope-following wah effect',
   },
+  {
+    category: 'wasm',
+    type: 'MoogFilter',
+    label: 'Moog Filter',
+    group: 'Filter',
+    description: '6 analog-modeled Moog ladder filters (Hyperion, Krajeski, Stilson, Microtracker, Improved, Oberheim) via WASM',
+  },
+  {
+    category: 'wasm',
+    type: 'MVerb',
+    label: 'MVerb Plate',
+    group: 'Reverb & Delay',
+    description: 'MVerb plate reverb — lush algorithmic reverb with damping, density, and early/late reflections (WASM, GPL v3)',
+  },
+  {
+    category: 'wasm',
+    type: 'Leslie',
+    label: 'Leslie Speaker',
+    group: 'Modulation',
+    description: 'Rotary speaker cabinet — crossover, dual-rotor AM/doppler, speed ramping between chorale and tremolo (WASM)',
+  },
+  {
+    category: 'wasm',
+    type: 'SpringReverb',
+    label: 'Spring Reverb',
+    group: 'Reverb & Delay',
+    description: 'Classic dub spring tank — allpass diffusion, comb bank, metallic drip transients, tension control (WASM)',
+  },
 
   // ===== PITCH (Tone.js) =====
   {
@@ -269,10 +297,11 @@ export function searchEffects(query: string): AvailableEffect[] {
 /**
  * Get total effect count
  */
-export function getTotalEffectCount(): { total: number; tonejs: number; neural: number } {
+export function getTotalEffectCount(): { total: number; tonejs: number; neural: number; wasm: number } {
   const tonejs = AVAILABLE_EFFECTS.filter((e) => e.category === 'tonejs').length;
   const neural = AVAILABLE_EFFECTS.filter((e) => e.category === 'neural').length;
-  return { total: tonejs + neural, tonejs, neural };
+  const wasm = AVAILABLE_EFFECTS.filter((e) => e.category === 'wasm').length;
+  return { total: tonejs + neural + wasm, tonejs, neural, wasm };
 }
 
 /**
