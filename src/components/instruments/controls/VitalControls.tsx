@@ -7,7 +7,7 @@
  * Falls back to VSTBridgePanel if synth not yet loaded.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Loader } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -100,19 +100,6 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
       synthRef.current.setParameter(id, value);
     }
   }, []);
-
-  /** Get a param's current value by name, defaulting to its default */
-  const getVal = useCallback((name: string): number => {
-    const p = paramByName.get(name);
-    if (!p) return 0;
-    return paramValues.get(p.id) ?? p.defaultValue;
-  }, [paramByName, paramValues]);
-
-  /** Set a param value by name */
-  const setByName = useCallback((name: string, value: number) => {
-    const p = paramByName.get(name);
-    if (p) setParam(p.id, value);
-  }, [paramByName, setParam]);
 
   /** Render a knob for a named parameter */
   const ParamKnob = useCallback(({ name, label, min, max, fmt, logarithmic, bipolar, size }: {
