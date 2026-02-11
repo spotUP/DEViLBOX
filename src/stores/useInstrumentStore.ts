@@ -569,6 +569,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 return; // Handled
               }
             }
+
+            // Standard Tone.js synths: update in-place instead of recreating
+            const toneJsSynthTypes = ['Synth', 'FMSynth', 'AMSynth', 'MonoSynth', 'DuoSynth', 'PluckSynth',
+              'MembraneSynth', 'MetalSynth', 'NoiseSynth'];
+            if (toneJsSynthTypes.includes(updatedInstrument.synthType) &&
+                (updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.volume !== undefined)) {
+              engine.updateToneJsSynthInPlace(id, updatedInstrument);
+              return; // Handled — no invalidation needed
+            }
           }
         } catch (error) {
           // Fall through to full invalidation if update failed or was skipped
