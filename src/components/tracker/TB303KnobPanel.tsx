@@ -34,10 +34,14 @@ export const TB303KnobPanel: React.FC = memo(() => {
     : instruments.find(i => i.synthType === 'TB303');
 
   // Handle config updates — store update triggers engine.updateTB303Parameters() → synth.applyConfig()
+  // IMPORTANT: Read latest tb303 from store at call time (not from closure) to avoid
+  // stale data when React batches renders — otherwise rapid knob changes clobber each other.
   const handleConfigChange = useCallback((updates: Partial<TB303Config>) => {
     if (!targetInstrument) return;
+    const latest = useInstrumentStore.getState().instruments.find(i => i.id === targetInstrument.id);
+    if (!latest?.tb303) return;
     updateInstrument(targetInstrument.id, {
-      tb303: { ...targetInstrument.tb303, ...updates } as any
+      tb303: { ...latest.tb303, ...updates } as any
     });
   }, [targetInstrument, updateInstrument]);
 

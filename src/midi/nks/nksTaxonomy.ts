@@ -197,8 +197,6 @@ export interface NKSTypeMapping {
 export const SYNTH_TYPE_TO_NKS: Partial<Record<SynthType, NKSTypeMapping>> = {
   // Acid / Bass synths
   TB303:          { type: 'Bass', subType: 'Synth', characters: ['Analog', 'Monophonic'] },
-  DB303:          { type: 'Bass', subType: 'Synth', characters: ['Analog', 'Monophonic'] },
-  Open303:        { type: 'Bass', subType: 'Synth', characters: ['Analog', 'Monophonic'] },
   Buzz3o3DF:      { type: 'Bass', subType: 'Synth', characters: ['Analog', 'Monophonic'] },
 
   // FM synths
@@ -231,7 +229,7 @@ export const SYNTH_TYPE_TO_NKS: Partial<Record<SynthType, NKSTypeMapping>> = {
   Synare:         { type: 'Drums', subType: 'Tom', characters: ['Analog', 'Percussive'] },
   GranularSynth:  { type: 'Synth Misc', subType: 'Sweeps & Swells', characters: ['Granular', 'Evolving'] },
   FormantSynth:   { type: 'Vocal', subType: 'Synth Choir', characters: ['Synthetic', 'Human'] },
-  SAM:            { type: 'Vocal', subType: 'Computer', characters: ['Digital', 'Synthetic'] },
+  Sam:            { type: 'Vocal', subType: 'Computer', characters: ['Digital', 'Synthetic'] },
   PWMSynth:       { type: 'Synth Lead', subType: 'Classic Mono', characters: ['Analog', 'Monophonic'] },
   SuperSaw:       { type: 'Synth Lead', subType: 'Classic Poly', characters: ['Huge', 'Bright'] },
   WobbleBass:     { type: 'Bass', subType: 'Synth', characters: ['Digital', 'Filtered'] },
