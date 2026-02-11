@@ -1483,7 +1483,6 @@ export class ToneEngine {
 
     // Store instrument with composite key (per-channel)
     this.instruments.set(key, instrument);
-    console.log(`[ToneEngine] CREATED instrument key=${key} type=${config.synthType} totalCached=${this.instruments.size}`);
     // Track the synth type for proper release handling
     // Don't overwrite if already set (e.g., Sampler converted to Player)
     if (!this.instrumentSynthTypes.has(key)) {
@@ -1832,21 +1831,6 @@ export class ToneEngine {
       return; // Audio context not ready
     }
 
-    // Diagnostic: trace EVERY note trigger to find double-trigger source
-    const storedType = this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, channelIndex));
-    console.log(`[ToneEngine] triggerNoteAttack: id=${instrumentId} note=${note} type=${storedType || config.synthType} vel=${velocity.toFixed(2)}`);
-    console.trace('[ToneEngine] triggerNoteAttack call stack');
-
-    // Diagnostic: log all instrument instances for this ID
-    const allKeysForId: string[] = [];
-    this.instruments.forEach((_inst, k) => {
-      const [idPart] = k.split('-');
-      if (idPart === String(instrumentId)) allKeysForId.push(k);
-    });
-    if (allKeysForId.length > 1) {
-      console.warn(`[ToneEngine] MULTIPLE instances for instrument ${instrumentId}:`, allKeysForId);
-    }
-
     try {
       // Handle TB-303 with JC303 or DB303 engine (both support accent/slide)
       if (instrument instanceof JC303Synth) {
@@ -2126,7 +2110,6 @@ export class ToneEngine {
     accent: boolean = false,
     slide: boolean = false
   ): void {
-    console.log(`[ToneEngine] triggerPolyNoteAttack ENTRY: id=${instrumentId} note=${note} type=${config.synthType}`);
     // Check if instrument is explicitly marked as monophonic
     if (config.monophonic === true) {
       // Force monophonic: Release any previous notes for this instrument first
@@ -2815,8 +2798,6 @@ export class ToneEngine {
   private disposeInstrumentByKey(key: string): void {
     const instrument = this.instruments.get(key);
     if (instrument) {
-      const wasType = this.instrumentSynthTypes.get(key);
-      console.log(`[ToneEngine] DISPOSING instrument key=${key} type=${wasType} disposed=${instrument.disposed ?? 'N/A'}`);
       // Remove from maps IMMEDIATELY so future triggers don't find it
       this.instruments.delete(key);
       this.instrumentSynthTypes.delete(key);
@@ -2859,20 +2840,9 @@ export class ToneEngine {
       }
     });
 
-    console.log(`[ToneEngine] disposeInstrument(${instrumentId}): found ${keysToRemove.length} keys to remove:`, keysToRemove);
     keysToRemove.forEach((key) => {
       this.disposeInstrumentByKey(key);
     });
-
-    // Verify disposal worked
-    let remaining = 0;
-    this.instruments.forEach((_inst, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) remaining++;
-    });
-    if (remaining > 0) {
-      console.error(`[ToneEngine] BUG: After disposeInstrument(${instrumentId}), ${remaining} entries STILL in cache!`);
-    }
   }
 
   /**

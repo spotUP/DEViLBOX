@@ -261,12 +261,6 @@ export const useMIDIStore = create<MIDIStore>()(
                                          selectedInstrument ||
                                          instrumentStore.instruments[0]; // Fall back to first instrument
 
-                // Calculate frequency for debugging
-                const freq = 440 * Math.pow(2, (transposedNote - 69) / 12);
-                // Diagnostic: show which fallback path was used
-                const routePath = instrumentStore.previewInstrument ? 'preview' :
-                                  selectedInstrument ? 'selected' : 'FALLBACK[0]';
-                console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} -> ${toneNote} (${freq.toFixed(1)} Hz), route=${routePath}, instrument=${targetInstrument?.name || 'NONE'} (id=${targetInstrument?.id}, type=${targetInstrument?.synthType})`);
 
                 if (targetInstrument) {
                   // AUTO-SWITCH BANK: Match knob bank to current synth type
