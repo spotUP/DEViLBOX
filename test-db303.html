@@ -623,16 +623,20 @@
     document.getElementById('initBtn').addEventListener('click', async () => {
       try {
         log('Initializing...', 'warning');
-        
-        const Tone = await import('https://cdn.skypack.dev/tone@14.7.77');
-        await Tone.start();
-        audioContext = Tone.getContext();
+
+        // Create native AudioContext (no Tone.js needed)
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        await audioContext.resume();
         log(`✓ Audio Context @ ${audioContext.sampleRate}Hz`, 'success');
-        
+
+        // Register context so DB303Synth can find it
+        const { setDevilboxAudioContext } = await import('./src/utils/audio-context.ts');
+        setDevilboxAudioContext(audioContext);
+
         const { DB303Synth } = await import('./src/engine/db303/DB303Synth.ts');
         db303Synth = new DB303Synth();
         await db303Synth.ensureInitialized();
-        db303Synth.toDestination();
+        db303Synth.output.connect(audioContext.destination);
         
         log('✓ DB303Synth ready!', 'success');
         

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-10T22:12:40.705Z
+ * Generated: 2026-02-11T00:48:55.462Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '361';
-export const BUILD_HASH = '5f3671a';
-export const BUILD_DATE = '2026-02-10';
+export const BUILD_NUMBER = '365';
+export const BUILD_HASH = '6453a7a';
+export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -31,6 +31,28 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-11',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Update editors, presets, tracker, and DB303 controls"
+      },
+      {
+        type: 'feature',
+        "description": "Improve import/export engine and song parser"
+      },
+      {
+        type: 'feature',
+        "description": "Add WAM host, VST bridge, and JUCE WASM build template"
+      },
+      {
+        type: 'improvement',
+        "description": "Introduce DevilboxSynth interface and decouple synths from Tone.js"
+      }
+    ]
+  },
+  {
+    version: '2026-02-10',
     date: '2026-02-10',
     changes: [
       {
@@ -228,28 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Comprehensive tracker optimization (memoization, jank fixes, and UI smoothing)"
-      }
-    ]
-  },
-  {
-    version: '2026-02-07',
-    date: '2026-02-07',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Chore: update song files with latest format and improvements"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog and Open303 worklet"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve engine systems and pattern handling"
-      },
-      {
-        type: 'improvement',
-        "description": "Consolidate tracker cells into unified FlagCell component"
       }
     ]
   }
