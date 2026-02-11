@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T09:34:56.778Z
+ * Generated: 2026-02-11T09:35:44.031Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '374';
-export const BUILD_HASH = 'e092398';
+export const BUILD_NUMBER = '378';
+export const BUILD_HASH = '88e8932';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Clean up SurgeControls component"
+      },
+      {
+        type: 'fix',
+        "description": "Clean up VitalControls component"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Register Vital, Odin2, and Surge panel components in synth registry"
+      },
       {
         type: 'feature',
         "description": "Test: add swing timing test scripts and XML test patterns"
@@ -234,22 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Expand TB-303 panel dimensions and optimize control spacing"
-      },
-      {
-        type: 'fix',
-        "description": "Optimize FT2 toolbar layout to prevent horizontal overflow"
-      },
-      {
-        type: 'fix',
-        "description": "Correct position and pattern order management in toolbar"
-      },
-      {
-        type: 'improvement',
-        "description": "Fix white dividers in groove settings modal"
-      },
-      {
-        type: 'improvement',
-        "description": "Move groove controls to dedicated settings modal and simplify toolbar"
       }
     ]
   }
