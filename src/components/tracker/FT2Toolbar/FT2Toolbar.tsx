@@ -870,7 +870,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             // Behringer TD-3 / Synthtribe pattern file
             const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
             const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
-            const { patterns, loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
+            const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
             const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
 
             let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
