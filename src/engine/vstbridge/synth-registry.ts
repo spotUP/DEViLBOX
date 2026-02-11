@@ -70,6 +70,7 @@ registerVSTBridge({
   synthClassName: 'VitalSynth',
   moduleFactoryName: 'createVitalModule',
   volumeOffsetDb: 0,
+  panelComponent: 'VitalControls',
   commands: ['loadWavetable', 'loadPreset'],
 });
 
@@ -85,6 +86,7 @@ registerVSTBridge({
   synthClassName: 'Odin2Synth',
   moduleFactoryName: 'createOdin2Module',
   volumeOffsetDb: 0,
+  panelComponent: 'Odin2Controls',
   commands: ['loadPatch'],
 });
 
@@ -100,6 +102,7 @@ registerVSTBridge({
   synthClassName: 'SurgeSynth',
   moduleFactoryName: 'createSurgeModule',
   volumeOffsetDb: 0,
+  panelComponent: 'SurgeControls',
   commands: ['loadPatch', 'loadWavetable'],
 });
 

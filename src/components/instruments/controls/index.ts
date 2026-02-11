@@ -17,3 +17,6 @@ export { DexedControls } from './DexedControls';
 export { OBXdControls } from './OBXdControls';
 export { TonewheelOrganControls } from './TonewheelOrganControls';
 export { MelodicaControls } from './MelodicaControls';
+export { VitalControls } from './VitalControls';
+export { Odin2Controls } from './Odin2Controls';
+export { SurgeControls } from './SurgeControls';
