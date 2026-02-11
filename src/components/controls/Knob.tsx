@@ -3,7 +3,7 @@
  * Supports automation, bipolar mode, logarithmic scaling, touch input, and more
  */
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
 import { useThemeStore } from '@stores';
 
 interface KnobProps {
@@ -67,11 +67,22 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const isDraggingRef = useRef(false);
   const dragStartY = useRef(0);
   const dragStartValue = useRef(0);
   const rafRef = useRef<number | null>(null);
   const pendingValueRef = useRef<number | null>(null);
+  const gradientId = useId();
+  // Stable refs for values needed during drag (avoids stale closures)
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const minRef = useRef(min);
+  minRef.current = min;
+  const maxRef = useRef(max);
+  maxRef.current = max;
+  const logarithmicRef = useRef(logarithmic);
+  logarithmicRef.current = logarithmic;
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -159,16 +170,66 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     return `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endPoint.x} ${endPoint.y}`;
   };
 
-  // Handle mouse/touch down
+  // Handle mouse/touch down — registers global listeners only for this drag session
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (disabled) return;
     e.preventDefault();
     setIsDragging(true);
-    isDraggingRef.current = true;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartY.current = clientY;
     dragStartValue.current = getNormalized();
     document.body.style.cursor = 'ns-resize';
+
+    const handleMouseMove = (ev: MouseEvent | TouchEvent) => {
+      const moveY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
+      const deltaY = dragStartY.current - moveY;
+      const sensitivity = 150;
+      const deltaNorm = deltaY / sensitivity;
+      const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
+
+      let newValue: number;
+      if (logarithmicRef.current) {
+        newValue = linearToLog(newNorm, minRef.current, maxRef.current);
+      } else {
+        newValue = minRef.current + newNorm * (maxRef.current - minRef.current);
+      }
+
+      const currentStep = stepRef.current;
+      if (currentStep !== undefined && currentStep > 0) {
+        newValue = Math.round(newValue / currentStep) * currentStep;
+      } else {
+        newValue = Math.round(newValue * 100) / 100;
+      }
+
+      pendingValueRef.current = newValue;
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          if (pendingValueRef.current !== null) {
+            onChangeRef.current(pendingValueRef.current);
+            pendingValueRef.current = null;
+          }
+          rafRef.current = null;
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleMouseMove, { passive: false });
+    window.addEventListener('touchend', handleMouseUp);
   }, [getNormalized, disabled]);
 
   // Handle double-click to reset
@@ -249,68 +310,14 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     onChange(newValue);
   }, [value, min, max, logarithmic, step, onChange]);
 
-  // Handle mouse/touch move (global)
+  // Cleanup any pending RAF on unmount
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDraggingRef.current) return;
-
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      const deltaY = dragStartY.current - clientY;
-      const sensitivity = 150; // pixels for full range
-      const deltaNorm = deltaY / sensitivity;
-      const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
-
-      let newValue: number;
-      if (logarithmic) {
-        newValue = linearToLog(newNorm, min, max);
-      } else {
-        newValue = min + newNorm * (max - min);
-      }
-
-      // Apply step if specified
-      if (step !== undefined && step > 0) {
-        newValue = Math.round(newValue / step) * step;
-      } else {
-        // No step - use maximum precision for smooth movement
-        newValue = Math.round(newValue * 100) / 100;
-      }
-
-      // Schedule RAF update for smooth rendering
-      pendingValueRef.current = newValue;
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(() => {
-          if (pendingValueRef.current !== null) {
-            onChange(pendingValueRef.current);
-            pendingValueRef.current = null;
-          }
-          rafRef.current = null;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDraggingRef.current) {
-        setIsDragging(false);
-        isDraggingRef.current = false;
-        document.body.style.cursor = '';
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleMouseMove);
-    window.addEventListener('touchend', handleMouseUp);
-
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleMouseMove);
-      window.removeEventListener('touchend', handleMouseUp);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [min, max, logarithmic, step, onChange]);
+  }, []);
 
   // Indicator line position
   const indicatorEnd = polarToCartesian(rotation);
@@ -409,7 +416,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
             cx={center}
             cy={center}
             r={radius - stroke - 4}
-            fill="url(#knobGradient)"
+            fill={`url(#kg-${gradientId})`}
             stroke={knobStrokeColor}
             strokeWidth="1"
           />
@@ -431,7 +438,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 
           {/* Gradient definitions */}
           <defs>
-            <linearGradient id="knobGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient id={`kg-${gradientId}`} x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor={gradientTop} />
               <stop offset="50%" stopColor={gradientMid} />
               <stop offset="100%" stopColor={gradientBot} />
@@ -455,6 +462,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   );
 }, (prevProps, nextProps) => {
   // Custom comparison for optimal memoization
+  // onChange/onChangeRef handled via ref — no need to compare
   return (
     prevProps.value === nextProps.value &&
     prevProps.displayValue === nextProps.displayValue &&
@@ -463,7 +471,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     prevProps.max === nextProps.max &&
     prevProps.label === nextProps.label &&
     prevProps.color === nextProps.color &&
-    prevProps.size === nextProps.size
+    prevProps.size === nextProps.size &&
+    prevProps.disabled === nextProps.disabled
   );
 });
 
