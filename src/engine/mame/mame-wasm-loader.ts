@@ -22,6 +22,7 @@ const workletLoadedMap = new WeakMap<AudioContext, Set<string>>();
  *  - import.meta.url
  *  - ES module export default
  *  - Node.js dynamic import() blocks
+ *  - URL constructor (not available in AudioWorklet global scope)
  *
  * We also expose wasmMemory on the Module object so the worklet can
  * regenerate Float32Array views after WASM memory growth.
@@ -31,7 +32,13 @@ export function preprocessEmscriptenJS(jsCode: string, baseUrl: string): string 
     .replace(/import\.meta\.url/g, `"${baseUrl}"`)
     .replace(/export\s+default\s+\w+;?\s*$/, '')
     .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-    .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+    .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory')
+    // Replace new URL(file, base).href with string concatenation.
+    // AudioWorklet scope does not have the URL constructor. After the
+    // import.meta.url replacement above, these become
+    //   new URL("Chip.wasm", "baseUrl").href
+    // which we convert to simple string concatenation: "baseUrl" + "Chip.wasm"
+    .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
 }
 
 /**
