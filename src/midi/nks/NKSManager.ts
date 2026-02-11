@@ -19,7 +19,9 @@ import type {
   NKSKeyLight,
 } from './types';
 import { parseNKSF, writeNKSF } from './NKSFileFormat';
-import { getNKSParametersForSynth, buildNKSPages, formatNKSValue } from './synthParameterMaps';
+import { getNKSParametersForSynth, buildNKSPages, formatNKSValue, getEngineParam } from './synthParameterMaps';
+import { routeParameterToEngine } from './parameterRouter';
+import { updateNKSDisplay } from './AkaiMIDIProtocol';
 import type { SynthType } from '@typedefs/instrument';
 
 interface NKSStore {
@@ -296,9 +298,15 @@ export const useNKSStore = create<NKSStore>()(
       
       // Update display
       get().updateDisplay();
-      
-      // TODO: Apply parameter change to actual synth engine
-      // This would call into ToneEngine or InstrumentStore
+
+      // Route parameter change to the actual synth engine
+      if (param.engineParam) {
+        routeParameterToEngine(param.engineParam, clampedValue);
+      } else {
+        // Resolve via ENGINE_PARAM_MAP or use param ID as fallback
+        const engineParam = getEngineParam(param);
+        routeParameterToEngine(engineParam, clampedValue);
+      }
     },
 
     // Reset parameter to default
@@ -378,7 +386,8 @@ export const useNKSStore = create<NKSStore>()(
         state.displayInfo = lines;
       });
 
-      // Hardware controller will pick this up and send to device
+      // Push to Akai MPK Mini LCD if available
+      updateNKSDisplay(currentSynthType, currentPage, pages.length, page.parameters.slice(0, 8));
     },
 
     // Light guide control

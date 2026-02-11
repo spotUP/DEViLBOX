@@ -6,6 +6,7 @@
  */
 
 import { useMIDIStore } from '@/stores/useMIDIStore';
+import type { NKSParameter } from './types';
 
 /**
  * Akai SysEx header
@@ -433,6 +434,51 @@ export async function sendMPKTestPattern(): Promise<void> {
   
   const bitmap = createBitmap(pixels);
   await sendMPKOLEDBitmap(bitmap);
+}
+
+/**
+ * Update MPK Mini LCD with NKS2 synth/page/parameter info.
+ * Called by NKSManager.updateDisplay() on page change, instrument switch, or parameter edit.
+ *
+ * Line 1: SynthType [Page N/M]
+ * Line 2: First 4 param names (abbreviated to fit 16 chars)
+ */
+export function updateNKSDisplay(
+  synthType: string,
+  currentPage: number,
+  totalPages: number,
+  pageParams: NKSParameter[],
+): void {
+  // Line 1: synth name + page indicator
+  const pageStr = totalPages > 1 ? ` ${currentPage + 1}/${totalPages}` : '';
+  const maxNameLen = 16 - pageStr.length;
+  const line1 = synthType.substring(0, maxNameLen) + pageStr;
+
+  // Line 2: abbreviated param names (3-4 chars each, space separated)
+  const abbrevs = pageParams.slice(0, 4).map(p => {
+    const name = p.name || p.id;
+    // Common abbreviations
+    return name
+      .replace(/Cutoff/i, 'Cut')
+      .replace(/Resonance/i, 'Res')
+      .replace(/Attack/i, 'Atk')
+      .replace(/Decay/i, 'Dec')
+      .replace(/Sustain/i, 'Sus')
+      .replace(/Release/i, 'Rel')
+      .replace(/Volume/i, 'Vol')
+      .replace(/Feedback/i, 'Fdb')
+      .replace(/Frequency/i, 'Frq')
+      .replace(/Algorithm/i, 'Alg')
+      .replace(/Overdrive/i, 'OD')
+      .replace(/Waveform/i, 'Wav')
+      .substring(0, 4);
+  });
+  const line2 = abbrevs.join(' ');
+
+  // Fire-and-forget LCD update (async but we don't await)
+  sendMPKLCDDisplay(line1, line2).catch(() => {
+    // Silently ignore - no MPK Mini connected is fine
+  });
 }
 
 /**

@@ -6,8 +6,10 @@
 
 import { NKSHIDProtocol, NKS_BUTTONS, isHIDSupported } from './NKSHIDProtocol';
 import { useNKSStore } from './NKSManager';
-import type { NKSControllerInfo, NKSKeyLight } from './types';
+import type { NKSControllerInfo, NKSKeyLight, NKS2SynthProfile, NKS2PDI } from './types';
 import { sendMPKLCDDisplay, syncNKSLightsToPads } from './AkaiMIDIProtocol';
+import { getNKS2Profile } from './synthParameterMaps';
+import type { SynthType } from '@typedefs/instrument';
 
 /**
  * Hardware controller manager
@@ -334,6 +336,165 @@ export class NKSHardwareController {
     // Note: Physical knobs can't be moved by software
     // This would trigger a display update to show current values
     await this.updateDisplay();
+  }
+
+  // ========================================================================
+  // NKS2 Display Modes (Stubs - requires NI hardware to test)
+  // ========================================================================
+
+  /** Current display mode: Performance shows top 8-16 params, Edit shows grouped navigation */
+  private displayMode: 'performance' | 'edit' = 'performance';
+  private editGroupIndex = 0;
+  private nks2Profile: NKS2SynthProfile | null = null;
+
+  /**
+   * Load NKS2 profile for a synth and configure display.
+   * Called when instrument changes.
+   *
+   * On NI hardware (S-Series MK2/MK3):
+   * - Performance mode: 8 knobs = first Performance section, PDI-styled controls
+   * - Edit mode: Navigate through EditGroups with soft buttons
+   * - Display shows parameter names, values with PDI formatting
+   *
+   * On Akai MPK Mini:
+   * - Performance mode only (8 knobs, LCD text)
+   */
+  loadNKS2Profile(synthType: SynthType): void {
+    this.nks2Profile = getNKS2Profile(synthType);
+    this.displayMode = 'performance';
+    this.editGroupIndex = 0;
+
+    if (!this.nks2Profile) return;
+
+    // TODO: When NI hardware connected, send NKS2 display mode init:
+    // - Set knob PDI types (affects how knobs render on NI displays)
+    // - Send parameter names and units for display
+    // - Configure Performance section labels
+    // - For S-Series MK3: render PDI controls on high-res display
+    console.log('[NKS2] Profile loaded for', synthType, '-',
+      this.nks2Profile.parameters.length, 'params,',
+      this.nks2Profile.navigation.performance.length, 'perf sections');
+  }
+
+  /**
+   * Toggle between Performance and Edit display modes.
+   * Performance: shows top 8-16 params (most important)
+   * Edit: shows all params organized in groups (NKS2 EditGroups)
+   *
+   * On NI S-Series: INSTANCE button toggles mode
+   * On Akai: Not applicable (Performance mode only)
+   */
+  toggleDisplayMode(): void {
+    if (!this.nks2Profile?.navigation.editGroups?.length) return;
+
+    this.displayMode = this.displayMode === 'performance' ? 'edit' : 'performance';
+    this.editGroupIndex = 0;
+
+    console.log('[NKS2] Display mode:', this.displayMode);
+    // TODO: Update NI hardware display with mode indicator
+  }
+
+  /**
+   * Navigate between Edit groups (when in Edit mode).
+   * On NI hardware, soft buttons above the display select groups.
+   */
+  navigateEditGroup(direction: 'prev' | 'next'): void {
+    if (this.displayMode !== 'edit' || !this.nks2Profile?.navigation.editGroups) return;
+
+    const groups = this.nks2Profile.navigation.editGroups;
+    if (direction === 'next') {
+      this.editGroupIndex = (this.editGroupIndex + 1) % groups.length;
+    } else {
+      this.editGroupIndex = this.editGroupIndex === 0 ? groups.length - 1 : this.editGroupIndex - 1;
+    }
+
+    console.log('[NKS2] Edit group:', groups[this.editGroupIndex].name);
+    // TODO: Update NI hardware display with group parameters
+  }
+
+  /**
+   * Format a parameter value according to its NKS2 PDI type.
+   * Used for hardware display rendering.
+   *
+   * - continuous: "0.00" to "1.00" (or with unit: "440 Hz")
+   * - continuous_bipolar: "-1.00" to "+1.00" (centered at 0)
+   * - discrete: Display value string from list
+   * - toggle: "ON" / "OFF"
+   */
+  formatNKS2Value(pdi: NKS2PDI, value: number): string {
+    switch (pdi.type) {
+      case 'toggle':
+        return value >= 0.5 ? 'ON' : 'OFF';
+
+      case 'discrete':
+      case 'discrete_bipolar':
+        if (pdi.display_values && pdi.value_count) {
+          const index = Math.round(value * (pdi.value_count - 1));
+          return pdi.display_values[Math.min(index, pdi.display_values.length - 1)] || `${index}`;
+        }
+        return `${Math.round(value * (pdi.value_count || 1))}`;
+
+      case 'continuous_bipolar':
+        return (value * 2 - 1).toFixed(2);
+
+      case 'continuous':
+      default:
+        return value.toFixed(2);
+    }
+  }
+
+  // ========================================================================
+  // Light Guide Integration (Stubs - requires NI keyboard hardware)
+  // ========================================================================
+
+  /**
+   * Set light guide for a key range (e.g., bass synth = lower keys highlighted).
+   * On NI S-Series keyboards, LEDs above each key light up.
+   *
+   * @param lowNote - Lowest MIDI note of the active range
+   * @param highNote - Highest MIDI note of the active range
+   * @param color - NKS light color index (see NKSKeyLight)
+   */
+  setKeyRangeLightGuide(lowNote: number, highNote: number, color = 0x05): void {
+    const lights: NKSKeyLight[] = [];
+
+    for (let note = lowNote; note <= highNote; note++) {
+      lights.push({
+        note,
+        color,
+        brightness: note === lowNote || note === highNote ? 1.0 : 0.5,
+      });
+    }
+
+    const state = useNKSStore.getState();
+    state.setLightGuide(lights);
+
+    // TODO: Send to NI hardware via HID
+    console.log(`[NKS2] Key range light guide: ${lowNote}-${highNote}`);
+  }
+
+  /**
+   * Set light guide for drum pad mapping.
+   * Maps MIDI notes to pad positions with color coding by drum type.
+   * On Akai: maps to RGB pad LEDs via MIDI SysEx
+   * On NI Maschine: maps to pad LEDs via HID
+   */
+  setDrumPadLightGuide(padMap: Array<{ note: number; color: number; name: string }>): void {
+    const lights: NKSKeyLight[] = padMap.map(pad => ({
+      note: pad.note,
+      color: pad.color,
+      brightness: 0.8,
+    }));
+
+    const state = useNKSStore.getState();
+    state.setLightGuide(lights);
+
+    if (this.isAkaiDevice) {
+      syncNKSLightsToPads(lights).catch(() => {});
+    }
+    // TODO: For NI Maschine, send via HID pad LED protocol
+
+    console.log(`[NKS2] Drum pad light guide: ${padMap.length} pads`);
   }
 }
 
