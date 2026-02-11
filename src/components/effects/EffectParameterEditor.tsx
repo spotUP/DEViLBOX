@@ -109,12 +109,20 @@ interface NeuralEffectEditorProps {
 
 function SectionHeader({ color, title }: { color: string; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-4">
-      <div className="w-1 h-4 rounded-full" style={{ backgroundColor: color }} />
-      <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+    <div className="flex items-center gap-2.5 mb-4">
+      <div className="w-1.5 h-5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }} />
+      <h3 className="text-xs font-black text-white/90 uppercase tracking-[0.15em]">{title}</h3>
     </div>
   );
 }
+
+/** Neural pedal enclosure shadow */
+const NEURAL_SHADOW = [
+  '0 6px 16px rgba(0,0,0,0.5)',
+  '0 2px 4px rgba(0,0,0,0.7)',
+  'inset 0 1px 0 rgba(255,255,255,0.06)',
+  'inset 0 -1px 0 rgba(0,0,0,0.4)',
+].join(', ');
 
 const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
   effect,
@@ -133,24 +141,59 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
   const unimplementedParams = parameters.filter(p => p.implemented === false);
 
   return (
-    <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515] rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a] flex items-center justify-between">
+    <div
+      className="synth-editor-container rounded-xl overflow-hidden select-none"
+      style={{
+        background: 'linear-gradient(170deg, #1a0a20 0%, #100618 100%)',
+        border: '2px solid #281430',
+        boxShadow: NEURAL_SHADOW,
+      }}
+    >
+      {/* Pedal Header — glass-like with LED */}
+      <div
+        className="px-5 py-4 flex items-center justify-between"
+        style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)',
+          borderBottom: '1px solid #281430',
+        }}
+      >
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600">
-            <Volume2 size={20} className="text-white" />
+          <div
+            className="p-2 rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.15))',
+              border: '1px solid rgba(168,85,247,0.2)',
+              boxShadow: '0 0 12px rgba(168,85,247,0.1)',
+            }}
+          >
+            <Volume2 size={18} className="text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">{effect.type}</h2>
-            <p className="text-xs text-gray-400">
-              Neural Effect | {effect.enabled ? 'Active' : 'Bypassed'}
-            </p>
+            <h2 className="text-base font-black text-white tracking-wide">{effect.type}</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              {/* LED indicator */}
+              <div
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  backgroundColor: effect.enabled ? '#c084fc' : '#1a0a20',
+                  boxShadow: effect.enabled
+                    ? '0 0 4px 1px rgba(192,132,252,0.5), 0 0 10px 3px rgba(192,132,252,0.15)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                  transition: 'all 0.3s ease',
+                }}
+              />
+              <p className="text-[11px] text-gray-400 font-medium">
+                Neural Effect | {effect.enabled ? 'Active' : 'Bypassed'}
+              </p>
+            </div>
           </div>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
           >
             <X size={16} />
           </button>
@@ -161,7 +204,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
       <div className="p-4 space-y-4">
         {/* Implemented Parameters */}
         {implementedParams.length > 0 && (
-          <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+          <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
             <SectionHeader color="#a855f7" title="Parameters" />
             <div className="flex flex-wrap justify-around gap-4">
               {implementedParams.map((param) => (
@@ -183,10 +226,10 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
         {/* Unimplemented Parameters (show as disabled) */}
         {unimplementedParams.length > 0 && (
-          <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800 opacity-50">
+          <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm opacity-50">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle size={14} className="text-yellow-500" />
-              <h3 className="text-sm font-bold text-yellow-500 uppercase tracking-wide">
+              <h3 className="text-[11px] font-black text-yellow-500/80 uppercase tracking-[0.15em]">
                 Coming Soon
               </h3>
             </div>
@@ -209,7 +252,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         )}
 
         {/* Mix */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
           <SectionHeader color="#ec4899" title="Output" />
           <div className="flex justify-center">
             <Knob
@@ -226,8 +269,8 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         </section>
 
         {/* Info */}
-        <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
-          <p className="text-xs text-gray-400 leading-relaxed">
+        <div className="rounded-lg p-3 border border-white/[0.04] bg-black/20">
+          <p className="text-[11px] text-gray-500 leading-relaxed">
             Neural effects use machine learning models for authentic amp/pedal emulation.
             Changes are applied in real-time.
           </p>

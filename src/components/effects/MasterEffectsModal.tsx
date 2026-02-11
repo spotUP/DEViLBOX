@@ -25,6 +25,7 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import { useAudioStore } from '@stores/useAudioStore';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
+import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 
@@ -508,22 +509,29 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
     id: effect.id,
   });
 
-  const style = {
+  // Neural effects get a purple tint; standard effects use their type color
+  const enc = effect.category === 'neural'
+    ? { bg: '#1a0a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' }
+    : (ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE);
+
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : effect.enabled ? 1 : 0.55,
+    background: `linear-gradient(135deg, ${enc.bg} 0%, ${enc.bgEnd} 100%)`,
+    border: isSelected ? `2px solid ${enc.accent}` : `2px solid ${enc.border}`,
+    boxShadow: isDragging
+      ? `0 8px 24px rgba(0,0,0,0.5), 0 0 0 2px ${enc.accent}`
+      : isSelected
+        ? `0 4px 12px rgba(0,0,0,0.4), 0 0 12px ${enc.accent}20`
+        : '0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`
-        bg-dark-bgSecondary border rounded-lg p-4 mb-3 cursor-pointer transition-all
-        ${isDragging ? 'shadow-lg ring-2 ring-accent-primary' : ''}
-        ${!effect.enabled ? 'opacity-60' : ''}
-        ${isSelected ? 'border-accent-primary bg-accent-primary/5' : 'border-dark-border hover:border-dark-borderLight'}
-      `}
+      className="rounded-xl p-4 mb-3 cursor-pointer transition-all select-none"
       onClick={onSelect}
     >
       <div className="flex items-center gap-3">
@@ -531,11 +539,12 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
         <button
           {...attributes}
           {...listeners}
-          className="text-text-muted hover:text-accent-primary cursor-grab active:cursor-grabbing p-1"
+          className="cursor-grab active:cursor-grabbing p-1 opacity-30 hover:opacity-60 transition-opacity"
+          style={{ color: enc.accent }}
           title="Drag to reorder"
           onClick={(e) => e.stopPropagation()}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <circle cx="4" cy="4" r="1.5" />
             <circle cx="4" cy="8" r="1.5" />
             <circle cx="4" cy="12" r="1.5" />
@@ -545,40 +554,63 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
           </svg>
         </button>
 
+        {/* LED indicator */}
+        <div
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            backgroundColor: effect.enabled ? enc.accent : `${enc.bg}`,
+            boxShadow: effect.enabled
+              ? `0 0 4px 1px ${enc.accent}80, 0 0 10px 3px ${enc.accent}25`
+              : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            transition: 'all 0.3s ease',
+            flexShrink: 0,
+          }}
+        />
+
         {/* Effect Info */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-sm text-text-primary">
+            <span className="font-black text-sm text-white/90 tracking-wide truncate">
               {effect.neuralModelName || effect.type}
             </span>
-            {/* User Decision #4: Visual badges */}
             {effect.category === 'neural' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded text-[10px] text-purple-300">
-                <Cpu size={10} />
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                style={{
+                  background: `${enc.accent}15`,
+                  border: `1px solid ${enc.accent}30`,
+                  color: `${enc.accent}cc`,
+                }}
+              >
+                <Cpu size={8} />
                 Neural
               </span>
             )}
           </div>
-          <div className="text-xs text-text-muted">
-            {effect.enabled ? 'Active' : 'Bypassed'} • Wet: {effect.wet}%
+          <div className="text-[11px] mt-0.5" style={{ color: `${enc.accent}80` }}>
+            {effect.enabled ? 'Active' : 'Bypassed'} | Mix: {effect.wet}%
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {/* Wet/Dry Control */}
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={effect.wet}
-              onChange={(e) => onWetChange(Number(e.target.value))}
-              className="w-20 h-1 bg-dark-bg rounded-lg appearance-none cursor-pointer
-                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-                       [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-primary"
-            />
-          </div>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {/* Wet/Dry slider */}
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={effect.wet}
+            onChange={(e) => onWetChange(Number(e.target.value))}
+            className="w-16 h-1 rounded-lg appearance-none cursor-pointer
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5
+                     [&::-webkit-slider-thumb]:rounded-full"
+            style={{
+              background: `linear-gradient(90deg, ${enc.accent}60 ${effect.wet}%, rgba(255,255,255,0.08) ${effect.wet}%)`,
+              // @ts-expect-error -- webkit slider thumb color via CSS variable
+              '--thumb-color': enc.accent,
+            }}
+          />
 
           {/* Edit Button */}
           <button
@@ -586,10 +618,11 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
               e.stopPropagation();
               onSelect();
             }}
-            className="p-2 rounded text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
+            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: `${enc.accent}70` }}
             title="Edit parameters"
           >
-            <Sliders size={16} />
+            <Sliders size={14} />
           </button>
 
           {/* On/Off Toggle */}
@@ -598,16 +631,11 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
               e.stopPropagation();
               onToggle();
             }}
-            className={`
-              p-2 rounded transition-colors
-              ${effect.enabled
-                ? 'text-accent-success bg-accent-success/10 hover:bg-accent-success/20'
-                : 'text-text-muted hover:text-accent-error hover:bg-accent-error/10'
-              }
-            `}
+            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: effect.enabled ? enc.accent : 'rgba(255,255,255,0.2)' }}
             title={effect.enabled ? 'Disable' : 'Enable'}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
               <line x1="12" y1="2" x2="12" y2="12" />
             </svg>
@@ -619,10 +647,11 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
               e.stopPropagation();
               onRemove();
             }}
-            className="p-2 rounded text-text-muted hover:text-accent-error hover:bg-accent-error/10 transition-colors"
+            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: 'rgba(255,80,80,0.4)' }}
             title="Remove effect"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       </div>
