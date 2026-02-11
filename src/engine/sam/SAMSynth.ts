@@ -1,37 +1,37 @@
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 // @ts-ignore
 import SamJs from './samjs';
 import type { SamConfig } from '@/types/instrument';
 
-export class SAMSynth extends Tone.ToneAudioNode {
+export class SAMSynth implements DevilboxSynth {
   public readonly name: string = 'SAMSynth';
-  public readonly input: undefined = undefined;
-  public readonly output: Tone.Gain;
+  public readonly output: GainNode;
 
-  private _player: Tone.Player;
+  private audioContext: AudioContext;
+  private _sourceNode: AudioBufferSourceNode | null = null;
+  private _playerGain: GainNode;
   private _sam: any;
   private _config: SamConfig;
   private _buffer: AudioBuffer | null = null;
   private _isRendering: boolean = false;
+  private _isPlaying: boolean = false;
   private _ready: boolean = false;
   private _readyPromise: Promise<void>;
   private _readyResolve!: () => void;
-
   private _renderTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: SamConfig) {
-    super();
-    this.output = new Tone.Gain();
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
+    this._playerGain = this.audioContext.createGain();
+    this._playerGain.connect(this.output);
     this._config = { ...config };
-    this._player = new Tone.Player().connect(this.output);
-    this._player.loop = this._config.singmode; // Loop in sing mode for continuous playback
 
-    // Create ready promise for async initialization
     this._readyPromise = new Promise<void>((resolve) => {
       this._readyResolve = resolve;
     });
 
-    // Initialize SAM with current config
     this._sam = new SamJs({
       pitch: this._config.pitch,
       speed: this._config.speed,
@@ -41,13 +41,9 @@ export class SAMSynth extends Tone.ToneAudioNode {
       phonetic: this._config.phonetic
     });
 
-    // Initial render
     this._render();
   }
 
-  /**
-   * Wait for the synth to be ready (initial render complete)
-   */
   public async ready(): Promise<void> {
     return this._readyPromise;
   }
@@ -56,36 +52,51 @@ export class SAMSynth extends Tone.ToneAudioNode {
     return this._readyPromise;
   }
 
+  private _stopSource(): void {
+    if (this._sourceNode) {
+      try { this._sourceNode.stop(); } catch (_e) { /* already stopped */ }
+      this._sourceNode.disconnect();
+      this._sourceNode = null;
+    }
+    this._isPlaying = false;
+  }
+
+  private _startSource(time?: number, offset?: number): void {
+    if (!this._buffer) return;
+    this._stopSource();
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = this._buffer;
+    source.loop = this._config.singmode;
+    source.connect(this._playerGain);
+    source.onended = () => {
+      if (this._sourceNode === source) {
+        this._isPlaying = false;
+        this._sourceNode = null;
+      }
+    };
+    this._sourceNode = source;
+    source.start(time, offset ?? 0);
+    this._isPlaying = true;
+  }
+
   private async _render() {
     if (this._isRendering) return;
     this._isRendering = true;
 
     try {
-      // SAM renders at 22050Hz
       const buf32 = this._sam.buf32(this._config.text, this._config.phonetic);
       if (buf32) {
-        const audioBuf = Tone.getContext().createBuffer(1, buf32.length, 22050);
+        const audioBuf = this.audioContext.createBuffer(1, buf32.length, 22050);
         audioBuf.getChannelData(0).set(buf32);
+
+        const wasPlaying = this._isPlaying;
         this._buffer = audioBuf;
 
-        // Preserve current playback state if possible
-        const wasPlaying = this._player.state === 'started';
-
-        // Dispose previous buffer before creating new one to prevent memory leak
-        if (this._player.buffer) {
-          this._player.buffer.dispose();
-        }
-
-        this._player.buffer = new Tone.ToneAudioBuffer(audioBuf);
         if (wasPlaying && this._config.singmode) {
-          // Stop before starting to prevent double-start error
-          if (this._player.state === 'started') {
-            this._player.stop();
-          }
-          this._player.start();
+          this._startSource();
         }
 
-        // Mark as ready on first successful render
         if (!this._ready) {
           this._ready = true;
           this._readyResolve();
@@ -100,7 +111,7 @@ export class SAMSynth extends Tone.ToneAudioNode {
 
   public applyConfig(config: Partial<SamConfig>) {
     const hasTextChanged = config.text !== undefined && config.text !== this._config.text;
-    const hasParamsChanged = 
+    const hasParamsChanged =
       (config.pitch !== undefined && config.pitch !== this._config.pitch) ||
       (config.speed !== undefined && config.speed !== this._config.speed) ||
       (config.mouth !== undefined && config.mouth !== this._config.mouth) ||
@@ -110,13 +121,11 @@ export class SAMSynth extends Tone.ToneAudioNode {
 
     this._config = { ...this._config, ...config };
 
-    // Update loop mode when singmode changes
-    if (config.singmode !== undefined) {
-      this._player.loop = config.singmode;
+    if (config.singmode !== undefined && this._sourceNode) {
+      this._sourceNode.loop = config.singmode;
     }
 
     if (hasParamsChanged || hasTextChanged) {
-      // Throttled re-render to prevent UI/Audio lag during knob moves
       if (this._renderTimer) clearTimeout(this._renderTimer);
       this._renderTimer = setTimeout(() => {
         this._sam = new SamJs({
@@ -138,53 +147,43 @@ export class SAMSynth extends Tone.ToneAudioNode {
       return;
     }
 
-    // Note tracking: If we are in "Sing Mode", adjust playbackRate and keep playing continuously
-    // MIDI 60 (C4) is our "base" pitch.
     if (this._config.singmode) {
-      const midi = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+      const midi = typeof note === 'string' ? noteToMidi(note) : note;
       const ratio = Math.pow(2, (midi - 60) / 12);
-      this._player.playbackRate = ratio;
 
-      // In sing mode, only start if not already playing (for continuous pitch tracking)
-      if (this._player.state !== 'started') {
-        this._player.start(time, 0);
+      if (this._isPlaying && this._sourceNode) {
+        // Just update pitch — keep playing
+        this._sourceNode.playbackRate.value = ratio;
+      } else {
+        this._startSource(time);
+        if (this._sourceNode) {
+          this._sourceNode.playbackRate.value = ratio;
+        }
       }
-      this._player.volume.value = Tone.gainToDb(velocity);
+      this._playerGain.gain.value = velocity;
     } else {
-      // In normal mode, restart on each note trigger
-      this._player.playbackRate = 1.0;
-      
-      // Stop any current playback before starting new
-      if (this._player.state === 'started') {
-        this._player.stop();
-      }
-      
-      this._player.start(time, 0);
-      this._player.volume.value = Tone.gainToDb(velocity);
+      // Normal mode: restart on each trigger
+      this._startSource(time);
+      this._playerGain.gain.value = velocity;
     }
   }
 
-  public triggerAttackRelease(note: string | number, _duration: Tone.Unit.Time, time?: number, velocity: number = 1) {
+  public triggerAttackRelease(note: string | number, _duration: number | string, time?: number, velocity: number = 1) {
     this.triggerAttack(note, time, velocity);
     // One-shot playback: ignore duration, let buffer play to completion
   }
 
   public triggerRelease() {
-    // One-shot playback usually doesn't need release,
-    // but we could stop it if desired.
-    // this._player.stop();
+    // One-shot playback usually doesn't need release
   }
 
-  public dispose() {
-    // Clear pending render timer to prevent callback on disposed synth
+  public dispose(): void {
     if (this._renderTimer) {
       clearTimeout(this._renderTimer);
       this._renderTimer = null;
     }
-
-    super.dispose();
-    this._player.dispose();
-    this.output.dispose();
-    return this;
+    this._stopSource();
+    this._playerGain.disconnect();
+    this.output.disconnect();
   }
 }

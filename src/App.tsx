@@ -293,7 +293,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, showInstrumentFX, handleUndo, handleRedo, saveProject]);
 
-  const handleUpdateEffectParameter = (key: string, value: number) => {
+  const handleUpdateEffectParameter = (key: string, value: number | string) => {
     if (!editingEffect) return;
     const updatedParams = { ...editingEffect.effect.parameters, [key]: value };
     updateMasterEffect(editingEffect.effect.id, { parameters: updatedParams });

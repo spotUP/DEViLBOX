@@ -40,6 +40,11 @@ import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
+import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from './effects/MoogFilterEffect';
+import { MVerbEffect } from './effects/MVerbEffect';
+import { LeslieEffect } from './effects/LeslieEffect';
+import { SpringReverbEffect } from './effects/SpringReverbEffect';
+import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import type { InstrumentConfig, EffectConfig, SynthType } from '@/types/instrument';
 import { ArpeggioEngine } from './ArpeggioEngine';
@@ -1333,6 +1338,59 @@ export class InstrumentFactory {
         break;
       }
 
+      // WASM effects
+      case 'MoogFilter':
+        node = new MoogFilterEffect({
+          cutoff: Number(config.parameters.cutoff) || 1000,
+          resonance: (Number(config.parameters.resonance) || 10) / 100,  // 0-100 -> 0-1
+          drive: Number(config.parameters.drive) || 1.0,
+          model: Number(config.parameters.model) || MoogFilterModel.Hyperion,
+          filterMode: Number(config.parameters.filterMode) || MoogFilterMode.LP4,
+          wet: wetValue,
+        });
+        break;
+
+      case 'MVerb':
+        node = new MVerbEffect({
+          damping: Number(config.parameters.damping) ?? 0.5,
+          density: Number(config.parameters.density) ?? 0.5,
+          bandwidth: Number(config.parameters.bandwidth) ?? 0.5,
+          decay: Number(config.parameters.decay) ?? 0.7,
+          predelay: Number(config.parameters.predelay) ?? 0.0,
+          size: Number(config.parameters.size) ?? 0.8,
+          gain: Number(config.parameters.gain) ?? 1.0,
+          mix: Number(config.parameters.mix) ?? 0.4,
+          earlyMix: Number(config.parameters.earlyMix) ?? 0.5,
+          wet: wetValue,
+        });
+        break;
+
+      case 'Leslie':
+        node = new LeslieEffect({
+          speed: Number(config.parameters.speed) ?? 0.0,
+          hornRate: Number(config.parameters.hornRate) ?? 6.8,
+          drumRate: Number(config.parameters.drumRate) ?? 5.9,
+          hornDepth: Number(config.parameters.hornDepth) ?? 0.7,
+          drumDepth: Number(config.parameters.drumDepth) ?? 0.5,
+          doppler: Number(config.parameters.doppler) ?? 0.5,
+          width: Number(config.parameters.width) ?? 0.8,
+          acceleration: Number(config.parameters.acceleration) ?? 0.5,
+          wet: wetValue,
+        });
+        break;
+
+      case 'SpringReverb':
+        node = new SpringReverbEffect({
+          decay: Number(config.parameters.decay) ?? 0.6,
+          damping: Number(config.parameters.damping) ?? 0.4,
+          tension: Number(config.parameters.tension) ?? 0.5,
+          mix: Number(config.parameters.mix) ?? 0.35,
+          drip: Number(config.parameters.drip) ?? 0.5,
+          diffusion: Number(config.parameters.diffusion) ?? 0.7,
+          wet: wetValue,
+        });
+        break;
+
       default:
         console.warn(`Unknown effect type: ${config.type}, creating bypass`);
         node = new Tone.Gain(1);
@@ -1340,6 +1398,44 @@ export class InstrumentFactory {
 
     // Attach type metadata for identification in the engine
     (node as any)._fxType = config.type;
+
+    // Apply initial BPM-synced values if sync is enabled
+    if (isEffectBpmSynced(config.parameters)) {
+      const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+      if (syncEntries) {
+        const bpm = Tone.getTransport().bpm.value;
+        const division = getEffectSyncDivision(config.parameters);
+        for (const entry of syncEntries) {
+          const value = computeSyncedValue(bpm, division, entry.unit);
+          // Apply directly via the same pattern as ToneEngine.applyBpmSyncedParam
+          switch (config.type) {
+            case 'Delay':
+            case 'FeedbackDelay':
+              if (entry.param === 'time' && node instanceof Tone.FeedbackDelay) node.delayTime.value = value;
+              break;
+            case 'PingPongDelay':
+              if (entry.param === 'time' && node instanceof Tone.PingPongDelay) node.delayTime.value = value;
+              break;
+            case 'SpaceEcho':
+              if (entry.param === 'rate' && node instanceof SpaceEchoEffect) node.setRate(value);
+              break;
+            case 'SpaceyDelayer':
+              if (entry.param === 'firstTap' && node instanceof SpaceyDelayerEffect) node.setFirstTap(value);
+              break;
+            case 'RETapeEcho':
+              if (entry.param === 'repeatRate' && node instanceof RETapeEchoEffect) node.setRepeatRate(value);
+              break;
+            case 'Chorus':
+              if (entry.param === 'frequency' && node instanceof Tone.Chorus) node.frequency.value = value;
+              break;
+            case 'BiPhase':
+              if (entry.param === 'rateA' && node instanceof BiPhaseEffect) (node as any).rateA = value;
+              break;
+          }
+        }
+      }
+    }
+
     return node;
   }
 

@@ -11,8 +11,8 @@
  * - Ring modulation and pitch modulation between voice pairs
  */
 
-import * as Tone from 'tone';
-import { getNativeAudioNode } from '@utils/audio-context';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 
 // CZ-101 Waveform types
 export const CZWaveform = {
@@ -91,10 +91,10 @@ interface VoiceState {
   envStage: number;
 }
 
-export class CZ101Synth extends Tone.ToneAudioNode {
+export class CZ101Synth implements DevilboxSynth {
   readonly name = 'CZ101Synth';
-  readonly input: undefined = undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private workletNode: AudioWorkletNode | null = null;
   private voices: VoiceState[] = [];
@@ -131,8 +131,8 @@ export class CZ101Synth extends Tone.ToneAudioNode {
   };
 
   constructor() {
-    super();
-    this.output = new Tone.Gain(1);
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
 
     // Initialize 8 voices
     for (let i = 0; i < 8; i++) {
@@ -158,7 +158,7 @@ export class CZ101Synth extends Tone.ToneAudioNode {
   }
 
   private async doInit(): Promise<void> {
-    const ctx = Tone.getContext().rawContext as AudioContext;
+    const ctx = this.audioContext;
 
     if (!ctx.audioWorklet) {
       throw new Error('AudioWorklet not supported');
@@ -180,12 +180,7 @@ export class CZ101Synth extends Tone.ToneAudioNode {
     });
 
     // Connect to output
-    const nativeOutput = getNativeAudioNode(this.output);
-    if (nativeOutput) {
-      this.workletNode.connect(nativeOutput);
-    } else {
-      throw new Error('Could not find native AudioNode for connection');
-    }
+    this.workletNode.connect(this.output);
 
     // CRITICAL: Connect through silent keepalive to destination to force process() calls
     try {
@@ -320,8 +315,8 @@ export class CZ101Synth extends Tone.ToneAudioNode {
   /**
    * Trigger a note on
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): this {
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): void {
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
 
     // Find a free voice
     let voiceIndex = this.voices.findIndex(v => !v.active);
@@ -336,7 +331,7 @@ export class CZ101Synth extends Tone.ToneAudioNode {
     voice.active = true;
     voice.envStage = 0;
 
-    if (!this.workletNode || !this.currentPatch) return this;
+    if (!this.workletNode || !this.currentPatch) return;
 
     // Set pitch
     const pitch = this.midiNoteToPitch(midiNote, this.currentPatch.detune ?? 0);
@@ -377,31 +372,27 @@ export class CZ101Synth extends Tone.ToneAudioNode {
       );
       this.writeReg(UPD933_REG.DCO_STEP + voiceIndex, dcoValue);
     }
-
-    return this;
   }
 
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): this {
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+  triggerRelease(note: string | number, _time?: number): void {
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
 
     // Find the voice playing this note
     const voiceIndex = this.voices.findIndex(v => v.active && v.note === midiNote);
-    if (voiceIndex === -1) return this;
+    if (voiceIndex === -1) return;
 
     const voice = this.voices[voiceIndex];
     voice.active = false;
 
-    if (!this.workletNode || !this.currentPatch) return this;
+    if (!this.workletNode || !this.currentPatch) return;
 
     // Set DCA envelope to release (direction down, target 0)
     const releaseRate = 40; // Default release rate
     const dcaValue = this.encodeDCAStep(1, releaseRate, 0, 0);
     this.writeReg(UPD933_REG.DCA_STEP + voiceIndex, dcaValue);
-
-    return this;
   }
 
   /**
@@ -419,13 +410,12 @@ export class CZ101Synth extends Tone.ToneAudioNode {
     return {};
   }
 
-  dispose(): this {
+  dispose(): void {
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }
 

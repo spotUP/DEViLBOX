@@ -20,13 +20,17 @@ import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
 import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext, getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
+import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
 import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
 import { BiPhaseEffect } from './effects/BiPhaseEffect';
 import { DubFilterEffect } from './effects/DubFilterEffect';
+import { MoogFilterEffect, type MoogFilterModel, type MoogFilterMode } from './effects/MoogFilterEffect';
+import { MVerbEffect } from './effects/MVerbEffect';
+import { LeslieEffect } from './effects/LeslieEffect';
+import { SpringReverbEffect } from './effects/SpringReverbEffect';
+import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { WAMSynth } from './wam/WAMSynth';
@@ -172,6 +176,9 @@ export class ToneEngine {
     effects: Tone.ToneAudioNode[];
     output: Tone.Gain;
   }> = new Map();
+
+  // Per-instrument effect nodes indexed by effectId for real-time parameter updates
+  private instrumentEffectNodes: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }> = new Map();
 
   // Per-instrument analysers for visualization (keyed by instrumentId)
   // Lazy-created: only exists when visualization requests it
@@ -326,10 +333,7 @@ export class ToneEngine {
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running
-    const toneCtx = Tone.getContext() as any;
     const nativeCtx = this._nativeContext!;
-    // rawContext is the standardized-audio-context context (needed for toneCreateAudioWorkletNode)
-    const rawContext = toneCtx.rawContext || toneCtx._context;
     
     if (nativeCtx.state !== 'running') {
       await new Promise<void>((resolve) => {
@@ -375,13 +379,14 @@ export class ToneEngine {
         ToneEngine.itFilterWorkletPromise = (async () => {
           try {
             const baseUrl = import.meta.env.BASE_URL || '/';
-            // Add module to rawContext (standardized-audio-context)
-            await rawContext.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
+            // Add module to native AudioContext (not standardized-audio-context wrapper)
+            // toneCreateAudioWorkletNode throws InvalidStateError with rawContext
+            await nativeCtx.audioWorklet.addModule(`${baseUrl}ITFilter.worklet.js`);
 
             const binary = await fetchDSP();
             if (binary) {
-              // Use rawContext for node creation with Tone.js helper
-              const tempNode = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
+              // Use native AudioWorkletNode directly (matches FurnaceDispatch fix)
+              const tempNode = new AudioWorkletNode(nativeCtx, 'it-filter-processor');
               tempNode.port.postMessage({ type: 'init', wasmBinary: binary });
               tempNode.disconnect();
             }
@@ -658,6 +663,9 @@ export class ToneEngine {
     } else {
       transport.bpm.value = bpm;
     }
+
+    // Update all BPM-synced effects (master + per-instrument)
+    this.updateBpmSyncedEffects(bpm);
   }
 
   /**
@@ -4083,6 +4091,7 @@ export class ToneEngine {
       }
     });
     this.instrumentEffectChains.clear();
+    this.instrumentEffectNodes.clear();
 
     // Dispose all instruments
     this.instruments.forEach((instrument, key) => {
@@ -4136,6 +4145,12 @@ export class ToneEngine {
     // Dispose existing effect chain if any
     const existing = this.instrumentEffectChains.get(key);
     if (existing) {
+      // Clean up per-node registry entries
+      for (const [effectId, entry] of this.instrumentEffectNodes) {
+        if (existing.effects.includes(entry.node)) {
+          this.instrumentEffectNodes.delete(effectId);
+        }
+      }
       existing.effects.forEach((fx) => {
         try {
           fx.disconnect();
@@ -4218,6 +4233,11 @@ export class ToneEngine {
     }
 
     this.instrumentEffectChains.set(key, { effects: effectNodes, output });
+
+    // Register individual effect nodes for real-time parameter updates
+    enabledEffects.forEach((config, i) => {
+      this.instrumentEffectNodes.set(config.id, { node: effectNodes[i], config });
+    });
   }
 
   /**
@@ -4407,6 +4427,27 @@ export class ToneEngine {
   }
 
   /**
+   * Update parameters for a per-instrument effect in real-time
+   */
+  public updateInstrumentEffectParams(effectId: string, config: EffectConfig): void {
+    const effectData = this.instrumentEffectNodes.get(effectId);
+    if (!effectData) return; // Effect not in active chain
+
+    const { node } = effectData;
+    const wetValue = config.wet / 100;
+
+    try {
+      if ('wet' in node && node.wet instanceof Tone.Signal) {
+        node.wet.value = wetValue;
+      }
+      this.applyEffectParameters(node, config);
+      effectData.config = config;
+    } catch (error) {
+      console.error('[ToneEngine] Failed to update instrument effect params:', error);
+    }
+  }
+
+  /**
    * Apply effect-specific parameters to a node
    */
   private applyEffectParameters(node: Tone.ToneAudioNode, config: EffectConfig): void {
@@ -4578,6 +4619,160 @@ export class ToneEngine {
           if (params.gain != null) (node as any).gain = Number(params.gain);
         }
         break;
+
+      case 'MoogFilter':
+        if (node instanceof MoogFilterEffect) {
+          if (params.cutoff != null) node.setCutoff(Number(params.cutoff));
+          if (params.resonance != null) node.setResonance(Number(params.resonance));
+          if (params.drive != null) node.setDrive(Number(params.drive));
+          if (params.model != null) node.setModel(Number(params.model) as MoogFilterModel);
+          if (params.filterMode != null) node.setFilterMode(Number(params.filterMode) as MoogFilterMode);
+        }
+        break;
+
+      case 'MVerb':
+        if (node instanceof MVerbEffect) {
+          if (params.damping != null) node.setDamping(Number(params.damping));
+          if (params.density != null) node.setDensity(Number(params.density));
+          if (params.bandwidth != null) node.setBandwidth(Number(params.bandwidth));
+          if (params.decay != null) node.setDecay(Number(params.decay));
+          if (params.predelay != null) node.setPredelay(Number(params.predelay));
+          if (params.size != null) node.setSize(Number(params.size));
+          if (params.gain != null) node.setGain(Number(params.gain));
+          if (params.mix != null) node.setMix(Number(params.mix));
+          if (params.earlyMix != null) node.setEarlyMix(Number(params.earlyMix));
+        }
+        break;
+
+      case 'Leslie':
+        if (node instanceof LeslieEffect) {
+          if (params.speed != null) node.setSpeed(Number(params.speed));
+          if (params.hornRate != null) node.setHornRate(Number(params.hornRate));
+          if (params.drumRate != null) node.setDrumRate(Number(params.drumRate));
+          if (params.hornDepth != null) node.setHornDepth(Number(params.hornDepth));
+          if (params.drumDepth != null) node.setDrumDepth(Number(params.drumDepth));
+          if (params.doppler != null) node.setDoppler(Number(params.doppler));
+          if (params.mix != null) node.setMix(Number(params.mix));
+          if (params.width != null) node.setWidth(Number(params.width));
+          if (params.acceleration != null) node.setAcceleration(Number(params.acceleration));
+        }
+        break;
+
+      case 'SpringReverb':
+        if (node instanceof SpringReverbEffect) {
+          if (params.decay != null) node.setDecay(Number(params.decay));
+          if (params.damping != null) node.setDamping(Number(params.damping));
+          if (params.tension != null) node.setTension(Number(params.tension));
+          if (params.mix != null) node.setSpringMix(Number(params.mix));
+          if (params.drip != null) node.setDrip(Number(params.drip));
+          if (params.diffusion != null) node.setDiffusion(Number(params.diffusion));
+        }
+        break;
+    }
+  }
+
+  /**
+   * Update all BPM-synced effects (master + per-instrument) when BPM changes.
+   * Recalculates timing values in-place — no chain rebuild needed.
+   */
+  public updateBpmSyncedEffects(bpm: number): void {
+    // 1. Master effects
+    this.masterEffectConfigs.forEach(({ node, config }) => {
+      if (!isEffectBpmSynced(config.parameters)) return;
+      const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+      if (!syncEntries) return;
+      const division = getEffectSyncDivision(config.parameters);
+      for (const entry of syncEntries) {
+        const value = computeSyncedValue(bpm, division, entry.unit);
+        this.applyBpmSyncedParam(node, config.type, entry.param, value);
+      }
+    });
+
+    // 2. Per-instrument effects
+    // Lazy-import to avoid circular: useInstrumentStore -> ToneEngine -> useInstrumentStore
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { useInstrumentStore } = require('../stores/useInstrumentStore');
+      const instruments = useInstrumentStore.getState().instruments;
+
+      this.instrumentEffectChains.forEach((chain, key) => {
+        // key format: "instrumentId-channelIndex" or just instrumentId
+        const instrumentId = typeof key === 'number' ? key : Number(String(key).split('-')[0]);
+        const instrument = instruments.find((inst: any) => inst.id === instrumentId);
+        if (!instrument?.effects) return;
+
+        const enabledEffects = instrument.effects.filter((fx: EffectConfig) => fx.enabled);
+
+        // Match chain nodes to enabled configs by index
+        enabledEffects.forEach((config: EffectConfig, idx: number) => {
+          if (idx >= chain.effects.length) return;
+          if (!isEffectBpmSynced(config.parameters)) return;
+          const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+          if (!syncEntries) return;
+          const division = getEffectSyncDivision(config.parameters);
+          const node = chain.effects[idx];
+          for (const entry of syncEntries) {
+            const value = computeSyncedValue(bpm, division, entry.unit);
+            this.applyBpmSyncedParam(node, config.type, entry.param, value);
+          }
+        });
+      });
+    } catch {
+      // Store not yet initialized — skip instrument sync
+    }
+  }
+
+  /**
+   * Apply a single BPM-synced parameter value to an effect node.
+   * Routes via the correct setter per effect type.
+   */
+  private applyBpmSyncedParam(
+    node: Tone.ToneAudioNode,
+    effectType: string,
+    paramKey: string,
+    value: number,
+  ): void {
+    try {
+      switch (effectType) {
+        case 'Delay':
+        case 'FeedbackDelay':
+          if (paramKey === 'time' && node instanceof Tone.FeedbackDelay) {
+            node.delayTime.rampTo(value, 0.02);
+          }
+          break;
+        case 'PingPongDelay':
+          if (paramKey === 'time' && node instanceof Tone.PingPongDelay) {
+            node.delayTime.rampTo(value, 0.02);
+          }
+          break;
+        case 'SpaceEcho':
+          if (paramKey === 'rate' && node instanceof SpaceEchoEffect) {
+            node.setRate(value);
+          }
+          break;
+        case 'SpaceyDelayer':
+          if (paramKey === 'firstTap' && node instanceof SpaceyDelayerEffect) {
+            node.setFirstTap(value);
+          }
+          break;
+        case 'RETapeEcho':
+          if (paramKey === 'repeatRate' && node instanceof RETapeEchoEffect) {
+            node.setRepeatRate(value);
+          }
+          break;
+        case 'Chorus':
+          if (paramKey === 'frequency' && node instanceof Tone.Chorus) {
+            node.frequency.rampTo(value, 0.02);
+          }
+          break;
+        case 'BiPhase':
+          if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
+            (node as any).rateA = value;
+          }
+          break;
+      }
+    } catch (error) {
+      console.warn('[ToneEngine] Failed to apply BPM-synced param:', effectType, paramKey, error);
     }
   }
 
@@ -4625,10 +4820,9 @@ export class ToneEngine {
     const isIT = config.metadata?.importedFrom === 'IT';
     
     if (isIT && ToneEngine.itFilterWorkletLoaded) {
-      // Get the rawContext from Tone.js (standardized-audio-context)
-      const toneContext = Tone.getContext() as any;
-      const rawContext = toneContext.rawContext || toneContext._context;
-      filter = toneCreateAudioWorkletNode(rawContext, 'it-filter-processor');
+      // Use native AudioWorkletNode directly (matches FurnaceDispatch fix)
+      const nCtx = this._nativeContext!;
+      filter = new AudioWorkletNode(nCtx, 'it-filter-processor');
     } else {
       filter = new Tone.Filter({
         type: 'lowpass',

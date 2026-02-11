@@ -92,7 +92,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
 
     // Connect to destination with an analyser to detect sound
     const analyser = new Tone.Analyser('waveform', 256);
-    instrument.connect(analyser);
+    (instrument as any).connect(analyser);
     analyser.toDestination();
 
     // Try to trigger a note
@@ -101,7 +101,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
         instrument.triggerAttack('C4', Tone.now(), 0.8);
         result.noteOnWorked = true;
       } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-        instrument.triggerAttackRelease('C4', '8n', Tone.now(), 0.8);
+        (instrument as any).triggerAttackRelease('C4', '8n', Tone.now(), 0.8);
         result.noteOnWorked = true;
       }
     } catch (e) {
@@ -133,7 +133,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
     // Cleanup
     await new Promise((resolve) => setTimeout(resolve, 50));
     try {
-      instrument.disconnect();
+      (instrument as any).disconnect();
       analyser.disconnect();
       if ('dispose' in instrument && typeof instrument.dispose === 'function') {
         instrument.dispose();

@@ -14,7 +14,8 @@
  * The ROM data can be extracted from an original MU-2000 unit.
  */
 
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { MAMEEngine, MAMESynthType } from '../MAMEEngine';
 
 // XG/GM2 Voice categories
@@ -101,10 +102,10 @@ export interface MU2000Preset {
   };
 }
 
-export class MU2000Synth extends Tone.ToneAudioNode {
+export class MU2000Synth implements DevilboxSynth {
   readonly name = 'MU2000Synth';
-  readonly input: undefined = undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private mameEngine: MAMEEngine;
   private handle: number = 0;
@@ -118,8 +119,8 @@ export class MU2000Synth extends Tone.ToneAudioNode {
   private static readonly NUM_VOICES = 64;
 
   constructor() {
-    super();
-    this.output = new Tone.Gain(1);
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
     this.mameEngine = MAMEEngine.getInstance();
 
     // Initialize voice states
@@ -246,13 +247,13 @@ export class MU2000Synth extends Tone.ToneAudioNode {
   /**
    * Trigger a note on
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8, channel: number = 0): this {
+  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8, channel: number = 0): void {
     if (!this.isInitialized || !this.romLoaded) {
       console.warn('[MU2000Synth] Not ready (initialized:', this.isInitialized, ', ROM:', this.romLoaded, ')');
-      return this;
+      return;
     }
 
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.allocateVoice(channel);
     const voice = this.voices[voiceIndex];
 
@@ -277,21 +278,19 @@ export class MU2000Synth extends Tone.ToneAudioNode {
     // The SWP30 auto-starts when sample address is written
     this.writeReg(voiceBase + SWP30_REG.ADDRESS_H, 0);
     this.writeReg(voiceBase + SWP30_REG.ADDRESS_L, 0);
-
-    return this;
   }
 
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): this {
-    if (!this.isInitialized) return this;
+  triggerRelease(note: string | number, _time?: number): void {
+    if (!this.isInitialized) return;
 
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
 
     // Find the voice playing this note
     const voiceIndex = this.voices.findIndex(v => v.active && v.note === midiNote);
-    if (voiceIndex === -1) return this;
+    if (voiceIndex === -1) return;
 
     const voice = this.voices[voiceIndex];
     voice.active = false;
@@ -302,8 +301,6 @@ export class MU2000Synth extends Tone.ToneAudioNode {
 
     // For now, just set volume to 0 (proper envelope would use release time)
     this.writeReg(voiceBase + SWP30_REG.VOLUME, 0);
-
-    return this;
   }
 
   /**
@@ -332,13 +329,12 @@ export class MU2000Synth extends Tone.ToneAudioNode {
     };
   }
 
-  dispose(): this {
+  dispose(): void {
     if (this.handle !== 0) {
       this.mameEngine.deleteInstance(this.handle);
       this.handle = 0;
     }
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }
 

@@ -1,12 +1,11 @@
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
-import { getNativeContext } from '@utils/audio-context';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
 
 /**
  * DB303 Parameter Names
  * These map to WASM setters like setCutoff, setResonance, etc.
  * The worklet constructs the setter name by capitalizing the first letter.
- * 
+ *
  * NOTE: Some parameters have special WASM function names (Korg filter params):
  * - diodeCharacter -> setKorgWarmth
  * - duffingAmount -> setKorgStiffness (with sticky-zero transform)
@@ -75,27 +74,19 @@ const DB303Param = {
   OVERSAMPLING_ORDER: 'oversamplingOrder'
 } as const;
 
-export class DB303Synth extends Tone.ToneAudioNode {
+export class DB303Synth implements DevilboxSynth {
   readonly name = 'DB303Synth';
-  readonly input: undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
   // Track which contexts have the worklet module loaded
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
-  // Post-processing effects
-  private overdrive: Tone.WaveShaper;
-  private overdriveGain: Tone.Gain;
+  // Native overdrive nodes — created lazily when amount > 0
+  private overdrive: WaveShaperNode | null = null;
+  private overdriveGain: GainNode | null = null;
   private overdriveAmount: number = 0;
-
-  // Built-in effects
-  private chorus: Tone.Chorus;
-  private phaser: Tone.Phaser;
-  private delay: Tone.FeedbackDelay;
-  private delayFilter: Tone.Filter;  // Tone control for delay
-  private effectsChain: Tone.Gain;   // Chain all effects together
 
   // Compatibility properties
   public config: any = {};
@@ -109,59 +100,14 @@ export class DB303Synth extends Tone.ToneAudioNode {
   private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    super();
     console.log('[DB303Synth] Constructor called');
-    this.audioContext = getNativeContext(this.context);
-    this.output = new Tone.Gain(1);
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
 
     // Create promise that resolves when worklet reports 'ready'
     this._initPromise = new Promise<void>((resolve) => {
       this._resolveInit = resolve;
     });
-
-    // Overdrive setup - bypassed by default for clean signal path
-    this.overdriveGain = new Tone.Gain(1);
-    this.overdrive = new Tone.WaveShaper((x) => {
-      const drive = 1 + this.overdriveAmount * 8;
-      return Math.tanh(x * drive) / Math.tanh(drive);
-    }, 4096);
-
-    // Built-in effects setup - all bypassed by default
-    this.chorus = new Tone.Chorus({
-      frequency: 1.5,
-      delayTime: 3.5,
-      depth: 0.7,
-      wet: 0,  // Start bypassed
-    });
-
-    this.phaser = new Tone.Phaser({
-      frequency: 0.5,
-      octaves: 3,
-      baseFrequency: 350,
-      wet: 0,  // Start bypassed
-    });
-
-    this.delayFilter = new Tone.Filter({
-      type: 'lowpass',
-      frequency: 5000,
-    });
-
-    this.delay = new Tone.FeedbackDelay({
-      delayTime: 0.25,
-      feedback: 0.3,
-      wet: 0,  // Start bypassed
-      maxDelay: 2,  // Max 2 seconds
-    });
-
-    this.effectsChain = new Tone.Gain(1);
-
-    // Signal chain: overdriveGain -> chorus -> phaser -> delay (with filter) -> effectsChain -> output
-    this.overdriveGain.connect(this.chorus);
-    this.chorus.connect(this.phaser);
-    this.phaser.connect(this.delay);
-    this.delay.connect(this.delayFilter);
-    this.delayFilter.connect(this.effectsChain);
-    this.effectsChain.connect(this.output);
 
     this.initialize();
   }
@@ -172,15 +118,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      // Get the TRUE native context from Tone.js - this is the actual browser AudioContext
-      const toneContext = this.context as any;
-      const nativeCtx = toneContext.rawContext || toneContext._context || getNativeContext(this.context);
-
-      if (!nativeCtx) {
-        throw new Error('Could not get native AudioContext');
-      }
-
-      await DB303Synth.ensureInitialized(nativeCtx);
+      await DB303Synth.ensureInitialized(this.audioContext);
       if (this._disposed) return;
       this.createNode();
     } catch (err) {
@@ -248,14 +186,12 @@ export class DB303Synth extends Tone.ToneAudioNode {
   private createNode(): void {
     if (this._disposed) return;
 
-    const toneContext = this.context as any;
-    const rawContext = toneContext.rawContext || toneContext._context;
+    const ctx = this.audioContext;
 
-    // Create worklet using Tone.js's createAudioWorkletNode which uses standardized-audio-context
-    this.workletNode = toneCreateAudioWorkletNode(rawContext, 'db303-processor', {
+    this.workletNode = new AudioWorkletNode(ctx, 'db303-processor', {
       outputChannelCount: [2],
       processorOptions: {
-        sampleRate: rawContext.sampleRate
+        sampleRate: ctx.sampleRate
       }
     });
 
@@ -273,7 +209,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
     this.workletNode.port.postMessage({
       type: 'init',
-      sampleRate: rawContext.sampleRate,
+      sampleRate: ctx.sampleRate,
       wasmBinary: DB303Synth.wasmBinary,
       jsCode: DB303Synth.jsCode
     });
@@ -294,16 +230,15 @@ export class DB303Synth extends Tone.ToneAudioNode {
       this._pendingParams = [];
     }
 
-    // Connect worklet to Tone.js output
-    const targetNode = this.overdriveGain.input as AudioNode;
-    this.workletNode.connect(targetNode);
+    // Connect worklet directly to output (no Tone.js effects in chain)
+    this.workletNode.connect(this.output);
 
     // CRITICAL: Connect through silent keepalive to destination to force process() calls
     try {
-      const keepalive = rawContext.createGain();
+      const keepalive = ctx.createGain();
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
+      keepalive.connect(ctx.destination);
     } catch (_e) { /* keepalive failed */ }
   }
 
@@ -322,7 +257,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
     }
 
     const midiNote = typeof note === 'string'
-      ? Tone.Frequency(note).toMidi()
+      ? noteToMidi(note)
       : Math.round(12 * Math.log2(note / 440) + 69);
 
     // Map accent flag to velocity (DB303 uses high velocity for accent)
@@ -355,8 +290,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // Pass slide flag to worklet for proper 303 slide behavior
     // When slide=true: worklet keeps previous note held → DB303 slideToNote (legato)
     // When slide=false: worklet releases previous note first → DB303 triggerNote (retrigger)
-    // Use Tone.now() as fallback to ensure consistent queuing with gateOff
-    const safeTime = _time ?? Tone.now();
+    const safeTime = _time ?? audioNow();
     this.workletNode.port.postMessage({
       type: 'noteOn',
       time: safeTime, // Always pass time for consistent queuing
@@ -378,9 +312,9 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   triggerRelease(time?: number): void {
     if (!this.workletNode || this._disposed) return;
-    
-    const safeTime = time ?? Tone.now();
-    
+
+    const safeTime = time ?? audioNow();
+
     // Send gateOff to release the VCA envelope with hardware-accurate 16ms release.
     // Real TB-303: gate LOW → 8ms hold + 8ms linear decay → silence.
     // This creates the characteristic staccato between non-slide notes.
@@ -405,7 +339,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
    */
   noteOn(midiNote: number, velocity: number, accent: boolean, slide: boolean): void {
     // Convert MIDI note number to frequency for triggerAttack
-    const freq = Tone.Frequency(midiNote, 'midi').toFrequency();
+    const freq = noteToFrequency(midiNote);
     this.triggerAttack(freq, undefined, velocity / 127, accent, slide, false);
   }
 
@@ -415,15 +349,15 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   triggerAttackRelease(note: string | number, duration: string | number, time?: number, velocity?: number, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (this._disposed) return;
-    
-    const safeTime = time ?? Tone.now();
+
+    const safeTime = time ?? audioNow();
     this.triggerAttack(note, safeTime, velocity || 1, accent, slide, hammer);
 
-    const d = Tone.Time(duration).toSeconds();
-    
+    const d = timeToSeconds(duration);
+
     // Calculate precise delay relative to NOW to account for lookahead
-    const delayMs = (safeTime + d - Tone.now()) * 1000;
-    
+    const delayMs = (safeTime + d - audioNow()) * 1000;
+
     if (this._releaseTimeout !== null) {
       clearTimeout(this._releaseTimeout);
     }
@@ -785,10 +719,6 @@ export class DB303Synth extends Tone.ToneAudioNode {
   setChorusMode(mode: number): void {
     // 0-4 chorus mode (0=Off, 1=Subtle, 2=Standard, 3=Rich, 4=Dramatic)
     this.setParameterByName(DB303Param.CHORUS_MODE, mode);
-    // When mode is 0 (Off), bypass the Tone.js chorus effect
-    if (mode === 0) {
-      this.chorus.wet.value = 0;
-    }
   }
 
   setOversamplingOrder(order: number): void {
@@ -813,98 +743,51 @@ export class DB303Synth extends Tone.ToneAudioNode {
     this.setParameterByName(DB303Param.SUB_OSC_BLEND, value);
   }
 
-  // Built-in effects setters (sending normalized 0-1 to WASM if supported, or using Tone.js)
+  // Built-in effects setters — WASM-only, no Tone.js duplication
 
   setChorusMix(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.CHORUS_MIX, clamped);
-    this.chorus.wet.value = clamped;
   }
 
   setPhaserRate(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.PHASER_RATE, clamped);
-    const targetFreq = 0.1 + clamped * 9.9;
-    try {
-      this.phaser.frequency.exponentialRampToValueAtTime(
-        Math.max(0.01, targetFreq),
-        this.context.currentTime + 0.1
-      );
-    } catch {
-      this.phaser.frequency.value = Math.max(0.01, targetFreq);
-    }
   }
 
   setPhaserWidth(value: number): void {
-    // Clamp to 0-1 range to prevent overflow
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.PHASER_WIDTH, clamped);
-    this.phaser.octaves = 1 + clamped * 4;
   }
 
   setPhaserFeedback(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.PHASER_FEEDBACK, clamped);
-    const targetQ = clamped * 20;
-    try {
-      this.phaser.Q.linearRampToValueAtTime(
-        Math.min(30, targetQ),
-        this.context.currentTime + 0.1
-      );
-    } catch {
-      this.phaser.Q.value = Math.min(30, targetQ);
-    }
   }
 
   setPhaserMix(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.PHASER_MIX, clamped);
-    this.phaser.wet.value = clamped;
   }
 
   setDelayTime(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_TIME, clamped);
-    // db303 delay time range: 0.1 to 2 seconds (beat-sync friendly)
-    // Map 0-1 input to 0.1-2 seconds
-    const DELAY_MIN = 0.1;
-    const DELAY_MAX = 2;
-    const targetTime = DELAY_MIN + clamped * (DELAY_MAX - DELAY_MIN);
-    try {
-      this.delay.delayTime.linearRampToValueAtTime(
-        targetTime,
-        this.context.currentTime + 0.1
-      );
-    } catch {
-      this.delay.delayTime.value = targetTime;
-    }
   }
 
   setDelayFeedback(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_FEEDBACK, clamped);
-    this.delay.feedback.value = clamped * 0.95;
   }
 
   setDelayTone(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_TONE, clamped);
-    const targetFreq = 200 + clamped * 7800;
-    // Use exponentialRampToValueAtTime for smooth filter changes (100ms for stability)
-    try {
-      this.delayFilter.frequency.exponentialRampToValueAtTime(
-        Math.max(20, targetFreq),
-        this.context.currentTime + 0.1
-      );
-    } catch {
-      this.delayFilter.frequency.value = Math.max(20, targetFreq);
-    }
   }
 
   setDelayMix(value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DELAY_MIX, clamped);
-    this.delay.wet.value = clamped;
   }
 
   setDelaySpread(value: number): void {
@@ -913,10 +796,20 @@ export class DB303Synth extends Tone.ToneAudioNode {
 
   // --- Missing methods for compatibility ---
   setOverdrive(amount: number): void {
-    if (this._disposed) return;
+    if (this._disposed || !this.workletNode) return;
     this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
 
+    const now = this.audioContext.currentTime;
+    const RAMP = 0.03; // 30ms smooth transition
+
     if (this.overdriveAmount > 0) {
+      // Lazy-create native overdrive nodes
+      if (!this.overdrive || !this.overdriveGain) {
+        this.overdriveGain = this.audioContext.createGain();
+        this.overdrive = this.audioContext.createWaveShaper();
+      }
+
+      // Generate tanh distortion curve
       const curve = new Float32Array(4096);
       const drive = 1 + this.overdriveAmount * 8;
       for (let i = 0; i < 4096; i++) {
@@ -924,40 +817,41 @@ export class DB303Synth extends Tone.ToneAudioNode {
         curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
       }
       this.overdrive.curve = curve;
-      this.overdriveGain.gain.linearRampTo(1 + this.overdriveAmount * 2, 0.03);
+      this.overdriveGain.gain.linearRampToValueAtTime(1 + this.overdriveAmount * 2, now + RAMP);
 
-      // Route through waveshaper if switching from bypass
-      if (this.overdriveGain.numberOfOutputs > 0) {
-        try {
-          this.overdriveGain.disconnect(this.chorus);
-          this.overdriveGain.connect(this.overdrive);
-          this.overdrive.connect(this.chorus);
-        } catch (_e) {}
-      }
-    } else {
-      // Bypass waveshaper for clean signal
+      // Rewire: worklet → overdriveGain → overdrive → output
       try {
-        this.overdrive.disconnect(this.chorus);
-        this.overdriveGain.disconnect(this.overdrive);
-        this.overdriveGain.connect(this.chorus);
-        this.overdriveGain.gain.linearRampTo(1, 0.03);
-      } catch (_e) {}
+        this.workletNode.disconnect(this.output);
+      } catch (_e) { /* not connected */ }
+      try {
+        this.workletNode.connect(this.overdriveGain);
+        this.overdriveGain.connect(this.overdrive);
+        this.overdrive.connect(this.output);
+      } catch (_e) { /* already connected */ }
+    } else {
+      // Bypass: worklet → output (direct)
+      if (this.overdrive && this.overdriveGain) {
+        try {
+          this.workletNode.disconnect(this.overdriveGain);
+          this.overdriveGain.disconnect(this.overdrive);
+          this.overdrive.disconnect(this.output);
+        } catch (_e) { /* not connected */ }
+        this.overdriveGain.gain.linearRampToValueAtTime(1, now + RAMP);
+      }
+      try {
+        this.workletNode.connect(this.output);
+      } catch (_e) { /* already connected */ }
     }
   }
 
   setVegDecay(_ms: number): void {
     // VEG (Volume Envelope Generator) decay - convert to ms (16-3000ms)
     // NOTE: This WASM doesn't have ampDecay/VegDecay - amplitude uses filter envelope
-    // const clamped = Math.max(16, Math.min(3000, ms));
-    // this.setParameterByName('ampDecay', clamped);
   }
 
   setVegSustain(_percent: number): void {
     // VEG sustain - convert percent to dB (0-100% = -60 to 0dB)
     // NOTE: This WASM doesn't have ampSustain/VegSustain - amplitude uses filter envelope
-    // const clamped = Math.max(0, Math.min(100, percent));
-    // const db = clamped === 0 ? -60 : this.linToLin(clamped, 0, 100, -60.0, 0.0);
-    // this.setParameterByName('ampSustain', db);
   }
 
   setFilterFM(percent: number): void {
@@ -1004,30 +898,27 @@ export class DB303Synth extends Tone.ToneAudioNode {
     // Always enabled in db303
   }
 
-  // Enable/disable methods for effects
+  // Enable/disable methods for effects — WASM-only
   setChorusEnabled(enabled: boolean): void {
-    // Toggle chorus wet to enable/disable
     if (!enabled) {
-      this.chorus.wet.value = 0;
+      this.setParameterByName(DB303Param.CHORUS_MIX, 0);
     }
   }
 
   setPhaserEnabled(enabled: boolean): void {
-    // Toggle phaser wet to enable/disable
     if (!enabled) {
-      this.phaser.wet.value = 0;
+      this.setParameterByName(DB303Param.PHASER_MIX, 0);
     }
   }
 
   setPhaserDepth(value: number): void {
-    // Map to phaser octaves (like setPhaserWidth)
-    this.phaser.octaves = 1 + value * 4;
+    // Map to WASM phaser width
+    this.setParameterByName(DB303Param.PHASER_WIDTH, value);
   }
 
   setDelayEnabled(enabled: boolean): void {
-    // Toggle delay wet to enable/disable
     if (!enabled) {
-      this.delay.wet.value = 0;
+      this.setParameterByName(DB303Param.DELAY_MIX, 0);
     }
   }
 
@@ -1038,7 +929,7 @@ export class DB303Synth extends Tone.ToneAudioNode {
   enableDevilFish(_enabled: boolean): void {}
   setHighResonance(_enabled: boolean): void {}
 
-  dispose(): this {
+  dispose(): void {
     this._disposed = true;
     if (this._releaseTimeout !== null) {
       clearTimeout(this._releaseTimeout);
@@ -1048,16 +939,15 @@ export class DB303Synth extends Tone.ToneAudioNode {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
-    this.overdriveGain.dispose();
-    this.overdrive.dispose();
-    this.chorus.dispose();
-    this.phaser.dispose();
-    this.delay.dispose();
-    this.delayFilter.dispose();
-    this.effectsChain.dispose();
-    this.output.dispose();
-    super.dispose();
-    return this;
+    if (this.overdrive) {
+      this.overdrive.disconnect();
+      this.overdrive = null;
+    }
+    if (this.overdriveGain) {
+      this.overdriveGain.disconnect();
+      this.overdriveGain = null;
+    }
+    this.output.disconnect();
   }
 }
 
