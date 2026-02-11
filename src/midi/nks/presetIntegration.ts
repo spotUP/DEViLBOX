@@ -314,7 +314,7 @@ function inferSynthTypeFromMetadata(metadata: NKSPresetMetadata): SynthType | nu
   if (combined.includes('surge')) return 'Surge';
   if (combined.includes('tonewheel') || combined.includes('organ')) return 'TonewheelOrgan';
   if (combined.includes('melodica')) return 'Melodica';
-  if (combined.includes('sam') && combined.includes('speech')) return 'SAM';
+  if (combined.includes('sam') && combined.includes('speech')) return 'Sam';
   if (combined.includes('supersaw')) return 'SuperSaw';
   if (combined.includes('wobble')) return 'WobbleBass';
   if (combined.includes('string machine')) return 'StringMachine';

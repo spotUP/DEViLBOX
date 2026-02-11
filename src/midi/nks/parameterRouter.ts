@@ -11,7 +11,6 @@
 
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { getToneEngine } from '../../engine/ToneEngine';
-import type { SynthType } from '@typedefs/instrument';
 import type { MappableParameter } from '../types';
 
 // ============================================================================

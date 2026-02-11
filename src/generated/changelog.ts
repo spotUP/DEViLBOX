@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T17:57:04.536Z
+ * Generated: 2026-02-11T19:40:07.763Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '392';
-export const BUILD_HASH = 'a8322a5';
+export const BUILD_NUMBER = '399';
+export const BUILD_HASH = '2d2ad1f';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement NKS2 specification with unified parameter routing"
+      },
+      {
+        type: 'fix',
+        "description": "Center WAM plugin GUI in container"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: update changelog, add 303 synthesis tips, update project docs"
+      },
+      {
+        type: 'feature',
+        "description": "Detect effect plugins and add internal tone generator"
+      },
+      {
+        type: 'feature',
+        "description": "Add filter scope visualization and quick tips to JC303 panel"
+      },
+      {
+        type: 'improvement',
+        "description": "Normalize all parameters to 0-1, add set() and applyConfig() API"
+      },
+      {
+        type: 'feature',
+        "description": "Register Open303 and OB-Xd, fix Dexed init voice, harden VSTBridge worklet"
+      },
       {
         type: 'improvement',
         "description": "Ci: build Electron desktop apps on every deploy"
@@ -212,34 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Update changelog and minor UI refinements"
-      },
-      {
-        type: 'improvement',
-        "description": "303 UI improvements: full-width responsive layout with collapsible sections"
-      },
-      {
-        type: 'fix',
-        "description": "Rebrand file formats: .dbx for songs, .dbi for instruments + fix speech synth singing modes"
-      },
-      {
-        type: 'improvement',
-        "description": "Optimize engine and shared control components"
-      },
-      {
-        type: 'improvement',
-        "description": "Optimize effect and specialty synth controls"
-      },
-      {
-        type: 'improvement',
-        "description": "Add refs to high-complexity synth controls"
-      },
-      {
-        type: 'improvement',
-        "description": "Prevent knob handler re-creation with refs"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate stale state bug preventing first drag response"
       }
     ]
   }
