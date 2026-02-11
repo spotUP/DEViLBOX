@@ -19,12 +19,11 @@ Complete implementation of Native Instruments' NKS specification for DEViLBOX.
    - plugin.json generator
    - File import/export utilities
 
-3. **`parameterMap.ts`** - Parameter organization
-   - TB-303 parameter definitions (16+ params)
-   - Organized into 2 pages (Main + Effects)
-   - CC mapping included
-   - Value formatting helpers
-   - Page builder utilities
+3. **`synthParameterMaps.ts`** - Parameter maps for ALL synths
+   - NKS parameter definitions for 170+ synth types
+   - Organized into pages (8 params per page)
+   - CC mapping, value formatting, NKS2 PDI inference
+   - NKS2 profile builder and engine param routing map
 
 4. **`NKSManager.ts`** - Central NKS manager (Zustand store)
    - Preset management (load/save/export)
@@ -204,7 +203,7 @@ NKSF                    # Magic header (4 bytes)
 ### ✅ Phase 1: File Format & State Management (COMPLETE)
 - NKS type definitions (`types.ts`)
 - .nksf file parser/writer (`NKSFileFormat.ts`)
-- TB-303 parameter mapping (`parameterMap.ts`)
+- Synth parameter mapping (`synthParameterMaps.ts`)
 - Zustand state management (`NKSManager.ts`)
 - Preset import/export functionality
 

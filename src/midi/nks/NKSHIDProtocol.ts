@@ -21,8 +21,10 @@ export const AKAI_VENDOR_ID = 0x09E8;   // Akai Professional
 export const ARTURIA_VENDOR_ID = 0x1C75; // Arturia
 export const NEKTAR_VENDOR_ID = 0x1FC9;  // Nektar Technology
 export const M_AUDIO_VENDOR_ID = 0x0763; // M-Audio (Avid)
-export const STUDIOLOGIC_VENDOR_ID = 0x1C75; // Studiologic
-export const ICON_VENDOR_ID = 0x1FC9;   // iCON
+// TODO: Verify real USB vendor IDs with hardware - these are placeholders
+// that currently duplicate Arturia/Nektar IDs and will cause wrong vendor name detection
+export const STUDIOLOGIC_VENDOR_ID = 0x1C75; // Placeholder - same as Arturia, needs real Studiologic/Fatar VID
+export const ICON_VENDOR_ID = 0x1FC9;   // Placeholder - same as Nektar, needs real iCON VID
 export const ALESIS_VENDOR_ID = 0x000F;  // Alesis
 
 /**

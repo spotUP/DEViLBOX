@@ -6,7 +6,7 @@
 
 import { NKSHIDProtocol, NKS_BUTTONS, isHIDSupported } from './NKSHIDProtocol';
 import { useNKSStore } from './NKSManager';
-import type { NKSControllerInfo, NKSKeyLight, NKS2SynthProfile, NKS2PDI } from './types';
+import type { NKSControllerInfo, NKSKeyLight, NKSLightGuideColor, NKS2SynthProfile, NKS2PDI } from './types';
 import { sendMPKLCDDisplay, syncNKSLightsToPads } from './AkaiMIDIProtocol';
 import { getNKS2Profile } from './synthParameterMaps';
 import type { SynthType } from '@typedefs/instrument';
@@ -455,7 +455,7 @@ export class NKSHardwareController {
    * @param highNote - Highest MIDI note of the active range
    * @param color - NKS light color index (see NKSKeyLight)
    */
-  setKeyRangeLightGuide(lowNote: number, highNote: number, color = 0x05): void {
+  setKeyRangeLightGuide(lowNote: number, highNote: number, color: NKSLightGuideColor = 0x05): void {
     const lights: NKSKeyLight[] = [];
 
     for (let note = lowNote; note <= highNote; note++) {
@@ -479,7 +479,7 @@ export class NKSHardwareController {
    * On Akai: maps to RGB pad LEDs via MIDI SysEx
    * On NI Maschine: maps to pad LEDs via HID
    */
-  setDrumPadLightGuide(padMap: Array<{ note: number; color: number; name: string }>): void {
+  setDrumPadLightGuide(padMap: Array<{ note: number; color: NKSLightGuideColor; name: string }>): void {
     const lights: NKSKeyLight[] = padMap.map(pad => ({
       note: pad.note,
       color: pad.color,
