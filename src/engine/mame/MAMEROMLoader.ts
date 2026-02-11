@@ -95,10 +95,10 @@ export const SP0250_ROM_CONFIG: ChipROMConfig = {
  */
 export const TMS5220_ROM_CONFIG: ChipROMConfig = {
   chipName: 'TMS5220',
-  basePath: '/roms/tms5220',
-  zipFile: 'tms5220.zip',
+  basePath: '/roms/snspell',
   files: [
-    { name: 'tms5220.vsm', offset: 0, required: true },
+    { name: 'tmc0351n2l.vsm', offset: 0, size: 16384, required: true },
+    { name: 'tmc0352n2l.vsm', offset: 16384, size: 16384, required: true },
   ],
 };
 

@@ -1,5 +1,8 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
+import { type MEA8000Frame, phonemesToMEA8000Frames } from '@engine/speech/mea8000PhonemeMap';
 
 /**
  * MEA8000 Parameter IDs (matching C++ enum)
@@ -75,6 +78,8 @@ export class MEA8000Synth extends MAMEBaseSynth {
   protected readonly chipName = 'MEA8000';
   protected readonly workletFile = 'MEA8000.worklet.js';
   protected readonly processorName = 'mea8000-processor';
+
+  private _speechSequencer: SpeechSequencer<MEA8000Frame> | null = null;
 
   constructor() {
     super();
@@ -163,6 +168,50 @@ export class MEA8000Synth extends MAMEBaseSynth {
   writeRegister(offset: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  // ===========================================================================
+  // Text-to-Speech
+  // ===========================================================================
+
+  /** Speak English text using SAM's reciter and MEA8000 formant mapping */
+  speakText(text: string): void {
+    this.stopSpeaking();
+
+    const phonemeStr = textToPhonemes(text);
+    if (!phonemeStr) return;
+
+    const tokens = parsePhonemeString(phonemeStr);
+    const frames = phonemesToMEA8000Frames(tokens);
+    if (frames.length === 0) return;
+
+    const speechFrames: SpeechFrame<MEA8000Frame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
+
+    this._speechSequencer = new SpeechSequencer<MEA8000Frame>(
+      (frame) => {
+        this.setFormants(frame.f1, frame.f2, frame.f3);
+        this.setNoiseMode(frame.noise);
+        this.setBandwidth(frame.bw);
+      },
+      () => { this._speechSequencer = null; }
+    );
+    this._speechSequencer.speak(speechFrames);
+  }
+
+  /** Stop current text-to-speech playback */
+  stopSpeaking(): void {
+    if (this._speechSequencer) {
+      this._speechSequencer.stop();
+      this._speechSequencer = null;
+    }
+  }
+
+  /** Whether text-to-speech is currently playing */
+  get isSpeaking(): boolean {
+    return this._speechSequencer?.isSpeaking ?? false;
   }
 
   // ===========================================================================

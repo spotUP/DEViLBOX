@@ -14,8 +14,14 @@ import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
-import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth } from '../midi/knobBanks';
+import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount } from '../midi/knobBanks';
+import type { KnobAssignment } from '../midi/knobBanks';
 import { routeParameterToEngine } from '../midi/nks/parameterRouter';
+import { updateNKSDisplay } from '../midi/nks/AkaiMIDIProtocol';
+import type { NKSParameter } from '../midi/nks/types';
+
+// Guard against double handler registration (e.g., React StrictMode or HMR)
+let midiNoteHandlerRegistered = false;
 
 interface MIDIStore {
   // Status
@@ -41,6 +47,12 @@ interface MIDIStore {
   controlledInstrumentId: number | null;  // Which instrument the knobs control (null = all TB303)
   knobBank: KnobBankMode;
   padBank: 'A' | 'B';
+
+  // NKS2 Knob Paging
+  nksKnobAssignments: KnobAssignment[];  // Current 8 knob mappings (active page)
+  nksKnobPage: number;                    // Current page (0-indexed)
+  nksKnobTotalPages: number;              // Total pages for current synth
+  nksActiveSynthType: string | null;       // Synth type currently driving knobs
 
   // MIDI Note Transpose
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
@@ -81,6 +93,12 @@ interface MIDIStore {
   setKnobBank: (bank: KnobBankMode) => void;
   togglePadBank: () => void;
   setPadBank: (bank: 'A' | 'B') => void;
+
+  // NKS2 Knob Paging actions
+  syncKnobsToSynth: (synthType: string) => void;
+  nextKnobPage: () => void;
+  prevKnobPage: () => void;
+  setKnobPage: (page: number) => void;
 
   // MIDI Output - send CC to external hardware (e.g., TD-3-MO)
   sendCC: (cc: number, value: number, channel?: number) => void;
@@ -160,6 +178,10 @@ export const useMIDIStore = create<MIDIStore>()(
       controlledInstrumentId: null,  // null = control all TB303 instruments
             knobBank: '303',
             padBank: 'A',
+            nksKnobAssignments: [],
+            nksKnobPage: 0,
+            nksKnobTotalPages: 0,
+            nksActiveSynthType: null,
             midiOctaveOffset: 0,
         // Default: no octave transpose
       showPatternDialog: false,
@@ -186,7 +208,14 @@ export const useMIDIStore = create<MIDIStore>()(
           const success = await manager.init();
 
           if (success) {
-            console.log('[useMIDIStore] MIDI initialized successfully, adding message handler');
+            // Guard: only register the note/CC handler ONCE
+            if (midiNoteHandlerRegistered) {
+              console.warn('[useMIDIStore] MIDI handler already registered — skipping duplicate registration');
+            }
+
+            if (!midiNoteHandlerRegistered) {
+              midiNoteHandlerRegistered = true;
+              console.log('[useMIDIStore] MIDI initialized successfully, adding message handler');
 
             // Set up message handler for notes and CC
             manager.addMessageHandler((message) => {
@@ -211,6 +240,10 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (message.note === 38) { store.setKnobBank('FX'); return; }
                 if (message.note === 39) { store.setKnobBank('Mixer'); return; }
 
+                // Pad Bank B: page switching (notes 40-41)
+                if (message.note === 40) { store.prevKnobPage(); return; }
+                if (message.note === 41) { store.nextKnobPage(); return; }
+
                 // Apply octave offset (each octave = 12 semitones)
                 const octaveOffset = store.midiOctaveOffset || 0;
                 const transposedNote = message.note + (octaveOffset * 12);
@@ -230,13 +263,20 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Calculate frequency for debugging
                 const freq = 440 * Math.pow(2, (transposedNote - 69) / 12);
-                console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} (offset ${octaveOffset}) -> ${toneNote} (${freq.toFixed(1)} Hz), instrument:`, targetInstrument?.name || 'NONE');
+                // Diagnostic: show which fallback path was used
+                const routePath = instrumentStore.previewInstrument ? 'preview' :
+                                  selectedInstrument ? 'selected' : 'FALLBACK[0]';
+                console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} -> ${toneNote} (${freq.toFixed(1)} Hz), route=${routePath}, instrument=${targetInstrument?.name || 'NONE'} (id=${targetInstrument?.id}, type=${targetInstrument?.synthType})`);
 
                 if (targetInstrument) {
                   // AUTO-SWITCH BANK: Match knob bank to current synth type
                   const autoBank = getKnobBankForSynth(targetInstrument.synthType);
                   if (autoBank && store.knobBank !== autoBank) {
                     store.setKnobBank(autoBank);
+                  }
+                  // NKS2: Sync knob assignments + LCD for this synth
+                  if (store.nksActiveSynthType !== targetInstrument.synthType) {
+                    store.syncKnobsToSynth(targetInstrument.synthType);
                   }
 
                   const engine = getToneEngine();
@@ -334,6 +374,14 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Handle Bank Knobs (CC 70-77)
                 if (message.cc >= 70 && message.cc <= 77) {
+                  const knobIndex = message.cc - 70;
+                  // NKS2 dynamic assignments take priority
+                  const nksAssignment = store.nksKnobAssignments[knobIndex];
+                  if (nksAssignment) {
+                    updateBankParameter(nksAssignment.param, message.value);
+                    return;
+                  }
+                  // Legacy fallback
                   const bankAssignments = KNOB_BANKS[store.knobBank];
                   const assignment = bankAssignments.find(a => a.cc === message.cc);
                   if (assignment) {
@@ -375,6 +423,7 @@ export const useMIDIStore = create<MIDIStore>()(
                 }
               }
             });
+            } // end midiNoteHandlerRegistered guard
 
             // Subscribe to device changes
             manager.onDeviceChange(() => {
@@ -599,6 +648,58 @@ export const useMIDIStore = create<MIDIStore>()(
           state.padBank = bank;
         }),
 
+      // NKS2 Knob Paging: load page 0 for a synth, update LCD
+      syncKnobsToSynth: (synthType) => {
+        const assignments = getKnobAssignmentsForPage(synthType as import('../types/instrument').SynthType, 0);
+        const totalPages = getKnobPageCount(synthType as import('../types/instrument').SynthType);
+        set((state) => {
+          state.nksKnobAssignments = assignments;
+          state.nksKnobPage = 0;
+          state.nksKnobTotalPages = totalPages;
+          state.nksActiveSynthType = synthType;
+        });
+        // Update LCD display
+        const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
+        updateNKSDisplay(synthType, 0, totalPages, displayParams);
+      },
+
+      nextKnobPage: () => {
+        const { nksActiveSynthType, nksKnobPage, nksKnobTotalPages } = get();
+        if (!nksActiveSynthType || nksKnobTotalPages <= 1) return;
+        const nextPage = (nksKnobPage + 1) % nksKnobTotalPages;
+        const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, nextPage);
+        set((state) => {
+          state.nksKnobAssignments = assignments;
+          state.nksKnobPage = nextPage;
+        });
+        const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
+        updateNKSDisplay(nksActiveSynthType, nextPage, nksKnobTotalPages, displayParams);
+      },
+
+      prevKnobPage: () => {
+        const { nksActiveSynthType, nksKnobPage, nksKnobTotalPages } = get();
+        if (!nksActiveSynthType || nksKnobTotalPages <= 1) return;
+        const prevPage = (nksKnobPage - 1 + nksKnobTotalPages) % nksKnobTotalPages;
+        const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, prevPage);
+        set((state) => {
+          state.nksKnobAssignments = assignments;
+          state.nksKnobPage = prevPage;
+        });
+        const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
+        updateNKSDisplay(nksActiveSynthType, prevPage, nksKnobTotalPages, displayParams);
+      },
+
+      setKnobPage: (page) => {
+        const { nksActiveSynthType, nksKnobTotalPages } = get();
+        if (!nksActiveSynthType || page < 0 || page >= nksKnobTotalPages) return;
+        const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, page);
+        set((state) => {
+          state.nksKnobAssignments = assignments;
+          state.nksKnobPage = page;
+        });
+        const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
+        updateNKSDisplay(nksActiveSynthType, page, nksKnobTotalPages, displayParams);
+      },
 
       setShowKnobBar: (show) => {
         set((state) => {

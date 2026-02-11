@@ -244,7 +244,7 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 // Falls back to legacy KNOB_BANKS for synths with hardcoded banks.
 // ============================================================================
 
-import { getKnob8Params } from './nks/synthParameterMaps';
+import { getKnob8Params, getPerformanceParams } from './nks/synthParameterMaps';
 
 /** CC numbers for the 8 knobs on Akai MPK Mini MK3 (CC 70-77) */
 const KNOB_CC_START = 70;
@@ -292,4 +292,44 @@ export function getKnobPageName(synthType: SynthType): string {
   const legacyBank = getKnobBankForSynth(synthType);
   if (legacyBank) return legacyBank;
   return synthType;
+}
+
+/**
+ * Get knob assignments for a specific page of an NKS2 profile.
+ * page 0 = params [0..7], page 1 = params [8..15].
+ * Falls back to legacy KNOB_BANKS (1 page only) or Mixer as last resort.
+ */
+export function getKnobAssignmentsForPage(synthType: SynthType, page: number): KnobAssignment[] {
+  // Legacy synths with hardcoded banks: always 1 page
+  const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank) {
+    return page === 0 ? KNOB_BANKS[legacyBank] : [];
+  }
+
+  // NKS2: get all performance params (up to 16), slice into 8-knob pages
+  const allParams = getPerformanceParams(synthType);
+  if (allParams.length === 0) {
+    return page === 0 ? KNOB_BANKS['Mixer'] : [];
+  }
+
+  const start = page * 8;
+  const pageParams = allParams.slice(start, start + 8);
+  return pageParams.map((param, index) => ({
+    cc: KNOB_CC_START + index,
+    param: param.engineParam as MappableParameter,
+    label: param.name.substring(0, 10),
+  }));
+}
+
+/**
+ * Get total page count for a synth's NKS2 profile.
+ * Legacy synths = 1 page. NKS2 synths = ceil(performanceParams / 8).
+ */
+export function getKnobPageCount(synthType: SynthType): number {
+  const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank) return 1;
+
+  const allParams = getPerformanceParams(synthType);
+  if (allParams.length === 0) return 1; // Mixer fallback = 1 page
+  return Math.ceil(allParams.length / 8);
 }

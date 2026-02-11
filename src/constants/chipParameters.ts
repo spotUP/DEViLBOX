@@ -196,6 +196,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'AE', 'UH', 'ER'],
     parameters: [
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'noise_mode', label: 'Noise Mode', group: 'Excitation', type: 'toggle', min: 0, max: 1, default: 0 },
       { key: 'f1_index', label: 'F1 Index', group: 'Formants', type: 'knob', min: 0, max: 7, step: 1, default: 3, formatValue: 'int' },
@@ -275,6 +276,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
     parameters: [
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'vowel', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
@@ -322,6 +324,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'OH', 'OO', 'SH', 'ZH', 'NG', 'PA'],
     parameters: [
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'phoneme', label: 'Phoneme', group: 'Speech', type: 'knob', min: 0, max: 63, step: 1, default: 0, formatValue: 'int' },
       { key: 'inflection', label: 'Inflection', group: 'Speech', type: 'select', min: 0, max: 3, default: 0, formatValue: 'int', options: [
@@ -483,6 +486,7 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'AE', 'UH', 'SH'],
     parameters: [
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'chirp_type', label: 'Chirp Type', group: 'Excitation', type: 'select', min: 0, max: 2, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'TMS5220' }, { value: 1, label: 'TMS5200' }, { value: 2, label: 'TI99' },

@@ -20,6 +20,7 @@ interface ChipSynthControlsProps {
   onTextChange?: (key: string, value: string) => void;
   onLoadPreset: (program: number) => void;
   onRomUpload?: (bank: number, data: Uint8Array) => void;
+  onSpeak?: (text: string) => void;
 }
 
 export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
@@ -30,6 +31,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   onTextChange,
   onLoadPreset,
   onRomUpload,
+  onSpeak,
 }) => {
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
@@ -150,26 +152,55 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
 
     if (param.type === 'text') {
       const textValue = parameters[paramKey] ?? param.defaultText ?? '';
+      const isSpeechText = paramKey === 'speechText' && onSpeak;
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
           <span style={{ fontSize: 10, color: mutedColor, textTransform: 'uppercase', fontWeight: 600 }}>{param.label}</span>
-          <input
-            type="text"
-            value={textValue}
-            onChange={(e) => onTextChange?.(paramKey, e.target.value)}
-            placeholder={param.placeholder || ''}
-            style={{
-              background: isCyanTheme ? '#041010' : '#0d1117',
-              color: isCyanTheme ? '#00ffff' : accentColor,
-              border: `1px solid ${panelBorder}`,
-              borderRadius: 6,
-              padding: '8px 12px',
-              fontSize: 13,
-              fontFamily: 'Monaco, Menlo, monospace',
-              outline: 'none',
-              width: '100%',
-            }}
-          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              value={textValue}
+              onChange={(e) => onTextChange?.(paramKey, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isSpeechText) {
+                  onSpeak!(textValue);
+                }
+              }}
+              placeholder={param.placeholder || ''}
+              style={{
+                background: isCyanTheme ? '#041010' : '#0d1117',
+                color: isCyanTheme ? '#00ffff' : accentColor,
+                border: `1px solid ${panelBorder}`,
+                borderRadius: 6,
+                padding: '8px 12px',
+                fontSize: 13,
+                fontFamily: 'Monaco, Menlo, monospace',
+                outline: 'none',
+                flex: 1,
+              }}
+            />
+            {isSpeechText && (
+              <button
+                onClick={() => onSpeak!(textValue)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: `1px solid ${accentColor}44`,
+                  background: `${accentColor}18`,
+                  color: accentColor,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                }}
+              >
+                Speak
+              </button>
+            )}
+          </div>
         </div>
       );
     }

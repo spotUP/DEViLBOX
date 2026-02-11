@@ -1,5 +1,10 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
+import { type TMS5220Frame, phonemesToTMS5220Frames } from '@engine/speech/tms5220PhonemeMap';
+import { type LPCFrame, scanVSMForWords, type VSMWord } from '@engine/speech/VSMROMParser';
+import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * TMS5220 Parameter IDs (matching C++ enum)
@@ -79,9 +84,70 @@ export class TMS5220Synth extends MAMEBaseSynth {
   protected readonly workletFile = 'TMS5220.worklet.js';
   protected readonly processorName = 'tms5220-processor';
 
+  private _speechSequencer: SpeechSequencer<TMS5220Frame> | null = null;
+  private _romData: Uint8Array | null = null;
+  private _romWords: VSMWord[] = [];
+  private _romLoaded = false;
+  private _romSequencer: SpeechSequencer<LPCFrame> | null = null;
+
   constructor() {
     super();
     this.initSynth();
+    this._loadROMs();
+  }
+
+  /** Try to load Speak & Spell VSM ROMs on init */
+  private async _loadROMs(): Promise<void> {
+    try {
+      this._romData = await loadTMS5220ROMs();
+      this._romWords = scanVSMForWords(this._romData);
+      this._romLoaded = true;
+      console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} words found`);
+    } catch (e) {
+      console.log('[TMS5220] VSM ROMs not available (optional for text-to-speech)');
+    }
+  }
+
+  /** Get list of words found in the ROM */
+  get romWords(): VSMWord[] {
+    return this._romWords;
+  }
+
+  /** Whether ROM data is loaded */
+  get hasROM(): boolean {
+    return this._romLoaded;
+  }
+
+  /** Play a word from the ROM by index */
+  speakWord(index: number): void {
+    if (!this._romLoaded || index < 0 || index >= this._romWords.length) return;
+
+    this.stopSpeaking();
+    const word = this._romWords[index];
+    const lastK = [8, 8, 8, 8, 8, 8, 8, 4, 4, 4]; // Default K values for repeat frames
+
+    const speechFrames: SpeechFrame<LPCFrame>[] = word.frames.map(f => ({
+      data: f,
+      durationMs: 25, // 25ms per TMS5220 frame (200 samples at 8kHz)
+    }));
+
+    this._romSequencer = new SpeechSequencer<LPCFrame>(
+      (frame) => {
+        if (frame.energy === 0) return; // Silent frame
+        const k = frame.repeat ? lastK : frame.k;
+        if (!frame.repeat && frame.k.length >= 3) {
+          // Update last K values
+          for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+        }
+        if (k.length >= 3) {
+          this.setFormants(k[0], k[1], k[2]);
+        }
+        this.setNoiseMode(frame.unvoiced);
+        this.setEnergy(frame.energy);
+      },
+      () => { this._romSequencer = null; }
+    );
+    this._romSequencer.speak(speechFrames);
   }
 
   // ===========================================================================
@@ -178,6 +244,57 @@ export class TMS5220Synth extends MAMEBaseSynth {
     }
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'programChange', program });
+  }
+
+  // ===========================================================================
+  // Text-to-Speech
+  // ===========================================================================
+
+  /** Speak English text using SAM's reciter and TMS5220 LPC mapping */
+  speakText(text: string): void {
+    this.stopSpeaking();
+
+    const phonemeStr = textToPhonemes(text);
+    if (!phonemeStr) return;
+
+    const tokens = parsePhonemeString(phonemeStr);
+    const frames = phonemesToTMS5220Frames(tokens);
+    if (frames.length === 0) return;
+
+    const speechFrames: SpeechFrame<TMS5220Frame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
+
+    this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
+      (frame) => {
+        // Set K1/K2/K3 formants
+        this.setFormants(frame.k[0], frame.k[1], frame.k[2]);
+        // Set noise mode
+        this.setNoiseMode(frame.unvoiced);
+        // Set energy
+        this.setEnergy(frame.energy);
+      },
+      () => { this._speechSequencer = null; }
+    );
+    this._speechSequencer.speak(speechFrames);
+  }
+
+  /** Stop current text-to-speech or ROM playback */
+  stopSpeaking(): void {
+    if (this._speechSequencer) {
+      this._speechSequencer.stop();
+      this._speechSequencer = null;
+    }
+    if (this._romSequencer) {
+      this._romSequencer.stop();
+      this._romSequencer = null;
+    }
+  }
+
+  /** Whether text-to-speech or ROM playback is currently playing */
+  get isSpeaking(): boolean {
+    return (this._speechSequencer?.isSpeaking ?? false) || (this._romSequencer?.isSpeaking ?? false);
   }
 
   // ===========================================================================

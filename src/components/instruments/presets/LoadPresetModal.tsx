@@ -103,6 +103,12 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
     return () => {
       setPreviewInstrument(null);
+      // Dispose the preview engine instance to prevent stale sounds
+      try {
+        getToneEngine().invalidateInstrument(999);
+      } catch {
+        // Engine may not be available during teardown
+      }
     };
   }, [selectedPreset, setPreviewInstrument]);
 
