@@ -24,6 +24,7 @@ import {
   Wind,
   Volume2,
   Disc,
+  X,
 } from 'lucide-react';
 
 interface VisualEffectEditorProps {
@@ -33,13 +34,13 @@ interface VisualEffectEditorProps {
 }
 
 /**
- * Section header component for consistency
+ * Section header component — pedal panel label
  */
 function SectionHeader({ color, title }: { color: string; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-4">
-      <div className="w-1 h-4 rounded-full" style={{ backgroundColor: color }} />
-      <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+    <div className="flex items-center gap-2.5 mb-4">
+      <div className="w-1.5 h-5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }} />
+      <h3 className="text-xs font-black text-white/90 uppercase tracking-[0.15em]">{title}</h3>
     </div>
   );
 }
@@ -85,7 +86,7 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#ef4444" title="Distortion" />
         <div className="flex justify-around items-end">
           <Knob
@@ -128,7 +129,7 @@ export const ReverbEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#6366f1" title="Reverb" />
         <div className="flex justify-around items-end">
           <Knob
@@ -181,7 +182,7 @@ export const DelayEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#3b82f6" title={isPingPong ? 'Ping Pong Delay' : 'Delay'} />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -236,7 +237,7 @@ export const ChorusEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#ec4899" title="Chorus" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -303,7 +304,7 @@ export const PhaserEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#a855f7" title="Phaser" />
         <div className="flex justify-around items-end">
           <Knob
@@ -366,7 +367,7 @@ export const TremoloEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f97316" title="Tremolo" />
         <div className="flex justify-around items-end">
           <Knob
@@ -416,7 +417,7 @@ export const VibratoEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#14b8a6" title="Vibrato" />
         <div className="flex justify-around items-end">
           <Knob
@@ -467,7 +468,7 @@ export const AutoFilterEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#eab308" title="Auto Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -530,7 +531,7 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#22c55e" title="Auto Panner" />
         <div className="flex justify-around items-end">
           <Knob
@@ -582,7 +583,7 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f43f5e" title="Auto Wah" />
         <div className="flex justify-around items-end">
           <Knob
@@ -627,7 +628,7 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -657,7 +658,7 @@ export const BitCrusherEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#84cc16" title="Bit Crusher" />
         <div className="flex justify-around items-end">
           <Knob
@@ -699,7 +700,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f59e0b" title="Chebyshev Waveshaper" />
         <div className="flex justify-around items-end">
           <Knob
@@ -741,7 +742,7 @@ export const FrequencyShifterEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#06b6d4" title="Frequency Shifter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -786,7 +787,7 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#8b5cf6" title="Pitch Shift" />
         <div className="flex justify-around items-end">
           <Knob
@@ -819,7 +820,7 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -852,7 +853,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
           <Knob
@@ -897,7 +898,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -931,7 +932,7 @@ export const EQ3Editor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#3b82f6" title="3-Band EQ" />
         <div className="flex justify-around items-end">
           <Knob
@@ -966,7 +967,7 @@ export const EQ3Editor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#6b7280" title="Crossover" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1020,7 +1021,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f97316" title="Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1053,7 +1054,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -1083,7 +1084,7 @@ export const JCReverbEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#6366f1" title="JC Reverb" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1125,7 +1126,7 @@ export const StereoWidenerEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#ec4899" title="Stereo Widener" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1164,7 +1165,7 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#6b7280" title={effect.type} />
         <div className="flex justify-center">
           <Knob
@@ -1205,7 +1206,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Delay Controls */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#8b5cf6" title="Spacey Delayer" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -1251,7 +1252,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Toggles */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#a78bfa" title="Options" />
         <div className="flex gap-4">
           <button
@@ -1306,7 +1307,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Main Controls */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#dc2626" title="RE Tape Echo" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -1352,7 +1353,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Tape Imperfections */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f97316" title="Tape Character" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1395,7 +1396,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Mode + Toggles */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#b91c1c" title="Mode & Options" />
         <div className="mb-3">
           <div className="text-xs text-gray-400 mb-2">Echo Mode</div>
@@ -1462,7 +1463,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#6366f1" title="Echo" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1497,7 +1498,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
         {renderBpmSync(effect, onUpdateParameter)}
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#818cf8" title="Levels & EQ" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1540,7 +1541,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -1576,7 +1577,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#a855f7" title="Routing" />
         <div className="flex gap-2 justify-center mb-2">
           <button
@@ -1601,7 +1602,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
           </button>
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#a855f7" title="Phase A" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -1627,7 +1628,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
         {renderBpmSync(effect, onUpdateParameter)}
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#c084fc" title="Phase B" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1650,7 +1651,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-around items-end">
           <Knob
             value={feedback}
@@ -1691,7 +1692,7 @@ export const DubFilterEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#22c55e" title="Dub Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1723,7 +1724,7 @@ export const DubFilterEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -1754,7 +1755,7 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#ef4444" title="Tape Saturation" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1777,7 +1778,7 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -1812,7 +1813,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1844,7 +1845,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#34d399" title="Envelope & Sidechain" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1876,7 +1877,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -1914,7 +1915,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Model & Mode */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f59e0b" title="Model" />
         <div className="grid grid-cols-3 gap-1 mb-3">
           {MOOG_MODEL_NAMES.map((name, i) => (
@@ -1953,7 +1954,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
         )}
       </section>
       {/* Filter Controls */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f59e0b" title="Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -1986,7 +1987,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       {/* Mix */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -2024,7 +2025,7 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#7c3aed" title="Reverb" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={decay} min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)} label="Decay" color="#7c3aed" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -2033,7 +2034,7 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
           <Knob value={density} min={0} max={1} onChange={(v) => onUpdateParameter('density', v)} label="Density" color="#8b5cf6" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#a78bfa" title="Character" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={bandwidth} min={0} max={1} onChange={(v) => onUpdateParameter('bandwidth', v)} label="Bandwidth" color="#a78bfa" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -2041,7 +2042,7 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
           <Knob value={earlyMix} min={0} max={1} onChange={(v) => onUpdateParameter('earlyMix', v)} label="Early Mix" color="#a78bfa" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-around items-end">
           <Knob value={gain} min={0} max={1} onChange={(v) => onUpdateParameter('gain', v)} label="Gain" color="#c4b5fd" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={mix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)} label="Int. Mix" color="#c4b5fd" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -2076,7 +2077,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#f97316" title="Speed" />
         <div className="grid grid-cols-3 gap-1 mb-3">
           {SPEED_LABELS.map((label, i) => (
@@ -2097,7 +2098,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
           <Knob value={acceleration} min={0} max={1} onChange={(v) => onUpdateParameter('acceleration', v)} label="Accel" color="#f97316" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#fb923c" title="Rotors" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={hornRate} min={0.1} max={10} onChange={(v) => onUpdateParameter('hornRate', v)} label="Horn Hz" color="#fb923c" formatValue={(v) => `${v.toFixed(1)}`} />
@@ -2106,7 +2107,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
           <Knob value={drumDepth} min={0} max={1} onChange={(v) => onUpdateParameter('drumDepth', v)} label="Drum Dep" color="#fdba74" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-around items-end">
           <Knob value={doppler} min={0} max={1} onChange={(v) => onUpdateParameter('doppler', v)} label="Doppler" color="#fed7aa" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={width} min={0} max={1} onChange={(v) => onUpdateParameter('width', v)} label="Width" color="#fed7aa" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -2135,7 +2136,7 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#059669" title="Spring Tank" />
         <div className="flex justify-around items-end">
           <Knob value={decay} min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)} label="Decay" color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
@@ -2143,14 +2144,14 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
           <Knob value={tension} min={0} max={1} onChange={(v) => onUpdateParameter('tension', v)} label="Tension" color="#10b981" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <SectionHeader color="#34d399" title="Character" />
         <div className="flex justify-around items-end">
           <Knob value={drip} min={0} max={1} onChange={(v) => onUpdateParameter('drip', v)} label="Drip" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={diffusion} min={0} max={1} onChange={(v) => onUpdateParameter('diffusion', v)} label="Diffusion" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
         <div className="flex justify-around items-end">
           <Knob value={springMix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)} label="Int. Mix" color="#6ee7b7" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet} label="Wet" color="#a7f3d0" formatValue={(v) => `${Math.round(v)}%`} />
@@ -2217,6 +2218,52 @@ interface VisualEffectEditorWrapperProps {
   onClose?: () => void;
 }
 
+/** Enclosure color mapping — background tint per effect type */
+export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accent: string; border: string }> = {
+  Distortion:          { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  Reverb:              { bg: '#0e0a20', bgEnd: '#080618', accent: '#6366f1', border: '#1a1430' },
+  JCReverb:            { bg: '#0e0a20', bgEnd: '#080618', accent: '#6366f1', border: '#1a1430' },
+  Delay:               { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  FeedbackDelay:       { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  PingPongDelay:       { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  Chorus:              { bg: '#200a18', bgEnd: '#180614', accent: '#ec4899', border: '#301428' },
+  Phaser:              { bg: '#180a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' },
+  Tremolo:             { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
+  Vibrato:             { bg: '#081a18', bgEnd: '#041210', accent: '#14b8a6', border: '#0a2a28' },
+  Compressor:          { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
+  EQ3:                 { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  Filter:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
+  StereoWidener:       { bg: '#200a18', bgEnd: '#180614', accent: '#ec4899', border: '#301428' },
+  AutoFilter:          { bg: '#1a1808', bgEnd: '#121004', accent: '#eab308', border: '#2a280a' },
+  AutoPanner:          { bg: '#081a0a', bgEnd: '#041204', accent: '#22c55e', border: '#0a2a0e' },
+  AutoWah:             { bg: '#200a10', bgEnd: '#18060a', accent: '#f43f5e', border: '#301418' },
+  BitCrusher:          { bg: '#141a08', bgEnd: '#0e1204', accent: '#84cc16', border: '#1e2a0a' },
+  Chebyshev:           { bg: '#1a1508', bgEnd: '#120e04', accent: '#f59e0b', border: '#2a2008' },
+  FrequencyShifter:    { bg: '#081820', bgEnd: '#041018', accent: '#06b6d4', border: '#0a2830' },
+  PitchShift:          { bg: '#100a20', bgEnd: '#0a0618', accent: '#8b5cf6', border: '#1a1430' },
+  SpaceyDelayer:       { bg: '#100a20', bgEnd: '#0a0618', accent: '#8b5cf6', border: '#1a1430' },
+  SpaceEcho:           { bg: '#0e0a20', bgEnd: '#080618', accent: '#6366f1', border: '#1a1430' },
+  BiPhase:             { bg: '#180a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' },
+  DubFilter:           { bg: '#081a0a', bgEnd: '#041204', accent: '#22c55e', border: '#0a2a0e' },
+  TapeSaturation:      { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  SidechainCompressor: { bg: '#081a10', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a18' },
+  RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
+  MoogFilter:          { bg: '#1a1508', bgEnd: '#120e04', accent: '#f59e0b', border: '#2a2008' },
+  MVerb:               { bg: '#140a22', bgEnd: '#0c061a', accent: '#7c3aed', border: '#201432' },
+  Leslie:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
+  SpringReverb:        { bg: '#081a0a', bgEnd: '#041204', accent: '#059669', border: '#0a2a0e' },
+};
+
+export const DEFAULT_ENCLOSURE = { bg: '#181818', bgEnd: '#101010', accent: '#888', border: '#282828' };
+
+/** 3D pedal enclosure shadows */
+const ENCLOSURE_SHADOW = [
+  '0 6px 16px rgba(0,0,0,0.5)',
+  '0 2px 4px rgba(0,0,0,0.7)',
+  'inset 0 1px 0 rgba(255,255,255,0.06)',
+  'inset 0 -1px 0 rgba(0,0,0,0.4)',
+].join(', ');
+
 export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps> = ({
   effect,
   onUpdateParameter,
@@ -2227,86 +2274,94 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
 
   // Icon mapping
   const iconMap: Record<string, React.ReactNode> = {
-    Distortion: <Zap size={20} className="text-white" />,
-    Reverb: <Waves size={20} className="text-white" />,
-    JCReverb: <Waves size={20} className="text-white" />,
-    Delay: <Clock size={20} className="text-white" />,
-    FeedbackDelay: <Clock size={20} className="text-white" />,
-    PingPongDelay: <Clock size={20} className="text-white" />,
-    Chorus: <Radio size={20} className="text-white" />,
-    Phaser: <Radio size={20} className="text-white" />,
-    Tremolo: <Wind size={20} className="text-white" />,
-    Vibrato: <Wind size={20} className="text-white" />,
-    Compressor: <Gauge size={20} className="text-white" />,
-    EQ3: <Sliders size={20} className="text-white" />,
-    Filter: <Sliders size={20} className="text-white" />,
-    StereoWidener: <ArrowLeftRight size={20} className="text-white" />,
-    SpaceyDelayer: <Clock size={20} className="text-white" />,
-    SpaceEcho: <Waves size={20} className="text-white" />,
-    BiPhase: <Radio size={20} className="text-white" />,
-    DubFilter: <Sliders size={20} className="text-white" />,
-    TapeSaturation: <Zap size={20} className="text-white" />,
-    SidechainCompressor: <Gauge size={20} className="text-white" />,
-    RETapeEcho: <Disc size={20} className="text-white" />,
-    MoogFilter: <Sliders size={20} className="text-white" />,
-    MVerb: <Waves size={20} className="text-white" />,
-    Leslie: <Radio size={20} className="text-white" />,
-    SpringReverb: <Waves size={20} className="text-white" />,
+    Distortion: <Zap size={18} className="text-white" />,
+    Reverb: <Waves size={18} className="text-white" />,
+    JCReverb: <Waves size={18} className="text-white" />,
+    Delay: <Clock size={18} className="text-white" />,
+    FeedbackDelay: <Clock size={18} className="text-white" />,
+    PingPongDelay: <Clock size={18} className="text-white" />,
+    Chorus: <Radio size={18} className="text-white" />,
+    Phaser: <Radio size={18} className="text-white" />,
+    Tremolo: <Wind size={18} className="text-white" />,
+    Vibrato: <Wind size={18} className="text-white" />,
+    Compressor: <Gauge size={18} className="text-white" />,
+    EQ3: <Sliders size={18} className="text-white" />,
+    Filter: <Sliders size={18} className="text-white" />,
+    StereoWidener: <ArrowLeftRight size={18} className="text-white" />,
+    SpaceyDelayer: <Clock size={18} className="text-white" />,
+    SpaceEcho: <Waves size={18} className="text-white" />,
+    BiPhase: <Radio size={18} className="text-white" />,
+    DubFilter: <Sliders size={18} className="text-white" />,
+    TapeSaturation: <Zap size={18} className="text-white" />,
+    SidechainCompressor: <Gauge size={18} className="text-white" />,
+    RETapeEcho: <Disc size={18} className="text-white" />,
+    MoogFilter: <Sliders size={18} className="text-white" />,
+    MVerb: <Waves size={18} className="text-white" />,
+    Leslie: <Radio size={18} className="text-white" />,
+    SpringReverb: <Waves size={18} className="text-white" />,
   };
 
-  // Color mapping
-  const colorMap: Record<string, string> = {
-    Distortion: 'from-red-600 to-orange-600',
-    Reverb: 'from-indigo-500 to-purple-600',
-    JCReverb: 'from-indigo-500 to-purple-600',
-    Delay: 'from-blue-500 to-cyan-600',
-    FeedbackDelay: 'from-blue-500 to-cyan-600',
-    PingPongDelay: 'from-blue-500 to-cyan-600',
-    Chorus: 'from-pink-500 to-rose-600',
-    Phaser: 'from-purple-500 to-violet-600',
-    Tremolo: 'from-orange-500 to-amber-600',
-    Vibrato: 'from-teal-500 to-emerald-600',
-    Compressor: 'from-green-500 to-emerald-600',
-    EQ3: 'from-blue-500 to-indigo-600',
-    Filter: 'from-orange-500 to-red-600',
-    StereoWidener: 'from-pink-500 to-fuchsia-600',
-    SpaceyDelayer: 'from-purple-500 to-violet-600',
-    SpaceEcho: 'from-indigo-500 to-violet-600',
-    BiPhase: 'from-purple-500 to-violet-600',
-    DubFilter: 'from-green-500 to-emerald-600',
-    TapeSaturation: 'from-red-500 to-rose-600',
-    SidechainCompressor: 'from-emerald-500 to-teal-600',
-    RETapeEcho: 'from-red-600 to-orange-600',
-    MoogFilter: 'from-amber-500 to-yellow-600',
-    MVerb: 'from-violet-600 to-purple-700',
-    Leslie: 'from-orange-500 to-amber-600',
-    SpringReverb: 'from-emerald-500 to-green-700',
-  };
-
-  const icon = iconMap[effect.type] || <Music size={20} className="text-white" />;
-  const gradient = colorMap[effect.type] || 'from-gray-500 to-gray-600';
+  const enc = ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE;
+  const icon = iconMap[effect.type] || <Music size={18} className="text-white" />;
 
   return (
-    <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515] rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a] flex items-center justify-between">
+    <div
+      className="synth-editor-container rounded-xl overflow-hidden select-none"
+      style={{
+        background: `linear-gradient(170deg, ${enc.bg} 0%, ${enc.bgEnd} 100%)`,
+        border: `2px solid ${enc.border}`,
+        boxShadow: ENCLOSURE_SHADOW,
+      }}
+    >
+      {/* Pedal Header — icon, name, LED, status */}
+      <div
+        className="px-5 py-4 flex items-center justify-between"
+        style={{
+          background: `linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)`,
+          borderBottom: `1px solid ${enc.border}`,
+        }}
+      >
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient}`}>
+          <div
+            className="p-2 rounded-lg"
+            style={{
+              background: `linear-gradient(135deg, ${enc.accent}40, ${enc.accent}20)`,
+              border: `1px solid ${enc.accent}30`,
+              boxShadow: `0 0 12px ${enc.accent}15`,
+            }}
+          >
             {icon}
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">{effect.type}</h2>
-            <p className="text-xs text-gray-400">
-              {effect.enabled ? 'Active' : 'Bypassed'} | Mix: {effect.wet}%
-            </p>
+            <h2 className="text-base font-black text-white tracking-wide">
+              {effect.neuralModelName || effect.type}
+            </h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              {/* LED indicator */}
+              <div
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  backgroundColor: effect.enabled ? '#22ff44' : '#1a2a1a',
+                  boxShadow: effect.enabled
+                    ? '0 0 4px 1px rgba(34,255,68,0.5), 0 0 10px 3px rgba(34,255,68,0.15)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                  transition: 'all 0.3s ease',
+                }}
+              />
+              <p className="text-[11px] text-gray-400 font-medium">
+                {effect.enabled ? 'Active' : 'Bypassed'} | Mix: {effect.wet}%
+              </p>
+            </div>
           </div>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
           >
-            <Volume2 size={16} />
+            <X size={16} />
           </button>
         )}
       </div>

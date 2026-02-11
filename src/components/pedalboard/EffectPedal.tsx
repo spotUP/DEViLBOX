@@ -1,14 +1,14 @@
 /**
- * EffectPedal - Individual effect display with bypass and parameter controls
- * Represents a single pedal in the effect chain
+ * EffectPedal - Realistic guitar pedal enclosure with bypass and parameter controls
+ * Inspired by hardware stomp boxes (Big Muff, TS808, RAT, etc.)
  */
 
 import React from 'react';
 import { Knob } from '@components/controls/Knob';
-import { Power, GripVertical, X, Settings } from 'lucide-react';
+import { GripVertical, X, Settings } from 'lucide-react';
 import { getModelByIndex } from '@constants/guitarMLRegistry';
 import type { PedalboardEffect } from '@typedefs/pedalboard';
-import { useThemeStore } from '@stores';
+import type { PedalboardEffectCategory } from '@typedefs/pedalboard';
 
 interface EffectPedalProps {
   effect: PedalboardEffect;
@@ -19,6 +19,41 @@ interface EffectPedalProps {
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
+/** Category-based pedal color schemes (inspired by classic hardware) */
+const PEDAL_COLORS: Record<PedalboardEffectCategory | 'default', {
+  bg: string;       // Main enclosure gradient start
+  bgEnd: string;    // Gradient end (darker)
+  accent: string;   // Text, label highlights
+  knob: string;     // Knob arc color
+  border: string;   // Enclosure edge
+}> = {
+  overdrive:  { bg: '#2a5418', bgEnd: '#1a3a0d', accent: '#8ddd55', knob: '#8ddd55', border: '#3a6a22' },
+  distortion: { bg: '#7a3200', bgEnd: '#4a1e00', accent: '#ffaa44', knob: '#ffaa44', border: '#8a4210' },
+  amplifier:  { bg: '#6b1212', bgEnd: '#3a0808', accent: '#ff6b6b', knob: '#ff6b6b', border: '#7a2020' },
+  eq:         { bg: '#1a3560', bgEnd: '#0d1e3a', accent: '#66aaff', knob: '#66aaff', border: '#2a4570' },
+  filter:     { bg: '#4a1860', bgEnd: '#2a0d3a', accent: '#bb77ff', knob: '#bb77ff', border: '#5a2870' },
+  modulation: { bg: '#185060', bgEnd: '#0d2e3a', accent: '#55ccdd', knob: '#55ccdd', border: '#286070' },
+  delay:      { bg: '#183860', bgEnd: '#0d2040', accent: '#5599ee', knob: '#5599ee', border: '#284870' },
+  reverb:     { bg: '#381860', bgEnd: '#200d3a', accent: '#9966ee', knob: '#9966ee', border: '#482870' },
+  dynamics:   { bg: '#383838', bgEnd: '#222222', accent: '#aaaaaa', knob: '#cccccc', border: '#484848' },
+  cabinet:    { bg: '#4a3018', bgEnd: '#2a1a0d', accent: '#cc9955', knob: '#cc9955', border: '#5a4028' },
+  utility:    { bg: '#383838', bgEnd: '#222222', accent: '#aaaaaa', knob: '#cccccc', border: '#484848' },
+  default:    { bg: '#2a2a2a', bgEnd: '#1a1a1a', accent: '#cccccc', knob: '#cccccc', border: '#3a3a3a' },
+};
+
+/** 3D enclosure shadow — layered for depth like a real metal pedal */
+const PEDAL_SHADOW = [
+  '0 4px 8px rgba(0,0,0,0.5)',           // Drop shadow
+  '0 1px 2px rgba(0,0,0,0.8)',           // Tight edge
+  'inset 0 1px 0 rgba(255,255,255,0.08)', // Top bevel highlight
+  'inset 0 -1px 0 rgba(0,0,0,0.3)',       // Bottom bevel
+].join(', ');
+
+const PEDAL_SHADOW_DISABLED = [
+  '0 2px 4px rgba(0,0,0,0.3)',
+  'inset 0 1px 0 rgba(255,255,255,0.04)',
+].join(', ');
+
 export const EffectPedal: React.FC<EffectPedalProps> = ({
   effect,
   onToggle,
@@ -27,187 +62,201 @@ export const EffectPedal: React.FC<EffectPedalProps> = ({
   onModelSelect,
   dragHandleProps,
 }) => {
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
+  const modelInfo = effect.type === 'neural' && effect.modelIndex !== undefined
+    ? getModelByIndex(effect.modelIndex)
+    : null;
 
-  const modelInfo = effect.type === 'neural' && effect.modelIndex !== undefined ? getModelByIndex(effect.modelIndex) : null;
-
-  const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
-  const enabledColor = isCyanTheme ? '#00ffff' : '#00ff00';
-  const disabledColor = isCyanTheme ? '#003333' : '#333';
-  const bgColor = isCyanTheme ? '#051515' : '#1a1a1a';
-  const borderColor = effect.enabled ? accentColor : (isCyanTheme ? '#0a3030' : '#333');
+  const category = (modelInfo?.category || 'default') as PedalboardEffectCategory | 'default';
+  const colors = PEDAL_COLORS[category] || PEDAL_COLORS.default;
 
   const handleModelNameClick = () => {
-    if (onModelSelect) {
-      onModelSelect();
-    }
+    if (onModelSelect) onModelSelect();
   };
+
+  // Collect available parameter entries
+  const paramEntries: { key: string; label: string }[] = [];
+  if (effect.parameters?.drive !== undefined) paramEntries.push({ key: 'drive', label: 'Drive' });
+  if (effect.parameters?.tone !== undefined) paramEntries.push({ key: 'tone', label: 'Tone' });
+  if (effect.parameters?.level !== undefined) paramEntries.push({ key: 'level', label: 'Level' });
+  if (effect.parameters?.dryWet !== undefined) paramEntries.push({ key: 'dryWet', label: 'Mix' });
+  // Support extra parameters from amp models
+  if (effect.parameters?.bass !== undefined) paramEntries.push({ key: 'bass', label: 'Bass' });
+  if (effect.parameters?.mid !== undefined) paramEntries.push({ key: 'mid', label: 'Mid' });
+  if (effect.parameters?.treble !== undefined) paramEntries.push({ key: 'treble', label: 'Treble' });
+  if (effect.parameters?.presence !== undefined) paramEntries.push({ key: 'presence', label: 'Pres' });
 
   return (
     <div
-      className="rounded-lg border-2 p-4 transition-all"
+      className="relative select-none transition-all duration-200"
       style={{
-        backgroundColor: bgColor,
-        borderColor,
-        opacity: effect.enabled ? 1 : 0.6,
+        background: `linear-gradient(170deg, ${colors.bg} 0%, ${colors.bgEnd} 100%)`,
+        borderRadius: 12,
+        border: `2px solid ${effect.enabled ? colors.border : '#2a2a2a'}`,
+        boxShadow: effect.enabled ? PEDAL_SHADOW : PEDAL_SHADOW_DISABLED,
+        opacity: effect.enabled ? 1 : 0.55,
+        padding: '12px 14px 14px',
+        minWidth: 180,
       }}
       role="article"
       aria-label={`${effect.modelName || 'Effect'} pedal`}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {/* Drag Handle */}
-          <div
-            {...dragHandleProps}
-            className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300"
-            aria-label="Drag to reorder"
-            role="button"
-            tabIndex={0}
-          >
-            <GripVertical size={16} />
-          </div>
-
-          {/* Model Name */}
-          <div>
-            <div
-              className={`font-bold text-sm ${onModelSelect ? 'cursor-pointer hover:underline' : ''}`}
-              style={{ color: effect.enabled ? accentColor : '#666' }}
-              onClick={handleModelNameClick}
-              role={onModelSelect ? 'button' : undefined}
-              tabIndex={onModelSelect ? 0 : undefined}
-              onKeyDown={onModelSelect ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleModelNameClick();
-                }
-              } : undefined}
-              aria-label={onModelSelect ? `Change model (currently ${effect.modelName || 'Unknown'})` : undefined}
-            >
-              {effect.type === 'neural' ? effect.modelName : 'Unknown Effect'}
-            </div>
-            {modelInfo && (
-              <div className="text-xs text-gray-500 uppercase">{modelInfo.category}</div>
-            )}
-          </div>
+      {/* Top bar: drag handle, settings, remove */}
+      <div className="flex items-center justify-between mb-1" style={{ minHeight: 20 }}>
+        <div
+          {...dragHandleProps}
+          className="cursor-grab active:cursor-grabbing"
+          style={{ color: `${colors.accent}50` }}
+          aria-label="Drag to reorder"
+          role="button"
+          tabIndex={0}
+        >
+          <GripVertical size={14} />
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          {/* Power Toggle */}
-          <button
-            onClick={() => onToggle(!effect.enabled)}
-            className="p-1 rounded transition-colors"
-            style={{
-              backgroundColor: effect.enabled ? `${enabledColor}30` : `${disabledColor}30`,
-              color: effect.enabled ? enabledColor : disabledColor,
-            }}
-            title={effect.enabled ? 'Bypass effect' : 'Enable effect'}
-            aria-label={effect.enabled ? 'Bypass effect' : 'Enable effect'}
-            aria-pressed={effect.enabled}
-          >
-            <Power size={16} />
-          </button>
-
-          {/* Model Settings */}
+        <div className="flex items-center gap-1">
           {onModelSelect && (
             <button
               onClick={onModelSelect}
-              className="p-1 rounded transition-colors hover:bg-gray-700"
-              style={{ color: '#999' }}
+              className="p-0.5 rounded transition-colors"
+              style={{ color: `${colors.accent}70` }}
               title="Change model"
               aria-label="Change neural model"
             >
-              <Settings size={16} />
+              <Settings size={12} />
             </button>
           )}
-
-          {/* Remove */}
           <button
             onClick={onRemove}
-            className="p-1 rounded transition-colors hover:bg-red-900"
-            style={{ color: '#999' }}
-            title="Remove effect from chain"
+            className="p-0.5 rounded transition-colors hover:opacity-100"
+            style={{ color: '#ff555580' }}
+            title="Remove effect"
             aria-label="Remove effect from chain"
           >
-            <X size={16} />
+            <X size={12} />
           </button>
         </div>
       </div>
 
-      {/* Parameters */}
-      {effect.enabled && effect.parameters && Object.keys(effect.parameters).length > 0 && (
-        <div className="grid grid-cols-4 gap-3 mt-4">
-          {/* Drive */}
-          {effect.parameters.drive !== undefined && (
-            <div className="flex flex-col items-center">
-              <Knob
-                value={effect.parameters.drive}
-                min={0}
-                max={100}
-                onChange={(v) => onParameterChange('drive', v)}
-                label="Drive"
-                size="sm"
-                color={accentColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
-          )}
+      {/* Pedal name — big centered label */}
+      <div className="text-center mb-1">
+        <div
+          className={`font-black text-sm uppercase tracking-wider leading-tight ${
+            onModelSelect ? 'cursor-pointer hover:opacity-80' : ''
+          }`}
+          style={{
+            color: effect.enabled ? colors.accent : '#555',
+            textShadow: effect.enabled ? `0 0 12px ${colors.accent}40` : 'none',
+            letterSpacing: '0.1em',
+          }}
+          onClick={handleModelNameClick}
+          role={onModelSelect ? 'button' : undefined}
+          tabIndex={onModelSelect ? 0 : undefined}
+          onKeyDown={onModelSelect ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleModelNameClick();
+            }
+          } : undefined}
+          aria-label={onModelSelect ? `Change model (currently ${effect.modelName || 'Unknown'})` : undefined}
+        >
+          {effect.type === 'neural' ? effect.modelName : 'Unknown'}
+        </div>
+        {modelInfo && (
+          <div
+            className="text-[9px] uppercase tracking-widest mt-0.5"
+            style={{ color: `${colors.accent}80` }}
+          >
+            {modelInfo.category}
+          </div>
+        )}
+      </div>
 
-          {/* Tone */}
-          {effect.parameters.tone !== undefined && (
-            <div className="flex flex-col items-center">
-              <Knob
-                value={effect.parameters.tone}
-                min={0}
-                max={100}
-                onChange={(v) => onParameterChange('tone', v)}
-                label="Tone"
-                size="sm"
-                color={accentColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
-          )}
+      {/* LED indicator */}
+      <div className="flex justify-center my-2">
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: effect.enabled ? '#ff2222' : '#331111',
+            boxShadow: effect.enabled
+              ? '0 0 6px 2px rgba(255,0,0,0.5), 0 0 12px 4px rgba(255,0,0,0.2), inset 0 -1px 2px rgba(0,0,0,0.3)'
+              : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            transition: 'all 0.3s ease',
+          }}
+          aria-hidden="true"
+        />
+      </div>
 
-          {/* Level */}
-          {effect.parameters.level !== undefined && (
-            <div className="flex flex-col items-center">
+      {/* Knobs section */}
+      {effect.parameters && paramEntries.length > 0 && (
+        <div
+          className="flex justify-center gap-2 my-3 flex-wrap"
+          style={{
+            padding: '6px 2px',
+            borderRadius: 6,
+            background: 'rgba(0,0,0,0.15)',
+          }}
+        >
+          {paramEntries.map(({ key, label }) => (
+            <div key={key} className="flex flex-col items-center" style={{ minWidth: 42 }}>
               <Knob
-                value={effect.parameters.level}
+                value={effect.parameters[key]}
                 min={0}
                 max={100}
-                onChange={(v) => onParameterChange('level', v)}
-                label="Level"
+                onChange={(v) => onParameterChange(key, v)}
+                label={label}
                 size="sm"
-                color={accentColor}
+                color={colors.knob}
                 formatValue={(v) => `${Math.round(v)}%`}
+                disabled={!effect.enabled}
               />
             </div>
-          )}
-
-          {/* Dry/Wet Mix */}
-          {effect.parameters.dryWet !== undefined && (
-            <div className="flex flex-col items-center">
-              <Knob
-                value={effect.parameters.dryWet}
-                min={0}
-                max={100}
-                onChange={(v) => onParameterChange('dryWet', v)}
-                label="Mix"
-                size="sm"
-                color={accentColor}
-                formatValue={(v) => `${Math.round(v)}%`}
-              />
-            </div>
-          )}
+          ))}
         </div>
       )}
 
-      {/* Bypassed State */}
+      {/* Stomp switch — big bypass button */}
+      <div className="flex justify-center mt-2">
+        <button
+          onClick={() => onToggle(!effect.enabled)}
+          className="relative group transition-all duration-150 active:scale-95"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: effect.enabled
+              ? 'linear-gradient(145deg, #555 0%, #333 100%)'
+              : 'linear-gradient(145deg, #444 0%, #282828 100%)',
+            boxShadow: effect.enabled
+              ? 'inset 0 2px 4px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.05)'
+              : 'inset 0 1px 3px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+          title={effect.enabled ? 'Bypass effect' : 'Enable effect'}
+          aria-label={effect.enabled ? 'Bypass effect' : 'Enable effect'}
+          aria-pressed={effect.enabled}
+        >
+          {/* Inner circle detail */}
+          <div
+            className="absolute inset-[6px] rounded-full"
+            style={{
+              background: effect.enabled
+                ? 'radial-gradient(circle at 40% 35%, rgba(255,255,255,0.1), transparent 60%)'
+                : 'radial-gradient(circle at 40% 35%, rgba(255,255,255,0.06), transparent 60%)',
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}
+          />
+        </button>
+      </div>
+
+      {/* Bypassed label */}
       {!effect.enabled && (
-        <div className="mt-3 text-center text-xs text-gray-600 uppercase tracking-wide" role="status">
+        <div
+          className="text-center text-[8px] uppercase tracking-widest mt-2"
+          style={{ color: '#555' }}
+          role="status"
+        >
           Bypassed
         </div>
       )}
