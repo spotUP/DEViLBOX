@@ -7,7 +7,6 @@ import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
 import { NKSSettingsPanel } from './NKSSettingsPanel';
-import { NKSPresetBrowser } from './NKSPresetBrowser';
 import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2 } from 'lucide-react';
 
 
@@ -15,7 +14,6 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [showLearnModal, setShowLearnModal] = useState(false);
-  const [showPresetBrowser, setShowPresetBrowser] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // PERFORMANCE OPTIMIZATION: Use individual selectors
@@ -210,11 +208,6 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
         </div>
       )}
     </div>
-
-    {/* NKS Preset Browser Modal */}
-    {showPresetBrowser && (
-      <NKSPresetBrowser onClose={() => setShowPresetBrowser(false)} />
-    )}
 
     {/* MIDI Learn Modal */}
     <MIDILearnModal

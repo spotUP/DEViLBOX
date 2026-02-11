@@ -5,10 +5,9 @@
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, Zap } from 'lucide-react';
+import { Plus, X, Palette, Download } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
-import { NanoExportDialog } from '@components/export';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 
@@ -34,7 +33,7 @@ const NavBarComponent: React.FC = () => {
 
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [showNanoExport, setShowNanoExport] = useState(false);
+
 
   const currentTheme = getCurrentTheme();
 
@@ -98,18 +97,6 @@ const NavBarComponent: React.FC = () => {
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
         <div className="flex items-center gap-4">
-          {/* Nano Exporter (4k Intro) */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowNanoExport(true)}
-            icon={<Zap size={14} className="text-amber-400" />}
-            className="text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 border border-amber-400/20"
-            title="Nano Exporter: Demoscene-grade binary packing"
-          >
-            NANO
-          </Button>
-
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <Button
@@ -231,10 +218,6 @@ const NavBarComponent: React.FC = () => {
         onClose={() => setShowDownloadModal(false)}
       />
 
-      {/* Nano Exporter */}
-      {showNanoExport && (
-        <NanoExportDialog onClose={() => setShowNanoExport(false)} />
-      )}
     </div>
   );
 };

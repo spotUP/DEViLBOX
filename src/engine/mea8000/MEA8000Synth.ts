@@ -190,23 +190,31 @@ export class MEA8000Synth extends MAMEBaseSynth {
       durationMs: f.durationMs,
     }));
 
+    // Activate a voice so WASM processes parameter changes
+    this.writeKeyOn(60, 0.8);
+
     this._speechSequencer = new SpeechSequencer<MEA8000Frame>(
       (frame) => {
         this.setFormants(frame.f1, frame.f2, frame.f3);
         this.setNoiseMode(frame.noise);
         this.setBandwidth(frame.bw);
       },
-      () => { this._speechSequencer = null; }
+      () => {
+        this._speechSequencer = null;
+        this.writeKeyOff();
+      }
     );
     this._speechSequencer.speak(speechFrames);
   }
 
   /** Stop current text-to-speech playback */
   stopSpeaking(): void {
+    const wasSpeaking = this._speechSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
+    if (wasSpeaking) this.writeKeyOff();
   }
 
   /** Whether text-to-speech is currently playing */
