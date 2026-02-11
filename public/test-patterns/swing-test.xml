@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db303-pattern version="1.0" numSteps="16" tempo="120" swing="0" rootNote="60">
+  <!-- Swing Timing Test Pattern - EVERY STEP HAS A NOTE -->
+  <!-- 16 steps at 120 BPM, continuous 16th notes to test swing -->
+  <!-- At swing=100: should sound like even metronome clicks -->
+  <!-- At swing=150: odd steps should be slightly delayed (shuffle) -->
+  <!-- At swing=200: strong triplet/shuffle feel -->
+  
+  <!-- Step 0: C (on-beat, never delayed) -->
+  <step index="0" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 1: C (off-beat, GETS DELAYED by swing) -->
+  <step index="1" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 2: C (on-beat, never delayed) -->
+  <step index="2" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 3: C (off-beat, GETS DELAYED by swing) -->
+  <step index="3" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 4: C (on-beat) -->
+  <step index="4" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 5: C (off-beat, GETS DELAYED) -->
+  <step index="5" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 6: C (on-beat) -->
+  <step index="6" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 7: C (off-beat, GETS DELAYED) -->
+  <step index="7" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 8: C (on-beat) -->
+  <step index="8" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 9: C (off-beat, GETS DELAYED) -->
+  <step index="9" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 10: C (on-beat) -->
+  <step index="10" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 11: C (off-beat, GETS DELAYED) -->
+  <step index="11" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 12: C (on-beat) -->
+  <step index="12" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 13: C (off-beat, GETS DELAYED) -->
+  <step index="13" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 14: C (on-beat) -->
+  <step index="14" key="0" octave="0" gate="true" accent="true" slide="false" mute="false" hammer="false" />
+  
+  <!-- Step 15: C (off-beat, GETS DELAYED) -->
+  <step index="15" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+</db303-pattern>
