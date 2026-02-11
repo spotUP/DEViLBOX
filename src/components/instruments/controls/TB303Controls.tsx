@@ -12,6 +12,7 @@ import { JC303StyledKnobPanel } from './JC303StyledKnobPanel';
 interface TB303ControlsProps {
   config: TB303Config;
   onChange: (updates: Partial<TB303Config>) => void;
+  onPresetLoad?: (preset: any) => void;
   /** Show the filter curve visualization at top */
   showFilterCurve?: boolean;
   /** Show the TB303 branding header */
@@ -24,12 +25,14 @@ interface TB303ControlsProps {
 export const TB303Controls: React.FC<TB303ControlsProps> = ({
   config,
   onChange,
+  onPresetLoad,
   isBuzz3o3 = false,
 }) => {
   return (
         <JC303StyledKnobPanel
           config={config}
           onChange={onChange}
+          onPresetLoad={onPresetLoad}
           isBuzz3o3={isBuzz3o3}
         />  );
 };

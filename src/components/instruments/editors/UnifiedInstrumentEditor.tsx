@@ -458,6 +458,33 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     });
   }, [instrument.tb303, handleChange]);
 
+  // Handle full TB303 preset load (synth config + effects chain)
+  const handleTB303PresetLoad = useCallback(async (preset: any) => {
+    // Apply TB-303 synth config
+    if (preset.tb303) {
+      handleChange({
+        tb303: { ...instrument.tb303, ...preset.tb303 } as any,
+      });
+    }
+
+    // Apply effects chain (or clear if preset has none)
+    if (preset.effects !== undefined) {
+      const effects = preset.effects.map((fx: any, i: number) => ({
+        ...fx,
+        id: fx.id || `tb303-fx-${Date.now()}-${i}`,
+      }));
+      handleChange({ effects });
+
+      // Rebuild audio chain immediately
+      try {
+        const engine = getToneEngine();
+        await engine.rebuildInstrumentEffects(instrument.id, effects);
+      } catch (e) {
+        // Engine not initialized yet
+      }
+    }
+  }, [instrument.tb303, instrument.id, handleChange]);
+
   // Handle Dub Siren config updates
   const handleDubSirenChange = useCallback((updates: Partial<typeof instrument.dubSiren>) => {
     const currentDubSiren = instrument.dubSiren || DEFAULT_DUB_SIREN;
@@ -634,6 +661,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <TB303Controls
             config={instrument.tb303}
             onChange={handleTB303Change}
+            onPresetLoad={handleTB303PresetLoad}
             showFilterCurve={false}
             showHeader={false}
             isJC303={true}
