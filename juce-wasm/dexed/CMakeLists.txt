@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(DexedWASM VERSION 1.0.0)
+
 # Dexed (DX7 FM Synthesizer) WASM Build
 # Uses the msfa engine from music-synthesizer-for-android (Apache 2.0)
 
@@ -22,7 +25,7 @@ add_executable(DexedWASM ${DEXED_SOURCES})
 target_include_directories(DexedWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/msfa
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/../common
 )
 
 # Define WASM-specific macros
@@ -33,7 +36,7 @@ target_compile_definitions(DexedWASM PRIVATE
 set_target_properties(DexedWASM PROPERTIES
     OUTPUT_NAME "Dexed"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/dexed"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/dexed"
 )
 
 target_link_options(DexedWASM PRIVATE

@@ -1,21 +1,28 @@
 # Tonewheel Organ WASM Synth Build
 # Built from scratch for DEViLBOX - Hammond-style tonewheel organ
+#
+# Build:
+#   cd juce-wasm/tonewheel && mkdir -p build && cd build
+#   emcmake cmake .. && emmake make -j$(nproc)
+
+cmake_minimum_required(VERSION 3.15)
+project(TonewheelWASM VERSION 1.0.0)
 
 set(TONEWHEEL_SOURCES
-    TonewheelOrganSynth.cpp
+    "${CMAKE_SOURCE_DIR}/TonewheelOrganSynth.cpp"
 )
 
 add_executable(TonewheelWASM ${TONEWHEEL_SOURCES})
 
 target_include_directories(TonewheelWASM PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/../common
 )
 
 set_target_properties(TonewheelWASM PROPERTIES
     OUTPUT_NAME "Tonewheel"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/tonewheel"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/tonewheel"
 )
 
 target_link_options(TonewheelWASM PRIVATE

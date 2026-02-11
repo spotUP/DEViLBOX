@@ -35,7 +35,7 @@ add_executable(Open303WASM ${OPEN303_CXX_SOURCES} ${OPEN303_C_SOURCES})
 
 target_include_directories(Open303WASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/../common
 )
 
 # C++ compile options
@@ -51,7 +51,7 @@ set_source_files_properties(${OPEN303_C_SOURCES} PROPERTIES COMPILE_FLAGS
 set_target_properties(Open303WASM PROPERTIES
     OUTPUT_NAME "Open303"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/open303"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/open303"
 )
 
 target_link_options(Open303WASM PRIVATE

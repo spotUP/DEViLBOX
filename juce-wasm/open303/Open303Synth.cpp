@@ -16,6 +16,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/bind.h>
@@ -25,10 +26,9 @@
 namespace devilbox {
 
 /**
- * Open303 Parameter IDs
+ * Open303 Parameter IDs (sequential for VSTBridge compatibility)
  */
 enum class Open303Param {
-    // Main parameters (0-9)
     WAVEFORM = 0,       // 0-1 (saw to square)
     TUNING = 1,         // Hz (default 440)
     CUTOFF = 2,         // Hz (filter cutoff)
@@ -37,27 +37,49 @@ enum class Open303Param {
     DECAY = 5,          // ms
     ACCENT = 6,         // 0-100%
     VOLUME = 7,         // dB
+    AMP_SUSTAIN = 8,    // dB
+    SLIDE_TIME = 9,     // ms
+    NORMAL_ATTACK = 10, // ms
+    ACCENT_ATTACK = 11, // ms
+    ACCENT_DECAY = 12,  // ms
+    AMP_DECAY = 13,     // ms
+    AMP_RELEASE = 14,   // ms
+    PRE_FILTER_HP = 15, // Hz
+    FEEDBACK_HP = 16,   // Hz
+    POST_FILTER_HP = 17,// Hz
+    SQUARE_PHASE = 18,  // degrees
+    TANH_DRIVE = 19,
+    TANH_OFFSET = 20,
+    PARAM_COUNT = 21
+};
 
-    // Extended parameters (10-19)
-    AMP_SUSTAIN = 10,   // dB
-    SLIDE_TIME = 11,    // ms
-    NORMAL_ATTACK = 12, // ms
-    ACCENT_ATTACK = 13, // ms
-    ACCENT_DECAY = 14,  // ms
-    AMP_DECAY = 15,     // ms
-    AMP_RELEASE = 16,   // ms
+static constexpr int O303_COUNT = static_cast<int>(Open303Param::PARAM_COUNT);
 
-    // Filter tuning (20-29)
-    PRE_FILTER_HP = 20,   // Hz
-    FEEDBACK_HP = 21,     // Hz
-    POST_FILTER_HP = 22,  // Hz
-    SQUARE_PHASE = 23,    // degrees
+static const char* O303_PARAM_NAMES[O303_COUNT] = {
+    "Osc:Waveform", "Master:Tuning", "Filter:Cutoff", "Filter:Resonance",
+    "Filter:Env Mod", "Filter:Decay", "Play:Accent", "Master:Volume",
+    "Amp:Sustain", "Play:Slide Time", "Envelope:Attack", "Envelope:Accent Atk",
+    "Envelope:Accent Dcy", "Amp:Decay", "Amp:Release",
+    "Internal:Pre Filter HP", "Internal:Feedback HP", "Internal:Post Filter HP",
+    "Internal:Square Phase", "Internal:Tanh Drive", "Internal:Tanh Offset"
+};
 
-    // Internal/advanced (30+)
-    TANH_DRIVE = 30,
-    TANH_OFFSET = 31,
+static const float O303_PARAM_MINS[O303_COUNT] = {
+    0, 400, 20, 0, 0, 30, 0, -60,
+    -60, 1, 0.3f, 0.3f, 30, 16, 1,
+    1, 1, 1, 0, 0, -1
+};
 
-    PARAM_COUNT = 32
+static const float O303_PARAM_MAXS[O303_COUNT] = {
+    1, 480, 20000, 100, 100, 3000, 100, 0,
+    0, 500, 30, 30, 3000, 3000, 3000,
+    1000, 1000, 1000, 360, 10, 1
+};
+
+static const float O303_PARAM_DEFAULTS[O303_COUNT] = {
+    0.0f, 440.0f, 1000.0f, 50.0f, 25.0f, 1000.0f, 0.0f, -12.0f,
+    -60.0f, 60.0f, 3.0f, 3.0f, 200.0f, 1230.0f, 1.0f,
+    44.5f, 150.0f, 24.0f, 180.0f, 0.5f, 0.0f
 };
 
 /**
@@ -329,6 +351,35 @@ public:
         // Slide is handled automatically when notes overlap
     }
 
+    // --- Parameter metadata (for VSTBridge auto-generated UI) ---
+    int getParameterCount() const { return O303_COUNT; }
+
+    const char* getParameterName(int paramId) const {
+        if (paramId >= 0 && paramId < O303_COUNT) return O303_PARAM_NAMES[paramId];
+        return "";
+    }
+
+    float getParameterMin(int paramId) const {
+        if (paramId >= 0 && paramId < O303_COUNT) return O303_PARAM_MINS[paramId];
+        return 0.0f;
+    }
+
+    float getParameterMax(int paramId) const {
+        if (paramId >= 0 && paramId < O303_COUNT) return O303_PARAM_MAXS[paramId];
+        return 1.0f;
+    }
+
+    float getParameterDefault(int paramId) const {
+        if (paramId >= 0 && paramId < O303_COUNT) return O303_PARAM_DEFAULTS[paramId];
+        return 0.0f;
+    }
+
+#ifdef __EMSCRIPTEN__
+    std::string getParameterNameJS(int paramId) const {
+        return std::string(getParameterName(paramId));
+    }
+#endif
+
 private:
     int sampleRate_;
     bool isInitialized_;
@@ -353,6 +404,11 @@ EMSCRIPTEN_BINDINGS(Open303Synth_bindings) {
         .function("allNotesOff", &devilbox::Open303Synth::allNotesOff)
         .function("setParameter", &devilbox::Open303Synth::setParameter)
         .function("getParameter", &devilbox::Open303Synth::getParameter)
+        .function("getParameterCount", &devilbox::Open303Synth::getParameterCount)
+        .function("getParameterName", &devilbox::Open303Synth::getParameterNameJS)
+        .function("getParameterMin", &devilbox::Open303Synth::getParameterMin)
+        .function("getParameterMax", &devilbox::Open303Synth::getParameterMax)
+        .function("getParameterDefault", &devilbox::Open303Synth::getParameterDefault)
         .function("controlChange", &devilbox::Open303Synth::controlChange)
         .function("pitchBend", &devilbox::Open303Synth::pitchBend)
         .function("programChange", &devilbox::Open303Synth::programChange)
