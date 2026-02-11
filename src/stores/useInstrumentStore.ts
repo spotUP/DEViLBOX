@@ -21,6 +21,7 @@ import {
   DEFAULT_SPACE_LASER,
   DEFAULT_V2,
   DEFAULT_SAM,
+  DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
   DEFAULT_DRUM_MACHINE,
@@ -134,6 +135,12 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       break;
     case 'Synare':
       base.synare = { ...DEFAULT_SYNARE };
+      break;
+    case 'WAMOBXd':
+    case 'WAMSynth101':
+    case 'WAMTinySynth':
+    case 'WAMFaustFlute':
+      base.wam = { ...DEFAULT_WAM };
       break;
     case 'WAM':
       base.wam = { ...DEFAULT_WAM };
@@ -423,6 +430,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
             instrument.sam = { ...DEFAULT_SAM };
           }
 
+          // Auto-initialize V2Speech config when synthType changes to 'V2Speech'
+          if (synthTypeChanging && updates.synthType === 'V2Speech' && !instrument.v2Speech) {
+            instrument.v2Speech = { ...DEFAULT_V2_SPEECH };
+          }
+
           // Auto-apply first factory preset when synthType changes (unless this IS a preset load).
           // This ensures synths produce sound immediately (V2 needs patch data, MAME chips need _program).
           // Only applies when switching to a new type — won't affect re-editing existing instruments.
@@ -482,7 +494,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             // V2 Speech mode - uses applyConfig pattern
-            if (updatedInstrument.synthType === 'V2' && updatedInstrument.v2Speech && updates.v2Speech) {
+            if ((updatedInstrument.synthType === 'V2' || updatedInstrument.synthType === 'V2Speech') && updatedInstrument.v2Speech && updates.v2Speech) {
               engine.updateComplexSynthParameters(id, updatedInstrument.v2Speech);
               return; // Handled
             }
