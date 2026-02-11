@@ -142,11 +142,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
     return allParams.filter(p => p.name.startsWith(prefix));
   }, [allParams, activeScene]);
 
-  /** Get params matching a prefix (no scene) */
-  const getGlobalParams = useCallback((pattern: string): VSTBridgeParam[] => {
-    return allParams.filter(p => p.name.startsWith(pattern));
-  }, [allParams]);
-
   if (!synthReady) {
     return (
       <div className="flex flex-col gap-4 p-4">
@@ -324,7 +319,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
         {activeTab === 'lfo' && (
           <SurgeLfoTab
             activeScene={activeScene}
-            paramByName={paramByName}
             paramValues={paramValues}
             setParam={setParam}
             knobColor={knobColor}
@@ -376,7 +370,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
 
 interface SurgeLfoTabProps {
   activeScene: Scene;
-  paramByName: Map<string, VSTBridgeParam>;
   paramValues: Map<number, number>;
   setParam: (id: number, value: number) => void;
   knobColor: string;
@@ -386,7 +379,7 @@ interface SurgeLfoTabProps {
 }
 
 const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
-  activeScene, paramByName, paramValues, setParam, knobColor, accentColor, panelBg, allParams,
+  activeScene, paramValues, setParam, knobColor, accentColor, panelBg, allParams,
 }) => {
   const [activeLfo, setActiveLfo] = useState(1);
 
