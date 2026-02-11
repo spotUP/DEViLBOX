@@ -1650,40 +1650,33 @@ export class ToneEngine {
     }
 
     try {
+      // TB303-style synths — delegate to set() for all params
+      if (instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator') {
+        if (typeof instrument.set === 'function') {
+          instrument.set(parameter, value);
+          return;
+        }
+      }
+
+      // Non-TB303 instruments
       switch (parameter) {
         case 'cutoff':
-          // Map 0-1 to 200-20000 Hz (logarithmic)
-          if (instrument instanceof JC303Synth) {
-            const cutoffHz = 200 * Math.pow(100, value); // 200 to 20000 Hz
-            instrument.setCutoff(cutoffHz);
-          } else if (instrument.filter) {
+          if (instrument.filter) {
             const cutoffHz = 200 * Math.pow(100, value);
             instrument.filter.frequency.setValueAtTime(cutoffHz, now);
           }
           break;
 
         case 'resonance':
-          // Map 0-1 to 0-100%
-          if (instrument instanceof JC303Synth) {
-            instrument.setResonance(value * 100);
-          } else if (instrument.filter) {
+          if (instrument.filter) {
             instrument.filter.Q.setValueAtTime(value * 10, now);
           }
           break;
 
-        case 'envMod':
-          // Map 0-1 to 0-100% envelope modulation
-          if (instrument instanceof JC303Synth) {
-            instrument.setEnvMod(value * 100);
-          }
-          break;
-
         case 'volume':
-          // Map 0-1 to -40dB to 0dB
           const volumeDb = -40 + value * 40;
           if (isDevilboxSynth(instrument)) {
-            // DevilboxSynth: set gain on native GainNode output
-            const gain = Math.pow(10, volumeDb / 20); // dB to linear
+            const gain = Math.pow(10, volumeDb / 20);
             (instrument.output as GainNode).gain.setValueAtTime(gain, now);
           } else if (instrument.volume) {
             instrument.volume.setValueAtTime(volumeDb, now);
@@ -1691,94 +1684,9 @@ export class ToneEngine {
           break;
 
         case 'pan':
-          // Map 0-1 to -1 to +1 (left to right)
           const panValue = value * 2 - 1;
           if (instrument.pan) {
             instrument.pan.setValueAtTime(panValue, now);
-          }
-          break;
-
-        case 'decay':
-          // Map 0-1 to 30-3000ms decay time
-          if (instrument instanceof JC303Synth) {
-            const decayMs = 30 + value * 2970; // 30 to 3000ms
-            instrument.setDecay(decayMs);
-          }
-          break;
-
-        case 'accent':
-          // Map 0-1 to 0-100% accent amount
-          if (instrument instanceof JC303Synth) {
-            instrument.setAccentAmount(value * 100);
-          }
-          break;
-
-        case 'tuning':
-          // Map 0-1 to -100 to +100 cents
-          if (instrument instanceof JC303Synth) {
-            const cents = (value - 0.5) * 200; // -100 to +100
-            instrument.setTuning(cents);
-          }
-          break;
-
-        case 'overdrive':
-          // Map 0-1 to 0-100% overdrive
-          if (instrument instanceof JC303Synth) {
-            instrument.setOverdrive(value * 100);
-          }
-          break;
-
-        // Devil Fish parameters
-        case 'normalDecay':
-          // Map 0-1 to 30-3000ms decay time for normal notes
-          if (instrument instanceof JC303Synth) {
-            const decayMs = 30 + value * 2970; // 30 to 3000ms
-            instrument.setNormalDecay(decayMs);
-          }
-          break;
-
-        case 'accentDecay':
-          // Map 0-1 to 30-3000ms decay time for accented notes
-          if (instrument instanceof JC303Synth) {
-            const decayMs = 30 + value * 2970; // 30 to 3000ms
-            instrument.setAccentDecay(decayMs);
-          }
-          break;
-
-        case 'vegDecay':
-          // Map 0-1 to 16-3000ms VEG decay time
-          if (instrument instanceof JC303Synth) {
-            const decayMs = 16 + value * 2984; // 16 to 3000ms
-            instrument.setVegDecay(decayMs);
-          }
-          break;
-
-        case 'vegSustain':
-          // Map 0-1 to 0-100% VEG sustain level
-          if (instrument instanceof JC303Synth) {
-            instrument.setVegSustain(value * 100);
-          }
-          break;
-
-        case 'softAttack':
-          // Map 0-1 to 0.3-30ms soft attack time (logarithmic)
-          if (instrument instanceof JC303Synth) {
-            const attackMs = 0.3 * Math.pow(100, value); // 0.3 to 30ms
-            instrument.setSoftAttack(attackMs);
-          }
-          break;
-
-        case 'filterTracking':
-          // Map 0-1 to 0-200% filter tracking
-          if (instrument instanceof JC303Synth) {
-            instrument.setFilterTracking(value * 200);
-          }
-          break;
-
-        case 'filterFM':
-          // Map 0-1 to 0-100% filter FM amount
-          if (instrument instanceof JC303Synth) {
-            instrument.setFilterFM(value * 100);
           }
           break;
 
@@ -3115,9 +3023,6 @@ export class ToneEngine {
    * Supports both JC303Synth (TB303) and BuzzmachineGenerator (Buzz3o3)
    */
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
-    // No throttling needed - parameter normalization prevents BiquadFilterNode instability
-    // Immediate updates provide responsive knob feel
-
     // Find all DB303Synth instances for this instrument
     const synths: DB303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
@@ -3133,219 +3038,9 @@ export class ToneEngine {
       return;
     }
 
-    // Normalization constants (must match InstrumentFactory)
-    const CUTOFF_MIN = 314;
-    const CUTOFF_MAX = 2394;
-    const DECAY_MIN = 200;
-    const DECAY_MAX = 2000;
-    const SLIDE_MIN = 2;
-    const SLIDE_MAX = 360;
-    
-    // Normalization helper - converts raw values (Hz, ms, %) to 0-1 range
-    // Matches InstrumentFactory logic: accepts both normalized (0-1) and raw (Hz/ms/%) values
-    const norm = (v: number, min: number, max: number) => {
-      if (v >= 0 && v <= 1) return v; // Already normalized
-      const clamped = Math.max(min, Math.min(max, v)); // Clamp to range
-      return Math.log(clamped / min) / Math.log(max / min); // Logarithmic for frequency/time
-    };
-    
-    const normPercent = (v: number) => {
-      if (v >= 0 && v <= 1) return v; // Already normalized (0-1)
-      return Math.max(0, Math.min(1, v / 100)); // Convert 0-100% to 0-1
-    };
-
-    // Logging disabled for performance (causes UI lag during knob dragging)
-    // Convert normalized value back to Hz/ms/% for logging
-    // const denorm = (v: number, min: number, max: number) => {
-    //   if (v > 1) return v; // Already in Hz/ms
-    //   return min * Math.pow(max / min, v);
-    // };
-    // const denormPercent = (v: number) => {
-    //   if (v > 1) return v; // Already in %
-    //   return v * 100;
-    // };
-    // const cutoffHz = tb303Config.filter?.cutoff !== undefined ? denorm(tb303Config.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX) : 0;
-    // const resoPercent = tb303Config.filter?.resonance !== undefined ? denormPercent(tb303Config.filter.resonance) : 0;
-    // const envModPercent = tb303Config.filterEnvelope?.envMod !== undefined ? denormPercent(tb303Config.filterEnvelope.envMod) : 0;
-    // const decayMs = tb303Config.filterEnvelope?.decay !== undefined ? denorm(tb303Config.filterEnvelope.decay, DECAY_MIN, DECAY_MAX) : 0;
-    // console.log(`[ToneEngine] updateTB303Parameters: cutoff=${cutoffHz.toFixed(1)}Hz reso=${resoPercent.toFixed(0)}% envMod=${envModPercent.toFixed(0)}% decay=${decayMs.toFixed(0)}ms (${synths.length} instances)`);
-
-    // Update all DB303Synth instances
-    synths.forEach((synth) => {
-      // Core parameters
-      if (tb303Config.tuning !== undefined) {
-        synth.setTuning(tb303Config.tuning);
-      }
-      
-      if (tb303Config.volume !== undefined) {
-        synth.setVolume(tb303Config.volume);
-      }
-      
-      if (tb303Config.filter) {
-        synth.setCutoff(norm(tb303Config.filter.cutoff, CUTOFF_MIN, CUTOFF_MAX));
-        synth.setResonance(normPercent(tb303Config.filter.resonance));
-      }
-      
-      if (tb303Config.filterEnvelope) {
-        synth.setEnvMod(normPercent(tb303Config.filterEnvelope.envMod));
-        synth.setDecay(norm(tb303Config.filterEnvelope.decay, DECAY_MIN, DECAY_MAX));
-      }
-      
-      if (tb303Config.accent) {
-        synth.setAccentAmount(normPercent(tb303Config.accent.amount));
-      }
-      
-      if (tb303Config.slide) {
-        synth.setSlideTime(norm(tb303Config.slide.time, SLIDE_MIN, SLIDE_MAX));
-      }
-      
-      if (tb303Config.overdrive) {
-        synth.setOverdrive(normPercent(tb303Config.overdrive.amount));
-      }
-      
-      if (tb303Config.oscillator) {
-        // Use waveformBlend if available (0-1 continuous), otherwise fall back to type
-        const waveformValue = tb303Config.oscillator.waveformBlend !== undefined 
-          ? tb303Config.oscillator.waveformBlend 
-          : (tb303Config.oscillator.type === 'square' ? 1.0 : 0.0);
-        synth.setWaveform(waveformValue);
-        
-        if (tb303Config.oscillator.pulseWidth !== undefined) {
-          synth.setPulseWidth(normPercent(tb303Config.oscillator.pulseWidth));
-        }
-        if (tb303Config.oscillator.subOscGain !== undefined) {
-          synth.setSubOscGain(normPercent(tb303Config.oscillator.subOscGain));
-        }
-        if (tb303Config.oscillator.subOscBlend !== undefined) {
-          synth.setSubOscBlend(normPercent(tb303Config.oscillator.subOscBlend));
-        }
-        if (tb303Config.oscillator.pitchToPw !== undefined) {
-          synth.setPitchToPw(tb303Config.oscillator.pitchToPw);
-        }
-      }
-
-      // Devil Fish parameters
-      if (tb303Config.devilFish?.enabled) {
-        const df = tb303Config.devilFish;
-        synth.enableDevilFish(true);
-        
-        // Decay times
-        synth.setNormalDecay(norm(df.normalDecay, DECAY_MIN, DECAY_MAX));
-        synth.setAccentDecay(norm(df.accentDecay, DECAY_MIN, DECAY_MAX));
-        
-        // Attack
-        synth.setSoftAttack(normPercent(df.softAttack));
-        if (df.accentSoftAttack !== undefined) {
-          synth.setAccentSoftAttack(normPercent(df.accentSoftAttack));
-        }
-        
-        // VEG (Volume Envelope Generator)
-        synth.setVegDecay(norm(df.vegDecay, DECAY_MIN, DECAY_MAX));
-        synth.setVegSustain(normPercent(df.vegSustain));
-        
-        // Filter enhancements
-        synth.setFilterTracking(normPercent(df.filterTracking));
-        synth.setFilterFmDepth(normPercent(df.filterFmDepth));
-        
-        if (df.filterInputDrive !== undefined) {
-          synth.setFilterInputDrive(normPercent(df.filterInputDrive));
-        }
-        if (df.passbandCompensation !== undefined) {
-          // db303 web app inverts knob value before sending to engine
-          synth.setPassbandCompensation(1 - normPercent(df.passbandCompensation));
-        }
-        if (df.resTracking !== undefined) {
-          // Config stores inverted XML value (knob position). Engine needs 1 - knobPos.
-          const rtNorm = normPercent(df.resTracking);
-          synth.setResTracking(1 - rtNorm);
-          synth.setKorgIbiasScale(0.1 + rtNorm * 3.9);
-        }
-        if (df.duffingAmount !== undefined) {
-          synth.setDuffingAmount(normPercent(df.duffingAmount));
-        }
-        if (df.lpBpMix !== undefined) {
-          synth.setLpBpMix(normPercent(df.lpBpMix));
-        }
-        if (df.filterSelect !== undefined) {
-          synth.setFilterSelect(df.filterSelect);
-        }
-        if (df.diodeCharacter !== undefined) {
-          synth.setDiodeCharacter(normPercent(df.diodeCharacter));
-        }
-        if (df.stageNLAmount !== undefined && typeof (synth as any).setStageNLAmount === 'function') {
-          (synth as any).setStageNLAmount(normPercent(df.stageNLAmount));
-        }
-        if (df.ensembleAmount !== undefined && typeof (synth as any).setEnsembleAmount === 'function') {
-          (synth as any).setEnsembleAmount(normPercent(df.ensembleAmount));
-        }
-        if (df.oversamplingOrder !== undefined && typeof (synth as any).setOversamplingOrder === 'function') {
-          (synth as any).setOversamplingOrder(df.oversamplingOrder);
-        }
-        
-        // Korg filter parameters (for Korg Ladder filter mode)
-        if (df.korgBite !== undefined) {
-          synth.setKorgBite(df.korgBite);
-        }
-        if (df.korgClip !== undefined) {
-          synth.setKorgClip(df.korgClip);
-        }
-        if (df.korgCrossmod !== undefined) {
-          synth.setKorgCrossmod(df.korgCrossmod);
-        }
-        if (df.korgQSag !== undefined) {
-          synth.setKorgQSag(df.korgQSag);
-        }
-        if (df.korgSharpness !== undefined) {
-          synth.setKorgSharpness(df.korgSharpness);
-        }
-        
-        if (typeof synth.setMuffler === 'function') {
-          synth.setMuffler(df.muffler);
-        }
-        // Note: sweepSpeed is not a native DB303 parameter - it's handled by normalAttack/accentAttack/decay
-        if (typeof synth.setHighResonance === 'function') {
-          synth.setHighResonance(df.highResonance);
-        }
-      } else if (tb303Config.devilFish) {
-        synth.enableDevilFish(false);
-      }
-
-      // LFO parameters
-      if (tb303Config.lfo) {
-        synth.setLfoWaveform(tb303Config.lfo.waveform);
-        synth.setLfoRate(tb303Config.lfo.rate);
-        synth.setLfoContour(tb303Config.lfo.contour);
-        synth.setLfoPitchDepth(tb303Config.lfo.pitchDepth);
-        synth.setLfoPwmDepth(tb303Config.lfo.pwmDepth);
-        synth.setLfoFilterDepth(tb303Config.lfo.filterDepth);
-        if (tb303Config.lfo.stiffDepth !== undefined) {
-          synth.setLfoStiffDepth(tb303Config.lfo.stiffDepth);
-        }
-      }
-
-      // Effects parameters
-      if (tb303Config.chorus) {
-        synth.setChorusMode(tb303Config.chorus.mode);
-        const mix = normPercent(tb303Config.chorus.mix);
-        synth.setChorusMix(tb303Config.chorus.enabled ? mix : 0);
-      }
-      
-      if (tb303Config.phaser) {
-        synth.setPhaserRate(normPercent(tb303Config.phaser.rate));
-        synth.setPhaserWidth(normPercent(tb303Config.phaser.depth));
-        synth.setPhaserFeedback(normPercent(tb303Config.phaser.feedback));
-        const mix = normPercent(tb303Config.phaser.mix);
-        synth.setPhaserMix(tb303Config.phaser.enabled ? mix : 0);
-      }
-      
-      if (tb303Config.delay) {
-        synth.setDelayTime(tb303Config.delay.time > 1 ? tb303Config.delay.time / 2000 : tb303Config.delay.time);
-        synth.setDelayFeedback(normPercent(tb303Config.delay.feedback));
-        synth.setDelayTone(normPercent(tb303Config.delay.tone));
-        synth.setDelayMix(tb303Config.delay.enabled ? normPercent(tb303Config.delay.mix) : 0);
-        synth.setDelaySpread(normPercent(tb303Config.delay.stereo));
-      }
-    }); // End synths.forEach
+    // Delegate directly to DB303Synth — it owns its own parameter mapping.
+    // All config values are already 0-1 normalized from the UI knobs.
+    synths.forEach((synth) => synth.applyConfig(tb303Config));
   }
 
   /**

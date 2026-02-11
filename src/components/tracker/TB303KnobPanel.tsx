@@ -33,96 +33,11 @@ export const TB303KnobPanel: React.FC = memo(() => {
     ? instruments.find(i => i.id === controlledInstrumentId && i.synthType === 'TB303')
     : instruments.find(i => i.synthType === 'TB303');
 
-  // Handle config updates - hook must be called before any returns
-  const handleConfigChange = useCallback(async (updates: Partial<TB303Config>) => {
+  // Handle config updates — store update triggers engine.updateTB303Parameters() → synth.applyConfig()
+  const handleConfigChange = useCallback((updates: Partial<TB303Config>) => {
     if (!targetInstrument) return;
-    
-    // Update config in store (for persistence)
-    const newConfig = { ...targetInstrument.tb303, ...updates };
     updateInstrument(targetInstrument.id, {
-      tb303: newConfig as any
-    });
-    
-    // CRITICAL: Also update live synth directly for immediate response
-    const { getToneEngine } = await import('@engine/ToneEngine');
-    const engine = getToneEngine();
-    const synth = engine.getInstrument(targetInstrument.id, targetInstrument);
-    if (!synth || !('setCutoff' in synth)) return; // Not a DB303Synth
-    
-    // Apply each changed parameter directly to WASM (all values are 0-1)
-    Object.entries(updates).forEach(([key, value]) => {
-      if (!value || typeof value !== 'object') {
-        // Simple values
-        if (key === 'tuning') synth.setTuning(value as number);
-        else if (key === 'volume') synth.setVolume(value as number);
-        return;
-      }
-      
-      const val = value as Record<string, any>;
-      if (key === 'filter') {
-        if ('cutoff' in val) synth.setCutoff(val.cutoff);
-        if ('resonance' in val) synth.setResonance(val.resonance);
-      } else if (key === 'filterEnvelope') {
-        if ('envMod' in val) synth.setEnvMod(val.envMod);
-        if ('decay' in val) synth.setDecay(val.decay);
-      } else if (key === 'accent') {
-        if ('amount' in val) synth.setAccent(val.amount);
-      } else if (key === 'oscillator') {
-        if ('type' in val) synth.setWaveform(val.type === 'square' ? 1.0 : 0.0);
-        if ('pulseWidth' in val) synth.setPulseWidth(val.pulseWidth);
-        if ('subOscGain' in val) synth.setSubOscGain(val.subOscGain);
-        if ('subOscBlend' in val) synth.setSubOscBlend(val.subOscBlend);
-        if ('pitchToPw' in val) synth.setPitchToPw(val.pitchToPw);
-      } else if (key === 'slide') {
-        if ('time' in val) synth.setSlideTime(val.time);
-      } else if (key === 'devilFish') {
-        if ('enabled' in val) synth.enableDevilFish(val.enabled);
-        if ('normalDecay' in val) synth.setNormalDecay(val.normalDecay);
-        if ('accentDecay' in val) synth.setAccentDecay(val.accentDecay);
-        if ('softAttack' in val) synth.setSoftAttack(val.softAttack);
-        if ('accentSoftAttack' in val) synth.setAccentSoftAttack(val.accentSoftAttack);
-        if ('passbandCompensation' in val) synth.setPassbandCompensation(val.passbandCompensation);
-        if ('resTracking' in val) synth.setResTracking(val.resTracking);
-        if ('filterInputDrive' in val) synth.setFilterInputDrive(val.filterInputDrive);
-        if ('diodeCharacter' in val) synth.setDiodeCharacter(val.diodeCharacter);
-        if ('duffingAmount' in val) synth.setDuffingAmount(val.duffingAmount);
-        if ('filterFmDepth' in val) synth.setFilterFmDepth(val.filterFmDepth);
-        if ('lpBpMix' in val) synth.setLpBpMix(val.lpBpMix);
-        if ('filterTracking' in val) synth.setFilterTracking(val.filterTracking);
-        if ('filterSelect' in val) synth.setFilterSelect(val.filterSelect);
-        // Korg filter params
-        if ('korgBite' in val) synth.setKorgBite(val.korgBite);
-        if ('korgClip' in val) synth.setKorgClip(val.korgClip);
-        if ('korgCrossmod' in val) synth.setKorgCrossmod(val.korgCrossmod);
-        if ('korgQSag' in val) synth.setKorgQSag(val.korgQSag);
-        if ('korgSharpness' in val) synth.setKorgSharpness(val.korgSharpness);
-        // Extras
-        if ('stageNLAmount' in val) synth.setStageNLAmount(val.stageNLAmount);
-        if ('ensembleAmount' in val) synth.setEnsembleAmount(val.ensembleAmount);
-        if ('oversamplingOrder' in val) synth.setOversamplingOrder(val.oversamplingOrder);
-      } else if (key === 'lfo') {
-        if ('waveform' in val) synth.setLfoWaveform(val.waveform);
-        if ('rate' in val) synth.setLfoRate(val.rate);
-        if ('contour' in val) synth.setLfoContour(val.contour);
-        if ('pitchDepth' in val) synth.setLfoPitchDepth(val.pitchDepth);
-        if ('pwmDepth' in val) synth.setLfoPwmDepth(val.pwmDepth);
-        if ('filterDepth' in val) synth.setLfoFilterDepth(val.filterDepth);
-        if ('stiffDepth' in val) synth.setLfoStiffDepth(val.stiffDepth);
-      } else if (key === 'chorus') {
-        if ('mode' in val) synth.setChorusMode(val.mode);
-        if ('mix' in val) synth.setChorusMix(val.mix);
-      } else if (key === 'phaser') {
-        if ('rate' in val) synth.setPhaserRate(val.rate);
-        if ('depth' in val) synth.setPhaserWidth(val.depth);
-        if ('feedback' in val) synth.setPhaserFeedback(val.feedback);
-        if ('mix' in val) synth.setPhaserMix(val.mix);
-      } else if (key === 'delay') {
-        if ('time' in val) synth.setDelayTime(val.time);
-        if ('feedback' in val) synth.setDelayFeedback(val.feedback);
-        if ('tone' in val) synth.setDelayTone(val.tone);
-        if ('mix' in val) synth.setDelayMix(val.mix);
-        if ('stereo' in val) synth.setDelaySpread(val.stereo);
-      }
+      tb303: { ...targetInstrument.tb303, ...updates } as any
     });
   }, [targetInstrument, updateInstrument]);
 
@@ -224,6 +139,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
           config={targetInstrument.tb303}
           onChange={handleConfigChange}
           onPresetLoad={handlePresetLoad}
+          instrumentId={targetInstrument.id}
         />
       </div>
     </div>

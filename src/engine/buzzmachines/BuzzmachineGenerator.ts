@@ -619,6 +619,36 @@ export class BuzzmachineGenerator implements DevilboxSynth {
     this.setHighResonanceEnabled(enabled);
   }
 
+  /**
+   * Universal single-parameter API (implements DevilboxSynth.set).
+   * All continuous values are 0-1 normalized. Maps to BuzzmachineGenerator's
+   * internal setters which handle WASM parameter index translation.
+   */
+  set(param: string, value: number): void {
+    switch (param) {
+      case 'cutoff':        this.setCutoff(value); break;
+      case 'resonance':     this.setResonance(value); break;
+      case 'envMod':        this.setEnvMod(value); break;
+      case 'decay':         this.setDecay(value); break;
+      case 'accent':        this.setAccent(value); break;
+      case 'tuning':        this.setTuning(value); break;
+      case 'volume':        this.setVolume(value); break;
+      case 'waveform':      this.setWaveform(value); break;
+      case 'slideTime':     this.setSlideTime(value); break;
+      case 'overdrive':     this.setOverdrive(value); break;
+      // Devil Fish
+      case 'normalDecay':   this.setNormalDecay(value); break;
+      case 'accentDecay':   this.setAccentDecay(value); break;
+      case 'softAttack':    this.setSoftAttack(value); break;
+      case 'filterTracking': this.setFilterTracking(value); break;
+      case 'filterFmDepth': this.setFilterFM(value); break;
+      case 'filterFM':      this.setFilterFM(value); break;
+      // VEG
+      case 'vegDecay':      this.setVegDecay(value); break;
+      case 'vegSustain':    this.setVegSustain(value); break;
+    }
+  }
+
   // ============================================
   // ENVELOPE PARAMETERS (limited support)
   // ============================================

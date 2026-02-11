@@ -1,4 +1,5 @@
 import type { DevilboxSynth } from '@/types/synth';
+import type { TB303Config } from '@typedefs/instrument';
 import { getDevilboxAudioContext, noteToMidi, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
 
 /**
@@ -74,6 +75,11 @@ const DB303Param = {
   OVERSAMPLING_ORDER: 'oversamplingOrder'
 } as const;
 
+/** Signal chain trace logging — enable via `window.DB303_TRACE = true` in browser console */
+function db303TraceEnabled(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).DB303_TRACE;
+}
+
 export class DB303Synth implements DevilboxSynth {
   readonly name = 'DB303Synth';
   readonly output: GainNode;
@@ -100,7 +106,6 @@ export class DB303Synth implements DevilboxSynth {
   private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    console.log('[DB303Synth] Constructor called');
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
@@ -392,6 +397,7 @@ export class DB303Synth implements DevilboxSynth {
       console.log(`[DB303] setParameter QUEUED (workletNode null): paramName=${paramName}, value=${value}, queue=${this._pendingParams.length}`);
       return;
     }
+    if (db303TraceEnabled()) console.log(`[DB303:WASM] ${paramName} = ${value}`);
     this.workletNode.port.postMessage({
       type: 'setParameter',
       paramId: paramName,  // String param name, worklet constructs setter
@@ -399,66 +405,76 @@ export class DB303Synth implements DevilboxSynth {
     });
   }
 
-  setParam(param: string, value: number): void {
-    // Map external param names to setter method calls
-    // This ensures transformations (like sticky-zero for duffing) are applied
+  /**
+   * Universal single-parameter API (implements DevilboxSynth.set).
+   * All continuous values are 0-1 normalized. The synth owns all internal
+   * transformations (Hz, ms, etc.). Callers never convert units.
+   */
+  set(param: string, value: number): void {
+    if (db303TraceEnabled()) console.log(`[DB303:set] ${param} = ${value}`);
     switch (param) {
-      case 'cutoff': this.setCutoff(value); break;
-      case 'cutoff_hz': this.setCutoffHz(value); break;
-      case 'resonance': this.setResonance(value); break;
-      case 'env_mod': this.setEnvMod(value); break;
-      case 'env_mod_percent': this.setEnvModPercent(value); break;
-      case 'decay': this.setDecay(value); break;
-      case 'accent': this.setAccent(value); break;
-      case 'waveform': this.setWaveform(value); break;
-      case 'pulse_width': this.setPulseWidth(value); break;
-      case 'pitch_to_pw': this.setPitchToPw(value); break;
-      case 'sub_osc_gain': this.setSubOscGain(value); break;
-      case 'sub_osc_blend': this.setSubOscBlend(value); break;
-      case 'normal_decay': this.setNormalDecay(value); break;
-      case 'accent_decay': this.setAccentDecay(value); break;
-      case 'soft_attack': this.setSoftAttack(value); break;
-      case 'accent_soft_attack': this.setAccentSoftAttack(value); break;
-      case 'passband_compensation': this.setPassbandCompensation(value); break;
-      case 'res_tracking': this.setResTracking(value); break;
-      case 'filter_input_drive': this.setFilterInputDrive(value); break;
-      case 'filter_select': this.setFilterSelect(value); break;
-      case 'diode_character': this.setDiodeCharacter(value); break;
-      case 'duffing_amount': this.setDuffingAmount(value); break;
-      case 'filter_fm_depth': this.setFilterFmDepth(value); break;
-      case 'korg_bite': this.setKorgBite(value); break;
-      case 'korg_clip': this.setKorgClip(value); break;
-      case 'korg_crossmod': this.setKorgCrossmod(value); break;
-      case 'korg_q_sag': this.setKorgQSag(value); break;
-      case 'korg_sharpness': this.setKorgSharpness(value); break;
-      case 'lp_bp_mix': this.setLpBpMix(value); break;
-      case 'filter_tracking': this.setFilterTracking(value); break;
-      case 'stage_nl_amount': this.setStageNLAmount(value); break;
-      case 'ensemble_amount': this.setEnsembleAmount(value); break;
-      case 'slide_time': this.setSlideTime(value); break;
-      case 'lfo_rate': this.setLfoRate(value); break;
-      case 'lfo_contour': this.setLfoContour(value); break;
-      case 'lfo_pitch_depth': this.setLfoPitchDepth(value); break;
-      case 'lfo_pwm_depth': this.setLfoPwmDepth(value); break;
-      case 'lfo_filter_depth': this.setLfoFilterDepth(value); break;
-      case 'lfo_stiff_depth': this.setLfoStiffDepth(value); break;
-      case 'chorus_mix': this.setChorusMix(value); break;
-      case 'phaser_rate': this.setPhaserRate(value); break;
-      case 'phaser_width': this.setPhaserWidth(value); break;
-      case 'phaser_feedback': this.setPhaserFeedback(value); break;
-      case 'phaser_mix': this.setPhaserMix(value); break;
-      case 'delay_time': this.setDelayTime(value); break;
-      case 'delay_feedback': this.setDelayFeedback(value); break;
-      case 'delay_tone': this.setDelayTone(value); break;
-      case 'delay_mix': this.setDelayMix(value); break;
-      case 'delay_spread': this.setDelaySpread(value); break;
-      case 'tuning': this.setTuning(value); break;
-      case 'volume': this.setVolume(value); break;
-      case 'lfo_waveform': this.setLfoWaveform(value); break;
-      case 'chorus_mode': this.setChorusMode(value); break;
-      case 'oversampling_order': this.setOversamplingOrder(value); break;
-      default:
-        console.warn(`[DB303] Unknown parameter: ${param}`);
+      case 'cutoff':        this.setCutoff(value); break;
+      case 'resonance':     this.setResonance(value); break;
+      case 'envMod':        this.setEnvMod(value); break;
+      case 'decay':         this.setDecay(value); break;
+      case 'accent':        this.setAccent(value); break;
+      case 'tuning':        this.setTuning(value); break;
+      case 'volume':        this.setVolume(value); break;
+      case 'waveform':      this.setWaveform(value); break;
+      case 'slideTime':     this.setSlideTime(value); break;
+      case 'overdrive':     this.setOverdrive(value); break;
+      case 'pulseWidth':    this.setPulseWidth(value); break;
+      case 'subOscGain':    this.setSubOscGain(value); break;
+      case 'subOscBlend':   this.setSubOscBlend(value); break;
+      case 'pitchToPw':     this.setPitchToPw(value); break;
+      // Devil Fish
+      case 'normalDecay':   this.setNormalDecay(value); break;
+      case 'accentDecay':   this.setAccentDecay(value); break;
+      case 'softAttack':    this.setSoftAttack(value); break;
+      case 'accentSoftAttack': this.setAccentSoftAttack(value); break;
+      case 'filterTracking': this.setFilterTracking(value); break;
+      case 'filterFmDepth': this.setFilterFmDepth(value); break;
+      case 'filterInputDrive': this.setFilterInputDrive(value); break;
+      case 'passbandCompensation': this.setPassbandCompensation(value); break;
+      case 'resTracking':   this.setResTracking(value); break;
+      case 'diodeCharacter': this.setDiodeCharacter(value); break;
+      case 'duffingAmount': this.setDuffingAmount(value); break;
+      case 'lpBpMix':       this.setLpBpMix(value); break;
+      case 'korgBite':      this.setKorgBite(value); break;
+      case 'korgClip':      this.setKorgClip(value); break;
+      case 'korgCrossmod':  this.setKorgCrossmod(value); break;
+      case 'korgQSag':      this.setKorgQSag(value); break;
+      case 'korgSharpness': this.setKorgSharpness(value); break;
+      case 'stageNLAmount': this.setStageNLAmount(value); break;
+      case 'ensembleAmount': this.setEnsembleAmount(value); break;
+      // LFO
+      case 'lfoRate':       this.setLfoRate(value); break;
+      case 'lfoContour':    this.setLfoContour(value); break;
+      case 'lfoPitchDepth': this.setLfoPitchDepth(value); break;
+      case 'lfoPwmDepth':   this.setLfoPwmDepth(value); break;
+      case 'lfoFilterDepth': this.setLfoFilterDepth(value); break;
+      case 'lfoStiffDepth': this.setLfoStiffDepth(value); break;
+      // Effects
+      case 'phaserRate':    this.setPhaserRate(value); break;
+      case 'phaserWidth':   this.setPhaserWidth(value); break;
+      case 'phaserFeedback': this.setPhaserFeedback(value); break;
+      case 'phaserMix':     this.setPhaserMix(value); break;
+      case 'delayTime':     this.setDelayTime(value); break;
+      case 'delayFeedback': this.setDelayFeedback(value); break;
+      case 'delayTone':     this.setDelayTone(value); break;
+      case 'delayMix':      this.setDelayMix(value); break;
+      case 'delaySpread':   this.setDelaySpread(value); break;
+      // Discrete (integer values, not 0-1)
+      case 'filterSelect':  this.setFilterSelect(value); break;
+      case 'chorusMode':    this.setChorusMode(value); break;
+      case 'chorusMix':     this.setChorusMix(value); break;
+      case 'lfoWaveform':   this.setLfoWaveform(value); break;
+      case 'oversamplingOrder': this.setOversamplingOrder(value); break;
+      // No-ops (WASM doesn't have these)
+      case 'vegDecay':      this.setVegDecay(value); break;
+      case 'vegSustain':    this.setVegSustain(value); break;
+      // Legacy snake_case aliases (for setParam compatibility)
+      case 'filterFM':      this.setFilterFmDepth(value); break;
     }
   }
 
@@ -467,21 +483,18 @@ export class DB303Synth implements DevilboxSynth {
   setCutoff(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
-    console.log('[DB303Synth] setCutoff:', clamped);
     this.setParameterByName(DB303Param.CUTOFF, clamped);
   }
 
   setResonance(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
-    console.log('[DB303Synth] setResonance:', clamped);
     this.setParameterByName(DB303Param.RESONANCE, clamped);
   }
 
   setEnvMod(value: number): void {
     // Send normalized 0-1 value directly
     const clamped = Math.max(0, Math.min(1, value));
-    console.log('[DB303Synth] setEnvMod:', clamped);
     this.setParameterByName(DB303Param.ENV_MOD, clamped);
   }
 
@@ -517,7 +530,6 @@ export class DB303Synth implements DevilboxSynth {
 
   setWaveform(value: number): void {
     // 0-1 (saw to square blend) - this one stays normalized
-    console.log('[DB303Synth] setWaveform:', value);
     this.setParameterByName(DB303Param.WAVEFORM, value);
   }
 
@@ -797,7 +809,7 @@ export class DB303Synth implements DevilboxSynth {
   // --- Missing methods for compatibility ---
   setOverdrive(amount: number): void {
     if (this._disposed || !this.workletNode) return;
-    this.overdriveAmount = Math.min(Math.max(amount, 0), 100) / 100;
+    this.overdriveAmount = Math.max(0, Math.min(1, amount));
 
     const now = this.audioContext.currentTime;
     const RAMP = 0.03; // 30ms smooth transition
@@ -862,19 +874,19 @@ export class DB303Synth implements DevilboxSynth {
     // Maps to the JS-side overdrive waveshaper with mode-specific curves.
     switch (mode) {
       case 'soft':
-        this.setOverdrive(15);
+        this.setOverdrive(0.15);
         break;
       case 'hard':
-        this.setOverdrive(45);
+        this.setOverdrive(0.45);
         break;
       case 'dark':
-        this.setOverdrive(30);
+        this.setOverdrive(0.30);
         break;
       case 'mid':
-        this.setOverdrive(25);
+        this.setOverdrive(0.25);
         break;
       case 'bright':
-        this.setOverdrive(35);
+        this.setOverdrive(0.35);
         break;
       case 'off':
       default:
@@ -928,6 +940,145 @@ export class DB303Synth implements DevilboxSynth {
   setQuality(_quality: string): void {}
   enableDevilFish(_enabled: boolean): void {}
   setHighResonance(_enabled: boolean): void {}
+
+  /**
+   * Apply a full TB303Config directly. All values are 0-1 normalized.
+   * This is the single canonical place for config → WASM parameter mapping.
+   * Called by both InstrumentFactory (init) and useInstrumentStore (runtime updates).
+   */
+  applyConfig(tb: TB303Config): void {
+    if (db303TraceEnabled()) {
+      const keys = Object.keys(tb).filter(k => (tb as any)[k] !== undefined);
+      console.log('[DB303:applyConfig]', keys);
+    }
+    // --- Core parameters ---
+    if (tb.tuning !== undefined) this.setTuning(tb.tuning);
+    if (tb.volume !== undefined) this.setVolume(tb.volume);
+
+    // Filter (all 0-1)
+    if (tb.filter) {
+      this.setCutoff(tb.filter.cutoff);
+      this.setResonance(tb.filter.resonance);
+    }
+
+    // Filter envelope (all 0-1)
+    if (tb.filterEnvelope) {
+      this.setEnvMod(tb.filterEnvelope.envMod);
+      this.setDecay(tb.filterEnvelope.decay);
+    }
+
+    // Accent (0-1)
+    if (tb.accent) {
+      this.setAccent(tb.accent.amount);
+    }
+
+    // Slide (0-1)
+    if (tb.slide) {
+      this.setSlideTime(tb.slide.time);
+    }
+
+    // Overdrive (0-1 normalized)
+    if (tb.overdrive) {
+      this.setOverdrive(tb.overdrive.amount);
+    }
+
+    // --- Oscillator ---
+    if (tb.oscillator) {
+      const waveformValue = tb.oscillator.waveformBlend !== undefined
+        ? tb.oscillator.waveformBlend
+        : (tb.oscillator.type === 'square' ? 1.0 : 0.0);
+      this.setWaveform(waveformValue);
+      if (tb.oscillator.pulseWidth !== undefined) this.setPulseWidth(tb.oscillator.pulseWidth);
+      if (tb.oscillator.subOscGain !== undefined) this.setSubOscGain(tb.oscillator.subOscGain);
+      if (tb.oscillator.subOscBlend !== undefined) this.setSubOscBlend(tb.oscillator.subOscBlend);
+      if (tb.oscillator.pitchToPw !== undefined) this.setPitchToPw(tb.oscillator.pitchToPw);
+    }
+
+    // --- Devil Fish modifications ---
+    const df = tb.devilFish;
+    if (df?.enabled) {
+      this.enableDevilFish(true);
+      if (df.normalDecay !== undefined) this.setNormalDecay(df.normalDecay);
+      if (df.accentDecay !== undefined) this.setAccentDecay(df.accentDecay);
+      if (df.softAttack !== undefined) this.setSoftAttack(df.softAttack);
+      if (df.accentSoftAttack !== undefined) this.setAccentSoftAttack(df.accentSoftAttack);
+      if (df.filterTracking !== undefined) this.setFilterTracking(df.filterTracking);
+      if (df.filterFmDepth !== undefined) this.setFilterFmDepth(df.filterFmDepth);
+      if (df.filterInputDrive !== undefined) this.setFilterInputDrive(df.filterInputDrive);
+      // passbandCompensation: db303 web app inverts knob value before sending to engine
+      if (df.passbandCompensation !== undefined) this.setPassbandCompensation(1 - df.passbandCompensation);
+      // resTracking: knob position → engine needs inverted + korgIbiasScale formula
+      if (df.resTracking !== undefined) {
+        this.setResTracking(1 - df.resTracking);
+        this.setKorgIbiasScale(0.1 + df.resTracking * 3.9);
+      }
+      if (df.duffingAmount !== undefined) this.setDuffingAmount(df.duffingAmount);
+      if (df.lpBpMix !== undefined) this.setLpBpMix(df.lpBpMix);
+      if (df.filterSelect !== undefined) this.setFilterSelect(df.filterSelect);
+      if (df.diodeCharacter !== undefined) this.setDiodeCharacter(df.diodeCharacter);
+      if (df.stageNLAmount !== undefined) this.setStageNLAmount(df.stageNLAmount);
+      if (df.ensembleAmount !== undefined) this.setEnsembleAmount(df.ensembleAmount);
+      if (df.oversamplingOrder !== undefined) this.setOversamplingOrder(df.oversamplingOrder);
+      // Korg filter parameters
+      if (df.korgBite !== undefined) this.setKorgBite(df.korgBite);
+      if (df.korgClip !== undefined) this.setKorgClip(df.korgClip);
+      if (df.korgCrossmod !== undefined) this.setKorgCrossmod(df.korgCrossmod);
+      if (df.korgQSag !== undefined) this.setKorgQSag(df.korgQSag);
+      if (df.korgSharpness !== undefined) this.setKorgSharpness(df.korgSharpness);
+      if (df.muffler !== undefined) this.setMuffler(df.muffler);
+      if (df.sweepSpeed !== undefined) this.setSweepSpeed(df.sweepSpeed);
+      if (df.highResonance !== undefined) this.setHighResonanceEnabled(df.highResonance);
+    } else if (df) {
+      this.enableDevilFish(false);
+    }
+
+    // --- LFO ---
+    const lfo = tb.lfo;
+    if (lfo) {
+      if (lfo.waveform !== undefined) this.setLfoWaveform(lfo.waveform);
+      if (lfo.rate !== undefined) this.setLfoRate(lfo.rate);
+      if (lfo.contour !== undefined) this.setLfoContour(lfo.contour);
+      if (lfo.pitchDepth !== undefined) this.setLfoPitchDepth(lfo.pitchDepth);
+      if (lfo.pwmDepth !== undefined) this.setLfoPwmDepth(lfo.pwmDepth);
+      if (lfo.filterDepth !== undefined) this.setLfoFilterDepth(lfo.filterDepth);
+      if (lfo.stiffDepth !== undefined) this.setLfoStiffDepth(lfo.stiffDepth);
+    }
+
+    // --- Built-in effects (all WASM-internal) ---
+    if (tb.chorus) {
+      if (tb.chorus.mode !== undefined) this.setChorusMode(tb.chorus.mode);
+      this.setChorusMix(tb.chorus.enabled ? (tb.chorus.mix ?? 0) : 0);
+    }
+    if (tb.phaser) {
+      if (tb.phaser.rate !== undefined) this.setPhaserRate(tb.phaser.rate);
+      if (tb.phaser.depth !== undefined) this.setPhaserWidth(tb.phaser.depth);
+      if (tb.phaser.feedback !== undefined) this.setPhaserFeedback(tb.phaser.feedback);
+      this.setPhaserMix(tb.phaser.enabled ? (tb.phaser.mix ?? 0) : 0);
+    }
+    if (tb.delay) {
+      if (tb.delay.time !== undefined) this.setDelayTime(tb.delay.time);
+      if (tb.delay.feedback !== undefined) this.setDelayFeedback(tb.delay.feedback);
+      if (tb.delay.tone !== undefined) this.setDelayTone(tb.delay.tone);
+      this.setDelayMix(tb.delay.enabled ? (tb.delay.mix ?? 0) : 0);
+      if (tb.delay.stereo !== undefined) this.setDelaySpread(tb.delay.stereo);
+    }
+  }
+
+  /** Request WASM diagnostics readback from the worklet. Returns parameter state as seen by WASM. */
+  getDiagnostics(): Promise<Record<string, number>> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({}); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'diagnostics') {
+          this.workletNode?.port.removeEventListener('message', handler);
+          resolve(event.data);
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'getDiagnostics' });
+      setTimeout(() => resolve({}), 500);
+    });
+  }
 
   dispose(): void {
     this._disposed = true;
