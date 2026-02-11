@@ -17,7 +17,7 @@ import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
 
-type VitalTab = 'osc' | 'filter' | 'env' | 'lfo' | 'fx' | 'master';
+type VitalTab = 'osc' | 'filter' | 'env' | 'lfo' | 'fx' | 'master' | 'other';
 
 const TABS: { id: VitalTab; label: string }[] = [
   { id: 'osc', label: 'OSC' },
@@ -26,7 +26,28 @@ const TABS: { id: VitalTab; label: string }[] = [
   { id: 'lfo', label: 'LFO' },
   { id: 'fx', label: 'FX' },
   { id: 'master', label: 'MASTER' },
+  { id: 'other', label: 'OTHER' },
 ];
+
+/** Prefixes/names covered by the categorized tabs */
+const CATEGORIZED_PREFIXES = [
+  'osc_1_', 'osc_2_', 'osc_3_',
+  'filter_1_', 'filter_2_', 'filter_fx_',
+  'env_1_', 'env_2_', 'env_3_', 'env_4_', 'env_5_', 'env_6_',
+  'lfo_1_', 'lfo_2_', 'lfo_3_', 'lfo_4_', 'lfo_5_', 'lfo_6_', 'lfo_7_', 'lfo_8_',
+  'chorus_', 'delay_', 'distortion_', 'reverb_', 'compressor_', 'flanger_', 'phaser_', 'eq_',
+];
+
+const CATEGORIZED_EXACT = new Set([
+  'volume', 'polyphony', 'portamento_time', 'pitch_bend_range',
+  'velocity_track', 'oversampling',
+  'macro_control_1', 'macro_control_2', 'macro_control_3', 'macro_control_4',
+]);
+
+function isParamCategorized(name: string): boolean {
+  if (CATEGORIZED_EXACT.has(name)) return true;
+  return CATEGORIZED_PREFIXES.some(prefix => name.startsWith(prefix));
+}
 
 interface VitalControlsProps {
   instrument: InstrumentConfig;
@@ -40,6 +61,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
   const [activeTab, setActiveTab] = useState<VitalTab>('osc');
   const [paramValues, setParamValues] = useState<Map<number, number>>(new Map());
   const [paramByName, setParamByName] = useState<Map<string, VSTBridgeParam>>(new Map());
+  const [allParams, setAllParams] = useState<VSTBridgeParam[]>([]);
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
@@ -76,6 +98,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
           if (!cancelled) {
             setParamByName(nameMap);
             setParamValues(valMap);
+            setAllParams(wasmParams);
             setSynthReady(true);
           }
         } else {
@@ -351,6 +374,17 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
             </div>
           </div>
         )}
+
+        {activeTab === 'other' && (
+          <OtherParamsTab
+            allParams={allParams}
+            paramValues={paramValues}
+            setParam={setParam}
+            knobColor={knobColor}
+            accentColor={accentColor}
+            panelBg={panelBg}
+          />
+        )}
       </div>
     </div>
   );
@@ -459,5 +493,75 @@ const ToggleButton: React.FC<ToggleButtonProps> = ({
     >
       {isOn ? 'ON' : 'OFF'}
     </button>
+  );
+};
+
+// ============================================================================
+// Other (uncategorized) params tab
+// ============================================================================
+
+interface OtherParamsTabProps {
+  allParams: VSTBridgeParam[];
+  paramValues: Map<number, number>;
+  setParam: (id: number, value: number) => void;
+  knobColor: string;
+  accentColor: string;
+  panelBg: string;
+}
+
+const OtherParamsTab: React.FC<OtherParamsTabProps> = ({
+  allParams, paramValues, setParam, knobColor, accentColor, panelBg,
+}) => {
+  const uncategorized = allParams.filter(p => !isParamCategorized(p.name));
+
+  if (uncategorized.length === 0) {
+    return (
+      <div className={`p-4 rounded-xl border ${panelBg}`}>
+        <p className="text-sm text-gray-500">All parameters are shown in the categorized tabs.</p>
+      </div>
+    );
+  }
+
+  // Group uncategorized params by prefix (first word before underscore)
+  const groups = new Map<string, VSTBridgeParam[]>();
+  for (const p of uncategorized) {
+    const prefix = p.name.split('_').slice(0, 2).join('_');
+    if (!groups.has(prefix)) groups.set(prefix, []);
+    groups.get(prefix)!.push(p);
+  }
+
+  return (
+    <>
+      <div className={`p-3 rounded-lg border ${panelBg}`}>
+        <p className="text-xs text-gray-500 mb-1">
+          {uncategorized.length} additional parameters not shown in other tabs
+        </p>
+      </div>
+      {Array.from(groups.entries()).map(([prefix, params]) => (
+        <div key={prefix} className={`p-4 rounded-xl border ${panelBg}`}>
+          <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
+            {prefix.replace(/_/g, ' ')}
+          </h3>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {params.map(p => {
+              const shortLabel = p.name.replace(`${prefix}_`, '').replace(/_/g, ' ');
+              return (
+                <Knob
+                  key={p.id}
+                  label={shortLabel.length > 12 ? shortLabel.substring(0, 12) : shortLabel}
+                  value={paramValues.get(p.id) ?? p.defaultValue}
+                  min={p.min}
+                  max={p.max}
+                  defaultValue={p.defaultValue}
+                  onChange={(v) => setParam(p.id, v)}
+                  size="sm"
+                  color={knobColor}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </>
   );
 };
