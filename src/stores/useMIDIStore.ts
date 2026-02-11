@@ -121,25 +121,25 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
   switch (param) {
     // ── 303 Main ──────────────────────────────────────────────────────
     case 'cutoff':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: 200 * Math.pow(5000 / 200, normalized) } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: normalized } } });
       break;
     case 'resonance':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, resonance: normalized * 100 } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, resonance: normalized } } });
       break;
     case 'envMod':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, envMod: normalized * 100 } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, envMod: normalized } } });
       break;
     case 'decay':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, decay: 30 + (normalized * 2970) } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filterEnvelope: { ...instrument.tb303!.filterEnvelope, decay: normalized } } });
       break;
     case 'accent':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, accent: { amount: normalized * 100 } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, accent: { amount: normalized } } });
       break;
     case 'overdrive':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, overdrive: { ...instrument.tb303!.overdrive, amount: normalized * 100 } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, overdrive: { ...instrument.tb303!.overdrive, amount: normalized } } });
       break;
     case 'slideTime':
-      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: 2 + (normalized * 358) } } });
+      instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: normalized } } });
       break;
 
     // ── Siren ─────────────────────────────────────────────────────────

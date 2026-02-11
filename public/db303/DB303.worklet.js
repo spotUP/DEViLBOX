@@ -111,33 +111,8 @@ class DB303Processor extends AudioWorkletProcessor {
           // Convert string to number
           const numericValue = parseFloat(data.value);
           
-          // Try BOTH approaches:
-          // 1. Named setters (setCutoff, etc.)
-          // 2. Numeric setParameter(id, value) if it exists
-          
-          // Numeric parameter IDs (from JUCE source)
-          const paramIdMap = {
-            cutoff: 2,
-            resonance: 3,
-            envMod: 4,
-            decay: 5,
-            accent: 6,
-            volume: 7,
-            waveform: 0,
-            tuning: 1
-          };
-          
-          // Try numeric setParameter first (if it exists)
-          const numericId = paramIdMap[data.paramId];
-          if (numericId !== undefined && typeof this.synth.setParameter === 'function') {
-            try {
-              this.synth.setParameter(numericId, numericValue);
-            } catch (e) {
-              // setParameter not supported, will use named setters below
-            }
-          }
-          
-          // Also try named setter
+          // Named setters are the authoritative path — don't also call
+          // setParameter() as the numeric API may interpret values differently
           const setterMap = {
             // Core 303 Parameters
             cutoff: 'setCutoff',
@@ -183,6 +158,11 @@ class DB303Processor extends AudioWorkletProcessor {
             korgStiffness: 'setKorgStiffness',
             korgFilterFm: 'setKorgFilterFm',
             korgIbiasScale: 'setKorgIbiasScale',
+            korgBite: 'setKorgBite',
+            korgClip: 'setKorgClip',
+            korgCrossmod: 'setKorgCrossmod',
+            korgQSag: 'setKorgQSag',
+            korgSharpness: 'setKorgSharpness',
             // LFO Parameters
             lfoWaveform: 'setLfoWaveform',
             lfoRate: 'setLfoRate',

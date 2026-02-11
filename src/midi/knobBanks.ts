@@ -155,8 +155,8 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
 /** Joystick axis mappings per bank (X = pitch bend, Y = CC1 mod wheel) */
 export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
   '303': {
-    x: { param: 'cutoff', min: 200, max: 5000, curve: 'log' },
-    y: { param: 'resonance', min: 0, max: 100, curve: 'linear' },
+    x: { param: 'cutoff', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'resonance', min: 0, max: 1, curve: 'linear' },
   },
   'Siren': {
     x: { param: 'siren.osc.frequency', min: 60, max: 1500, curve: 'linear' },

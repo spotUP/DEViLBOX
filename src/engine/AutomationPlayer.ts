@@ -232,133 +232,29 @@ export class AutomationPlayer {
     if (!instrument) return;
 
     try {
-      // Check if this is a TB303-style synth (JC303Synth or Buzz3o3) - use its dedicated methods
+      // TB303-style synths (JC303Synth or Buzz3o3) — delegate to set() for all params
       const isTB303 = instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator';
+      if (isTB303 && 'set' in instrument) {
+        instrument.set(parameter, value);
+        return;
+      }
 
+      // Non-TB303 instruments: generic parameter application
       switch (parameter) {
         case 'cutoff':
-          // Map 0-1 to 200-5000 Hz (logarithmic) — calibrated to DSP env mod range
-          const cutoffHz = 200 * Math.pow(5000 / 200, value); // 200 to 5000 Hz
-          if (isTB303) {
-            console.log(`[AutomationPlayer] Applying cutoff: value=${value.toFixed(3)} -> ${cutoffHz.toFixed(0)}Hz`);
-            (instrument as JC303Synth).setCutoff(cutoffHz);
-          } else if (isDevilboxSynth(instrument) && instrument.set) {
+          if (isDevilboxSynth(instrument) && instrument.set) {
             instrument.set('cutoff', value);
           } else if (instrument.filter?.frequency) {
-            instrument.filter.frequency.setValueAtTime(cutoffHz, Tone.now());
+            instrument.filter.frequency.setValueAtTime(200 * Math.pow(5000 / 200, value), Tone.now());
           }
           break;
 
         case 'resonance':
-          // Map 0-1 to 0-100 percent
-          const resoPercent = value * 100;
-          if (isTB303) {
-            (instrument as JC303Synth).setResonance(resoPercent);
-          } else if (isDevilboxSynth(instrument) && instrument.set) {
+          if (isDevilboxSynth(instrument) && instrument.set) {
             instrument.set('resonance', value);
           } else if (instrument.filter?.Q) {
-            // For non-TB303, map to Q factor
             const qValue = value * 30;
             instrument.filter.Q.setValueAtTime(qValue, Tone.now());
-          }
-          break;
-
-        case 'envMod':
-          // Envelope modulation (TB-303 specific)
-          if (isTB303) {
-            (instrument as JC303Synth).setEnvMod(value * 100);
-          } else if (typeof (instrument as any).setEnvMod === 'function') {
-            (instrument as any).setEnvMod(value * 100);
-          }
-          break;
-
-        case 'decay':
-          // Decay time (TB-303 specific) - Map 0-1 to 30-3000ms LOGARITHMICALLY
-          // Must match the Knob's logarithmic scaling
-          if (isTB303) {
-            const decayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as JC303Synth).setDecay(decayMs);
-          }
-          break;
-
-        case 'accent':
-          // Accent amount (TB-303 specific) - Map 0-1 to 0-100%
-          if (isTB303) {
-            console.log(`[AutomationPlayer] Applying accent: value=${value.toFixed(3)} -> ${(value * 100).toFixed(1)}%`);
-            (instrument as JC303Synth).setAccentAmount(value * 100);
-          }
-          break;
-
-        case 'tuning':
-          // Tuning/detune (TB-303 specific) - Map 0-1 to -1200 to +1200 cents
-          // 0.5 = no detune, 0 = -1200 cents, 1 = +1200 cents
-          if (isTB303) {
-            const cents = (value - 0.5) * 2400; // -1200 to +1200 cents
-            (instrument as JC303Synth).setTuning(cents);
-          }
-          break;
-
-        case 'overdrive':
-          // Overdrive amount (TB-303 specific) - Map 0-1 to 0-100%
-          if (isTB303) {
-            (instrument as JC303Synth).setOverdrive(value * 100);
-          }
-          break;
-
-        // === DEVIL FISH PARAMETERS ===
-        case 'normalDecay':
-          // Normal decay time (Devil Fish) - Map 0-1 to 30-3000ms LOGARITHMICALLY
-          // Must match the Knob's logarithmic scaling
-          if (isTB303) {
-            const normalDecayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as JC303Synth).setNormalDecay(normalDecayMs);
-          }
-          break;
-
-        case 'accentDecay':
-          // Accent decay time (Devil Fish) - Map 0-1 to 30-3000ms LOGARITHMICALLY
-          // Must match the Knob's logarithmic scaling
-          if (isTB303) {
-            const accentDecayMs = 30 * Math.pow(100, value); // 30ms to 3000ms (log scale)
-            (instrument as JC303Synth).setAccentDecay(accentDecayMs);
-          }
-          break;
-
-        case 'vegDecay':
-          // VEG decay time (Devil Fish) - Map 0-1 to 16-3000ms LOGARITHMICALLY
-          // Must match the Knob's logarithmic scaling (16 * (3000/16)^value = 16 * 187.5^value)
-          if (isTB303) {
-            const vegDecayMs = 16 * Math.pow(187.5, value); // 16ms to 3000ms (log scale)
-            (instrument as JC303Synth).setVegDecay(vegDecayMs);
-          }
-          break;
-
-        case 'vegSustain':
-          // VEG sustain level (Devil Fish) - Map 0-1 to 0-100%
-          if (isTB303) {
-            (instrument as JC303Synth).setVegSustain(value * 100);
-          }
-          break;
-
-        case 'softAttack':
-          // Soft attack time (Devil Fish) - Map 0-1 to 0.3-30ms (logarithmic)
-          if (isTB303) {
-            const softAttackMs = 0.3 * Math.pow(100, value); // 0.3 to 30ms
-            (instrument as JC303Synth).setSoftAttack(softAttackMs);
-          }
-          break;
-
-        case 'filterTracking':
-          // Filter tracking amount (Devil Fish) - Map 0-1 to 0-200%
-          if (isTB303) {
-            (instrument as JC303Synth).setFilterTracking(value * 200);
-          }
-          break;
-
-        case 'filterFM':
-          // Filter FM amount (Devil Fish) - Map 0-1 to 0-100%
-          if (isTB303) {
-            (instrument as JC303Synth).setFilterFM(value * 100);
           }
           break;
 
@@ -366,8 +262,7 @@ export class AutomationPlayer {
           // Map 0-1 to -40dB to 0dB
           const volumeDb = -40 + value * 40;
           if (isDevilboxSynth(instrument)) {
-            // DevilboxSynth: set gain on native GainNode output
-            const gain = Math.pow(10, volumeDb / 20); // dB to linear
+            const gain = Math.pow(10, volumeDb / 20);
             (instrument.output as GainNode).gain.setValueAtTime(gain, Tone.now());
           } else if (instrument.volume) {
             instrument.volume.setValueAtTime(volumeDb, Tone.now());
@@ -375,7 +270,6 @@ export class AutomationPlayer {
           break;
 
         case 'pan':
-          // Map 0-1 to -1 to +1 (left to right)
           const panValue = value * 2 - 1;
           if (instrument.pan) {
             instrument.pan.setValueAtTime(panValue, Tone.now());
@@ -383,28 +277,27 @@ export class AutomationPlayer {
           break;
 
         case 'distortion':
-          // Map 0-1 to 0-1 distortion amount
           if (instrument.distortion) {
             instrument.distortion.setValueAtTime(value, Tone.now());
           }
           break;
 
         case 'delay':
-          // Map 0-1 to 0-1 delay wet/dry mix
           if (instrument.delayWet) {
             instrument.delayWet.setValueAtTime(value, Tone.now());
           }
           break;
 
         case 'reverb':
-          // Map 0-1 to 0-1 reverb wet/dry mix
           if (instrument.reverbWet) {
             instrument.reverbWet.setValueAtTime(value, Tone.now());
           }
           break;
 
         default:
-          console.warn(`Unknown automation parameter: ${parameter}`);
+          if (isDevilboxSynth(instrument) && instrument.set) {
+            instrument.set(parameter, value);
+          }
       }
     } catch (error) {
       console.error(`Failed to apply automation for ${parameter}:`, error);
