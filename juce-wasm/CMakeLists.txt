@@ -67,9 +67,46 @@ add_subdirectory(db303)
 add_subdirectory(rdpiano)
 
 # ============================================================================
+# MoogFilters (6 analog-modeled Moog ladder filters) - Unlicense/ISC/Free
+# ============================================================================
+add_subdirectory(moogfilters)
+
+# ============================================================================
+# MVerb (Plate Reverb) - GPL v3 (Martin Eastwood)
+# ============================================================================
+add_subdirectory(mverb)
+
+# ============================================================================
+# Leslie (Rotary Speaker) - Built from scratch
+# ============================================================================
+add_subdirectory(leslie)
+
+# ============================================================================
+# Spring Reverb (Dub Spring Tank) - Built from scratch
+# ============================================================================
+add_subdirectory(springreverb)
+
+# ============================================================================
+# Tonewheel Organ (Hammond-style) - Built from scratch
+# ============================================================================
+add_subdirectory(tonewheel)
+
+# ============================================================================
+# Melodica (Reed Instrument Physical Model) - Built from scratch
+# ============================================================================
+add_subdirectory(melodica)
+
+# ============================================================================
+# Monique (Morphing Monosynth) - Surge Synth Team (dual GPL3/MIT)
+# ============================================================================
+add_subdirectory(monique)
+
+# ============================================================================
 # Combined build target
 # ============================================================================
 add_custom_target(all_synths
-    DEPENDS DexedWASM OBXdWASM Open303WASM DB303WASM RdPianoWASM
-    COMMENT "Building all JUCE WASM synths"
+    DEPENDS DexedWASM OBXdWASM Open303WASM DB303WASM RdPianoWASM MoogFiltersWASM
+            MVerbWASM LeslieWASM SpringReverbWASM TonewheelWASM MelodicaWASM
+            MoniqueWASMBuild
+    COMMENT "Building all JUCE WASM synths and effects"
 )
