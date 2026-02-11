@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T19:40:07.763Z
+ * Generated: 2026-02-11T21:26:14.041Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '399';
-export const BUILD_HASH = '2d2ad1f';
+export const BUILD_NUMBER = '413';
+export const BUILD_HASH = '2f208bd';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,62 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'feature',
+        "description": "Split WAM plugins into effects and synths, add effect search, fix bugs"
+      },
+      {
+        type: 'feature',
+        "description": "Add complete Leap sample taxonomy with 17 categories and character tags"
+      },
+      {
+        type: 'fix',
+        "description": "Correct data model, add validation suite, and complete SDK coverage"
+      },
+      {
+        type: 'fix',
+        "description": "Polyfill URL constructor for AudioWorklet WASM loading"
+      },
+      {
+        type: 'feature',
+        "description": "Add NKS2 metadata builder, Leap expansion support, and NICA improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Implement full NKS SDK v2.0.2 specification"
+      },
+      {
+        type: 'fix',
+        "description": "Send correct MIDI note in writeKeyOff for all MAME synths"
+      },
+      {
+        type: 'fix',
+        "description": "Stop V2Speech looping on note release"
+      },
+      {
+        type: 'fix',
+        "description": "Register V2Speech in engine factory and ToneEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Expand NKS parameter maps to all 170+ synths with dedicated profiles"
+      },
+      {
+        type: 'fix',
+        "description": "Show speech text input without preset, add Speech & Voice category"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: update changelog, NKS tweaks, TB303 panel fix"
+      },
+      {
+        type: 'fix',
+        "description": "Improve WAM plugin loading, GUI mounting, and registry cleanup"
+      },
+      {
+        type: 'feature',
+        "description": "Redesign effect editors with pedal-enclosure aesthetic"
+      },
       {
         type: 'feature',
         "description": "Implement NKS2 specification with unified parameter routing"
@@ -172,74 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Improve import/export engine and song parser"
-      },
-      {
-        type: 'feature',
-        "description": "Add WAM host, VST bridge, and JUCE WASM build template"
-      },
-      {
-        type: 'improvement',
-        "description": "Introduce DevilboxSynth interface and decouple synths from Tone.js"
-      }
-    ]
-  },
-  {
-    version: '2026-02-10',
-    date: '2026-02-10',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Chore(infra): update electron, packages, and local debug tools"
-      },
-      {
-        type: 'improvement',
-        "description": "Enhance audio engine and fix multiple stability issues"
-      },
-      {
-        type: 'feature',
-        "description": "Add new channel visualizers and standardize styling"
-      },
-      {
-        type: 'feature',
-        "description": "Implement 1:1 logic port of FT2 Nibbles"
-      },
-      {
-        type: 'feature',
-        "description": "Improve TD-3 pattern import/export and audit .seq format"
-      }
-    ]
-  },
-  {
-    version: '2026-02-09',
-    date: '2026-02-09',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Use absolute paths for worklet/wasm loading on GitHub Pages"
-      },
-      {
-        type: 'fix',
-        "description": "Test page uses direct worklet loading + correct case-sensitive filenames"
-      },
-      {
-        type: 'fix',
-        "description": "Test page now uses direct worklet loading instead of TypeScript imports"
-      },
-      {
-        type: 'fix',
-        "description": "Tracker knobs now update live synth + improve test page tracking params"
-      },
-      {
-        type: 'feature',
-        "description": "Comprehensive parameter testing with smoothing, retrigger, and auto-setup"
-      },
-      {
-        type: 'feature',
-        "description": "Complete DB303 synth overhaul with full parameter test suite"
-      },
-      {
-        type: 'improvement',
-        "description": "Update changelog and minor UI refinements"
       }
     ]
   }

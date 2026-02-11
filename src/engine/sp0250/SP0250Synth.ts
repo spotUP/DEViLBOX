@@ -1,5 +1,8 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
+import { type SP0250Frame, phonemesToSP0250Frames } from '@engine/speech/sp0250PhonemeMap';
 
 /**
  * SP0250 Parameter IDs (matching C++ enum)
@@ -61,6 +64,8 @@ export class SP0250Synth extends MAMEBaseSynth {
   protected readonly chipName = 'SP0250';
   protected readonly workletFile = 'SP0250.worklet.js';
   protected readonly processorName = 'sp0250-processor';
+
+  private _speechSequencer: SpeechSequencer<SP0250Frame> | null = null;
 
   constructor() {
     super();
@@ -153,6 +158,50 @@ export class SP0250Synth extends MAMEBaseSynth {
   writeRegister(offset: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  // ===========================================================================
+  // Text-to-Speech
+  // ===========================================================================
+
+  /** Speak English text using SAM's reciter and SP0250 vowel mapping */
+  speakText(text: string): void {
+    this.stopSpeaking();
+
+    const phonemeStr = textToPhonemes(text);
+    if (!phonemeStr) return;
+
+    const tokens = parsePhonemeString(phonemeStr);
+    const frames = phonemesToSP0250Frames(tokens);
+    if (frames.length === 0) return;
+
+    const speechFrames: SpeechFrame<SP0250Frame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
+
+    this._speechSequencer = new SpeechSequencer<SP0250Frame>(
+      (frame) => {
+        this.setVowel(frame.preset);
+        this.setVoiced(frame.voiced);
+        this.setBrightness(frame.brightness);
+      },
+      () => { this._speechSequencer = null; }
+    );
+    this._speechSequencer.speak(speechFrames);
+  }
+
+  /** Stop current text-to-speech playback */
+  stopSpeaking(): void {
+    if (this._speechSequencer) {
+      this._speechSequencer.stop();
+      this._speechSequencer = null;
+    }
+  }
+
+  /** Whether text-to-speech is currently playing */
+  get isSpeaking(): boolean {
+    return this._speechSequencer?.isSpeaking ?? false;
   }
 
   // ===========================================================================

@@ -1,5 +1,8 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
+import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
+import { type VotraxFrame, phonemesToVotraxFrames } from '@engine/speech/votraxPhonemeMap';
 
 /**
  * Votrax Parameter IDs (matching C++ enum)
@@ -64,6 +67,8 @@ export class VotraxSynth extends MAMEBaseSynth {
   protected readonly chipName = 'Votrax';
   protected readonly workletFile = 'Votrax.worklet.js';
   protected readonly processorName = 'votrax-processor';
+
+  private _speechSequencer: SpeechSequencer<VotraxFrame> | null = null;
 
   constructor() {
     super();
@@ -166,6 +171,46 @@ export class VotraxSynth extends MAMEBaseSynth {
   writeRegister(offset: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({ type: 'writeRegister', offset, value });
+  }
+
+  // ===========================================================================
+  // Text-to-Speech
+  // ===========================================================================
+
+  /** Speak English text using SAM's reciter and Votrax allophone mapping */
+  speakText(text: string): void {
+    this.stopSpeaking();
+
+    const phonemeStr = textToPhonemes(text);
+    if (!phonemeStr) return;
+
+    const tokens = parsePhonemeString(phonemeStr);
+    const frames = phonemesToVotraxFrames(tokens);
+    if (frames.length === 0) return;
+
+    const speechFrames: SpeechFrame<VotraxFrame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
+
+    this._speechSequencer = new SpeechSequencer<VotraxFrame>(
+      (frame) => this.writePhone(frame.phone),
+      () => { this._speechSequencer = null; }
+    );
+    this._speechSequencer.speak(speechFrames);
+  }
+
+  /** Stop current text-to-speech playback */
+  stopSpeaking(): void {
+    if (this._speechSequencer) {
+      this._speechSequencer.stop();
+      this._speechSequencer = null;
+    }
+  }
+
+  /** Whether text-to-speech is currently playing */
+  get isSpeaking(): boolean {
+    return this._speechSequencer?.isSpeaking ?? false;
   }
 
   // ===========================================================================

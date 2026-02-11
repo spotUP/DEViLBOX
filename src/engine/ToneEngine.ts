@@ -850,7 +850,13 @@ export class ToneEngine {
 
     // Check if instrument already exists for this channel
     if (this.instruments.has(key)) {
-      return this.instruments.get(key);
+      const cached = this.instruments.get(key);
+      // Diagnostic: warn if cached instrument type doesn't match requested config
+      const cachedType = cached?.constructor?.name || 'unknown';
+      if (config.synthType === 'Sampler' && cachedType !== 'Sampler' && cachedType !== 'Player') {
+        console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} has ${cachedType} but config wants Sampler — dispose was missed!`);
+      }
+      return cached;
     }
 
     // PERFORMANCE FIX: Check for shared/legacy instrument before creating new one
@@ -3169,6 +3175,18 @@ export class ToneEngine {
       (instrument as any).setTextParam(key, value);
     } else if (typeof (instrument as any).applyConfig === 'function') {
       (instrument as any).applyConfig({ [key]: value });
+    }
+  }
+
+  /**
+   * Trigger text-to-speech on a MAME speech chip synth.
+   */
+  public speakMAMEChipText(instrumentId: number, text: string): void {
+    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
+    const instrument = this.instruments.get(instrumentKey);
+    if (!instrument) return;
+    if (typeof (instrument as any).speakText === 'function') {
+      (instrument as any).speakText(text);
     }
   }
 

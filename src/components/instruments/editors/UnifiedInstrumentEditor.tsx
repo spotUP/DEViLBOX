@@ -585,6 +585,14 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     } catch (_e) { /* ignored */ }
   }, [instrument.id, instrument.synthType]);
 
+  // Handle speech text-to-speech trigger for MAME speech chips
+  const handleChipSpeak = useCallback((text: string) => {
+    try {
+      const engine = getToneEngine();
+      engine.speakMAMEChipText(instrument.id, text);
+    } catch (_e) { /* ignored */ }
+  }, [instrument.id]);
+
   // Handle Dexed (DX7) config updates
   const handleDexedChange = useCallback((updates: Partial<typeof instrument.dexed>) => {
     const currentDexed = instrument.dexed || DEFAULT_DEXED;
@@ -1068,6 +1076,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                 onTextChange={handleChipTextChange}
                 onLoadPreset={handleChipPresetLoad}
                 onRomUpload={handleChipRomUpload}
+                onSpeak={handleChipSpeak}
               />
 
               {/* Macro Editor */}

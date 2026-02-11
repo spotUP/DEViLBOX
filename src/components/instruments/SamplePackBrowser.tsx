@@ -85,6 +85,13 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
     return () => {
       setPreviewInstrument(null);
+      // Also dispose the preview instrument instance in the engine
+      // to prevent stale Sampler from lingering and potentially playing
+      try {
+        getToneEngine().invalidateInstrument(999);
+      } catch {
+        // Engine may not be available during teardown
+      }
     };
   }, [previewConfig, setPreviewInstrument]);
 
@@ -336,6 +343,14 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           pan: 0,
         });
       }
+    }
+
+    // Clear preview instrument BEFORE closing to prevent stale MIDI routing
+    setPreviewInstrument(null);
+    try {
+      getToneEngine().invalidateInstrument(999);
+    } catch {
+      // Engine may not be available
     }
 
     onClose();
