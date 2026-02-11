@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(OBXdWASM VERSION 1.0.0)
+
 # OB-Xd (Oberheim Synthesizer) WASM Build
 # Based on the discoDSP OB-Xd synthesizer
 
@@ -9,13 +12,13 @@ add_executable(OBXdWASM ${OBXD_SOURCES})
 
 target_include_directories(OBXdWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/../common
 )
 
 set_target_properties(OBXdWASM PROPERTIES
     OUTPUT_NAME "OBXd"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/obxd"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/obxd"
 )
 
 target_link_options(OBXdWASM PRIVATE

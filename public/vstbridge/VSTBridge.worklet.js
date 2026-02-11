@@ -91,6 +91,14 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
       case 'command':
         if (this.synth && this.isInitialized && data.commandType) {
           try {
+            if (typeof this.synth.handleCommand !== 'function') {
+              this.port.postMessage({
+                type: 'commandResult',
+                commandType: data.commandType,
+                handled: false,
+              });
+              break;
+            }
             const cmdData = data.data ? new Uint8Array(data.data) : new Uint8Array(0);
             const handled = this.synth.handleCommand(data.commandType, cmdData);
             this.port.postMessage({
@@ -108,15 +116,22 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
       case 'getParams':
         if (this.synth && this.isInitialized) {
           const params = [];
-          const count = this.synth.getParameterCount();
-          for (let i = 0; i < count; i++) {
-            params.push({
-              id: i,
-              name: this.synth.getParameterName(i),
-              min: this.synth.getParameterMin(i),
-              max: this.synth.getParameterMax(i),
-              defaultValue: this.synth.getParameterDefault(i),
-            });
+          const s = this.synth;
+          if (typeof s.getParameterCount === 'function' &&
+              typeof s.getParameterName === 'function' &&
+              typeof s.getParameterMin === 'function' &&
+              typeof s.getParameterMax === 'function' &&
+              typeof s.getParameterDefault === 'function') {
+            const count = s.getParameterCount();
+            for (let i = 0; i < count; i++) {
+              params.push({
+                id: i,
+                name: s.getParameterName(i),
+                min: s.getParameterMin(i),
+                max: s.getParameterMax(i),
+                defaultValue: s.getParameterDefault(i),
+              });
+            }
           }
           this.port.postMessage({ type: 'params', params });
         }

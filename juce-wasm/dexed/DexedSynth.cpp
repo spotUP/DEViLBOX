@@ -45,21 +45,24 @@ static constexpr int BLOCK_SIZE = 64;  // N from synth.h
 
 /**
  * Default DX7 "INIT VOICE" patch data (156 bytes)
- * Standard DX7 initialized voice
+ * Standard DX7 VCED format: 6 ops × 21 bytes + 30 global bytes
+ * msfa parses operators at off = op * 21, output level at off + 16
+ * Algorithm 1: Op3 and Op1 (indices 3,5) are carriers
  */
 static const uint8_t INIT_VOICE[156] = {
-    // Op 6 (carriers first in DX7 format)
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
-    // Op 5
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
-    // Op 4
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
-    // Op 3
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
-    // Op 2
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
-    // Op 1
-    99, 99, 99, 99, 99, 99, 99, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 1, 0, 7,
+    // Op 6 - Modulator (feedback source in algo 1)
+    // R1  R2  R3  R4  L1  L2  L3  L4  BP  LSD RSD LC  RC  RS  AMS KVS OL  OM  FC  FF  DET
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  7,
+    // Op 5 - Modulator
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  7,
+    // Op 4 - Modulator
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  7,
+    // Op 3 - CARRIER (output level = 99)
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0, 99,  0,  1,  0,  7,
+    // Op 2 - Modulator
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  7,
+    // Op 1 - CARRIER (output level = 99)
+    99, 99, 99, 99, 99, 99, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0, 99,  0,  1,  0,  7,
     // Pitch EG: rates, levels
     99, 99, 99, 99, 50, 50, 50, 50,
     // Algorithm, feedback, osc sync
@@ -68,7 +71,7 @@ static const uint8_t INIT_VOICE[156] = {
     35, 0, 0, 0, 0, 0, 0,
     // Transpose (24 = C3)
     24,
-    // Voice name (10 chars) - optional, not used in synthesis
+    // Voice name (10 chars)
     'I', 'N', 'I', 'T', ' ', 'V', 'O', 'I', 'C', 'E'
 };
 

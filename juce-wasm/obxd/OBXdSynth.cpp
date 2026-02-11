@@ -95,6 +95,56 @@ enum class OBXdParam {
     PARAM_COUNT = 45
 };
 
+static constexpr int OBXD_COUNT = static_cast<int>(OBXdParam::PARAM_COUNT);
+
+static const char* OBXD_PARAM_NAMES[OBXD_COUNT] = {
+    "Osc1:Waveform", "Osc1:Octave", "Osc1:Detune", "Osc1:Pulse Width", "Osc1:Level",
+    "Osc2:Waveform", "Osc2:Octave", "Osc2:Detune", "Osc2:Pulse Width", "Osc2:Level",
+    "Osc:Mix", "Osc:Sync", "Osc:Ring Mod",
+    "Filter:Cutoff", "Filter:Resonance", "Filter:Type", "Filter:Env Amount", "Filter:Key Track", "Filter:Velocity",
+    "Filter Env:Attack", "Filter Env:Decay", "Filter Env:Sustain", "Filter Env:Release",
+    "Amp Env:Attack", "Amp Env:Decay", "Amp Env:Sustain", "Amp Env:Release",
+    "LFO:Rate", "LFO:Waveform", "LFO:Delay", "LFO:Osc Amount", "LFO:Filter Amount", "LFO:Amp Amount", "LFO:PW Amount",
+    "Master:Volume", "Master:Voices", "Master:Unison", "Master:Unison Detune", "Master:Portamento", "Master:Pan Spread", "Master:Velocity Sens",
+    "Osc:Noise Level", "Sub Osc:Level", "Sub Osc:Octave", "Osc:Drift"
+};
+
+static const float OBXD_PARAM_MINS[OBXD_COUNT] = {
+    0, -2, -1, 0, 0,
+    0, -2, -1, 0, 0,
+    0, 0, 0,
+    0, 0, 0, -1, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 0, 0, 0,
+    0, 0, -2, 0
+};
+
+static const float OBXD_PARAM_MAXS[OBXD_COUNT] = {
+    3, 2, 1, 1, 1,
+    3, 2, 1, 1, 1,
+    1, 1, 1,
+    1, 1, 4, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 4, 1, 1, 1, 1, 1,
+    1, 8, 1, 1, 1, 1, 1,
+    1, 1, -1, 1
+};
+
+static const float OBXD_PARAM_DEFAULTS[OBXD_COUNT] = {
+    0, 0, 0, 0.5f, 1.0f,
+    0, 0, 0.1f, 0.5f, 0.7f,
+    0, 0, 0,
+    0.7f, 0.3f, 0, 0.5f, 0, 0,
+    0.01f, 0.3f, 0.3f, 0.3f,
+    0.01f, 0.2f, 0.7f, 0.3f,
+    0.2f, 0, 0, 0, 0, 0, 0,
+    0.7f, 8, 0, 0, 0, 0.3f, 0.5f,
+    0, 0, -1, 0
+};
+
 /**
  * Simple biquad filter for the Oberheim-style filter
  */
@@ -592,6 +642,24 @@ public:
         return 0.0f;
     }
 
+    int getParameterCount() const override { return OBXD_COUNT; }
+    const char* getParameterName(int paramId) const override {
+        if (paramId >= 0 && paramId < OBXD_COUNT) return OBXD_PARAM_NAMES[paramId];
+        return "";
+    }
+    float getParameterMin(int paramId) const override {
+        if (paramId >= 0 && paramId < OBXD_COUNT) return OBXD_PARAM_MINS[paramId];
+        return 0.0f;
+    }
+    float getParameterMax(int paramId) const override {
+        if (paramId >= 0 && paramId < OBXD_COUNT) return OBXD_PARAM_MAXS[paramId];
+        return 1.0f;
+    }
+    float getParameterDefault(int paramId) const override {
+        if (paramId >= 0 && paramId < OBXD_COUNT) return OBXD_PARAM_DEFAULTS[paramId];
+        return 0.0f;
+    }
+
     void controlChange(int cc, int value) override {
         float normValue = value / 127.0f;
 
@@ -705,24 +773,8 @@ private:
     }
 };
 
-} // namespace devilbox
-
-// Emscripten bindings
 #ifdef __EMSCRIPTEN__
-EMSCRIPTEN_BINDINGS(OBXdSynth_bindings) {
-    emscripten::class_<devilbox::OBXdSynth>("OBXdSynth")
-        .constructor<>()
-        .function("initialize", &devilbox::OBXdSynth::initialize)
-        .function("isInitialized", &devilbox::OBXdSynth::isInitialized)
-        .function("getSampleRate", &devilbox::OBXdSynth::getSampleRate)
-        .function("noteOn", &devilbox::OBXdSynth::noteOn)
-        .function("noteOff", &devilbox::OBXdSynth::noteOff)
-        .function("allNotesOff", &devilbox::OBXdSynth::allNotesOff)
-        .function("setParameter", &devilbox::OBXdSynth::setParameter)
-        .function("getParameter", &devilbox::OBXdSynth::getParameter)
-        .function("controlChange", &devilbox::OBXdSynth::controlChange)
-        .function("pitchBend", &devilbox::OBXdSynth::pitchBend)
-        .function("programChange", &devilbox::OBXdSynth::programChange)
-        .function("process", &devilbox::OBXdSynth::processJS);
-}
+EXPORT_WASM_SYNTH_EXTENDED_EX(OBXdSynth, devilbox::OBXdSynth, "OBXdSynth")
 #endif
+
+} // namespace devilbox
