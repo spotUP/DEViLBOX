@@ -1,9 +1,22 @@
 import type { MappableParameter, KnobBankMode } from './types';
+import type { SynthType } from '../types/instrument';
 
 export interface KnobAssignment {
   cc: number;
   param: MappableParameter;
   label: string;
+}
+
+export interface JoystickAxisMapping {
+  param: MappableParameter;
+  min: number;
+  max: number;
+  curve: 'linear' | 'log';
+}
+
+export interface JoystickMapping {
+  x: JoystickAxisMapping;
+  y: JoystickAxisMapping;
 }
 
 export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
@@ -27,6 +40,96 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'siren.filter.frequency', label: 'Filter' },
     { cc: 77, param: 'siren.reverb.wet', label: 'Reverb' },
   ],
+  'Furnace': [
+    { cc: 70, param: 'furnace.algorithm', label: 'Algorithm' },
+    { cc: 71, param: 'furnace.feedback', label: 'Feedback' },
+    { cc: 72, param: 'furnace.op1TL', label: 'Op1 TL' },
+    { cc: 73, param: 'furnace.op1AR', label: 'Op1 AR' },
+    { cc: 74, param: 'furnace.op1DR', label: 'Op1 DR' },
+    { cc: 75, param: 'furnace.op1SL', label: 'Op1 SL' },
+    { cc: 76, param: 'furnace.op1RR', label: 'Op1 RR' },
+    { cc: 77, param: 'furnace.fms', label: 'FM Sens' },
+  ],
+  'V2': [
+    { cc: 70, param: 'v2.osc1Level', label: 'Osc1 Lvl' },
+    { cc: 71, param: 'v2.filter1Cutoff', label: 'Cutoff' },
+    { cc: 72, param: 'v2.filter1Reso', label: 'Reso' },
+    { cc: 73, param: 'v2.envAttack', label: 'Attack' },
+    { cc: 74, param: 'v2.envDecay', label: 'Decay' },
+    { cc: 75, param: 'v2.envSustain', label: 'Sustain' },
+    { cc: 76, param: 'v2.envRelease', label: 'Release' },
+    { cc: 77, param: 'v2.lfo1Depth', label: 'LFO Dep' },
+  ],
+  'Synare': [
+    { cc: 70, param: 'synare.tune', label: 'Tune' },
+    { cc: 71, param: 'synare.osc2Mix', label: 'Osc2 Mix' },
+    { cc: 72, param: 'synare.filterCutoff', label: 'Cutoff' },
+    { cc: 73, param: 'synare.filterReso', label: 'Reso' },
+    { cc: 74, param: 'synare.filterEnvMod', label: 'Env Mod' },
+    { cc: 75, param: 'synare.filterDecay', label: 'Flt Dcy' },
+    { cc: 76, param: 'synare.sweepAmount', label: 'Sweep' },
+    { cc: 77, param: 'synare.sweepTime', label: 'Swp Time' },
+  ],
+  'Dexed': [
+    { cc: 70, param: 'dexed.algorithm', label: 'Algorithm' },
+    { cc: 71, param: 'dexed.feedback', label: 'Feedback' },
+    { cc: 72, param: 'dexed.op1Level', label: 'Op1 Lvl' },
+    { cc: 73, param: 'dexed.op1Coarse', label: 'Op1 Coarse' },
+    { cc: 74, param: 'dexed.lfoSpeed', label: 'LFO Spd' },
+    { cc: 75, param: 'dexed.lfoPitchMod', label: 'LFO Pitch' },
+    { cc: 76, param: 'dexed.lfoAmpMod', label: 'LFO Amp' },
+    { cc: 77, param: 'dexed.transpose', label: 'Transpose' },
+  ],
+  'OBXd': [
+    { cc: 70, param: 'obxd.osc1Level', label: 'Osc1 Lvl' },
+    { cc: 71, param: 'obxd.osc2Level', label: 'Osc2 Lvl' },
+    { cc: 72, param: 'obxd.filterCutoff', label: 'Cutoff' },
+    { cc: 73, param: 'obxd.filterReso', label: 'Reso' },
+    { cc: 74, param: 'obxd.filterEnv', label: 'Flt Env' },
+    { cc: 75, param: 'obxd.ampAttack', label: 'Attack' },
+    { cc: 76, param: 'obxd.ampDecay', label: 'Decay' },
+    { cc: 77, param: 'obxd.volume', label: 'Volume' },
+  ],
+  'SpaceLaser': [
+    { cc: 70, param: 'spacelaser.startFreq', label: 'Start Hz' },
+    { cc: 71, param: 'spacelaser.endFreq', label: 'End Hz' },
+    { cc: 72, param: 'spacelaser.sweepTime', label: 'Sweep' },
+    { cc: 73, param: 'spacelaser.fmAmount', label: 'FM Amt' },
+    { cc: 74, param: 'spacelaser.fmRatio', label: 'FM Ratio' },
+    { cc: 75, param: 'spacelaser.filterCutoff', label: 'Cutoff' },
+    { cc: 76, param: 'spacelaser.filterReso', label: 'Reso' },
+    { cc: 77, param: 'spacelaser.delayWet', label: 'Delay' },
+  ],
+  'SAM': [
+    { cc: 70, param: 'sam.pitch', label: 'Pitch' },
+    { cc: 71, param: 'sam.speed', label: 'Speed' },
+    { cc: 72, param: 'sam.mouth', label: 'Mouth' },
+    { cc: 73, param: 'sam.throat', label: 'Throat' },
+    { cc: 74, param: 'mixer.volume', label: 'Volume' },
+    { cc: 75, param: 'mixer.volume', label: '-' },
+    { cc: 76, param: 'mixer.volume', label: '-' },
+    { cc: 77, param: 'mixer.volume', label: '-' },
+  ],
+  'Organ': [
+    { cc: 70, param: 'organ.drawbar16', label: "16'" },
+    { cc: 71, param: 'organ.drawbar8', label: "8'" },
+    { cc: 72, param: 'organ.drawbar4', label: "4'" },
+    { cc: 73, param: 'organ.percussion', label: 'Perc' },
+    { cc: 74, param: 'organ.vibratoType', label: 'Vib Type' },
+    { cc: 75, param: 'organ.vibratoDepth', label: 'Vib Dep' },
+    { cc: 76, param: 'organ.overdrive', label: 'Drive' },
+    { cc: 77, param: 'organ.volume', label: 'Volume' },
+  ],
+  'Melodica': [
+    { cc: 70, param: 'melodica.breath', label: 'Breath' },
+    { cc: 71, param: 'melodica.brightness', label: 'Bright' },
+    { cc: 72, param: 'melodica.vibratoRate', label: 'Vib Rate' },
+    { cc: 73, param: 'melodica.vibratoDepth', label: 'Vib Dep' },
+    { cc: 74, param: 'melodica.detune', label: 'Detune' },
+    { cc: 75, param: 'melodica.portamento', label: 'Porta' },
+    { cc: 76, param: 'melodica.attack', label: 'Attack' },
+    { cc: 77, param: 'melodica.volume', label: 'Volume' },
+  ],
   'FX': [
     { cc: 70, param: 'echo.rate', label: 'Echo Rate' },
     { cc: 71, param: 'echo.intensity', label: 'Intensity' },
@@ -48,3 +151,89 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 77, param: 'mixer.pan', label: 'Pan 4' },
   ],
 };
+
+/** Joystick axis mappings per bank (X = pitch bend, Y = CC1 mod wheel) */
+export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
+  '303': {
+    x: { param: 'cutoff', min: 200, max: 5000, curve: 'log' },
+    y: { param: 'resonance', min: 0, max: 100, curve: 'linear' },
+  },
+  'Siren': {
+    x: { param: 'siren.osc.frequency', min: 60, max: 1500, curve: 'linear' },
+    y: { param: 'siren.lfo.rate', min: 0.1, max: 20, curve: 'linear' },
+  },
+  'Furnace': {
+    x: { param: 'furnace.fms', min: 0, max: 7, curve: 'linear' },
+    y: { param: 'furnace.op1SL', min: 0, max: 15, curve: 'linear' },
+  },
+  'V2': {
+    x: { param: 'v2.filter1Cutoff', min: 0, max: 127, curve: 'linear' },
+    y: { param: 'v2.filter1Reso', min: 0, max: 127, curve: 'linear' },
+  },
+  'Synare': {
+    x: { param: 'synare.filterCutoff', min: 20, max: 20000, curve: 'log' },
+    y: { param: 'synare.filterEnvMod', min: 0, max: 100, curve: 'linear' },
+  },
+  'Dexed': {
+    x: { param: 'dexed.lfoPitchMod', min: 0, max: 99, curve: 'linear' },
+    y: { param: 'dexed.lfoAmpMod', min: 0, max: 99, curve: 'linear' },
+  },
+  'OBXd': {
+    x: { param: 'obxd.filterCutoff', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'obxd.filterReso', min: 0, max: 1, curve: 'linear' },
+  },
+  'SpaceLaser': {
+    x: { param: 'spacelaser.fmAmount', min: 0, max: 100, curve: 'linear' },
+    y: { param: 'spacelaser.filterCutoff', min: 20, max: 20000, curve: 'log' },
+  },
+  'SAM': {
+    x: { param: 'sam.pitch', min: 0, max: 255, curve: 'linear' },
+    y: { param: 'sam.speed', min: 0, max: 255, curve: 'linear' },
+  },
+  'Organ': {
+    x: { param: 'organ.vibratoDepth', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'organ.overdrive', min: 0, max: 1, curve: 'linear' },
+  },
+  'Melodica': {
+    x: { param: 'melodica.vibratoRate', min: 0, max: 10, curve: 'linear' },
+    y: { param: 'melodica.brightness', min: 0, max: 1, curve: 'linear' },
+  },
+};
+
+/** Map a SynthType to the appropriate knob bank for auto-switching */
+export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
+  // TB-303 variants
+  if (synthType === 'TB303' || synthType === 'Buzz3o3' || synthType === 'Buzz3o3DF') return '303';
+
+  // DubSiren
+  if (synthType === 'DubSiren') return 'Siren';
+
+  // Furnace chips (all start with "Furnace")
+  if (synthType.startsWith('Furnace')) return 'Furnace';
+
+  // V2 variants
+  if (synthType === 'V2' || synthType === 'V2Speech') return 'V2';
+
+  // Synare percussion
+  if (synthType === 'Synare') return 'Synare';
+
+  // Dexed DX7
+  if (synthType === 'Dexed' || synthType === 'DexedBridge') return 'Dexed';
+
+  // OBXd
+  if (synthType === 'OBXd') return 'OBXd';
+
+  // SpaceLaser
+  if (synthType === 'SpaceLaser') return 'SpaceLaser';
+
+  // SAM speech
+  if (synthType === 'Sam') return 'SAM';
+
+  // VSTBridge: TonewheelOrgan
+  if (synthType === 'TonewheelOrgan') return 'Organ';
+
+  // VSTBridge: Melodica
+  if (synthType === 'Melodica') return 'Melodica';
+
+  return null;
+}

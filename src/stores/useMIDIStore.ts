@@ -14,7 +14,7 @@ import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
-import { KNOB_BANKS } from '../midi/knobBanks';
+import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth } from '../midi/knobBanks';
 
 interface MIDIStore {
   // Status
@@ -102,6 +102,13 @@ interface MIDIStore {
   applyGridMIDIValue: (channel: number, controller: number, value: number) => number | null;
 }
 
+// Helper: get VSTBridge synth instance for the current instrument
+const getVSTBridgeSynth = (instrumentId: number) => {
+  const engine = getToneEngine();
+  const key = `${instrumentId}--1`;
+  return engine.instruments.get(key);
+};
+
 // Helper to update parameters from bank CC
 const updateBankParameter = (param: MappableParameter, value: number) => {
   const normalized = value / 127;
@@ -112,9 +119,8 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
   if (!instrument) return;
 
   switch (param) {
-    // 303 Main
+    // ── 303 Main ──────────────────────────────────────────────────────
     case 'cutoff':
-      // Logarithmic mapping matching the knob range (200-5000 Hz)
       instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, filter: { ...instrument.tb303!.filter, cutoff: 200 * Math.pow(5000 / 200, normalized) } } });
       break;
     case 'resonance':
@@ -133,11 +139,10 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, overdrive: { ...instrument.tb303!.overdrive, amount: normalized * 100 } } });
       break;
     case 'slideTime':
-      // Range 2-360 ms matching jc303 reference
       instrumentStore.updateInstrument(instrument.id, { tb303: { ...instrument.tb303!, slide: { ...instrument.tb303!.slide, time: 2 + (normalized * 358) } } });
       break;
 
-    // Siren
+    // ── Siren ─────────────────────────────────────────────────────────
     case 'siren.osc.frequency':
       if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, oscillator: { ...instrument.dubSiren.oscillator, frequency: 60 + (normalized * 940) } } });
       break;
@@ -163,9 +168,289 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       if (instrument.dubSiren) instrumentStore.updateInstrument(instrument.id, { dubSiren: { ...instrument.dubSiren, reverb: { ...instrument.dubSiren.reverb, wet: normalized } } });
       break;
 
-    // FX (assuming Space Echo / Bi-Phase are in master for now, or instrument chain?)
-    // User asked for "all effects", typically means master or active instrument.
-    // Let's target the first effect of type X in the instrument chain.
+    // ── Furnace FM ────────────────────────────────────────────────────
+    case 'furnace.algorithm':
+      if (instrument.furnace) instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, algorithm: Math.round(normalized * 7) } });
+      break;
+    case 'furnace.feedback':
+      if (instrument.furnace) instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, feedback: Math.round(normalized * 7) } });
+      break;
+    case 'furnace.op1TL':
+      if (instrument.furnace?.operators?.[0]) {
+        const ops = [...instrument.furnace.operators];
+        ops[0] = { ...ops[0], tl: Math.round(normalized * 127) };
+        instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, operators: ops } });
+      }
+      break;
+    case 'furnace.op1AR':
+      if (instrument.furnace?.operators?.[0]) {
+        const ops = [...instrument.furnace.operators];
+        ops[0] = { ...ops[0], ar: Math.round(normalized * 31) };
+        instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, operators: ops } });
+      }
+      break;
+    case 'furnace.op1DR':
+      if (instrument.furnace?.operators?.[0]) {
+        const ops = [...instrument.furnace.operators];
+        ops[0] = { ...ops[0], dr: Math.round(normalized * 31) };
+        instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, operators: ops } });
+      }
+      break;
+    case 'furnace.op1SL':
+      if (instrument.furnace?.operators?.[0]) {
+        const ops = [...instrument.furnace.operators];
+        ops[0] = { ...ops[0], sl: Math.round(normalized * 15) };
+        instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, operators: ops } });
+      }
+      break;
+    case 'furnace.op1RR':
+      if (instrument.furnace?.operators?.[0]) {
+        const ops = [...instrument.furnace.operators];
+        ops[0] = { ...ops[0], rr: Math.round(normalized * 15) };
+        instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, operators: ops } });
+      }
+      break;
+    case 'furnace.fms':
+      if (instrument.furnace) instrumentStore.updateInstrument(instrument.id, { furnace: { ...instrument.furnace, fms: Math.round(normalized * 7) } });
+      break;
+
+    // ── V2 ────────────────────────────────────────────────────────────
+    case 'v2.osc1Level':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, osc1: { ...instrument.v2.osc1, level: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.filter1Cutoff':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, filter1: { ...instrument.v2.filter1, cutoff: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.filter1Reso':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, filter1: { ...instrument.v2.filter1, resonance: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.envAttack':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, envelope: { ...instrument.v2.envelope, attack: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.envDecay':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, envelope: { ...instrument.v2.envelope, decay: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.envSustain':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, envelope: { ...instrument.v2.envelope, sustain: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.envRelease':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, envelope: { ...instrument.v2.envelope, release: Math.round(normalized * 127) } } });
+      break;
+    case 'v2.lfo1Depth':
+      if (instrument.v2) instrumentStore.updateInstrument(instrument.id, { v2: { ...instrument.v2, lfo1: { ...instrument.v2.lfo1, depth: Math.round(normalized * 127) } } });
+      break;
+
+    // ── Synare ────────────────────────────────────────────────────────
+    case 'synare.tune':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, oscillator: { ...instrument.synare.oscillator, tune: 20 + normalized * 980 } } });
+      break;
+    case 'synare.osc2Mix':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, oscillator2: { ...instrument.synare.oscillator2, mix: normalized } } });
+      break;
+    case 'synare.filterCutoff':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, filter: { ...instrument.synare.filter, cutoff: 20 * Math.pow(20000 / 20, normalized) } } });
+      break;
+    case 'synare.filterReso':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, filter: { ...instrument.synare.filter, resonance: normalized * 100 } } });
+      break;
+    case 'synare.filterEnvMod':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, filter: { ...instrument.synare.filter, envMod: normalized * 100 } } });
+      break;
+    case 'synare.filterDecay':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, filter: { ...instrument.synare.filter, decay: 10 + normalized * 1990 } } });
+      break;
+    case 'synare.sweepAmount':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, sweep: { ...instrument.synare.sweep, amount: normalized * 48 } } });
+      break;
+    case 'synare.sweepTime':
+      if (instrument.synare) instrumentStore.updateInstrument(instrument.id, { synare: { ...instrument.synare, sweep: { ...instrument.synare.sweep, time: 5 + normalized * 495 } } });
+      break;
+
+    // ── Dexed (DX7) ──────────────────────────────────────────────────
+    case 'dexed.algorithm':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, algorithm: Math.round(normalized * 31) } });
+      break;
+    case 'dexed.feedback':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, feedback: Math.round(normalized * 7) } });
+      break;
+    case 'dexed.op1Level':
+      if (instrument.dexed?.operators?.[0]) {
+        const ops = [...instrument.dexed.operators];
+        ops[0] = { ...ops[0], level: Math.round(normalized * 99) };
+        instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, operators: ops } });
+      }
+      break;
+    case 'dexed.op1Coarse':
+      if (instrument.dexed?.operators?.[0]) {
+        const ops = [...instrument.dexed.operators];
+        ops[0] = { ...ops[0], coarse: Math.round(normalized * 31) };
+        instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, operators: ops } });
+      }
+      break;
+    case 'dexed.lfoSpeed':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, lfoSpeed: Math.round(normalized * 99) } });
+      break;
+    case 'dexed.lfoPitchMod':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, lfoPitchModDepth: Math.round(normalized * 99) } });
+      break;
+    case 'dexed.lfoAmpMod':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, lfoAmpModDepth: Math.round(normalized * 99) } });
+      break;
+    case 'dexed.transpose':
+      if (instrument.dexed) instrumentStore.updateInstrument(instrument.id, { dexed: { ...instrument.dexed, transpose: Math.round(-24 + normalized * 48) } });
+      break;
+
+    // ── OBXd ──────────────────────────────────────────────────────────
+    case 'obxd.osc1Level':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, osc1Level: normalized } });
+      break;
+    case 'obxd.osc2Level':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, osc2Level: normalized } });
+      break;
+    case 'obxd.filterCutoff':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, filterCutoff: normalized } });
+      break;
+    case 'obxd.filterReso':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, filterResonance: normalized } });
+      break;
+    case 'obxd.filterEnv':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, filterEnvAmount: normalized } });
+      break;
+    case 'obxd.ampAttack':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, ampAttack: normalized } });
+      break;
+    case 'obxd.ampDecay':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, ampDecay: normalized } });
+      break;
+    case 'obxd.volume':
+      if (instrument.obxd) instrumentStore.updateInstrument(instrument.id, { obxd: { ...instrument.obxd, masterVolume: normalized } });
+      break;
+
+    // ── SpaceLaser ────────────────────────────────────────────────────
+    case 'spacelaser.startFreq':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, laser: { ...instrument.spaceLaser.laser, startFreq: 100 + normalized * 9900 } } });
+      break;
+    case 'spacelaser.endFreq':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, laser: { ...instrument.spaceLaser.laser, endFreq: 20 + normalized * 4980 } } });
+      break;
+    case 'spacelaser.sweepTime':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, laser: { ...instrument.spaceLaser.laser, sweepTime: 10 + normalized * 2990 } } });
+      break;
+    case 'spacelaser.fmAmount':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, fm: { ...instrument.spaceLaser.fm, amount: normalized * 100 } } });
+      break;
+    case 'spacelaser.fmRatio':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, fm: { ...instrument.spaceLaser.fm, ratio: 0.5 + normalized * 15.5 } } });
+      break;
+    case 'spacelaser.filterCutoff':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, filter: { ...instrument.spaceLaser.filter, cutoff: 20 * Math.pow(20000 / 20, normalized) } } });
+      break;
+    case 'spacelaser.filterReso':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, filter: { ...instrument.spaceLaser.filter, resonance: normalized * 100 } } });
+      break;
+    case 'spacelaser.delayWet':
+      if (instrument.spaceLaser) instrumentStore.updateInstrument(instrument.id, { spaceLaser: { ...instrument.spaceLaser, delay: { ...instrument.spaceLaser.delay, wet: normalized } } });
+      break;
+
+    // ── SAM Speech ────────────────────────────────────────────────────
+    case 'sam.pitch':
+      if (instrument.sam) instrumentStore.updateInstrument(instrument.id, { sam: { ...instrument.sam, pitch: Math.round(normalized * 255) } });
+      break;
+    case 'sam.speed':
+      if (instrument.sam) instrumentStore.updateInstrument(instrument.id, { sam: { ...instrument.sam, speed: Math.round(normalized * 255) } });
+      break;
+    case 'sam.mouth':
+      if (instrument.sam) instrumentStore.updateInstrument(instrument.id, { sam: { ...instrument.sam, mouth: Math.round(normalized * 255) } });
+      break;
+    case 'sam.throat':
+      if (instrument.sam) instrumentStore.updateInstrument(instrument.id, { sam: { ...instrument.sam, throat: Math.round(normalized * 255) } });
+      break;
+
+    // ── TonewheelOrgan (VSTBridge — param IDs from C++ enum) ─────────
+    case 'organ.drawbar16': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(0, normalized * 8);
+      break;
+    }
+    case 'organ.drawbar8': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(2, normalized * 8);
+      break;
+    }
+    case 'organ.drawbar4': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(3, normalized * 8);
+      break;
+    }
+    case 'organ.percussion': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(9, normalized);
+      break;
+    }
+    case 'organ.vibratoType': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(13, Math.round(normalized * 5));
+      break;
+    }
+    case 'organ.vibratoDepth': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(14, normalized);
+      break;
+    }
+    case 'organ.overdrive': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(15, normalized);
+      break;
+    }
+    case 'organ.volume': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(16, normalized);
+      break;
+    }
+
+    // ── Melodica (VSTBridge — param IDs from C++ enum) ────────────────
+    case 'melodica.breath': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(0, normalized);
+      break;
+    }
+    case 'melodica.brightness': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(1, normalized);
+      break;
+    }
+    case 'melodica.vibratoRate': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(2, normalized * 10);
+      break;
+    }
+    case 'melodica.vibratoDepth': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(3, normalized);
+      break;
+    }
+    case 'melodica.detune': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(4, -50 + normalized * 100);
+      break;
+    }
+    case 'melodica.portamento': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(6, normalized);
+      break;
+    }
+    case 'melodica.attack': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(7, normalized);
+      break;
+    }
+    case 'melodica.volume': {
+      const synth = getVSTBridgeSynth(instrument.id);
+      if (synth && 'setParameter' in synth) (synth as any).setParameter(9, normalized);
+      break;
+    }
+
+    // ── FX (Space Echo / Bi-Phase) ────────────────────────────────────
     case 'echo.rate': {
       const fx = instrument.effects.find(e => e.type === 'SpaceEcho');
       if (fx) instrumentStore.updateEffect(instrument.id, fx.id, { parameters: { ...fx.parameters, rate: 50 + (normalized * 950) } });
@@ -207,7 +492,7 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       break;
     }
 
-    // Mixer
+    // ── Mixer ─────────────────────────────────────────────────────────
     case 'mixer.volume':
       instrumentStore.updateInstrument(instrument.id, { volume: -60 + (normalized * 60) });
       break;
@@ -216,6 +501,7 @@ const updateBankParameter = (param: MappableParameter, value: number) => {
       break;
   }
 };
+
 
 // Grid MIDI mapping helpers
 function getGridMappingKey(channel: number, controller: number): string {
@@ -341,11 +627,10 @@ export const useMIDIStore = create<MIDIStore>()(
                 console.log(`[useMIDIStore] NoteOn: MIDI ${message.note} (offset ${octaveOffset}) -> ${toneNote} (${freq.toFixed(1)} Hz), instrument:`, targetInstrument?.name || 'NONE');
 
                 if (targetInstrument) {
-                  // AUTO-SWITCH BANK: If it's a Dub Siren, switch to Siren bank
-                  if (targetInstrument.synthType === 'DubSiren' && store.knobBank !== 'Siren') {
-                    store.setKnobBank('Siren');
-                  } else if ((targetInstrument.synthType === 'TB303' || targetInstrument.synthType === 'Buzz3o3') && store.knobBank !== '303') {
-                    store.setKnobBank('303');
+                  // AUTO-SWITCH BANK: Match knob bank to current synth type
+                  const autoBank = getKnobBankForSynth(targetInstrument.synthType);
+                  if (autoBank && store.knobBank !== autoBank) {
+                    store.setKnobBank(autoBank);
                   }
 
                   const engine = getToneEngine();
@@ -413,21 +698,11 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Pitch Bend (X-axis on MPK Mini joystick)
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
-                // Map -8192..8191 to 0..1 range
-                const normalized = (message.pitchBend + 8192) / 16383;
-                
-                // If controlling Dub Siren, map Pitch Bend to Frequency
-                const instrumentStore = useInstrumentStore.getState();
-                const currentId = instrumentStore.currentInstrumentId;
-                const instrument = instrumentStore.instruments.find(i => i.id === currentId);
-                
-                if (instrument?.synthType === 'DubSiren' && instrument.dubSiren) {
-                  // Map center (0.5) to current base frequency or a reasonable range
-                  // Let's use a wide sweep: 60Hz to 1500Hz
-                  const freq = 60 + (normalized * 1440);
-                  instrumentStore.updateInstrument(instrument.id, { 
-                    dubSiren: { ...instrument.dubSiren, oscillator: { ...instrument.dubSiren.oscillator, frequency: freq } } 
-                  });
+                const joyMap = JOYSTICK_MAP[store.knobBank];
+                if (joyMap?.x) {
+                  // Map -8192..8191 to 0..127 for updateBankParameter
+                  const midiValue = Math.round(((message.pitchBend + 8192) / 16383) * 127);
+                  updateBankParameter(joyMap.x.param, midiValue);
                 }
                 return;
               }
@@ -439,17 +714,9 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
-                  const normalized = message.value / 127;
-                  const instrumentStore = useInstrumentStore.getState();
-                  const currentId = instrumentStore.currentInstrumentId;
-                  const instrument = instrumentStore.instruments.find(i => i.id === currentId);
-                  
-                  if (instrument?.synthType === 'DubSiren' && instrument.dubSiren) {
-                    // Map Y-axis to LFO Rate (0.1 to 20Hz)
-                    const rate = 0.1 + (normalized * 19.9);
-                    instrumentStore.updateInstrument(instrument.id, { 
-                      dubSiren: { ...instrument.dubSiren, lfo: { ...instrument.dubSiren.lfo, rate } } 
-                    });
+                  const joyMap = JOYSTICK_MAP[store.knobBank];
+                  if (joyMap?.y) {
+                    updateBankParameter(joyMap.y.param, message.value);
                   }
                 }
 
