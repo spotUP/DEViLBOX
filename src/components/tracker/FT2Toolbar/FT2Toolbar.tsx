@@ -887,8 +887,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               return;
             }
 
-            const currentInstruments = useInstrumentStore.getState().instruments;
-            const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument!.id) + 1 || 1;
+            // Use the actual instrument ID — the replayer does .find(i => i.id === instNum)
+            const instrumentId = tb303Instrument!.id;
 
             const importedPatterns = td3File.patterns.map((td3Pattern, idx) => {
               const cells = td3StepsToTrackerCells(td3Pattern.steps, 2);
@@ -910,16 +910,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   color: '#ec4899',
                   rows: cells.slice(0, patternLength).map(cell => ({
                     ...cell,
-                    instrument: cell.note ? instrumentIndex : 0
+                    instrument: cell.note ? instrumentId : 0
                   }))
                 }]
               };
             });
 
-            const newPatterns = [...patterns, ...importedPatterns];
-            loadPatterns(newPatterns);
-            setCurrentPattern(patterns.length);
-            setPatternOrder(newPatterns.map((_, i) => i));
+            loadPatterns(importedPatterns);
+            setCurrentPattern(0);
+            setPatternOrder(importedPatterns.map((_, i) => i));
             notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
           } else {
             const { loadModuleFile } = await import('@lib/import/ModuleLoader');

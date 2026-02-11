@@ -148,6 +148,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Handler for opening parameter editor from context menu
   const handleOpenParameterEditor = useCallback((field: 'volume' | 'effect' | 'effectParam') => {
+    if (!pattern) return;
     const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cursor.channelIndex;
     // Use selection if available, otherwise use 16 rows from current position
     const start = selection?.startRow ?? cursor.rowIndex;
@@ -161,7 +162,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       endRow: end,
     });
     cellContextMenu.closeMenu();
-  }, [cellContextMenu, cursor, selection, pattern.length]);
+  }, [cellContextMenu, cursor, selection, pattern]);
 
   // Clear caches when theme changes
   useEffect(() => {
