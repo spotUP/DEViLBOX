@@ -162,6 +162,11 @@ export class WAMSynth implements DevilboxSynth {
   private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
   private _activeNotes: Set<number> = new Set();
   private _audioContext: AudioContext;
+  private _pluginType: 'instrument' | 'effect' | 'unknown' = 'unknown';
+
+  // Internal tone generator for effect plugins (effects need audio input to process)
+  private _inputGain: GainNode | null = null;
+  private _activeOscillators: Map<number, { osc: OscillatorNode; gain: GainNode }> = new Map();
 
   // WAM host state — initialized once per AudioContext
   private static _hostInitPromise: Promise<[string, string]> | null = null;
@@ -199,6 +204,16 @@ export class WAMSynth implements DevilboxSynth {
 
   public async ensureInitialized(): Promise<void> {
     return this._initPromise;
+  }
+
+  /** Returns the detected plugin type: 'instrument', 'effect', or 'unknown' */
+  public get pluginType(): 'instrument' | 'effect' | 'unknown' {
+    return this._pluginType;
+  }
+
+  /** Returns the WAM descriptor (name, vendor, keywords, etc.) */
+  public get descriptor(): any {
+    return this._wamInstance?.descriptor || null;
   }
 
   /**
@@ -254,10 +269,34 @@ export class WAMSynth implements DevilboxSynth {
         throw new Error('Failed to create WAM audio node');
       }
 
-      // 5. Connect WAM node → native GainNode output
-      this._wamNode.connect(this.output);
+      // 5. Detect plugin type BEFORE connecting (needed for routing decision)
+      const descriptor = this._wamInstance.descriptor;
+      if (descriptor) {
+        const keywords: string[] = descriptor.keywords || [];
+        const isInstrument = keywords.includes('instrument') || keywords.includes('synth') || keywords.includes('synthesizer');
+        const isEffect = keywords.includes('effect') || keywords.includes('fx') || keywords.includes('audio-effect');
+        this._pluginType = isInstrument ? 'instrument' : isEffect ? 'effect' : 'unknown';
+      }
+      // Heuristic: if the WAM node has audio inputs, it's likely an effect
+      if (this._pluginType === 'unknown' && this._wamNode.numberOfInputs > 0) {
+        this._pluginType = 'effect';
+      }
 
-      // 6. Restore state if available
+      // 6. Connect based on plugin type
+      if (this._pluginType === 'effect') {
+        // Effect plugins: create an input gain mixer → WAM effect → output
+        // Individual oscillators will connect to this mixer on note-on
+        this._inputGain = ctx.createGain();
+        this._inputGain.gain.value = 1;
+        this._inputGain.connect(this._wamNode);
+        this._wamNode.connect(this.output);
+        console.log('[WAMSynth] Effect plugin detected — internal tone generator enabled');
+      } else {
+        // Instrument plugins: WAM generates audio directly → output
+        this._wamNode.connect(this.output);
+      }
+
+      // 7. Restore state if available
       if (this._config.pluginState && this._wamInstance.setState) {
         try {
           await this._wamInstance.setState(this._config.pluginState);
@@ -268,7 +307,9 @@ export class WAMSynth implements DevilboxSynth {
       }
 
       this._isInitialized = true;
-      console.log(`[WAMSynth] Loaded plugin: ${this._wamInstance.descriptor?.name || 'Unknown'}`);
+
+      console.log(`[WAMSynth] Loaded plugin: ${descriptor?.name || 'Unknown'} (type: ${this._pluginType})`,
+        descriptor ? descriptor : '');
 
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -290,28 +331,46 @@ export class WAMSynth implements DevilboxSynth {
   }
 
   /**
-   * Send a MIDI event through the best available delivery method
+   * Send a MIDI event through the best available delivery method.
+   * WAM 2.0 SDK expects Uint8Array for MIDI bytes.
    */
   private _sendMidi(event: number[], time: number): void {
-    if (this._wamInstance.onMidi) {
-      this._wamInstance.onMidi(event, time);
-    } else if ((this._wamNode as any)?.scheduleEvents) {
+    const bytes = new Uint8Array(event);
+
+    if ((this._wamNode as any)?.scheduleEvents) {
+      // WAM 2.0 standard: WamNode.scheduleEvents()
       (this._wamNode as any).scheduleEvents({
         type: 'wam-midi',
-        data: { bytes: event },
+        data: { bytes },
         time,
       });
+    } else if (this._wamInstance.onMidi) {
+      // WAM 1.0 fallback
+      this._wamInstance.onMidi(event, time);
     } else if ((this._wamNode as any)?.port) {
+      // Direct port message fallback
       (this._wamNode as any).port.postMessage({
         type: 'wam-midi',
-        data: { bytes: event },
+        data: { bytes },
         time,
       });
+    } else {
+      console.warn('[WAMSynth] No MIDI delivery method available on this plugin');
     }
   }
 
   /**
-   * Trigger a note attack
+   * Convert MIDI note to frequency (Hz)
+   */
+  private _midiToFreq(midi: number): number {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  /**
+   * Trigger a note attack.
+   * For instrument plugins: sends MIDI note-on.
+   * For effect plugins: creates an oscillator at the note frequency and feeds it
+   * through the effect so you hear the processed tone.
    */
   triggerAttack(frequency: number | string, time?: number, velocity = 1): this {
     if (!this._isInitialized || !this._wamInstance) return this;
@@ -321,13 +380,53 @@ export class WAMSynth implements DevilboxSynth {
     const triggerTime = time ?? this._audioContext.currentTime;
 
     this._activeNotes.add(midiNote);
-    this._sendMidi([0x90, midiNote, vel], triggerTime);
+
+    if (this._pluginType === 'effect' && this._inputGain) {
+      // Effect plugin: create a per-note oscillator → inputGain → WAM effect → output
+      // Stop existing oscillator for this note if any
+      const existing = this._activeOscillators.get(midiNote);
+      if (existing) {
+        try { existing.osc.stop(); } catch { /* already stopped */ }
+        existing.gain.disconnect();
+      }
+
+      const osc = this._audioContext.createOscillator();
+      const noteGain = this._audioContext.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(this._midiToFreq(midiNote), triggerTime);
+      noteGain.gain.setValueAtTime(velocity * 0.3, triggerTime); // Scale down to avoid clipping
+
+      osc.connect(noteGain);
+      noteGain.connect(this._inputGain);
+      osc.start(triggerTime);
+
+      this._activeOscillators.set(midiNote, { osc, gain: noteGain });
+    } else {
+      // Instrument plugin: send MIDI
+      this._sendMidi([0x90, midiNote, vel], triggerTime);
+    }
 
     return this;
   }
 
   /**
-   * Trigger a note release
+   * Stop an internal oscillator for effect plugin mode
+   */
+  private _stopOscillator(midiNote: number, time: number): void {
+    const entry = this._activeOscillators.get(midiNote);
+    if (!entry) return;
+    // Quick fade-out to avoid click
+    entry.gain.gain.setValueAtTime(entry.gain.gain.value, time);
+    entry.gain.gain.linearRampToValueAtTime(0, time + 0.02);
+    try { entry.osc.stop(time + 0.03); } catch { /* already stopped */ }
+    this._activeOscillators.delete(midiNote);
+  }
+
+  /**
+   * Trigger a note release.
+   * For instrument plugins: sends MIDI note-off.
+   * For effect plugins: stops the internal oscillator for this note.
    */
   triggerRelease(frequency?: number | string, time?: number): this {
     if (!this._isInitialized || !this._wamInstance) return this;
@@ -337,14 +436,25 @@ export class WAMSynth implements DevilboxSynth {
     if (frequency !== undefined) {
       const midiNote = noteToMidi(frequency);
       this._activeNotes.delete(midiNote);
-      this._sendMidi([0x80, midiNote, 0], triggerTime);
+
+      if (this._pluginType === 'effect') {
+        this._stopOscillator(midiNote, triggerTime);
+      } else {
+        this._sendMidi([0x80, midiNote, 0], triggerTime);
+      }
     } else {
-      // Release all tracked notes individually, then CC#123 as safety net
-      for (const activeNote of this._activeNotes) {
-        this._sendMidi([0x80, activeNote, 0], triggerTime);
+      // Release all
+      if (this._pluginType === 'effect') {
+        for (const note of this._activeOscillators.keys()) {
+          this._stopOscillator(note, triggerTime);
+        }
+      } else {
+        for (const activeNote of this._activeNotes) {
+          this._sendMidi([0x80, activeNote, 0], triggerTime);
+        }
+        this._sendMidi([0xB0, 123, 0], triggerTime);
       }
       this._activeNotes.clear();
-      this._sendMidi([0xB0, 123, 0], triggerTime);
     }
 
     return this;
@@ -455,6 +565,15 @@ export class WAMSynth implements DevilboxSynth {
     this._releaseTimers.forEach(timer => clearTimeout(timer));
     this._releaseTimers.clear();
     this._activeNotes.clear();
+    // Stop all active oscillators (effect mode)
+    for (const [, entry] of this._activeOscillators) {
+      try { entry.osc.stop(); } catch { /* already stopped */ }
+      entry.gain.disconnect();
+    }
+    this._activeOscillators.clear();
+    if (this._inputGain) {
+      this._inputGain.disconnect();
+    }
     if (this._wamNode) {
       this._wamNode.disconnect();
     }

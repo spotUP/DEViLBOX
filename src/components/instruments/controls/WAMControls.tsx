@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { WAMSynth } from '@engine/wam/WAMSynth';
-import { Globe, RefreshCw, AlertCircle, Sliders } from 'lucide-react';
+import { Globe, RefreshCw, AlertCircle, Sliders, ChevronDown } from 'lucide-react';
 import type { InstrumentConfig, WAMConfig } from '@typedefs/instrument';
+import { WAM_SYNTH_PLUGINS, type WAMPluginEntry } from '@constants/wamPlugins';
 
 interface WAMControlsProps {
   instrument: InstrumentConfig;
@@ -26,6 +27,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
   const [fallbackParams, setFallbackParams] = useState<Record<string, WAMParamInfo> | null>(null);
   const [paramValues, setParamValues] = useState<Record<string, number>>({});
   const [hasNativeGui, setHasNativeGui] = useState(false);
+  const [pluginWarning, setPluginWarning] = useState<string | null>(null);
   const guiContainerRef = useRef<HTMLDivElement>(null);
   const engine = getToneEngine();
 
@@ -50,6 +52,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
       guiContainerRef.current.innerHTML = '';
       setFallbackParams(null);
       setHasNativeGui(false);
+      setPluginWarning(null);
 
       if (!instrument.wam?.moduleUrl) {
         console.log('[WAMControls] No URL provided yet');
@@ -78,11 +81,19 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
 
         console.log('[WAMControls] Creating native GUI...');
         const gui = await synth.createGui();
-        if (gui && isMounted) {
+        if (gui && isMounted && guiContainerRef.current) {
           console.log('[WAMControls] GUI created, mounting to DOM');
           currentGui = gui;
           setHasNativeGui(true);
           guiContainerRef.current.appendChild(gui);
+
+          // Info banner for effects plugins
+          if (synth.pluginType === 'effect') {
+            setPluginWarning(
+              `"${synth.descriptor?.name || 'This plugin'}" is an audio effect. ` +
+              `A built-in tone generator feeds audio through it so you can play it from the keyboard.`
+            );
+          }
         } else if (!gui && isMounted) {
           console.warn('[WAMControls] Plugin did not provide a GUI, trying parameter discovery');
           // No native GUI — try parameter discovery for fallback UI
@@ -143,37 +154,92 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
     engine.invalidateInstrument(instrument.id);
   };
 
+  const loadPlugin = useCallback((pluginUrl: string) => {
+    setUrl(pluginUrl);
+    onChange({
+      wam: {
+        ...instrument.wam,
+        moduleUrl: pluginUrl,
+        pluginState: null,
+      } as WAMConfig
+    });
+    engine.invalidateInstrument(instrument.id);
+  }, [instrument, onChange, engine]);
+
+  const handlePluginSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedUrl = e.target.value;
+    if (!selectedUrl) return;
+    loadPlugin(selectedUrl);
+  }, [loadPlugin]);
+
+  // Group plugins by type for the dropdown
+  const groupedPlugins = WAM_SYNTH_PLUGINS.reduce<Record<string, WAMPluginEntry[]>>((acc, p) => {
+    const groupKey = p.type === 'instrument' ? 'Synthesizers' : p.type === 'effect' ? 'Effects (with tone generator)' : 'Utility';
+    if (!acc[groupKey]) acc[groupKey] = [];
+    acc[groupKey].push(p);
+    return acc;
+  }, {});
+
   return (
     <div className="flex flex-col h-full bg-dark-bgSecondary p-4 space-y-4 overflow-hidden">
-      {/* URL Header */}
+      {/* Plugin Browser */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
           <Globe size={14} />
-          WAM Module URL
+          Web Audio Module
         </label>
-        <form onSubmit={handleUrlSubmit} className="flex gap-2">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://cdn.example.com/wam/plugin/index.js"
-            className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-          />
-          <button
-            type="submit"
+
+        {/* Plugin dropdown */}
+        <div className="relative">
+          <select
+            value={instrument.wam?.moduleUrl || ''}
+            onChange={handlePluginSelect}
             disabled={isLoading}
-            className="bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-50 text-text-inverse px-4 py-1.5 rounded text-sm font-bold transition-all flex items-center gap-2"
+            className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors appearance-none cursor-pointer disabled:opacity-50"
           >
-            {isLoading ? <RefreshCw size={14} className="animate-spin" /> : 'LOAD'}
-          </button>
-        </form>
-        <div className="text-[10px] text-text-muted space-y-0.5">
-          <p className="italic">Enter a WAM 2.0 module URL above. Example sources:</p>
-          <ul className="list-disc list-inside pl-1">
-            <li><a href="https://github.com/webaudiomodules" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">github.com/webaudiomodules</a> — Official WAM ecosystem</li>
-            <li><a href="https://mainline.i3s.unice.fr/wam2/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">mainline.i3s.unice.fr/wam2</a> — WAM 2.0 demo host</li>
-          </ul>
+            <option value="">Select a WAM plugin...</option>
+            {Object.entries(groupedPlugins).map(([group, plugins]) => (
+              <optgroup key={group} label={group}>
+                {plugins.map(p => (
+                  <option key={p.url} value={p.url}>
+                    {p.name} — {p.description}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
         </div>
+
+        {/* Custom URL (collapsible) */}
+        <details className="group">
+          <summary className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none flex items-center gap-1">
+            <ChevronDown size={10} className="group-open:rotate-180 transition-transform" />
+            Custom URL
+          </summary>
+          <div className="mt-2 space-y-2">
+            <form onSubmit={handleUrlSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com/my-wam-plugin/index.js"
+                className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-50 text-text-inverse px-4 py-1.5 rounded text-sm font-bold transition-all flex items-center gap-2"
+              >
+                {isLoading ? <RefreshCw size={14} className="animate-spin" /> : 'LOAD'}
+              </button>
+            </form>
+            <p className="text-[10px] text-text-muted italic">
+              Enter any WAM 2.0 module URL. Browse more at{' '}
+              <a href="https://www.webaudiomodules.com/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">webaudiomodules.com</a>
+            </p>
+          </div>
+        </details>
       </div>
 
       {/* Error State */}
@@ -187,6 +253,14 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
         </div>
       )}
 
+      {/* Plugin type info (effects plugin with tone generator) */}
+      {pluginWarning && !error && (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+          <AlertCircle size={14} className="text-blue-400 flex-shrink-0" />
+          <p className="text-xs text-text-secondary">{pluginWarning}</p>
+        </div>
+      )}
+
       {/* Loading Overlay */}
       {isLoading && !error && (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-dark-bg/20 rounded-xl border border-dark-border border-dashed">
@@ -195,24 +269,26 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
         </div>
       )}
 
-      {/* GUI Container (native GUI or empty for fallback) */}
-      {!isLoading && !error && instrument.wam?.moduleUrl && (hasNativeGui || !fallbackParams) && (
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-text-muted uppercase">Plugin Interface</span>
-            <button
-              onClick={() => engine.invalidateInstrument(instrument.id)}
-              className="text-[10px] text-text-muted hover:text-text-primary flex items-center gap-1"
-            >
-              <RefreshCw size={10} /> Reload
-            </button>
-          </div>
-          <div
-            ref={guiContainerRef}
-            className="flex-1 bg-black rounded-lg border border-dark-border overflow-auto flex items-center justify-center min-h-[300px]"
-          />
+      {/* GUI Container — always rendered so the ref stays stable during async WAM loading */}
+      <div
+        className={`flex-1 flex flex-col min-h-0 ${
+          !isLoading && !error && instrument.wam?.moduleUrl && (hasNativeGui || !fallbackParams) ? '' : 'hidden'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold text-text-muted uppercase">Plugin Interface</span>
+          <button
+            onClick={() => engine.invalidateInstrument(instrument.id)}
+            className="text-[10px] text-text-muted hover:text-text-primary flex items-center gap-1"
+          >
+            <RefreshCw size={10} /> Reload
+          </button>
         </div>
-      )}
+        <div
+          ref={guiContainerRef}
+          className="flex-1 bg-black rounded-lg border border-dark-border overflow-auto flex items-center justify-center min-h-[300px]"
+        />
+      </div>
 
       {/* Fallback Parameter UI (when plugin has no native GUI but has discoverable params) */}
       {fallbackParams && !hasNativeGui && !isLoading && !error && (
@@ -256,8 +332,6 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
               );
             })}
           </div>
-          {/* Hidden GUI container ref still needed for effect cleanup */}
-          <div ref={guiContainerRef} className="hidden" />
         </div>
       )}
 
