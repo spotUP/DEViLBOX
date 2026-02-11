@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T00:48:55.462Z
+ * Generated: 2026-02-11T09:34:56.778Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '365';
-export const BUILD_HASH = '6453a7a';
+export const BUILD_NUMBER = '374';
+export const BUILD_HASH = 'e092398';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,42 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'feature',
+        "description": "Test: add swing timing test scripts and XML test patterns"
+      },
+      {
+        type: 'feature',
+        "description": "Add Tonewheel Organ, Vital, Odin2, Surge, and Melodica controls"
+      },
+      {
+        type: 'feature',
+        "description": "Add effect engine modules, BPM sync, and compiled WASM binaries"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add documentation, changelog, test pages, and gitignore updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add Moog filters, MVerb, Leslie, Spring reverb, and synth templates"
+      },
+      {
+        type: 'feature',
+        "description": "Expand knob banks and controller mappings for all synth types"
+      },
+      {
+        type: 'feature',
+        "description": "Add auto-preview oscilloscope hook and expand synth parameter editors"
+      },
+      {
+        type: 'feature',
+        "description": "Add BPM sync controls, genre presets, and enhanced visual editors"
+      },
+      {
+        type: 'improvement',
+        "description": "Decouple synth engines from Tone.js and expand audio architecture"
+      },
       {
         type: 'feature',
         "description": "Update editors, presets, tracker, and DB303 controls"
@@ -214,42 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Move groove controls to dedicated settings modal and simplify toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance groove templates with velocity dynamics"
-      },
-      {
-        type: 'feature',
-        "description": "Implement adjustable groove cycle duration and immediate re-sync"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused tickLoop property"
-      },
-      {
-        type: 'feature',
-        "description": "Add manual swing amount control to groove menu"
-      },
-      {
-        type: 'fix',
-        "description": "Implement sample-accurate groove and swing for 303 synths"
-      },
-      {
-        type: 'improvement',
-        "description": "Fix groove menu dividers and cleanup unused imports"
-      },
-      {
-        type: 'improvement',
-        "description": "Comprehensive FT2 panel cleanup and reorganization"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve AmigaFilter InvalidStateError and optimize 303 timing"
-      },
-      {
-        type: 'improvement',
-        "description": "Comprehensive tracker optimization (memoization, jank fixes, and UI smoothing)"
       }
     ]
   }
