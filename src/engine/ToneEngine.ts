@@ -30,6 +30,7 @@ import { MoogFilterEffect, type MoogFilterModel, type MoogFilterMode } from './e
 import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
+import { WAMEffectNode } from './wam/WAMEffectNode';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -1434,6 +1435,7 @@ export class ToneEngine {
       case 'DubSiren':
       case 'SpaceLaser':
       case 'V2':
+      case 'V2Speech':
       case 'Sam':
       case 'Synare':
       case 'WAM':
@@ -4468,6 +4470,26 @@ export class ToneEngine {
           if (params.mix != null) node.setSpringMix(Number(params.mix));
           if (params.drip != null) node.setDrip(Number(params.drip));
           if (params.diffusion != null) node.setDiffusion(Number(params.diffusion));
+        }
+        break;
+
+      // WAM 2.0 effects — parameters are forwarded to the WAM node
+      case 'WAMBigMuff':
+      case 'WAMTS9':
+      case 'WAMDistoMachine':
+      case 'WAMQuadraFuzz':
+      case 'WAMVoxAmp':
+      case 'WAMStonePhaser':
+      case 'WAMPingPongDelay':
+      case 'WAMFaustDelay':
+      case 'WAMPitchShifter':
+      case 'WAMGraphicEQ':
+      case 'WAMPedalboard':
+        if (node instanceof WAMEffectNode) {
+          for (const [key, value] of Object.entries(params)) {
+            if (key === 'bpmSync' || key === 'syncDivision') continue;
+            node.setParameter(key, Number(value));
+          }
         }
         break;
     }

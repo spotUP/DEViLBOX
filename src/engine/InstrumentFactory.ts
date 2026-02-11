@@ -94,6 +94,8 @@ import { YMF271Synth } from './ymf271/YMF271Synth';
 import { YMOPQSynth } from './ymopq/YMOPQSynth';
 import { VASynthSynth } from './vasynth/VASynthSynth';
 import { WAMSynth } from './wam/WAMSynth';
+import { WAMEffectNode } from './wam/WAMEffectNode';
+import { WAM_EFFECT_URLS, WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 
@@ -545,6 +547,7 @@ export class InstrumentFactory {
         break;
 
       case 'V2':
+      case 'V2Speech':
         instrument = this.createV2(config);
         break;
 
@@ -554,6 +557,13 @@ export class InstrumentFactory {
 
       case 'Synare':
         instrument = this.createSynare(config);
+        break;
+
+      case 'WAMOBXd':
+      case 'WAMSynth101':
+      case 'WAMTinySynth':
+      case 'WAMFaustFlute':
+        instrument = this.createNamedWAM(config);
         break;
 
       case 'WAM':
@@ -1391,6 +1401,30 @@ export class InstrumentFactory {
         });
         break;
 
+      // WAM 2.0 effects
+      case 'WAMBigMuff':
+      case 'WAMTS9':
+      case 'WAMDistoMachine':
+      case 'WAMQuadraFuzz':
+      case 'WAMVoxAmp':
+      case 'WAMStonePhaser':
+      case 'WAMPingPongDelay':
+      case 'WAMFaustDelay':
+      case 'WAMPitchShifter':
+      case 'WAMGraphicEQ':
+      case 'WAMPedalboard': {
+        const wamUrl = WAM_EFFECT_URLS[config.type];
+        if (!wamUrl) {
+          console.warn(`[InstrumentFactory] No WAM URL for effect: ${config.type}`);
+          node = new Tone.Gain(1);
+          break;
+        }
+        const wamNode = new WAMEffectNode({ moduleUrl: wamUrl, wet: wetValue });
+        await wamNode.ensureInitialized();
+        node = wamNode;
+        break;
+      }
+
       default:
         console.warn(`Unknown effect type: ${config.type}, creating bypass`);
         node = new Tone.Gain(1);
@@ -1712,6 +1746,21 @@ export class InstrumentFactory {
     // WAMs usually have their own internal gain — set the native GainNode level
     synth.output.gain.value = Tone.dbToGain(config.volume ?? -12);
 
+    return synth;
+  }
+
+  /**
+   * Create a named WAM synth (preconfigured URL from WAM_SYNTH_URLS)
+   */
+  private static createNamedWAM(config: InstrumentConfig): WAMSynth {
+    const url = WAM_SYNTH_URLS[config.synthType];
+    if (!url) {
+      console.warn(`[InstrumentFactory] No URL found for WAM synth type: ${config.synthType}`);
+      return this.createWAM(config);
+    }
+    const wamConfig = { ...config.wam, moduleUrl: url, pluginState: config.wam?.pluginState ?? null };
+    const synth = new WAMSynth(wamConfig);
+    synth.output.gain.value = Tone.dbToGain(config.volume ?? -12);
     return synth;
   }
 
@@ -4565,8 +4614,8 @@ export class InstrumentFactory {
 
   private static createV2(config: InstrumentConfig): Tone.ToneAudioNode {
     // Check if V2 Speech mode is enabled - use V2SpeechSynth for singing/talking
-    if (config.v2Speech) {
-      const synth = new V2SpeechSynth(config.v2Speech);
+    if (config.v2Speech || config.synthType === 'V2Speech') {
+      const synth = new V2SpeechSynth(config.v2Speech || undefined);
 
       synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('V2', config.volume));
 
