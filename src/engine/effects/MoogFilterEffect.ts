@@ -240,6 +240,8 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
                 /(wasmMemory=wasmExports\["\w+"\])/,
                 '$1;Module["wasmMemory"]=wasmMemory'
               );
+            // Inject URL shim for AudioWorklet new Function() scope
+            code = 'var URL = globalThis.URL || self.URL;\n' + code;
             this.jsCode = code;
           }
         } catch (fetchErr) {
@@ -274,19 +276,14 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
         this.fallbackFilter!.process(inL, inR, outL, outR);
       };
 
-      // Connect fallback as wet path
-      const toneInput = this.input as any;
-      const toneWetGain = this.wetGain as any;
-      const inputNode = toneInput._gainNode || toneInput;
-      const wetNode = toneWetGain._gainNode || toneWetGain;
-
-      // Access raw Web Audio nodes from Tone.js wrappers
-      const rawInput = (inputNode as any)._nativeAudioNode || (inputNode as any)._node || inputNode;
-      const rawWet = (wetNode as any)._nativeAudioNode || (wetNode as any)._node || wetNode;
+      // Connect fallback as wet path using raw GainNodes from Tone.Gain wrappers
+      const rawInput = (this.input as any)._gainNode as GainNode;
+      const rawWet = (this.wetGain as any)._gainNode as GainNode;
+      const rawOut = (this.output as any)._gainNode as GainNode;
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(rawOut);
       this.usingFallback = true;
     } catch (err) {
       console.warn('[MoogFilter] Fallback init failed:', err);
@@ -309,13 +306,14 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
         this.usingFallback = false;
       }
 
-      // Connect WASM worklet as wet path
-      const rawInput = (this.input as any)._nativeAudioNode || (this.input as any)._node || this.input;
-      const rawWet = (this.wetGain as any)._nativeAudioNode || (this.wetGain as any)._node || this.wetGain;
+      // Connect WASM worklet as wet path using raw GainNodes
+      const rawInput = (this.input as any)._gainNode as GainNode;
+      const rawWet = (this.wetGain as any)._gainNode as GainNode;
+      const rawOut = (this.output as any)._gainNode as GainNode;
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(rawOut);
 
       // Keepalive connection
       const keepalive = rawContext.createGain();

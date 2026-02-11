@@ -1,6 +1,7 @@
 import React, { useRef, useLayoutEffect, useState, useEffect, useCallback, memo } from 'react';
 import { ChevronRight, ChevronDown, Lightbulb } from 'lucide-react';
 import type { TB303Config } from '@typedefs/instrument';
+import { DEFAULT_TB303 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
@@ -257,12 +258,23 @@ const DB303DiagnosticsOverlay: React.FC<{ instrumentId: number }> = ({ instrumen
 };
 
 export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
-  config,
+  config: rawConfig,
   onChange,
   onPresetLoad,
   isBuzz3o3 = false,
   instrumentId,
 }) => {
+  // Defensive defaults — guard against partially-loaded configs from persistence
+  const config: TB303Config = {
+    ...DEFAULT_TB303,
+    ...rawConfig,
+    oscillator: { ...DEFAULT_TB303.oscillator, ...rawConfig.oscillator },
+    filter: { ...DEFAULT_TB303.filter, ...rawConfig.filter },
+    filterEnvelope: { ...DEFAULT_TB303.filterEnvelope, ...rawConfig.filterEnvelope },
+    accent: { ...DEFAULT_TB303.accent, ...rawConfig.accent },
+    slide: { ...DEFAULT_TB303.slide, ...rawConfig.slide },
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [sections, setSections] = useState({
     mods: false,    // Collapsed by default

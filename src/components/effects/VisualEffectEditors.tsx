@@ -22,9 +22,9 @@ import {
   Music,
   ArrowLeftRight,
   Wind,
-  Volume2,
   Disc,
   X,
+  Globe,
 } from 'lucide-react';
 
 interface VisualEffectEditorProps {
@@ -2198,6 +2198,18 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   MVerb: MVerbEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
+  // WAM 2.0 effects — use generic editor (WAM provides its own native GUI)
+  WAMBigMuff: GenericEffectEditor,
+  WAMTS9: GenericEffectEditor,
+  WAMDistoMachine: GenericEffectEditor,
+  WAMQuadraFuzz: GenericEffectEditor,
+  WAMVoxAmp: GenericEffectEditor,
+  WAMStonePhaser: GenericEffectEditor,
+  WAMPingPongDelay: GenericEffectEditor,
+  WAMFaustDelay: GenericEffectEditor,
+  WAMPitchShifter: GenericEffectEditor,
+  WAMGraphicEQ: GenericEffectEditor,
+  WAMPedalboard: GenericEffectEditor,
 };
 
 /**
@@ -2252,6 +2264,18 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   MVerb:               { bg: '#140a22', bgEnd: '#0c061a', accent: '#7c3aed', border: '#201432' },
   Leslie:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
   SpringReverb:        { bg: '#081a0a', bgEnd: '#041204', accent: '#059669', border: '#0a2a0e' },
+  // WAM 2.0 effects
+  WAMBigMuff:          { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  WAMTS9:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
+  WAMDistoMachine:     { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#dc2626', border: '#3a1a0a' },
+  WAMQuadraFuzz:       { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  WAMVoxAmp:           { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
+  WAMStonePhaser:      { bg: '#180a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' },
+  WAMPingPongDelay:    { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  WAMFaustDelay:       { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  WAMPitchShifter:     { bg: '#100a20', bgEnd: '#0a0618', accent: '#8b5cf6', border: '#1a1430' },
+  WAMGraphicEQ:        { bg: '#081420', bgEnd: '#040e18', accent: '#3b82f6', border: '#0a1e30' },
+  WAMPedalboard:       { bg: '#081a18', bgEnd: '#041210', accent: '#14b8a6', border: '#0a2a28' },
 };
 
 export const DEFAULT_ENCLOSURE = { bg: '#181818', bgEnd: '#101010', accent: '#888', border: '#282828' };
@@ -2299,6 +2323,18 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     MVerb: <Waves size={18} className="text-white" />,
     Leslie: <Radio size={18} className="text-white" />,
     SpringReverb: <Waves size={18} className="text-white" />,
+    // WAM 2.0 effects
+    WAMBigMuff: <Globe size={18} className="text-white" />,
+    WAMTS9: <Globe size={18} className="text-white" />,
+    WAMDistoMachine: <Globe size={18} className="text-white" />,
+    WAMQuadraFuzz: <Globe size={18} className="text-white" />,
+    WAMVoxAmp: <Globe size={18} className="text-white" />,
+    WAMStonePhaser: <Globe size={18} className="text-white" />,
+    WAMPingPongDelay: <Globe size={18} className="text-white" />,
+    WAMFaustDelay: <Globe size={18} className="text-white" />,
+    WAMPitchShifter: <Globe size={18} className="text-white" />,
+    WAMGraphicEQ: <Globe size={18} className="text-white" />,
+    WAMPedalboard: <Globe size={18} className="text-white" />,
   };
 
   const enc = ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE;

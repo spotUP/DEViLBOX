@@ -84,6 +84,9 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
     );
   }
 
+  // WAM effects use the generic visual editor (WAM plugins provide their own native GUI
+  // via the VisualEffectEditors dispatch, or fall through to GenericEffectEditor)
+
   // Use visual editor for standard effects
   return (
     <VisualEffectEditorWrapper
