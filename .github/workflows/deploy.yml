@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages & Build Desktop Apps
 
 on:
   push:
@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
-  group: 'pages'
+  group: 'deploy'
   cancel-in-progress: true
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
@@ -51,3 +51,102 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Build Electron desktop apps for all platforms
+  electron:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Build Electron App
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder build --${{ matrix.platform }} --publish never
+
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.platform }}
+          path: |
+            dist_electron/*.dmg
+            dist_electron/*.zip
+            dist_electron/*.exe
+            dist_electron/*.AppImage
+            dist_electron/*.deb
+            dist_electron/*.tar.gz
+          if-no-files-found: warn
+
+  # Create a GitHub Release with all desktop app binaries
+  release:
+    needs: [electron, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: version
+        run: echo "version=$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
+
+      - name: Download all Electron artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: electron-*
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la release-assets/ || echo "No assets found"
+
+      - name: Delete existing latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete latest --yes --cleanup-tag || true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "DEViLBOX v${{ steps.version.outputs.version }} (Latest Build)"
+          body: |
+            **Automatically built from the latest `main` branch.**
+
+            This release is updated on every deploy. Download the installer for your platform below.
+
+            | Platform | Files |
+            |----------|-------|
+            | Windows | `.exe` (installer) or `.zip` (portable) |
+            | macOS | `.dmg` (disk image) or `.zip` |
+            | Linux | `.AppImage`, `.deb`, or `.tar.gz` |
+
+            ---
+            Built from commit ${{ github.sha }}
+          files: release-assets/*
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
