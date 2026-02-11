@@ -32,7 +32,8 @@ class DB303Processor extends AudioWorkletProcessor {
     // delayTime needs VERY slow smoothing to avoid tape-warble/garbage artifacts
     this.smoothedParams = {
       delayTime: { current: 0.3, target: 0.3, rate: 0.002 },  // VERY slow - delay time changes cause glitches
-      cutoff: { current: 0.5, target: 0.5, rate: 0.15 },      // Moderate - smooth but responsive
+      // cutoff NOT smoothed — WASM engine has internal smoothing; JS smoothing
+      // on top makes sweeps sluggish vs original db303.pages.dev
     };
     
     console.log('[DB303 Worklet] v1.3.2 (FilterSelect Validation)');
@@ -55,7 +56,7 @@ class DB303Processor extends AudioWorkletProcessor {
           state.current += diff * state.rate;
         }
         // Apply the smoothed value to WASM
-        const setterName = paramId === 'delayTime' ? 'setDelayTime' : 'setCutoff';
+        const setterName = 'set' + paramId.charAt(0).toUpperCase() + paramId.slice(1);
         if (typeof this.synth[setterName] === 'function') {
           this.synth[setterName](state.current);
         }
@@ -343,8 +344,12 @@ class DB303Processor extends AudioWorkletProcessor {
     switch (data.type) {
       case 'noteOn':
         if (!data.slide && this.currentNote >= 0) {
-          if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
-          this.synth.noteOff(this.currentNote);
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: allNotesOff() then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
+          // Use allNotesOff instead of noteOff(currentNote) to clear orphan notes
+          // left in the WASM noteList by slides. During slides, noteOn is called
+          // without noteOff, so previous notes accumulate. If we only noteOff the
+          // currentNote, slide-source notes remain orphaned and degrade audio output.
+          this.synth.allNotesOff();
         } else if (data.slide && this.currentNote >= 0) {
           // FIX: Skip noteOn entirely for same-pitch slides
           // When sliding to the same pitch, just sustain the note without any WASM call.

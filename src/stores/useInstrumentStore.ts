@@ -1180,6 +1180,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.instruments = migratedInstruments;
         state.currentInstrumentId = migratedInstruments.length > 0 ? migratedInstruments[0].id : null;
       });
+
+      // Preload instruments so WASM synths (TB303, Furnace, etc.) are initialized
+      // before playback starts. Without this, on-demand creation in getInstrument()
+      // returns synths whose AudioWorklet hasn't loaded yet → silent notes.
+      getToneEngine().preloadInstruments(migratedInstruments).catch(err => {
+        console.warn('[InstrumentStore] Instrument preload failed:', err);
+      });
     },
 
     loadFurnaceInstrument: (buffer) => {
