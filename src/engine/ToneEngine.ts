@@ -175,6 +175,7 @@ export class ToneEngine {
   private instrumentEffectChains: Map<string | number, {
     effects: Tone.ToneAudioNode[];
     output: Tone.Gain;
+    bridge?: Tone.Gain;
   }> = new Map();
 
   // Per-instrument effect nodes indexed by effectId for real-time parameter updates
@@ -255,12 +256,22 @@ export class ToneEngine {
   public connectNativeSynth(synthOutput: AudioNode, destination: Tone.ToneAudioNode): void {
     const nativeDestination = getNativeAudioNode(destination);
     if (nativeDestination) {
-      synthOutput.connect(nativeDestination);
+      try {
+        synthOutput.connect(nativeDestination);
+      } catch (e) {
+        console.error('[ToneEngine] connectNativeSynth failed:', e,
+          'synthOutput context:', (synthOutput as any).context?.constructor?.name,
+          'dest context:', (nativeDestination as any).context?.constructor?.name);
+      }
     } else {
       console.warn('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');
       // Last resort: try connecting to Tone.js input property
       if ((destination as any).input) {
-        synthOutput.connect((destination as any).input);
+        try {
+          synthOutput.connect((destination as any).input);
+        } catch (e) {
+          console.error('[ToneEngine] connectNativeSynth fallback also failed:', e);
+        }
       }
     }
   }
@@ -1405,6 +1416,11 @@ export class ToneEngine {
       }
 
       default: {
+        // Check VSTBridge registry for dynamically registered synths
+        if (SYNTH_REGISTRY.has(config.synthType || '')) {
+          instrument = InstrumentFactory.createInstrument(config);
+          break;
+        }
         reportSynthError(
           config.synthType || 'Unknown',
           `Unsupported synth type "${config.synthType}". This instrument cannot produce sound.`,
@@ -2421,7 +2437,10 @@ export class ToneEngine {
       } else {
         // Create new voice entry
         const voice = this.createVoice(channelIndex, voiceNode, note, config);
-        voiceNode.connect(voice.nodes.gain);
+        if (!isDevilboxSynth(voiceNode)) {
+          voiceNode.connect(voice.nodes.gain);
+        }
+        // DevilboxSynths: audio flows via buildInstrumentEffectChain → masterInput
         voices.push(voice);
       }
       this.activeVoices.set(channelIndex, voices);
@@ -2957,15 +2976,30 @@ export class ToneEngine {
       // Create effects chain if present
       if (config.effects && config.effects.length > 0) {
         const effects = await InstrumentFactory.createEffectChain(config.effects);
-        // Connect instrument -> effect1 -> effect2 ... -> destination
-        let lastNode: Tone.ToneAudioNode = instrument;
+        let firstNode: Tone.ToneAudioNode;
+        if (isDevilboxSynth(instrument)) {
+          const bridge = new Tone.Gain(1);
+          const nativeBridge = getNativeAudioNode(bridge);
+          if (nativeBridge) instrument.output.connect(nativeBridge);
+          firstNode = bridge;
+        } else {
+          firstNode = instrument;
+        }
+        let lastNode = firstNode;
         for (const effect of effects) {
           lastNode.connect(effect);
           lastNode = effect;
         }
         lastNode.toDestination();
       } else {
-        instrument.toDestination();
+        if (isDevilboxSynth(instrument)) {
+          const bridge = new Tone.Gain(1);
+          const nativeBridge = getNativeAudioNode(bridge);
+          if (nativeBridge) instrument.output.connect(nativeBridge);
+          bridge.toDestination();
+        } else {
+          instrument.toDestination();
+        }
       }
 
       // Trigger the specific note
@@ -4159,6 +4193,14 @@ export class ToneEngine {
           // Node may already be disposed
         }
       });
+      if (existing.bridge) {
+        try {
+          existing.bridge.disconnect();
+          existing.bridge.dispose();
+        } catch {
+          // Bridge may already be disposed
+        }
+      }
       existing.output.disconnect();
       existing.output.dispose();
     }
@@ -4168,6 +4210,9 @@ export class ToneEngine {
 
     // Detect if this is a native DevilboxSynth (non-Tone.js) or a Tone.js node
     const isNativeSynth = isDevilboxSynth(instrument);
+    if (isNativeSynth) {
+      console.log(`[ToneEngine] buildEffectChain: key=${key} is DevilboxSynth (${(instrument as any).name || 'unknown'}), output context=${(instrument as DevilboxSynth).output?.constructor?.name}`);
+    }
 
     // Helper: connect instrument to a Tone.js destination node
     const connectInstrumentTo = (dest: Tone.ToneAudioNode) => {
@@ -4207,10 +4252,18 @@ export class ToneEngine {
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
     );
 
-    // Build full chain: instrument → effect[0] → effect[1] → ... → effect[N-1] → output → destination
+    // Build full chain: instrument → [bridge?] → effect[0] → ... → effect[N-1] → output → destination
+    let bridge: Tone.Gain | undefined;
     if (effectNodes.length > 0) {
-      // Connect instrument to first effect
-      connectInstrumentTo(effectNodes[0]);
+      if (isNativeSynth) {
+        // Native synths can't connect directly to Tone.js effects (CrossFade input).
+        // Insert a Tone.Gain bridge whose .input IS a native GainNode.
+        bridge = new Tone.Gain(1);
+        connectInstrumentTo(bridge);
+        bridge.connect(effectNodes[0]);
+      } else {
+        (instrument as Tone.ToneAudioNode).connect(effectNodes[0]);
+      }
       // Chain effects together
       for (let i = 0; i < effectNodes.length - 1; i++) {
         effectNodes[i].connect(effectNodes[i + 1]);
@@ -4232,7 +4285,7 @@ export class ToneEngine {
       output.connect(this.masterInput);
     }
 
-    this.instrumentEffectChains.set(key, { effects: effectNodes, output });
+    this.instrumentEffectChains.set(key, { effects: effectNodes, output, bridge });
 
     // Register individual effect nodes for real-time parameter updates
     enabledEffects.forEach((config, i) => {
