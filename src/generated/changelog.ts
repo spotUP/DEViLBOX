@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T09:35:44.031Z
+ * Generated: 2026-02-11T12:27:29.034Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '378';
-export const BUILD_HASH = '88e8932';
+export const BUILD_NUMBER = '382';
+export const BUILD_HASH = 'cc5476d';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve Tone.js compatibility issues from DevilboxSynth refactor"
+      },
+      {
+        type: 'fix',
+        "description": "Load Behringer .sqs/.seq files via file browser"
+      },
+      {
+        type: 'fix',
+        "description": "Clean up synth controls - fix Odin2 ranges, add OTHER tab, show all params"
+      },
+      {
+        type: 'fix',
+        "description": "Bridge native DevilboxSynths into Tone.js effect chains"
+      },
       {
         type: 'fix',
         "description": "Clean up SurgeControls component"
@@ -234,22 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add automation lane to tracker channels"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve WASM loading errors and update synth implementations"
-      },
-      {
-        type: 'improvement',
-        "description": "Implement authentic ProTracker status messages in pattern header"
-      },
-      {
-        type: 'improvement',
-        "description": "Implement collapsible sections for cleaner vertical layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Expand TB-303 panel dimensions and optimize control spacing"
       }
     ]
   }
