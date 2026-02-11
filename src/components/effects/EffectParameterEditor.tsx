@@ -29,7 +29,7 @@ export const NEURAL_PARAMETER_SCHEMA: Record<string, EffectParameter[]> = {};
 
 interface EffectParameterEditorProps {
   effect: EffectConfig;
-  onUpdateParameter: (key: string, value: number) => void;
+  onUpdateParameter: (key: string, value: number | string) => void;
   onUpdateWet: (wet: number) => void;
   onClose?: () => void;
 }
@@ -102,7 +102,7 @@ export const EffectParameterEditor: React.FC<EffectParameterEditorProps> = ({
 interface NeuralEffectEditorProps {
   effect: EffectConfig;
   parameters: EffectParameter[];
-  onUpdateParameter: (key: string, value: number) => void;
+  onUpdateParameter: (key: string, value: number | string) => void;
   onUpdateWet: (wet: number) => void;
   onClose?: () => void;
 }

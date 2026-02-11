@@ -15,3 +15,5 @@ export { V2Controls } from './V2Controls';
 export { SynareControls } from './SynareControls';
 export { DexedControls } from './DexedControls';
 export { OBXdControls } from './OBXdControls';
+export { TonewheelOrganControls } from './TonewheelOrganControls';
+export { MelodicaControls } from './MelodicaControls';

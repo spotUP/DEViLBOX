@@ -8,7 +8,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 export interface MasterFxPreset {
   name: string;
   description: string;
-  category: 'Clean' | 'Club' | 'Lo-Fi' | 'Ambient' | 'Aggressive' | 'Dub';
+  category: 'Clean' | 'Club' | 'Lo-Fi' | 'Ambient' | 'Aggressive' | 'Dub' | 'Genre';
   effects: Omit<EffectConfig, 'id'>[];
 }
 
@@ -539,6 +539,246 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         enabled: true,
         wet: 100,
         parameters: { threshold: -15, ratio: 4, attack: 0.01, release: 0.2 },
+      },
+    ],
+  },
+
+  // === GENRE (BPM-Synced) ===
+  {
+    name: 'Reggae',
+    description: 'Dotted-eighth skank echo with warm bass — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'SpaceEcho',
+        enabled: true,
+        wet: 25,
+        parameters: { mode: 4, rate: 375, intensity: 0.4, echoVolume: 0.7, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/8d' },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: 0, high: -1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Dub',
+    description: 'Heavy quarter-note echo with phaser swirl — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'SpaceEcho',
+        enabled: true,
+        wet: 45,
+        parameters: { mode: 4, rate: 500, intensity: 0.7, echoVolume: 0.85, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+      },
+      {
+        category: 'tonejs',
+        type: 'BiPhase',
+        enabled: true,
+        wet: 30,
+        parameters: { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0, bpmSync: 1, syncDivision: '1/2' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 25,
+        parameters: { decay: 3, preDelay: 0.03 },
+      },
+    ],
+  },
+  {
+    name: 'Techno',
+    description: 'Driving eighth-note delay with hard compression — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Delay',
+        enabled: true,
+        wet: 20,
+        parameters: { time: 0.25, feedback: 0.35, bpmSync: 1, syncDivision: '1/8' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Distortion',
+        enabled: true,
+        wet: 12,
+        parameters: { distortion: 0.15 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 3, mid: -1, high: 2 },
+      },
+    ],
+  },
+  {
+    name: 'House',
+    description: 'Ping-pong delay and chorus groove — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 18,
+        parameters: { time: 0.25, feedback: 0.4, bpmSync: 1, syncDivision: '1/8' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 20,
+        parameters: { frequency: 1.0, depth: 0.4, bpmSync: 1, syncDivision: '1/4' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 3.5, attack: 0.008, release: 0.18 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 0, high: 1 },
+      },
+    ],
+  },
+  {
+    name: 'Ambient',
+    description: 'Long reverb with dotted-quarter ping-pong — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 50,
+        parameters: { decay: 6, preDelay: 0.06 },
+      },
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 30,
+        parameters: { time: 0.375, feedback: 0.5, bpmSync: 1, syncDivision: '1/4d' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 25,
+        parameters: { frequency: 0.25, depth: 0.5, bpmSync: 1, syncDivision: '1/1' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Filter',
+        enabled: true,
+        wet: 100,
+        parameters: { frequency: 6000, type: 'lowpass', Q: 0.5 },
+      },
+    ],
+  },
+  {
+    name: 'Lo-Fi Hip Hop',
+    description: 'Lazy swing delay with vinyl crunch — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'BitCrusher',
+        enabled: true,
+        wet: 20,
+        parameters: { bits: 10 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Filter',
+        enabled: true,
+        wet: 100,
+        parameters: { frequency: 7000, type: 'lowpass', Q: 0.8 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Delay',
+        enabled: true,
+        wet: 22,
+        parameters: { time: 0.375, feedback: 0.3, bpmSync: 1, syncDivision: '1/8d' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Vibrato',
+        enabled: true,
+        wet: 15,
+        parameters: { frequency: 4, depth: 0.06 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 3, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Drum & Bass',
+    description: 'Tight sixteenth-note delay with sub boost — auto-syncs to BPM',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 5, mid: -1, high: 3 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -10, ratio: 5, attack: 0.002, release: 0.08 },
+      },
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 15,
+        parameters: { time: 0.125, feedback: 0.3, bpmSync: 1, syncDivision: '1/16' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 12,
+        parameters: { decay: 0.8, preDelay: 0.01 },
       },
     ],
   },

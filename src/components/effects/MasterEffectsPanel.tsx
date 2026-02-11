@@ -44,8 +44,11 @@ const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[]
   { type: 'SpaceEcho', label: 'Space Echo', category: 'Time' },
   { type: 'SpaceyDelayer', label: 'Spacey Delayer', category: 'Time' },
   { type: 'RETapeEcho', label: 'RE Tape Echo', category: 'Time' },
+  { type: 'MVerb', label: 'MVerb Plate', category: 'Time' },
+  { type: 'SpringReverb', label: 'Spring Reverb', category: 'Time' },
 
   // Modulation
+  { type: 'Leslie', label: 'Leslie Speaker', category: 'Modulation' },
   { type: 'BiPhase', label: 'Bi-Phase', category: 'Modulation' },
   { type: 'Chorus', label: 'Chorus', category: 'Modulation' },
   { type: 'Phaser', label: 'Phaser', category: 'Modulation' },
@@ -57,6 +60,7 @@ const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[]
 
   // Pitch/Filter
   { type: 'DubFilter', label: 'Dub Filter', category: 'Filter' },
+  { type: 'MoogFilter', label: 'Moog Filter', category: 'Filter' },
   { type: 'Filter', label: 'Filter', category: 'Filter' },
   { type: 'PitchShift', label: 'Pitch Shift', category: 'Pitch' },
   { type: 'FrequencyShifter', label: 'Freq Shifter', category: 'Pitch' },
