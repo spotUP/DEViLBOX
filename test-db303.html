@@ -189,8 +189,11 @@
     <div class="controls-grid">
       <div class="control-group">
         <div class="name">Waveform</div>
-        <label>Saw → Square (0-1)</label>
-        <input type="range" id="waveform" min="0" max="1" step="0.01" value="0" disabled>
+        <label>Oscillator type</label>
+        <select id="waveform" disabled>
+          <option value="0">SAW</option>
+          <option value="1">SQUARE</option>
+        </select>
         <div class="value-display" id="waveformVal">SAW</div>
       </div>
       <div class="control-group">
@@ -270,6 +273,12 @@
         <label>Cutoff mod depth (0-1)</label>
         <input type="range" id="lfoFilterDepth" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="lfoFilterDepthVal">0</div>
+      </div>
+      <div class="control-group">
+        <div class="name">LFO → Stiff</div>
+        <label>Tension mod depth (0-1)</label>
+        <input type="range" id="lfoStiffDepth" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="lfoStiffDepthVal">0</div>
       </div>
     </div>
   </div>
@@ -494,8 +503,8 @@
       decay: { setter: 'setDecay', format: v => v.toFixed(2) },
       accent: { setter: 'setAccent', format: v => `${(v*100).toFixed(0)}%` },
       
-      // Oscillator
-      waveform: { setter: 'setWaveform', format: v => v < 0.5 ? 'SAW' : 'SQR' },
+      // Oscillator (waveform is now a select, handled separately)
+      // waveform: handled in selectParams
       pulseWidth: { setter: 'setPulseWidth', format: v => `${(50 + v*49).toFixed(0)}%` },
       subOscGain: { setter: 'setSubOscGain', format: v => `${(v*100).toFixed(0)}%` },
       subOscBlend: { setter: 'setSubOscBlend', format: v => `${(v*100).toFixed(0)}%` },
@@ -508,6 +517,7 @@
       lfoPitchDepth: { setter: 'setLfoPitchDepth', format: v => v.toFixed(2) },
       lfoPwmDepth: { setter: 'setLfoPwmDepth', format: v => v.toFixed(2) },
       lfoFilterDepth: { setter: 'setLfoFilterDepth', format: v => v.toFixed(2) },
+      lfoStiffDepth: { setter: 'setLfoStiffDepth', format: v => v.toFixed(2) },
       
       // DevilFish - Filter
       lpBpMix: { setter: 'setLpBpMix', format: v => v < 0.1 ? 'LP' : v > 0.9 ? 'BP' : `${(v*100).toFixed(0)}%` },
@@ -547,6 +557,7 @@
 
     // Select parameters (integer values)
     const selectParams = {
+      waveform: { setter: 'setWaveform', format: v => v === 0 ? 'SAW' : 'SQUARE' },
       lfoWaveform: { setter: 'setLfoWaveform' },
       filterSelect: { setter: 'setFilterSelect' },
       chorusMode: { setter: 'setChorusMode' },
@@ -623,103 +634,20 @@
     document.getElementById('initBtn').addEventListener('click', async () => {
       try {
         log('Initializing...', 'warning');
-        
-        // Use plain Web Audio API instead of Tone.js for production
+
+        // Create native AudioContext (no Tone.js needed)
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        log(`✓ Audio Context @ ${audioContext.sampleRate}Hz`, 'success');
-        
-        // Load DB303 worklet directly (use absolute path for GitHub Pages)
-        const basePath = window.location.pathname.includes('/DEViLBOX/') ? '/DEViLBOX' : '';
-        await audioContext.audioWorklet.addModule(`${basePath}/db303/DB303.worklet.js`);
-        
-        // Create worklet node
-        const workletNode = new AudioWorkletNode(audioContext, 'db303-processor', {
-          outputChannelCount: [2]
-        });
-        workletNode.connect(audioContext.destination);
-        
-        // Load WASM (reuse basePath from above)
-        const wasmResponse = await fetch(`${basePath}/db303/DB303.wasm`);
-        const wasmBinary = await wasmResponse.arrayBuffer();
-        const jsResponse = await fetch(`${basePath}/db303/DB303.js`);
-        const jsCode = await jsResponse.text();
-        
-        workletNode.port.postMessage({
-          type: 'init',
-          sampleRate: audioContext.sampleRate,
-          wasmBinary,
-          jsCode
-        });
-        
-        // Wait for ready
-        await new Promise((resolve) => {
-          workletNode.port.onmessage = (e) => {
-            if (e.data.type === 'ready') resolve();
-          };
-        });
-        
-        // Create simplified API wrapper
-        db303Synth = {
-          workletNode,
-          audioContext,
-          triggerAttack: (note, time, velocity = 1, accent = false, slide = false) => {
-            const midiNote = typeof note === 'string' ? 
-              (12 * parseInt(note.match(/\d+/)[0]) + ['C','','D','','E','F','','G','','A','','B'].indexOf(note[0])) : 
-              Math.round(12 * Math.log2(note / 440) + 69);
-            workletNode.port.postMessage({ type: 'noteOn', note: midiNote, velocity: Math.floor(velocity * 127), slide, accent });
-          },
-          triggerRelease: () => {
-            workletNode.port.postMessage({ type: 'gateOff' });
-          },
-          // All parameter setters (0-1 normalized)
-          setCutoff: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'cutoff', value: v }),
-          setResonance: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'resonance', value: v }),
-          setEnvMod: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'envMod', value: v }),
-          setDecay: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'decay', value: v }),
-          setAccent: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'accent', value: v }),
-          setWaveform: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'waveform', value: v }),
-          setPulseWidth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'pulseWidth', value: v }),
-          setSubOscGain: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'subOscGain', value: v }),
-          setSubOscBlend: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'subOscBlend', value: v }),
-          setPitchToPw: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'pitchToPw', value: v }),
-          setTuning: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'tuning', value: v }),
-          setVolume: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'volume', value: v }),
-          setSlideTime: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'slideTime', value: v }),
-          setNormalDecay: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'normalDecay', value: v }),
-          setAccentDecay: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'accentDecay', value: v }),
-          setSoftAttack: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'softAttack', value: v }),
-          setAccentSoftAttack: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'accentSoftAttack', value: v }),
-          setPassbandCompensation: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'passbandCompensation', value: v }),
-          setResTracking: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'resTracking', value: v }),
-          setFilterInputDrive: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterInputDrive', value: v }),
-          setDiodeCharacter: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'diodeCharacter', value: v }),
-          setDuffingAmount: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'duffingAmount', value: v }),
-          setFilterFmDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterFmDepth', value: v }),
-          setLpBpMix: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lpBpMix', value: v }),
-          setFilterTracking: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterTracking', value: v }),
-          setFilterSelect: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterSelect', value: v }),
-          setLfoWaveform: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoWaveform', value: v }),
-          setLfoRate: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoRate', value: v }),
-          setLfoContour: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoContour', value: v }),
-          setLfoPitchDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoPitchDepth', value: v }),
-          setLfoPwmDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoPwmDepth', value: v }),
-          setLfoFilterDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoFilterDepth', value: v }),
-          setLfoStiffDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoStiffDepth', value: v }),
-          setChorusMode: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'chorusMode', value: v }),
-          setChorusMix: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'chorusMix', value: v }),
-          setPhaserRate: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'phaserRate', value: v }),
-          setPhaserWidth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'phaserWidth', value: v }),
-          setPhaserFeedback: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'phaserFeedback', value: v }),
-          setPhaserMix: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'phaserMix', value: v }),
-          setPhaserDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'phaserDepth', value: v }),
-          setDelayTime: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'delayTime', value: v }),
-          setDelayFeedback: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'delayFeedback', value: v }),
-          setDelayTone: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'delayTone', value: v }),
-          setDelayMix: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'delayMix', value: v }),
-          setDelaySpread: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'delaySpread', value: v }),
-        };
-        
         await audioContext.resume();
+        log(`✓ Audio Context @ ${audioContext.sampleRate}Hz`, 'success');
+
+        // Register context so DB303Synth can find it
+        const { setDevilboxAudioContext } = await import('./src/utils/audio-context.ts');
+        setDevilboxAudioContext(audioContext);
+
+        const { DB303Synth } = await import('./src/engine/db303/DB303Synth.ts');
+        db303Synth = new DB303Synth();
+        await db303Synth.ensureInitialized();
+        db303Synth.output.connect(audioContext.destination);
         
         log('✓ DB303Synth ready!', 'success');
         
@@ -807,7 +735,7 @@
       // Parameter groups - we'll set up "parent" params before testing children
       const paramGroups = {
         // LFO params need LFO rate to be audible
-        lfo: ['lfoRate', 'lfoContour', 'lfoPitchDepth', 'lfoPwmDepth', 'lfoFilterDepth'],
+        lfo: ['lfoRate', 'lfoContour', 'lfoPitchDepth', 'lfoPwmDepth', 'lfoFilterDepth', 'lfoStiffDepth'],
         // Korg filter params need filterSelect=5
         korg: ['diodeCharacter', 'duffingAmount', 'filterFmDepth'],
         // Chorus needs mix > 0
@@ -824,6 +752,8 @@
         normalEnv: ['normalDecay', 'softAttack'],
         // Trigger-time params: effect only heard on note attack, need multiple notes
         triggerTime: ['softAttack', 'accentSoftAttack', 'normalDecay', 'accentDecay', 'decay', 'accent', 'envMod'],
+        // Tracking params: pitch-following parameters need multi-octave test
+        tracking: ['filterTracking', 'resTracking'],
       };
       
       const paramList = Object.entries(params);

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db303-pattern version="1.0" numSteps="8" tempo="80" swing="0" rootNote="60">
+  <!-- SLOW Swing Test - 8th notes at 80 BPM -->
+  <!-- Each note is 375ms apart - much easier to hear swing -->
+  <!-- NO ACCENTS to avoid double-triggering -->
+  
+  <step index="0" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="1" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="2" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="3" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="4" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="5" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="6" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+  <step index="7" key="0" octave="0" gate="true" accent="false" slide="false" mute="false" hammer="false" />
+</db303-pattern>
