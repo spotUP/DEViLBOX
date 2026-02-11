@@ -6,7 +6,8 @@
 
 import { NKSHIDProtocol, NKS_BUTTONS, isHIDSupported } from './NKSHIDProtocol';
 import { useNKSStore } from './NKSManager';
-import type { NKSControllerInfo, NKSKeyLight, NKSLightGuideColor, NKS2SynthProfile, NKS2PDI } from './types';
+import type { NKSControllerInfo, NKSKeyLight, NKSLightGuideColor, NKSNoteMode, NKS2SynthProfile, NKS2PDI } from './types';
+import { NKSLightGuideColor as LGC, NKS_DRUM_COLOR_MAP } from './types';
 import { sendMPKLCDDisplay, syncNKSLightsToPads } from './AkaiMIDIProtocol';
 import { getNKS2Profile } from './synthParameterMaps';
 import type { SynthType } from '@typedefs/instrument';
@@ -283,25 +284,51 @@ export class NKSHardwareController {
   }
   
   /**
-   * Set light guide colors for scale highlighting
+   * Set light guide colors for scale highlighting.
+   * Per NKS SDK Section 12.2.2: use main colors for melodic instruments.
    */
-  setScaleLights(rootNote: number, scaleIntervals: number[]): void {
+  setScaleLights(rootNote: number, scaleIntervals: number[], color: NKSLightGuideColor = LGC.TURQUOISE): void {
     const lights: NKSKeyLight[] = [];
-    
-    // Generate lights for all octaves
+
     for (let octave = 0; octave < 11; octave++) {
       for (const interval of scaleIntervals) {
         const note = (octave * 12) + rootNote + interval;
         if (note >= 0 && note < 128) {
           lights.push({
             note,
-            color: interval === 0 ? 0x02 : 0x01, // Root = blue, others = white
-            brightness: 0.5,
+            color: interval === 0 ? LGC.BLUE : color,
+            brightness: interval === 0 ? 1.0 : 0.5,
+            mode: 'default' as NKSNoteMode,
           });
         }
       }
     }
-    
+
+    const state = useNKSStore.getState();
+    state.setLightGuide(lights);
+    this.updateLightGuide();
+  }
+
+  /**
+   * Set light guide for a drum kit using the official NKS color scheme.
+   * Per NKS SDK Section 12.2.3 and Available Light Guide Colors table.
+   *
+   * @param pads - Array of drum pad definitions with type, note, and optional name
+   */
+  setDrumKitLights(pads: Array<{ note: number; type: string; name?: string }>): void {
+    const lights: NKSKeyLight[] = pads.map(pad => {
+      const drumType = pad.type.toLowerCase();
+      const color = NKS_DRUM_COLOR_MAP[drumType] ?? LGC.BLUE;
+
+      return {
+        note: pad.note,
+        color,
+        brightness: 0.8,
+        mode: 'control' as NKSNoteMode,
+        name: pad.name?.substring(0, 25),  // Max 25 chars per SDK spec
+      };
+    });
+
     const state = useNKSStore.getState();
     state.setLightGuide(lights);
     this.updateLightGuide();
