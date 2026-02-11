@@ -67,29 +67,49 @@ export async function parseNKSF(buffer: ArrayBuffer): Promise<NKSPreset> {
 
       case NKS_CONSTANTS.MAGIC_NIKA: {
         // NI Kontrol Automation chunk - parameter values
+        // Supports two formats:
+        // 1. DEViLBOX format: count(u32le) + [idLen(u8) + idStr + value(f32le)] x N
+        // 2. NI native format: count(u32le) + [paramIndex(u32le) + value(f32le)] x N
         const paramView = new DataView(buffer, chunkStart, chunkSize);
         let paramOffset = 0;
-        
+
         // Read parameter count
         const paramCount = paramView.getUint32(paramOffset, true);
         paramOffset += 4;
-        
-        // Read each parameter
-        for (let i = 0; i < paramCount; i++) {
-          // Read parameter ID length
-          const idLength = paramView.getUint8(paramOffset);
-          paramOffset += 1;
-          
-          // Read parameter ID
-          const idBytes = new Uint8Array(buffer, chunkStart + paramOffset, idLength);
-          const paramId = new TextDecoder().decode(idBytes);
-          paramOffset += idLength;
-          
-          // Read parameter value (float)
-          const paramValue = paramView.getFloat32(paramOffset, true);
-          paramOffset += 4;
-          
-          parameters[paramId] = paramValue;
+
+        // Detect format: if first byte after count looks like a small string length (<128)
+        // it's probably our string-ID format. If it's a larger value, it's NI numeric format.
+        const firstByte = paramCount > 0 && paramOffset < chunkSize
+          ? paramView.getUint8(paramOffset) : 0;
+        const isStringFormat = firstByte > 0 && firstByte < 128 && (paramOffset + 1 + firstByte + 4) <= chunkSize;
+
+        if (isStringFormat) {
+          // DEViLBOX string-ID format
+          for (let i = 0; i < paramCount && paramOffset < chunkSize; i++) {
+            const idLength = paramView.getUint8(paramOffset);
+            paramOffset += 1;
+
+            const idBytes = new Uint8Array(buffer, chunkStart + paramOffset, idLength);
+            const paramId = new TextDecoder().decode(idBytes);
+            paramOffset += idLength;
+
+            const paramValue = paramView.getFloat32(paramOffset, true);
+            paramOffset += 4;
+
+            parameters[paramId] = paramValue;
+          }
+        } else {
+          // NI native numeric-index format
+          for (let i = 0; i < paramCount && paramOffset + 8 <= chunkSize; i++) {
+            const paramIndex = paramView.getUint32(paramOffset, true);
+            paramOffset += 4;
+
+            const paramValue = paramView.getFloat32(paramOffset, true);
+            paramOffset += 4;
+
+            // Store with numeric index as string key
+            parameters[`param.${paramIndex}`] = paramValue;
+          }
         }
         break;
       }
@@ -120,8 +140,15 @@ export async function parseNKSF(buffer: ArrayBuffer): Promise<NKSPreset> {
 export function writeNKSF(preset: NKSPreset): ArrayBuffer {
   const chunks: ArrayBuffer[] = [];
 
-  // NISI chunk - metadata
-  const metaJson = JSON.stringify(preset.metadata);
+  // NISI chunk - metadata (ensure NKS2 required fields are present)
+  const nisiData = {
+    ...preset.metadata,
+    // NKS2 requires types array
+    types: preset.metadata.types || [],
+    // NKS2 character tags stored in modes
+    modes: preset.metadata.modes || [],
+  };
+  const metaJson = JSON.stringify(nisiData);
   const metaBytes = new TextEncoder().encode(metaJson);
   chunks.push(createChunk(NKS_CONSTANTS.MAGIC_NISI, metaBytes.buffer));
 

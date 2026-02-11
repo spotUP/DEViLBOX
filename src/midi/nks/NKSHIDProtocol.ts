@@ -134,6 +134,24 @@ export const ALESIS_PRODUCT_IDS = {
 
 /**
  * HID Report IDs for different message types
+ *
+ * NI MK2 Protocol:
+ *   Display: 2-line text, knobs render as basic value bars
+ *   Reports: Standard report IDs below
+ *
+ * NI MK3 Protocol (S49/S61/S88 MK3):
+ *   Display: High-res color screens (480x272 per section)
+ *   NKS2 PDI: Full graphical rendering of knob/menu/waveform/filter controls
+ *   Reports: Extended report format with display region addressing
+ *   Touch strip: Capacitive strip below display, reports position + pressure
+ *   Light guide: Per-key RGB LEDs (not just on/off)
+ *
+ * TODO: MK3-specific report IDs (requires hardware for verification):
+ *   DISPLAY_REGION: 0x80 - Draw to specific display region
+ *   DISPLAY_BITMAP: 0x81 - Send bitmap data to display
+ *   TOUCH_STRIP:    0x20 - Touch strip position/pressure input
+ *   KEY_LED_RGB:    0x04 - Per-key RGB light guide
+ *   KNOB_TOUCH:     0x13 - Knob touch detection (capacitive)
  */
 const HID_REPORT_IDS = {
   DISPLAY_UPDATE: 0x01,

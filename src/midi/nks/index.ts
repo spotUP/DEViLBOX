@@ -11,6 +11,9 @@ export * from './NKSManager';
 export * from './NKSHIDProtocol';
 export * from './NKSHardwareController';
 export * from './presetIntegration';
+export * from './parameterRouter';
+export * from './autoParameterMap';
+export * from './nksTaxonomy';
 
 // Convenience exports
 export { useNKSStore, getNKSManager } from './NKSManager';

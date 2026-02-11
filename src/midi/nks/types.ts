@@ -50,29 +50,34 @@ export interface NKSParameter {
   name: string;                  // Display name (max 31 chars)
   section: NKSSection;           // Parameter category
   type: NKSParameterType;        // Value type
-  
+
   // Value range
   min: number;
   max: number;
   defaultValue: number;
-  
+
   // Display formatting
   unit?: string;                 // e.g., "Hz", "dB", "%"
   formatString?: string;         // e.g., "%.1f Hz"
-  
+
   // Enumerated values (for SELECTOR type)
   valueStrings?: string[];
-  
+
   // Page assignment (8 parameters per page)
   page: number;                  // 0-based page index
   index: number;                 // 0-7 position on page
-  
+
   // MIDI CC mapping (optional)
   ccNumber?: number;
-  
+
   // Automation
   isAutomatable: boolean;
   isHidden?: boolean;            // Hidden from NI browser but still controllable
+
+  // NKS2 extensions (optional, for gradual migration)
+  pdi?: NKS2PDI;                 // NKS2 Parameter Display Info
+  engineParam?: string;          // Engine routing key (MappableParameter or synth-specific path)
+  route?: NKS2ParameterRoute;    // Explicit routing instructions for parameterRouter
 }
 
 /**
@@ -248,14 +253,138 @@ export const NKS_CONSTANTS = {
   MAGIC_NISI: 0x4E495349,        // "NISI" chunk (NI Sound Info)
   MAGIC_NIKA: 0x4E494B41,        // "NIKA" chunk (NI Kontrol)
   MAGIC_PLUG: 0x504C5547,        // "PLUG" chunk (Plugin state)
-  
+
   VERSION_MAJOR: 1,
   VERSION_MINOR: 0,
-  
+
   MAX_PARAM_NAME_LENGTH: 31,
   MAX_PRESET_NAME_LENGTH: 127,
   MAX_PARAMETERS_PER_PAGE: 8,
-  
+  MAX_PERFORMANCE_PARAMS: 16,     // NKS2: Up to 16 params in Performance mode
+  MAX_EDIT_PARAMS_PER_GROUP: 48,  // NKS2: Up to 48 params per Edit group
+
   VENDOR_ID: 'DEViLBOX',
   PLUGIN_UUID: 'devilbox-tracker-v1',  // Update when format changes
 };
+
+// ============================================================================
+// NKS2 Type System
+// ============================================================================
+
+/**
+ * NKS2 PDI (Parameter Display Info) Type
+ * Defines how a parameter behaves and is displayed on NI hardware
+ */
+export type NKS2PDIType =
+  | 'continuous'           // Unipolar 0-1 (e.g., volume, cutoff)
+  | 'continuous_bipolar'   // Bipolar -1 to +1 (e.g., pan, detune)
+  | 'discrete'             // Enumerated values (e.g., waveform: 0,1,2,3)
+  | 'discrete_bipolar'     // Bipolar discrete (e.g., transpose: -24 to +24)
+  | 'toggle';              // On/Off (e.g., enable, bypass)
+
+/**
+ * NKS2 PDI Style
+ * Determines the visual control type on NI displays
+ */
+export type NKS2PDIStyle =
+  | 'knob'         // Standard rotary (default for continuous)
+  | 'value'        // Numeric value display
+  | 'menu'         // Dropdown-style list (default for discrete)
+  | 'waveform'     // Waveform selector with visual icons
+  | 'filterType'   // Filter type selector with visual icons
+  | 'power'        // On/Off toggle with power icon (default for toggle)
+  | 'temposync';   // Tempo-synced values (1/4, 1/8, etc.)
+
+/**
+ * NKS2 Parameter Display Info
+ * Full PDI descriptor for hardware rendering
+ */
+export interface NKS2PDI {
+  type: NKS2PDIType;
+  style?: NKS2PDIStyle;             // Defaults based on type if omitted
+  value_count?: number;              // For discrete: number of possible values
+  display_values?: string[];         // For discrete: labels for each value
+}
+
+/**
+ * NKS2 Parameter Definition
+ * Extended parameter with PDI and engine routing
+ */
+export interface NKS2Parameter {
+  id: string;                        // Unique parameter ID (e.g., 'tb303.cutoff')
+  name: string;                      // Display name (max 31 chars for NI hardware)
+  pdi: NKS2PDI;                      // Parameter Display Info
+  defaultValue: number;              // Default value (0-1 normalized)
+  unit?: string;                     // Display unit (e.g., "Hz", "dB", "%")
+  formatValue?: (value: number) => string;  // Custom value formatter
+  ccNumber?: number;                 // MIDI CC number (optional)
+  engineParam: string;               // Engine routing key (MappableParameter or synth-specific path)
+}
+
+/**
+ * NKS2 Performance Section
+ * A named group of up to 8 parameters in Performance mode
+ * Performance mode shows the most important controls (max 2 sections = 16 params)
+ */
+export interface NKS2PerformanceSection {
+  name: string;                      // Section name (e.g., "Main", "Effects")
+  parameters: NKS2Parameter[];       // Up to 8 parameters
+}
+
+/**
+ * NKS2 Edit Group
+ * A deeper parameter group for Edit mode (detailed editing)
+ * Each group can have multiple sections
+ */
+export interface NKS2EditSection {
+  name: string;                      // Section name within group
+  parameters: NKS2Parameter[];       // Parameters in this section
+}
+
+export interface NKS2EditGroup {
+  name: string;                      // Group name (e.g., "Oscillator", "Filter")
+  sections: NKS2EditSection[];       // Sections within the group
+}
+
+/**
+ * NKS2 Navigation Structure
+ * Organizes parameters into Performance and Edit modes
+ */
+export interface NKS2Navigation {
+  performance: NKS2PerformanceSection[];  // Performance mode (1-2 sections, max 16 params)
+  editGroups?: NKS2EditGroup[];           // Edit mode (optional, for deep editing)
+}
+
+/**
+ * NKS2 Synth Profile
+ * Complete NKS2 descriptor for a synth type
+ */
+export interface NKS2SynthProfile {
+  synthType: string;                      // SynthType string
+  parameters: NKS2Parameter[];            // All available parameters
+  navigation: NKS2Navigation;             // Performance + Edit organization
+  controlColor?: number;                  // NI display accent color (0xRRGGBB)
+}
+
+/**
+ * NKS2 Parameter Route
+ * Describes how to apply a parameter value to the synth engine.
+ * Used by the parameter router to dispatch changes.
+ */
+export type NKS2RouteType =
+  | 'config'       // Update instrument config via useInstrumentStore.updateInstrument()
+  | 'vstbridge'    // Send to VSTBridge WASM via setParameter(id, value)
+  | 'wam'          // Send to WAM plugin via audioNode.parameterMap
+  | 'tonejs'       // Set Tone.js synth property via instrument.set()
+  | 'effect';      // Update effect parameter via useInstrumentStore.updateEffect()
+
+export interface NKS2ParameterRoute {
+  type: NKS2RouteType;
+  configPath?: string;        // For 'config': dot-path into instrument config (e.g., 'tb303.filter.cutoff')
+  vstParamId?: number;        // For 'vstbridge': WASM parameter index
+  wamParamId?: string;        // For 'wam': WAM parameter identifier
+  tonePath?: string;          // For 'tonejs': Tone.js property path
+  effectType?: string;        // For 'effect': effect type to find
+  effectParam?: string;       // For 'effect': parameter name within effect
+  transform?: (normalized: number) => number;  // Optional value transform (normalized -> engine value)
+}

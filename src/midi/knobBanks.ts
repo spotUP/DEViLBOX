@@ -237,3 +237,59 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 
   return null;
 }
+
+// ============================================================================
+// NKS2-BASED KNOB BANK GENERATION
+// Derives knob assignments from NKS2 performance profiles for any synth.
+// Falls back to legacy KNOB_BANKS for synths with hardcoded banks.
+// ============================================================================
+
+import { getKnob8Params } from './nks/synthParameterMaps';
+
+/** CC numbers for the 8 knobs on Akai MPK Mini MK3 (CC 70-77) */
+const KNOB_CC_START = 70;
+
+/**
+ * Generate a KnobAssignment array from NKS2 Performance mode params.
+ * Returns 8 assignments mapped to CC 70-77.
+ */
+export function getKnobBankFromNKS2(synthType: SynthType): KnobAssignment[] {
+  const nks2Params = getKnob8Params(synthType);
+
+  return nks2Params.map((param, index) => ({
+    cc: KNOB_CC_START + index,
+    param: param.engineParam as MappableParameter,
+    label: param.name.substring(0, 10), // Truncate for LCD display
+  }));
+}
+
+/**
+ * Get knob assignments for a synth, checking NKS2 first, legacy fallback second.
+ * This is the unified entry point for the MIDI store.
+ */
+export function getKnobAssignmentsForSynth(synthType: SynthType): KnobAssignment[] {
+  // 1. Check if there's a legacy knob bank for this synth
+  const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank) {
+    return KNOB_BANKS[legacyBank];
+  }
+
+  // 2. Fall back to NKS2-generated assignments
+  const nks2Bank = getKnobBankFromNKS2(synthType);
+  if (nks2Bank.length > 0) {
+    return nks2Bank;
+  }
+
+  // 3. Last resort: mixer controls
+  return KNOB_BANKS['Mixer'];
+}
+
+/**
+ * Get the display name for a synth's current knob page.
+ * Used for LCD display on hardware controllers.
+ */
+export function getKnobPageName(synthType: SynthType): string {
+  const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank) return legacyBank;
+  return synthType;
+}

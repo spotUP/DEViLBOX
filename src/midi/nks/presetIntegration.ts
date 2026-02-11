@@ -14,30 +14,44 @@ import { NKS_CONSTANTS } from './types';
 import { getNKSParametersForSynth } from './synthParameterMaps';
 import { writeNKSF, parseNKSF } from './NKSFileFormat';
 import type { UserPreset, PresetCategory } from '@/stores/usePresetStore';
+import {
+  CATEGORY_TO_NKS_TYPE,
+  getNKSTypeForSynth,
+  nksTypeToCategory,
+  validateCharacterTags,
+  isValidNKSInstrumentType,
+} from './nksTaxonomy';
 
 /**
- * Map DEViLBOX preset category to NKS bank chain
+ * Map DEViLBOX preset category to NKS bank chain (uses official taxonomy)
  */
 const CATEGORY_TO_BANK_CHAIN: Record<PresetCategory, string[]> = {
-  Bass: ['Bass', 'Synth Bass'],
-  Lead: ['Lead', 'Synth Lead'],
-  Pad: ['Pad', 'Ambient'],
-  Drum: ['Drums', 'Electronic'],
-  FX: ['FX', 'Sound Design'],
-  User: ['User', 'Custom'],
+  Bass: CATEGORY_TO_NKS_TYPE.Bass.bankChain,
+  Lead: CATEGORY_TO_NKS_TYPE.Lead.bankChain,
+  Pad:  CATEGORY_TO_NKS_TYPE.Pad.bankChain,
+  Drum: CATEGORY_TO_NKS_TYPE.Drum.bankChain,
+  FX:   CATEGORY_TO_NKS_TYPE.FX.bankChain,
+  User: CATEGORY_TO_NKS_TYPE.User.bankChain,
 };
 
 /**
- * Map NKS bank chain to DEViLBOX category
+ * Map NKS bank chain to DEViLBOX category (uses official taxonomy)
  */
 function bankChainToCategory(bankChain: string[]): PresetCategory {
-  const firstBank = bankChain[0]?.toLowerCase() || '';
+  // Check if any part of the bank chain matches an NKS type
+  for (const part of bankChain) {
+    if (isValidNKSInstrumentType(part)) {
+      return nksTypeToCategory(part);
+    }
+  }
 
-  if (firstBank.includes('bass')) return 'Bass';
-  if (firstBank.includes('lead')) return 'Lead';
-  if (firstBank.includes('pad') || firstBank.includes('ambient')) return 'Pad';
-  if (firstBank.includes('drum') || firstBank.includes('perc')) return 'Drum';
-  if (firstBank.includes('fx') || firstBank.includes('effect')) return 'FX';
+  // Fall back to keyword matching
+  const combined = bankChain.join(' ').toLowerCase();
+  if (combined.includes('bass')) return 'Bass';
+  if (combined.includes('lead') || combined.includes('synth lead')) return 'Lead';
+  if (combined.includes('pad') || combined.includes('ambient') || combined.includes('soundscape')) return 'Pad';
+  if (combined.includes('drum') || combined.includes('perc')) return 'Drum';
+  if (combined.includes('fx') || combined.includes('effect') || combined.includes('sound effect')) return 'FX';
 
   return 'User';
 }
@@ -59,24 +73,33 @@ function nksTypesToTags(types?: string[], modes?: string[]): string[] {
 }
 
 /**
- * Map DEViLBOX tags to NKS types/modes
+ * Map DEViLBOX tags to NKS types/modes (validated against official taxonomy)
  */
 function tagsToNKSTypes(tags: string[]): { types: string[]; modes: string[] } {
   const types: string[] = [];
-  const modes: string[] = [];
+  // "modes" in NKS are actually Character tags
+  const modes = validateCharacterTags(tags);
 
-  // Common NKS type mappings
-  const typeKeywords = ['bass', 'lead', 'pad', 'drum', 'fx', 'synth', 'keys', 'strings', 'brass', 'vocal'];
-  const modeKeywords = ['mono', 'poly', 'analog', 'digital', 'fm', 'wavetable', 'granular', 'acoustic', 'electric'];
-
+  // Check if any tags match official NKS instrument types
   for (const tag of tags) {
-    const lower = tag.toLowerCase();
-
-    if (typeKeywords.some(k => lower.includes(k))) {
-      types.push(tag.charAt(0).toUpperCase() + tag.slice(1));
-    } else if (modeKeywords.some(k => lower.includes(k))) {
-      modes.push(tag.charAt(0).toUpperCase() + tag.slice(1));
+    if (isValidNKSInstrumentType(tag)) {
+      types.push(tag);
     }
+  }
+
+  // If no types matched, try keyword inference
+  if (types.length === 0) {
+    const combined = tags.join(' ').toLowerCase();
+    if (combined.includes('bass')) types.push('Bass');
+    else if (combined.includes('lead')) types.push('Synth Lead');
+    else if (combined.includes('pad')) types.push('Synth Pad');
+    else if (combined.includes('drum') || combined.includes('perc')) types.push('Drums');
+    else if (combined.includes('fx') || combined.includes('effect')) types.push('Sound Effects');
+    else if (combined.includes('key') || combined.includes('piano')) types.push('Piano / Keys');
+    else if (combined.includes('organ')) types.push('Organ');
+    else if (combined.includes('vocal') || combined.includes('voice')) types.push('Vocal');
+    else if (combined.includes('string')) types.push('Bowed Strings');
+    else if (combined.includes('brass')) types.push('Brass');
   }
 
   return { types, modes };
@@ -181,7 +204,14 @@ export function instrumentConfigToNKSPreset(
   const { types, modes } = tagsToNKSTypes(options?.tags || []);
   const bankChain = options?.category
     ? CATEGORY_TO_BANK_CHAIN[options.category]
-    : ['User', config.synthType];
+    : ['DEViLBOX', config.synthType];
+
+  // Get NKS type info from taxonomy for this synth
+  const nksInfo = getNKSTypeForSynth(synthType, options?.category);
+
+  // Use explicit tags if provided, otherwise use taxonomy defaults
+  const finalTypes = types.length > 0 ? types : [nksInfo.type];
+  const finalModes = modes.length > 0 ? modes : nksInfo.characters;
 
   const metadata: NKSPresetMetadata = {
     vendor: NKS_CONSTANTS.VENDOR_ID,
@@ -192,8 +222,8 @@ export function instrumentConfigToNKSPreset(
     comment: options?.comment || `${synthType} preset for DEViLBOX`,
     deviceType: 'INST',
     bankChain,
-    types: types.length > 0 ? types : [synthType],
-    modes: modes.length > 0 ? modes : undefined,
+    types: finalTypes,
+    modes: finalModes,
     isUser: true,
   };
 
@@ -266,25 +296,46 @@ function inferSynthTypeFromMetadata(metadata: NKSPresetMetadata): SynthType | nu
   const bankChain = metadata.bankChain.join(' ').toLowerCase();
   const types = (metadata.types || []).join(' ').toLowerCase();
   const comment = (metadata.comment || '').toLowerCase();
+  const name = (metadata.name || '').toLowerCase();
 
-  const combined = `${bankChain} ${types} ${comment}`;
+  const combined = `${bankChain} ${types} ${comment} ${name}`;
 
-  // Check for specific synth types
-  if (combined.includes('tb303') || combined.includes('303')) return 'TB303';
-  if (combined.includes('tb808') || combined.includes('808')) return 'DrumMachine';
+  // Check for specific synth types (most specific first)
+  if (combined.includes('tb303') || combined.includes('db303') || combined.includes('open303')) return 'TB303';
+  if (combined.includes('tb808') || combined.includes('808') || combined.includes('drum machine')) return 'DrumMachine';
   if (combined.includes('dub siren') || combined.includes('dubsiren')) return 'DubSiren';
   if (combined.includes('space laser') || combined.includes('spacelaser')) return 'SpaceLaser';
-  if (combined.includes('fm') || combined.includes('dexed')) return 'FMSynth';
-  if (combined.includes('wavetable')) return 'Wavetable';
+  if (combined.includes('synare')) return 'Synare';
+  if (combined.includes('dexed') || combined.includes('dx7')) return 'Dexed';
+  if (combined.includes('obxd') || combined.includes('ob-x')) return 'OBXd';
+  if (combined.includes('v2synth') || combined.includes('v2 synth')) return 'V2';
+  if (combined.includes('vital')) return 'Vital';
+  if (combined.includes('odin')) return 'Odin2';
+  if (combined.includes('surge')) return 'Surge';
+  if (combined.includes('tonewheel') || combined.includes('organ')) return 'TonewheelOrgan';
+  if (combined.includes('melodica')) return 'Melodica';
+  if (combined.includes('sam') && combined.includes('speech')) return 'SAM';
+  if (combined.includes('supersaw')) return 'SuperSaw';
+  if (combined.includes('wobble')) return 'WobbleBass';
+  if (combined.includes('string machine')) return 'StringMachine';
+  if (combined.includes('chip') && combined.includes('synth')) return 'ChipSynth';
+  if (combined.includes('pwm')) return 'PWMSynth';
+  if (combined.includes('formant')) return 'FormantSynth';
   if (combined.includes('granular')) return 'GranularSynth';
-  if (combined.includes('mono')) return 'MonoSynth';
-  if (combined.includes('poly')) return 'PolySynth';
+  if (combined.includes('wavetable')) return 'Wavetable';
+
+  // Generic NKS type -> DEViLBOX synth type
+  if (combined.includes('fm') || types.includes('fm')) return 'FMSynth';
   if (combined.includes('membrane') || combined.includes('kick')) return 'MembraneSynth';
   if (combined.includes('metal') || combined.includes('hihat') || combined.includes('cymbal')) return 'MetalSynth';
   if (combined.includes('pluck')) return 'PluckSynth';
   if (combined.includes('noise')) return 'NoiseSynth';
-  if (combined.includes('am ')) return 'AMSynth';
   if (combined.includes('duo')) return 'DuoSynth';
+  if (combined.includes('am synth') || combined.includes('amsyn')) return 'AMSynth';
+  if (types.includes('synth lead') && combined.includes('mono')) return 'MonoSynth';
+  if (types.includes('synth lead')) return 'PolySynth';
+  if (types.includes('synth pad')) return 'PolySynth';
+  if (types.includes('bass')) return 'MonoSynth';
 
   return null;
 }

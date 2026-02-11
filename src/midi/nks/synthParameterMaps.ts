@@ -5,7 +5,7 @@
  * This enables hardware control via Komplete Kontrol, Maschine, etc.
  */
 
-import type { NKSParameter, NKSPage } from './types';
+import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSection, NKS2SynthProfile, NKS2Navigation } from './types';
 import { NKSParameterType, NKSSection } from './types';
 import type { SynthType } from '@typedefs/instrument';
 
@@ -692,12 +692,68 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'FurnaceSCVTONE': FURNACE_PSG_NKS_PARAMETERS,
   'FurnacePCMDAC': SAMPLER_NKS_PARAMETERS,
 
-  // MAME synths
+  // V2 variants
+  'V2Speech': V2_NKS_PARAMETERS,
+
+  // Buzzmachine additions
+  'Buzz3o3DF': TB303_NKS_PARAMETERS,
+  'BuzzM4': BUZZMACHINE_NKS_PARAMETERS,
+
+  // VSTBridge synths (use closest equivalent until auto-profiled)
+  'DexedBridge': DEXED_NKS_PARAMETERS,
+  'TonewheelOrgan': ORGAN_NKS_PARAMETERS,
+  'Melodica': MONOSYNTH_NKS_PARAMETERS,
+  'Vital': POLYSYNTH_NKS_PARAMETERS,
+  'Odin2': POLYSYNTH_NKS_PARAMETERS,
+  'Surge': POLYSYNTH_NKS_PARAMETERS,
+  'Monique': MONOSYNTH_NKS_PARAMETERS,
+
+  // WAM plugin (generic until auto-profiled at runtime)
+  'WAM': GENERIC_NKS_PARAMETERS,
+
+  // Multi-sample / Module playback
+  'DrumKit': DRUMMACHINE_NKS_PARAMETERS,
+  'ChiptuneModule': SAMPLER_NKS_PARAMETERS,
+
+  // MAME dedicated synth engines
+  'CEM3394': MONOSYNTH_NKS_PARAMETERS,
+  'SCSP': FURNACE_FM_NKS_PARAMETERS,
+
+  // MAME synths (FM-based)
   'MAMEVFX': FURNACE_FM_NKS_PARAMETERS,
   'MAMEDOC': FURNACE_FM_NKS_PARAMETERS,
   'MAMERSA': POLYSYNTH_NKS_PARAMETERS,
   'MAMESWP30': FURNACE_FM_NKS_PARAMETERS,
   'CZ101': FURNACE_FM_NKS_PARAMETERS,
+  'MAMEYMF271': FURNACE_FM_NKS_PARAMETERS,
+  'MAMEYMOPQ': FURNACE_FM_NKS_PARAMETERS,
+  'MAMEVASynth': MONOSYNTH_NKS_PARAMETERS,
+
+  // MAME synths (PCM/sample-based)
+  'MAMEAICA': SAMPLER_NKS_PARAMETERS,
+  'MAMEC352': SAMPLER_NKS_PARAMETERS,
+  'MAMEES5503': SAMPLER_NKS_PARAMETERS,
+  'MAMEICS2115': SAMPLER_NKS_PARAMETERS,
+  'MAMEK054539': SAMPLER_NKS_PARAMETERS,
+  'MAMERF5C400': SAMPLER_NKS_PARAMETERS,
+  'MAMETR707': DRUMMACHINE_NKS_PARAMETERS,
+  'MAMESNKWave': FURNACE_PSG_NKS_PARAMETERS,
+
+  // MAME synths (PSG/simple oscillator)
+  'MAMEASC': FURNACE_PSG_NKS_PARAMETERS,
+  'MAMEAstrocade': FURNACE_PSG_NKS_PARAMETERS,
+  'MAMESN76477': NOISESYNTH_NKS_PARAMETERS,
+  'MAMETIA': FURNACE_PSG_NKS_PARAMETERS,
+  'MAMETMS36XX': FURNACE_PSG_NKS_PARAMETERS,
+  'MAMEMSM5232': FURNACE_PSG_NKS_PARAMETERS,
+
+  // MAME synths (speech synthesis)
+  'MAMEMEA8000': GENERIC_NKS_PARAMETERS,
+  'MAMESP0250': GENERIC_NKS_PARAMETERS,
+  'MAMETMS5220': GENERIC_NKS_PARAMETERS,
+  'MAMEUPD931': GENERIC_NKS_PARAMETERS,
+  'MAMEUPD933': GENERIC_NKS_PARAMETERS,
+  'MAMEVotrax': GENERIC_NKS_PARAMETERS,
 };
 
 /**
@@ -786,4 +842,247 @@ export function formatNKSValue(param: NKSParameter, value: number): string {
       return param.unit ? `${formatted}${param.unit}` : formatted;
     }
   }
+}
+
+// ============================================================================
+// NKS2 PDI INFERENCE
+// Automatically derive NKS2 PDI from existing NKS1 parameter types
+// ============================================================================
+
+/**
+ * Infer NKS2 PDI from an NKS1 parameter definition.
+ * This allows existing parameter maps to work with NKS2 without rewriting.
+ */
+export function inferNKS2PDI(param: NKSParameter): NKS2PDI {
+  // If param already has explicit PDI, use it
+  if (param.pdi) return param.pdi;
+
+  switch (param.type) {
+    case NKSParameterType.BOOLEAN:
+      return { type: 'toggle', style: 'power' };
+
+    case NKSParameterType.SELECTOR: {
+      const count = param.valueStrings?.length ?? Math.round(param.max - param.min + 1);
+      // Detect waveform and filter type selectors by name
+      const lowerName = param.name.toLowerCase();
+      let style: NKS2PDI['style'] = 'menu';
+      if (lowerName.includes('wave') || lowerName.includes('osc type') || lowerName.includes('waveform')) {
+        style = 'waveform';
+      } else if (lowerName.includes('filter') && (lowerName.includes('mode') || lowerName.includes('type'))) {
+        style = 'filterType';
+      }
+      return {
+        type: 'discrete',
+        style,
+        value_count: count,
+        display_values: param.valueStrings,
+      };
+    }
+
+    case NKSParameterType.INT: {
+      const isBipolar = param.min < 0;
+      return {
+        type: isBipolar ? 'discrete_bipolar' : 'discrete',
+        style: 'value',
+        value_count: Math.round(param.max - param.min + 1),
+      };
+    }
+
+    case NKSParameterType.FLOAT:
+    default: {
+      const isBipolar = param.min < 0;
+      return {
+        type: isBipolar ? 'continuous_bipolar' : 'continuous',
+        style: 'knob',
+      };
+    }
+  }
+}
+
+// ============================================================================
+// ENGINE PARAM MAPPING
+// Maps NKS parameter IDs to MappableParameter strings used by parameterRouter.
+// Only needed for params that have a direct route; others fall through to
+// generic config-path routing.
+// ============================================================================
+
+const ENGINE_PARAM_MAP: Record<string, string> = {
+  // TB303
+  'tb303.cutoff': 'cutoff',
+  'tb303.resonance': 'resonance',
+  'tb303.envMod': 'envMod',
+  'tb303.decay': 'decay',
+  'tb303.accent': 'accent',
+  'tb303.volume': 'mixer.volume',
+
+  // DubSiren
+  'dubsiren.oscillator.frequency': 'siren.osc.frequency',
+  'dubsiren.lfo.rate': 'siren.lfo.rate',
+  'dubsiren.lfo.depth': 'siren.lfo.depth',
+  'dubsiren.delay.time': 'siren.delay.time',
+  'dubsiren.delay.feedback': 'siren.delay.feedback',
+  'dubsiren.delay.wet': 'siren.delay.wet',
+  'dubsiren.filter.frequency': 'siren.filter.frequency',
+  'dubsiren.reverb.wet': 'siren.reverb.wet',
+
+  // Furnace FM
+  'furnace.algorithm': 'furnace.algorithm',
+  'furnace.feedback': 'furnace.feedback',
+  'furnace.op1.level': 'furnace.op1TL',
+  'furnace.lfoRate': 'furnace.fms',
+
+  // V2
+  'v2.osc1.level': 'v2.osc1Level',
+  'v2.filter1.cutoff': 'v2.filter1Cutoff',
+  'v2.filter1.resonance': 'v2.filter1Reso',
+  'v2.envelope.attack': 'v2.envAttack',
+  'v2.envelope.decay': 'v2.envDecay',
+  'v2.envelope.sustain': 'v2.envSustain',
+  'v2.envelope.release': 'v2.envRelease',
+  'v2.lfo1.depth': 'v2.lfo1Depth',
+
+  // Synare
+  'synare.oscillator.tune': 'synare.tune',
+  'synare.oscillator2.mix': 'synare.osc2Mix',
+  'synare.filter.cutoff': 'synare.filterCutoff',
+  'synare.filter.resonance': 'synare.filterReso',
+  'synare.filter.envMod': 'synare.filterEnvMod',
+  'synare.filter.decay': 'synare.filterDecay',
+  'synare.sweep.amount': 'synare.sweepAmount',
+  'synare.sweep.time': 'synare.sweepTime',
+
+  // Dexed
+  'dexed.algorithm': 'dexed.algorithm',
+  'dexed.feedback': 'dexed.feedback',
+  'dexed.lfoSpeed': 'dexed.lfoSpeed',
+  'dexed.lfoPitchModDepth': 'dexed.lfoPitchMod',
+  'dexed.lfoAmpModDepth': 'dexed.lfoAmpMod',
+  'dexed.transpose': 'dexed.transpose',
+
+  // OBXd
+  'obxd.filterCutoff': 'obxd.filterCutoff',
+  'obxd.filterResonance': 'obxd.filterReso',
+  'obxd.filterEnvAmount': 'obxd.filterEnv',
+  'obxd.ampAttack': 'obxd.ampAttack',
+  'obxd.ampDecay': 'obxd.ampDecay',
+  'obxd.masterVolume': 'obxd.volume',
+  'obxd.osc1Level': 'obxd.osc1Level',
+  'obxd.osc2Level': 'obxd.osc2Level',
+
+  // SpaceLaser
+  'spacelaser.laser.startFreq': 'spacelaser.startFreq',
+  'spacelaser.laser.endFreq': 'spacelaser.endFreq',
+  'spacelaser.laser.sweepTime': 'spacelaser.sweepTime',
+  'spacelaser.fm.amount': 'spacelaser.fmAmount',
+  'spacelaser.fm.ratio': 'spacelaser.fmRatio',
+  'spacelaser.filter.cutoff': 'spacelaser.filterCutoff',
+  'spacelaser.filter.resonance': 'spacelaser.filterReso',
+  'spacelaser.delay.wet': 'spacelaser.delayWet',
+
+  // SAM
+  'sam.speed': 'sam.speed',
+  'sam.pitch': 'sam.pitch',
+  'sam.mouth': 'sam.mouth',
+  'sam.throat': 'sam.throat',
+
+  // Generic
+  'generic.volume': 'mixer.volume',
+  'generic.pan': 'mixer.pan',
+};
+
+/**
+ * Get the engine parameter key for an NKS parameter ID.
+ * Returns the param.engineParam if set, then checks the ENGINE_PARAM_MAP,
+ * finally falls back to the parameter ID itself.
+ */
+export function getEngineParam(param: NKSParameter): string {
+  if (param.engineParam) return param.engineParam;
+  return ENGINE_PARAM_MAP[param.id] || param.id;
+}
+
+// ============================================================================
+// NKS2 PROFILE BUILDER
+// Convert existing NKS1 parameter arrays to full NKS2 profiles
+// ============================================================================
+
+/**
+ * Convert an NKS1 parameter to an NKS2 parameter.
+ */
+export function toNKS2Parameter(param: NKSParameter): NKS2Parameter {
+  return {
+    id: param.id,
+    name: param.name,
+    pdi: inferNKS2PDI(param),
+    defaultValue: param.defaultValue,
+    unit: param.unit,
+    ccNumber: param.ccNumber,
+    engineParam: getEngineParam(param),
+  };
+}
+
+/**
+ * Build an NKS2 synth profile from an NKS1 parameter array.
+ * Performance mode uses page 0 (first 8 params).
+ * Additional pages become additional performance sections or edit groups.
+ */
+export function buildNKS2Profile(synthType: SynthType): NKS2SynthProfile {
+  const nks1Params = getNKSParametersForSynth(synthType);
+  const nks2Params = nks1Params.map(toNKS2Parameter);
+
+  // Build performance sections from NKS1 pages
+  const pages = buildNKSPages(nks1Params);
+  const performance: NKS2PerformanceSection[] = pages.slice(0, 2).map(page => ({
+    name: page.name,
+    parameters: page.parameters.map(toNKS2Parameter),
+  }));
+
+  // Remaining pages become edit groups (if any)
+  const editGroups = pages.length > 2
+    ? pages.slice(2).map(page => ({
+        name: page.name,
+        sections: [{ name: page.name, parameters: page.parameters.map(toNKS2Parameter) }],
+      }))
+    : undefined;
+
+  const navigation: NKS2Navigation = {
+    performance,
+    editGroups,
+  };
+
+  return {
+    synthType,
+    parameters: nks2Params,
+    navigation,
+  };
+}
+
+/**
+ * Get an NKS2 synth profile for any synth type.
+ * Cached for performance since profiles are computed from static data.
+ */
+const profileCache = new Map<string, NKS2SynthProfile>();
+
+export function getNKS2Profile(synthType: SynthType): NKS2SynthProfile {
+  let profile = profileCache.get(synthType);
+  if (!profile) {
+    profile = buildNKS2Profile(synthType);
+    profileCache.set(synthType, profile);
+  }
+  return profile;
+}
+
+/**
+ * Get Performance mode parameters for a synth (first 8-16 most important params).
+ * This is what hardware knobs should map to.
+ */
+export function getPerformanceParams(synthType: SynthType): NKS2Parameter[] {
+  const profile = getNKS2Profile(synthType);
+  return profile.navigation.performance.flatMap(s => s.parameters).slice(0, 16);
+}
+
+/**
+ * Get the first 8 performance params (for 8-knob controllers like Akai MPK Mini).
+ */
+export function getKnob8Params(synthType: SynthType): NKS2Parameter[] {
+  return getPerformanceParams(synthType).slice(0, 8);
 }
