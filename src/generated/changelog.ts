@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T12:27:29.034Z
+ * Generated: 2026-02-11T17:57:04.536Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '382';
-export const BUILD_HASH = 'cc5476d';
+export const BUILD_NUMBER = '392';
+export const BUILD_HASH = 'a8322a5';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,46 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Ci: build Electron desktop apps on every deploy"
+      },
+      {
+        type: 'fix',
+        "description": "Enable file browser on GitHub Pages via static manifest fallback"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused patterns variable from TD-3 import"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Fix knob drag interference on TB-303 panel"
+      },
+      {
+        type: 'feature',
+        "description": "Add classic acid effect chain presets and fix preset loader"
+      },
+      {
+        type: 'fix',
+        "description": "Fix TD-3 pattern import and parameter editor null guard"
+      },
+      {
+        type: 'fix',
+        "description": "Improve master routing and synth engine stability"
+      },
+      {
+        type: 'feature',
+        "description": "Expand Odin2 WASM engine with full parameter coverage"
+      },
+      {
+        type: 'feature',
+        "description": "Add Helm, Sorcer, amsynth, and OB-Xf WASM synth engines"
+      },
       {
         type: 'fix',
         "description": "Resolve Tone.js compatibility issues from DevilboxSynth refactor"
@@ -56,10 +96,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Clean up VitalControls component"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
       },
       {
         type: 'fix',
@@ -204,52 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Eliminate stale state bug preventing first drag response"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: Add demo channel fix script and update build"
-      },
-      {
-        type: 'fix',
-        "description": "Improve VU meter timing and visibility"
-      },
-      {
-        type: 'feature',
-        "description": "Add ProTracker-style status messages"
-      },
-      {
-        type: 'feature',
-        "description": "Add ghost patterns and automation integration"
-      },
-      {
-        type: 'feature',
-        "description": "Update visualizer integration and logo animation"
-      },
-      {
-        type: 'feature',
-        "description": "Add classic demoscene sine scroller with starfield"
-      },
-      {
-        type: 'feature',
-        "description": "Add 5 per-channel visualizers"
-      },
-      {
-        type: 'feature',
-        "description": "Add 3 new global audio visualizers"
-      },
-      {
-        type: 'feature',
-        "description": "Add mouse interaction to automation lanes"
-      }
-    ]
-  },
-  {
-    version: '2026-02-08',
-    date: '2026-02-08',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Add automation lane to tracker channels"
       }
     ]
   }

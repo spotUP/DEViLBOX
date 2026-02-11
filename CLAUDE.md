@@ -87,3 +87,17 @@ const SCHEMA_VERSION = 2;  // Bump this for breaking changes
 - 2: Fixed `filterSelect=255` bug in TB303 config (2026-02-09)
 
 ---
+
+## DB303 Parameter Convention
+
+All DB303Synth/BuzzmachineGenerator parameters are **0-1 normalized** at every layer.
+WASM handles Hz/ms conversion internally. **Never transform values before passing to the synth.**
+
+Two canonical entry points:
+- **`applyConfig(config: TB303Config)`** — Bulk updates from store (init, UI knob changes, MIDI CC)
+- **`set(param: string, value: number)`** — Single param, real-time (automation, tracker)
+
+Both accept 0-1 normalized values (except discrete params like `filterSelect`, `chorusMode`).
+The synth owns all internal transformations. No caller ever converts units.
+
+---

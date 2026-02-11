@@ -203,5 +203,25 @@ export const DEVILBOX_TIPS: Tip[] = [
     title: "Chord Memory",
     content: "Use the 'Chord' tool (Ctrl+H) to automatically expand a single note into a Major, Minor, or Sus4 chord across multiple channels.",
     category: 'tracker'
+  },
+  {
+    title: "Acid Scream Recipe",
+    content: "For maximum 303 squelch: Cutoff LOW (20-30%), Resonance HIGH (90%+), Env Mod HIGH (90%+). The filter sweeps from low → high on each note.",
+    category: 'synthesis'
+  },
+  {
+    title: "303 Envelope Secret",
+    content: "Env Mod controls HOW FAR the 303 filter sweeps. Decay controls HOW LONG the sweep takes. Together they define the acid character.",
+    category: 'synthesis'
+  },
+  {
+    title: "303 Accent Power",
+    content: "Accent on the 303 isn't just volume — it pushes the filter harder AND shortens the decay. Use it sparingly for maximum impact.",
+    category: 'synthesis'
+  },
+  {
+    title: "Dub Techno Bass",
+    content: "For warm dub techno bass on the 303: Cutoff 40%, Reso 30%, Env Mod 50%, Decay 70%. Deep and warm, not screaming.",
+    category: 'synthesis'
   }
 ];
