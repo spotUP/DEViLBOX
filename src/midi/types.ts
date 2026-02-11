@@ -35,7 +35,7 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
-export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer';
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' | 'Synare' | 'Dexed' | 'OBXd' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica';
 
 export type MappableParameter =
   | TB303Parameter
@@ -65,7 +65,84 @@ export type MappableParameter =
   | 'biphase.routing'
   // Mixer
   | 'mixer.volume'
-  | 'mixer.pan';
+  | 'mixer.pan'
+  // Furnace FM
+  | 'furnace.algorithm'
+  | 'furnace.feedback'
+  | 'furnace.op1TL'
+  | 'furnace.op1AR'
+  | 'furnace.op1DR'
+  | 'furnace.op1SL'
+  | 'furnace.op1RR'
+  | 'furnace.fms'
+  // V2
+  | 'v2.osc1Level'
+  | 'v2.filter1Cutoff'
+  | 'v2.filter1Reso'
+  | 'v2.envAttack'
+  | 'v2.envDecay'
+  | 'v2.envSustain'
+  | 'v2.envRelease'
+  | 'v2.lfo1Depth'
+  // Synare
+  | 'synare.tune'
+  | 'synare.osc2Mix'
+  | 'synare.filterCutoff'
+  | 'synare.filterReso'
+  | 'synare.filterEnvMod'
+  | 'synare.filterDecay'
+  | 'synare.sweepAmount'
+  | 'synare.sweepTime'
+  // Dexed
+  | 'dexed.algorithm'
+  | 'dexed.feedback'
+  | 'dexed.op1Level'
+  | 'dexed.op1Coarse'
+  | 'dexed.lfoSpeed'
+  | 'dexed.lfoPitchMod'
+  | 'dexed.lfoAmpMod'
+  | 'dexed.transpose'
+  // OBXd
+  | 'obxd.osc1Level'
+  | 'obxd.osc2Level'
+  | 'obxd.filterCutoff'
+  | 'obxd.filterReso'
+  | 'obxd.filterEnv'
+  | 'obxd.ampAttack'
+  | 'obxd.ampDecay'
+  | 'obxd.volume'
+  // SpaceLaser
+  | 'spacelaser.startFreq'
+  | 'spacelaser.endFreq'
+  | 'spacelaser.sweepTime'
+  | 'spacelaser.fmAmount'
+  | 'spacelaser.fmRatio'
+  | 'spacelaser.filterCutoff'
+  | 'spacelaser.filterReso'
+  | 'spacelaser.delayWet'
+  // SAM
+  | 'sam.pitch'
+  | 'sam.speed'
+  | 'sam.mouth'
+  | 'sam.throat'
+  // TonewheelOrgan (VSTBridge)
+  | 'organ.drawbar16'
+  | 'organ.drawbar8'
+  | 'organ.drawbar4'
+  | 'organ.percussion'
+  | 'organ.vibratoType'
+  | 'organ.vibratoDepth'
+  | 'organ.overdrive'
+  | 'organ.volume'
+  // Melodica (VSTBridge)
+  | 'melodica.breath'
+  | 'melodica.brightness'
+  | 'melodica.vibratoRate'
+  | 'melodica.vibratoDepth'
+  | 'melodica.detune'
+  | 'melodica.portamento'
+  | 'melodica.attack'
+  | 'melodica.volume';
 
 export interface CCMapping {
   ccNumber: number;
