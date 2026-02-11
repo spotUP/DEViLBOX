@@ -19,6 +19,7 @@ import {
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { PresetDropdown } from '../presets/PresetDropdown';
+import { useAutoPreview } from '@hooks/useAutoPreview';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { TB303Controls } from '../controls/TB303Controls';
 import { FurnaceControls } from '../controls/FurnaceControls';
@@ -36,6 +37,8 @@ import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
 import { WAMControls } from '../controls/WAMControls';
 import { VSTBridgePanel } from '../controls/VSTBridgePanel';
+import { TonewheelOrganControls } from '../controls/TonewheelOrganControls';
+import { MelodicaControls } from '../controls/MelodicaControls';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
@@ -45,7 +48,7 @@ import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { isMAMEChipType, getChipSynthDef } from '@constants/chipParameters';
 import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
-import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic, Monitor, Cpu } from 'lucide-react';
+import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic, Monitor, Cpu, SlidersHorizontal } from 'lucide-react';
 
 // Import the tab content renderers from VisualSynthEditor
 // We'll keep the existing tab content implementations
@@ -55,7 +58,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'vstbridge';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vstbridge';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -132,6 +135,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
   if (synthType === 'WAM') return 'wam';
+  if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
+  if (synthType === 'Melodica') return 'melodica';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }
@@ -152,8 +157,17 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const [uiMode, setUIMode] = useState<'simple' | 'hardware'>(() =>
     hasHardwareUI(instrument.synthType) ? 'hardware' : 'simple'
   );
+  // Custom (purpose-built) vs Generic (auto-generated VSTBridge) UI for WASM synths with custom editors
+  const [vstUiMode, setVstUiMode] = useState<'custom' | 'generic'>('custom');
 
   const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
+
+  // Auto-preview: trigger a short note on parameter changes so the oscilloscope shows waveform
+  const { triggerPreview } = useAutoPreview(instrument.id, instrument);
+  const handleChange = useCallback((updates: Partial<InstrumentConfig>) => {
+    onChange(updates);
+    triggerPreview();
+  }, [onChange, triggerPreview]);
 
   const isBaked = !!instrument.metadata?.preservedSynth;
 
@@ -187,7 +201,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       setGenericTab('special');
     } else if (isSampleType(instrument.synthType)) {
       setGenericTab('envelope');
-    } else if (genericTab === 'special' && !renderSpecialParameters(instrument, onChange)) {
+    } else if (genericTab === 'special' && !renderSpecialParameters(instrument, handleChange)) {
       setGenericTab('oscillator');
     }
   }, [instrument.synthType]);
@@ -205,7 +219,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <EditorHeader
         instrument={instrument}
-        onChange={onChange}
+        onChange={handleChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
         onBake={handleBake}
@@ -229,7 +243,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               <div className="flex items-center gap-2">
                 {/* Live Mode Toggle */}
                 <button
-                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  onClick={() => handleChange({ isLive: !instrument.isLive })}
                   className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                     instrument.isLive
                       ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -242,7 +256,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                 <PresetDropdown
                   synthType={instrument.synthType}
-                  onChange={onChange}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -259,13 +273,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
     const handleEnableSpeech = () => {
-      onChange({ v2Speech: { ...DEFAULT_V2_SPEECH } });
+      handleChange({ v2Speech: { ...DEFAULT_V2_SPEECH } });
     };
 
     return (
       <EditorHeader
         instrument={instrument}
-        onChange={onChange}
+        onChange={handleChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
         onBake={handleBake}
@@ -298,7 +312,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                 </button>
 
                 <button
-                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  onClick={() => handleChange({ isLive: !instrument.isLive })}
                   className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                     instrument.isLive
                       ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -311,7 +325,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                 <PresetDropdown
                   synthType={instrument.synthType}
-                  onChange={onChange}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -330,7 +344,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <EditorHeader
         instrument={instrument}
-        onChange={onChange}
+        onChange={handleChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
         onBake={handleBake}
@@ -353,7 +367,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  onClick={() => handleChange({ isLive: !instrument.isLive })}
                   className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                     instrument.isLive
                       ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -366,7 +380,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                 <PresetDropdown
                   synthType={instrument.synthType}
-                  onChange={onChange}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -385,7 +399,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <EditorHeader
         instrument={instrument}
-        onChange={onChange}
+        onChange={handleChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
         onBake={handleBake}
@@ -408,7 +422,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => onChange({ isLive: !instrument.isLive })}
+                  onClick={() => handleChange({ isLive: !instrument.isLive })}
                   className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                     instrument.isLive
                       ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -421,7 +435,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                 <PresetDropdown
                   synthType={instrument.synthType}
-                  onChange={onChange}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -433,50 +447,50 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
   // Handle TB303 config updates
   const handleTB303Change = useCallback((updates: Partial<typeof instrument.tb303>) => {
-    onChange({
+    handleChange({
       tb303: { ...instrument.tb303, ...updates } as any,
     });
-  }, [instrument.tb303, onChange]);
+  }, [instrument.tb303, handleChange]);
 
   // Handle Dub Siren config updates
   const handleDubSirenChange = useCallback((updates: Partial<typeof instrument.dubSiren>) => {
     const currentDubSiren = instrument.dubSiren || DEFAULT_DUB_SIREN;
-    onChange({
+    handleChange({
       dubSiren: { ...currentDubSiren, ...updates },
     });
-  }, [instrument.dubSiren, onChange]);
+  }, [instrument.dubSiren, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
     const currentSpaceLaser = instrument.spaceLaser || DEFAULT_SPACE_LASER;
-    onChange({
+    handleChange({
       spaceLaser: { ...currentSpaceLaser, ...updates },
     });
-  }, [instrument.spaceLaser, onChange]);
+  }, [instrument.spaceLaser, handleChange]);
 
   // Handle V2 config updates
   const handleV2Change = useCallback((updates: Partial<typeof instrument.v2>) => {
     const currentV2 = instrument.v2 || DEFAULT_V2;
-    onChange({
+    handleChange({
       v2: { ...currentV2, ...updates },
     });
-  }, [instrument.v2, onChange]);
+  }, [instrument.v2, handleChange]);
 
   // Handle Synare config updates
   const handleSynareChange = useCallback((updates: Partial<typeof instrument.synare>) => {
     const currentSynare = instrument.synare || DEFAULT_SYNARE;
-    onChange({
+    handleChange({
       synare: { ...currentSynare, ...updates },
     });
-  }, [instrument.synare, onChange]);
+  }, [instrument.synare, handleChange]);
 
   // Handle Furnace config updates
   const handleFurnaceChange = useCallback((updates: Partial<typeof instrument.furnace>) => {
     const currentFurnace = instrument.furnace || DEFAULT_FURNACE;
-    onChange({
+    handleChange({
       furnace: { ...currentFurnace, ...updates },
     });
-  }, [instrument.furnace, onChange]);
+  }, [instrument.furnace, handleChange]);
 
   // Handle MAME config updates
   const handleMAMEChange = useCallback((updates: Partial<typeof instrument.mame>) => {
@@ -485,10 +499,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       DEFAULT_MAME_VFX
     );
     const newConfig = { ...currentMame, ...updates };
-    onChange({
+    handleChange({
       mame: newConfig,
     });
-    
+
     // Real-time update
     try {
       const engine = getToneEngine();
@@ -496,39 +510,39 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     } catch (e) {
       // Ignored
     }
-  }, [instrument.mame, instrument.synthType, instrument.id, onChange]);
+  }, [instrument.mame, instrument.synthType, instrument.id, handleChange]);
 
   // Handle MAME chip synth parameter changes
   const handleChipParamChange = useCallback((key: string, value: number) => {
     const currentParams = instrument.parameters || {};
     const newParams = { ...currentParams, [key]: value };
-    onChange({ parameters: newParams });
+    handleChange({ parameters: newParams });
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipParam(instrument.id, key, value);
     } catch (_e) { /* ignored */ }
-  }, [instrument.parameters, instrument.id, onChange]);
+  }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle MAME chip synth text parameter changes (e.g. speech text)
   const handleChipTextChange = useCallback((key: string, value: string) => {
     const currentParams = instrument.parameters || {};
     const newParams = { ...currentParams, [key]: value };
-    onChange({ parameters: newParams });
+    handleChange({ parameters: newParams });
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipTextParam(instrument.id, key, value);
     } catch (_e) { /* ignored */ }
-  }, [instrument.parameters, instrument.id, onChange]);
+  }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle MAME chip synth preset load
   const handleChipPresetLoad = useCallback((program: number) => {
     const currentParams = instrument.parameters || {};
-    onChange({ parameters: { ...currentParams, _program: program } });
+    handleChange({ parameters: { ...currentParams, _program: program } });
     try {
       const engine = getToneEngine();
       engine.loadMAMEChipPreset(instrument.id, program);
     } catch (_e) { /* ignored */ }
-  }, [instrument.parameters, instrument.id, onChange]);
+  }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle ROM upload for chip synths that require ROMs
   const handleChipRomUpload = useCallback((bank: number, data: Uint8Array) => {
@@ -542,7 +556,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleDexedChange = useCallback((updates: Partial<typeof instrument.dexed>) => {
     const currentDexed = instrument.dexed || DEFAULT_DEXED;
     const newConfig = { ...currentDexed, ...updates };
-    onChange({
+    handleChange({
       dexed: newConfig,
     });
 
@@ -553,13 +567,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     } catch (e) {
       // Ignored
     }
-  }, [instrument.dexed, instrument.id, onChange]);
+  }, [instrument.dexed, instrument.id, handleChange]);
 
   // Handle OBXd (Oberheim) config updates
   const handleOBXdChange = useCallback((updates: Partial<typeof instrument.obxd>) => {
     const currentOBXd = instrument.obxd || DEFAULT_OBXD;
     const newConfig = { ...currentOBXd, ...updates };
-    onChange({
+    handleChange({
       obxd: newConfig,
     });
 
@@ -570,7 +584,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     } catch (e) {
       // Ignored
     }
-  }, [instrument.obxd, instrument.id, onChange]);
+  }, [instrument.obxd, instrument.id, handleChange]);
 
   // Determine which tabs to hide based on synth type for generic editor
   const getHiddenTabs = (): SynthEditorTab[] => {
@@ -593,7 +607,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     }
 
     // Hide special tab if no special parameters for this synth type
-    const hasSpecialParams = renderSpecialParameters(instrument, onChange) !== null;
+    const hasSpecialParams = renderSpecialParameters(instrument, handleChange) !== null;
     if (!hasSpecialParams) {
       hidden.push('special');
     }
@@ -644,7 +658,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -681,7 +695,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -691,7 +705,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-y-auto p-4">
           <BuzzmachineControls
             config={instrument}
-            onChange={onChange}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -707,7 +721,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header but hide viz (sample editor has waveform) */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           hideVisualization={true}
@@ -718,7 +732,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-y-auto p-4">
           <SampleControls
             instrument={instrument}
-            onChange={onChange}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -771,14 +785,14 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
       const handleDisableSpeech = () => {
-        onChange({ v2Speech: undefined });
+        handleChange({ v2Speech: undefined });
       };
 
       return (
         <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
           <EditorHeader
             instrument={instrument}
-            onChange={onChange}
+            onChange={handleChange}
             vizMode={vizMode}
             onVizModeChange={setVizMode}
             onBake={handleBake}
@@ -811,7 +825,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                     </button>
 
                     <button
-                      onClick={() => onChange({ isLive: !instrument.isLive })}
+                      onClick={() => handleChange({ isLive: !instrument.isLive })}
                       className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                         instrument.isLive
                           ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -824,7 +838,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                     <PresetDropdown
                       synthType={instrument.synthType}
-                      onChange={onChange}
+                      onChange={handleChange}
                     />
                   </div>
                 </div>
@@ -833,7 +847,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           />
           <V2SpeechControls
             config={deepMerge(DEFAULT_V2_SPEECH, instrument.v2Speech || {})}
-            onChange={(updates) => onChange({ v2Speech: { ...instrument.v2Speech!, ...updates } })}
+            onChange={(updates) => handleChange({ v2Speech: { ...instrument.v2Speech!, ...updates } })}
           />
         </div>
       );
@@ -865,7 +879,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           onBake={handleBake}
@@ -888,7 +902,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => onChange({ isLive: !instrument.isLive })}
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
@@ -901,7 +915,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
                   <PresetDropdown
                     synthType={instrument.synthType}
-                    onChange={onChange}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -910,7 +924,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         />
         <SAMControls
           config={samConfig}
-          onChange={(updates) => onChange({ sam: { ...instrument.sam!, ...updates } })}
+          onChange={(updates) => handleChange({ sam: { ...instrument.sam!, ...updates } })}
         />
       </div>
     );
@@ -943,7 +957,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const macros: MacroData[] = instrument.parameters?.macros || [];
 
     const handleMacrosChange = (newMacros: MacroData[]) => {
-      onChange({
+      handleChange({
         parameters: {
           ...instrument.parameters,
           macros: newMacros,
@@ -955,7 +969,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const wavetables = instrument.parameters?.wavetables || [];
 
     const handleWavetablesChange = (newWavetables: any[]) => {
-      onChange({
+      handleChange({
         parameters: {
           ...instrument.parameters,
           wavetables: newWavetables,
@@ -970,7 +984,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1073,7 +1087,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1102,7 +1116,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1135,7 +1149,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Use common header with visualization */}
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1158,6 +1172,184 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }
 
   // ============================================================================
+  // TONEWHEEL ORGAN EDITOR (custom drawbar UI with VSTBridge fallback)
+  // ============================================================================
+  if (editorMode === 'tonewheelOrgan') {
+    const organAccentColor = isCyanTheme ? '#00ffff' : '#d4a017';
+    const organHeaderBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#d4a017]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${organHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 shadow-lg">
+                    <Music size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: organAccentColor }}>TONEWHEEL ORGAN</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Hammond-Style Drawbar Organ</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Native/Visual UI Toggle */}
+                  <button
+                    onClick={() => setVstUiMode(vstUiMode === 'custom' ? 'generic' : 'custom')}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      vstUiMode === 'custom'
+                        ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                    title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
+                  >
+                    {vstUiMode === 'custom' ? <Music size={14} /> : <SlidersHorizontal size={14} />}
+                    <span className="text-[10px] font-bold uppercase">
+                      {vstUiMode === 'custom' ? 'Custom' : 'Generic'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          {vstUiMode === 'custom' ? (
+            <TonewheelOrganControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          ) : (
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MELODICA EDITOR (custom reed instrument UI with VSTBridge fallback)
+  // ============================================================================
+  if (editorMode === 'melodica') {
+    const melodicaAccentColor = isCyanTheme ? '#00ffff' : '#2dd4bf';
+    const melodicaHeaderBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#2dd4bf]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${melodicaHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 shadow-lg">
+                    <Music size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: melodicaAccentColor }}>MELODICA</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Reed Instrument Physical Model</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Native/Visual UI Toggle */}
+                  <button
+                    onClick={() => setVstUiMode(vstUiMode === 'custom' ? 'generic' : 'custom')}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      vstUiMode === 'custom'
+                        ? 'bg-teal-500/20 text-teal-400 ring-1 ring-teal-500/50'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                    title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
+                  >
+                    {vstUiMode === 'custom' ? <Music size={14} /> : <SlidersHorizontal size={14} />}
+                    <span className="text-[10px] font-bold uppercase">
+                      {vstUiMode === 'custom' ? 'Custom' : 'Generic'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          {vstUiMode === 'custom' ? (
+            <MelodicaControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          ) : (
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
   // VST BRIDGE EDITOR (auto-generated parameter knobs from WASM metadata)
   // ============================================================================
   if (editorMode === 'vstbridge') {
@@ -1165,7 +1357,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1178,7 +1370,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-y-auto">
           <VSTBridgePanel
             instrument={instrument}
-            onChange={onChange}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -1193,7 +1385,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         <EditorHeader
           instrument={instrument}
-          onChange={onChange}
+          onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
@@ -1201,7 +1393,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-hidden">
           <WAMControls
             instrument={instrument}
-            onChange={onChange}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -1218,7 +1410,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       {/* Common header with visualization */}
       <EditorHeader
         instrument={instrument}
-        onChange={onChange}
+        onChange={handleChange}
         vizMode={vizMode}
         onVizModeChange={setVizMode}
         showHelpButton={!hasHardwareGeneric}
@@ -1256,7 +1448,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             synthType={instrument.synthType}
             parameters={instrument.parameters || {}}
             onParamChange={(key, value) => {
-              onChange({
+              handleChange({
                 parameters: {
                   ...instrument.parameters,
                   [key]: value,
@@ -1279,7 +1471,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <div className="synth-editor-content">
             <GenericTabContent
               instrument={instrument}
-              onChange={onChange}
+              onChange={handleChange}
               activeTab={genericTab}
             />
           </div>
