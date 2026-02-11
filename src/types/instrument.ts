@@ -170,7 +170,13 @@ export type SynthType =
   | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
   | 'OBXd'             // Oberheim OB-X Analog Synthesizer
   // VST Bridge (dynamically registered WASM synths)
-  | 'DexedBridge';     // Dexed DX7 via VSTBridge (test/validation)
+  | 'DexedBridge'      // Dexed DX7 via VSTBridge (test/validation)
+  | 'Vital'            // Vital Spectral Warping Wavetable Synthesizer
+  | 'Odin2'            // Odin2 Semi-Modular Hybrid Synthesizer
+  | 'Surge'            // Surge XT Hybrid Synthesizer
+  | 'TonewheelOrgan'   // Hammond-style Tonewheel Organ (VSTBridge)
+  | 'Melodica'         // Melodica Reed Instrument (VSTBridge)
+  | 'Monique';         // Monique Morphing Monosynth (VSTBridge)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -2159,9 +2165,14 @@ export type AudioEffectType =
   | 'BuzzChorus2'      // FSM Chorus 2
   | 'BuzzPanzerDelay'  // FSM Panzer Delay
   | 'SpaceyDelayer'    // WASM SpaceyDelayer multitap tape delay
-  | 'RETapeEcho';      // WASM RE-150/201 tape echo
+  | 'RETapeEcho'       // WASM RE-150/201 tape echo
+  // WASM effects (native C++ DSP via AudioWorklet)
+  | 'MoogFilter'       // 6 analog-modeled Moog ladder filters (WASM)
+  | 'MVerb'            // MVerb plate reverb (WASM, GPL v3)
+  | 'Leslie'           // Leslie rotary speaker (WASM)
+  | 'SpringReverb';    // Spring reverb with drip (WASM)
 
-export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine';
+export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine' | 'wasm';
 
 export interface EffectConfig {
   id: string;

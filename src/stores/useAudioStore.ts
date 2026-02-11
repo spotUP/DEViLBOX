@@ -199,6 +199,12 @@ export const useAudioStore = create<AudioStore>()(
           const engine = get().toneEngineInstance;
           if (engine) {
             engine.updateMasterEffectParams(effectId, effect);
+
+            // If bpmSync is ON after update, apply synced timing
+            if (effect.parameters.bpmSync === 1) {
+              const bpm = engine.getBPM();
+              engine.updateBpmSyncedEffects(bpm);
+            }
           }
         }
       }),

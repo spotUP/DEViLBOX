@@ -1,20 +1,23 @@
 /**
  * WavetableSynth - Multi-voice wavetable synthesizer with morphing
  *
+ * Native Web Audio implementation (no Tone.js dependency).
+ *
  * Features:
- * - Wavetable playback with position morphing
- * - LFO or envelope-based morph modulation
+ * - Wavetable playback with position morphing via PeriodicWave
  * - Unison with voice detuning and stereo spread
- * - Filter with envelope modulation
- * - ADSR amplitude envelope
+ * - BiquadFilter with configurable type/cutoff/resonance
+ * - Manual ADSR amplitude envelope via AudioParam scheduling
  */
 
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
 import type { WavetableConfig } from '../types/instrument';
+import { getDevilboxAudioContext, noteToMidi, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
 import { getWavetablePreset, getFrameAtPosition } from '../constants/wavetablePresets';
 
-export class WavetableSynth extends Tone.ToneAudioNode {
+export class WavetableSynth implements DevilboxSynth {
   readonly name = 'WavetableSynth';
+  readonly output: GainNode;
 
   // Voice management
   private voices: Map<number, WavetableVoice> = new Map();
@@ -23,73 +26,37 @@ export class WavetableSynth extends Tone.ToneAudioNode {
   // Configuration
   private config: WavetableConfig;
 
-  // Morph LFO
-  private morphLFO: Tone.LFO;
-  private morphEnvelope: Tone.Envelope;
+  // Audio context
+  private audioContext: AudioContext;
 
   // Output chain
-  private filter: Tone.Filter;
-  private filterEnvelope: Tone.Envelope;
-  private outputGain: Tone.Gain;
-
-  // Required by ToneAudioNode
-  readonly input: Tone.Gain;
-  readonly output: Tone.Gain;
+  private filter: BiquadFilterNode;
+  private outputGain: GainNode;
 
   // Current morph position (modulated)
   private baseMorphPosition: number = 0;
 
   constructor(config: WavetableConfig) {
-    super();
-
     this.config = config;
+    this.audioContext = getDevilboxAudioContext();
 
-    // Create I/O
-    this.input = new Tone.Gain(1);
-    this.output = new Tone.Gain(1);
-
-    // Create morph modulation sources
-    this.morphLFO = new Tone.LFO({
-      frequency: config.morphLFORate,
-      type: 'sine',
-      min: 0,
-      max: 1,
-    });
-
-    this.morphEnvelope = new Tone.Envelope({
-      attack: config.envelope.attack / 1000,
-      decay: config.envelope.decay / 1000,
-      sustain: config.envelope.sustain / 100,
-      release: config.envelope.release / 1000,
-    });
+    // Create output
+    this.output = this.audioContext.createGain();
+    this.output.gain.value = 1;
 
     // Create filter
-    this.filter = new Tone.Filter({
-      type: config.filter.type,
-      frequency: config.filter.cutoff,
-      Q: config.filter.resonance / 10, // 0-100 -> 0-10
-      rolloff: -24,
-    });
-
-    // Create filter envelope
-    this.filterEnvelope = new Tone.Envelope({
-      attack: config.filterEnvelope.attack / 1000,
-      decay: config.filterEnvelope.decay / 1000,
-      sustain: config.filterEnvelope.sustain / 100,
-      release: config.filterEnvelope.release / 1000,
-    });
+    this.filter = this.audioContext.createBiquadFilter();
+    this.filter.type = config.filter.type as BiquadFilterType;
+    this.filter.frequency.value = config.filter.cutoff;
+    this.filter.Q.value = config.filter.resonance / 10; // 0-100 -> 0-10
 
     // Output gain with volume boost (wavetable tends to be quiet)
-    this.outputGain = new Tone.Gain(2);
+    this.outputGain = this.audioContext.createGain();
+    this.outputGain.gain.value = 2;
 
-    // Connect filter -> output
+    // Connect filter -> outputGain -> output
     this.filter.connect(this.outputGain);
     this.outputGain.connect(this.output);
-
-    // Start morph LFO if enabled
-    if (config.morphModSource === 'lfo') {
-      this.morphLFO.start();
-    }
 
     // Initialize voice pool
     for (let i = 0; i < 8; i++) {
@@ -104,7 +71,7 @@ export class WavetableSynth extends Tone.ToneAudioNode {
    * Create a single voice
    */
   private createVoice(): WavetableVoice {
-    return new WavetableVoice(this.config, this.filter);
+    return new WavetableVoice(this.config, this.filter, this.audioContext);
   }
 
   /**
@@ -120,10 +87,12 @@ export class WavetableSynth extends Tone.ToneAudioNode {
   /**
    * Trigger attack for a note
    */
-  triggerAttack(note: string | number, time?: number, velocity: number = 1): this {
-    const now = time ?? Tone.now();
-    const freq = typeof note === 'string' ? Tone.Frequency(note).toFrequency() : note;
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : Math.round(69 + 12 * Math.log2(note / 440));
+  triggerAttack(note: string | number, time?: number, velocity: number = 1): void {
+    const now = time ?? audioNow();
+    const freq = typeof note === 'string' ? noteToFrequency(note) : note;
+    const midiNote = typeof note === 'string'
+      ? noteToMidi(note)
+      : Math.round(69 + 12 * Math.log2(note / 440));
 
     // Get a voice from the pool or steal one
     let voice = this.voicePool.pop();
@@ -145,23 +114,33 @@ export class WavetableSynth extends Tone.ToneAudioNode {
       voice.triggerAttack(freq, now, velocity);
       this.voices.set(midiNote, voice);
 
-      // Trigger filter envelope if enabled
+      // Filter envelope modulation (manual scheduling)
       if (this.config.filter.envelopeAmount !== 0) {
         const baseFreq = this.config.filter.cutoff;
+        const envAmount = this.config.filter.envelopeAmount / 100;
+        const maxFreq = Math.min(20000, baseFreq + envAmount * (20000 - baseFreq));
+        const filterAttack = this.config.filterEnvelope.attack / 1000;
+        const filterDecay = this.config.filterEnvelope.decay / 1000;
+        const filterSustain = this.config.filterEnvelope.sustain / 100;
+
+        const sustainFreq = baseFreq + (maxFreq - baseFreq) * filterSustain;
+
+        this.filter.frequency.cancelScheduledValues(now);
         this.filter.frequency.setValueAtTime(baseFreq, now);
-        this.filterEnvelope.triggerAttack(now);
+        this.filter.frequency.linearRampToValueAtTime(maxFreq, now + filterAttack);
+        this.filter.frequency.linearRampToValueAtTime(sustainFreq, now + filterAttack + filterDecay);
       }
     }
-
-    return this;
   }
 
   /**
    * Trigger release for a note
    */
-  triggerRelease(note: string | number, time?: number): this {
-    const now = time ?? Tone.now();
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : Math.round(69 + 12 * Math.log2(note / 440));
+  triggerRelease(note: string | number, time?: number): void {
+    const now = time ?? audioNow();
+    const midiNote = typeof note === 'string'
+      ? noteToMidi(note)
+      : Math.round(69 + 12 * Math.log2(note / 440));
 
     const voice = this.voices.get(midiNote);
     if (voice) {
@@ -173,8 +152,6 @@ export class WavetableSynth extends Tone.ToneAudioNode {
         this.voicePool.push(voice);
       }, (this.config.envelope.release + 100));
     }
-
-    return this;
   }
 
   /**
@@ -185,16 +162,14 @@ export class WavetableSynth extends Tone.ToneAudioNode {
     duration: number | string,
     time?: number,
     velocity: number = 1
-  ): this {
-    const now = time ?? Tone.now();
+  ): void {
+    const now = time ?? audioNow();
     const durationSeconds = typeof duration === 'string'
-      ? Tone.Time(duration).toSeconds()
+      ? timeToSeconds(duration)
       : duration;
 
     this.triggerAttack(note, now, velocity);
     this.triggerRelease(note, now + durationSeconds);
-
-    return this;
   }
 
   /**
@@ -215,7 +190,6 @@ export class WavetableSynth extends Tone.ToneAudioNode {
    */
   setMorphLFORate(rate: number): void {
     this.config.morphLFORate = rate;
-    this.morphLFO.frequency.value = rate;
   }
 
   /**
@@ -240,13 +214,9 @@ export class WavetableSynth extends Tone.ToneAudioNode {
   updateConfig(updates: Partial<WavetableConfig>): void {
     this.config = { ...this.config, ...updates };
 
-    if (updates.morphLFORate !== undefined) {
-      this.morphLFO.frequency.value = updates.morphLFORate;
-    }
-
     if (updates.filter) {
       if (updates.filter.type) {
-        this.filter.type = updates.filter.type;
+        this.filter.type = updates.filter.type as BiquadFilterType;
       }
       if (updates.filter.cutoff !== undefined) {
         this.filter.frequency.value = updates.filter.cutoff;
@@ -260,19 +230,13 @@ export class WavetableSynth extends Tone.ToneAudioNode {
   /**
    * Clean up
    */
-  dispose(): this {
-    super.dispose();
-
+  dispose(): void {
     this.voices.forEach((voice) => voice.dispose());
     this.voicePool.forEach((voice) => voice.dispose());
 
-    this.morphLFO.dispose();
-    this.morphEnvelope.dispose();
-    this.filter.dispose();
-    this.filterEnvelope.dispose();
-    this.outputGain.dispose();
-
-    return this;
+    this.filter.disconnect();
+    this.outputGain.disconnect();
+    this.output.disconnect();
   }
 }
 
@@ -280,22 +244,27 @@ export class WavetableSynth extends Tone.ToneAudioNode {
  * Single wavetable voice with unison oscillators
  */
 class WavetableVoice {
-  private oscillators: Tone.Oscillator[] = [];
-  private gains: Tone.Gain[] = [];
-  private panners: Tone.Panner[] = [];
-  private envelope: Tone.Envelope;
+  private oscillators: OscillatorNode[] = [];
+  private gains: GainNode[] = [];
+  private panners: StereoPannerNode[] = [];
   private config: WavetableConfig;
+  private audioContext: AudioContext;
 
-  constructor(config: WavetableConfig, output: Tone.ToneAudioNode) {
+  // ADSR envelope parameters (in seconds)
+  private attackTime: number;
+  private decayTime: number;
+  private sustainLevel: number;
+  private releaseTime: number;
+
+  constructor(config: WavetableConfig, output: AudioNode, audioContext: AudioContext) {
     this.config = config;
+    this.audioContext = audioContext;
 
-    // Create envelope
-    this.envelope = new Tone.Envelope({
-      attack: config.envelope.attack / 1000,
-      decay: config.envelope.decay / 1000,
-      sustain: config.envelope.sustain / 100,
-      release: config.envelope.release / 1000,
-    });
+    // Store ADSR values (config is in ms / percent)
+    this.attackTime = config.envelope.attack / 1000;
+    this.decayTime = config.envelope.decay / 1000;
+    this.sustainLevel = config.envelope.sustain / 100;
+    this.releaseTime = config.envelope.release / 1000;
 
     // Create unison voices
     const numVoices = config.unison.voices;
@@ -316,20 +285,19 @@ class WavetableVoice {
       }
 
       // Create oscillator
-      const osc = new Tone.Oscillator({
-        type: 'sine', // Will be replaced with wavetable
-        detune: detune,
-      });
+      const osc = audioContext.createOscillator();
+      osc.detune.value = detune;
 
       // Create gain (for envelope)
-      const gain = new Tone.Gain(0);
+      const gain = audioContext.createGain();
+      gain.gain.value = 0;
 
       // Create panner
-      const panner = new Tone.Panner(pan);
+      const panner = audioContext.createStereoPanner();
+      panner.pan.value = pan;
 
-      // Connect
+      // Connect: osc -> gain -> panner -> output
       osc.connect(gain);
-      this.envelope.connect(gain.gain);
       gain.connect(panner);
       panner.connect(output);
 
@@ -343,7 +311,7 @@ class WavetableVoice {
   }
 
   /**
-   * Set wavetable morph position
+   * Set wavetable morph position using PeriodicWave
    */
   setMorphPosition(position: number): void {
     const preset = getWavetablePreset(this.config.wavetableId);
@@ -351,22 +319,27 @@ class WavetableVoice {
 
     const frame = getFrameAtPosition(preset, position);
 
-    // Convert frame to partials array (imaginary components = sine partials)
+    // Build PeriodicWave from frame data
     // Take first 32 partials for performance
-    const partials: number[] = [];
-    for (let i = 1; i < Math.min(32, frame.imag.length); i++) {
-      partials.push(frame.imag[i]);
+    const numPartials = Math.min(32, frame.imag.length);
+    const real = new Float32Array(numPartials + 1);
+    const imag = new Float32Array(numPartials + 1);
+
+    // DC component (index 0) stays at 0
+    for (let i = 1; i < numPartials; i++) {
+      imag[i + 1 - 1] = frame.imag[i]; // sine partials go in imaginary
     }
 
-    // Apply to all oscillators using partials
+    const wave = this.audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
+
+    // Apply to all oscillators
     this.oscillators.forEach((osc) => {
-      // Set as custom oscillator with partials
-      (osc as any).partials = partials;
+      osc.setPeriodicWave(wave);
     });
   }
 
   /**
-   * Trigger attack
+   * Trigger attack with manual ADSR envelope scheduling
    */
   triggerAttack(frequency: number, time: number, _velocity: number): void {
     this.oscillators.forEach((osc) => {
@@ -374,22 +347,30 @@ class WavetableVoice {
       osc.start(time);
     });
 
-    // Reset gains for envelope
-    this.gains.forEach((gain) => {
-      gain.gain.setValueAtTime(0, time);
+    // Schedule ADSR attack + decay on each gain node
+    this.gains.forEach((g) => {
+      const param = g.gain;
+      param.cancelScheduledValues(time);
+      param.setValueAtTime(0, time);
+      param.linearRampToValueAtTime(1, time + this.attackTime);
+      param.linearRampToValueAtTime(this.sustainLevel, time + this.attackTime + this.decayTime);
     });
-
-    this.envelope.triggerAttack(time);
   }
 
   /**
-   * Trigger release
+   * Trigger release with manual envelope scheduling
    */
   triggerRelease(time: number): void {
-    this.envelope.triggerRelease(time);
+    // Schedule release ramp on each gain node
+    this.gains.forEach((g) => {
+      const param = g.gain;
+      param.cancelScheduledValues(time);
+      param.setValueAtTime(param.value, time); // hold current value
+      param.linearRampToValueAtTime(0, time + this.releaseTime);
+    });
 
-    // Stop oscillators after release
-    const stopTime = time + this.config.envelope.release / 1000 + 0.1;
+    // Stop oscillators after release completes
+    const stopTime = time + this.releaseTime + 0.1;
     this.oscillators.forEach((osc) => {
       osc.stop(stopTime);
     });
@@ -399,9 +380,11 @@ class WavetableVoice {
    * Clean up
    */
   dispose(): void {
-    this.envelope.dispose();
-    this.oscillators.forEach((osc) => osc.dispose());
-    this.gains.forEach((gain) => gain.dispose());
-    this.panners.forEach((panner) => panner.dispose());
+    this.oscillators.forEach((osc) => {
+      try { osc.stop(); } catch (_) { /* may already be stopped */ }
+      osc.disconnect();
+    });
+    this.gains.forEach((gain) => gain.disconnect());
+    this.panners.forEach((panner) => panner.disconnect());
   }
 }

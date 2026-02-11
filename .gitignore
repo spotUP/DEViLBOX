@@ -26,6 +26,7 @@ Reference Code/
 .cache/
 */.cache/
 juce-wasm/build/
+juce-wasm/*/build/
 mame-wasm/build/
 furnace-wasm/build/
 spacey-delayer-wasm/build/

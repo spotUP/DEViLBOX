@@ -8,20 +8,21 @@
  * - Voice limiting with note cut option
  */
 
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '../types/synth';
+import { getDevilboxAudioContext, audioNow } from '../utils/audio-context';
 import type { DrumKitConfig, DrumKitKeyMapping } from '../types/instrument';
 import { noteToMidi } from '../lib/xmConversions';
 
 interface ActiveVoice {
-  player: Tone.Player;
-  panner: Tone.Panner;
-  gain: Tone.Gain;
+  source: AudioBufferSourceNode;
+  panner: StereoPannerNode;
+  gain: GainNode;
   midiNote: number;
   mappingId: string;
   startTime: number;
 }
 
-export class DrumKitSynth extends Tone.ToneAudioNode {
+export class DrumKitSynth implements DevilboxSynth {
   readonly name = 'DrumKitSynth';
 
   // Configuration
@@ -33,27 +34,27 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
   // Active voices
   private activeVoices: ActiveVoice[] = [];
 
-  // Output chain
-  private outputGain: Tone.Gain;
+  // Native Web Audio context
+  private audioContext: AudioContext;
 
-  // Required by ToneAudioNode
-  readonly input: Tone.Gain;
-  readonly output: Tone.Gain;
+  // Output chain
+  private outputGain: GainNode;
+  readonly output: GainNode;
 
   // Callback for loading samples
   private onSampleNeeded?: (sampleId: string, sampleUrl?: string) => Promise<AudioBuffer | null>;
 
   constructor(config: DrumKitConfig) {
-    super();
-
     this.config = config;
+    this.audioContext = getDevilboxAudioContext();
 
-    // Create I/O
-    this.input = new Tone.Gain(1);
-    this.output = new Tone.Gain(1);
+    // Create output
+    this.output = this.audioContext.createGain();
+    this.output.gain.value = 1;
 
     // Output gain
-    this.outputGain = new Tone.Gain(0.8);
+    this.outputGain = this.audioContext.createGain();
+    this.outputGain.gain.value = 0.8;
     this.outputGain.connect(this.output);
   }
 
@@ -151,36 +152,36 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
       });
     }
 
-    // Create Tone.js buffer from AudioBuffer
-    const toneBuffer = new Tone.ToneAudioBuffer(buffer);
+    // Calculate playback rate
+    const playbackRate = this.calculatePlaybackRate(mapping, midiNote);
 
-    // Create player
-    const player = new Tone.Player({
-      url: toneBuffer,
-      playbackRate: this.calculatePlaybackRate(mapping, midiNote),
-    });
+    // Create buffer source
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
 
     // Create panner with offset
     const panValue = (mapping.panOffset || 0) / 100; // -100 to +100 -> -1 to +1
-    const panner = new Tone.Panner(panValue);
+    const panner = this.audioContext.createStereoPanner();
+    panner.pan.value = panValue;
 
     // Create gain with velocity and volume offset
     const volumeMultiplier = Math.pow(10, (mapping.volumeOffset || 0) / 20); // dB to linear
-    const gain = new Tone.Gain(velocity * volumeMultiplier);
+    const gain = this.audioContext.createGain();
+    gain.gain.value = velocity * volumeMultiplier;
 
-    // Connect: player -> panner -> gain -> output
-    player.connect(panner);
+    // Connect: source -> panner -> gain -> output
+    source.connect(panner);
     panner.connect(gain);
     gain.connect(this.outputGain);
 
     // Start playback
-    const startTime = time ?? Tone.now();
-    player.start(startTime);
+    const startTime = time ?? audioNow();
+    source.start(startTime);
 
     // Track active voice
-    const playbackRate = this.calculatePlaybackRate(mapping, midiNote);
     const voice: ActiveVoice = {
-      player,
+      source,
       panner,
       gain,
       midiNote,
@@ -238,8 +239,9 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
 
     toRelease.forEach(voice => {
       // Fade out over 50ms
-      const releaseTime = time ?? Tone.now();
-      voice.gain.gain.linearRampTo(0, 0.05, releaseTime);
+      const releaseTime = time ?? audioNow();
+      voice.gain.gain.setValueAtTime(voice.gain.gain.value, releaseTime);
+      voice.gain.gain.linearRampToValueAtTime(0, releaseTime + 0.05);
 
       // Schedule cleanup
       setTimeout(() => {
@@ -257,15 +259,16 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
    */
   private disposeVoice(voice: ActiveVoice): void {
     try {
-      voice.player.stop();
-      voice.player.disconnect();
-      voice.player.dispose();
+      voice.source.stop();
+    } catch (_e) {
+      // source may already have stopped
+    }
+    try {
+      voice.source.disconnect();
       voice.panner.disconnect();
-      voice.panner.dispose();
       voice.gain.disconnect();
-      voice.gain.dispose();
-    } catch (e) {
-      // Ignore disposal errors
+    } catch (_e) {
+      // Ignore disconnection errors
     }
   }
 
@@ -321,13 +324,10 @@ export class DrumKitSynth extends Tone.ToneAudioNode {
   /**
    * Dispose
    */
-  dispose(): this {
+  dispose(): void {
     this.releaseAll();
     this.sampleBuffers.clear();
-    this.outputGain.dispose();
-    this.input.dispose();
-    this.output.dispose();
-    super.dispose();
-    return this;
+    this.outputGain.disconnect();
+    this.output.disconnect();
   }
 }

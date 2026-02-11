@@ -12,7 +12,8 @@
  * These can be extracted from an original D-50 unit.
  */
 
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi, timeToSeconds } from '@/utils/audio-context';
 import { MAMEEngine, MAMESynthType } from '../MAMEEngine';
 import { loadD50ROMs } from '@engine/mame/MAMEROMLoader';
 
@@ -188,10 +189,10 @@ interface VoiceState {
   partialMask: number;
 }
 
-export class D50Synth extends Tone.ToneAudioNode {
+export class D50Synth implements DevilboxSynth {
   readonly name = 'D50Synth';
-  readonly input: undefined = undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private mameEngine: MAMEEngine;
   private handle: number = 0;
@@ -206,8 +207,8 @@ export class D50Synth extends Tone.ToneAudioNode {
   private static readonly NUM_VOICES = 16;
 
   constructor() {
-    super();
-    this.output = new Tone.Gain(1);
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
     this.mameEngine = MAMEEngine.getInstance();
 
     // Initialize voice states
@@ -326,13 +327,13 @@ export class D50Synth extends Tone.ToneAudioNode {
   /**
    * Trigger a note on
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): this {
+  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): void {
     if (!this.isInitialized || !this.romLoaded) {
       console.warn('[D50Synth] Not ready');
-      return this;
+      return;
     }
 
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.allocateVoice();
     const voice = this.voices[voiceIndex];
 
@@ -354,35 +355,31 @@ export class D50Synth extends Tone.ToneAudioNode {
 
     // Trigger key-on
     this.writeControl(voiceBase + 0x02, 0x01);
-
-    return this;
   }
 
   /**
    * Trigger a note with automatic release
    */
-  triggerAttackRelease(note: string | number, duration: string | number = 0.5, _time?: number, velocity: number = 0.8): this {
+  triggerAttackRelease(note: string | number, duration: string | number = 0.5, _time?: number, velocity: number = 0.8): void {
     this.triggerAttack(note, _time, velocity);
 
     // Schedule release
-    const durationSeconds = typeof duration === 'string' ? Tone.Time(duration).toSeconds() : duration;
+    const durationSeconds = typeof duration === 'string' ? timeToSeconds(duration) : duration;
     setTimeout(() => {
       this.triggerRelease(note);
     }, durationSeconds * 1000);
-
-    return this;
   }
 
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): this {
-    if (!this.isInitialized) return this;
+  triggerRelease(note: string | number, _time?: number): void {
+    if (!this.isInitialized) return;
 
-    const midiNote = typeof note === 'string' ? Tone.Frequency(note).toMidi() : note;
+    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.voices.findIndex(v => v.active && v.note === midiNote);
 
-    if (voiceIndex === -1) return this;
+    if (voiceIndex === -1) return;
 
     const voice = this.voices[voiceIndex];
     voice.active = false;
@@ -390,8 +387,6 @@ export class D50Synth extends Tone.ToneAudioNode {
     // Trigger key-off
     const voiceBase = ROLAND_SA_REG.VOICE_BASE + voiceIndex * 0x80;
     this.writeControl(voiceBase + 0x02, 0x00);
-
-    return this;
   }
 
   /**
@@ -417,13 +412,12 @@ export class D50Synth extends Tone.ToneAudioNode {
     };
   }
 
-  dispose(): this {
+  dispose(): void {
     if (this.handle !== 0) {
       this.mameEngine.deleteInstance(this.handle);
       this.handle = 0;
     }
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }
 

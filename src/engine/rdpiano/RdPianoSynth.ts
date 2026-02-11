@@ -11,8 +11,8 @@
  * - Runtime ROM loading from public/rdpiano/roms/
  */
 
-import * as Tone from 'tone';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 
 // Parameter IDs (must match C++ enum)
 const PARAM = {
@@ -86,10 +86,10 @@ export interface RdPianoConfig {
   volume?: number;
 }
 
-export class RdPianoSynth extends Tone.ToneAudioNode {
+export class RdPianoSynth implements DevilboxSynth {
   readonly name = 'RdPianoSynth';
-  readonly input: undefined = undefined;
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private _worklet: AudioWorkletNode | null = null;
   private config: RdPianoConfig;
@@ -108,8 +108,8 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
   private static jsCode: string | null = null;
 
   constructor(config: Partial<RdPianoConfig> = {}) {
-    super();
-    this.output = new Tone.Gain(1);
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
     this.config = {
       patch: 0,
       chorusEnabled: true,
@@ -133,12 +133,7 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
 
   private async initialize(): Promise<void> {
     try {
-      const toneContext = this.context as unknown as { rawContext?: AudioContext; _context?: AudioContext };
-      const rawContext = toneContext.rawContext || toneContext._context;
-      if (!rawContext) {
-        console.error('[RdPiano] Cannot get raw AudioContext');
-        return;
-      }
+      const rawContext = this.audioContext;
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       // Load worklet module (once per session)
@@ -180,7 +175,7 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
       }
 
       // Create AudioWorklet node
-      this._worklet = toneCreateAudioWorkletNode(rawContext, 'rdpiano-processor');
+      this._worklet = new AudioWorkletNode(this.audioContext, 'rdpiano-processor');
 
       // Set up message handler
       this._worklet.port.onmessage = (event: MessageEvent) => {
@@ -215,8 +210,7 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
       });
 
       // Connect to output
-      const targetNode = this.output.input as AudioNode;
-      this._worklet.connect(targetNode);
+      this._worklet.connect(this.output);
 
     } catch (error) {
       console.error('[RdPiano] Initialization error:', error);
@@ -435,17 +429,17 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
     this.setParameter(PARAM.VOLUME, vol);
   }
 
-  triggerAttack(frequency: number | string, _time?: number, velocity = 1): this {
+  triggerAttack(frequency: number | string, _time?: number, velocity = 1): void {
     const midiNote = typeof frequency === 'string'
-      ? Tone.Frequency(frequency).toMidi()
-      : Tone.Frequency(frequency, 'hz').toMidi();
+      ? noteToMidi(frequency)
+      : noteToMidi(frequency);
     const vel = Math.round(Math.max(0, Math.min(1, velocity)) * 127);
 
-    if (this.romLoadError) return this;
+    if (this.romLoadError) return;
 
     if (!this.isInitialized) {
       this.pendingNotes.push({ note: midiNote, velocity: vel });
-      return this;
+      return;
     }
 
     this._worklet?.port.postMessage({
@@ -453,16 +447,15 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
       note: midiNote,
       velocity: vel,
     });
-    return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet) return this;
+  triggerRelease(frequency?: number | string, _time?: number): void {
+    if (!this._worklet) return;
 
     if (frequency !== undefined) {
       const midiNote = typeof frequency === 'string'
-        ? Tone.Frequency(frequency).toMidi()
-        : Tone.Frequency(frequency, 'hz').toMidi();
+        ? noteToMidi(frequency)
+        : noteToMidi(frequency);
       this._worklet.port.postMessage({
         type: 'noteOff',
         note: midiNote,
@@ -470,7 +463,6 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
     } else {
       this._worklet.port.postMessage({ type: 'allNotesOff' });
     }
-    return this;
   }
 
   controlChange(cc: number, value: number): void {
@@ -492,12 +484,11 @@ export class RdPianoSynth extends Tone.ToneAudioNode {
     return this.currentPatch;
   }
 
-  dispose(): this {
+  dispose(): void {
     this._worklet?.port.postMessage({ type: 'allNotesOff' });
     this._worklet?.port.postMessage({ type: 'dispose' });
     this._worklet?.disconnect();
     this._worklet = null;
-    this.output.dispose();
-    return this;
+    this.output.disconnect();
   }
 }

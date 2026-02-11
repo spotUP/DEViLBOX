@@ -32,8 +32,8 @@ export class SynthBaker {
       const instrument = InstrumentFactory.createInstrument(config);
       
       // Connect to offline destination - must use raw Web Audio connection if node is not a Tone object
-      if (instrument.connect) {
-        instrument.connect(Tone.getContext().destination);
+      if ('connect' in instrument && typeof (instrument as any).connect === 'function') {
+        (instrument as any).connect(Tone.getContext().destination);
       }
       
       // Trigger note

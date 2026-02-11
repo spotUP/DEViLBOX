@@ -1043,6 +1043,31 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
           })();
         }
+      } else {
+        // Push parameter/wet changes to the audio engine in real-time
+        const instrument = get().instruments.find((inst) => inst.id === instrumentId);
+        const effect = instrument?.effects.find((eff) => eff.id === effectId);
+        if (effect) {
+          try {
+            const engine = getToneEngine();
+            engine.updateInstrumentEffectParams(effectId, effect);
+          } catch {
+            // Engine not initialized yet
+          }
+        }
+      }
+
+      // If bpmSync is ON after update, apply synced timing
+      const updatedInstrument = get().instruments.find((inst) => inst.id === instrumentId);
+      const updatedEffect = updatedInstrument?.effects.find((eff) => eff.id === effectId);
+      if (updatedEffect?.parameters.bpmSync === 1) {
+        try {
+          const engine = getToneEngine();
+          const bpm = engine.getBPM();
+          engine.updateBpmSyncedEffects(bpm);
+        } catch {
+          // Engine not initialized yet
+        }
       }
     },
 

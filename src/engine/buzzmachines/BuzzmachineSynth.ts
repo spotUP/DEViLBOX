@@ -1,4 +1,5 @@
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   BuzzmachineEngine,
   BuzzmachineType,
@@ -8,15 +9,16 @@ import {
 import { reportSynthError } from '../../stores/useSynthErrorStore';
 
 /**
- * BuzzmachineSynth - Tone.js wrapper for buzzmachine WASM effects
+ * BuzzmachineSynth - DevilboxSynth wrapper for buzzmachine WASM effects
  *
- * Provides a Tone.js-compatible interface to buzzmachines.
+ * Provides a DevilboxSynth-compatible interface to buzzmachines.
  * Similar to FurnaceSynth but for effects processing.
  */
-export class BuzzmachineSynth extends Tone.ToneAudioNode {
+export class BuzzmachineSynth implements DevilboxSynth {
   readonly name = 'BuzzmachineSynth';
-  readonly input: Tone.Gain;
-  readonly output: Tone.Gain;
+  readonly input: GainNode;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private engine = BuzzmachineEngine.getInstance();
   private machineType: BuzzmachineType;
@@ -29,12 +31,12 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
   private errorReported: boolean = false;
 
   constructor(machineType: BuzzmachineType) {
-    super();
     this.machineType = machineType;
+    this.audioContext = getDevilboxAudioContext();
 
     // Create input/output gains
-    this.input = new Tone.Gain(1);
-    this.output = new Tone.Gain(1);
+    this.input = this.audioContext.createGain();
+    this.output = this.audioContext.createGain();
 
     // Connect input directly to output (pass-through until WASM loads)
     this.input.connect(this.output);
@@ -70,9 +72,7 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
     this.initInProgress = true;
 
     try {
-      // Use the wrapped context (this.context)
-      // The engines will extract the native context using getNativeContext where needed
-      const context = this.context;
+      const context = this.audioContext;
 
       // Initialize engine
       await this.engine.init(context as any);
@@ -87,8 +87,8 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
       this.input.disconnect(this.output);
 
       // Connect worklet
-      this.input.connect(this.workletNode as unknown as Tone.ToneAudioNode);
-      (this.workletNode as unknown as Tone.ToneAudioNode).connect(this.output);
+      this.input.connect(this.workletNode!);
+      this.workletNode!.connect(this.output);
 
       this.useWasmEngine = true;
       console.log(`[BuzzmachineSynth] ${this.machineType} WASM engine active`);
@@ -153,16 +153,13 @@ export class BuzzmachineSynth extends Tone.ToneAudioNode {
   /**
    * Dispose of resources
    */
-  public dispose(): this {
-    super.dispose();
-    this.input.dispose();
-    this.output.dispose();
+  public dispose(): void {
+    this.input.disconnect();
+    this.output.disconnect();
 
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
-
-    return this;
   }
 }

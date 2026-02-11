@@ -1,4 +1,5 @@
-import * as Tone from 'tone';
+import type { DevilboxSynth } from '@/types/synth';
+import { getDevilboxAudioContext, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
 import {
   BuzzmachineEngine,
   BuzzmachineType,
@@ -6,7 +7,6 @@ import {
   type BuzzmachineParameter,
 } from './BuzzmachineEngine';
 import { reportSynthError } from '../../stores/useSynthErrorStore';
-import { getNativeAudioNode } from '../../utils/audio-context';
 
 /**
  * Muffler mode presets (Devil Fish style)
@@ -14,7 +14,7 @@ import { getNativeAudioNode } from '../../utils/audio-context';
 type MufflerMode = 'off' | 'dark' | 'mid' | 'bright';
 
 /**
- * BuzzmachineGenerator - Tone.js wrapper for buzzmachine WASM generators
+ * BuzzmachineGenerator - DevilboxSynth wrapper for buzzmachine WASM generators
  *
  * Unlike BuzzmachineSynth (for effects), this class handles generators
  * that produce audio (synths, drums, etc.)
@@ -22,10 +22,10 @@ type MufflerMode = 'off' | 'dark' | 'mid' | 'bright';
  * For 303-style synths (Oomek Aggressor), this adds an external effects chain
  * to provide Devil Fish-like enhancements that the original WASM doesn't support.
  */
-export class BuzzmachineGenerator extends Tone.ToneAudioNode {
+export class BuzzmachineGenerator implements DevilboxSynth {
   readonly name = 'BuzzmachineGenerator';
-  readonly input: undefined = undefined;  // Generators don't have input
-  readonly output: Tone.Gain;
+  readonly output: GainNode;
+  private audioContext: AudioContext;
 
   private engine = BuzzmachineEngine.getInstance();
   private machineType: BuzzmachineType;
@@ -41,11 +41,13 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   // EFFECTS CHAIN FOR 303-STYLE ENHANCEMENTS
   // These provide Devil Fish-like features externally
   // ============================================
-  private preGain: Tone.Gain | null = null;           // Input gain before effects
-  private overdrive: Tone.Distortion | null = null;   // Overdrive/saturation
-  private mufflerFilter: Tone.Filter | null = null;   // Muffler lowpass
-  private postFilter: Tone.Filter | null = null;      // Additional filter control
-  private postGain: Tone.Gain | null = null;          // Output gain after effects
+  private preGain: GainNode | null = null;              // Input gain before effects
+  private overdrive: WaveShaperNode | null = null;     // Overdrive/saturation
+  private overdriveDry: GainNode | null = null;        // Dry path for overdrive mix
+  private overdriveWet: GainNode | null = null;        // Wet path for overdrive mix
+  private mufflerFilter: BiquadFilterNode | null = null; // Muffler lowpass
+  private postFilter: BiquadFilterNode | null = null;  // Additional filter control
+  private postGain: GainNode | null = null;            // Output gain after effects
 
   // 303 enhancement state
   private overdriveAmount = 0;        // 0-100, 0 = bypassed
@@ -54,11 +56,11 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   private currentCutoff = 1000;       // Track cutoff for filter tracking
 
   constructor(machineType: BuzzmachineType) {
-    super();
+    this.audioContext = getDevilboxAudioContext();
     this.machineType = machineType;
 
     // Create output gain
-    this.output = new Tone.Gain(1);
+    this.output = this.audioContext.createGain();
 
     // Create effects chain for 303-style synths
     if (this.is303Style()) {
@@ -73,41 +75,61 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
    * Create the effects chain for 303-style enhancements
    */
   private createEffectsChain(): void {
-    // Pre-gain for input level control
-    this.preGain = new Tone.Gain(1);
+    const ctx = this.audioContext;
 
-    // Overdrive - starts bypassed (wet = 0)
-    this.overdrive = new Tone.Distortion({
-      distortion: 0.4,  // Fixed distortion character
-      wet: 0,           // Bypassed by default
-      oversample: '2x', // Better quality
-    });
+    this.preGain = ctx.createGain();
 
-    // Muffler filter - lowpass to tame highs (Devil Fish mod)
-    this.mufflerFilter = new Tone.Filter({
-      type: 'lowpass',
-      frequency: 20000,  // Wide open by default (bypassed)
-      rolloff: -12,
-      Q: 0.7,
-    });
+    // Overdrive: parallel dry/wet paths through a WaveShaperNode
+    this.overdrive = ctx.createWaveShaper();
+    this.overdrive.oversample = '2x';
+    // Default curve (moderate distortion)
+    this.updateOverdriveCurve(0.4);
 
-    // Post filter - additional filter control for filter tracking/FM
-    this.postFilter = new Tone.Filter({
-      type: 'lowpass',
-      frequency: 20000,  // Wide open by default
-      rolloff: -12,
-      Q: 1,
-    });
+    this.overdriveDry = ctx.createGain();
+    this.overdriveDry.gain.value = 1; // fully dry by default
+    this.overdriveWet = ctx.createGain();
+    this.overdriveWet.gain.value = 0; // bypassed by default
 
-    // Post-gain for output level
-    this.postGain = new Tone.Gain(1);
+    this.mufflerFilter = ctx.createBiquadFilter();
+    this.mufflerFilter.type = 'lowpass';
+    this.mufflerFilter.frequency.value = 20000;
+    this.mufflerFilter.Q.value = 0.7;
 
-    // Chain: preGain -> overdrive -> muffler -> postFilter -> postGain -> output
+    this.postFilter = ctx.createBiquadFilter();
+    this.postFilter.type = 'lowpass';
+    this.postFilter.frequency.value = 20000;
+    this.postFilter.Q.value = 1;
+
+    this.postGain = ctx.createGain();
+
+    // Merge node for dry/wet mix
+    const merger = ctx.createGain();
+
+    // Chain: preGain → [dry path + wet path] → merger → muffler → postFilter → postGain → output
+    this.preGain.connect(this.overdriveDry);
     this.preGain.connect(this.overdrive);
-    this.overdrive.connect(this.mufflerFilter);
+    this.overdrive.connect(this.overdriveWet);
+    this.overdriveDry.connect(merger);
+    this.overdriveWet.connect(merger);
+    merger.connect(this.mufflerFilter);
     this.mufflerFilter.connect(this.postFilter);
     this.postFilter.connect(this.postGain);
     this.postGain.connect(this.output);
+  }
+
+  /**
+   * Generate a waveshaper distortion curve
+   */
+  private updateOverdriveCurve(distortion: number): void {
+    if (!this.overdrive) return;
+    const samples = 4096;
+    const curve = new Float32Array(samples);
+    const k = distortion * 100;
+    for (let i = 0; i < samples; i++) {
+      const x = (i / samples) * 2 - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    this.overdrive.curve = curve;
   }
 
   /**
@@ -137,9 +159,7 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     this.initInProgress = true;
 
     try {
-      // Use the wrapped context (this.context)
-      // The engines will extract the native context using getNativeContext where needed
-      const context = this.context;
+      const context = this.audioContext;
 
       // Initialize engine
       await this.engine.init(context as any);
@@ -151,30 +171,20 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       );
 
       // Connect worklet to output (through effects chain for 303 synths)
-      // AudioWorkletNode must connect to native AudioNode, not Tone.js wrapper
       if (!this.workletNode) {
         throw new Error('Worklet node creation failed');
       }
 
-      // Connect worklet to output - must use native AudioNode, not Tone.js wrapper
+      // Connect worklet to output — native AudioNodes, no wrapper needed
       const targetNode = this.is303Style() && this.preGain ? this.preGain : this.output;
-      const nativeTarget = getNativeAudioNode(targetNode);
-      if (nativeTarget) {
-        this.workletNode.connect(nativeTarget);
-      } else {
-        throw new Error('Could not find native AudioNode for connection');
-      }
+      this.workletNode.connect(targetNode);
 
       // CRITICAL: Connect through silent keepalive to destination to force process() calls
       try {
-        const toneCtx = this.context as any;
-        const rawCtx = toneCtx.rawContext || toneCtx._context;
-        if (rawCtx) {
-          const keepalive = rawCtx.createGain();
-          keepalive.gain.value = 0;
-          this.workletNode.connect(keepalive);
-          keepalive.connect(rawCtx.destination);
-        }
+        const keepalive = this.audioContext.createGain();
+        keepalive.gain.value = 0;
+        this.workletNode.connect(keepalive);
+        keepalive.connect(this.audioContext.destination);
       } catch (_e) { /* keepalive failed */ }
 
       this.useWasmEngine = true;
@@ -214,20 +224,18 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
    * Trigger a note
    */
   public triggerAttack(
-    note: Tone.Unit.Frequency,
-    time?: Tone.Unit.Time,
+    note: string | number,
+    time?: number,
     velocity: number = 1,
     accent?: boolean,
     slide?: boolean
-  ): this {
+  ): void {
     // If WASM not available, error was already reported at init
     if (!this.useWasmEngine || !this.workletNode) {
-      return this;
+      return;
     }
 
-    // Normalize null to undefined for Tone.js compatibility
-    const normalizedTime = time ?? undefined;
-    const freq = Tone.Frequency(note).toFrequency();
+    const freq = noteToFrequency(note);
 
     // Apply filter tracking for 303-style synths
     if (this.is303Style() && this.filterTrackingAmount > 0) {
@@ -239,53 +247,43 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
       type: 'noteOn',
       frequency: freq,
       velocity: Math.round(velocity * 127),
-      time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
+      time,
       accent,
       slide,
     });
-
-    return this;
   }
 
   /**
    * Release a note
    */
-  public triggerRelease(time?: Tone.Unit.Time): this {
+  public triggerRelease(time?: number): void {
     // If WASM not available, error was already reported at init
     if (!this.useWasmEngine || !this.workletNode) {
-      return this;
+      return;
     }
-
-    // Normalize null to undefined for Tone.js compatibility
-    const normalizedTime = time ?? undefined;
 
     this.workletNode.port.postMessage({
       type: 'noteOff',
-      time: normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : undefined,
+      time,
     });
-
-    return this;
   }
 
   /**
    * Trigger attack and release
    */
   public triggerAttackRelease(
-    note: Tone.Unit.Frequency,
-    duration: Tone.Unit.Time,
-    time?: Tone.Unit.Time,
+    note: string | number,
+    duration: number | string,
+    time?: number,
     velocity: number = 1,
     accent?: boolean,
     slide?: boolean
-  ): this {
-    // Normalize null to undefined for Tone.js compatibility
-    const normalizedTime = time ?? undefined;
-    const computedTime = normalizedTime !== undefined ? Tone.Time(normalizedTime).toSeconds() : Tone.now();
-    const computedDuration = Tone.Time(duration).toSeconds();
+  ): void {
+    const computedTime = time !== undefined ? timeToSeconds(time) : audioNow();
+    const computedDuration = timeToSeconds(duration);
 
     this.triggerAttack(note, computedTime, velocity, accent, slide);
     this.triggerRelease(computedTime + computedDuration);
-    return this;
   }
 
   /**
@@ -497,7 +495,7 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
 
   /**
    * Set overdrive amount (0-1 normalized)
-   * Uses external Tone.js Distortion for saturation
+   * Uses external WaveShaperNode for saturation
    */
   public setOverdrive(amount: number): void {
     if (!this.is303Style() || !this.overdrive) return;
@@ -505,12 +503,13 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
     this.overdriveAmount = Math.min(Math.max(amount, 0), 1);
 
     if (this.overdriveAmount === 0) {
-      this.overdrive.wet.value = 0;
+      if (this.overdriveDry) this.overdriveDry.gain.value = 1;
+      if (this.overdriveWet) this.overdriveWet.gain.value = 0;
     } else {
-      // Scale wet mix: 0-1 -> 0-0.8
-      this.overdrive.wet.value = this.overdriveAmount * 0.8;
-      // Adjust distortion character
-      this.overdrive.distortion = 0.2 + this.overdriveAmount * 0.6;
+      const wet = this.overdriveAmount * 0.8;
+      if (this.overdriveDry) this.overdriveDry.gain.value = 1 - wet;
+      if (this.overdriveWet) this.overdriveWet.gain.value = wet;
+      this.updateOverdriveCurve(0.2 + this.overdriveAmount * 0.6);
     }
   }
 
@@ -755,37 +754,42 @@ export class BuzzmachineGenerator extends Tone.ToneAudioNode {
   /**
    * Dispose of resources
    */
-  public dispose(): this {
-    super.dispose();
-    this.output.dispose();
+  public dispose(): void {
+    this.output.disconnect();
 
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
     }
 
-    // Dispose effects chain
+    // Disconnect effects chain
     if (this.preGain) {
-      this.preGain.dispose();
+      this.preGain.disconnect();
       this.preGain = null;
     }
     if (this.overdrive) {
-      this.overdrive.dispose();
+      this.overdrive.disconnect();
       this.overdrive = null;
     }
+    if (this.overdriveDry) {
+      this.overdriveDry.disconnect();
+      this.overdriveDry = null;
+    }
+    if (this.overdriveWet) {
+      this.overdriveWet.disconnect();
+      this.overdriveWet = null;
+    }
     if (this.mufflerFilter) {
-      this.mufflerFilter.dispose();
+      this.mufflerFilter.disconnect();
       this.mufflerFilter = null;
     }
     if (this.postFilter) {
-      this.postFilter.dispose();
+      this.postFilter.disconnect();
       this.postFilter = null;
     }
     if (this.postGain) {
-      this.postGain.dispose();
+      this.postGain.disconnect();
       this.postGain = null;
     }
-
-    return this;
   }
 }
