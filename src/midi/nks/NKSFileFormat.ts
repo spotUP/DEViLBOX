@@ -23,13 +23,28 @@ const FOURCC_PLID = 0x504C4944; // "PLID" - Plugin Info
 // Chunk versions per spec
 const CHUNK_VERSION = 1;
 
-/** NICA parameter assignment (per NKS spec Section 17.10) */
-interface NICAssignment {
+/**
+ * NICA parameter assignment (per NKS spec Section 17.10)
+ *
+ * Each assignment represents one encoder (knob) on an 8-encoder page.
+ * The "ni8" key in the NICA chunk contains pages of 8 assignments each.
+ *
+ * Fields:
+ * - id: Plugin parameter ID. Encoder is unassigned if this key is absent.
+ * - name: Display name for the parameter.
+ * - section: Section label. Starts a new visual section on the display.
+ *   Ends at the next encoder that has a section name.
+ * - autoname: If true, use the name reported by the plugin host instead
+ *   of the static name field (default: false).
+ * - vflag: If true, show the parameter value instead of name on the
+ *   display (default: false). Useful for discrete selectors.
+ */
+export interface NICAssignment {
   id?: number;       // Plugin parameter ID (omit for unassigned encoder)
   name: string;      // Display name
   section?: string;  // Section label (starts a new section on display)
-  autoname?: boolean; // Use plugin-reported name instead
-  vflag?: boolean;   // Show value instead of name on display
+  autoname?: boolean; // Use plugin-reported name instead (default: false)
+  vflag?: boolean;   // Show value instead of name on display (default: false)
 }
 
 // ============================================================================
@@ -90,13 +105,11 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
     offset += 8;
 
     // Each NI chunk has a version uint32 after the standard RIFF header
-    const chunkDataStart = offset;
     const chunkDataEnd = offset + chunkSize;
 
     switch (chunkId) {
       case FOURCC_NISI: {
-        // NI Sound Info - msgpack MAP
-        const chunkVersion = view.getUint32(offset, true);
+        // NI Sound Info - msgpack MAP (skip 4-byte chunk version)
         const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
         try {
           const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
@@ -125,8 +138,7 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
       }
 
       case FOURCC_NICA: {
-        // NI Controller Assignments - msgpack MAP with "ni8" key
-        const chunkVersion = view.getUint32(offset, true);
+        // NI Controller Assignments - msgpack MAP with "ni8" key (skip 4-byte chunk version)
         const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
         try {
           const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
@@ -150,8 +162,7 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
       }
 
       case FOURCC_PLID: {
-        // Plugin Info - msgpack MAP with VST.magic or VST3.uid
-        const chunkVersion = view.getUint32(offset, true);
+        // Plugin Info - msgpack MAP with VST.magic or VST3.uid (skip 4-byte chunk version)
         const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
         try {
           const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
@@ -169,8 +180,7 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
       }
 
       case FOURCC_PCHK: {
-        // Plugin Data - raw bytes (no msgpack)
-        const chunkVersion = view.getUint32(offset, true);
+        // Plugin Data - raw bytes (no msgpack, skip 4-byte chunk version)
         pluginBlob = buffer.slice(offset + 4, chunkDataEnd);
         break;
       }
@@ -333,7 +343,7 @@ function buildPLIDChunk(metadata: NKSPresetMetadata): ArrayBuffer {
   const pluginInfo: Record<string, unknown> = {};
 
   // Use stored VST identifiers if available, otherwise use DEViLBOX defaults
-  const meta = metadata as Record<string, unknown>;
+  const meta = metadata as unknown as Record<string, unknown>;
   if (meta.vstMagic) {
     pluginInfo['VST.magic'] = meta.vstMagic;
   }
@@ -393,17 +403,33 @@ function buildNISIChunk(metadata: NKSPresetMetadata): ArrayBuffer {
 
 /**
  * Build NICA chunk (Controller Assignments)
- * Contains msgpack MAP with "ni8" key -> pages of 8 assignments
+ * Contains msgpack MAP with "ni8" key -> pages of 8 assignments.
+ *
+ * If the preset has explicit NIC assignments (via nicaPages), use those directly.
+ * Otherwise, auto-generate from parameter entries.
+ *
+ * Per SDK Section 17.10:
+ * - Each page has exactly 8 encoder assignments
+ * - Unassigned encoders have no "id" key (blank on display)
+ * - "section" key starts a new visual section
+ * - "autoname" uses plugin-reported parameter name
+ * - "vflag" shows value instead of name
  */
 function buildNICAChunk(preset: NKSPreset): ArrayBuffer {
+  // Check for explicit NICA pages on the preset
+  const explicitPages = (preset as NKSPresetWithNICA).nicaPages;
+  if (explicitPages && explicitPages.length > 0) {
+    return buildNICAFromExplicit(explicitPages);
+  }
+
+  // Auto-generate from parameter entries
   const paramEntries = Object.entries(preset.parameters);
 
-  // Build pages of 8 assignments each
   const pages: Record<string, unknown>[][] = [];
   let currentPage: Record<string, unknown>[] = [];
 
   for (let i = 0; i < paramEntries.length; i++) {
-    const [id, value] = paramEntries[i];
+    const [id] = paramEntries[i];
 
     const assignment: Record<string, unknown> = {
       name: id,
@@ -439,6 +465,66 @@ function buildNICAChunk(preset: NKSPreset): ArrayBuffer {
   }
 
   const nica = { ni8: pages };
+  const msgpackData = msgpackEncode(nica);
+  return buildRIFFChunk(FOURCC_NICA, CHUNK_VERSION, msgpackData);
+}
+
+/**
+ * Build NICA chunk from explicit NICAssignment pages.
+ * Properly serializes autoname, vflag, and section fields.
+ */
+function buildNICAFromExplicit(pages: NICAssignment[][]): ArrayBuffer {
+  const serializedPages: Record<string, unknown>[][] = [];
+
+  for (const page of pages) {
+    const serializedPage: Record<string, unknown>[] = [];
+
+    for (let i = 0; i < 8; i++) {
+      const assignment = page[i];
+
+      if (!assignment || (assignment.id === undefined && !assignment.name)) {
+        // Unassigned encoder
+        serializedPage.push({ name: '' });
+        continue;
+      }
+
+      const entry: Record<string, unknown> = {
+        name: assignment.name || '',
+      };
+
+      // Only include "id" if the encoder is assigned to a parameter
+      // Omitting "id" means the encoder is unassigned (blank display)
+      if (assignment.id !== undefined && assignment.id >= 0) {
+        entry.id = assignment.id;
+      }
+
+      // Section label starts a new visual section on the display
+      if (assignment.section) {
+        entry.section = assignment.section;
+      }
+
+      // autoname: use plugin-reported name instead of static name
+      if (assignment.autoname === true) {
+        entry.autoname = true;
+      }
+
+      // vflag: show parameter value instead of name on display
+      if (assignment.vflag === true) {
+        entry.vflag = true;
+      }
+
+      serializedPage.push(entry);
+    }
+
+    serializedPages.push(serializedPage);
+  }
+
+  // Ensure at least one page
+  if (serializedPages.length === 0) {
+    serializedPages.push(Array.from({ length: 8 }, () => ({ name: '' })));
+  }
+
+  const nica = { ni8: serializedPages };
   const msgpackData = msgpackEncode(nica);
   return buildRIFFChunk(FOURCC_NICA, CHUNK_VERSION, msgpackData);
 }
@@ -494,6 +580,100 @@ function hashStringToInt32(str: string): number {
     hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
   }
   return hash >>> 0; // Ensure positive
+}
+
+// ============================================================================
+// Extended Preset Type with NICA
+// ============================================================================
+
+/**
+ * Extended NKS preset that includes explicit NICA page assignments.
+ * Use this when you want full control over the controller assignment layout
+ * including section labels, autoname, and vflag flags.
+ */
+export interface NKSPresetWithNICA extends NKSPreset {
+  nicaPages?: NICAssignment[][];
+}
+
+/**
+ * Build NICA pages from NKS parameters with proper section grouping.
+ * This creates well-structured pages with section labels and appropriate flags.
+ *
+ * Per SDK Section 9.2.4:
+ * - Knob 1 must always be assigned
+ * - Knob 5 must be assigned if any of Knobs 6-8 is used
+ * - Don't span sections from Knob 3 to Knob 5 (display boundary)
+ */
+export function buildNICAPages(
+  parameters: Array<{
+    id: number;
+    name: string;
+    section?: string;
+    autoname?: boolean;
+    vflag?: boolean;
+  }>,
+): NICAssignment[][] {
+  const pages: NICAssignment[][] = [];
+  let currentPage: NICAssignment[] = [];
+  let lastSection: string | undefined;
+
+  for (const param of parameters) {
+    const assignment: NICAssignment = {
+      id: param.id,
+      name: param.name,
+    };
+
+    // Add section label if it's a new section
+    if (param.section && param.section !== lastSection) {
+      assignment.section = param.section;
+      lastSection = param.section;
+    }
+
+    // Preserve autoname and vflag
+    if (param.autoname) assignment.autoname = true;
+    if (param.vflag) assignment.vflag = true;
+
+    currentPage.push(assignment);
+
+    if (currentPage.length === 8) {
+      pages.push(currentPage);
+      currentPage = [];
+      lastSection = undefined; // Reset section for new page
+    }
+  }
+
+  // Pad last page to 8 entries
+  if (currentPage.length > 0) {
+    while (currentPage.length < 8) {
+      currentPage.push({ name: '' }); // Unassigned encoder
+    }
+    pages.push(currentPage);
+  }
+
+  return pages;
+}
+
+/**
+ * Build NICA pages following the first-page paradigm per SDK Section 9.2.1.
+ * Orders parameters by importance: Spectrum, Oscillator, FX, Sound, Reverb, Delay, Attack, Decay.
+ */
+export function buildFirstPageNICA(
+  parameters: Array<{
+    id: number;
+    name: string;
+    section?: string;
+    priority?: number;  // Higher = more important for first page
+  }>,
+): NICAssignment[][] {
+  // Sort by priority (highest first) for the first page
+  const sorted = [...parameters].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+  // First page gets top 8 priority parameters
+  const firstPage = sorted.slice(0, 8);
+  // Remaining pages get the rest
+  const remaining = sorted.slice(8);
+
+  return buildNICAPages([...firstPage, ...remaining]);
 }
 
 // ============================================================================

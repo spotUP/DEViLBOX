@@ -470,41 +470,119 @@ export const NKS2_FILTER_TYPE_DISPLAY_VALUES = [
 export type NKS2FilterTypeValue = typeof NKS2_FILTER_TYPE_DISPLAY_VALUES[number];
 
 /**
- * Common NKS parameter name abbreviations (SDK Section 10.3)
- * Used for hardware display fitting (8 char max on S-series MK1)
+ * Common NKS parameter name abbreviations (SDK Section 9.4)
+ * Complete table from the official NKS SDK documentation.
+ *
+ * Two tiers:
+ * - Short: fits 8 chars (S-series MK1, Maschine MK1/Mikro)
+ * - Even shorter: minimum abbreviation for constrained displays
+ *
+ * Guideline: "Limit parameter and section names to eight characters,
+ * including spaces. If a name has more than eight characters and still
+ * fits on pixel-based displays and is listed in the Common Abbreviations
+ * table, it is possible to use that longer name."
  */
 export const NKS_PARAM_ABBREVIATIONS: Record<string, string> = {
+  // Standard abbreviations (Full Name -> Short ≤8 chars)
   'Amount': 'Amt',
   'Amplitude': 'Amp',
+  'Augmented': 'Aug',
+  'Balance': 'Bal',
   'Brightness': 'Bright',
+  'Channel': 'Ch',
+  'Chord': 'Crd',
   'Chorus': 'Chrs',
+  'Controller': 'Ctrl',
+  'Crossfade': 'XFde',
   'Cutoff': 'Cut',
   'Decay': 'Dec',
+  'Default': 'Def',
+  'Diminished': 'Dim',
   'Distortion': 'Dist',
   'Drive': 'Drv',
   'Envelope': 'Env',
   'Expression': 'Exp',
-  'Feedback': 'Fdbk',
+  'Feedback': 'Fb',
   'Filter': 'Flt',
   'Frequency': 'Freq',
-  'Intensity': 'Intens',
-  'Key Tracking': 'Key Tr',
+  'Groove': 'Grv',
+  'Harmonic': 'Har',
+  'Intensity': 'Int',
+  'Key Tracking': 'KT',
+  'Keyboard': 'Kbd',
   'Level': 'Lvl',
+  'Loop': 'Lp',
+  'Macro Control': 'MC',
   'Master': 'Mst',
   'Modulation': 'Mod',
+  'Octave': 'Oct',
   'Oscillator': 'Osc',
   'Output': 'Out',
+  'Pentatonic': 'Pnt',
   'Portamento': 'Porta',
+  'Quarter Tone': 'QT',
+  'Random': 'Rnd',
   'Release': 'Rel',
   'Resonance': 'Res',
-  'Reverb': 'Rev',
+  'Reverse': 'Rev',
+  'Round Robin': 'RR',
+  'Semi Tone': 'ST',
   'Sequence': 'Seq',
+  'Sequencer': 'Seq',
   'Sustain': 'Sus',
-  'Transpose': 'Transp',
-  'Tuning': 'Tune',
+  'Track': 'Trk',
+  'Transpose': 'Trans',
+  'Tuning': 'Tun',
+  'Unison': 'Uni',
+  'Variation': 'Var',
   'Velocity': 'Vel',
   'Volume': 'Vol',
   'Waveform': 'Wave',
+  'Whole Tone': 'WT',
+};
+
+/**
+ * Extended abbreviation table with intermediate (≤8 char) forms.
+ * Some parameters have a "short" form (≤8) different from the "even shorter" form.
+ * Use NKS_PARAM_ABBREVIATIONS for the shortest form.
+ */
+export const NKS_PARAM_ABBREVIATIONS_LONG: Record<string, string> = {
+  'Amount': 'Amount',
+  'Augmented': 'Aug',
+  'Balance': 'Balance',
+  'Channel': 'Channel',
+  'Chord': 'Chrd',
+  'Controller': 'Ctrl',
+  'Crossfade': 'X-Fade',
+  'Default': 'Default',
+  'Diminished': 'Dimnshed',
+  'Expression': 'Exp',
+  'Feedback': 'Feedback',
+  'Groove': 'Groove',
+  'Harmonic': 'Harmonic',
+  'Intensity': 'Intens',
+  'Key Tracking': 'Key Tr',
+  'Keyboard': 'Keyboard',
+  'Level': 'Level',
+  'Loop': 'Lp',
+  'Macro Control': 'Macro',
+  'Master': 'Master',
+  'Octave': 'Octave',
+  'Pentatonic': 'Pent',
+  'Quarter Tone': '1/4 Tone',
+  'Random': 'Random',
+  'Reverse': 'Reverse',
+  'Round Robin': 'R Robin',
+  'Semi Tone': 'Semi Tn',
+  'Sequence': 'Sequence',
+  'Sequencer': 'Seq',
+  'Track': 'Track',
+  'Transpose': 'Transp',
+  'Tuning': 'Tune',
+  'Unison': 'Unison',
+  'Variation': 'Var',
+  'Volume': 'Volume',
+  'Whole Tone': 'Whole Tn',
 };
 
 // ============================================================================
