@@ -56,9 +56,17 @@ interface FileItem {
 // Helper to detect tracker module files (binary formats)
 const TRACKER_EXTENSIONS = ['.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', '.dbm', '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm', '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx'];
 
+// Binary file formats that need ArrayBuffer loading (not JSON)
+const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq'];
+
 function isTrackerModule(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
   return TRACKER_EXTENSIONS.includes(ext);
+}
+
+function isBinaryFile(filename: string): boolean {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
+  return BINARY_EXTENSIONS.includes(ext);
 }
 
 export const FileBrowser: React.FC<FileBrowserProps> = ({
@@ -214,10 +222,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     setError(null);
 
     try {
-      // Check if this is a tracker module
-      if (isTrackerModule(selectedFile.name)) {
+      // Check if this is a binary file (tracker module, .sqs/.seq, etc.)
+      if (isBinaryFile(selectedFile.name)) {
         if (!onLoadTrackerModule) {
-          throw new Error('Tracker module loading not supported');
+          throw new Error('Binary file loading not supported');
         }
 
         let buffer: ArrayBuffer;

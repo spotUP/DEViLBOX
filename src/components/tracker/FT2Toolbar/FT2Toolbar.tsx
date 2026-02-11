@@ -865,10 +865,68 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
-          const { loadModuleFile } = await import('@lib/import/ModuleLoader');
-          const moduleInfo = await loadModuleFile(new File([buffer], filename));
-          if (moduleInfo) await handleModuleImport(moduleInfo);
-        } catch (error) { notify.error('Failed to load module'); }
+          const lower = filename.toLowerCase();
+          if (lower.endsWith('.sqs') || lower.endsWith('.seq')) {
+            // Behringer TD-3 / Synthtribe pattern file
+            const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
+            const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
+            const { patterns, loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
+            const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
+
+            let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
+            if (!tb303Instrument) {
+              const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
+              const newInst = createDefaultTB303Instrument();
+              addInst(newInst);
+              tb303Instrument = newInst;
+            }
+
+            const td3File = await parseTD3File(buffer);
+            if (td3File.patterns.length === 0) {
+              notify.error('No patterns found in file');
+              return;
+            }
+
+            const currentInstruments = useInstrumentStore.getState().instruments;
+            const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument!.id) + 1 || 1;
+
+            const importedPatterns = td3File.patterns.map((td3Pattern, idx) => {
+              const cells = td3StepsToTrackerCells(td3Pattern.steps, 2);
+              const patternLength = td3Pattern.length || 16;
+              const patternId = `td3-${Date.now()}-${idx}`;
+              return {
+                id: patternId,
+                name: td3Pattern.name || `TD-3 Pattern ${idx + 1}`,
+                length: patternLength,
+                channels: [{
+                  id: `ch-${tb303Instrument!.id}-${idx}`,
+                  name: 'TB-303',
+                  muted: false,
+                  solo: false,
+                  collapsed: false,
+                  volume: 100,
+                  pan: 0,
+                  instrumentId: tb303Instrument!.id,
+                  color: '#ec4899',
+                  rows: cells.slice(0, patternLength).map(cell => ({
+                    ...cell,
+                    instrument: cell.note ? instrumentIndex : 0
+                  }))
+                }]
+              };
+            });
+
+            const newPatterns = [...patterns, ...importedPatterns];
+            loadPatterns(newPatterns);
+            setCurrentPattern(patterns.length);
+            setPatternOrder(newPatterns.map((_, i) => i));
+            notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
+          } else {
+            const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+            const moduleInfo = await loadModuleFile(new File([buffer], filename));
+            if (moduleInfo) await handleModuleImport(moduleInfo);
+          }
+        } catch (error) { notify.error('Failed to load file'); }
       }} />
 
       {/* Clear Modal */}
