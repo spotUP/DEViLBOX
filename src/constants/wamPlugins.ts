@@ -143,20 +143,4 @@ export const WAM_SYNTH_PLUGINS: WAMPluginEntry[] = [
     category: 'Multi-FX',
     description: 'Drag-and-drop guitar pedalboard',
   },
-
-  // ── UTILITY: VISUALIZATION ───────────────────────────────────────────
-  {
-    name: 'Oscilloscope',
-    url: `${WAM_HOST}/livegain/dist/oscilloscope/index.js`,
-    type: 'utility',
-    category: 'Visualization',
-    description: 'Real-time waveform display',
-  },
-  {
-    name: 'Live Gain',
-    url: `${WAM_HOST}/livegain/dist/livegain/index.js`,
-    type: 'utility',
-    category: 'Visualization',
-    description: 'VU meter and gain control',
-  },
 ];
