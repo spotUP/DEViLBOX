@@ -126,6 +126,30 @@ export const TB303KnobPanel: React.FC = memo(() => {
     });
   }, [targetInstrument, updateInstrument]);
 
+  // Handle full preset load (synth config + effects chain)
+  const handlePresetLoad = useCallback(async (preset: any) => {
+    if (!targetInstrument) return;
+
+    // Apply TB-303 synth config
+    if (preset.tb303) {
+      handleConfigChange(preset.tb303);
+    }
+
+    // Apply effects chain (or clear if preset has none)
+    if (preset.effects !== undefined) {
+      const effects = preset.effects.map((fx: any, i: number) => ({
+        ...fx,
+        id: fx.id || `tb303-fx-${Date.now()}-${i}`,
+      }));
+      updateInstrument(targetInstrument.id, { effects });
+
+      // Rebuild audio chain immediately
+      const { getToneEngine } = await import('@engine/ToneEngine');
+      const engine = getToneEngine();
+      await engine.rebuildInstrumentEffects(targetInstrument.id, effects);
+    }
+  }, [targetInstrument, handleConfigChange, updateInstrument]);
+
   // NOW conditional returns are safe
   if (!targetInstrument || !targetInstrument.tb303) {
     return null;
@@ -195,10 +219,11 @@ export const TB303KnobPanel: React.FC = memo(() => {
 
       {/* Panel Content */}
       <div>
-        <JC303StyledKnobPanel 
+        <JC303StyledKnobPanel
           key={targetInstrument.id}
-          config={targetInstrument.tb303} 
+          config={targetInstrument.tb303}
           onChange={handleConfigChange}
+          onPresetLoad={handlePresetLoad}
         />
       </div>
     </div>
