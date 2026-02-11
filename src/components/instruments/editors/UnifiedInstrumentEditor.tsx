@@ -39,6 +39,9 @@ import { WAMControls } from '../controls/WAMControls';
 import { VSTBridgePanel } from '../controls/VSTBridgePanel';
 import { TonewheelOrganControls } from '../controls/TonewheelOrganControls';
 import { MelodicaControls } from '../controls/MelodicaControls';
+import { VitalControls } from '../controls/VitalControls';
+import { Odin2Controls } from '../controls/Odin2Controls';
+import { SurgeControls } from '../controls/SurgeControls';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
@@ -58,7 +61,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vstbridge';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -137,6 +140,9 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'WAM') return 'wam';
   if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
   if (synthType === 'Melodica') return 'melodica';
+  if (synthType === 'Vital') return 'vital';
+  if (synthType === 'Odin2') return 'odin2';
+  if (synthType === 'Surge') return 'surge';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }
@@ -1335,6 +1341,270 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-y-auto">
           {vstUiMode === 'custom' ? (
             <MelodicaControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          ) : (
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // VITAL EDITOR (custom tabbed UI with VSTBridge fallback)
+  // ============================================================================
+  if (editorMode === 'vital') {
+    const vitalAccentColor = isCyanTheme ? '#00ffff' : '#b84eff';
+    const vitalHeaderBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#b84eff]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${vitalHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 shadow-lg">
+                    <Music size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: vitalAccentColor }}>VITAL</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Spectral Wavetable Synth</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setVstUiMode(vstUiMode === 'custom' ? 'generic' : 'custom')}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      vstUiMode === 'custom'
+                        ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/50'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                    title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
+                  >
+                    {vstUiMode === 'custom' ? <Music size={14} /> : <SlidersHorizontal size={14} />}
+                    <span className="text-[10px] font-bold uppercase">
+                      {vstUiMode === 'custom' ? 'Custom' : 'Generic'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          {vstUiMode === 'custom' ? (
+            <VitalControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          ) : (
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // ODIN2 EDITOR (custom panel UI with VSTBridge fallback)
+  // ============================================================================
+  if (editorMode === 'odin2') {
+    const odinAccentColor = isCyanTheme ? '#00ffff' : '#4a9eff';
+    const odinHeaderBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#4a9eff]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${odinHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg">
+                    <Music size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: odinAccentColor }}>ODIN2</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Semi-Modular Hybrid Synth</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setVstUiMode(vstUiMode === 'custom' ? 'generic' : 'custom')}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      vstUiMode === 'custom'
+                        ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                    title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
+                  >
+                    {vstUiMode === 'custom' ? <Music size={14} /> : <SlidersHorizontal size={14} />}
+                    <span className="text-[10px] font-bold uppercase">
+                      {vstUiMode === 'custom' ? 'Custom' : 'Generic'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          {vstUiMode === 'custom' ? (
+            <Odin2Controls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          ) : (
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SURGE XT EDITOR (custom scene-based UI with VSTBridge fallback)
+  // ============================================================================
+  if (editorMode === 'surge') {
+    const surgeAccentColor = isCyanTheme ? '#00ffff' : '#ff8c00';
+    const surgeHeaderBg = isCyanTheme
+      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff8c00]';
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+          customHeader={
+            <div className={`synth-editor-header px-4 py-3 ${surgeHeaderBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 shadow-lg">
+                    <Music size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight" style={{ color: surgeAccentColor }}>SURGE XT</h2>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Hybrid Synthesizer</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setVstUiMode(vstUiMode === 'custom' ? 'generic' : 'custom')}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      vstUiMode === 'custom'
+                        ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/50'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                    title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
+                  >
+                    {vstUiMode === 'custom' ? <Music size={14} /> : <SlidersHorizontal size={14} />}
+                    <span className="text-[10px] font-bold uppercase">
+                      {vstUiMode === 'custom' ? 'Custom' : 'Generic'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => handleChange({ isLive: !instrument.isLive })}
+                    className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                      instrument.isLive
+                        ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
+                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    }`}
+                  >
+                    <Radio size={14} />
+                    <span className="text-[10px] font-bold uppercase">LIVE</span>
+                  </button>
+
+                  <PresetDropdown
+                    synthType={instrument.synthType}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          }
+        />
+        <div className="synth-editor-content overflow-y-auto">
+          {vstUiMode === 'custom' ? (
+            <SurgeControls
               instrument={instrument}
               onChange={handleChange}
             />
