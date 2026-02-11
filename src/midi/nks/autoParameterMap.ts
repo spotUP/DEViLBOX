@@ -41,7 +41,6 @@ export interface RuntimeParam {
 /** Keywords that indicate specific parameter types */
 const WAVEFORM_KEYWORDS = ['wave', 'waveform', 'osc type', 'oscillator type', 'osc mode'];
 const FILTER_TYPE_KEYWORDS = ['filter type', 'filter mode', 'flt type', 'flt mode'];
-const TOGGLE_KEYWORDS = ['on', 'off', 'enable', 'disable', 'bypass', 'active', 'mute', 'solo'];
 const BIPOLAR_KEYWORDS = ['pan', 'detune', 'pitch', 'tune', 'offset', 'balance', 'spread'];
 const TEMPO_KEYWORDS = ['tempo', 'sync', 'bpm', 'rate'];
 

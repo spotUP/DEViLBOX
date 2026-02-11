@@ -536,17 +536,282 @@ export const FURNACE_PSG_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
-// GENERIC BUZZMACHINE PARAMETERS
+// BUZZMACHINE: FSM Kick (synthesized kick drum)
 // ============================================================================
-export const BUZZMACHINE_NKS_PARAMETERS: NKSParameter[] = [
-  { id: 'buzzmachine.param0', name: 'Param 1', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
-  { id: 'buzzmachine.param1', name: 'Param 2', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
-  { id: 'buzzmachine.param2', name: 'Param 3', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
-  { id: 'buzzmachine.param3', name: 'Param 4', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
-  { id: 'buzzmachine.param4', name: 'Param 5', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
-  { id: 'buzzmachine.param5', name: 'Param 6', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
-  { id: 'buzzmachine.param6', name: 'Param 7', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
-  { id: 'buzzmachine.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+export const BUZZKICK_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzkick.startFreq', name: 'Start Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 198, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzkick.endFreq', name: 'End Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 64, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzkick.toneDecay', name: 'Tone Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 46, page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzkick.toneShape', name: 'Tone Shape', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 27, page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzkick.ampDecay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 55, page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzkick.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: FSM KickXP (enhanced kick drum)
+// ============================================================================
+export const BUZZKICKXP_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzkickxp.startFreq', name: 'Start Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 198, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzkickxp.endFreq', name: 'End Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 240, defaultValue: 64, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzkickxp.buzzAmt', name: 'Buzz', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzkickxp.clickAmt', name: 'Click', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzkickxp.punchAmt', name: 'Punch', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzkickxp.toneDecay', name: 'Tone Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.4, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'buzzkickxp.decayTime', name: 'Decay Time', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'buzzkickxp.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: Jeskola Trilok (bass drum)
+// ============================================================================
+export const BUZZTRILOK_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzztrilok.tone', name: 'BD Tone', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzztrilok.decay', name: 'BD Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzztrilok.volume', name: 'BD Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: CyanPhase DTMF (phone tone generator)
+// ============================================================================
+export const BUZZDTMF_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzdtmf.dialNumber', name: 'Dial #', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 11, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzdtmf.sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 254, defaultValue: 40, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzdtmf.twist', name: 'Twist', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 40, defaultValue: 0, unit: 'dB', page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzdtmf.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.75, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: Elenzil FrequencyBomb (oscillator + LFO)
+// ============================================================================
+export const BUZZFREQBOMB_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzfreqbomb.freq', name: 'Frequency', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0.01, max: 655, defaultValue: 50, unit: 'Hz', formatString: '%.1f', page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzfreqbomb.waveform', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 4, defaultValue: 0, valueStrings: ['Sine', 'Saw', 'Square', 'Triangle', 'Noise'], page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzfreqbomb.wavePower', name: 'Wave Power', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 13, defaultValue: 1, page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzfreqbomb.lfoRate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0.01, max: 655, defaultValue: 10, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzfreqbomb.lfoAmount', name: 'LFO Amount', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 65, defaultValue: 0, unit: 'Hz', formatString: '%.1f', page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzfreqbomb.freqAttack', name: 'Freq Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 655, defaultValue: 0.1, unit: 's', formatString: '%.2f', page: 0, index: 5, isAutomatable: true },
+  { id: 'buzzfreqbomb.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: Makk M3 (dual-osc mono synth, top 8 of 35 params)
+// ============================================================================
+export const BUZZM3_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzm3.osc1Wave', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 1, valueStrings: ['Off', 'Saw', 'Pulse', 'Tri', 'Sin', 'Noise'], page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzm3.osc1PW', name: 'Osc1 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzm3.osc2Wave', name: 'Osc2 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['Off', 'Saw', 'Pulse', 'Tri', 'Sin', 'Noise'], page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzm3.mix', name: 'Osc Mix', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzm3.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 100, page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzm3.filterReso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
+  { id: 'buzzm3.ampAttack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
+  { id: 'buzzm3.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: Makk M4 (poly wavetable synth, top 8 of 37 params)
+// ============================================================================
+export const BUZZM4_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzm4.osc1Wave', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzm4.osc2Wave', name: 'Osc2 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzm4.oscMix', name: 'Osc Mix', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzm4.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 100, page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzm4.filterReso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzm4.ampAttack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
+  { id: 'buzzm4.ampRelease', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 30, page: 0, index: 6, isAutomatable: true },
+  { id: 'buzzm4.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// BUZZMACHINE: MadBrain Dynamite6 (6-pipe additive, top 8 of 27 params)
+// ============================================================================
+export const BUZZDYNAMITE6_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'buzzdyn6.coarseTune', name: 'Coarse', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 1, max: 255, defaultValue: 128, page: 0, index: 0, isAutomatable: true },
+  { id: 'buzzdyn6.pipe1Len', name: 'Pipe 1 Len', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 128, page: 0, index: 1, isAutomatable: true },
+  { id: 'buzzdyn6.pipe1Fdbk', name: 'Pipe 1 FB', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 128, page: 0, index: 2, isAutomatable: true },
+  { id: 'buzzdyn6.pipe1Filter', name: 'Pipe 1 Flt', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 128, page: 0, index: 3, isAutomatable: true },
+  { id: 'buzzdyn6.envAttack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 254, defaultValue: 4, page: 0, index: 4, isAutomatable: true },
+  { id: 'buzzdyn6.envDecay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 1, max: 255, defaultValue: 255, page: 0, index: 5, isAutomatable: true },
+  { id: 'buzzdyn6.routing', name: 'Routing', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
+  { id: 'buzzdyn6.amplification', name: 'Amplify', section: NKSSection.OUTPUT, type: NKSParameterType.INT, min: 1, max: 255, defaultValue: 32, page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: Votrax SC-01 (formant speech synthesis)
+// ============================================================================
+export const VOTRAX_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'votrax.phoneme', name: 'Phoneme', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 63, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'votrax.inflection', name: 'Inflection', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Normal', 'Rise', 'Fall', 'Stress'], page: 0, index: 1, isAutomatable: true },
+  { id: 'votrax.f1Override', name: 'F1 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: -1, max: 15, defaultValue: -1, page: 0, index: 2, isAutomatable: true },
+  { id: 'votrax.f2Override', name: 'F2 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: -1, max: 15, defaultValue: -1, page: 0, index: 3, isAutomatable: true },
+  { id: 'votrax.f3Override', name: 'F3 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: -1, max: 15, defaultValue: -1, page: 0, index: 4, isAutomatable: true },
+  { id: 'votrax.stereoWidth', name: 'Stereo Wid', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'votrax.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: TMS5220 Speak & Spell (LPC speech synthesis)
+// ============================================================================
+export const TMS5220_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'tms5220.chirpType', name: 'Chirp Type', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 2, defaultValue: 0, valueStrings: ['TMS5220', 'TMS5200', 'TI99'], page: 0, index: 0, isAutomatable: true },
+  { id: 'tms5220.pitchIndex', name: 'Pitch', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 63, defaultValue: 32, page: 0, index: 1, isAutomatable: true },
+  { id: 'tms5220.energyIndex', name: 'Energy', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 10, page: 0, index: 2, isAutomatable: true },
+  { id: 'tms5220.k1Index', name: 'K1 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 15, page: 0, index: 3, isAutomatable: true },
+  { id: 'tms5220.k2Index', name: 'K2 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 15, page: 0, index: 4, isAutomatable: true },
+  { id: 'tms5220.noiseMode', name: 'Noise', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
+  { id: 'tms5220.brightness', name: 'Brightness', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'tms5220.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: MEA8000 (Philips 4-formant speech synthesis)
+// ============================================================================
+export const MEA8000_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'mea8000.noiseMode', name: 'Noise Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'mea8000.f1Index', name: 'F1 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 3, page: 0, index: 1, isAutomatable: true },
+  { id: 'mea8000.f2Index', name: 'F2 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 4, page: 0, index: 2, isAutomatable: true },
+  { id: 'mea8000.f3Index', name: 'F3 Formant', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 5, page: 0, index: 3, isAutomatable: true },
+  { id: 'mea8000.bwIndex', name: 'Bandwidth', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Wide', 'Medium', 'Narrow', 'V.Narrow'], page: 0, index: 4, isAutomatable: true },
+  { id: 'mea8000.amplitude', name: 'Amplitude', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'mea8000.interpTime', name: 'Interp Time', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0.1, max: 10, defaultValue: 1, formatString: '%.1f', page: 0, index: 6, isAutomatable: true },
+  { id: 'mea8000.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: SP0250 (GI digital LPC speech)
+// ============================================================================
+export const SP0250_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'sp0250.vowel', name: 'Vowel', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'], page: 0, index: 0, isAutomatable: true },
+  { id: 'sp0250.voiced', name: 'Voiced', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 1, page: 0, index: 1, isAutomatable: true },
+  { id: 'sp0250.brightness', name: 'Brightness', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'sp0250.filterMix', name: 'Filter Mix', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'sp0250.stereoWidth', name: 'Stereo Wid', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'sp0250.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: UPD931 (NEC/Casio keyboard voice chip)
+// ============================================================================
+export const UPD931_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'upd931.waveA', name: 'Wave A', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'upd931.waveB', name: 'Wave B', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 1, page: 0, index: 1, isAutomatable: true },
+  { id: 'upd931.modeA', name: 'Mode A', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Always', 'Alternate', 'Attack', 'Sustain'], page: 0, index: 2, isAutomatable: true },
+  { id: 'upd931.modeB', name: 'Mode B', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Always', 'Alternate', 'Attack', 'Sustain'], page: 0, index: 3, isAutomatable: true },
+  { id: 'upd931.mirror', name: 'Mirror', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 4, isAutomatable: true },
+  { id: 'upd931.invert', name: 'Invert', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
+  { id: 'upd931.keyScaling', name: 'Key Scale', section: NKSSection.MODULATION, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
+  { id: 'upd931.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: UPD933 (NEC/Casio CZ phase distortion chip)
+// ============================================================================
+export const UPD933_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'upd933.waveform1', name: 'Wave 1', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Saw', 'Square', 'Pulse', 'Silent', 'DblSine', 'Saw+Pls', 'Reso', 'DblPls'], page: 0, index: 0, isAutomatable: true },
+  { id: 'upd933.waveform2', name: 'Wave 2', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Saw', 'Square', 'Pulse', 'Silent', 'DblSine', 'Saw+Pls', 'Reso', 'DblPls'], page: 0, index: 1, isAutomatable: true },
+  { id: 'upd933.dcwDepth', name: 'DCW Depth', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'upd933.dcaRate', name: 'DCA Rate', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'upd933.dcwRate', name: 'DCW Rate', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'upd933.dcoDepth', name: 'Pitch Env', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'upd933.ringMod', name: 'Ring Mod', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 6, isAutomatable: true },
+  { id: 'upd933.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// MAME: CEM3394 (Curtis analog synth voice)
+// ============================================================================
+export const CEM3394_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'cem3394.waveSelect', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 2, valueStrings: ['Off', 'Tri', 'Saw', 'Tri+Saw', 'Pulse', 'Tri+Pls', 'Saw+Pls', 'All'], page: 0, index: 0, isAutomatable: true },
+  { id: 'cem3394.pulseWidth', name: 'Pulse Wid', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'cem3394.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'cem3394.filterReso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'cem3394.modAmount', name: 'Filter FM', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true },
+  { id: 'cem3394.mixerBalance', name: 'Mix Bal', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'cem3394.vcoFreq', name: 'VCO Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'cem3394.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: Vital (top 8 params from 774)
+// ============================================================================
+export const VITAL_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'vital.osc1WaveFrame', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'vital.filter1Cutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'vital.filter1Reso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'vital.env1Attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
+  { id: 'vital.env1Decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
+  { id: 'vital.env1Sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'vital.env1Release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
+  { id: 'vital.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: Odin2 (top 8 params from 119)
+// ============================================================================
+export const ODIN2_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'odin2.osc1Type', name: 'Osc1 Type', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 11, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'odin2.filter1Freq', name: 'Flt Freq', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'odin2.filter1Reso', name: 'Flt Reso', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'odin2.env1Attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
+  { id: 'odin2.env1Decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
+  { id: 'odin2.env1Sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'odin2.env1Release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
+  { id: 'odin2.masterVol', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: Surge XT (top 8 params from 766)
+// ============================================================================
+export const SURGE_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'surge.osc1Type', name: 'Osc Type', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 11, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
+  { id: 'surge.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'surge.filterReso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'surge.envAttack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
+  { id: 'surge.envDecay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
+  { id: 'surge.envSustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'surge.envRelease', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
+  { id: 'surge.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: Monique (top 8 from 120 morphing monosynth params)
+// ============================================================================
+export const MONIQUE_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'monique.osc1Wave', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'monique.filter1Cutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'monique.filter1Reso', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'monique.filter1Dist', name: 'Distortion', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'monique.envAttack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
+  { id: 'monique.envRelease', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 5, isAutomatable: true },
+  { id: 'monique.glide', name: 'Glide', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'monique.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: TonewheelOrgan (9 drawbars + controls)
+// ============================================================================
+export const TONEWHEEL_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'tonewheel.drawbar16', name: "16'", section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 8, defaultValue: 8, page: 0, index: 0, isAutomatable: true },
+  { id: 'tonewheel.drawbar8', name: "8'", section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 8, defaultValue: 8, page: 0, index: 1, isAutomatable: true },
+  { id: 'tonewheel.drawbar4', name: "4'", section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 8, defaultValue: 0, page: 0, index: 2, isAutomatable: true },
+  { id: 'tonewheel.percMode', name: 'Perc Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 2, defaultValue: 0, valueStrings: ['Off', '2nd', '3rd'], page: 0, index: 3, isAutomatable: true },
+  { id: 'tonewheel.vibratoType', name: 'Vib Type', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['V1', 'V2', 'V3', 'C1', 'C2', 'C3'], page: 0, index: 4, isAutomatable: true },
+  { id: 'tonewheel.click', name: 'Click', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'tonewheel.overdrive', name: 'Overdrive', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'tonewheel.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+];
+
+// ============================================================================
+// VSTBridge: Melodica (reed instrument)
+// ============================================================================
+export const MELODICA_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'melodica.breath', name: 'Breath', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true },
+  { id: 'melodica.brightness', name: 'Brightness', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'melodica.vibratoRate', name: 'Vib Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 10, defaultValue: 4, unit: 'Hz', formatString: '%.1f', page: 0, index: 2, isAutomatable: true },
+  { id: 'melodica.vibratoDepth', name: 'Vib Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
+  { id: 'melodica.detune', name: 'Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -50, max: 50, defaultValue: 0, unit: 'ct', formatString: '%.0f', page: 0, index: 4, isAutomatable: true },
+  { id: 'melodica.noise', name: 'Noise', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.1, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'melodica.portamento', name: 'Portamento', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true },
+  { id: 'melodica.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
 ];
 
 // ============================================================================
@@ -597,18 +862,18 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'GranularSynth': GRANULAR_NKS_PARAMETERS,
   'Wavetable': WAVETABLE_NKS_PARAMETERS,
 
-  // Buzzmachines - TB-303 style uses TB303 params
+  // Buzzmachines - each with dedicated parameter maps
   'Buzz3o3': TB303_NKS_PARAMETERS,
-  'BuzzM3': BUZZMACHINE_NKS_PARAMETERS,
+  'BuzzM3': BUZZM3_NKS_PARAMETERS,
   'Buzz4FM2F': FURNACE_FM_NKS_PARAMETERS,
-  'BuzzDynamite6': BUZZMACHINE_NKS_PARAMETERS,
-  'BuzzKick': BUZZMACHINE_NKS_PARAMETERS,
-  'BuzzKickXP': BUZZMACHINE_NKS_PARAMETERS,
-  'BuzzTrilok': BUZZMACHINE_NKS_PARAMETERS,
+  'BuzzDynamite6': BUZZDYNAMITE6_NKS_PARAMETERS,
+  'BuzzKick': BUZZKICK_NKS_PARAMETERS,
+  'BuzzKickXP': BUZZKICKXP_NKS_PARAMETERS,
+  'BuzzTrilok': BUZZTRILOK_NKS_PARAMETERS,
   'BuzzNoise': NOISESYNTH_NKS_PARAMETERS,
-  'BuzzFreqBomb': BUZZMACHINE_NKS_PARAMETERS,
-  'BuzzDTMF': BUZZMACHINE_NKS_PARAMETERS,
-  'Buzzmachine': BUZZMACHINE_NKS_PARAMETERS,
+  'BuzzFreqBomb': BUZZFREQBOMB_NKS_PARAMETERS,
+  'BuzzDTMF': BUZZDTMF_NKS_PARAMETERS,
+  'Buzzmachine': BUZZM3_NKS_PARAMETERS,
 
   // Furnace FM chips - use FM params
   'Furnace': FURNACE_FM_NKS_PARAMETERS,
@@ -697,16 +962,16 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
 
   // Buzzmachine additions
   'Buzz3o3DF': TB303_NKS_PARAMETERS,
-  'BuzzM4': BUZZMACHINE_NKS_PARAMETERS,
+  'BuzzM4': BUZZM4_NKS_PARAMETERS,
 
-  // VSTBridge synths (use closest equivalent until auto-profiled)
+  // VSTBridge synths - dedicated parameter maps
   'DexedBridge': DEXED_NKS_PARAMETERS,
-  'TonewheelOrgan': ORGAN_NKS_PARAMETERS,
-  'Melodica': MONOSYNTH_NKS_PARAMETERS,
-  'Vital': POLYSYNTH_NKS_PARAMETERS,
-  'Odin2': POLYSYNTH_NKS_PARAMETERS,
-  'Surge': POLYSYNTH_NKS_PARAMETERS,
-  'Monique': MONOSYNTH_NKS_PARAMETERS,
+  'TonewheelOrgan': TONEWHEEL_NKS_PARAMETERS,
+  'Melodica': MELODICA_NKS_PARAMETERS,
+  'Vital': VITAL_NKS_PARAMETERS,
+  'Odin2': ODIN2_NKS_PARAMETERS,
+  'Surge': SURGE_NKS_PARAMETERS,
+  'Monique': MONIQUE_NKS_PARAMETERS,
 
   // WAM plugin (generic until auto-profiled at runtime)
   'WAM': GENERIC_NKS_PARAMETERS,
@@ -716,7 +981,7 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'ChiptuneModule': SAMPLER_NKS_PARAMETERS,
 
   // MAME dedicated synth engines
-  'CEM3394': MONOSYNTH_NKS_PARAMETERS,
+  'CEM3394': CEM3394_NKS_PARAMETERS,
   'SCSP': FURNACE_FM_NKS_PARAMETERS,
 
   // MAME synths (FM-based)
@@ -747,13 +1012,13 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'MAMETMS36XX': FURNACE_PSG_NKS_PARAMETERS,
   'MAMEMSM5232': FURNACE_PSG_NKS_PARAMETERS,
 
-  // MAME synths (speech synthesis)
-  'MAMEMEA8000': GENERIC_NKS_PARAMETERS,
-  'MAMESP0250': GENERIC_NKS_PARAMETERS,
-  'MAMETMS5220': GENERIC_NKS_PARAMETERS,
-  'MAMEUPD931': GENERIC_NKS_PARAMETERS,
-  'MAMEUPD933': GENERIC_NKS_PARAMETERS,
-  'MAMEVotrax': GENERIC_NKS_PARAMETERS,
+  // MAME synths (speech synthesis) - dedicated parameter maps
+  'MAMEMEA8000': MEA8000_NKS_PARAMETERS,
+  'MAMESP0250': SP0250_NKS_PARAMETERS,
+  'MAMETMS5220': TMS5220_NKS_PARAMETERS,
+  'MAMEUPD931': UPD931_NKS_PARAMETERS,
+  'MAMEUPD933': UPD933_NKS_PARAMETERS,
+  'MAMEVotrax': VOTRAX_NKS_PARAMETERS,
 };
 
 /**
