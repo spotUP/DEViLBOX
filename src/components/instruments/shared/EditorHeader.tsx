@@ -99,8 +99,10 @@ function handleSynthTypeChange(
   ToneEngine.getInstance().invalidateInstrument(instrument.id);
 
   // Build update with cleared configs and new type
+  const newSynthInfo = getSynthInfo(newType);
   const updates: Partial<InstrumentConfig> = {
     synthType: newType,
+    name: newSynthInfo.name,
     // Clear all synth-specific configs
     tb303: undefined,
     drumMachine: undefined,

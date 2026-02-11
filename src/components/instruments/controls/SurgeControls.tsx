@@ -18,7 +18,7 @@ import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
 
-type SurgeTab = 'osc' | 'filter' | 'env' | 'lfo' | 'fx' | 'global';
+type SurgeTab = 'osc' | 'filter' | 'env' | 'lfo' | 'fx' | 'global' | 'other';
 type Scene = 'A' | 'B';
 
 const TABS: { id: SurgeTab; label: string }[] = [
@@ -28,7 +28,38 @@ const TABS: { id: SurgeTab; label: string }[] = [
   { id: 'lfo', label: 'LFO' },
   { id: 'fx', label: 'FX' },
   { id: 'global', label: 'GLOBAL' },
+  { id: 'other', label: 'OTHER' },
 ];
+
+/** Check if a Surge param is covered by the categorized tabs */
+function isSurgeParamCategorized(name: string): boolean {
+  // Scene-prefixed params: A/B + Osc/Filter/EG/LFO
+  for (const scene of ['A', 'B']) {
+    for (const n of [1, 2, 3]) {
+      if (name.startsWith(`${scene} Osc ${n} `)) return true;
+    }
+    for (const n of [1, 2]) {
+      if (name.startsWith(`${scene} Filter ${n} `)) return true;
+    }
+    if (name.startsWith(`${scene} Amp EG `)) return true;
+    if (name.startsWith(`${scene} Filter EG `)) return true;
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      if (name.startsWith(`${scene} LFO ${n} `)) return true;
+    }
+    for (const n of [1, 2]) {
+      if (name.startsWith(`${scene} S-LFO ${n} `)) return true;
+    }
+  }
+  // FX params
+  if (name.startsWith('FX ')) return true;
+  // Global params shown in Global tab
+  const globalNames = new Set([
+    'Volume', 'Active Scene', 'Scene Mode', 'Split Point',
+    'FX Return A', 'FX Return B', 'Polyphony',
+  ]);
+  if (globalNames.has(name)) return true;
+  return false;
+}
 
 interface SurgeControlsProps {
   instrument: InstrumentConfig;
@@ -221,7 +252,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                       fmt={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}st`} />
                     {oscParams
                       .filter(p => !p.name.includes('Pitch') && !p.name.includes('Type'))
-                      .slice(0, 8)
                       .map(p => {
                         const shortName = p.name.replace(`${activeScene} Osc ${n} `, '');
                         return (
@@ -267,7 +297,6 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                         return !n.includes('frequency') && !n.includes('resonance') &&
                                !n.includes('env depth') && !n.includes('keytrack') && !n.includes('type');
                       })
-                      .slice(0, 4)
                       .map(p => {
                         const shortName = p.name.replace(new RegExp(`${activeScene} Filter \\d+ `), '');
                         return (
@@ -359,6 +388,17 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
             </div>
           </div>
         )}
+
+        {activeTab === 'other' && (
+          <SurgeOtherTab
+            allParams={allParams}
+            paramValues={paramValues}
+            setParam={setParam}
+            knobColor={knobColor}
+            accentColor={accentColor}
+            panelBg={panelBg}
+          />
+        )}
       </div>
     </div>
   );
@@ -414,7 +454,7 @@ const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
           {activeScene} - {currentLfoName}
         </h3>
         <div className="flex flex-wrap gap-3 justify-center">
-          {lfoParams.slice(0, 12).map(p => {
+          {lfoParams.map(p => {
             const shortName = p.name.replace(`${prefix} `, '');
             return (
               <Knob
@@ -477,7 +517,7 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
           Effects
         </h3>
         <div className="flex flex-wrap gap-3 justify-center">
-          {fxParams.slice(0, 40).map(p => (
+          {fxParams.map(p => (
             <Knob
               key={p.id}
               label={p.name.replace('FX ', '').substring(0, 10)}
@@ -503,12 +543,83 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
             FX {slot}
           </h3>
           <div className="flex flex-wrap gap-3 justify-center">
-            {params.slice(0, 10).map(p => {
+            {params.map(p => {
               const shortName = p.name.replace(`${prefix} `, '');
               return (
                 <Knob
                   key={p.id}
                   label={shortName.length > 10 ? shortName.substring(0, 10) : shortName}
+                  value={paramValues.get(p.id) ?? p.defaultValue}
+                  min={p.min}
+                  max={p.max}
+                  defaultValue={p.defaultValue}
+                  onChange={(v) => setParam(p.id, v)}
+                  size="sm"
+                  color={knobColor}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
+
+// ============================================================================
+// Other (uncategorized) params tab
+// ============================================================================
+
+interface SurgeOtherTabProps {
+  allParams: VSTBridgeParam[];
+  paramValues: Map<number, number>;
+  setParam: (id: number, value: number) => void;
+  knobColor: string;
+  accentColor: string;
+  panelBg: string;
+}
+
+const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
+  allParams, paramValues, setParam, knobColor, accentColor, panelBg,
+}) => {
+  const uncategorized = allParams.filter(p => !isSurgeParamCategorized(p.name));
+
+  if (uncategorized.length === 0) {
+    return (
+      <div className={`p-4 rounded-xl border ${panelBg}`}>
+        <p className="text-sm text-gray-500">All parameters are shown in the categorized tabs.</p>
+      </div>
+    );
+  }
+
+  // Group by first word(s) in the param name
+  const groups = new Map<string, VSTBridgeParam[]>();
+  for (const p of uncategorized) {
+    const words = p.name.split(' ');
+    const prefix = words.length > 2 ? words.slice(0, 2).join(' ') : words[0];
+    if (!groups.has(prefix)) groups.set(prefix, []);
+    groups.get(prefix)!.push(p);
+  }
+
+  return (
+    <>
+      <div className={`p-3 rounded-lg border ${panelBg}`}>
+        <p className="text-xs text-gray-500 mb-1">
+          {uncategorized.length} additional parameters not shown in other tabs
+        </p>
+      </div>
+      {Array.from(groups.entries()).map(([prefix, params]) => (
+        <div key={prefix} className={`p-4 rounded-xl border ${panelBg}`}>
+          <h3 className="font-bold uppercase tracking-tight text-sm mb-3" style={{ color: accentColor }}>
+            {prefix}
+          </h3>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {params.map(p => {
+              const shortLabel = p.name.replace(`${prefix} `, '');
+              return (
+                <Knob
+                  key={p.id}
+                  label={shortLabel.length > 12 ? shortLabel.substring(0, 12) : shortLabel}
                   value={paramValues.get(p.id) ?? p.defaultValue}
                   min={p.min}
                   max={p.max}

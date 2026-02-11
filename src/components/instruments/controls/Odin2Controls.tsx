@@ -197,8 +197,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 1</span>
-              <Knob label="Env Amt" value={params[P.FIL1_ENV_AMT]} min={-1} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_ENV_AMT, v)} size="sm" color={knobColor} bipolar />
+              <Knob label="Env Amt" value={params[P.FIL1_ENV_AMT]} min={0} max={1} defaultValue={0.5}
+                onChange={(v) => setParam(P.FIL1_ENV_AMT, v)} size="sm" color={knobColor}
+                formatValue={(v) => `${Math.round(v * 100)}%`} />
             </div>
             <div className="flex flex-wrap gap-1">
               {FILTER_TYPE_LABELS.map((label, i) => (
@@ -222,9 +223,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob label="Res" value={params[P.FIL1_RES]} min={0} max={1} defaultValue={0}
                 onChange={(v) => setParam(P.FIL1_RES, v)} size="sm" color={knobColor} />
-              <Knob label="Gain" value={params[P.FIL1_GAIN]} min={-12} max={12} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_GAIN, v)} size="sm" color={knobColor} bipolar
-                formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`} />
+              <Knob label="Gain" value={params[P.FIL1_GAIN]} min={0} max={2} defaultValue={1}
+                onChange={(v) => setParam(P.FIL1_GAIN, v)} size="sm" color={knobColor}
+                formatValue={(v) => `x${v.toFixed(2)}`} />
             </div>
             {/* Source routing */}
             <div className="flex gap-1 justify-center">
@@ -252,8 +253,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 2</span>
-              <Knob label="Env Amt" value={params[P.FIL2_ENV_AMT]} min={-1} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_ENV_AMT, v)} size="sm" color={knobColor} bipolar />
+              <Knob label="Env Amt" value={params[P.FIL2_ENV_AMT]} min={0} max={1} defaultValue={0}
+                onChange={(v) => setParam(P.FIL2_ENV_AMT, v)} size="sm" color={knobColor}
+                formatValue={(v) => `${Math.round(v * 100)}%`} />
             </div>
             <div className="flex flex-wrap gap-1">
               {FILTER_TYPE_LABELS.map((label, i) => (
@@ -277,9 +279,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob label="Res" value={params[P.FIL2_RES]} min={0} max={1} defaultValue={0}
                 onChange={(v) => setParam(P.FIL2_RES, v)} size="sm" color={knobColor} />
-              <Knob label="Gain" value={params[P.FIL2_GAIN]} min={-12} max={12} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_GAIN, v)} size="sm" color={knobColor} bipolar
-                formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`} />
+              <Knob label="Gain" value={params[P.FIL2_GAIN]} min={0} max={2} defaultValue={1}
+                onChange={(v) => setParam(P.FIL2_GAIN, v)} size="sm" color={knobColor}
+                formatValue={(v) => `x${v.toFixed(2)}`} />
             </div>
             {/* Source routing — includes Fil1 cascade */}
             <div className="flex gap-1 justify-center">
