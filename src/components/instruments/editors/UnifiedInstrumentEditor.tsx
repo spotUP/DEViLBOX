@@ -104,7 +104,7 @@ function isSpaceLaserType(synthType: SynthType): boolean {
 
 /** Check if synth type is V2 */
 function isV2Type(synthType: SynthType): boolean {
-  return synthType === 'V2';
+  return synthType === 'V2' || synthType === 'V2Speech';
 }
 
 /** Check if synth type is Synare */
@@ -812,7 +812,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // V2 SYNTH EDITOR
   // ============================================================================
   if (editorMode === 'v2') {
-    if (instrument.v2Speech) {
+    if (instrument.v2Speech || instrument.synthType === 'V2Speech') {
       const accentColor = isCyanTheme ? '#00ffff' : '#ffaa00';
       const headerBg = isCyanTheme
         ? 'bg-[#041010] border-b-2 border-cyan-500'
