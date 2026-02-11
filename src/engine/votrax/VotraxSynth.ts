@@ -17,19 +17,9 @@ const VotraxParam = {
   STEREO_WIDTH: 6,
 } as const;
 
-/**
- * Votrax SC-01 Phoneme codes (64 phonemes)
- */
-export const VotraxPhoneme = {
-  EH3: 0, EH2: 1, EH1: 2, PA0: 3, DT: 4, A1: 5, A2: 6, ZH: 7,
-  AH2: 8, I3: 9, I2: 10, I1: 11, M: 12, N: 13, B: 14, V: 15,
-  CH: 16, SH: 17, Z: 18, AW1: 19, NG: 20, AH1: 21, OO1: 22, OO: 23,
-  L: 24, K: 25, J: 26, H: 27, G: 28, F: 29, D: 30, S: 31,
-  A: 32, AY: 33, Y1: 34, UH3: 35, AH: 36, P: 37, O: 38, I: 39,
-  U: 40, Y: 41, T: 42, R: 43, E: 44, W: 45, AE: 46, AE1: 47,
-  AW2: 48, UH2: 49, UH1: 50, UH: 51, O2: 52, O1: 53, IU: 54, U1: 55,
-  THV: 56, TH: 57, ER: 58, EH: 59, E1: 60, AW: 61, PA1: 62, STOP: 63,
-} as const;
+// VotraxPhoneme is imported from votraxPhonemeMap to avoid circular dependencies
+// Re-export for consumers that imported it from here
+export { VotraxPhoneme } from '@engine/speech/votraxPhonemeMap';
 
 /**
  * Votrax SC-01 Synthesizer - Formant Speech Synthesizer (WASM)
