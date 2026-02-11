@@ -1035,6 +1035,8 @@ export function buildNKSPages(parameters: NKSParameter[]): NKSPage[] {
   const pageMap = new Map<number, NKSParameter[]>();
 
   for (const param of parameters) {
+    // Skip non-automatable params (e.g. sampler.baseUrl) — they aren't knob-mappable
+    if (param.isAutomatable === false) continue;
     if (!pageMap.has(param.page)) {
       pageMap.set(param.page, []);
     }

@@ -3,7 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type TMS5220Frame, phonemesToTMS5220Frames } from '@engine/speech/tms5220PhonemeMap';
-import { type LPCFrame, scanVSMForWords, type VSMWord } from '@engine/speech/VSMROMParser';
+import { type LPCFrame, scanVSMForWords, buildWordTableFromMCU, type VSMWord } from '@engine/speech/VSMROMParser';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
@@ -100,9 +100,21 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private async _loadROMs(): Promise<void> {
     try {
       this._romData = await loadTMS5220ROMs();
-      this._romWords = scanVSMForWords(this._romData);
+
+      // Try to build word table from MCU ROM address table (accurate)
+      try {
+        const mcuResponse = await fetch('/roms/snspell/tmc0271h-n2l');
+        const mcuBuffer = await mcuResponse.arrayBuffer();
+        this._romWords = buildWordTableFromMCU(new Uint8Array(mcuBuffer), this._romData);
+        console.log(`[TMS5220] Built word table from MCU ROM: ${this._romWords.length} words`);
+      } catch {
+        // Fall back to heuristic scanning
+        this._romWords = scanVSMForWords(this._romData);
+        console.log(`[TMS5220] Heuristic scan: ${this._romWords.length} words found`);
+      }
+
       this._romLoaded = true;
-      console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} words found`);
+      console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} named words`);
     } catch (e) {
       console.log('[TMS5220] VSM ROMs not available (optional for text-to-speech)');
     }
@@ -131,6 +143,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: 25, // 25ms per TMS5220 frame (200 samples at 8kHz)
     }));
 
+    // Activate a voice so WASM processes parameter changes
+    this.writeKeyOn(60, 0.8);
+
     this._romSequencer = new SpeechSequencer<LPCFrame>(
       (frame) => {
         if (frame.energy === 0) return; // Silent frame
@@ -145,7 +160,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
         this.setNoiseMode(frame.unvoiced);
         this.setEnergy(frame.energy);
       },
-      () => { this._romSequencer = null; }
+      () => {
+        this._romSequencer = null;
+        this.writeKeyOff();
+      }
     );
     this._romSequencer.speak(speechFrames);
   }
@@ -256,6 +274,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
     const phonemeStr = textToPhonemes(text);
     if (!phonemeStr) return;
+    console.log(`[TMS5220] speakText phonemes: "${phonemeStr}"`);
 
     const tokens = parsePhonemeString(phonemeStr);
     const frames = phonemesToTMS5220Frames(tokens);
@@ -266,6 +285,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: f.durationMs,
     }));
 
+    // Activate a voice so WASM processes parameter changes
+    this.writeKeyOn(60, 0.8);
+
     this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
       (frame) => {
         // Set K1/K2/K3 formants
@@ -275,13 +297,17 @@ export class TMS5220Synth extends MAMEBaseSynth {
         // Set energy
         this.setEnergy(frame.energy);
       },
-      () => { this._speechSequencer = null; }
+      () => {
+        this._speechSequencer = null;
+        this.writeKeyOff();
+      }
     );
     this._speechSequencer.speak(speechFrames);
   }
 
   /** Stop current text-to-speech or ROM playback */
   stopSpeaking(): void {
+    const wasSpeaking = this._speechSequencer !== null || this._romSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
@@ -290,6 +316,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       this._romSequencer.stop();
       this._romSequencer = null;
     }
+    if (wasSpeaking) this.writeKeyOff();
   }
 
   /** Whether text-to-speech or ROM playback is currently playing */

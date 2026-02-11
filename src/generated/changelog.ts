@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T21:26:14.041Z
+ * Generated: 2026-02-11T21:59:08.566Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '413';
-export const BUILD_HASH = '2f208bd';
+export const BUILD_NUMBER = '416';
+export const BUILD_HASH = '659ca4b';
 export const BUILD_DATE = '2026-02-11';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Use stored type instead of minified constructor name for stale instrument check"
+      },
+      {
+        type: 'fix',
+        "description": "Break circular import between VotraxSynth and votraxPhonemeMap"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent stale preview instrument causing double-trigger on MIDI playback"
+      },
       {
         type: 'feature',
         "description": "Split WAM plugins into effects and synths, add effect search, fix bugs"
@@ -216,18 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add BPM sync controls, genre presets, and enhanced visual editors"
-      },
-      {
-        type: 'improvement',
-        "description": "Decouple synth engines from Tone.js and expand audio architecture"
-      },
-      {
-        type: 'feature',
-        "description": "Update editors, presets, tracker, and DB303 controls"
-      },
-      {
-        type: 'feature',
-        "description": "Improve import/export engine and song parser"
       }
     ]
   }

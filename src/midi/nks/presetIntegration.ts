@@ -211,7 +211,7 @@ export function instrumentConfigToNKSPreset(
   const nksInfo = getNKSTypeForSynth(synthType, options?.category);
 
   // Use explicit tags if provided, otherwise use taxonomy defaults
-  const finalTypes = types.length > 0 ? types : [nksInfo.type];
+  const finalTypes = types.length > 0 ? types.map(t => [t]) : [[nksInfo.type]];
   const finalModes = modes.length > 0 ? modes : nksInfo.characters;
 
   const metadata: NKSPresetMetadata = {

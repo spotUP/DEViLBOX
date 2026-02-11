@@ -1831,6 +1831,16 @@ export class ToneEngine {
       return; // Audio context not ready
     }
 
+    // Diagnostic: log all instrument instances for this ID
+    const allKeysForId: string[] = [];
+    this.instruments.forEach((_inst, k) => {
+      const [idPart] = k.split('-');
+      if (idPart === String(instrumentId)) allKeysForId.push(k);
+    });
+    if (allKeysForId.length > 1) {
+      console.warn(`[ToneEngine] MULTIPLE instances for instrument ${instrumentId}:`, allKeysForId);
+    }
+
     try {
       // Handle TB-303 with JC303 or DB303 engine (both support accent/slide)
       if (instrument instanceof JC303Synth) {

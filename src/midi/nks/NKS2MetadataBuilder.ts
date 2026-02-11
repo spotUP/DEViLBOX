@@ -12,12 +12,10 @@
 import type {
   NKS2SynthProfile,
   NKS2Parameter,
-  NKS2PDI,
   NKS2PDIType,
   NKS2PDIStyle,
   NKS2PerformanceSection,
   NKS2EditGroup,
-  NKS2EditSection,
   NKSParameter,
 } from './types';
 import { NKS_CONSTANTS } from './types';
@@ -207,7 +205,7 @@ function buildMetadataGroup(group: NKS2EditGroup): NKS2MetadataGroup {
  */
 export function buildNKS2MetadataFromNKS1(
   parameters: NKSParameter[],
-  synthType: string,
+  _synthType: string,
 ): NKS2Metadata {
   // Build PDI entries
   const pdi: NKS2MetadataPDI[] = parameters.map((param, index) => {
@@ -244,7 +242,7 @@ export function buildNKS2MetadataFromNKS1(
     pageGroups.get(param.page)!.push(param);
   }
 
-  for (const [page, params] of pageGroups) {
+  for (const [_page, params] of pageGroups) {
     // Group by section within page
     const sectionNames = [...new Set(params.map(p => String(p.section)))];
     for (const sectionName of sectionNames) {
