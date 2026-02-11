@@ -1,21 +1,48 @@
 /**
  * NKS (Native Kontrol Standard) Integration
  *
- * Complete implementation of Native Instruments' NKS specification
+ * Complete implementation of Native Instruments' NKS/NKS2 specification v2.0.2
  */
 
+// Core types and constants
 export * from './types';
+
+// File format (RIFF/NIKS with msgpack)
 export * from './NKSFileFormat';
+export { msgpackEncode, msgpackDecode } from './msgpack';
+
+// Parameter maps and routing
 export * from './synthParameterMaps';
-export * from './NKSManager';
-export * from './NKSHIDProtocol';
-export * from './NKSHardwareController';
-export * from './presetIntegration';
 export * from './parameterRouter';
 export * from './autoParameterMap';
+
+// State management
+export * from './NKSManager';
+
+// Hardware integration
+export * from './NKSHIDProtocol';
+export * from './NKSHardwareController';
+
+// Preset integration and taxonomy
+export * from './presetIntegration';
 export * from './nksTaxonomy';
 
-// Convenience exports
+// Preview system
+export * from './NKSPreviewSystem';
+
+// Artwork and visual identity
+export * from './NKSArtwork';
+
+// Accessibility
+export * from './NKSAccessibility';
+
+// Deployment and registry
+export * from './NKSDeployment';
+
+// ============================================================================
+// Convenience re-exports
+// ============================================================================
+
 export { useNKSStore, getNKSManager } from './NKSManager';
 export {
   getNKSParametersForSynth,
@@ -26,12 +53,12 @@ export {
   DEXED_NKS_PARAMETERS,
   OBXD_NKS_PARAMETERS,
 } from './synthParameterMaps';
-export { parseNKSF, writeNKSF, loadNKSF, downloadNKSF } from './NKSFileFormat';
+export { parseNKSF, writeNKSF, loadNKSF, downloadNKSF, verifyNKSF } from './NKSFileFormat';
 export { getNKSHardwareController, isNKSHardwareAvailable } from './NKSHardwareController';
-export { 
-  isHIDSupported, 
-  getPairedDevices, 
-  NI_VENDOR_ID, 
+export {
+  isHIDSupported,
+  getPairedDevices,
+  NI_VENDOR_ID,
   AKAI_VENDOR_ID,
   ARTURIA_VENDOR_ID,
   NEKTAR_VENDOR_ID,
@@ -39,7 +66,7 @@ export {
   STUDIOLOGIC_VENDOR_ID,
   ICON_VENDOR_ID,
   ALESIS_VENDOR_ID,
-  NI_PRODUCT_IDS, 
+  NI_PRODUCT_IDS,
   AKAI_PRODUCT_IDS,
   ARTURIA_PRODUCT_IDS,
   NEKTAR_PRODUCT_IDS,
@@ -47,5 +74,36 @@ export {
   STUDIOLOGIC_PRODUCT_IDS,
   ICON_PRODUCT_IDS,
   ALESIS_PRODUCT_IDS,
-  NKS_BUTTONS 
+  NKS_BUTTONS,
 } from './NKSHIDProtocol';
+export {
+  generatePreview,
+  generatePreviewFromBuffer,
+  isPreviewGenerationSupported,
+  getPreviewFilename,
+  downloadPreview,
+} from './NKSPreviewSystem';
+export {
+  NKS_ARTWORK_SPECS,
+  DEVILBOX_ARTWORK,
+  DEVILBOX_RESOURCES,
+  getControlColor,
+  getDeploymentManifest,
+  validateArtworkAsset,
+} from './NKSArtwork';
+export {
+  setAccessibilityEnabled,
+  isAccessibilityEnabled,
+  speak,
+  announceParameter,
+  announceParameterChange,
+  getAriaAttributes,
+} from './NKSAccessibility';
+export {
+  generateServiceCenterXML,
+  generateWindowsRegistry,
+  generateMacOSPlist,
+  getDefaultDeploymentConfig,
+  generateDeploymentManifest,
+  incrementContentVersion,
+} from './NKSDeployment';

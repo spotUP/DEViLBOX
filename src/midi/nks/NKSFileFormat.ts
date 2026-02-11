@@ -1,130 +1,187 @@
 /**
  * NKS File Format Parser/Writer
- * 
- * Handles .nksf preset file format:
- * - Binary chunk-based format (similar to RIFF/IFF)
- * - Contains metadata, parameter values, and plugin state
- * - Compatible with NI Komplete Kontrol and Maschine
+ *
+ * Implements the official NKSF preset file format per NKS SDK v2.0.2 Section 17:
+ * - RIFF container with "NIKS" form type
+ * - msgpack-encoded chunks (NISI, NICA, PLID)
+ * - Raw binary PCHK chunk for plugin state
+ * - 2-byte word alignment per RIFF spec
  */
 
 import type { NKSPreset, NKSPresetMetadata } from './types';
 import { NKS_CONSTANTS } from './types';
+import { msgpackEncode, msgpackDecode } from './msgpack';
+
+// RIFF FOURCC constants (ASCII encoded as big-endian uint32)
+const FOURCC_RIFF = 0x52494646; // "RIFF"
+const FOURCC_NIKS = 0x4E494B53; // "NIKS"
+const FOURCC_NISI = 0x4E495349; // "NISI" - NI Sound Info
+const FOURCC_NICA = 0x4E494341; // "NICA" - NI Controller Assignments
+const FOURCC_PCHK = 0x5043484B; // "PCHK" - Plugin Data Chunk
+const FOURCC_PLID = 0x504C4944; // "PLID" - Plugin Info
+
+// Chunk versions per spec
+const CHUNK_VERSION = 1;
+
+/** NICA parameter assignment (per NKS spec Section 17.10) */
+interface NICAssignment {
+  id?: number;       // Plugin parameter ID (omit for unassigned encoder)
+  name: string;      // Display name
+  section?: string;  // Section label (starts a new section on display)
+  autoname?: boolean; // Use plugin-reported name instead
+  vflag?: boolean;   // Show value instead of name on display
+}
+
+// ============================================================================
+// Parser
+// ============================================================================
 
 /**
- * Parse .nksf preset file
+ * Parse .nksf preset file (RIFF/NIKS format)
+ * Also supports legacy DEViLBOX format for backward compatibility.
  */
 export async function parseNKSF(buffer: ArrayBuffer): Promise<NKSPreset> {
   const view = new DataView(buffer);
+  const firstFourCC = view.getUint32(0, false);
+
+  // Check if this is a proper RIFF/NIKS file or legacy DEViLBOX format
+  if (firstFourCC === FOURCC_RIFF) {
+    return parseRIFFNKSF(buffer);
+  } else if (firstFourCC === NKS_CONSTANTS.MAGIC_NKSF) {
+    return parseLegacyNKSF(buffer);
+  } else {
+    throw new Error('Invalid NKSF file: unrecognized header');
+  }
+}
+
+/**
+ * Parse official RIFF/NIKS format per NKS SDK spec
+ */
+function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
+  const view = new DataView(buffer);
   let offset = 0;
 
-  // Verify NKSF magic header
-  const magic = view.getUint32(offset, false);
-  if (magic !== NKS_CONSTANTS.MAGIC_NKSF) {
-    throw new Error('Invalid NKSF file: missing magic header');
-  }
+  // File header: RIFF(4) + fileSize(4 LE) + NIKS(4)
+  const riffMagic = view.getUint32(offset, false);
+  if (riffMagic !== FOURCC_RIFF) throw new Error('Invalid RIFF header');
   offset += 4;
 
-  // Read version
-  const versionMajor = view.getUint16(offset, false);
-  const versionMinor = view.getUint16(offset + 2, false);
+  const fileSize = view.getUint32(offset, true); // LE per RIFF spec
   offset += 4;
-  
-  console.log(`[NKS] Parsing NKSF v${versionMajor}.${versionMinor}`);
+
+  const formType = view.getUint32(offset, false);
+  if (formType !== FOURCC_NIKS) throw new Error('Invalid NIKS form type');
+  offset += 4;
 
   const metadata: Partial<NKSPresetMetadata> = {
     vendor: NKS_CONSTANTS.VENDOR_ID,
     uuid: NKS_CONSTANTS.PLUGIN_UUID,
-    version: `${versionMajor}.${versionMinor}`,
+    version: '1.0',
   };
-  
   const parameters: Record<string, number> = {};
   let pluginBlob: ArrayBuffer | undefined;
+  let controllerAssignments: NICAssignment[][] | undefined;
 
-  // Read chunks until end of file
-  while (offset < buffer.byteLength) {
-    // Read chunk header
+  // Parse RIFF chunks
+  const endOffset = Math.min(8 + fileSize, buffer.byteLength);
+  while (offset + 8 <= endOffset) {
     const chunkId = view.getUint32(offset, false);
-    const chunkSize = view.getUint32(offset + 4, true);  // Little-endian
+    const chunkSize = view.getUint32(offset + 4, true); // LE
     offset += 8;
 
-    const chunkStart = offset;
-    const chunkEnd = offset + chunkSize;
-
-    console.log(`[NKS] Chunk: 0x${chunkId.toString(16)}, size: ${chunkSize}`);
+    // Each NI chunk has a version uint32 after the standard RIFF header
+    const chunkDataStart = offset;
+    const chunkDataEnd = offset + chunkSize;
 
     switch (chunkId) {
-      case NKS_CONSTANTS.MAGIC_NISI: {
-        // NI Sound Info chunk - metadata
-        const metaStr = readString(new Uint8Array(buffer, chunkStart, chunkSize));
+      case FOURCC_NISI: {
+        // NI Sound Info - msgpack MAP
+        const chunkVersion = view.getUint32(offset, true);
+        const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
         try {
-          const metaJson = JSON.parse(metaStr);
-          Object.assign(metadata, metaJson);
+          const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
+          if (decoded.name) metadata.name = String(decoded.name);
+          if (decoded.vendor) metadata.vendor = String(decoded.vendor);
+          if (decoded.author) metadata.author = String(decoded.author);
+          if (decoded.comment) metadata.comment = String(decoded.comment);
+          if (decoded.deviceType) metadata.deviceType = String(decoded.deviceType);
+          if (decoded.UUID) metadata.uuid = String(decoded.UUID);
+          if (Array.isArray(decoded.bankchain)) {
+            metadata.bankChain = decoded.bankchain.map(String);
+          }
+          if (Array.isArray(decoded.types)) {
+            // types is [[type, subtype], ...]
+            metadata.types = (decoded.types as string[][]).map(
+              pair => Array.isArray(pair) ? pair.map(String) : [String(pair)]
+            ).flat();
+          }
+          if (Array.isArray(decoded.Character)) {
+            metadata.modes = decoded.Character.map(String);
+          }
         } catch (e) {
-          console.warn('[NKS] Failed to parse NISI metadata:', e);
+          console.warn('[NKS] Failed to decode NISI chunk:', e);
         }
         break;
       }
 
-      case NKS_CONSTANTS.MAGIC_NIKA: {
-        // NI Kontrol Automation chunk - parameter values
-        // Supports two formats:
-        // 1. DEViLBOX format: count(u32le) + [idLen(u8) + idStr + value(f32le)] x N
-        // 2. NI native format: count(u32le) + [paramIndex(u32le) + value(f32le)] x N
-        const paramView = new DataView(buffer, chunkStart, chunkSize);
-        let paramOffset = 0;
-
-        // Read parameter count
-        const paramCount = paramView.getUint32(paramOffset, true);
-        paramOffset += 4;
-
-        // Detect format: if first byte after count looks like a small string length (<128)
-        // it's probably our string-ID format. If it's a larger value, it's NI numeric format.
-        const firstByte = paramCount > 0 && paramOffset < chunkSize
-          ? paramView.getUint8(paramOffset) : 0;
-        const isStringFormat = firstByte > 0 && firstByte < 128 && (paramOffset + 1 + firstByte + 4) <= chunkSize;
-
-        if (isStringFormat) {
-          // DEViLBOX string-ID format
-          for (let i = 0; i < paramCount && paramOffset < chunkSize; i++) {
-            const idLength = paramView.getUint8(paramOffset);
-            paramOffset += 1;
-
-            const idBytes = new Uint8Array(buffer, chunkStart + paramOffset, idLength);
-            const paramId = new TextDecoder().decode(idBytes);
-            paramOffset += idLength;
-
-            const paramValue = paramView.getFloat32(paramOffset, true);
-            paramOffset += 4;
-
-            parameters[paramId] = paramValue;
+      case FOURCC_NICA: {
+        // NI Controller Assignments - msgpack MAP with "ni8" key
+        const chunkVersion = view.getUint32(offset, true);
+        const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
+        try {
+          const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
+          if (decoded.ni8 && Array.isArray(decoded.ni8)) {
+            controllerAssignments = decoded.ni8 as NICAssignment[][];
+            // Extract parameter values from assignments
+            for (const page of controllerAssignments) {
+              if (!Array.isArray(page)) continue;
+              for (const assignment of page) {
+                if (assignment && typeof assignment === 'object' && 'id' in assignment) {
+                  // Store with numeric index as key
+                  parameters[`param.${assignment.id}`] = 0; // Value comes from PCHK
+                }
+              }
+            }
           }
-        } else {
-          // NI native numeric-index format
-          for (let i = 0; i < paramCount && paramOffset + 8 <= chunkSize; i++) {
-            const paramIndex = paramView.getUint32(paramOffset, true);
-            paramOffset += 4;
-
-            const paramValue = paramView.getFloat32(paramOffset, true);
-            paramOffset += 4;
-
-            // Store with numeric index as string key
-            parameters[`param.${paramIndex}`] = paramValue;
-          }
+        } catch (e) {
+          console.warn('[NKS] Failed to decode NICA chunk:', e);
         }
         break;
       }
 
-      case NKS_CONSTANTS.MAGIC_PLUG: {
-        // Plugin state blob - raw plugin data
-        pluginBlob = buffer.slice(chunkStart, chunkEnd);
+      case FOURCC_PLID: {
+        // Plugin Info - msgpack MAP with VST.magic or VST3.uid
+        const chunkVersion = view.getUint32(offset, true);
+        const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
+        try {
+          const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
+          // Store plugin ID info in metadata for round-trip
+          if (decoded['VST.magic']) {
+            (metadata as Record<string, unknown>)['vstMagic'] = decoded['VST.magic'];
+          }
+          if (decoded['VST3.uid']) {
+            (metadata as Record<string, unknown>)['vst3Uid'] = decoded['VST3.uid'];
+          }
+        } catch (e) {
+          console.warn('[NKS] Failed to decode PLID chunk:', e);
+        }
+        break;
+      }
+
+      case FOURCC_PCHK: {
+        // Plugin Data - raw bytes (no msgpack)
+        const chunkVersion = view.getUint32(offset, true);
+        pluginBlob = buffer.slice(offset + 4, chunkDataEnd);
         break;
       }
 
       default:
-        console.warn(`[NKS] Unknown chunk: 0x${chunkId.toString(16)}`);
+        console.warn(`[NKS] Unknown RIFF chunk: "${fourccToString(chunkId)}"`);
     }
 
-    offset = chunkEnd;
+    // Advance to next chunk (aligned to 2-byte boundary per RIFF spec)
+    offset = chunkDataEnd;
+    if (offset % 2 !== 0) offset++;
   }
 
   return {
@@ -135,102 +192,313 @@ export async function parseNKSF(buffer: ArrayBuffer): Promise<NKSPreset> {
 }
 
 /**
- * Write .nksf preset file
+ * Parse legacy DEViLBOX format (pre-RIFF) for backward compatibility
+ */
+function parseLegacyNKSF(buffer: ArrayBuffer): NKSPreset {
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  // Skip NKSF magic + version
+  offset += 8;
+
+  const metadata: Partial<NKSPresetMetadata> = {
+    vendor: NKS_CONSTANTS.VENDOR_ID,
+    uuid: NKS_CONSTANTS.PLUGIN_UUID,
+    version: '1.0',
+  };
+  const parameters: Record<string, number> = {};
+  let pluginBlob: ArrayBuffer | undefined;
+
+  while (offset < buffer.byteLength) {
+    const chunkId = view.getUint32(offset, false);
+    const chunkSize = view.getUint32(offset + 4, true);
+    offset += 8;
+    const chunkStart = offset;
+
+    switch (chunkId) {
+      case NKS_CONSTANTS.MAGIC_NISI: {
+        const metaStr = readNullTermString(new Uint8Array(buffer, chunkStart, chunkSize));
+        try {
+          Object.assign(metadata, JSON.parse(metaStr));
+        } catch (e) {
+          console.warn('[NKS] Failed to parse legacy NISI:', e);
+        }
+        break;
+      }
+
+      case NKS_CONSTANTS.MAGIC_NIKA: {
+        const paramView = new DataView(buffer, chunkStart, chunkSize);
+        let po = 0;
+        const paramCount = paramView.getUint32(po, true);
+        po += 4;
+
+        const firstByte = paramCount > 0 && po < chunkSize ? paramView.getUint8(po) : 0;
+        const isStringFormat = firstByte > 0 && firstByte < 128 && (po + 1 + firstByte + 4) <= chunkSize;
+
+        if (isStringFormat) {
+          for (let i = 0; i < paramCount && po < chunkSize; i++) {
+            const idLength = paramView.getUint8(po); po += 1;
+            const idBytes = new Uint8Array(buffer, chunkStart + po, idLength);
+            const paramId = new TextDecoder().decode(idBytes);
+            po += idLength;
+            parameters[paramId] = paramView.getFloat32(po, true);
+            po += 4;
+          }
+        } else {
+          for (let i = 0; i < paramCount && po + 8 <= chunkSize; i++) {
+            const paramIndex = paramView.getUint32(po, true); po += 4;
+            parameters[`param.${paramIndex}`] = paramView.getFloat32(po, true); po += 4;
+          }
+        }
+        break;
+      }
+
+      case NKS_CONSTANTS.MAGIC_PLUG: {
+        pluginBlob = buffer.slice(chunkStart, chunkStart + chunkSize);
+        break;
+      }
+    }
+
+    offset = chunkStart + chunkSize;
+  }
+
+  return { metadata: metadata as NKSPresetMetadata, parameters, blob: pluginBlob };
+}
+
+// ============================================================================
+// Writer
+// ============================================================================
+
+/**
+ * Write .nksf preset file in official RIFF/NIKS format
  */
 export function writeNKSF(preset: NKSPreset): ArrayBuffer {
   const chunks: ArrayBuffer[] = [];
 
-  // NISI chunk - metadata (ensure NKS2 required fields are present)
-  const nisiData = {
-    ...preset.metadata,
-    // NKS2 requires types array
-    types: preset.metadata.types || [],
-    // NKS2 character tags stored in modes
-    modes: preset.metadata.modes || [],
-  };
-  const metaJson = JSON.stringify(nisiData);
-  const metaBytes = new TextEncoder().encode(metaJson);
-  chunks.push(createChunk(NKS_CONSTANTS.MAGIC_NISI, metaBytes.buffer));
+  // PLID chunk - Plugin Info
+  const plidData = buildPLIDChunk(preset.metadata);
+  chunks.push(plidData);
 
-  // NIKA chunk - parameter values
-  const paramEntries = Object.entries(preset.parameters);
-  const paramBufferSize = 4 + paramEntries.reduce((sum, [id]) => sum + 1 + id.length + 4, 0);
-  const paramBuffer = new ArrayBuffer(paramBufferSize);
-  const paramView = new DataView(paramBuffer);
-  let paramOffset = 0;
+  // NISI chunk - Sound Info (msgpack)
+  const nisiData = buildNISIChunk(preset.metadata);
+  chunks.push(nisiData);
 
-  // Write parameter count
-  paramView.setUint32(paramOffset, paramEntries.length, true);
-  paramOffset += 4;
+  // NICA chunk - Controller Assignments (msgpack)
+  const nicaData = buildNICAChunk(preset);
+  chunks.push(nicaData);
 
-  // Write each parameter
-  for (const [id, value] of paramEntries) {
-    const idBytes = new TextEncoder().encode(id);
-    paramView.setUint8(paramOffset, idBytes.length);
-    paramOffset += 1;
-    
-    new Uint8Array(paramBuffer, paramOffset, idBytes.length).set(idBytes);
-    paramOffset += idBytes.length;
-    
-    paramView.setFloat32(paramOffset, value, true);
-    paramOffset += 4;
-  }
-
-  chunks.push(createChunk(NKS_CONSTANTS.MAGIC_NIKA, paramBuffer));
-
-  // PLUG chunk - plugin state blob (optional)
+  // PCHK chunk - Plugin Data (raw bytes)
   if (preset.blob) {
-    chunks.push(createChunk(NKS_CONSTANTS.MAGIC_PLUG, preset.blob));
+    const pchkData = buildPCHKChunk(preset.blob);
+    chunks.push(pchkData);
   }
 
-  // Calculate total size
-  const totalSize = 8 + chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  // Calculate total RIFF file size (excludes the 8 bytes for "RIFF" + size)
+  const contentSize = 4 + chunks.reduce((sum, chunk) => {
+    // Each chunk may have padding byte for 2-byte alignment
+    const paddedSize = chunk.byteLength + (chunk.byteLength % 2);
+    return sum + paddedSize;
+  }, 0);
+
+  // Build final RIFF file
+  const totalSize = 8 + contentSize; // RIFF(4) + size(4) + content
   const buffer = new ArrayBuffer(totalSize);
   const view = new DataView(buffer);
   let offset = 0;
 
-  // Write NKSF header
-  view.setUint32(offset, NKS_CONSTANTS.MAGIC_NKSF, false);
-  offset += 4;
-  
-  view.setUint16(offset, NKS_CONSTANTS.VERSION_MAJOR, false);
-  view.setUint16(offset + 2, NKS_CONSTANTS.VERSION_MINOR, false);
-  offset += 4;
+  // RIFF header
+  view.setUint32(offset, FOURCC_RIFF, false); offset += 4;
+  view.setUint32(offset, contentSize, true);   offset += 4; // LE
+  view.setUint32(offset, FOURCC_NIKS, false);  offset += 4;
 
-  // Write chunks
+  // Write chunks with padding
   for (const chunk of chunks) {
     new Uint8Array(buffer, offset, chunk.byteLength).set(new Uint8Array(chunk));
     offset += chunk.byteLength;
+    // Pad to 2-byte boundary
+    if (offset % 2 !== 0) {
+      view.setUint8(offset, 0);
+      offset++;
+    }
   }
 
   return buffer;
 }
 
 /**
- * Create a chunk with header
+ * Build PLID chunk (Plugin Info)
+ * Contains msgpack MAP with VST.magic or VST3.uid
  */
-function createChunk(id: number, data: ArrayBuffer): ArrayBuffer {
-  const buffer = new ArrayBuffer(8 + data.byteLength);
-  const view = new DataView(buffer);
-  
-  view.setUint32(0, id, false);
-  view.setUint32(4, data.byteLength, true);
-  
-  new Uint8Array(buffer, 8, data.byteLength).set(new Uint8Array(data));
-  
-  return buffer;
+function buildPLIDChunk(metadata: NKSPresetMetadata): ArrayBuffer {
+  const pluginInfo: Record<string, unknown> = {};
+
+  // Use stored VST identifiers if available, otherwise use DEViLBOX defaults
+  const meta = metadata as Record<string, unknown>;
+  if (meta.vstMagic) {
+    pluginInfo['VST.magic'] = meta.vstMagic;
+  }
+  if (meta.vst3Uid) {
+    pluginInfo['VST3.uid'] = meta.vst3Uid;
+  }
+
+  // Default: use UUID hash as VST magic for DEViLBOX presets
+  if (!pluginInfo['VST.magic'] && !pluginInfo['VST3.uid']) {
+    pluginInfo['VST.magic'] = hashStringToInt32(metadata.uuid || NKS_CONSTANTS.PLUGIN_UUID);
+  }
+
+  const msgpackData = msgpackEncode(pluginInfo);
+  return buildRIFFChunk(FOURCC_PLID, CHUNK_VERSION, msgpackData);
 }
 
 /**
- * Read null-terminated or length-prefixed string
+ * Build NISI chunk (Sound Info)
+ * Contains msgpack MAP per NKS SDK Section 17.9
  */
-function readString(bytes: Uint8Array): string {
-  // Find null terminator
+function buildNISIChunk(metadata: NKSPresetMetadata): ArrayBuffer {
+  const nisi: Record<string, unknown> = {};
+
+  // Required fields
+  nisi.name = metadata.name || 'Untitled';
+  nisi.vendor = metadata.vendor || NKS_CONSTANTS.VENDOR_ID;
+  nisi.deviceType = metadata.deviceType || 'INST';
+  nisi.bankchain = metadata.bankChain || ['DEViLBOX'];
+
+  // Optional fields
+  if (metadata.author) nisi.author = metadata.author;
+  if (metadata.comment) nisi.comment = metadata.comment;
+  if (metadata.uuid) nisi.UUID = metadata.uuid;
+
+  // Types as [[type, subtype], ...] per spec
+  if (metadata.types && metadata.types.length > 0) {
+    // If types are flat strings, pair them as [type, subtype]
+    const typePairs: string[][] = [];
+    for (let i = 0; i < metadata.types.length; i += 2) {
+      if (i + 1 < metadata.types.length) {
+        typePairs.push([metadata.types[i], metadata.types[i + 1]]);
+      } else {
+        typePairs.push([metadata.types[i], '']);
+      }
+    }
+    nisi.types = typePairs;
+  }
+
+  // Character tags (stored in modes field internally)
+  if (metadata.modes && metadata.modes.length > 0) {
+    nisi.Character = metadata.modes;
+  }
+
+  const msgpackData = msgpackEncode(nisi);
+  return buildRIFFChunk(FOURCC_NISI, CHUNK_VERSION, msgpackData);
+}
+
+/**
+ * Build NICA chunk (Controller Assignments)
+ * Contains msgpack MAP with "ni8" key -> pages of 8 assignments
+ */
+function buildNICAChunk(preset: NKSPreset): ArrayBuffer {
+  const paramEntries = Object.entries(preset.parameters);
+
+  // Build pages of 8 assignments each
+  const pages: Record<string, unknown>[][] = [];
+  let currentPage: Record<string, unknown>[] = [];
+
+  for (let i = 0; i < paramEntries.length; i++) {
+    const [id, value] = paramEntries[i];
+
+    const assignment: Record<string, unknown> = {
+      name: id,
+    };
+
+    // If it's a numeric param ID, set the id field
+    if (id.startsWith('param.')) {
+      assignment.id = parseInt(id.replace('param.', ''), 10);
+    } else {
+      // For string IDs (DEViLBOX format), use index as numeric ID
+      assignment.id = i;
+    }
+
+    currentPage.push(assignment);
+
+    if (currentPage.length === 8) {
+      pages.push(currentPage);
+      currentPage = [];
+    }
+  }
+
+  // Pad last page to 8 entries
+  if (currentPage.length > 0) {
+    while (currentPage.length < 8) {
+      currentPage.push({ name: '' }); // Unassigned encoder (no id key)
+    }
+    pages.push(currentPage);
+  }
+
+  // If no parameters, create one empty page
+  if (pages.length === 0) {
+    pages.push(Array.from({ length: 8 }, () => ({ name: '' })));
+  }
+
+  const nica = { ni8: pages };
+  const msgpackData = msgpackEncode(nica);
+  return buildRIFFChunk(FOURCC_NICA, CHUNK_VERSION, msgpackData);
+}
+
+/**
+ * Build PCHK chunk (Plugin Data)
+ * Contains raw plugin state bytes (no msgpack)
+ */
+function buildPCHKChunk(blob: ArrayBuffer): ArrayBuffer {
+  return buildRIFFChunk(FOURCC_PCHK, CHUNK_VERSION, new Uint8Array(blob));
+}
+
+/**
+ * Build a RIFF chunk with FOURCC, size, version, and data
+ */
+function buildRIFFChunk(fourcc: number, version: number, data: Uint8Array): ArrayBuffer {
+  // FOURCC(4) + size(4) + version(4) + data(n)
+  const chunkSize = 4 + data.byteLength; // version(4) + data
+  const buffer = new ArrayBuffer(8 + chunkSize);
+  const view = new DataView(buffer);
+
+  view.setUint32(0, fourcc, false);       // FOURCC (big-endian)
+  view.setUint32(4, chunkSize, true);     // Chunk size (little-endian)
+  view.setUint32(8, version, true);       // Version (little-endian)
+
+  new Uint8Array(buffer, 12, data.byteLength).set(data);
+
+  return buffer;
+}
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+function fourccToString(fourcc: number): string {
+  return String.fromCharCode(
+    (fourcc >> 24) & 0xff,
+    (fourcc >> 16) & 0xff,
+    (fourcc >> 8) & 0xff,
+    fourcc & 0xff,
+  );
+}
+
+function readNullTermString(bytes: Uint8Array): string {
   let length = bytes.indexOf(0);
   if (length === -1) length = bytes.length;
-  
   return new TextDecoder().decode(bytes.subarray(0, length));
 }
+
+function hashStringToInt32(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return hash >>> 0; // Ensure positive
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
 
 /**
  * Generate plugin.json metadata file
@@ -242,22 +510,19 @@ export function generatePluginJson(
   numPages: number,
   deviceType: 'INST' | 'FX' = 'INST'
 ): string {
-  const pluginJson = {
+  return JSON.stringify({
     author,
     name,
     vendor: NKS_CONSTANTS.VENDOR_ID,
     version,
     uuid: NKS_CONSTANTS.PLUGIN_UUID,
-    url: 'https://github.com/yourusername/devilbox',
     short_name: name.substring(0, 16),
     description: `DEViLBOX ${name}`,
     ni_hw_integration: {
       device_type: deviceType,
       num_pages: numPages,
     },
-  };
-
-  return JSON.stringify(pluginJson, null, 2);
+  }, null, 2);
 }
 
 /**
@@ -267,12 +532,12 @@ export function downloadNKSF(preset: NKSPreset, filename?: string): void {
   const buffer = writeNKSF(preset);
   const blob = new Blob([buffer], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
-  
+
   const a = document.createElement('a');
   a.href = url;
   a.download = filename || `${preset.metadata.name || 'preset'}.nksf`;
   a.click();
-  
+
   URL.revokeObjectURL(url);
 }
 
@@ -282,4 +547,29 @@ export function downloadNKSF(preset: NKSPreset, filename?: string): void {
 export async function loadNKSF(file: File): Promise<NKSPreset> {
   const buffer = await file.arrayBuffer();
   return parseNKSF(buffer);
+}
+
+/**
+ * Verify NKSF file integrity by checking RIFF header
+ */
+export function verifyNKSF(buffer: ArrayBuffer): { valid: boolean; format: 'riff' | 'legacy' | 'invalid'; size: number } {
+  if (buffer.byteLength < 12) return { valid: false, format: 'invalid', size: buffer.byteLength };
+
+  const view = new DataView(buffer);
+  const first = view.getUint32(0, false);
+
+  if (first === FOURCC_RIFF) {
+    const formType = view.getUint32(8, false);
+    return {
+      valid: formType === FOURCC_NIKS,
+      format: 'riff',
+      size: buffer.byteLength,
+    };
+  }
+
+  if (first === NKS_CONSTANTS.MAGIC_NKSF) {
+    return { valid: true, format: 'legacy', size: buffer.byteLength };
+  }
+
+  return { valid: false, format: 'invalid', size: buffer.byteLength };
 }
