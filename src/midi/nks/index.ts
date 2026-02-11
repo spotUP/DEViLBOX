@@ -135,6 +135,9 @@ export {
 } from './NKS2MetadataBuilder';
 export {
   LEAP_KIT_TYPES,
+  LEAP_SAMPLE_TAXONOMY,
+  LEAP_SAMPLE_TYPES,
+  LEAP_CHARACTER_TAGS,
   LEAP_SAMPLE_SPEC,
   LEAP_MACRO_CONFIG,
   LEAP_BACKGROUND_SPEC,
@@ -142,6 +145,8 @@ export {
   LEAP_PREVIEW_SPEC,
   LEAP_EFFECTS_CHAIN,
   isValidLeapKitType,
+  isValidLeapSampleTag,
+  isValidLeapCharacterTag,
   formatLeapSampleName,
   parseLeapSampleName,
   createDefaultLeapMacros,

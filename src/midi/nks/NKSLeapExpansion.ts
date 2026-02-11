@@ -41,6 +41,147 @@ export function isValidLeapKitType(type: string): type is LeapKitType {
 }
 
 // ============================================================================
+// Sample Taxonomy (Leap SDK Section 7 - Complete)
+// ============================================================================
+
+/**
+ * Complete Leap sample Type/Sub-Type taxonomy.
+ * This is DIFFERENT from the NKS instrument taxonomy.
+ * Each entry includes whether it supports one-shots, loops, or both.
+ *
+ * Only officially listed tags are accepted — Leaps using other tags are
+ * rejected during encoding.
+ *
+ * Known bug: "Drums / Clap" auto-tags as "Percussion / Clap"
+ */
+export const LEAP_SAMPLE_TAXONOMY: Record<string, {
+  subTypes: string[];
+  oneShot: boolean;
+  loop: boolean;
+}> = {
+  'Bass': {
+    subTypes: ['Fingered', 'Fretless', 'Picked', 'Slapped', 'Synth', 'Upright'],
+    oneShot: true, loop: true,
+  },
+  'Bowed Strings': {
+    subTypes: ['Cello', 'Double Bass', 'Ensemble', 'Synth', 'Viola', 'Violin'],
+    oneShot: true, loop: true,
+  },
+  'Brass': {
+    subTypes: ['Ensemble', 'Flugelhorn', 'French Horn', 'Synth', 'Trombone', 'Trumpet', 'Tuba'],
+    oneShot: true, loop: true,
+  },
+  'Drums': {
+    subTypes: [
+      'Clap', 'Hi-Hat', 'Hi-Hat Pedal', 'Hi-Hat Closed', 'Hi-Hat Open',
+      'Ride Cymbal', 'Ride Bell', 'Splash Cymbal', 'China Cymbal', 'Clash Cymbal',
+      'Crash Cymbal', 'Finger Cymbal', 'Sizzle Cymbal',
+      'Kick', 'Snare', 'Snare Roll', 'Snare Brush', 'Snare Rimshot', 'Snare Side Stick',
+      'Tom', 'Shaker',
+    ],
+    oneShot: true, loop: true, // Hi-Hat is loops-only when used as loop
+  },
+  'Flute': {
+    subTypes: ['Concert', 'Didgeridoo', 'Ocarina', 'Pan Pipe', 'Piccolo', 'Recorder', 'Shakuhachi', 'Synth', 'Whistle'],
+    oneShot: true, loop: true,
+  },
+  'Guitar': {
+    subTypes: ['Acoustic', 'Classical', 'Electric', 'Dobro', 'Jazz', 'Lap', 'Lute', 'Pedal Steel', 'Slide'],
+    oneShot: true, loop: true,
+  },
+  'Mallet Instruments': {
+    subTypes: ['Chime', 'Glockenspiel', 'Gong', 'Marimba', 'Other', 'Vibraphone', 'Xylophone'],
+    oneShot: true, loop: true,
+  },
+  'Organ': {
+    subTypes: ['Accordion', 'Electric', 'Other', 'Pipe', 'Reed', 'Synth'],
+    oneShot: true, loop: true,
+  },
+  'Percussion': {
+    subTypes: [
+      'Agogo', 'Bell', 'Block', 'Bongo', 'Cajon', 'Castanets', 'Clave', 'Click',
+      'Conga', 'Cowbell', 'Darabuka', 'Djembe', 'Frame Drum', 'Gong', 'Guiro',
+      'Hand Drum', 'Kit', 'Mallet Drum', 'Other', 'Shaker', 'Small Metal', 'Snap',
+      'Steel Drum', 'Tabla', 'Taiko', 'Talking Drum', 'Tambourine', 'Timbale',
+      'Timpani', 'Triangle', 'Udu', 'Wood',
+    ],
+    oneShot: true, loop: true, // Kit is loops-only
+  },
+  'Piano / Keys': {
+    subTypes: ['Clavinet', 'Celesta', 'Toy Piano', 'Digital Piano', 'Electric Piano', 'Grand Piano', 'Harpsichord', 'Other', 'Upright Piano'],
+    oneShot: true, loop: true,
+  },
+  'Plucked Strings': {
+    subTypes: ['Banjo', 'Harp', 'Koto', 'Mandolin', 'Other', 'Oud', 'Sitar', 'Ukulele'],
+    oneShot: true, loop: true,
+  },
+  'Reed Instruments': {
+    subTypes: ['Bagpipes', 'Bassoon', 'Clarinet', 'Harmonica', 'Melodica', 'Oboe', 'Saxophone', 'Synth', 'Wind Ensemble'],
+    oneShot: true, loop: true,
+  },
+  'Sound Effects': {
+    subTypes: ['Big & Bad', 'Distortion', 'Field Recording', 'Foley', 'Machines', 'Metal', 'Nature', 'Noise', 'Orchestra', 'Other FX', 'Shots', 'Synth', 'Vinyl', 'Water'],
+    oneShot: true, loop: true,
+  },
+  'Soundscapes': {
+    subTypes: ['Ambivalent', 'Destructive', 'Gloomy', 'Heavenly', 'Hypnotizing', 'Insanity', 'Peaceful', 'Wind & Noise'],
+    oneShot: true, loop: true,
+  },
+  'Synth Lead': {
+    subTypes: ['Classic Mono', 'Classic Poly', 'Other', 'Soft', 'Sync', 'Vox'],
+    oneShot: true, loop: true,
+  },
+  'Synth Misc': {
+    subTypes: ['Classic', 'FX', 'Melodic Sequences', 'Other Sequences', 'Percussive', 'Sweeps & Swells'],
+    oneShot: true, loop: true,
+  },
+  'Synth Pad': {
+    subTypes: ['Basic', 'Chime', 'Other'],
+    oneShot: true, loop: true,
+  },
+  'Vocal': {
+    subTypes: ['Computer', 'Creature', 'Female Choir', 'Female Solo', 'Male Choir', 'Male Solo', 'Mixed Choir', 'Phoneme', 'Solo Voice', 'Synth Choir'],
+    oneShot: true, loop: true,
+  },
+};
+
+/** All valid Leap sample type names */
+export const LEAP_SAMPLE_TYPES = Object.keys(LEAP_SAMPLE_TAXONOMY) as string[];
+
+/**
+ * Validate a sample type/sub-type pair against the Leap taxonomy.
+ */
+export function isValidLeapSampleTag(type: string, subType?: string): boolean {
+  const entry = LEAP_SAMPLE_TAXONOMY[type];
+  if (!entry) return false;
+  if (!subType) return true;
+  return entry.subTypes.includes(subType);
+}
+
+/**
+ * Leap-specific character tags for samples.
+ * Slightly different from the main NKS instrument character tags.
+ */
+export const LEAP_CHARACTER_TAGS = [
+  'Acoustic', 'Additive', 'Airy', 'Analog', 'Arpeggiated', 'Bright',
+  'Chord', 'Clean', 'Dark', 'Deep', 'Digital', 'Dirty', 'Distorted',
+  'Dry', 'Electric', 'Evolving', 'Filtered', 'FM', 'Granular', 'Huge',
+  'Human', 'Layered', 'Lead', 'Lick', 'Lo-Fi', 'Long Release', 'Melodic',
+  'Metallic', 'Monophonic', 'Percussive', 'Physical Model', 'Processed',
+  'Riser', 'Sample-based', 'Stabs & Hits', 'Sub', 'Surround', 'Synthetic',
+  'Tempo-synced', 'Top', 'Vinyl', 'Vocoded', 'Wet',
+] as const;
+
+export type LeapCharacterTag = typeof LEAP_CHARACTER_TAGS[number];
+
+/**
+ * Validate a character tag against the Leap taxonomy.
+ */
+export function isValidLeapCharacterTag(tag: string): tag is LeapCharacterTag {
+  return (LEAP_CHARACTER_TAGS as readonly string[]).includes(tag);
+}
+
+// ============================================================================
 // Sample Specifications
 // ============================================================================
 
