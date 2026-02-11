@@ -852,9 +852,10 @@ export class ToneEngine {
     if (this.instruments.has(key)) {
       const cached = this.instruments.get(key);
       // Diagnostic: warn if cached instrument type doesn't match requested config
-      const cachedType = cached?.constructor?.name || 'unknown';
-      if (config.synthType === 'Sampler' && cachedType !== 'Sampler' && cachedType !== 'Player') {
-        console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} has ${cachedType} but config wants Sampler — dispose was missed!`);
+      // Use instrumentSynthTypes map (not constructor.name which gets minified by bundlers)
+      const storedType = this.instrumentSynthTypes.get(key);
+      if (config.synthType && storedType && storedType !== config.synthType && storedType !== 'Player') {
+        console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} stored as ${storedType} but config wants ${config.synthType} — dispose was missed!`);
       }
       return cached;
     }
