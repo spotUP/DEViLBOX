@@ -26,8 +26,8 @@ enum MelodicaParam {
 };
 
 static const char* PARAM_NAMES[PARAM_COUNT] = {
-    "Breath", "Brightness", "Vibrato Rate", "Vibrato Depth",
-    "Detune", "Noise", "Portamento", "Attack", "Release", "Volume"
+    "Tone:Breath", "Tone:Brightness", "Vibrato:Rate", "Vibrato:Depth",
+    "Tone:Detune", "Tone:Noise", "Play:Portamento", "Envelope:Attack", "Envelope:Release", "Master:Volume"
 };
 
 static const float PARAM_MINS[PARAM_COUNT] = {

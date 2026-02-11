@@ -59,8 +59,12 @@ export class ToneEngine {
   private static itFilterWorkletLoaded: boolean = false; // Track if ITFilter worklet is loaded
   private static itFilterWorkletPromise: Promise<void> | null = null; // Promise for ITFilter loading
 
-  // Master routing chain: instruments → masterInput → masterEffects → masterChannel → analyzers → destination
-  public masterInput: Tone.Gain; // Where instruments connect
+  // Master routing chain:
+  // - Tracker instruments → masterInput → amigaFilter ─→ masterEffectsInput → [master fx?] → masterChannel → destination
+  // - DevilboxSynths → synthBus ───────────────────────→ masterEffectsInput → [master fx?] → masterChannel → destination
+  public masterInput: Tone.Gain; // Where tracker instruments connect
+  public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths (skips AmigaFilter)
+  public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
@@ -185,6 +189,13 @@ export class ToneEngine {
   // Lazy-created: only exists when visualization requests it
   private instrumentAnalysers: Map<number, InstrumentAnalyser> = new Map();
 
+  // Track pending releaseAll gain-restore timeouts per instrument key
+  // Prevents race condition where double-releaseAll captures gain=0 and restores to 0
+  private releaseRestoreTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+  // Guard against concurrent preloadInstruments calls
+  private preloadGeneration = 0;
+
   private constructor() {
     // === Phase 1: DEViLBOX owns the native AudioContext ===
     // Create the native AudioContext FIRST, before any Tone.js nodes.
@@ -215,9 +226,19 @@ export class ToneEngine {
     this.masterChannel.connect(this.analyser);
     this.masterChannel.connect(this.fft);
 
-    // Default routing: masterInput → masterEffectsNode? → amigaFilter → masterChannel
+    // Master effects merge point — both tracker and synth audio meet here
+    this.masterEffectsInput = new Tone.Gain(1);
+
+    // Default routing:
+    //   masterInput → amigaFilter → masterEffectsInput → masterChannel
+    //   synthBus ──────────────────→ masterEffectsInput → masterChannel
     this.masterInput.connect(this.amigaFilter);
-    this.amigaFilter.connect(this.masterChannel);
+    this.amigaFilter.connect(this.masterEffectsInput);
+    this.masterEffectsInput.connect(this.masterChannel);
+
+    // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
+    this.synthBus = new Tone.Gain(1);
+    this.synthBus.connect(this.masterEffectsInput);
 
     // Instrument map
     this.instruments = new Map();
@@ -443,6 +464,8 @@ export class ToneEngine {
    * Call this after importing a module to ensure samples are loaded before playback
    */
   public async preloadInstruments(configs: InstrumentConfig[]): Promise<void> {
+    // Bump generation to invalidate any in-flight preload
+    const generation = ++this.preloadGeneration;
 
     // First, dispose any existing instruments to start fresh
     configs.forEach((config) => {
@@ -488,12 +511,14 @@ export class ToneEngine {
       try {
         // Wait for Tone.js internal loading (URL-based samples)
         await Tone.loaded();
+        if (generation !== this.preloadGeneration) return; // Superseded by newer preload
 
         // Also wait for any custom buffer loading promises (ArrayBuffer-based samples)
         const pendingLoads = Array.from(this.instrumentLoadingPromises.values());
         if (pendingLoads.length > 0) {
           console.log(`[ToneEngine] Waiting for ${pendingLoads.length} samples to decode...`);
           await Promise.all(pendingLoads);
+          if (generation !== this.preloadGeneration) return; // Superseded
           console.log(`[ToneEngine] All ${pendingLoads.length} samples loaded`);
         }
       } catch (error) {
@@ -506,6 +531,7 @@ export class ToneEngine {
       try {
         console.log(`[ToneEngine] Waiting for ${speechReadyPromises.length} speech synths to render...`);
         await Promise.all(speechReadyPromises);
+        if (generation !== this.preloadGeneration) return; // Superseded
         console.log(`[ToneEngine] All ${speechReadyPromises.length} speech synths ready`);
       } catch (error) {
         console.error('[ToneEngine] Some speech synths failed to render:', error);
@@ -527,6 +553,7 @@ export class ToneEngine {
         try {
           console.log(`[ToneEngine] Waiting for ${wasmPromises.length} WASM synth(s) to initialize...`);
           await Promise.all(wasmPromises);
+          if (generation !== this.preloadGeneration) return; // Superseded
           console.log(`[ToneEngine] All WASM synths ready`);
         } catch (error) {
           console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
@@ -1480,24 +1507,31 @@ export class ToneEngine {
 
     // Create new analyser
     analyser = new InstrumentAnalyser();
-    
-    // Ensure analyser output is connected to master input
-    // (This is where the summed audio from all matching chains will go)
-    analyser.output.connect(this.masterInput);
+
+    // Determine if this instrument is a DevilboxSynth to pick the right output bus
+    let analyserDest: Tone.ToneAudioNode = this.masterInput;
+    for (const [key, inst] of this.instruments) {
+      if (key.startsWith(`${instrumentId}-`)) {
+        if (isDevilboxSynth(inst)) analyserDest = this.synthBus;
+        break;
+      }
+    }
+    analyser.output.connect(analyserDest);
 
     // Redirect ALL existing effect chains for this instrument to the analyser
     let foundChains = 0;
     this.instrumentEffectChains.forEach((chain, key) => {
       const [idPart] = String(key).split('-');
       if (idPart === String(instrumentId)) {
-        // Disconnect from master input and connect to analyser instead
+        // Disconnect from both possible destinations, then connect to analyser
         try {
           chain.output.disconnect(this.masterInput);
-          chain.output.connect(analyser.input);
-          foundChains++;
-        } catch (e) {
-          // May not be connected to masterInput
-        }
+        } catch { /* May not be connected */ }
+        try {
+          chain.output.disconnect(this.synthBus);
+        } catch { /* May not be connected */ }
+        chain.output.connect(analyser.input);
+        foundChains++;
       }
     });
 
@@ -1562,7 +1596,7 @@ export class ToneEngine {
           connectTo(effectChain.output);
         }
       } else {
-        connectTo(this.masterInput);
+        connectTo(isNative ? this.synthBus : this.masterInput);
       }
     }
 
@@ -2468,6 +2502,11 @@ export class ToneEngine {
           const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
           voiceNode.start(safeTime, offset);
         } else if (voiceNode.triggerAttack) {
+          // Safety: ensure DevilboxSynth output gain isn't stuck at 0
+          if (isDevilboxSynth(voiceNode)) {
+            const gain = (voiceNode.output as GainNode).gain;
+            if (gain.value === 0) { gain.cancelScheduledValues(0); gain.value = 1; }
+          }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
             const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
@@ -2492,6 +2531,16 @@ export class ToneEngine {
         console.error(`[ToneEngine] Voice trigger error:`, e);
       }
       return; // Handled via voice system
+    }
+
+    // Safety: ensure DevilboxSynth output gain hasn't been stuck at 0
+    // (can happen if releaseAll gain-restore races with instrument disposal/recreation)
+    if (isDevilboxSynth(instrument)) {
+      const gain = (instrument.output as GainNode).gain;
+      if (gain.value === 0) {
+        gain.cancelScheduledValues(0);
+        gain.value = 1;
+      }
     }
 
     try {
@@ -2778,8 +2827,12 @@ export class ToneEngine {
         if (instrument.volume && typeof instrument.volume.rampTo === 'function') {
           const currentVolume = instrument.volume.value;
           instrument.volume.rampTo(-Infinity, 0.05, now); // 50ms fade out
+          // Cancel any pending restore for this key to prevent race conditions
+          const prevTimeout = this.releaseRestoreTimeouts.get(key);
+          if (prevTimeout) clearTimeout(prevTimeout);
           // Restore volume after fade for next playback
-          setTimeout(() => {
+          const timeout = setTimeout(() => {
+            this.releaseRestoreTimeouts.delete(key);
             try {
               if (instrument.volume) {
                 instrument.volume.value = currentVolume;
@@ -2788,19 +2841,28 @@ export class ToneEngine {
               // Instrument may be disposed
             }
           }, 100);
+          this.releaseRestoreTimeouts.set(key, timeout);
         } else if (isDevilboxSynth(instrument)) {
           // DevilboxSynths without .volume: ramp native GainNode to silence
           const outputGain = (instrument.output as GainNode).gain;
-          const currentGain = outputGain.value;
-          outputGain.setValueAtTime(currentGain, now);
+          // Cancel any pending restore to prevent race condition where
+          // double-releaseAll captures gain=0 and permanently silences the instrument
+          const prevTimeout = this.releaseRestoreTimeouts.get(key);
+          if (prevTimeout) clearTimeout(prevTimeout);
+          outputGain.cancelScheduledValues(now);
+          outputGain.setValueAtTime(outputGain.value || 1, now);
           outputGain.linearRampToValueAtTime(0, now + 0.05);
-          setTimeout(() => {
+          // Always restore to 1.0 — DevilboxSynth output GainNode is a pass-through
+          const timeout = setTimeout(() => {
+            this.releaseRestoreTimeouts.delete(key);
             try {
-              outputGain.value = currentGain;
+              outputGain.cancelScheduledValues(0);
+              outputGain.value = 1;
             } catch {
               // Instrument may be disposed
             }
           }, 100);
+          this.releaseRestoreTimeouts.set(key, timeout);
         }
       } catch (e) {
         console.warn(`[ToneEngine] Error releasing instrument ${key}:`, e);
@@ -4155,6 +4217,8 @@ export class ToneEngine {
     this.analyser.dispose();
     this.fft.dispose();
     this.amigaFilter.dispose();
+    this.synthBus.dispose();
+    this.masterEffectsInput.dispose();
     this.masterInput.dispose();
     this.masterChannel.dispose();
 
@@ -4237,7 +4301,7 @@ export class ToneEngine {
       if (activeAnalyser) {
         output.connect(activeAnalyser.input);
       } else {
-        output.connect(this.masterInput);
+        output.connect(isNativeSynth ? this.synthBus : this.masterInput);
       }
 
       this.instrumentEffectChains.set(key, { effects: [], output });
@@ -4279,7 +4343,7 @@ export class ToneEngine {
     if (activeAnalyser) {
       output.connect(activeAnalyser.input);
     } else {
-      output.connect(this.masterInput);
+      output.connect(isNativeSynth ? this.synthBus : this.masterInput);
     }
 
     this.instrumentEffectChains.set(key, { effects: effectNodes, output, bridge });
@@ -4393,8 +4457,8 @@ export class ToneEngine {
     // Deep clone effects to avoid Immer proxy revocation issues during async operations
     const effectsCopy = JSON.parse(JSON.stringify(effects)) as EffectConfig[];
 
-    // Disconnect current chain
-    this.masterInput.disconnect();
+    // Disconnect masterEffectsInput output (preserves upstream connections from amigaFilter & synthBus)
+    this.masterEffectsInput.disconnect();
     this.masterEffectsNodes.forEach((node) => {
       try {
         node.disconnect();
@@ -4409,16 +4473,9 @@ export class ToneEngine {
     // Filter to only enabled effects
     const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
-    // Helper to get final output (respecting Amiga filter state)
-    const getFinalOutput = () => this.amigaFilterEnabled ? this.amigaFilter : this.masterChannel;
-
     if (enabledEffects.length === 0) {
-      // No effects - connect through Amiga filter if enabled
-      if (this.amigaFilterEnabled) {
-        this.masterInput.connect(this.amigaFilter);
-      } else {
-        this.masterInput.connect(this.masterChannel);
-      }
+      // No effects - direct connection to master channel
+      this.masterEffectsInput.connect(this.masterChannel);
       return;
     }
 
@@ -4433,15 +4490,15 @@ export class ToneEngine {
       this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
     });
 
-    // Connect chain: masterInput → effects[0] → effects[n] → [amigaFilter] → masterChannel
-    this.masterInput.connect(this.masterEffectsNodes[0]);
+    // Connect chain: masterEffectsInput → effects[0] → effects[n] → masterChannel
+    // Both tracker audio (via amigaFilter) and synth audio (via synthBus) feed masterEffectsInput
+    this.masterEffectsInput.connect(this.masterEffectsNodes[0]);
 
     for (let i = 0; i < this.masterEffectsNodes.length - 1; i++) {
       this.masterEffectsNodes[i].connect(this.masterEffectsNodes[i + 1]);
     }
 
-    // Final effect connects to Amiga filter (if enabled) or directly to master channel
-    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(getFinalOutput());
+    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
 
   }
 

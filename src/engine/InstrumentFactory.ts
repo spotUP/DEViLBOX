@@ -1872,8 +1872,16 @@ export class InstrumentFactory {
       if (delay.stereo !== undefined) synth.setDelaySpread(delay.stereo > 1 ? delay.stereo / 100 : delay.stereo);
     }
 
+    // Apply instrument-level dB normalization via the output GainNode
+    // (WASM internal volume is clamped 0-1; dB offsets were lost to clamping before)
     if (volume !== undefined) {
-      synth.setVolume(volume > 1 ? (volume + 60) / 60 : volume);
+      synth.output.gain.value = Tone.dbToGain(volume);
+    }
+    // Set WASM internal volume from the Level knob (0-1)
+    // This must match what updateTB303Parameters sends at runtime,
+    // otherwise touching any knob causes a volume jump.
+    if (tb.volume !== undefined) {
+      synth.setVolume(tb.volume);
     }
 
     return synth;

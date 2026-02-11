@@ -33,10 +33,10 @@ enum TonewheelParam {
 };
 
 static const char* PARAM_NAMES[PARAM_COUNT] = {
-    "Drawbar 16'", "Drawbar 5-1/3'", "Drawbar 8'", "Drawbar 4'",
-    "Drawbar 2-2/3'", "Drawbar 2'", "Drawbar 1-3/5'", "Drawbar 1-1/3'",
-    "Drawbar 1'", "Percussion", "Perc Fast", "Perc Soft",
-    "Click", "Vibrato Type", "Vibrato Depth", "Overdrive", "Volume"
+    "Drawbar:16'", "Drawbar:5-1/3'", "Drawbar:8'", "Drawbar:4'",
+    "Drawbar:2-2/3'", "Drawbar:2'", "Drawbar:1-3/5'", "Drawbar:1-1/3'",
+    "Drawbar:1'", "Percussion:Mode", "Percussion:Fast", "Percussion:Soft",
+    "Tone:Click", "Vibrato:Type", "Vibrato:Depth", "Tone:Overdrive", "Master:Volume"
 };
 
 static const float PARAM_MINS[PARAM_COUNT] = {
