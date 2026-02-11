@@ -1,9 +1,10 @@
-import React, { useRef, useLayoutEffect, useState, memo } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import React, { useRef, useLayoutEffect, useState, useEffect, useCallback, memo } from 'react';
+import { ChevronRight, ChevronDown, Lightbulb } from 'lucide-react';
 import type { TB303Config } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
+import { getToneEngine } from '@engine/ToneEngine';
 import { clsx } from 'clsx';
 import { CURRENT_VERSION } from '@generated/changelog';
 
@@ -12,6 +13,7 @@ interface JC303StyledKnobPanelProps {
   onChange: (updates: Partial<TB303Config>) => void;
   onPresetLoad?: (preset: any) => void;
   isBuzz3o3?: boolean;
+  instrumentId?: number;
 }
 
 // Calibration constants from db303 source truth
@@ -24,11 +26,242 @@ const SLIDE_MAX = 360;
 const LFO_RATE_MIN = 0.05;
 const LFO_RATE_MAX = 20;
 
+// 303 Quick Tips - actionable acid sound design wisdom
+const TB303_QUICK_TIPS = [
+  "ACID SCREAM: Cutoff LOW (20-30%) + Resonance HIGH (90%+) + Env Mod HIGH (90%+) = maximum squelch",
+  "The filter envelope is the soul of acid. Env Mod controls HOW FAR the filter sweeps, Decay controls HOW LONG",
+  "For fat basslines, keep Resonance below 40% and Cutoff around 50%. Resonance scoops out the bass!",
+  "Accent doesn't just add volume — it pushes the filter HARDER. Accent + high Env Mod = face-melting sweep",
+  "Classic 303 trick: Set Cutoff to 0%, Env Mod to 100%, Resonance to 80%. Every note becomes a filter sweep from zero",
+  "Slides are everything in acid. Enable Devil Fish mods and crank the Slide time for long, gliding portamento",
+  "SAW wave = buzzy, aggressive acid. SQR wave = hollow, woody, more vintage. Mix with Sub Osc for both",
+  "PWM on square wave adds movement and thickness. Automate it with the LFO for evolving textures",
+  "Sub Oscillator adds weight without muddying the filter. Set SubG to 30-50% for solid low-end foundation",
+  "Devil Fish 'Drive' pushes the filter into saturation. Even small amounts (10-20%) add analog warmth",
+  "The Korg Ladder filter (in Mods) has a completely different character — darker, more aggressive self-oscillation",
+  "For dub techno bass: Cutoff 40%, Reso 30%, Env Mod 50%, Decay 70%. Warm and deep, not screaming",
+  "Quick reset: Double-click any knob to snap it back to its default value",
+  "Try the Phaser effect at low mix (10-20%) for subtle stereo movement on your acid lines",
+  "Delay + high feedback + short time = metallic resonance. Great for industrial acid textures",
+  "LFO → Filter at slow rate creates classic auto-wah. Speed it up for ring-mod-like timbres",
+  "Accent works best on every 2nd or 4th note. Too many accents = no accents. Let them breathe",
+  "Diode character (in Mods) adds asymmetric distortion — the secret sauce of real 303 clones",
+  "LP/BP mix blends lowpass and bandpass. Bandpass at high resonance creates nasal, vocal-like tones",
+  "For TB-303 authenticity: SAW wave, Cutoff 25%, Reso 60%, Env Mod 75%, Decay 40%. Pure Roland acid",
+];
+
+/** Combined scope: filter response curve (always) + live waveform (when playing).
+ *  Single canvas avoids z-index / layering issues between two transparent canvases. */
+const DB303Scope: React.FC<{ config: TB303Config; instrumentId: number }> = memo(({ config, instrumentId }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const [logicalWidth, setLogicalWidth] = useState(200);
+  const configRef = useRef(config);
+  configRef.current = config;
+  const HEIGHT = 80;
+
+  // Track container width
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0) setLogicalWidth(Math.floor(r.width));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Setup canvas DPI
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = logicalWidth * dpr;
+    canvas.height = HEIGHT * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    ctxRef.current = ctx;
+  }, [logicalWidth]);
+
+  // Animation frame — draws filter curve + waveform overlay
+  const onFrame = useCallback((): boolean => {
+    const ctx = ctxRef.current;
+    if (!ctx) return false;
+    const w = logicalWidth;
+    const h = HEIGHT;
+    const cfg = configRef.current;
+
+    // Dark background
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, w, h);
+
+    // --- Filter response curve (always drawn) ---
+    const cutoff = cfg.filter?.cutoff ?? 0.5;
+    const resonance = cfg.filter?.resonance ?? 0;
+    const envMod = cfg.filterEnvelope?.envMod ?? 0.5;
+    const Q = 0.5 + resonance * 24.5;
+    const zeroDbY = h * 0.45;
+    const dbScale = h * 0.02;
+
+    const mag = (f: number, fc: number, q: number): number => {
+      if (fc <= 0.001) return f < 0.001 ? 1 : 0.0001;
+      const ratio = f / fc;
+      const r2 = ratio * ratio;
+      return 1 / Math.max(Math.sqrt((1 - r2) * (1 - r2) + r2 / (q * q)), 0.0001);
+    };
+
+    const drawFilterCurve = (fc: number, q: number, style: string, lw: number, dash?: number[]) => {
+      ctx.beginPath();
+      ctx.strokeStyle = style;
+      ctx.lineWidth = lw;
+      if (dash) ctx.setLineDash(dash);
+      else ctx.setLineDash([]);
+      for (let i = 0; i < w; i++) {
+        const f = i / w;
+        const db = 20 * Math.log10(Math.max(mag(f, fc, q), 0.0001));
+        const y = Math.max(2, Math.min(h - 2, zeroDbY - db * dbScale));
+        if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+
+    // EnvMod sweep ghost
+    if (envMod > 0.02) {
+      const sweepFc = Math.min(1, cutoff + envMod * (1 - cutoff));
+      drawFilterCurve(sweepFc, Q, 'rgba(255, 204, 0, 0.12)', 1, [4, 4]);
+    }
+    // Main filter curve
+    drawFilterCurve(cutoff, Q, 'rgba(255, 204, 0, 0.4)', 1.5);
+    // Glow pass
+    ctx.shadowColor = '#ffcc00';
+    ctx.shadowBlur = 3;
+    drawFilterCurve(cutoff, Q, 'rgba(255, 204, 0, 0.15)', 1);
+    ctx.shadowBlur = 0;
+
+    // Label
+    ctx.fillStyle = 'rgba(255, 204, 0, 0.25)';
+    ctx.font = '7px monospace';
+    ctx.fillText('FILTER', 4, h - 4);
+
+    // --- Live waveform overlay (when audio playing) ---
+    const engine = getToneEngine();
+    const analyser = engine.getInstrumentAnalyser(instrumentId);
+    let hasAudio = false;
+
+    if (analyser) {
+      const waveform = analyser.getWaveform();
+      const hasActivity = analyser.hasActivity();
+      if (hasActivity) {
+        hasAudio = true;
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = '#ffcc00';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        const sliceW = w / waveform.length;
+        for (let i = 0; i < waveform.length; i++) {
+          const y = ((waveform[i] + 1) / 2) * h;
+          if (i === 0) ctx.moveTo(i * sliceW, y); else ctx.lineTo(i * sliceW, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    return hasAudio;
+  }, [instrumentId, logicalWidth]);
+
+  // 30fps animation
+  useEffect(() => {
+    let running = true;
+    let lastFrame = 0;
+    let raf: number;
+    const loop = (ts: number) => {
+      if (!running) return;
+      if (ts - lastFrame >= 33) { // ~30fps
+        lastFrame = ts;
+        onFrame();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { running = false; cancelAnimationFrame(raf); };
+  }, [onFrame]);
+
+  return (
+    <div ref={containerRef} className="w-full" style={{ height: `${HEIGHT}px` }}>
+      <canvas
+        ref={canvasRef}
+        className="rounded"
+        style={{ width: '100%', height: `${HEIGHT}px`, display: 'block' }}
+      />
+    </div>
+  );
+});
+DB303Scope.displayName = 'DB303Scope';
+
+/** Diagnostics overlay — shows WASM readback values when window.DB303_TRACE = true */
+const DB303DiagnosticsOverlay: React.FC<{ instrumentId: number }> = ({ instrumentId }) => {
+  const [diag, setDiag] = useState<Record<string, number> | null>(null);
+  const [traceEnabled, setTraceEnabled] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      setTraceEnabled(typeof window !== 'undefined' && !!(window as any).DB303_TRACE);
+    };
+    check();
+    const interval = setInterval(check, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!traceEnabled) { setDiag(null); return; }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { getToneEngine } = await import('@engine/ToneEngine');
+        const engine = getToneEngine();
+        const synth = (engine as any).instruments?.get(instrumentId);
+        if (synth?.getDiagnostics) {
+          const d = await synth.getDiagnostics();
+          if (!cancelled && d && Object.keys(d).length > 0) setDiag(d);
+        }
+      } catch { /* ignore */ }
+    };
+    poll();
+    const interval = setInterval(poll, 500);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [instrumentId, traceEnabled]);
+
+  if (!traceEnabled || !diag) return null;
+
+  return (
+    <div className="absolute inset-0 flex items-end pointer-events-none" style={{ fontSize: '8px', fontFamily: 'monospace' }}>
+      <div className="bg-black/70 text-green-400 px-2 py-0.5 rounded-t flex gap-3 flex-wrap">
+        {diag.cutoff !== undefined && <span>CUT:{(diag.cutoff as number).toFixed(3)}</span>}
+        {diag.resonance !== undefined && <span>RES:{(diag.resonance as number).toFixed(3)}</span>}
+        {diag.envMod !== undefined && <span>ENV:{(diag.envMod as number).toFixed(3)}</span>}
+        {diag.volume !== undefined && <span>VOL:{(diag.volume as number).toFixed(3)}</span>}
+        {diag.peakAmplitude !== undefined && <span>PEAK:{(diag.peakAmplitude as number).toFixed(4)}</span>}
+        {diag.currentNote !== undefined && <span>NOTE:{diag.currentNote}</span>}
+      </div>
+    </div>
+  );
+};
+
 export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   config,
   onChange,
   onPresetLoad,
   isBuzz3o3 = false,
+  instrumentId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sections, setSections] = useState({
@@ -40,6 +273,21 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   // Use ref for config to prevent stale closures in throttled callbacks
   const configRef = useRef(config);
   configRef.current = config;
+
+  // Cycling quick tips
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TB303_QUICK_TIPS.length));
+  const [tipFading, setTipFading] = useState(false);
+  const cycleTip = useCallback((direction: 1 | -1) => {
+    setTipFading(true);
+    setTimeout(() => {
+      setTipIndex(i => (i + direction + TB303_QUICK_TIPS.length) % TB303_QUICK_TIPS.length);
+      setTipFading(false);
+    }, 200);
+  }, []);
+  useEffect(() => {
+    const interval = setInterval(() => cycleTip(1), 12000);
+    return () => clearInterval(interval);
+  }, [cycleTip]);
 
   // Track container width for responsive layout
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -382,7 +630,29 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </select>
           </div>
         </div>
-        <div className="absolute bottom-2 right-4 text-[8px] text-gray-600 font-mono">V{CURRENT_VERSION}-WASM</div>
+        {/* Waveform Scope + Filter Response (single canvas) */}
+        {instrumentId !== undefined && (
+          <div className="absolute" style={{ top: '10px', left: '480px', right: '20px', height: '80px' }}>
+            <DB303Scope config={config} instrumentId={instrumentId} />
+            <DB303DiagnosticsOverlay instrumentId={instrumentId} />
+          </div>
+        )}
+        {/* Quick Tips Bar */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-1.5 bg-black/50 border-t border-white/5">
+          <Lightbulb size={12} className="text-yellow-500/70 flex-shrink-0" />
+          <button onClick={() => cycleTip(-1)} className="text-gray-600 hover:text-gray-400 text-[10px] flex-shrink-0 px-0.5">&lsaquo;</button>
+          <span
+            className={clsx(
+              "text-[10px] text-gray-400 flex-1 transition-opacity duration-200 min-w-0 truncate",
+              tipFading ? "opacity-0" : "opacity-100"
+            )}
+            title={TB303_QUICK_TIPS[tipIndex]}
+          >
+            {TB303_QUICK_TIPS[tipIndex]}
+          </span>
+          <button onClick={() => cycleTip(1)} className="text-gray-600 hover:text-gray-400 text-[10px] flex-shrink-0 px-0.5">&rsaquo;</button>
+          <span className="text-[7px] text-gray-600 font-mono flex-shrink-0 ml-2">V{CURRENT_VERSION}</span>
+        </div>
       </div>
     </div>
   );
