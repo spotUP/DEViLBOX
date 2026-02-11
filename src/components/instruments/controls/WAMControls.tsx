@@ -286,7 +286,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
         </div>
         <div
           ref={guiContainerRef}
-          className="flex-1 bg-black rounded-lg border border-dark-border overflow-auto flex items-center justify-center min-h-[300px]"
+          className="flex-1 bg-black rounded-lg border border-dark-border overflow-auto min-h-[300px] [&>*]:mx-auto"
         />
       </div>
 
