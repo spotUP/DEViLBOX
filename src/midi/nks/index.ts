@@ -11,6 +11,9 @@ export * from './types';
 export * from './NKSFileFormat';
 export { msgpackEncode, msgpackDecode } from './msgpack';
 
+// NKS2 metadata builder (getNksMetadata structure)
+export * from './NKS2MetadataBuilder';
+
 // Parameter maps and routing
 export * from './synthParameterMaps';
 export * from './parameterRouter';
@@ -39,6 +42,9 @@ export * from './NKSAccessibility';
 // Deployment and registry
 export * from './NKSDeployment';
 
+// Leap expansion support
+export * from './NKSLeapExpansion';
+
 // ============================================================================
 // Convenience re-exports
 // ============================================================================
@@ -53,7 +59,10 @@ export {
   DEXED_NKS_PARAMETERS,
   OBXD_NKS_PARAMETERS,
 } from './synthParameterMaps';
-export { parseNKSF, writeNKSF, loadNKSF, downloadNKSF, verifyNKSF } from './NKSFileFormat';
+export {
+  parseNKSF, writeNKSF, loadNKSF, downloadNKSF, verifyNKSF,
+  buildNICAPages, buildFirstPageNICA,
+} from './NKSFileFormat';
 export { getNKSHardwareController, isNKSHardwareAvailable } from './NKSHardwareController';
 export {
   isHIDSupported,
@@ -107,3 +116,31 @@ export {
   generateDeploymentManifest,
   incrementContentVersion,
 } from './NKSDeployment';
+export {
+  buildNKS2Metadata,
+  buildNKS2MetadataFromNKS1,
+  validatePageLayout,
+  validateNKS2Metadata,
+  serializeNKS2Metadata,
+  createGap,
+  insertDisplayAlignedGaps,
+  selectFirstPageParams,
+  scoreFirstPageFit,
+  FIRST_PAGE_PARADIGM,
+  NKS_HARDWARE_DISPLAY_SPECS,
+} from './NKS2MetadataBuilder';
+export {
+  LEAP_KIT_TYPES,
+  LEAP_SAMPLE_SPEC,
+  LEAP_MACRO_CONFIG,
+  LEAP_BACKGROUND_SPEC,
+  LEAP_ARTWORK_SPECS,
+  LEAP_PREVIEW_SPEC,
+  LEAP_EFFECTS_CHAIN,
+  isValidLeapKitType,
+  formatLeapSampleName,
+  parseLeapSampleName,
+  createDefaultLeapMacros,
+  getLeapPackageStructure,
+  validateLeapPackage,
+} from './NKSLeapExpansion';
