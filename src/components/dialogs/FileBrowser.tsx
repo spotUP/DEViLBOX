@@ -25,8 +25,11 @@ import type { FileEntry } from '@/lib/fileSystemAccess';
 import { hasElectronFS } from '@utils/electron';
 import {
   isServerFSAvailable,
+  isManifestAvailable,
   listServerDirectory,
+  listManifestDirectory,
   readServerFile,
+  readStaticFile,
   writeServerFile,
   type ServerFileEntry,
 } from '@/lib/serverFS';
@@ -162,7 +165,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
             source: 'filesystem' as const,
           }));
-          
+
           // Sort: directories first, then files
           items.sort((a, b) => {
             if (a.isDirectory && !b.isDirectory) return -1;
@@ -170,11 +173,26 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             return a.name.localeCompare(b.name);
           });
         } catch (err) {
-          // Server may not be available, fall through to empty items
+          // Server may not be available, fall through to manifest
           setHasServerFS(false);
         }
-        } else {
-          // Use Web File System Access API
+        }
+
+        // Fallback: use build-time file manifest (works on GitHub Pages)
+        if (items.length === 0 && isManifestAvailable()) {
+          const targetPath = currentPath || '';
+          const entries = listManifestDirectory(targetPath);
+          items = entries.map((e: ServerFileEntry) => ({
+            id: e.path,
+            name: e.name,
+            isDirectory: e.isDirectory,
+            path: e.path,
+            source: 'filesystem' as const,
+          }));
+        }
+
+        if (items.length === 0) {
+          // Last resort: Web File System Access API
           const dirHandle = getCurrentDirectory();
           if (dirHandle) {
             const entries = await listDirectory(dirHandle, []);
@@ -231,7 +249,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         let buffer: ArrayBuffer;
 
         if (selectedFile.source === 'filesystem') {
-          // Check if Electron or Web FS API or Server FS
+          // Check if Electron or Web FS API or Server FS or static manifest
           if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
             buffer = await window.electron.fs.readFile(selectedFile.path);
           } else if (hasServerFS && selectedFile.path) {
@@ -239,6 +257,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           } else if (selectedFile.handle) {
             const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
             buffer = await file.arrayBuffer();
+          } else if (selectedFile.path && isManifestAvailable()) {
+            buffer = await readStaticFile(selectedFile.path);
           } else {
             throw new Error('Cannot read tracker module');
           }
@@ -255,7 +275,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       let data: any;
       const isXmlFile = selectedFile.name.toLowerCase().endsWith('.xml');
 
-      // Check if Electron or Web FS API or Server FS
+      // Check if Electron or Web FS API or Server FS or static manifest
       if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
         const buffer = await window.electron.fs.readFile(selectedFile.path);
         const text = new TextDecoder().decode(buffer);
@@ -268,6 +288,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         const content = await readFile(selectedFile.handle as FileSystemFileHandle);
         // XML files are passed as raw text, others are parsed as JSON
         data = isXmlFile ? content : JSON.parse(content);
+      } else if (selectedFile.path && isManifestAvailable()) {
+        const buffer = await readStaticFile(selectedFile.path);
+        const text = new TextDecoder().decode(buffer);
+        data = isXmlFile ? text : JSON.parse(text);
       } else {
         throw new Error('Cannot read file');
       }
