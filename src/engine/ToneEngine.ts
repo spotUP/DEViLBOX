@@ -3659,6 +3659,77 @@ export class ToneEngine {
   }
 
   /**
+   * Update standard Tone.js synth parameters in real-time (no instrument recreation)
+   * Handles oscillator, envelope, filter, filterEnvelope changes with smooth ramping
+   */
+  public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void {
+    const R = ToneEngine.EFFECT_RAMP_TIME;
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart !== String(instrumentId)) return;
+
+      // Update oscillator type (discrete, no ramp needed)
+      if (config.oscillator?.type && instrument.oscillator) {
+        try {
+          const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
+          instrument.oscillator.type = type;
+        } catch { /* PolySynth wraps oscillator differently */ }
+      }
+      // PolySynth: update via .set()
+      if (instrument instanceof Tone.PolySynth && config.oscillator?.type) {
+        try {
+          const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
+          instrument.set({ oscillator: { type: type as any } });
+        } catch { /* ignore */ }
+      }
+
+      // Update envelope (with ramp for smooth transitions)
+      if (config.envelope) {
+        const env = config.envelope;
+        try {
+          if (instrument instanceof Tone.PolySynth) {
+            instrument.set({
+              envelope: {
+                attack: (env.attack ?? 10) / 1000,
+                decay: (env.decay ?? 200) / 1000,
+                sustain: (env.sustain ?? 50) / 100,
+                release: (env.release ?? 1000) / 1000,
+              }
+            });
+          } else if (instrument.envelope) {
+            instrument.envelope.attack = (env.attack ?? 10) / 1000;
+            instrument.envelope.decay = (env.decay ?? 200) / 1000;
+            instrument.envelope.sustain = (env.sustain ?? 50) / 100;
+            instrument.envelope.release = (env.release ?? 1000) / 1000;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Update filter (with ramp)
+      if (config.filter && instrument.filter) {
+        try {
+          if (config.filter.frequency !== undefined) {
+            instrument.filter.frequency.rampTo(config.filter.frequency, R);
+          }
+          if (config.filter.Q !== undefined) {
+            instrument.filter.Q.rampTo(config.filter.Q, R);
+          }
+          if (config.filter.type) {
+            instrument.filter.type = config.filter.type;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Update volume (with ramp)
+      if (config.volume !== undefined && instrument.volume) {
+        try {
+          instrument.volume.rampTo(config.volume, R);
+        } catch { /* ignore */ }
+      }
+    });
+  }
+
+  /**
    * Update Buzzmachine parameters in real-time
    */
   public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void {
@@ -4235,7 +4306,7 @@ export class ToneEngine {
     try {
       // Update wet/dry if the effect supports it
       if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.value = wetValue;
+        node.wet.rampTo(wetValue, 0.02);
       }
 
       // Update specific parameters based on effect type
@@ -4261,7 +4332,7 @@ export class ToneEngine {
 
     try {
       if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.value = wetValue;
+        node.wet.rampTo(wetValue, 0.02);
       }
       this.applyEffectParameters(node, config);
       effectData.config = config;
@@ -4273,8 +4344,12 @@ export class ToneEngine {
   /**
    * Apply effect-specific parameters to a node
    */
+  // Smooth ramp time for effect parameter changes (20ms eliminates zipper noise)
+  private static readonly EFFECT_RAMP_TIME = 0.02;
+
   private applyEffectParameters(node: Tone.ToneAudioNode, config: EffectConfig): void {
     const params = config.parameters;
+    const R = ToneEngine.EFFECT_RAMP_TIME;
 
     switch (config.type) {
       case 'Distortion':
@@ -4291,49 +4366,49 @@ export class ToneEngine {
       case 'Delay':
       case 'FeedbackDelay':
         if (node instanceof Tone.FeedbackDelay) {
-          node.delayTime.value = params.time as any ?? 0.25;
-          node.feedback.value = params.feedback as any ?? 0.5;
+          node.delayTime.rampTo(params.time as any ?? 0.25, R);
+          node.feedback.rampTo(params.feedback as any ?? 0.5, R);
         }
         break;
 
       case 'Chorus':
         if (node instanceof Tone.Chorus) {
-          node.frequency.value = params.frequency as any ?? 1.5;
+          node.frequency.rampTo(params.frequency as any ?? 1.5, R);
           node.depth = params.depth as any ?? 0.7;
         }
         break;
 
       case 'Phaser':
         if (node instanceof Tone.Phaser) {
-          node.frequency.value = params.frequency as any ?? 0.5;
+          node.frequency.rampTo(params.frequency as any ?? 0.5, R);
           node.octaves = params.octaves as any ?? 3;
         }
         break;
 
       case 'Tremolo':
         if (node instanceof Tone.Tremolo) {
-          node.frequency.value = params.frequency as any ?? 10;
-          node.depth.value = params.depth as any ?? 0.5;
+          node.frequency.rampTo(params.frequency as any ?? 10, R);
+          node.depth.rampTo(params.depth as any ?? 0.5, R);
         }
         break;
 
       case 'Vibrato':
         if (node instanceof Tone.Vibrato) {
-          node.frequency.value = params.frequency as any ?? 5;
-          node.depth.value = params.depth as any ?? 0.1;
+          node.frequency.rampTo(params.frequency as any ?? 5, R);
+          node.depth.rampTo(params.depth as any ?? 0.1, R);
         }
         break;
 
       case 'BitCrusher':
         if (node instanceof Tone.BitCrusher) {
-          node.bits.value = params.bits as any ?? 4;
+          node.bits.rampTo(params.bits as any ?? 4, R);
         }
         break;
 
       case 'PingPongDelay':
         if (node instanceof Tone.PingPongDelay) {
-          node.delayTime.value = params.time as any ?? 0.25;
-          node.feedback.value = params.feedback as any ?? 0.5;
+          node.delayTime.rampTo(params.time as any ?? 0.25, R);
+          node.feedback.rampTo(params.feedback as any ?? 0.5, R);
         }
         break;
 
@@ -4345,31 +4420,31 @@ export class ToneEngine {
 
       case 'Compressor':
         if (node instanceof Tone.Compressor) {
-          node.threshold.value = params.threshold as any ?? -24;
-          node.ratio.value = params.ratio as any ?? 12;
-          node.attack.value = params.attack as any ?? 0.003;
-          node.release.value = params.release as any ?? 0.25;
+          node.threshold.rampTo(params.threshold as any ?? -24, R);
+          node.ratio.rampTo(params.ratio as any ?? 12, R);
+          node.attack.rampTo(params.attack as any ?? 0.003, R);
+          node.release.rampTo(params.release as any ?? 0.25, R);
         }
         break;
 
       case 'EQ3':
         if (node instanceof Tone.EQ3) {
-          node.low.value = params.low as any ?? 0;
-          node.mid.value = params.mid as any ?? 0;
-          node.high.value = params.high as any ?? 0;
+          node.low.rampTo(params.low as any ?? 0, R);
+          node.mid.rampTo(params.mid as any ?? 0, R);
+          node.high.rampTo(params.high as any ?? 0, R);
         }
         break;
 
       case 'Filter':
         if (node instanceof Tone.Filter) {
-          node.frequency.value = params.frequency as any ?? 350;
-          node.Q.value = params.Q as any ?? 1;
+          node.frequency.rampTo(params.frequency as any ?? 350, R);
+          node.Q.rampTo(params.Q as any ?? 1, R);
         }
         break;
 
       case 'AutoFilter':
         if (node instanceof Tone.AutoFilter) {
-          node.frequency.value = params.frequency as any ?? 1;
+          node.frequency.rampTo(params.frequency as any ?? 1, R);
           node.baseFrequency = params.baseFrequency as any ?? 200;
           node.octaves = params.octaves as any ?? 2.6;
         }
@@ -4377,14 +4452,14 @@ export class ToneEngine {
 
       case 'AutoPanner':
         if (node instanceof Tone.AutoPanner) {
-          node.frequency.value = params.frequency as any ?? 1;
-          node.depth.value = params.depth as any ?? 1;
+          node.frequency.rampTo(params.frequency as any ?? 1, R);
+          node.depth.rampTo(params.depth as any ?? 1, R);
         }
         break;
 
       case 'StereoWidener':
         if (node instanceof Tone.StereoWidener) {
-          node.width.value = params.width as any ?? 0.5;
+          node.width.rampTo(params.width as any ?? 0.5, R);
         }
         break;
 
