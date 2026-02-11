@@ -101,19 +101,27 @@ export interface NKSPresetMetadata {
   name: string;                  // Preset name
   author?: string;               // Preset author
   comment?: string;              // Preset description
-  deviceType?: string;           // e.g., "INST", "FX"
-  
-  // Bank organization
+  deviceType?: string;           // "INST" or "FX"
+
+  // Bank organization (max 3 levels: Product, Bank, Sub-Bank)
   bankChain: string[];           // e.g., ["Bass", "Synth Bass", "TB-303"]
-  
-  // Search tags (NKS Content)
-  types?: string[];              // e.g., ["Bass", "Synth"]
-  modes?: string[];              // e.g., ["Monophonic", "Analog"]
-  
+
+  // Search tags as [type, subType] pairs per NKS SDK Section 17.9.
+  // Each entry is [type, subType], e.g., [["Bass", "Synth Bass"], ["Lead", ""]]
+  // Sub-type is REQUIRED for FX presets (deviceType === "FX")
+  types?: string[][];
+
+  // Character tags per NKS SDK (e.g., ["Monophonic", "Analog", "Dark"])
+  modes?: string[];              // Stored as "Character" in NISI chunk
+
   // Additional metadata
   tempo?: number;
   isUser?: boolean;              // User preset vs factory
   isFavorite?: boolean;
+
+  // PLID round-trip data (preserved from parsed files)
+  vstMagic?: number;             // VST2 magic number (INTEGER)
+  vst3Uid?: [number, number, number, number]; // VST3 UID (4 INTEGERs)
 }
 
 /**

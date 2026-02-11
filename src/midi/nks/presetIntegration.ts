@@ -59,11 +59,12 @@ function bankChainToCategory(bankChain: string[]): PresetCategory {
 /**
  * Map NKS types/modes to DEViLBOX tags
  */
-function nksTypesToTags(types?: string[], modes?: string[]): string[] {
+function nksTypesToTags(types?: string[][], modes?: string[]): string[] {
   const tags: string[] = [];
 
   if (types) {
-    tags.push(...types.map(t => t.toLowerCase()));
+    // types is [[type, subType], ...] - flatten to individual tags
+    tags.push(...types.flat().filter(Boolean).map(t => t.toLowerCase()));
   }
   if (modes) {
     tags.push(...modes.map(m => m.toLowerCase()));
@@ -294,7 +295,7 @@ export function nksPresetToInstrumentConfig(
  */
 function inferSynthTypeFromMetadata(metadata: NKSPresetMetadata): SynthType | null {
   const bankChain = metadata.bankChain.join(' ').toLowerCase();
-  const types = (metadata.types || []).join(' ').toLowerCase();
+  const types = (metadata.types || []).flat().join(' ').toLowerCase();
   const comment = (metadata.comment || '').toLowerCase();
   const name = (metadata.name || '').toLowerCase();
 

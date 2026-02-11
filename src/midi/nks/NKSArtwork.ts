@@ -186,7 +186,6 @@ export async function validateArtworkAsset(
   const errors: string[] = [];
 
   // Check format
-  const expectedMime = spec.format === 'webp' ? 'image/webp' : 'image/png';
   if (!blob.type.includes(spec.format)) {
     errors.push(`Expected ${spec.format} format, got ${blob.type}`);
   }

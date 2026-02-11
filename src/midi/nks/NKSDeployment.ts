@@ -9,7 +9,7 @@
  * - Complete PAResources directory structure
  */
 
-import type { NKSDeploymentConfig, NKSRegistryKeys, NKSProductResources } from './types';
+import type { NKSDeploymentConfig, NKSRegistryKeys } from './types';
 import { NKS_CONSTANTS } from './types';
 
 // ============================================================================
@@ -124,17 +124,21 @@ export function generateWindowsRegistry(
  * Creates: /Library/Preferences/com.native-instruments.<registryKey>.plist
  */
 export function generateMacOSPlist(
-  registryKey: string,
+  _registryKey: string,
   keys: NKSRegistryKeys,
 ): string {
+  // Per SDK Section 13.1.2: macOS plist paths must use HFS colon-separated format
+  const installDir = posixToHFS(keys.installDir || keys.contentDir);
+  const contentDir = posixToHFS(keys.contentDir);
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>InstallDir</key>
-  <string>${escapeXml(keys.installDir || keys.contentDir)}</string>
+  <string>${escapeXml(installDir)}</string>
   <key>ContentDir</key>
-  <string>${escapeXml(keys.contentDir)}</string>
+  <string>${escapeXml(contentDir)}</string>
   <key>ContentVersion</key>
   <string>${escapeXml(keys.contentVersion)}</string>
 </dict>
@@ -279,6 +283,48 @@ export function getDeploymentStructure(config: NKSDeploymentConfig): string[] {
 }
 
 // ============================================================================
+// Uninstall Manifest
+// ============================================================================
+
+/**
+ * Get files to remove for a clean uninstall per SDK Section 14.
+ * Returns platform-specific file paths that should be deleted.
+ */
+export function getUninstallManifest(
+  config: NKSDeploymentConfig,
+  targetOS: 'windows' | 'macos' | 'both' = 'both',
+): Array<{ path: string; description: string }> {
+  const files: Array<{ path: string; description: string }> = [];
+
+  if (targetOS === 'windows' || targetOS === 'both') {
+    files.push(
+      { path: `C:\\Program Files\\Common Files\\Native Instruments\\Service Center\\${config.productName}.xml`, description: 'Service Center XML' },
+      { path: `HKLM\\SOFTWARE\\Native Instruments\\${config.registryKey}`, description: 'Registry key (delete entire key)' },
+    );
+    if (config.contentDir) {
+      files.push({ path: config.contentDir, description: 'Content directory (presets, previews)' });
+    }
+  }
+
+  if (targetOS === 'macos' || targetOS === 'both') {
+    files.push(
+      { path: `/Library/Application Support/Native Instruments/Service Center/${config.productName}.xml`, description: 'Service Center XML' },
+      { path: `/Library/Preferences/${getPlistFilename(config.registryKey)}`, description: 'Product plist' },
+    );
+    if (config.contentDir) {
+      files.push({ path: config.contentDir, description: 'Content directory (presets, previews)' });
+    }
+    // NI caches that may need clearing for full uninstall
+    files.push(
+      { path: '~/Library/Application Support/Native Instruments/Komplete Kontrol/Plugin_kk3.data', description: 'Komplete Kontrol plugin cache (triggers rescan)' },
+      { path: '~/Library/Application Support/Native Instruments/Komplete Kontrol/Browser Data/', description: 'Browser data cache' },
+    );
+  }
+
+  return files;
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -289,4 +335,16 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+/**
+ * Convert POSIX path to HFS (colon-separated) format.
+ * Per SDK Section 13.1.2: macOS plist paths must use HFS format.
+ * e.g., "/Library/Vendor/Product" -> "Macintosh HD:Library:Vendor:Product"
+ */
+function posixToHFS(posixPath: string): string {
+  if (!posixPath || !posixPath.startsWith('/')) return posixPath;
+  // Replace forward slashes with colons, prepend volume name
+  const parts = posixPath.split('/').filter(Boolean);
+  return `Macintosh HD:${parts.join(':')}`;
 }

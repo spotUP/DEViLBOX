@@ -36,11 +36,6 @@ export async function generatePreview(
   const maxDuration = NKS_PREVIEW_SPEC.MAX_DURATION_S * 1000;
   const actualDuration = Math.min(durationMs, maxDuration);
 
-  // Create offline context for capture
-  const sampleRate = audioContext.sampleRate;
-  const frameCount = Math.ceil((actualDuration / 1000) * sampleRate);
-  const offlineCtx = new OfflineAudioContext(2, frameCount, sampleRate);
-
   // Create a MediaStream destination for real-time capture
   const dest = audioContext.createMediaStreamDestination();
   sourceNode.connect(dest);
@@ -151,7 +146,6 @@ function normalizeBuffer(buffer: AudioBuffer): AudioBuffer {
     }
   }
   const rms = Math.sqrt(sumSquared / totalSamples);
-  const currentLUFS = 20 * Math.log10(rms + 1e-10);
 
   // Target: -19 LUFS with -3dB peak ceiling
   const targetRMS = Math.pow(10, NKS_PREVIEW_SPEC.TARGET_LUFS / 20);
