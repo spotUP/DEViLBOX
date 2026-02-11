@@ -3,8 +3,8 @@
  * Now supports both Tone.js and Neural effects in a single unified list
  */
 
-import React, { useState, useCallback } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, AlertTriangle } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -49,6 +49,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [editingEffect, setEditingEffect] = useState<EffectConfig | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     masterEffects,
@@ -213,8 +214,18 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     return acc;
   }, {} as Record<string, MasterFxPreset[]>);
 
-  // Group effects by category for the add menu
+  // Group effects by category for the add menu, filtered by search
   const effectsByGroup = getEffectsByGroup();
+  const filteredEffectsByGroup = useMemo(() => {
+    if (!searchQuery.trim()) return effectsByGroup;
+    const q = searchQuery.toLowerCase();
+    const filtered: Record<string, typeof effectsByGroup[string]> = {};
+    for (const [group, effects] of Object.entries(effectsByGroup)) {
+      const matched = effects.filter(e => e.label.toLowerCase().includes(q));
+      if (matched.length > 0) filtered[group] = matched;
+    }
+    return filtered;
+  }, [effectsByGroup, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -455,13 +466,39 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               </>
             ) : (
               <>
-                <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
-                  <h3 className="text-sm font-bold text-text-primary">Add Effect</h3>
-                  <p className="text-xs text-text-muted">Select an effect to add to the chain</p>
+                <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary">Add Effect</h3>
+                    <p className="text-xs text-text-muted">Select an effect to add to the chain</p>
+                  </div>
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Search effects..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 text-sm bg-dark-bg border border-dark-border rounded-lg text-text-primary
+                               placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
                   <div className="space-y-4">
-                    {Object.entries(effectsByGroup).map(([group, groupEffects]) => (
+                    {Object.keys(filteredEffectsByGroup).length === 0 ? (
+                      <div className="p-8 text-center text-text-muted text-sm">
+                        No effects matching "{searchQuery}"
+                      </div>
+                    ) : null}
+                    {Object.entries(filteredEffectsByGroup).map(([group, groupEffects]) => (
                       <div key={group}>
                         <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-2">{group}</h4>
                         <div className="grid grid-cols-2 gap-2">
@@ -477,6 +514,9 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                               {/* User Decision #4: Visual badges */}
                               {effect.category === 'neural' && (
                                 <Cpu size={12} className="flex-shrink-0 opacity-60" />
+                              )}
+                              {effect.category === 'wam' && (
+                                <Globe size={12} className="flex-shrink-0 opacity-60" />
                               )}
                             </button>
                           ))}
@@ -585,6 +625,18 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
               >
                 <Cpu size={8} />
                 Neural
+              </span>
+            )}
+            {effect.category === 'wam' && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                style={{
+                  background: `${enc.accent}15`,
+                  border: `1px solid ${enc.accent}30`,
+                  color: `${enc.accent}cc`,
+                }}
+              >
+                <Globe size={8} />
+                WAM
               </span>
             )}
           </div>

@@ -14,7 +14,7 @@ import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
-import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForSynth } from '../midi/knobBanks';
+import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth } from '../midi/knobBanks';
 import { routeParameterToEngine } from '../midi/nks/parameterRouter';
 
 interface MIDIStore {
@@ -102,13 +102,6 @@ interface MIDIStore {
   stopGridLearning: () => void;
   applyGridMIDIValue: (channel: number, controller: number, value: number) => number | null;
 }
-
-// Helper: get VSTBridge synth instance for the current instrument
-const getVSTBridgeSynth = (instrumentId: number) => {
-  const engine = getToneEngine();
-  const key = `${instrumentId}--1`;
-  return engine.instruments.get(key);
-};
 
 // Helper to update parameters from bank CC — delegates to NKS2 parameter router
 const updateBankParameter = (param: MappableParameter, value: number) => {

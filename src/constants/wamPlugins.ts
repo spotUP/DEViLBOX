@@ -144,3 +144,32 @@ export const WAM_SYNTH_PLUGINS: WAMPluginEntry[] = [
     description: 'Drag-and-drop guitar pedalboard',
   },
 ];
+
+/**
+ * WAM Effect URL map — AudioEffectType → module URL
+ * Used by InstrumentFactory.createEffect() and WAMEffectNode
+ */
+export const WAM_EFFECT_URLS: Record<string, string> = {
+  WAMBigMuff: `${WAM_HOST}/BigMuff/index.js`,
+  WAMTS9: `${WAM_HOST}/TS9_OverdriveFaustGenerated/index.js`,
+  WAMDistoMachine: `${WAM_HOST}/disto_machine/src/index.js`,
+  WAMQuadraFuzz: `${WAM_HOST}/quadrafuzz/dist/index.js`,
+  WAMVoxAmp: `${WAM_HOST}/GuitarAmpSim60s/index.js`,
+  WAMStonePhaser: `${WAM_HOST}/StonePhaserStereo/index.js`,
+  WAMPingPongDelay: `${WAM_HOST}/pingpongdelay/dist/index.js`,
+  WAMFaustDelay: `${WAM_HOST}/faustPingPongDelay/plugin/index.js`,
+  WAMPitchShifter: `${WAM_HOST}/csoundPitchShifter/dist/index.js`,
+  WAMGraphicEQ: `${WAM_HOST}/graphicEqualizer/src/index.js`,
+  WAMPedalboard: `${WAM_HOST}/pedalboard/dist/index.js`,
+};
+
+/**
+ * WAM Synth URL map — SynthType → module URL
+ * Used by InstrumentFactory.createInstrument() for named WAM synths
+ */
+export const WAM_SYNTH_URLS: Record<string, string> = {
+  WAMOBXd: `${WAM_HOST}/obxd/index.js`,
+  WAMSynth101: `${WAM_HOST}/synth101/dist/index.js`,
+  WAMTinySynth: `${WAM_HOST}/tinySynth/src/index.js`,
+  WAMFaustFlute: `${WAM_HOST}/faustFlute/index.js`,
+};

@@ -166,6 +166,11 @@ export type SynthType =
   | 'Sam'              // Commodore SAM Speech Synth
   | 'Synare'           // Synare 3 (Electronic Percussion)
   | 'WAM'              // Web Audio Module (External Plugin)
+  // Named WAM Synths (WAM 2.0 instruments with preconfigured URLs)
+  | 'WAMOBXd'           // OB-Xd WAM synth
+  | 'WAMSynth101'       // Synth-101 WAM synth
+  | 'WAMTinySynth'      // TinySynth WAM synth
+  | 'WAMFaustFlute'     // Faust Flute WAM synth
   // JUCE WASM Synths
   | 'Dexed'            // Yamaha DX7 FM Synthesizer (6-op FM)
   | 'OBXd'             // Oberheim OB-X Analog Synthesizer
@@ -2170,9 +2175,21 @@ export type AudioEffectType =
   | 'MoogFilter'       // 6 analog-modeled Moog ladder filters (WASM)
   | 'MVerb'            // MVerb plate reverb (WASM, GPL v3)
   | 'Leslie'           // Leslie rotary speaker (WASM)
-  | 'SpringReverb';    // Spring reverb with drip (WASM)
+  | 'SpringReverb'     // Spring reverb with drip (WASM)
+  // WAM 2.0 effects (external Web Audio Module plugins)
+  | 'WAMBigMuff'        // Big Muff Pi fuzz
+  | 'WAMTS9'            // TS-9 Overdrive
+  | 'WAMDistoMachine'   // Disto Machine distortion
+  | 'WAMQuadraFuzz'     // QuadraFuzz multiband
+  | 'WAMVoxAmp'         // Vox Amp 30
+  | 'WAMStonePhaser'    // Stone Phaser stereo
+  | 'WAMPingPongDelay'  // Ping Pong Delay
+  | 'WAMFaustDelay'     // Faust Delay
+  | 'WAMPitchShifter'   // Csound Pitch Shifter
+  | 'WAMGraphicEQ'      // Graphic Equalizer
+  | 'WAMPedalboard';    // Pedalboard multi-FX
 
-export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine' | 'wasm';
+export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine' | 'wasm' | 'wam';
 
 export interface EffectConfig {
   id: string;

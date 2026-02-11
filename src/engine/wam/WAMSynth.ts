@@ -177,7 +177,7 @@ export class WAMSynth implements DevilboxSynth {
    * Registers WamEnv and WamGroup worklet processors.
    * Safe to call multiple times — only runs once.
    */
-  private static initializeHost(audioContext: AudioContext): Promise<[string, string]> {
+  public static initializeHost(audioContext: AudioContext): Promise<[string, string]> {
     if (WAMSynth._hostInitPromise) return WAMSynth._hostInitPromise;
 
     const hostGroupId = `devilbox-host-${performance.now()}`;

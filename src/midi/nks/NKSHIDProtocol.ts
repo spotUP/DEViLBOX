@@ -226,7 +226,8 @@ export class NKSHIDProtocol {
   private deviceInfo: NKSControllerInfo | null = null;
   private knobValues: number[] = new Array(8).fill(0);
   private buttonStates: Map<number, boolean> = new Map();
-  
+  private _connectPromise: Promise<boolean> | null = null;
+
   // Callbacks
   private onKnobChange?: (index: number, value: number) => void;
   private onButtonPress?: (buttonId: number) => void;
@@ -277,24 +278,38 @@ export class NKSHIDProtocol {
    * Connect to a specific HID device
    */
   async connect(device: HIDDevice): Promise<boolean> {
+    // Guard against concurrent connect calls (e.g. React StrictMode double-mount)
+    if (this._connectPromise) return this._connectPromise;
+
+    this._connectPromise = this._doConnect(device);
+    try {
+      return await this._connectPromise;
+    } finally {
+      this._connectPromise = null;
+    }
+  }
+
+  private async _doConnect(device: HIDDevice): Promise<boolean> {
     try {
       if (!device.opened) {
         await device.open();
       }
-      
+
       this.device = device;
       this.deviceInfo = this.parseDeviceInfo(device);
-      
+
       // Listen for input reports
       device.addEventListener('inputreport', this.handleInputReport);
-      
-      // Try to send ping (optional - some devices don't support output reports)
-      try {
-        await this.sendPing();
-      } catch (pingError) {
-        console.warn('[NKS HID] Device does not support ping (read-only mode)');
+
+      // Send ping only to NI devices that support HID output reports
+      if (this.deviceInfo.supportsHIDOutput) {
+        try {
+          await this.sendPing();
+        } catch (pingError) {
+          console.warn('[NKS HID] Ping failed:', pingError);
+        }
       }
-      
+
       console.log('[NKS HID] Connected to:', this.deviceInfo.name);
       return true;
     } catch (error) {
@@ -533,6 +548,10 @@ export class NKSHIDProtocol {
       knobCount = 8;
     }
     
+    // Only NI devices communicate via HID output reports;
+    // Akai, Arturia, etc. use MIDI SysEx for display/LED control
+    const supportsHIDOutput = vendorId === NI_VENDOR_ID;
+
     return {
       id: `nks_${vendorId.toString(16)}_${productId.toString(16)}`,
       name: productName,
@@ -550,6 +569,7 @@ export class NKSHIDProtocol {
       hasJogWheel: productId === 0x1700 || productId === 0x1710,
       hasBrowserControls: true,
       hasTouchStrip: productId >= 0x1720 && productId <= 0x1750, // S-Series MK3
+      supportsHIDOutput,
     };
   }
   
@@ -557,7 +577,7 @@ export class NKSHIDProtocol {
    * Send display update to controller
    */
   async sendDisplayUpdate(displayLines: string[]): Promise<void> {
-    if (!this.device || !this.deviceInfo?.hasDisplay) return;
+    if (!this.device || !this.deviceInfo?.hasDisplay || !this.deviceInfo.supportsHIDOutput) return;
     
     // Pad/truncate lines to display size
     const formattedLines = displayLines.slice(0, this.deviceInfo.displayLines).map(line => 
@@ -589,7 +609,7 @@ export class NKSHIDProtocol {
    * Send light guide update to controller
    */
   async sendLightGuide(keyLights: NKSKeyLight[]): Promise<void> {
-    if (!this.device || !this.deviceInfo?.hasLightGuide) return;
+    if (!this.device || !this.deviceInfo?.hasLightGuide || !this.deviceInfo.supportsHIDOutput) return;
     
     try {
       // Build light guide message (up to 128 keys)
@@ -719,7 +739,7 @@ export class NKSHIDProtocol {
    * Send ping to device
    */
   private async sendPing(): Promise<void> {
-    if (!this.device) return;
+    if (!this.device || !this.deviceInfo?.supportsHIDOutput) return;
     
     const report = new Uint8Array(64);
     report[0] = HID_REPORT_IDS.PING;

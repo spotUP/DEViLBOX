@@ -17,11 +17,12 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 /**
  * SCHEMA VERSION - Bump this when making breaking changes to stored data format.
  * This will cause old localStorage data to be discarded on load.
- * 
+ *
  * History:
  * - 2: Fixed filterSelect=255 bug (was invalid, now defaults to 1)
+ * - 3: Split WAM plugins — effects moved to effect browser, synths are individual types
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 interface SavedProject {
   version: string;

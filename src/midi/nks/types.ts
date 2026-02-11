@@ -243,6 +243,9 @@ export interface NKSControllerInfo {
   
   // Touch strip
   hasTouchStrip: boolean;
+
+  // HID output support (NI devices use HID; Akai/Arturia/etc. use MIDI SysEx)
+  supportsHIDOutput: boolean;
 }
 
 /**

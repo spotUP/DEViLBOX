@@ -245,6 +245,85 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     description: 'Enhance stereo image width',
   },
 
+  // ===== WAM 2.0 EFFECTS (Web Audio Modules) =====
+  {
+    category: 'wam',
+    type: 'WAMBigMuff',
+    label: 'Big Muff (WAM)',
+    group: 'Distortion',
+    description: 'Electro-Harmonix Big Muff Pi fuzz (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMTS9',
+    label: 'TS-9 Overdrive (WAM)',
+    group: 'Distortion',
+    description: 'Ibanez Tube Screamer overdrive (WAM 2.0, Faust DSP)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMQuadraFuzz',
+    label: 'QuadraFuzz (WAM)',
+    group: 'Distortion',
+    description: '4-band multiband distortion/fuzz (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMDistoMachine',
+    label: 'Disto Machine (WAM)',
+    group: 'Amp Simulator',
+    description: 'Multi-mode distortion with cabinet sim (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMVoxAmp',
+    label: 'Vox Amp 30 (WAM)',
+    group: 'Amp Simulator',
+    description: '1960s guitar amp simulator with cabinet (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMStonePhaser',
+    label: 'Stone Phaser (WAM)',
+    group: 'Modulation',
+    description: 'Stereo phaser effect (WAM 2.0, Faust DSP)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMPingPongDelay',
+    label: 'Ping Pong Delay (WAM)',
+    group: 'Reverb & Delay',
+    description: 'Stereo ping-pong delay (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMFaustDelay',
+    label: 'Faust Delay (WAM)',
+    group: 'Reverb & Delay',
+    description: 'Ping-pong delay powered by Faust DSP (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMPitchShifter',
+    label: 'Pitch Shifter (WAM)',
+    group: 'Pitch',
+    description: 'Csound-powered pitch shifter (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMGraphicEQ',
+    label: 'Graphic EQ (WAM)',
+    group: 'Dynamics',
+    description: 'Multi-band graphic equalizer (WAM 2.0)',
+  },
+  {
+    category: 'wam',
+    type: 'WAMPedalboard',
+    label: 'Pedalboard (WAM)',
+    group: 'Multi-FX',
+    description: 'Drag-and-drop guitar pedalboard (WAM 2.0)',
+  },
+
   // ===== NEURAL EFFECTS (37 GuitarML models) =====
   ...GUITARML_MODEL_REGISTRY.map((model) => ({
     category: 'neural' as const,
@@ -297,11 +376,12 @@ export function searchEffects(query: string): AvailableEffect[] {
 /**
  * Get total effect count
  */
-export function getTotalEffectCount(): { total: number; tonejs: number; neural: number; wasm: number } {
+export function getTotalEffectCount(): { total: number; tonejs: number; neural: number; wasm: number; wam: number } {
   const tonejs = AVAILABLE_EFFECTS.filter((e) => e.category === 'tonejs').length;
   const neural = AVAILABLE_EFFECTS.filter((e) => e.category === 'neural').length;
   const wasm = AVAILABLE_EFFECTS.filter((e) => e.category === 'wasm').length;
-  return { total: tonejs + neural + wasm, tonejs, neural, wasm };
+  const wam = AVAILABLE_EFFECTS.filter((e) => e.category === 'wam').length;
+  return { total: tonejs + neural + wasm + wam, tonejs, neural, wasm, wam };
 }
 
 /**

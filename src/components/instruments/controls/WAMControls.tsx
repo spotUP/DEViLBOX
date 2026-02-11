@@ -220,75 +220,82 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
     loadPlugin(selectedUrl);
   }, [loadPlugin]);
 
-  // Group plugins by type for the dropdown
-  const groupedPlugins = WAM_SYNTH_PLUGINS.reduce<Record<string, WAMPluginEntry[]>>((acc, p) => {
-    const groupKey = p.type === 'instrument' ? 'Synthesizers' : p.type === 'effect' ? 'Effects (with tone generator)' : 'Utility';
-    if (!acc[groupKey]) acc[groupKey] = [];
-    acc[groupKey].push(p);
-    return acc;
-  }, {});
+  // Named WAM synths skip the dropdown — they have a preconfigured URL
+  const isNamedWAM = ['WAMOBXd', 'WAMSynth101', 'WAMTinySynth', 'WAMFaustFlute'].includes(instrument.synthType);
+
+  // Group plugins by type for the dropdown (synths only — effects now live in the effect browser)
+  const groupedPlugins = WAM_SYNTH_PLUGINS
+    .filter(p => p.type === 'instrument')
+    .reduce<Record<string, WAMPluginEntry[]>>((acc, p) => {
+      const groupKey = 'Synthesizers';
+      if (!acc[groupKey]) acc[groupKey] = [];
+      acc[groupKey].push(p);
+      return acc;
+    }, {});
 
   return (
     <div className="flex flex-col h-full bg-dark-bgSecondary p-4 space-y-4 overflow-hidden">
-      {/* Plugin Browser */}
-      <div className="flex flex-col gap-2">
-        <label className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
-          <Globe size={14} />
-          Web Audio Module
-        </label>
+      {/* Plugin Browser — hidden for named WAM synths which have a preconfigured URL */}
+      {!isNamedWAM && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
+            <Globe size={14} />
+            Web Audio Module
+          </label>
 
-        {/* Plugin dropdown */}
-        <div className="relative">
-          <select
-            value={instrument.wam?.moduleUrl || ''}
-            onChange={handlePluginSelect}
-            disabled={isLoading}
-            className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors appearance-none cursor-pointer disabled:opacity-50"
-          >
-            <option value="">Select a WAM plugin...</option>
-            {Object.entries(groupedPlugins).map(([group, plugins]) => (
-              <optgroup key={group} label={group}>
-                {plugins.map(p => (
-                  <option key={p.url} value={p.url}>
-                    {p.name} — {p.description}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-        </div>
-
-        {/* Custom URL (collapsible) */}
-        <details className="group">
-          <summary className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none flex items-center gap-1">
-            <ChevronDown size={10} className="group-open:rotate-180 transition-transform" />
-            Custom URL
-          </summary>
-          <div className="mt-2 space-y-2">
-            <form onSubmit={handleUrlSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com/my-wam-plugin/index.js"
-                className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-50 text-text-inverse px-4 py-1.5 rounded text-sm font-bold transition-all flex items-center gap-2"
-              >
-                {isLoading ? <RefreshCw size={14} className="animate-spin" /> : 'LOAD'}
-              </button>
-            </form>
-            <p className="text-[10px] text-text-muted italic">
-              Enter any WAM 2.0 module URL. Browse more at{' '}
-              <a href="https://www.webaudiomodules.com/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">webaudiomodules.com</a>
-            </p>
+          {/* Plugin dropdown (synths only — effects are in the effect browser) */}
+          <div className="relative">
+            <select
+              value={instrument.wam?.moduleUrl || ''}
+              onChange={handlePluginSelect}
+              disabled={isLoading}
+              className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors appearance-none cursor-pointer disabled:opacity-50"
+            >
+              <option value="">Select a WAM plugin...</option>
+              {Object.entries(groupedPlugins).map(([group, plugins]) => (
+                <optgroup key={group} label={group}>
+                  {plugins.map(p => (
+                    <option key={p.url} value={p.url}>
+                      {p.name} — {p.description}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
           </div>
-        </details>
-      </div>
+
+          {/* Custom URL (collapsible) */}
+          <details className="group">
+            <summary className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary select-none flex items-center gap-1">
+              <ChevronDown size={10} className="group-open:rotate-180 transition-transform" />
+              Custom URL
+            </summary>
+            <div className="mt-2 space-y-2">
+              <form onSubmit={handleUrlSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com/my-wam-plugin/index.js"
+                  className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-accent-primary hover:bg-accent-primary/90 disabled:opacity-50 text-text-inverse px-4 py-1.5 rounded text-sm font-bold transition-all flex items-center gap-2"
+                >
+                  {isLoading ? <RefreshCw size={14} className="animate-spin" /> : 'LOAD'}
+                </button>
+              </form>
+              <p className="text-[10px] text-text-muted italic">
+                Enter any WAM 2.0 module URL. Browse more at{' '}
+                <a href="https://www.webaudiomodules.com/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">webaudiomodules.com</a>
+              </p>
+            </div>
+          </details>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
