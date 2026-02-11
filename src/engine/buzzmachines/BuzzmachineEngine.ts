@@ -7,7 +7,6 @@
  * Similar architecture to FurnaceChipEngine.ts
  */
 
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 import { getNativeContext } from '@utils/audio-context';
 
 export const BuzzmachineType = {
@@ -747,10 +746,10 @@ export class BuzzmachineEngine {
       await this.init(context);
     }
 
-    // Use Tone.js's createAudioWorkletNode for standardized-audio-context compatibility
+    // Use native AudioWorkletNode directly (addModule was called on the native context)
     const ctx = context as any;
     const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
-    const workletNode = toneCreateAudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
+    const workletNode = new AudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
       outputChannelCount: [2],

@@ -9,6 +9,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
+import { isDevilboxSynth } from '@typedefs/synth';
 import type { TrackerCell, Pattern } from '@typedefs';
 import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';
 
@@ -241,6 +242,8 @@ export class AutomationPlayer {
           if (isTB303) {
             console.log(`[AutomationPlayer] Applying cutoff: value=${value.toFixed(3)} -> ${cutoffHz.toFixed(0)}Hz`);
             (instrument as JC303Synth).setCutoff(cutoffHz);
+          } else if (isDevilboxSynth(instrument) && instrument.set) {
+            instrument.set('cutoff', value);
           } else if (instrument.filter?.frequency) {
             instrument.filter.frequency.setValueAtTime(cutoffHz, Tone.now());
           }
@@ -251,6 +254,8 @@ export class AutomationPlayer {
           const resoPercent = value * 100;
           if (isTB303) {
             (instrument as JC303Synth).setResonance(resoPercent);
+          } else if (isDevilboxSynth(instrument) && instrument.set) {
+            instrument.set('resonance', value);
           } else if (instrument.filter?.Q) {
             // For non-TB303, map to Q factor
             const qValue = value * 30;
@@ -360,7 +365,11 @@ export class AutomationPlayer {
         case 'volume':
           // Map 0-1 to -40dB to 0dB
           const volumeDb = -40 + value * 40;
-          if (instrument.volume) {
+          if (isDevilboxSynth(instrument)) {
+            // DevilboxSynth: set gain on native GainNode output
+            const gain = Math.pow(10, volumeDb / 20); // dB to linear
+            (instrument.output as GainNode).gain.setValueAtTime(gain, Tone.now());
+          } else if (instrument.volume) {
             instrument.volume.setValueAtTime(volumeDb, Tone.now());
           }
           break;

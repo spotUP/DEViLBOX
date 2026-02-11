@@ -8,7 +8,6 @@
  *  4. Worklet evaluates JS via new Function() and initializes WASM
  */
 
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 
 // Cache fetched WASM+JS per chip name so multiple instances share one fetch
 const moduleCache = new Map<string, Promise<{ wasmBinary: ArrayBuffer; jsCode: string }>>();
@@ -117,7 +116,7 @@ export function createMAMEWorkletNode(
   jsCode: string,
   outputNode: AudioNode
 ): { workletNode: AudioWorkletNode; readyPromise: Promise<void> } {
-  const workletNode = toneCreateAudioWorkletNode(rawContext, processorName, {
+  const workletNode = new AudioWorkletNode(rawContext, processorName, {
     outputChannelCount: [2],
     processorOptions: {
       sampleRate: rawContext.sampleRate

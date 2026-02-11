@@ -4210,9 +4210,6 @@ export class ToneEngine {
 
     // Detect if this is a native DevilboxSynth (non-Tone.js) or a Tone.js node
     const isNativeSynth = isDevilboxSynth(instrument);
-    if (isNativeSynth) {
-      console.log(`[ToneEngine] buildEffectChain: key=${key} is DevilboxSynth (${(instrument as any).name || 'unknown'}), output context=${(instrument as DevilboxSynth).output?.constructor?.name}`);
-    }
 
     // Helper: connect instrument to a Tone.js destination node
     const connectInstrumentTo = (dest: Tone.ToneAudioNode) => {
@@ -4934,7 +4931,7 @@ export class ToneEngine {
     // Dispose nodes after a short delay to allow for audio tail/clipping prevention
     setTimeout(() => {
       voice.nodes.gain.dispose();
-      voice.nodes.filter.dispose();
+      if (typeof voice.nodes.filter.dispose === 'function') voice.nodes.filter.dispose();
       voice.nodes.panner.dispose();
     }, 100);
   }
@@ -5500,7 +5497,7 @@ export class ToneEngine {
       } else {
         // Dispose nodes
         voice.nodes.gain.dispose();
-        voice.nodes.filter.dispose();
+        if (typeof voice.nodes.filter.dispose === 'function') voice.nodes.filter.dispose();
         voice.nodes.panner.dispose();
       }
     }

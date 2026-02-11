@@ -9,7 +9,6 @@
  */
 
 import { preprocessEmscriptenJS } from '../mame/mame-wasm-loader';
-import { createAudioWorkletNode as toneCreateAudioWorkletNode } from 'tone/build/esm/core/context/AudioContext';
 import type { VSTBridgeDescriptor } from './synth-registry';
 
 // Cache fetched WASM+JS per synth ID so multiple instances share one fetch
@@ -86,7 +85,7 @@ export function createVSTBridgeNode(
   jsCode: string,
   outputNode: AudioNode
 ): { workletNode: AudioWorkletNode; readyPromise: Promise<void> } {
-  const workletNode = toneCreateAudioWorkletNode(rawContext, 'vstbridge-processor', {
+  const workletNode = new AudioWorkletNode(rawContext, 'vstbridge-processor', {
     outputChannelCount: [2],
     processorOptions: {
       sampleRate: rawContext.sampleRate,
