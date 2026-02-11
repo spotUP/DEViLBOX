@@ -147,3 +147,63 @@ registerVSTBridge({
   moduleFactoryName: 'createMoniqueModule',
   volumeOffsetDb: 0,
 });
+
+// ---------------------------------------------------------------------------
+// Helm — Polyphonic Synthesizer by Matt Tytel (GPL3)
+// 2 oscillators, sub osc, 2 filters, 2 LFOs, 2 step sequencers, effects
+// 108 parameters across 19 groups
+// ---------------------------------------------------------------------------
+registerVSTBridge({
+  id: 'Helm',
+  name: 'Helm (Poly)',
+  wasmDir: 'helm',
+  wasmFile: 'Helm',
+  synthClassName: 'HelmSynth',
+  moduleFactoryName: 'createHelmModule',
+  volumeOffsetDb: 0,
+});
+
+// ---------------------------------------------------------------------------
+// Sorcer — FAUST-based Wavetable Synthesizer by OpenAV (GPL2)
+// Wavetable oscillator, Butterworth filter, compressor, LFO
+// 21 parameters across 6 groups
+// ---------------------------------------------------------------------------
+registerVSTBridge({
+  id: 'Sorcer',
+  name: 'Sorcer (Wavetable)',
+  wasmDir: 'sorcer',
+  wasmFile: 'Sorcer',
+  synthClassName: 'SorcerSynth',
+  moduleFactoryName: 'createSorcerModule',
+  volumeOffsetDb: 0,
+});
+
+// ---------------------------------------------------------------------------
+// amsynth — Classic Analog Modeling Synthesizer by Nick Dowell (GPL2)
+// 2 oscillators, filter, 2 envelopes, LFO, Freeverb reverb, distortion
+// 41 parameters across 11 groups
+// ---------------------------------------------------------------------------
+registerVSTBridge({
+  id: 'Amsynth',
+  name: 'amsynth (Analog)',
+  wasmDir: 'amsynth',
+  wasmFile: 'Amsynth',
+  synthClassName: 'AmsynthSynth',
+  moduleFactoryName: 'createAmsynthModule',
+  volumeOffsetDb: 0,
+});
+
+// ---------------------------------------------------------------------------
+// OB-Xf — Oberheim OB-X/OB-Xa Modeling by Surge Synth Team (GPL3)
+// 2 oscillators (saw/pulse), multimode filter, 2 LFOs, analog voice variation
+// 83 parameters across 12 groups
+// ---------------------------------------------------------------------------
+registerVSTBridge({
+  id: 'OBXf',
+  name: 'OB-Xf (Analog)',
+  wasmDir: 'obxf',
+  wasmFile: 'OBXf',
+  synthClassName: 'OBXfSynth',
+  moduleFactoryName: 'createOBXfModule',
+  volumeOffsetDb: 0,
+});
