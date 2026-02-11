@@ -171,6 +171,10 @@ export class V2SpeechSynth implements DevilboxSynth {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
       const ratio = Math.pow(2, (midi - 60) / 12);
 
+      // Cancel any release fade and restore gain
+      this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+      this._playerGain.gain.value = velocity;
+
       if (this._isPlaying && this._sourceNode) {
         this._sourceNode.playbackRate.value = ratio;
       } else {
@@ -179,15 +183,20 @@ export class V2SpeechSynth implements DevilboxSynth {
           this._sourceNode.playbackRate.value = ratio;
         }
       }
-      this._playerGain.gain.value = velocity;
     } else {
       this._startSource(time);
       this._playerGain.gain.value = velocity;
     }
   }
 
-  public triggerRelease(_time?: number) {
-    // One-shot playback usually doesn't need release
+  public triggerRelease(time?: number) {
+    if (this._config.singMode && this._isPlaying) {
+      // In sing mode, fade out quickly and stop
+      const t = time ?? this.audioContext.currentTime;
+      this._playerGain.gain.setValueAtTime(this._playerGain.gain.value, t);
+      this._playerGain.gain.linearRampToValueAtTime(0, t + 0.05);
+      setTimeout(() => this._stopSource(), 80);
+    }
   }
 
   public triggerAttackRelease(note: string | number, _duration: number | string, time?: number, velocity: number = 1) {
