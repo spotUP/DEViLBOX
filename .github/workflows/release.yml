@@ -1,18 +1,24 @@
-name: Build and Release Electron Apps
+name: Release Electron Apps (Manual Tag)
+
+# This workflow is for creating versioned releases with a tag.
+# Electron apps are also built automatically on every push to main
+# via deploy.yml. Use this workflow when you want a specific version
+# number attached to the release (e.g. v1.1.0).
 
 on:
   push:
     tags:
-      - 'v*' # Triggers on version tags like v1.0.0, v1.2.3, etc.
+      - 'v*'
 
 permissions:
-  contents: write # Required to create releases
+  contents: write
 
 jobs:
   release:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
 
@@ -35,7 +41,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm run build
-          npm run electron:build -- --mac --publish always
+          npx electron-builder build --mac --publish always
 
       - name: Build Electron App (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -43,7 +49,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm run build
-          npm run electron:build -- --linux --publish always
+          npx electron-builder build --linux --publish always
 
       - name: Build Electron App (Windows)
         if: matrix.os == 'windows-latest'
@@ -51,4 +57,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm run build
-          npm run electron:build -- --win --publish always
+          npx electron-builder build --win --publish always
