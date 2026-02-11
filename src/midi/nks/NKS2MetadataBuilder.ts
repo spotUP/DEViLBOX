@@ -514,9 +514,24 @@ export function validateNKS2Metadata(metadata: NKS2Metadata): LayoutValidationRe
   }
 
   for (const pdi of metadata.parameter_descriptive_info) {
-    if (pdi.type === 'Discrete' || pdi.type === 'Discrete bipolar') {
+    if (pdi.type === 'Discrete') {
       if (pdi.value_count !== undefined && (pdi.value_count < 3 || pdi.value_count > 128)) {
-        errors.push(`Parameter ${pdi.id}: value_count must be 3-128, got ${pdi.value_count}`);
+        errors.push(`Parameter ${pdi.id}: Discrete value_count must be 3-128, got ${pdi.value_count}`);
+      }
+    }
+    if (pdi.type === 'Discrete bipolar') {
+      if (pdi.value_count !== undefined) {
+        if (pdi.value_count < 3 || pdi.value_count > 127) {
+          errors.push(`Parameter ${pdi.id}: Discrete bipolar value_count must be 3-127, got ${pdi.value_count}`);
+        }
+        if (pdi.value_count % 2 === 0) {
+          errors.push(`Parameter ${pdi.id}: Discrete bipolar value_count must be odd, got ${pdi.value_count}`);
+        }
+      }
+    }
+    if (pdi.type === 'Toggle') {
+      if (pdi.display_values && pdi.display_values.length !== 2) {
+        errors.push(`Parameter ${pdi.id}: Toggle display_values must have exactly 2 entries, got ${pdi.display_values.length}`);
       }
     }
   }
@@ -543,6 +558,14 @@ export function validateNKS2Metadata(metadata: NKS2Metadata): LayoutValidationRe
     if (groupParams > NKS_CONSTANTS.MAX_EDIT_PARAMS_PER_GROUP) {
       errors.push(`Edit group "${group.name}" has ${groupParams} params, max is ${NKS_CONSTANTS.MAX_EDIT_PARAMS_PER_GROUP}`);
     }
+  }
+
+  // Edit group count: >7 triggers carousel navigation on hardware
+  if (metadata.parameter_navigation.groups.length > 7) {
+    warnings.push(
+      `${metadata.parameter_navigation.groups.length} edit groups: hardware will use carousel navigation (>7 groups). ` +
+      `Consider consolidating groups for simpler navigation.`,
+    );
   }
 
   // Check for duplicate parameter IDs in PDI

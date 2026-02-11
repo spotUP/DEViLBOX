@@ -120,13 +120,13 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
           if (decoded.deviceType) metadata.deviceType = String(decoded.deviceType);
           if (decoded.UUID) metadata.uuid = String(decoded.UUID);
           if (Array.isArray(decoded.bankchain)) {
-            metadata.bankChain = decoded.bankchain.map(String);
+            metadata.bankChain = decoded.bankchain.map(String).slice(0, 3); // Max 3 per spec
           }
           if (Array.isArray(decoded.types)) {
-            // types is [[type, subtype], ...]
-            metadata.types = (decoded.types as string[][]).map(
-              pair => Array.isArray(pair) ? pair.map(String) : [String(pair)]
-            ).flat();
+            // types is [[type, subtype], ...] per SDK Section 17.9
+            metadata.types = (decoded.types as unknown[]).map(pair =>
+              Array.isArray(pair) ? pair.map(String) : [String(pair), ''],
+            );
           }
           if (Array.isArray(decoded.Character)) {
             metadata.modes = decoded.Character.map(String);
@@ -167,11 +167,11 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
         try {
           const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
           // Store plugin ID info in metadata for round-trip
-          if (decoded['VST.magic']) {
-            (metadata as Record<string, unknown>)['vstMagic'] = decoded['VST.magic'];
+          if (decoded['VST.magic'] !== undefined) {
+            metadata.vstMagic = Number(decoded['VST.magic']);
           }
-          if (decoded['VST3.uid']) {
-            (metadata as Record<string, unknown>)['vst3Uid'] = decoded['VST3.uid'];
+          if (Array.isArray(decoded['VST3.uid']) && decoded['VST3.uid'].length === 4) {
+            metadata.vst3Uid = decoded['VST3.uid'].map(Number) as [number, number, number, number];
           }
         } catch (e) {
           console.warn('[NKS] Failed to decode PLID chunk:', e);
@@ -342,13 +342,13 @@ export function writeNKSF(preset: NKSPreset): ArrayBuffer {
 function buildPLIDChunk(metadata: NKSPresetMetadata): ArrayBuffer {
   const pluginInfo: Record<string, unknown> = {};
 
-  // Use stored VST identifiers if available, otherwise use DEViLBOX defaults
-  const meta = metadata as unknown as Record<string, unknown>;
-  if (meta.vstMagic) {
-    pluginInfo['VST.magic'] = meta.vstMagic;
+  // Use typed VST identifiers from metadata
+  if (metadata.vstMagic !== undefined) {
+    pluginInfo['VST.magic'] = metadata.vstMagic;
   }
-  if (meta.vst3Uid) {
-    pluginInfo['VST3.uid'] = meta.vst3Uid;
+  if (metadata.vst3Uid) {
+    // VST3 UID is an array of exactly 4 integers per SDK Section 17.8
+    pluginInfo['VST3.uid'] = [...metadata.vst3Uid];
   }
 
   // Default: use UUID hash as VST magic for DEViLBOX presets
@@ -378,18 +378,12 @@ function buildNISIChunk(metadata: NKSPresetMetadata): ArrayBuffer {
   if (metadata.comment) nisi.comment = metadata.comment;
   if (metadata.uuid) nisi.UUID = metadata.uuid;
 
-  // Types as [[type, subtype], ...] per spec
+  // Types as [[type, subtype], ...] per SDK Section 17.9
   if (metadata.types && metadata.types.length > 0) {
-    // If types are flat strings, pair them as [type, subtype]
-    const typePairs: string[][] = [];
-    for (let i = 0; i < metadata.types.length; i += 2) {
-      if (i + 1 < metadata.types.length) {
-        typePairs.push([metadata.types[i], metadata.types[i + 1]]);
-      } else {
-        typePairs.push([metadata.types[i], '']);
-      }
-    }
-    nisi.types = typePairs;
+    // types is already string[][] - each entry is [type, subType]
+    nisi.types = metadata.types.map(pair =>
+      pair.length >= 2 ? [pair[0], pair[1]] : [pair[0] || '', ''],
+    );
   }
 
   // Character tags (stored in modes field internally)

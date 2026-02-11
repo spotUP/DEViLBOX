@@ -42,6 +42,9 @@ export * from './NKSAccessibility';
 // Deployment and registry
 export * from './NKSDeployment';
 
+// Validation and pre-submission audit
+export * from './NKSValidation';
+
 // Leap expansion support
 export * from './NKSLeapExpansion';
 
@@ -115,6 +118,7 @@ export {
   getDefaultDeploymentConfig,
   generateDeploymentManifest,
   incrementContentVersion,
+  getUninstallManifest,
 } from './NKSDeployment';
 export {
   buildNKS2Metadata,
@@ -144,3 +148,18 @@ export {
   getLeapPackageStructure,
   validateLeapPackage,
 } from './NKSLeapExpansion';
+export {
+  validatePresetName,
+  validateBankChain,
+  validateTypeTags,
+  validateKeyName,
+  validateShortName,
+  selectPreviewPattern,
+  resolvePreviewPattern,
+  calculateMSTPluginDimensions,
+  auditNKSProduct,
+  NKS_SOURCE_ARTWORK_SPECS,
+  NKS_PREVIEW_PATTERNS,
+  NKS_PREVIEW_FULL_SPEC,
+  NKS_SDK_VERSIONS,
+} from './NKSValidation';
