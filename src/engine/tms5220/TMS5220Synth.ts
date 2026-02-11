@@ -100,7 +100,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: 0 });
+    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
   }
 
   protected writeFrequency(freq: number): void {
