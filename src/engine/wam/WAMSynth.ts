@@ -272,12 +272,38 @@ export class WAMSynth implements DevilboxSynth {
       // 5. Detect plugin type BEFORE connecting (needed for routing decision)
       const descriptor = this._wamInstance.descriptor;
       if (descriptor) {
-        const keywords: string[] = descriptor.keywords || [];
-        const isInstrument = keywords.includes('instrument') || keywords.includes('synth') || keywords.includes('synthesizer');
-        const isEffect = keywords.includes('effect') || keywords.includes('fx') || keywords.includes('audio-effect');
-        this._pluginType = isInstrument ? 'instrument' : isEffect ? 'effect' : 'unknown';
+        // WAM 2.0 descriptors may have isInstrument/hasAudioInput booleans
+        if (descriptor.isInstrument === true) {
+          this._pluginType = 'instrument';
+        } else if (descriptor.isInstrument === false) {
+          this._pluginType = 'effect';
+        } else {
+          // Fall back to keyword detection
+          const keywords: string[] = descriptor.keywords || [];
+          const kwInstrument = keywords.includes('instrument') || keywords.includes('synth') || keywords.includes('synthesizer');
+          const kwEffect = keywords.includes('effect') || keywords.includes('fx') || keywords.includes('audio-effect');
+          if (kwInstrument) {
+            this._pluginType = 'instrument';
+          } else if (kwEffect) {
+            this._pluginType = 'effect';
+          } else {
+            // Check descriptor name/description for instrument-related words
+            const text = `${descriptor.name || ''} ${descriptor.description || ''}`.toLowerCase();
+            if (/synth|instrument|piano|organ|drum/i.test(text)) {
+              this._pluginType = 'instrument';
+            }
+          }
+        }
       }
-      // Heuristic: if the WAM node has audio inputs, it's likely an effect
+      // Check our own curated registry as authoritative override
+      if (this._pluginType === 'unknown' && this._config.moduleUrl) {
+        const { WAM_SYNTH_PLUGINS } = await import('@/constants/wamPlugins');
+        const entry = WAM_SYNTH_PLUGINS.find(p => this._config.moduleUrl.includes(p.url) || p.url.includes(this._config.moduleUrl));
+        if (entry) {
+          this._pluginType = entry.type === 'instrument' ? 'instrument' : entry.type === 'effect' ? 'effect' : 'unknown';
+        }
+      }
+      // Last resort heuristic: if still unknown and has audio inputs, likely an effect
       if (this._pluginType === 'unknown' && this._wamNode.numberOfInputs > 0) {
         this._pluginType = 'effect';
       }
@@ -550,11 +576,52 @@ export class WAMSynth implements DevilboxSynth {
    * Create the native plugin GUI
    */
   async createGui(): Promise<HTMLElement | null> {
-    if (!this._isInitialized || !this._wamInstance) return null;
-
-    if (this._wamInstance.createGui) {
-      return await this._wamInstance.createGui();
+    if (!this._isInitialized || !this._wamInstance) {
+      console.warn('[WAMSynth] createGui: not initialized or no instance');
+      return null;
     }
+
+    const inst = this._wamInstance;
+    const pluginName = inst.descriptor?.name || inst.constructor?.name || 'unknown';
+    console.log(`[WAMSynth] createGui for "${pluginName}": hasMethod=${typeof inst.createGui === 'function'}, guiModuleUrl=${inst._guiModuleUrl || 'none'}`);
+
+    // 1. Try the standard WAM 2.0 createGui()
+    if (typeof inst.createGui === 'function') {
+      try {
+        const gui = await inst.createGui();
+        if (gui) {
+          console.log(`[WAMSynth] createGui returned element: <${gui.tagName?.toLowerCase()}>`);
+          return gui as HTMLElement;
+        }
+        console.log('[WAMSynth] createGui returned null/undefined');
+      } catch (err) {
+        console.warn('[WAMSynth] createGui threw:', err);
+      }
+    }
+
+    // 2. Fallback: try to load gui.js relative to the module URL
+    if (this._config.moduleUrl) {
+      const baseUrl = this._config.moduleUrl.replace(/\/[^/]*$/, '/');
+      const guiCandidates = ['gui.js', 'Gui/index.js', 'gui/index.js'];
+      for (const guiFile of guiCandidates) {
+        const guiUrl = baseUrl + guiFile;
+        try {
+          console.log(`[WAMSynth] Trying fallback GUI module: ${guiUrl}`);
+          const guiModule = await import(/* @vite-ignore */ guiUrl);
+          if (typeof guiModule.createElement === 'function') {
+            const gui = await guiModule.createElement(inst);
+            if (gui) {
+              console.log(`[WAMSynth] Fallback GUI loaded from ${guiFile}: <${gui.tagName?.toLowerCase()}>`);
+              return gui as HTMLElement;
+            }
+          }
+        } catch {
+          // This candidate doesn't exist, try next
+        }
+      }
+    }
+
+    console.log(`[WAMSynth] No GUI available for "${pluginName}"`);
     return null;
   }
 

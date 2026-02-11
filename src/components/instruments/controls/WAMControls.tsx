@@ -44,6 +44,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
   useEffect(() => {
     let isMounted = true;
     let currentGui: HTMLElement | null = null;
+    let resizeObserver: ResizeObserver | null = null;
 
     const mountGui = async () => {
       if (!guiContainerRef.current) return;
@@ -79,13 +80,55 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
 
         if (!isMounted) return;
 
+        // Skip createGui() for plugins that declare "no GUI" in their descriptor
+        const desc = synth.descriptor;
+        const declaredNoGui = desc && /no gui/i.test(desc.name || '');
+
         console.log('[WAMControls] Creating native GUI...');
-        const gui = await synth.createGui();
+        const gui = declaredNoGui ? null : await synth.createGui();
         if (gui && isMounted && guiContainerRef.current) {
           console.log('[WAMControls] GUI created, mounting to DOM');
           currentGui = gui;
           setHasNativeGui(true);
           guiContainerRef.current.appendChild(gui);
+
+          // Auto-scale plugin GUI to fill available container space.
+          // Re-measures on each attempt since WAM GUIs (shadow DOM, WASM) may
+          // load progressively and change size.
+          let guiNaturalW = 0, guiNaturalH = 0;
+          const scaleToFit = () => {
+            const container = guiContainerRef.current;
+            if (!container || !gui) return;
+            // Reset transform to measure natural size
+            gui.style.transform = '';
+            gui.style.position = '';
+            gui.style.left = '';
+            gui.style.top = '';
+            // Capture natural dimensions (re-measure each time for progressively-loading plugins)
+            const w = gui.offsetWidth || gui.scrollWidth || gui.clientWidth;
+            const h = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
+            if (!w || !h) return; // Not rendered yet, retry later
+            guiNaturalW = w;
+            guiNaturalH = h;
+            const cw = container.clientWidth;
+            const ch = container.clientHeight;
+            if (!cw || !ch) return;
+            // Scale to fill container (both up and down), maintaining aspect ratio
+            const scale = Math.min(cw / guiNaturalW, ch / guiNaturalH);
+            const scaledW = guiNaturalW * scale;
+            const scaledH = guiNaturalH * scale;
+            gui.style.position = 'absolute';
+            gui.style.transformOrigin = 'top left';
+            gui.style.transform = `scale(${scale})`;
+            gui.style.left = `${(cw - scaledW) / 2}px`;
+            gui.style.top = `${(ch - scaledH) / 2}px`;
+          };
+          resizeObserver = new ResizeObserver(scaleToFit);
+          resizeObserver.observe(guiContainerRef.current);
+          requestAnimationFrame(scaleToFit);
+          setTimeout(scaleToFit, 300);
+          setTimeout(scaleToFit, 800);
+          setTimeout(scaleToFit, 1500);
 
           // Info banner for effects plugins
           if (synth.pluginType === 'effect') {
@@ -94,8 +137,8 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
               `A built-in tone generator feeds audio through it so you can play it from the keyboard.`
             );
           }
-        } else if (!gui && isMounted) {
-          console.warn('[WAMControls] Plugin did not provide a GUI, trying parameter discovery');
+        } else if (isMounted) {
+          console.warn('[WAMControls] Plugin did not provide a usable GUI, trying parameter discovery');
           // No native GUI — try parameter discovery for fallback UI
           try {
             const params = await synth.getParameters();
@@ -106,9 +149,13 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
                 initialValues[id] = info.defaultValue ?? info.minValue ?? 0;
               });
               setParamValues(initialValues);
-            } else if (isMounted) {
+            } else if (isMounted && guiContainerRef.current) {
+              const pluginName = synth.descriptor?.name || 'This plugin';
               guiContainerRef.current.innerHTML =
-                '<div class="text-text-muted text-xs p-4 italic">Plugin does not provide a GUI or discoverable parameters</div>';
+                `<div class="text-text-muted text-sm p-6 text-center">` +
+                `<p class="font-semibold mb-2">${pluginName}</p>` +
+                `<p class="text-xs italic">This plugin does not provide a GUI or discoverable parameters.<br/>` +
+                `It can still be played from the keyboard.</p></div>`;
             }
           } catch (paramErr) {
             console.warn('[WAMControls] Parameter discovery failed:', paramErr);
@@ -131,6 +178,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
 
     return () => {
       isMounted = false;
+      resizeObserver?.disconnect();
       if (currentGui && currentGui.parentElement) {
         currentGui.parentElement.removeChild(currentGui);
       }
@@ -286,7 +334,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
         </div>
         <div
           ref={guiContainerRef}
-          className="flex-1 bg-black rounded-lg border border-dark-border overflow-auto min-h-[300px] [&>*]:mx-auto"
+          className="flex-1 bg-black rounded-lg border border-dark-border overflow-x-hidden overflow-y-auto relative min-h-[300px]"
         />
       </div>
 
