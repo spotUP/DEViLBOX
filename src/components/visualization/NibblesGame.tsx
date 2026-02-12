@@ -58,7 +58,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const [grid, setGrid] = useState(true);
   const [surround, setSurround] = useState(false);
   const [highScores, setHighScores] = useState<NibblesScore[]>([]);
-  
+  const [showNameEntry, setShowNameEntry] = useState(false);
+  const [nameEntryPlayer, setNameEntryPlayer] = useState(1);
+  const [nameEntryScore, setNameEntryScore] = useState(0);
+  const [nameEntryLevel, setNameEntryLevel] = useState(0);
+  const [nameInput, setNameInput] = useState('');
+
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
   const score1Ref = useRef(0);
@@ -202,36 +207,28 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
     const lowestTopScore = highScores.length < 10 ? 0 : highScores[highScores.length - 1].score;
 
+    // Check if either player got a high score
     if (s1 > lowestTopScore) {
-      const name = prompt("Player 1 - Enter your name for the highscore:", "Player 1");
-      if (name) {
-        await scoreLibrary.saveScore({
-          name,
-          score: s1,
-          level: lvl + 1,
-          players: numPlayers,
-          speed: speed
-        });
-      }
+      setNameEntryPlayer(1);
+      setNameEntryScore(s1);
+      setNameEntryLevel(lvl + 1);
+      setNameInput('Player 1');
+      setShowNameEntry(true);
+      return; // Wait for name entry
     }
 
     if (numPlayers === 2 && s2 > lowestTopScore) {
-      const name = prompt("Player 2 - Enter your name for the highscore:", "Player 2");
-      if (name) {
-        await scoreLibrary.saveScore({
-          name,
-          score: s2,
-          level: lvl + 1,
-          players: numPlayers,
-          speed: speed
-        });
-      }
+      setNameEntryPlayer(2);
+      setNameEntryScore(s2);
+      setNameEntryLevel(lvl + 1);
+      setNameInput('Player 2');
+      setShowNameEntry(true);
+      return; // Wait for name entry
     }
 
+    // No high scores, reset immediately
     loadHighScores();
     setShowHighScores(true);
-
-    // Reset Game State
     levelRef.current = 0;
     score1Ref.current = 0;
     score2Ref.current = 0;
@@ -240,6 +237,48 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     initLevel(0);
     syncUI();
   }, [numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
+
+  // Handle name entry submission
+  const handleNameSubmit = useCallback(async () => {
+    if (nameInput.trim()) {
+      await scoreLibrary.saveScore({
+        name: nameInput.trim(),
+        score: nameEntryScore,
+        level: nameEntryLevel,
+        players: numPlayers,
+        speed: speed
+      });
+    }
+
+    setShowNameEntry(false);
+
+    // Check if player 2 also needs to enter name
+    if (nameEntryPlayer === 1 && numPlayers === 2) {
+      const s2 = score2Ref.current;
+      const lvl = levelRef.current;
+      const lowestTopScore = highScores.length < 10 ? 0 : highScores[highScores.length - 1].score;
+
+      if (s2 > lowestTopScore) {
+        setNameEntryPlayer(2);
+        setNameEntryScore(s2);
+        setNameEntryLevel(lvl + 1);
+        setNameInput('Player 2');
+        setShowNameEntry(true);
+        return;
+      }
+    }
+
+    // All done, show high scores and reset
+    loadHighScores();
+    setShowHighScores(true);
+    levelRef.current = 0;
+    score1Ref.current = 0;
+    score2Ref.current = 0;
+    lives1Ref.current = 3;
+    lives2Ref.current = 3;
+    initLevel(0);
+    syncUI();
+  }, [nameInput, nameEntryScore, nameEntryLevel, nameEntryPlayer, numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
 
   const isInvalid = useCallback((currentX: number, currentY: number, d: number) => {
     // Calculate the next position
@@ -696,6 +735,63 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
               />
               Surround
             </label>
+          </div>
+        </div>
+      )}
+
+      {/* High Score Name Entry */}
+      {showNameEntry && (
+        <div
+          className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-dark-bgSecondary border border-accent-primary rounded p-4 flex flex-col gap-3 min-w-[200px]">
+            <div className="text-accent-primary font-bold text-[11px] uppercase tracking-wider text-center">
+              High Score!
+            </div>
+            <div className="text-text-secondary text-[9px] font-mono text-center">
+              Player {nameEntryPlayer} - {nameEntryScore.toLocaleString()} pts
+            </div>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleNameSubmit();
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  handleNameSubmit();
+                }
+              }}
+              maxLength={20}
+              placeholder="Enter your name"
+              autoFocus
+              className="bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-white text-[10px] font-mono focus:border-accent-primary focus:outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNameSubmit();
+                }}
+                className="flex-1 bg-accent-primary hover:bg-accent-secondary text-white px-3 py-1 rounded text-[9px] font-bold uppercase transition-all"
+              >
+                Submit
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNameInput('');
+                  handleNameSubmit();
+                }}
+                className="bg-dark-bgTertiary hover:bg-dark-border text-text-muted px-3 py-1 rounded text-[9px] uppercase transition-all"
+              >
+                Skip
+              </button>
+            </div>
           </div>
         </div>
       )}
