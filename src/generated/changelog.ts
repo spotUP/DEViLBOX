@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T19:09:53.331Z
+ * Generated: 2026-02-12T21:00:23.503Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '428';
-export const BUILD_HASH = '46195bf';
+export const BUILD_NUMBER = '435';
+export const BUILD_HASH = '699afd7';
 export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
@@ -33,6 +33,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-12',
     changes: [
+      {
+        type: 'fix',
+        "description": "Song length should use patternOrder.length not patterns.length"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in import/export and stores"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in hooks and utilities"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in UI components"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in synth implementations"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 363 TypeScript errors in InstrumentFactory and ToneEngine"
+      },
       {
         type: 'feature',
         "description": "Arrangement view, piano roll canvas engine, DB303 param wiring fixes"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix TD-3 pattern import and parameter editor null guard"
-      },
-      {
-        type: 'fix',
-        "description": "Improve master routing and synth engine stability"
-      },
-      {
-        type: 'feature',
-        "description": "Expand Odin2 WASM engine with full parameter coverage"
-      },
-      {
-        type: 'feature',
-        "description": "Add Helm, Sorcer, amsynth, and OB-Xf WASM synth engines"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve Tone.js compatibility issues from DevilboxSynth refactor"
-      },
-      {
-        type: 'fix',
-        "description": "Load Behringer .sqs/.seq files via file browser"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up synth controls - fix Odin2 ranges, add OTHER tab, show all params"
-      },
-      {
-        type: 'fix',
-        "description": "Bridge native DevilboxSynths into Tone.js effect chains"
       }
     ]
   }
