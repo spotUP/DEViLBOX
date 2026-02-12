@@ -159,8 +159,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     patterns,
     currentPatternIndex,
     setCurrentPattern,
-    deletePattern,
-    addPattern,
     expandPattern,
     shrinkPattern,
     resizePattern,
