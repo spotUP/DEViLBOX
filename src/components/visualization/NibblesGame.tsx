@@ -441,8 +441,19 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
           const px = offsetX + x * cellSize;
           const py = offsetY + y * cellSize;
           if (val >= 16) {
-            ctx.fillStyle = PALETTE[5];
-            ctx.font = `bold ${Math.floor(cellSize * 0.8)}px monospace`;
+            // Food: Draw filled cell with number (same size as worm segment)
+            if (grid) {
+              ctx.fillStyle = '#222';
+              ctx.fillRect(px, py, cellSize, cellSize);
+              ctx.fillStyle = PALETTE[12]; // Yellow background
+              ctx.fillRect(px + 1, py + 1, cellSize - 1, cellSize - 1);
+            } else {
+              ctx.fillStyle = PALETTE[12]; // Yellow background
+              ctx.fillRect(px, py, cellSize, cellSize);
+            }
+            // Draw number on top
+            ctx.fillStyle = '#000'; // Black text for contrast
+            ctx.font = `bold ${Math.floor(cellSize * 0.7)}px monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText((val - 16).toString(), px + cellSize / 2, py + cellSize / 2 + 1);
@@ -489,11 +500,11 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         <div className="font-mono text-[8px] text-white uppercase">P2: {uiState.score2} | L:{uiState.lives2}</div>
       </div>
 
-      <canvas 
-        ref={canvasRef} 
-        width={actualWidth} 
+      <canvas
+        ref={canvasRef}
+        width={actualWidth}
         height={height}
-        className="cursor-pointer"
+        className="cursor-pointer border-2 border-cyan-500/20"
         onClick={(e) => {
           e.stopPropagation();
           if (!uiState.isPlaying) setIsPlaying(true);
