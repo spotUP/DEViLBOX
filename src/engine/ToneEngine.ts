@@ -4740,7 +4740,7 @@ export class ToneEngine {
    * Update all BPM-synced effects (master + per-instrument) when BPM changes.
    * Recalculates timing values in-place — no chain rebuild needed.
    */
-  public updateBpmSyncedEffects(bpm: number): void {
+  public async updateBpmSyncedEffects(bpm: number): Promise<void> {
     // 1. Master effects
     this.masterEffectConfigs.forEach(({ node, config }) => {
       if (!isEffectBpmSynced(config.parameters)) return;
@@ -4756,8 +4756,7 @@ export class ToneEngine {
     // 2. Per-instrument effects
     // Lazy-import to avoid circular: useInstrumentStore -> ToneEngine -> useInstrumentStore
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { useInstrumentStore } = require('../stores/useInstrumentStore');
+      const { useInstrumentStore } = await import('../stores/useInstrumentStore');
       const instruments = useInstrumentStore.getState().instruments;
 
       this.instrumentEffectChains.forEach((chain, key) => {
