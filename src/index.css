@@ -2373,6 +2373,11 @@ html[data-theme="cyan-lineart"] #root > * {
     );
 }
 
+/* Compact variant — disable glass overlay for clarity */
+.viz-frame--compact .viz-frame__glass {
+  display: none;
+}
+
 /* Vignette — darkened edges for depth/focus */
 .viz-frame__vignette {
   position: absolute;
@@ -2385,11 +2390,9 @@ html[data-theme="cyan-lineart"] #root > * {
     inset 0 0 60px rgba(0, 0, 0, 0.15);
 }
 
-/* Compact variant — tighter shadow for small displays */
+/* Compact variant — disable vignette for clarity */
 .viz-frame--compact .viz-frame__vignette {
-  box-shadow:
-    inset 0 0 15px rgba(0, 0, 0, 0.4),
-    inset 0 0 30px rgba(0, 0, 0, 0.1);
+  display: none;
 }
 
 /* Large variant — more dramatic glass and vignette */
