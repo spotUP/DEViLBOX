@@ -976,7 +976,7 @@ export class DB303Synth implements DevilboxSynth {
    */
   applyConfig(tb: TB303Config): void {
     if (db303TraceEnabled()) {
-      const keys = Object.keys(tb).filter(k => (tb as Record<string, unknown>)[k] !== undefined);
+      const keys = Object.keys(tb).filter(k => (tb as unknown as Record<string, unknown>)[k] !== undefined);
       console.log('[DB303:applyConfig]', keys);
     }
     // --- Core parameters ---
