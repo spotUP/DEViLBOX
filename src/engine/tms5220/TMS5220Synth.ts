@@ -5,6 +5,7 @@ import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequence
 import { type TMS5220Frame, phonemesToTMS5220Frames } from '@engine/speech/tms5220PhonemeMap';
 import { type LPCFrame, scanVSMForWords, buildWordTableFromMCU, type VSMWord } from '@engine/speech/VSMROMParser';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
+import { normalizeUrl } from '@/utils/urlUtils';
 
 /**
  * TMS5220 Parameter IDs (matching C++ enum)
@@ -101,12 +102,13 @@ export class TMS5220Synth extends MAMEBaseSynth {
     try {
       this._romData = await loadTMS5220ROMs();
 
-      // Try to build word table from MCU ROM address table (accurate)
+      // Try to build word table from VSM ROM address table (via MCU ROM)
       try {
-        const mcuResponse = await fetch('/roms/snspell/tmc0271h-n2l');
+        const mcuResponse = await fetch(normalizeUrl('/roms/snspell/tmc0271h-n2l'));
+        if (!mcuResponse.ok) throw new Error(`MCU ROM not found (${mcuResponse.status})`);
         const mcuBuffer = await mcuResponse.arrayBuffer();
         this._romWords = buildWordTableFromMCU(new Uint8Array(mcuBuffer), this._romData);
-        console.log(`[TMS5220] Built word table from MCU ROM: ${this._romWords.length} words`);
+        console.log(`[TMS5220] Built word table from ROM: ${this._romWords.length} words`);
       } catch {
         // Fall back to heuristic scanning
         this._romWords = scanVSMForWords(this._romData);
@@ -143,15 +145,14 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: 25, // 25ms per TMS5220 frame (200 samples at 8kHz)
     }));
 
-    // Activate a voice so WASM processes parameter changes
-    this.writeKeyOn(60, 0.8);
+    // Activate a voice via the full triggerAttack path
+    this.triggerAttack(60, undefined, 0.8);
 
     this._romSequencer = new SpeechSequencer<LPCFrame>(
       (frame) => {
         if (frame.energy === 0) return; // Silent frame
         const k = frame.repeat ? lastK : frame.k;
         if (!frame.repeat && frame.k.length >= 3) {
-          // Update last K values
           for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
         }
         if (k.length >= 3) {
@@ -162,7 +163,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       },
       () => {
         this._romSequencer = null;
-        this.writeKeyOff();
+        this.triggerRelease();
       }
     );
     this._romSequencer.speak(speechFrames);
@@ -274,7 +275,6 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
     const phonemeStr = textToPhonemes(text);
     if (!phonemeStr) return;
-    console.log(`[TMS5220] speakText phonemes: "${phonemeStr}"`);
 
     const tokens = parsePhonemeString(phonemeStr);
     const frames = phonemesToTMS5220Frames(tokens);
@@ -285,21 +285,18 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice so WASM processes parameter changes
-    this.writeKeyOn(60, 0.8);
+    // Activate a voice via the full triggerAttack path (sets up macros, note state, etc.)
+    this.triggerAttack(60, undefined, 0.8);
 
     this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
       (frame) => {
-        // Set K1/K2/K3 formants
         this.setFormants(frame.k[0], frame.k[1], frame.k[2]);
-        // Set noise mode
         this.setNoiseMode(frame.unvoiced);
-        // Set energy
         this.setEnergy(frame.energy);
       },
       () => {
         this._speechSequencer = null;
-        this.writeKeyOff();
+        this.triggerRelease();
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -316,12 +313,89 @@ export class TMS5220Synth extends MAMEBaseSynth {
       this._romSequencer.stop();
       this._romSequencer = null;
     }
-    if (wasSpeaking) this.writeKeyOff();
+    if (wasSpeaking) this.triggerRelease();
   }
 
   /** Whether text-to-speech or ROM playback is currently playing */
   get isSpeaking(): boolean {
     return (this._speechSequencer?.isSpeaking ?? false) || (this._romSequencer?.isSpeaking ?? false);
+  }
+
+  /** Play a single letter from the ROM (A-Z) */
+  speakLetter(letter: string): void {
+    const idx = this._romWords.findIndex(w => w.name === letter.toUpperCase());
+    if (idx >= 0) this.speakWord(idx);
+  }
+
+  /** Spell out text letter-by-letter using authentic ROM alphabet recordings */
+  spellText(text: string): void {
+    this.stopSpeaking();
+    const letters = text.toUpperCase().split('').filter(c => /[A-Z]/.test(c));
+    if (letters.length === 0) return;
+
+    // Build a chain of ROM word playbacks with ~300ms gaps between letters
+    let idx = 0;
+    const playNext = () => {
+      if (idx >= letters.length) return;
+      const wordIdx = this._romWords.findIndex(w => w.name === letters[idx]);
+      idx++;
+      if (wordIdx >= 0) {
+        // speakWord sets up the ROM sequencer with a done callback.
+        // We override the done callback to chain the next letter.
+        this._speakWordChained(wordIdx, () => {
+          setTimeout(playNext, 300);
+        });
+      } else {
+        // Letter not in ROM, skip with a pause
+        setTimeout(playNext, 300);
+      }
+    };
+    playNext();
+  }
+
+  /** Internal: play a ROM word with a custom done callback for chaining */
+  private _speakWordChained(index: number, onDone: () => void): void {
+    if (!this._romLoaded || index < 0 || index >= this._romWords.length) {
+      onDone();
+      return;
+    }
+
+    // Stop any current playback but don't release the voice
+    if (this._romSequencer) {
+      this._romSequencer.stop();
+      this._romSequencer = null;
+    }
+
+    const word = this._romWords[index];
+    const lastK = [8, 8, 8, 8, 8, 8, 8, 4, 4, 4];
+
+    const speechFrames: SpeechFrame<LPCFrame>[] = word.frames.map(f => ({
+      data: f,
+      durationMs: 25,
+    }));
+
+    // Activate a voice via the full triggerAttack path
+    this.triggerAttack(60, undefined, 0.8);
+
+    this._romSequencer = new SpeechSequencer<LPCFrame>(
+      (frame) => {
+        if (frame.energy === 0) return;
+        const k = frame.repeat ? lastK : frame.k;
+        if (!frame.repeat && frame.k.length >= 3) {
+          for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+        }
+        if (k.length >= 3) {
+          this.setFormants(k[0], k[1], k[2]);
+        }
+        this.setNoiseMode(frame.unvoiced);
+        this.setEnergy(frame.energy);
+      },
+      () => {
+        this._romSequencer = null;
+        onDone();
+      }
+    );
+    this._romSequencer.speak(speechFrames);
   }
 
   // ===========================================================================
