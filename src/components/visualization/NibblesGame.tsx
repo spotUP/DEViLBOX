@@ -33,6 +33,10 @@ const WORM_PULSE_INTENSITY = 0.15;
 const GRID_GLOW_THRESHOLD = 0.1;
 const GRID_GLOW_BLUR_MULTIPLIER = 10;
 
+// Beat-synced food spawning
+const BEAT_SPAWN_INTENSITY_THRESHOLD = 0.5;
+const BEAT_SPAWN_COOLDOWN_MS = 2000;
+
 // Grid rendering
 const GRID_CELL_PADDING = 2;
 
@@ -116,6 +120,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   // Visual effects
   const [gridGlowIntensity, setGridGlowIntensity] = useState(0);
   const [wormPulseScale, setWormPulseScale] = useState(1);
+
+  // Beat-synced food spawning
+  const lastBeatSpawnRef = useRef(0);
+  const beatFoodQueueRef = useRef(0);
 
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
@@ -209,6 +217,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       setBeatIntensity(intensity);
       setGridGlowIntensity(intensity);
       setWormPulseScale(1 + (intensity * WORM_PULSE_INTENSITY));
+
+      // Queue food spawn on strong beats
+      if (intensity > BEAT_SPAWN_INTENSITY_THRESHOLD && Date.now() - lastBeatSpawnRef.current > BEAT_SPAWN_COOLDOWN_MS) {
+        beatFoodQueueRef.current++;
+        lastBeatSpawnRef.current = Date.now();
+      }
     } else {
       // Decay effects
       setBeatIntensity(prev => Math.max(0, prev - BEAT_DECAY_RATE));
@@ -455,6 +469,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     if (!isPlayingRef.current) return;
 
     updateAudioData();
+
+    // Spawn beat-synced food
+    if (beatFoodQueueRef.current > 0) {
+      spawnFood();
+      beatFoodQueueRef.current--;
+    }
 
     if (inputBuffer1.current.length > 0) {
       const d = inputBuffer1.current.shift()!;
