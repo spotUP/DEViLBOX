@@ -119,7 +119,7 @@ export const ArrangementToolbar: React.FC = () => {
         >
           <ZoomOut size={14} />
         </button>
-        <span className="text-text-muted w-10 text-center">{view.pixelsPerRow.toFixed(1)}</span>
+        <span className="text-text-muted w-12 text-center text-[10px] tabular-nums">{view.pixelsPerRow.toFixed(1)}</span>
         <button
           className="p-1 rounded bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary"
           onClick={handleZoomIn}

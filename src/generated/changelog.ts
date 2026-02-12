@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T21:00:23.503Z
+ * Generated: 2026-02-12T21:07:46.211Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '435';
-export const BUILD_HASH = '699afd7';
+export const BUILD_NUMBER = '438';
+export const BUILD_HASH = '908879e';
 export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-12',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add transport controls (Play/Stop) to toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused addPattern and deletePattern variables"
+      },
+      {
+        type: 'fix',
+        "description": "Replace require() with async import() in ToneEngine"
+      },
       {
         type: 'fix',
         "description": "Song length should use patternOrder.length not patterns.length"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Fix knob drag interference on TB-303 panel"
-      },
-      {
-        type: 'feature',
-        "description": "Add classic acid effect chain presets and fix preset loader"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TD-3 pattern import and parameter editor null guard"
       }
     ]
   }
