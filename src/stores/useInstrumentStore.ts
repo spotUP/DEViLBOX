@@ -47,7 +47,7 @@ import {
 } from '@typedefs/instrument';
 import { TB303_PRESETS } from '@constants/tb303Presets';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
-import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
+import { getDefaultFurnaceConfig, getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
@@ -276,7 +276,7 @@ const createDefaultInstrument = (id: number): InstrumentConfig => ({
   envelope: { ...DEFAULT_ENVELOPE },
   filter: { ...DEFAULT_FILTER },
   effects: [],
-  volume: -6,
+  volume: 0,
   pan: 0,
 });
 
@@ -968,7 +968,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             type: effectType,
             enabled: true,
             wet: 50,
-            parameters: {},
+            parameters: getDefaultEffectParameters(effectType),
           };
           instrument.effects.push(newEffect);
         }
@@ -996,6 +996,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           const newEffect: EffectConfig = {
             ...effect,
             id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            parameters: { ...getDefaultEffectParameters(effect.type), ...effect.parameters },
           };
           instrument.effects.push(newEffect);
         }
@@ -1046,6 +1047,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
         if (instrument) {
           const effect = instrument.effects.find((eff) => eff.id === effectId);
           if (effect) {
+            // Ensure defaults are populated for effects with sparse parameters
+            // (e.g., effects created before default population was added)
+            if (updates.parameters && Object.keys(effect.parameters).length < Object.keys(getDefaultEffectParameters(effect.type)).length) {
+              effect.parameters = { ...getDefaultEffectParameters(effect.type), ...effect.parameters };
+            }
             Object.assign(effect, updates);
           }
         }

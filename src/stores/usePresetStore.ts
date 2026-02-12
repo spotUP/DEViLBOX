@@ -15,8 +15,8 @@ import {
   userPresetToNKSPreset,
   batchExportToNKS,
   batchImportNKSF,
-} from '@/midi/nks/presetIntegration';
-import { writeNKSF } from '@/midi/nks/NKSFileFormat';
+} from '@/midi/performance/presetIntegration';
+import { writeNKSF } from '@/midi/performance/NKSFileFormat';
 
 export type PresetCategory = 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX' | 'User';
 

@@ -16,9 +16,9 @@ import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
 import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
-import { routeParameterToEngine } from '../midi/nks/parameterRouter';
-import { updateNKSDisplay } from '../midi/nks/AkaiMIDIProtocol';
-import type { NKSParameter } from '../midi/nks/types';
+import { routeParameterToEngine } from '../midi/performance/parameterRouter';
+import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
+import type { NKSParameter } from '../midi/performance/types';
 
 // Guard against double handler registration (e.g., React StrictMode or HMR)
 let midiNoteHandlerRegistered = false;

@@ -257,6 +257,8 @@ export class ToneEngine {
   public static getInstance(): ToneEngine {
     if (!ToneEngine.instance) {
       ToneEngine.instance = new ToneEngine();
+      // Expose for console diagnostics (scripts/db303-knob-diag.js)
+      (window as any)._toneEngine = ToneEngine.instance;
     }
     return ToneEngine.instance;
   }
@@ -4300,17 +4302,29 @@ export class ToneEngine {
       return;
     }
 
-    const { node } = effectData;
-    const wetValue = config.wet / 100;
+    const { node, config: prevConfig } = effectData;
 
     try {
-      // Update wet/dry if the effect supports it
-      if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.rampTo(wetValue, 0.02);
+      // Only update wet if it actually changed
+      if (config.wet !== prevConfig.wet) {
+        const wetValue = config.wet / 100;
+        if ('wet' in node && node.wet instanceof Tone.Signal) {
+          node.wet.rampTo(wetValue, 0.02);
+        }
       }
 
-      // Update specific parameters based on effect type
-      this.applyEffectParameters(node, config);
+      // Compute which parameters actually changed
+      const changedParams: Record<string, number | string> = {};
+      for (const [key, value] of Object.entries(config.parameters)) {
+        if (prevConfig.parameters[key] !== value) {
+          changedParams[key] = value;
+        }
+      }
+
+      // Only apply effect params if something actually changed
+      if (Object.keys(changedParams).length > 0) {
+        this.applyEffectParametersDiff(node, config.type, changedParams);
+      }
 
       // Update stored config
       effectData.config = config;
@@ -4327,247 +4341,263 @@ export class ToneEngine {
     const effectData = this.instrumentEffectNodes.get(effectId);
     if (!effectData) return; // Effect not in active chain
 
-    const { node } = effectData;
-    const wetValue = config.wet / 100;
+    const { node, config: prevConfig } = effectData;
 
     try {
-      if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.rampTo(wetValue, 0.02);
+      // Only update wet if it actually changed
+      if (config.wet !== prevConfig.wet) {
+        const wetValue = config.wet / 100;
+        if ('wet' in node && node.wet instanceof Tone.Signal) {
+          node.wet.rampTo(wetValue, 0.02);
+        }
       }
-      this.applyEffectParameters(node, config);
+
+      // Compute which parameters actually changed
+      const changedParams: Record<string, number | string> = {};
+      for (const [key, value] of Object.entries(config.parameters)) {
+        if (prevConfig.parameters[key] !== value) {
+          changedParams[key] = value;
+        }
+      }
+
+      // Only apply effect params if something actually changed
+      if (Object.keys(changedParams).length > 0) {
+        this.applyEffectParametersDiff(node, config.type, changedParams);
+      }
+
       effectData.config = config;
     } catch (error) {
       console.error('[ToneEngine] Failed to update instrument effect params:', error);
     }
   }
 
-  /**
-   * Apply effect-specific parameters to a node
-   */
   // Smooth ramp time for effect parameter changes (20ms eliminates zipper noise)
   private static readonly EFFECT_RAMP_TIME = 0.02;
 
-  private applyEffectParameters(node: Tone.ToneAudioNode, config: EffectConfig): void {
-    const params = config.parameters;
+  /**
+   * Apply only the changed parameters to an effect node (diff-based).
+   * Avoids redundant parameter sets which cause clicks/zipper noise.
+   */
+  private applyEffectParametersDiff(
+    node: Tone.ToneAudioNode,
+    type: string,
+    changed: Record<string, number | string>
+  ): void {
     const R = ToneEngine.EFFECT_RAMP_TIME;
 
-    switch (config.type) {
+    switch (type) {
       case 'Distortion':
         if (node instanceof Tone.Distortion) {
-          node.distortion = params.drive as any ?? 0.4;
-          node.oversample = params.oversample as any ?? 'none';
+          if ('drive' in changed) node.distortion = changed.drive as number;
+          if ('oversample' in changed) node.oversample = changed.oversample as any;
         }
-        break;
-
-      case 'Reverb':
-        // Reverb decay can't be changed after creation, would need rebuild
         break;
 
       case 'Delay':
       case 'FeedbackDelay':
         if (node instanceof Tone.FeedbackDelay) {
-          node.delayTime.rampTo(params.time as any ?? 0.25, R);
-          node.feedback.rampTo(params.feedback as any ?? 0.5, R);
+          if ('time' in changed) node.delayTime.rampTo(changed.time as number, R);
+          if ('feedback' in changed) node.feedback.rampTo(changed.feedback as number, R);
         }
         break;
 
       case 'Chorus':
         if (node instanceof Tone.Chorus) {
-          node.frequency.rampTo(params.frequency as any ?? 1.5, R);
-          node.depth = params.depth as any ?? 0.7;
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('depth' in changed) node.depth = changed.depth as number;
         }
         break;
 
       case 'Phaser':
         if (node instanceof Tone.Phaser) {
-          node.frequency.rampTo(params.frequency as any ?? 0.5, R);
-          node.octaves = params.octaves as any ?? 3;
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('octaves' in changed) node.octaves = changed.octaves as number;
         }
         break;
 
       case 'Tremolo':
         if (node instanceof Tone.Tremolo) {
-          node.frequency.rampTo(params.frequency as any ?? 10, R);
-          node.depth.rampTo(params.depth as any ?? 0.5, R);
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
         }
         break;
 
       case 'Vibrato':
         if (node instanceof Tone.Vibrato) {
-          node.frequency.rampTo(params.frequency as any ?? 5, R);
-          node.depth.rampTo(params.depth as any ?? 0.1, R);
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
         }
         break;
 
       case 'BitCrusher':
         if (node instanceof Tone.BitCrusher) {
-          node.bits.rampTo(params.bits as any ?? 4, R);
+          if ('bits' in changed) node.bits.rampTo(changed.bits as number, R);
         }
         break;
 
       case 'PingPongDelay':
         if (node instanceof Tone.PingPongDelay) {
-          node.delayTime.rampTo(params.time as any ?? 0.25, R);
-          node.feedback.rampTo(params.feedback as any ?? 0.5, R);
+          if ('time' in changed) node.delayTime.rampTo(changed.time as number, R);
+          if ('feedback' in changed) node.feedback.rampTo(changed.feedback as number, R);
         }
         break;
 
       case 'PitchShift':
         if (node instanceof Tone.PitchShift) {
-          node.pitch = params.pitch as any ?? 0;
+          if ('pitch' in changed) node.pitch = changed.pitch as number;
         }
         break;
 
       case 'Compressor':
         if (node instanceof Tone.Compressor) {
-          node.threshold.rampTo(params.threshold as any ?? -24, R);
-          node.ratio.rampTo(params.ratio as any ?? 12, R);
-          node.attack.rampTo(params.attack as any ?? 0.003, R);
-          node.release.rampTo(params.release as any ?? 0.25, R);
+          if ('threshold' in changed) node.threshold.rampTo(changed.threshold as number, R);
+          if ('ratio' in changed) node.ratio.rampTo(changed.ratio as number, R);
+          if ('attack' in changed) node.attack.rampTo(changed.attack as number, R);
+          if ('release' in changed) node.release.rampTo(changed.release as number, R);
         }
         break;
 
       case 'EQ3':
         if (node instanceof Tone.EQ3) {
-          node.low.rampTo(params.low as any ?? 0, R);
-          node.mid.rampTo(params.mid as any ?? 0, R);
-          node.high.rampTo(params.high as any ?? 0, R);
+          if ('low' in changed) node.low.rampTo(changed.low as number, R);
+          if ('mid' in changed) node.mid.rampTo(changed.mid as number, R);
+          if ('high' in changed) node.high.rampTo(changed.high as number, R);
         }
         break;
 
       case 'Filter':
         if (node instanceof Tone.Filter) {
-          node.frequency.rampTo(params.frequency as any ?? 350, R);
-          node.Q.rampTo(params.Q as any ?? 1, R);
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
         }
         break;
 
       case 'AutoFilter':
         if (node instanceof Tone.AutoFilter) {
-          node.frequency.rampTo(params.frequency as any ?? 1, R);
-          node.baseFrequency = params.baseFrequency as any ?? 200;
-          node.octaves = params.octaves as any ?? 2.6;
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
+          if ('octaves' in changed) node.octaves = changed.octaves as number;
         }
         break;
 
       case 'AutoPanner':
         if (node instanceof Tone.AutoPanner) {
-          node.frequency.rampTo(params.frequency as any ?? 1, R);
-          node.depth.rampTo(params.depth as any ?? 1, R);
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
         }
         break;
 
       case 'StereoWidener':
         if (node instanceof Tone.StereoWidener) {
-          node.width.rampTo(params.width as any ?? 0.5, R);
+          if ('width' in changed) node.width.rampTo(changed.width as number, R);
         }
         break;
 
       case 'SpaceyDelayer':
         if (node instanceof SpaceyDelayerEffect) {
-          if (params.firstTap != null) node.setFirstTap(Number(params.firstTap));
-          if (params.tapSize != null) node.setTapSize(Number(params.tapSize));
-          if (params.feedback != null) node.setFeedback(Number(params.feedback));
-          if (params.multiTap != null) node.setMultiTap(Number(params.multiTap));
-          if (params.tapeFilter != null) node.setTapeFilter(Number(params.tapeFilter));
+          if ('firstTap' in changed) node.setFirstTap(Number(changed.firstTap));
+          if ('tapSize' in changed) node.setTapSize(Number(changed.tapSize));
+          if ('feedback' in changed) node.setFeedback(Number(changed.feedback));
+          if ('multiTap' in changed) node.setMultiTap(Number(changed.multiTap));
+          if ('tapeFilter' in changed) node.setTapeFilter(Number(changed.tapeFilter));
         }
         break;
 
       case 'RETapeEcho':
         if (node instanceof RETapeEchoEffect) {
-          if (params.mode != null) node.setMode(Number(params.mode));
-          if (params.repeatRate != null) node.setRepeatRate(Number(params.repeatRate));
-          if (params.intensity != null) node.setIntensity(Number(params.intensity));
-          if (params.echoVolume != null) node.setEchoVolume(Number(params.echoVolume));
-          if (params.wow != null) node.setWow(Number(params.wow));
-          if (params.flutter != null) node.setFlutter(Number(params.flutter));
-          if (params.dirt != null) node.setDirt(Number(params.dirt));
-          if (params.inputBleed != null) node.setInputBleed(Number(params.inputBleed));
-          if (params.loopAmount != null) node.setLoopAmount(Number(params.loopAmount));
-          if (params.playheadFilter != null) node.setPlayheadFilter(Number(params.playheadFilter));
+          if ('mode' in changed) node.setMode(Number(changed.mode));
+          if ('repeatRate' in changed) node.setRepeatRate(Number(changed.repeatRate));
+          if ('intensity' in changed) node.setIntensity(Number(changed.intensity));
+          if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
+          if ('wow' in changed) node.setWow(Number(changed.wow));
+          if ('flutter' in changed) node.setFlutter(Number(changed.flutter));
+          if ('dirt' in changed) node.setDirt(Number(changed.dirt));
+          if ('inputBleed' in changed) node.setInputBleed(Number(changed.inputBleed));
+          if ('loopAmount' in changed) node.setLoopAmount(Number(changed.loopAmount));
+          if ('playheadFilter' in changed) node.setPlayheadFilter(Number(changed.playheadFilter));
         }
         break;
 
       case 'SpaceEcho':
         if (node instanceof SpaceEchoEffect) {
-          if (params.mode != null) node.setMode(Number(params.mode));
-          if (params.rate != null) node.setRate(Number(params.rate));
-          if (params.intensity != null) node.setIntensity(Number(params.intensity));
-          if (params.echoVolume != null) node.setEchoVolume(Number(params.echoVolume));
-          if (params.reverbVolume != null) node.setReverbVolume(Number(params.reverbVolume));
-          if (params.bass != null) node.setBass(Number(params.bass));
-          if (params.treble != null) node.setTreble(Number(params.treble));
+          if ('mode' in changed) node.setMode(Number(changed.mode));
+          if ('rate' in changed) node.setRate(Number(changed.rate));
+          if ('intensity' in changed) node.setIntensity(Number(changed.intensity));
+          if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
+          if ('reverbVolume' in changed) node.setReverbVolume(Number(changed.reverbVolume));
+          if ('bass' in changed) node.setBass(Number(changed.bass));
+          if ('treble' in changed) node.setTreble(Number(changed.treble));
         }
         break;
 
       case 'BiPhase':
         if (node instanceof BiPhaseEffect) {
-          if (params.rateA != null) (node as any).rateA = Number(params.rateA);
-          if (params.depthA != null) (node as any).depthA = Number(params.depthA);
-          if (params.rateB != null) (node as any).rateB = Number(params.rateB);
-          if (params.depthB != null) (node as any).depthB = Number(params.depthB);
-          if (params.feedback != null) (node as any).feedback = Number(params.feedback);
+          if ('rateA' in changed) (node as any).rateA = Number(changed.rateA);
+          if ('depthA' in changed) (node as any).depthA = Number(changed.depthA);
+          if ('rateB' in changed) (node as any).rateB = Number(changed.rateB);
+          if ('depthB' in changed) (node as any).depthB = Number(changed.depthB);
+          if ('feedback' in changed) (node as any).feedback = Number(changed.feedback);
         }
         break;
 
       case 'DubFilter':
         if (node instanceof DubFilterEffect) {
-          if (params.cutoff != null) (node as any).cutoff = Number(params.cutoff);
-          if (params.resonance != null) (node as any).resonance = Number(params.resonance);
-          if (params.gain != null) (node as any).gain = Number(params.gain);
+          if ('cutoff' in changed) (node as any).cutoff = Number(changed.cutoff);
+          if ('resonance' in changed) (node as any).resonance = Number(changed.resonance);
+          if ('gain' in changed) (node as any).gain = Number(changed.gain);
         }
         break;
 
       case 'MoogFilter':
         if (node instanceof MoogFilterEffect) {
-          if (params.cutoff != null) node.setCutoff(Number(params.cutoff));
-          if (params.resonance != null) node.setResonance(Number(params.resonance));
-          if (params.drive != null) node.setDrive(Number(params.drive));
-          if (params.model != null) node.setModel(Number(params.model) as MoogFilterModel);
-          if (params.filterMode != null) node.setFilterMode(Number(params.filterMode) as MoogFilterMode);
+          if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
+          if ('resonance' in changed) node.setResonance(Number(changed.resonance));
+          if ('drive' in changed) node.setDrive(Number(changed.drive));
+          if ('model' in changed) node.setModel(Number(changed.model) as MoogFilterModel);
+          if ('filterMode' in changed) node.setFilterMode(Number(changed.filterMode) as MoogFilterMode);
         }
         break;
 
       case 'MVerb':
         if (node instanceof MVerbEffect) {
-          if (params.damping != null) node.setDamping(Number(params.damping));
-          if (params.density != null) node.setDensity(Number(params.density));
-          if (params.bandwidth != null) node.setBandwidth(Number(params.bandwidth));
-          if (params.decay != null) node.setDecay(Number(params.decay));
-          if (params.predelay != null) node.setPredelay(Number(params.predelay));
-          if (params.size != null) node.setSize(Number(params.size));
-          if (params.gain != null) node.setGain(Number(params.gain));
-          if (params.mix != null) node.setMix(Number(params.mix));
-          if (params.earlyMix != null) node.setEarlyMix(Number(params.earlyMix));
+          if ('damping' in changed) node.setDamping(Number(changed.damping));
+          if ('density' in changed) node.setDensity(Number(changed.density));
+          if ('bandwidth' in changed) node.setBandwidth(Number(changed.bandwidth));
+          if ('decay' in changed) node.setDecay(Number(changed.decay));
+          if ('predelay' in changed) node.setPredelay(Number(changed.predelay));
+          if ('size' in changed) node.setSize(Number(changed.size));
+          if ('gain' in changed) node.setGain(Number(changed.gain));
+          if ('mix' in changed) node.setMix(Number(changed.mix));
+          if ('earlyMix' in changed) node.setEarlyMix(Number(changed.earlyMix));
         }
         break;
 
       case 'Leslie':
         if (node instanceof LeslieEffect) {
-          if (params.speed != null) node.setSpeed(Number(params.speed));
-          if (params.hornRate != null) node.setHornRate(Number(params.hornRate));
-          if (params.drumRate != null) node.setDrumRate(Number(params.drumRate));
-          if (params.hornDepth != null) node.setHornDepth(Number(params.hornDepth));
-          if (params.drumDepth != null) node.setDrumDepth(Number(params.drumDepth));
-          if (params.doppler != null) node.setDoppler(Number(params.doppler));
-          if (params.mix != null) node.setMix(Number(params.mix));
-          if (params.width != null) node.setWidth(Number(params.width));
-          if (params.acceleration != null) node.setAcceleration(Number(params.acceleration));
+          if ('speed' in changed) node.setSpeed(Number(changed.speed));
+          if ('hornRate' in changed) node.setHornRate(Number(changed.hornRate));
+          if ('drumRate' in changed) node.setDrumRate(Number(changed.drumRate));
+          if ('hornDepth' in changed) node.setHornDepth(Number(changed.hornDepth));
+          if ('drumDepth' in changed) node.setDrumDepth(Number(changed.drumDepth));
+          if ('doppler' in changed) node.setDoppler(Number(changed.doppler));
+          if ('mix' in changed) node.setMix(Number(changed.mix));
+          if ('width' in changed) node.setWidth(Number(changed.width));
+          if ('acceleration' in changed) node.setAcceleration(Number(changed.acceleration));
         }
         break;
 
       case 'SpringReverb':
         if (node instanceof SpringReverbEffect) {
-          if (params.decay != null) node.setDecay(Number(params.decay));
-          if (params.damping != null) node.setDamping(Number(params.damping));
-          if (params.tension != null) node.setTension(Number(params.tension));
-          if (params.mix != null) node.setSpringMix(Number(params.mix));
-          if (params.drip != null) node.setDrip(Number(params.drip));
-          if (params.diffusion != null) node.setDiffusion(Number(params.diffusion));
+          if ('decay' in changed) node.setDecay(Number(changed.decay));
+          if ('damping' in changed) node.setDamping(Number(changed.damping));
+          if ('tension' in changed) node.setTension(Number(changed.tension));
+          if ('mix' in changed) node.setSpringMix(Number(changed.mix));
+          if ('drip' in changed) node.setDrip(Number(changed.drip));
+          if ('diffusion' in changed) node.setDiffusion(Number(changed.diffusion));
         }
         break;
 
-      // WAM 2.0 effects — parameters are forwarded to the WAM node
+      // WAM 2.0 effects
       case 'WAMBigMuff':
       case 'WAMTS9':
       case 'WAMDistoMachine':
@@ -4580,7 +4610,7 @@ export class ToneEngine {
       case 'WAMGraphicEQ':
       case 'WAMPedalboard':
         if (node instanceof WAMEffectNode) {
-          for (const [key, value] of Object.entries(params)) {
+          for (const [key, value] of Object.entries(changed)) {
             if (key === 'bpmSync' || key === 'syncDivision') continue;
             node.setParameter(key, Number(value));
           }

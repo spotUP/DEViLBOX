@@ -99,6 +99,81 @@ import { WAM_EFFECT_URLS, WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 
+/**
+ * Returns the complete set of default parameters for a given effect type.
+ * Single source of truth — matches InstrumentFactory.createEffect() constructor defaults.
+ * Used by addEffect() to populate parameters so the store always has all params.
+ */
+export function getDefaultEffectParameters(type: string): Record<string, number | string> {
+  switch (type) {
+    case 'Distortion':
+      return { drive: 0.4, oversample: 'none' };
+    case 'Reverb':
+      return { decay: 1.5, preDelay: 0.01 };
+    case 'Delay':
+    case 'FeedbackDelay':
+      return { time: 0.25, feedback: 0.5 };
+    case 'Chorus':
+      return { frequency: 1.5, delayTime: 3.5, depth: 0.7 };
+    case 'Phaser':
+      return { frequency: 0.5, octaves: 3, baseFrequency: 350 };
+    case 'Tremolo':
+      return { frequency: 10, depth: 0.5 };
+    case 'Vibrato':
+      return { frequency: 5, depth: 0.1 };
+    case 'AutoFilter':
+      return { frequency: 1, baseFrequency: 200, octaves: 2.6, filterType: 'lowpass' };
+    case 'AutoPanner':
+      return { frequency: 1, depth: 1 };
+    case 'AutoWah':
+      return { baseFrequency: 100, octaves: 6, sensitivity: 0, Q: 2, gain: 2, follower: 0.1 };
+    case 'BitCrusher':
+      return { bits: 4 };
+    case 'Chebyshev':
+      return { order: 50, oversample: 'none' };
+    case 'FrequencyShifter':
+      return { frequency: 0 };
+    case 'PingPongDelay':
+      return { time: 0.25, feedback: 0.5 };
+    case 'PitchShift':
+      return { pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 };
+    case 'Compressor':
+      return { threshold: -24, ratio: 12, attack: 0.003, release: 0.25 };
+    case 'EQ3':
+      return { low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 };
+    case 'Filter':
+      return { type: 'lowpass', frequency: 350, rolloff: -12, Q: 1, gain: 0 };
+    case 'JCReverb':
+      return { roomSize: 0.5 };
+    case 'StereoWidener':
+      return { width: 0.5 };
+    case 'TapeSaturation':
+      return { drive: 50, tone: 12000 };
+    case 'SidechainCompressor':
+      return { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, knee: 6, sidechainGain: 100 };
+    case 'SpaceEcho':
+      return { mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0.3, bass: 0, treble: 0 };
+    case 'SpaceyDelayer':
+      return { firstTap: 250, tapSize: 150, feedback: 40, multiTap: 1, tapeFilter: 0 };
+    case 'RETapeEcho':
+      return { mode: 3, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, wow: 0, flutter: 0, dirt: 0, inputBleed: 0, loopAmount: 0, playheadFilter: 1 };
+    case 'BiPhase':
+      return { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 };
+    case 'DubFilter':
+      return { cutoff: 20, resonance: 1, gain: 1 };
+    case 'MoogFilter':
+      return { cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 };
+    case 'MVerb':
+      return { damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 };
+    case 'Leslie':
+      return { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 };
+    case 'SpringReverb':
+      return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
+    default:
+      return {};
+  }
+}
+
 /** Map synthType strings to FurnaceDispatchPlatform values for non-FM chips */
 const SYNTH_TO_DISPATCH: Record<string, number> = {
   // Console PSG chips

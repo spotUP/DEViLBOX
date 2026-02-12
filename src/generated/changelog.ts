@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-11T21:59:08.566Z
+ * Generated: 2026-02-12T02:58:47.658Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '416';
-export const BUILD_HASH = '659ca4b';
-export const BUILD_DATE = '2026-02-11';
+export const BUILD_NUMBER = '420';
+export const BUILD_HASH = 'bf1e85c';
+export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Eliminate crackles from parameter changes"
+      },
+      {
+        type: 'fix',
+        "description": "Clean up MIDI double-trigger diagnostics after confirming fix"
+      },
+      {
+        type: 'feature',
+        "description": "Diag: add comprehensive MIDI double-trigger diagnostics"
+      },
+      {
+        type: 'fix',
+        "description": "Filter non-automatable params from knob pages, clean up TS errors, add speech engine"
+      },
       {
         type: 'fix',
         "description": "Use stored type instead of minified constructor name for stale instrument check"
@@ -212,22 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Chore: add documentation, changelog, test pages, and gitignore updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add Moog filters, MVerb, Leslie, Spring reverb, and synth templates"
-      },
-      {
-        type: 'feature',
-        "description": "Expand knob banks and controller mappings for all synth types"
-      },
-      {
-        type: 'feature',
-        "description": "Add auto-preview oscilloscope hook and expand synth parameter editors"
-      },
-      {
-        type: 'feature',
-        "description": "Add BPM sync controls, genre presets, and enhanced visual editors"
       }
     ]
   }
