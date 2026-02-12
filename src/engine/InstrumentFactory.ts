@@ -1588,7 +1588,7 @@ export class InstrumentFactory {
     const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: {
         type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
-      } as Partial<Tone.OmniOscillatorSynthOptions>,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1687,7 +1687,7 @@ export class InstrumentFactory {
       voice0: {
         oscillator: {
           type: oscType,
-        } as Partial<Tone.OmniOscillatorSynthOptions>,
+        } as Partial<Tone.OmniOscillatorOptions>,
         envelope: {
           attack: (config.envelope?.attack ?? 10) / 1000,
           decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1698,7 +1698,7 @@ export class InstrumentFactory {
       voice1: {
         oscillator: {
           type: oscType,
-        } as Partial<Tone.OmniOscillatorSynthOptions>,
+        } as Partial<Tone.OmniOscillatorOptions>,
         envelope: {
           attack: (config.envelope?.attack ?? 10) / 1000,
           decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1716,7 +1716,7 @@ export class InstrumentFactory {
     return new Tone.PolySynth(Tone.FMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      } as Partial<Tone.OmniOscillatorSynthOptions>,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1732,7 +1732,7 @@ export class InstrumentFactory {
     return new Tone.PolySynth(Tone.AMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      } as Partial<Tone.OmniOscillatorSynthOptions>,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1744,12 +1744,14 @@ export class InstrumentFactory {
   }
 
   private static createPluckSynth(config: InstrumentConfig): Tone.PolySynth {
-    return new Tone.PolySynth(Tone.PluckSynth as any, {
+    const synth = new Tone.PolySynth(Tone.PluckSynth as unknown as typeof Tone.Synth);
+    synth.set({
       attackNoise: 1,
       dampening: 4000,
       resonance: 0.7,
-      volume: this.getNormalizedVolume('PluckSynth', config.volume),
-    });
+    } as unknown as Partial<Tone.SynthOptions>);
+    synth.volume.value = this.getNormalizedVolume('PluckSynth', config.volume);
+    return synth;
   }
 
   private static createMetalSynth(config: InstrumentConfig): Tone.MetalSynth {
@@ -1769,7 +1771,7 @@ export class InstrumentFactory {
       octaves: 10,
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      } as Partial<Tone.OmniOscillatorSynthOptions>,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 1) / 1000,
         decay: (config.envelope?.decay ?? 400) / 1000,
@@ -1984,12 +1986,12 @@ export class InstrumentFactory {
         instrumentId: config.id,
         baseNote,
         hasUrl: !!sampleUrl,
-        urlPreview: sampleUrl.substring(0, 50) + '...',
+        urlPreview: String(sampleUrl).substring(0, 50) + '...',
       });
 
       // Map sample to its actual base note
       const urls: { [note: string]: string } = {};
-      urls[baseNote] = sampleUrl;
+      urls[baseNote] = sampleUrl as string;
 
       return new Tone.Sampler({
         urls,
@@ -2012,7 +2014,7 @@ export class InstrumentFactory {
 
     if (sampleUrl) {
       const player = new Tone.Player({
-        url: sampleUrl,
+        url: sampleUrl as string,
         volume: this.getNormalizedVolume('Player', config.volume),
         reverse: reverseMode === 'reverse',
       });
@@ -2032,7 +2034,7 @@ export class InstrumentFactory {
 
     if (sampleUrl) {
       const grainPlayer = new Tone.GrainPlayer({
-        url: sampleUrl,
+        url: sampleUrl as string,
         grainSize: (granularConfig?.grainSize || 100) / 1000, // ms to seconds
         overlap: (granularConfig?.grainOverlap || 50) / 100, // percentage to ratio
         playbackRate: granularConfig?.playbackRate || 1,
@@ -2180,7 +2182,7 @@ export class InstrumentFactory {
     const synth = new Tone.PolySynth(VoiceClass as any, {
       oscillator: {
         type: psConfig.oscillator?.type || 'sawtooth',
-      } as Partial<Tone.OmniOscillatorSynthOptions>,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (psConfig.envelope?.attack || 50) / 1000,
         decay: (psConfig.envelope?.decay || 200) / 1000,
@@ -3488,10 +3490,8 @@ export class InstrumentFactory {
       });
 
       // Add bit crusher for 8-bit sound
-      const bitCrusher = new Tone.BitCrusher({
-        bits: chipConfig.bitDepth as any,
-        wet: 1,
-      });
+      const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
+      bitCrusher.wet.value = 1;
       noise.connect(bitCrusher);
 
       return {
@@ -3547,10 +3547,8 @@ export class InstrumentFactory {
     });
 
     // Add bit crusher for 8-bit character
-    const bitCrusher = new Tone.BitCrusher({
-      bits: chipConfig.bitDepth as any,
-      wet: 1,
-    });
+    const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
+    bitCrusher.wet.value = 1;
     synth.connect(bitCrusher);
 
     // Create ArpeggioEngine only if arpeggio is ENABLED (not just configured)
@@ -3895,6 +3893,7 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('PWMSynth', config.volume),
     });
+    synth.maxPolyphony = 32;
 
     // Add filter
     const filter = new Tone.Filter({
@@ -3980,6 +3979,7 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('StringMachine', config.volume),
     });
+    synth.maxPolyphony = 32;
 
     // Rich chorus effect for ensemble character
     const chorus = new Tone.Chorus({
@@ -4047,10 +4047,9 @@ export class InstrumentFactory {
 
     // Create source oscillator
     const synth = new Tone.PolySynth(Tone.Synth, {
-
       oscillator: {
-        type: (fmtConfig.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
-      },
+        type: fmtConfig.oscillator?.type || 'sawtooth',
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: (fmtConfig.envelope?.attack || 10) / 1000,
         decay: (fmtConfig.envelope?.decay || 200) / 1000,
@@ -4059,6 +4058,7 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('FormantSynth', config.volume),
     });
+    synth.maxPolyphony = 32;
 
     // Create 3 parallel bandpass filters for formants with lower Q for more output
     const f1 = new Tone.Filter({
@@ -4149,10 +4149,9 @@ export class InstrumentFactory {
 
     // Main oscillator 1 (with unison)
     const osc1 = new Tone.PolySynth(Tone.Synth, {
-
       oscillator: {
-        type: wbConfig.osc1.type as Tone.ToneOscillatorType,
-      },
+        type: wbConfig.osc1.type,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: wbConfig.envelope.attack / 1000,
         decay: wbConfig.envelope.decay / 1000,
@@ -4161,13 +4160,13 @@ export class InstrumentFactory {
       },
       volume: -6 + (wbConfig.osc1.level / 100) * 6 - 6,
     });
+    osc1.maxPolyphony = 32;
 
     // Main oscillator 2 (slightly detuned for Reese)
     const osc2 = new Tone.PolySynth(Tone.Synth, {
-
       oscillator: {
-        type: wbConfig.osc2.type as Tone.ToneOscillatorType,
-      },
+        type: wbConfig.osc2.type,
+      } as Partial<Tone.OmniOscillatorOptions>,
       envelope: {
         attack: wbConfig.envelope.attack / 1000,
         decay: wbConfig.envelope.decay / 1000,
@@ -4176,6 +4175,7 @@ export class InstrumentFactory {
       },
       volume: -6 + (wbConfig.osc2.level / 100) * 6 - 6,
     });
+    osc2.maxPolyphony = 32;
 
     // Set octave offsets via detune (1200 cents = 1 octave)
     osc1.set({ detune: wbConfig.osc1.octave * 1200 + wbConfig.osc1.detune });
@@ -4195,6 +4195,7 @@ export class InstrumentFactory {
         },
         volume: -12 + (wbConfig.sub.level / 100) * 12 - 6,
       });
+      subOsc.maxPolyphony = 32;
       subOsc.set({ detune: wbConfig.sub.octave * 1200 });
     }
 
@@ -4208,8 +4209,7 @@ export class InstrumentFactory {
         const panAmount = ((i / voiceCount) - 0.5) * (wbConfig.unison.stereoSpread / 50);
 
         const voice = new Tone.PolySynth(Tone.Synth, {
-    
-          oscillator: { type: wbConfig.osc1.type as Tone.ToneOscillatorType },
+          oscillator: { type: wbConfig.osc1.type } as Partial<Tone.OmniOscillatorOptions>,
           envelope: {
             attack: wbConfig.envelope.attack / 1000,
             decay: wbConfig.envelope.decay / 1000,
@@ -4218,6 +4218,7 @@ export class InstrumentFactory {
           },
           volume: -12 - (voiceCount * 1.5),
         });
+        voice.maxPolyphony = 32;
         voice.set({ detune: wbConfig.osc1.octave * 1200 + detuneAmount });
 
         const panner = new Tone.Panner(panAmount);
@@ -4243,6 +4244,7 @@ export class InstrumentFactory {
         },
         volume: -6,
       });
+      fmSynth.maxPolyphony = 32;
       fmSynth.set({ detune: wbConfig.osc1.octave * 1200 });
     }
 
@@ -4876,11 +4878,8 @@ export class InstrumentFactory {
         if (df.vegDecay !== undefined) synth.setVegDecay(df.vegDecay);
         if (df.vegSustain !== undefined) synth.setVegSustain(df.vegSustain);
         if (df.softAttack !== undefined) synth.setSoftAttack(df.softAttack);
-        if (df.slideTime !== undefined) synth.setSlideTime(df.slideTime);
         if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
-        if (df.accentAttack !== undefined) synth.setParam('accent_attack', df.accentAttack);
-        if (df.filterFM !== undefined) synth.setFilterFM(df.filterFM);
-        if (df.accentSweepEnabled !== undefined) synth.setAccentSweepEnabled(df.accentSweepEnabled);
+        if (df.filterFmDepth !== undefined) synth.setFilterFM(df.filterFmDepth);
       }
 
       const normalizedVolume = this.getNormalizedVolume('Buzz3o3DF', config.volume);

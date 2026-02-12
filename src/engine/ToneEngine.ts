@@ -4387,12 +4387,12 @@ export class ToneEngine {
     // Create effect nodes (async for neural effects)
     const effectNodes = (await Promise.all(
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
-    );
+    )) as Tone.ToneAudioNode[];
 
     // Store nodes and configs
     effectNodes.forEach((node, index) => {
-      this.masterEffectsNodes.push(node as Tone.ToneAudioNode);
-      this.masterEffectConfigs.set(enabledEffects[index].id, { node: node as Tone.ToneAudioNode, config: enabledEffects[index] });
+      this.masterEffectsNodes.push(node);
+      this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
     });
 
     // Connect chain: masterEffectsInput → effects[0] → effects[n] → masterChannel
@@ -5159,18 +5159,19 @@ export class ToneEngine {
     const synthType = this.instrumentSynthTypes.get(instrumentKey);
     const cents = 1200 * Math.log2(pitchMultiplier);
 
+    const n = node as any;
     if (node instanceof Tone.Player || node instanceof Tone.GrainPlayer) {
       (node as unknown as { playbackRate: number }).playbackRate = baseRate * pitchMultiplier;
     } else if (synthType === 'Sampler') {
-      if (node.detune !== undefined) node.detune.value = cents;
+      if (n.detune !== undefined) n.detune.value = cents;
     } else {
       // For synths: use detune property
-      if (node.detune !== undefined && node.detune instanceof Tone.Signal) {
-        node.detune.value = cents;
-      } else if (node.oscillator?.detune !== undefined) {
-        node.oscillator.detune.value = cents;
-      } else if (node.detune !== undefined) {
-        node.detune = cents; // Primitive
+      if (n.detune !== undefined && n.detune instanceof Tone.Signal) {
+        n.detune.value = cents;
+      } else if (n.oscillator?.detune !== undefined) {
+        n.oscillator.detune.value = cents;
+      } else if (n.detune !== undefined) {
+        n.detune = cents; // Primitive
       }
     }
   }
@@ -5513,7 +5514,7 @@ export class ToneEngine {
       } else {
         // Dispose nodes
         voice.nodes.gain.dispose();
-        if (typeof voice.nodes.filter.dispose === 'function') voice.nodes.filter.dispose();
+        if (typeof (voice.nodes.filter as any).dispose === 'function') (voice.nodes.filter as any).dispose();
         voice.nodes.panner.dispose();
       }
     }
