@@ -69,7 +69,7 @@ export async function runNeuralEnhancement(
       numberOfChannels: 1,
       sampleRate: targetSampleRate
     });
-    outputBuffer.copyToChannel(outputData, 0);
+    outputBuffer.copyToChannel(new Float32Array(outputData), 0);
     const dataUrl = await bufferToDataUrl(outputBuffer);
     return { buffer: outputBuffer, dataUrl };
 
@@ -136,7 +136,7 @@ async function fallbackDSPUpsample(
   return await ctx.startRendering();
 }
 
-function createHarmonicCurve(amount: number): Float32Array {
+function createHarmonicCurve(amount: number): Float32Array<ArrayBuffer> {
   const size = 4096;
   const curve = new Float32Array(size);
   for (let i = 0; i < size; i++) {

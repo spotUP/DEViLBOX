@@ -121,6 +121,7 @@ export function useMIDI(): UseMIDIReturn {
   // Handle MIDI input message
   const handleMIDIMessage = useCallback((event: Event) => {
     const midiEvent = event as MIDIMessageEvent;
+    if (!midiEvent.data) return;
     const message = parseMIDIMessage(midiEvent.data);
     setLastMessage(message);
 

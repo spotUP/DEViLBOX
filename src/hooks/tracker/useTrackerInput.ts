@@ -242,7 +242,7 @@ export const useTrackerInput = () => {
         engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument, accent, slideActive);
       } else {
         // Monophonic mode: use legacy direct attack with accent/slide
-        engine.triggerNoteAttack(currentInstrumentId, fullNote, undefined, 1, instrument, undefined, accent, slideActive);
+        engine.triggerNoteAttack(currentInstrumentId, fullNote, 0, 1, instrument, undefined, accent, slideActive);
       }
 
       // Track the held note with channel info (ref update, no re-render)
