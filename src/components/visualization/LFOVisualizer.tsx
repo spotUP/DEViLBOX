@@ -239,6 +239,7 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: depth > 0,
+    fps: 60,
   });
 
   return (

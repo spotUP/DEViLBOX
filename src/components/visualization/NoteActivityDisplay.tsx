@@ -221,6 +221,7 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   return (
