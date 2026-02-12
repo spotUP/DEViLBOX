@@ -430,9 +430,17 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         renderFrameId = requestAnimationFrame(render);
         return;
       }
-      const cellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
-      const offsetX = (canvas.width - WIDTH * cellSize) / 2;
-      const offsetY = (canvas.height - HEIGHT * cellSize) / 2;
+      const baseCellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
+      const cellSize = baseCellSize * 2; // Double the size
+      const playWidth = WIDTH * cellSize;
+      const playHeight = HEIGHT * cellSize;
+      const offsetX = (canvas.width - playWidth) / 2;
+      const offsetY = (canvas.height - playHeight) / 2;
+
+      // Draw playfield border
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan-500/30
+      ctx.lineWidth = 2;
+      ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
 
       for (let y = 0; y < HEIGHT; y++) {
         for (let x = 0; x < WIDTH; x++) {
@@ -504,7 +512,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         ref={canvasRef}
         width={actualWidth}
         height={height}
-        className="cursor-pointer border-2 border-cyan-500/20"
+        className="cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           if (!uiState.isPlaying) setIsPlaying(true);
