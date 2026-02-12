@@ -562,7 +562,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
-      <div className="flex min-w-0 overflow-hidden">
+      <div className="flex flex-1 min-w-0 overflow-hidden min-h-[120px]">
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
