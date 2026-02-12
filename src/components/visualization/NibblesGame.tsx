@@ -26,6 +26,10 @@ const MIN_VISUALIZATION_INTENSITY = 0.05; // Skip tiles below 5% intensity
 const MIN_TILE_ALPHA = 0.2; // Minimum opacity for background tiles
 const ALPHA_INTENSITY_RANGE = 0.4; // Additional opacity based on intensity (max = 0.6)
 
+// Dynamic speed modulation
+const SPEED_MOD_MIN = 0.9;  // -10% speed at silence
+const SPEED_MOD_RANGE = 0.3; // +20% speed at max energy (0.9 + 0.3 = 1.2)
+
 // Beat-synced visual effects tuning
 const GRID_GLOW_DECAY_RATE = 0.08;
 const WORM_PULSE_DECAY_RATE = 0.02;
@@ -203,6 +207,21 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       console.warn('Audio analysis setup failed:', e);
     }
   }, []);
+
+  // Calculate dynamic game speed based on audio energy
+  const getGameSpeed = useCallback(() => {
+    const baseSpeed = NI_SPEEDS[speed];
+
+    // Calculate average audio energy
+    const avgEnergy = audioData.length > 0
+      ? audioData.reduce((a, b) => a + b, 0) / audioData.length / 255
+      : 0;
+
+    // Modulate speed: +20% at high energy, -10% at low energy
+    const speedMod = SPEED_MOD_MIN + (avgEnergy * SPEED_MOD_RANGE);
+
+    return baseSpeed * speedMod;
+  }, [speed, audioData]);
 
   // Extract audio data for visualization
   const updateAudioData = useCallback(() => {
@@ -651,7 +670,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     let lastTick = 0;
     const tick = (now: number) => {
       if (isPlayingRef.current) {
-        if (now - lastTick >= (NI_SPEEDS[speed] * 16.67)) {
+        if (now - lastTick >= (getGameSpeed() * 16.67)) {
           lastTick = now;
           move();
         }
@@ -660,7 +679,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     };
     animationRef.current = requestAnimationFrame(tick);
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [speed, move]);
+  }, [speed, move, getGameSpeed]);
 
   // Key Handlers
   useEffect(() => {
