@@ -693,7 +693,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="flex-1 min-w-[120px] border-l border-dark-border cursor-pointer group" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="flex-1 min-w-[120px] border-l border-dark-border cursor-pointer group" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
           const currentIndex = modes.indexOf(vizMode);
