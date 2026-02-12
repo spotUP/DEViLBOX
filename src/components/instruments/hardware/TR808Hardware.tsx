@@ -619,7 +619,7 @@ const InstrumentColumn: React.FC<{
 const TitleText: React.FC<{ text: string }> = React.memo(({ text }) => {
   const eSplit = text.split('e');
   const result = eSplit.reduce<React.ReactNode[]>((acc, cur, idx) => {
-    if (acc === null) return [cur];
+    if (idx === 0) return [cur];
     const rotatedE = (
       <span
         key={idx}
@@ -633,7 +633,7 @@ const TitleText: React.FC<{ text: string }> = React.memo(({ text }) => {
       </span>
     );
     return [...acc, rotatedE, cur];
-  }, null as React.ReactNode);
+  }, []);
   return <>{result}</>;
 });
 
