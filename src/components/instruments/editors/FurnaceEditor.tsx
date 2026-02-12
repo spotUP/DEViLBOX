@@ -917,7 +917,7 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
                 formatValue={(v) => String(Math.round(v))} />
             )}
             {ranges.rs.max > 0 && (
-              <Knob label="RS" value={op.rs} min={ranges.rs.min} max={ranges.rs.max}
+              <Knob label="RS" value={op.rs ?? 0} min={ranges.rs.min} max={ranges.rs.max}
                 onChange={(v) => onUpdate({ rs: Math.round(v) })} size="sm" color="#06b6d4"
                 formatValue={(v) => String(Math.round(v))} />
             )}
@@ -927,12 +927,12 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
                 formatValue={(v) => String(Math.round(v))} />
             )}
             {ranges.ksl && (
-              <Knob label="KSL" value={op.ksl} min={ranges.ksl.min} max={ranges.ksl.max}
+              <Knob label="KSL" value={op.ksl ?? 0} min={ranges.ksl.min} max={ranges.ksl.max}
                 onChange={(v) => onUpdate({ ksl: Math.round(v) })} size="sm" color="#fbbf24"
                 formatValue={(v) => String(Math.round(v))} />
             )}
             {ranges.hasWS && (
-              <Knob label="WS" value={op.ws} min={0} max={7}
+              <Knob label="WS" value={op.ws ?? 0} min={0} max={7}
                 onChange={(v) => onUpdate({ ws: Math.round(v) })} size="sm" color="#34d399"
                 formatValue={(v) => String(Math.round(v))} />
             )}
@@ -940,15 +940,15 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
 
           {/* Boolean Flags - horizontal row */}
           <div className="flex justify-center gap-2">
-            <ToggleButton label="AM" value={op.am} onChange={(v) => onUpdate({ am: v })} />
+            <ToggleButton label="AM" value={op.am ?? false} onChange={(v) => onUpdate({ am: v })} />
             {ranges.hasSSG && (
               <ToggleButton label="SSG" value={(op.ssg ?? 0) > 0} onChange={(v) => onUpdate({ ssg: v ? 8 : 0 })} />
             )}
             {ranges.hasWS && (
               <>
-                <ToggleButton label="VIB" value={op.vib} onChange={(v) => onUpdate({ vib: v })} />
-                <ToggleButton label="SUS" value={op.sus} onChange={(v) => onUpdate({ sus: v })} />
-                <ToggleButton label="KSR" value={op.ksr} onChange={(v) => onUpdate({ ksr: v })} />
+                <ToggleButton label="VIB" value={op.vib ?? false} onChange={(v) => onUpdate({ vib: v })} />
+                <ToggleButton label="SUS" value={op.sus ?? false} onChange={(v) => onUpdate({ sus: v })} />
+                <ToggleButton label="KSR" value={op.ksr ?? false} onChange={(v) => onUpdate({ ksr: v })} />
               </>
             )}
           </div>

@@ -571,7 +571,7 @@ export function renderSpecialParameters(
               <button
                 key={type}
                 onClick={() => updateParam('noiseType', type)}
-                className={`flex-1 px-4 py-3 rounded-lg font-bold uppercase text-sm transition-all ${params.noiseType === type || (!params.noiseType && type === 'white') ? 'bg-gray-600 text-white ring-2 ring-gray-400' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
+                className={`flex-1 px-4 py-3 rounded-lg font-bold uppercase text-sm transition-all ${(params as Record<string, unknown>).noiseType === type || (!(params as Record<string, unknown>).noiseType && type === 'white') ? 'bg-gray-600 text-white ring-2 ring-gray-400' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
               >
                 {type}
               </button>

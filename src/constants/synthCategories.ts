@@ -1477,6 +1477,24 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Waves',
     color: 'text-pink-500',
   },
+  VFX: {
+    type: 'VFX',
+    name: 'Ensoniq VFX',
+    shortName: 'VFX',
+    description: 'Ensoniq VFX transwave synthesizer - alias for MAMEVFX',
+    bestFor: ['Transwave', 'Digital', 'Pads', 'Textures'],
+    icon: 'Cpu',
+    color: 'text-cyan-500',
+  },
+  D50: {
+    type: 'D50',
+    name: 'Roland D-50',
+    shortName: 'D-50',
+    description: 'Roland D-50 virtual analog synthesizer',
+    bestFor: ['Digital', 'Pads', 'Strings', 'Vintage digital'],
+    icon: 'Cpu',
+    color: 'text-rose-500',
+  },
 };
 
 // Organized categories
