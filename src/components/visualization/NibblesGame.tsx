@@ -26,6 +26,13 @@ const MIN_VISUALIZATION_INTENSITY = 0.05; // Skip tiles below 5% intensity
 const MIN_TILE_ALPHA = 0.2; // Minimum opacity for background tiles
 const ALPHA_INTENSITY_RANGE = 0.4; // Additional opacity based on intensity (max = 0.6)
 
+// Beat-synced visual effects tuning
+const GRID_GLOW_DECAY_RATE = 0.08;
+const WORM_PULSE_DECAY_RATE = 0.02;
+const WORM_PULSE_INTENSITY = 0.15;
+const GRID_GLOW_THRESHOLD = 0.1;
+const GRID_GLOW_BLUR_MULTIPLIER = 10;
+
 // Grid rendering
 const GRID_CELL_PADDING = 2;
 
@@ -101,11 +108,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
   // Audio reactivity state
   const [audioData, setAudioData] = useState<Uint8Array>(new Uint8Array(128));
-  // @ts-expect-error - beatIntensity will be used in Task 3 for beat-synced effects
   const [beatIntensity, setBeatIntensity] = useState(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const previousVolumeRef = useRef(0);
   const audioBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+
+  // Visual effects
+  const [gridGlowIntensity, setGridGlowIntensity] = useState(0);
+  const [wormPulseScale, setWormPulseScale] = useState(1);
 
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
@@ -195,10 +205,15 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
     if (volumeDelta > BEAT_DETECTION_THRESHOLD) {
       // Beat detected
-      setBeatIntensity(Math.min(volumeDelta / BEAT_INTENSITY_SCALE, 1));
+      const intensity = Math.min(volumeDelta / BEAT_INTENSITY_SCALE, 1);
+      setBeatIntensity(intensity);
+      setGridGlowIntensity(intensity);
+      setWormPulseScale(1 + (intensity * WORM_PULSE_INTENSITY));
     } else {
-      // Decay beat intensity
+      // Decay effects
       setBeatIntensity(prev => Math.max(0, prev - BEAT_DECAY_RATE));
+      setGridGlowIntensity(prev => Math.max(0, prev - GRID_GLOW_DECAY_RATE));
+      setWormPulseScale(prev => Math.max(1, prev - WORM_PULSE_DECAY_RATE));
     }
 
     previousVolumeRef.current = volume;
@@ -667,9 +682,23 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       ctx.restore();
 
       // Draw playfield border
-      ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan-500/30
-      ctx.lineWidth = 2;
-      ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
+      if (surround) {
+        ctx.strokeStyle = PALETTE[11]; // Cyan
+        ctx.lineWidth = 2;
+
+        // Add glow effect on beats
+        if (gridGlowIntensity > GRID_GLOW_THRESHOLD) {
+          ctx.shadowColor = PALETTE[11];
+          ctx.shadowBlur = GRID_GLOW_BLUR_MULTIPLIER * gridGlowIntensity;
+        }
+
+        ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan-500/30
+        ctx.lineWidth = 2;
+        ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
+      }
 
       for (let y = 0; y < HEIGHT; y++) {
         for (let x = 0; x < WIDTH; x++) {
@@ -699,7 +728,16 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
               ctx.fillStyle = '#000';
               ctx.fillRect(px, py, cellSize, cellSize);
               ctx.fillStyle = PALETTE[val] || '#fff';
-              ctx.fillRect(px + GRID_CELL_PADDING, py + GRID_CELL_PADDING, cellSize - (GRID_CELL_PADDING * 2), cellSize - (GRID_CELL_PADDING * 2));
+
+              // Apply pulse effect to worm segments
+              const inset = GRID_CELL_PADDING / wormPulseScale;
+              const size = (cellSize - (GRID_CELL_PADDING * 2)) * wormPulseScale;
+              ctx.fillRect(
+                px + inset,
+                py + inset,
+                size,
+                size
+              );
             } else {
               ctx.fillStyle = PALETTE[val] || '#fff';
               ctx.fillRect(px, py, cellSize, cellSize);
@@ -714,7 +752,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       isRunning = false;
       if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
     };
-  }, [grid, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles]);
+  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles]);
 
   // Initial Level Load (only once on mount)
   useEffect(() => {
