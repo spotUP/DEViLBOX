@@ -306,9 +306,18 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       const { analyserNode } = useAudioStore.getState();
       if (!analyserNode) return;
 
-      // Use Tone.js analyser's internal native AnalyserNode
-      const nativeAnalyser = analyserNode.input as unknown as AnalyserNode;
-      if (!nativeAnalyser || !nativeAnalyser.context) return;
+      // Get the native Web Audio context from Tone.js
+      const context = analyserNode.context.rawContext || analyserNode.context;
+      if (!context) return;
+
+      // Create a native AnalyserNode
+      const nativeAnalyser = context.createAnalyser();
+      nativeAnalyser.fftSize = 256; // 128 frequency bins
+      nativeAnalyser.smoothingTimeConstant = 0.8;
+
+      // Connect Tone.js analyser to our native analyser
+      // Tone.js analyser's output connects to destination, we tap into it
+      analyserNode.connect(nativeAnalyser as any);
 
       analyserRef.current = nativeAnalyser;
     } catch (e) {
