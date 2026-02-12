@@ -624,7 +624,7 @@ async function preWarmEngines(): Promise<void> {
     const rawCtx = (ctxRec.rawContext || ctxRec._context || ctx) as BaseAudioContext;
     const furnaceDispatchEngine = FurnaceDispatchEngine.getInstance();
     engineStatus.FurnaceDispatch = await initTimeout(
-      furnaceDispatchEngine.init(rawCtx),
+      furnaceDispatchEngine.init(rawCtx as unknown as Record<string, unknown>),
       10000, 'FurnaceDispatchEngine'
     );
   } catch (e) {
@@ -642,7 +642,7 @@ async function preWarmEngines(): Promise<void> {
     if (hasAudioWorklet) {
       const buzzEngine = BuzzmachineEngine.getInstance();
       engineStatus.Buzzmachine = await initTimeout(
-        buzzEngine.init(rawCtx),
+        buzzEngine.init(rawCtx as unknown as AudioContext),
         10000, 'BuzzmachineEngine'
       );
     } else {
@@ -981,7 +981,7 @@ async function testVolumeLevels() {
     try {
       // Auto-enrich config with first factory preset if available.
       // This ensures synths that need patch data (V2, MAME chips) produce sound.
-      const preset = getFirstPresetForSynthType(config.synthType);
+      const preset = getFirstPresetForSynthType(config.synthType as string);
       const presetConfig = preset
         ? (() => { const p = { ...preset } as Record<string, unknown>; delete p.name; delete p.type; delete p.synthType; return p; })()
         : {};
@@ -1525,7 +1525,7 @@ async function testSustainReleaseBehavior() {
     if (!config) continue;
 
     try {
-      const preset = getFirstPresetForSynthType(config.synthType);
+      const preset = getFirstPresetForSynthType(config.synthType as string);
       const presetConfig = preset
         ? (() => { const p = { ...preset } as Record<string, unknown>; delete p.name; delete p.type; delete p.synthType; return p; })()
         : {};

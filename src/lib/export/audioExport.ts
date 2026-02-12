@@ -82,7 +82,8 @@ export async function renderPatternToAudio(
       switch (inst.synthType) {
         case 'MonoSynth':
           synth = new Tone.MonoSynth({
-            oscillator: { type: inst.oscillator?.type || 'sawtooth' },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            oscillator: { type: inst.oscillator?.type || 'sawtooth' } as any,
             envelope: {
               attack: inst.envelope?.attack ?? 0.01,
               decay: inst.envelope?.decay ?? 0.2,
@@ -121,7 +122,7 @@ export async function renderPatternToAudio(
           // Create sampler with uploaded sample
           if (inst.parameters?.sampleUrl) {
             synth = new Tone.Sampler({
-              urls: { C4: inst.parameters.sampleUrl },
+              urls: { C4: inst.parameters.sampleUrl as string },
               volume: inst.volume || -12,
             }).toDestination();
           } else {
@@ -133,7 +134,7 @@ export async function renderPatternToAudio(
           // Create player with uploaded sample
           if (inst.parameters?.sampleUrl) {
             synth = new Tone.Player({
-              url: inst.parameters.sampleUrl,
+              url: inst.parameters.sampleUrl as string,
               volume: inst.volume || -12,
             }).toDestination();
           } else {
@@ -144,7 +145,8 @@ export async function renderPatternToAudio(
         default:
           // Default to PolySynth with Synth
           synth = new Tone.PolySynth(Tone.Synth, {
-            oscillator: { type: inst.oscillator?.type || 'sawtooth' },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            oscillator: { type: inst.oscillator?.type || 'sawtooth' } as any,
             envelope: {
               attack: inst.envelope?.attack ?? 0.01,
               decay: inst.envelope?.decay ?? 0.2,
