@@ -247,7 +247,7 @@ function sendDirectToSynth(instrumentId: number, param: string, value: number): 
     const engine = getToneEngine();
     engine.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      const synthObj = instrument as Record<string, unknown>;
+      const synthObj = instrument as unknown as Record<string, unknown>;
       if (idPart === String(instrumentId) && typeof synthObj.set === 'function') {
         (synthObj.set as (p: string, v: number) => void)(param, value);
       }

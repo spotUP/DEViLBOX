@@ -578,8 +578,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (complexSynthTypes.includes(updatedInstrument.synthType)) {
               // Find the config key for this synth type (e.g. 'superSaw' for 'SuperSaw')
               const configKey = updatedInstrument.synthType.charAt(0).toLowerCase() + updatedInstrument.synthType.slice(1);
-              const config = (updatedInstrument as Record<string, unknown>)[configKey];
-              if (config && (updates as Record<string, unknown>)[configKey]) {
+              const config = (updatedInstrument as unknown as Record<string, unknown>)[configKey];
+              if (config && (updates as unknown as Record<string, unknown>)[configKey]) {
                 engine.updateComplexSynthParameters(id, config);
                 return; // Handled
               }
@@ -1402,7 +1402,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             inst.metadata = {};
           }
 
-          inst.metadata.preservedSample = preserved;
+          inst.metadata.preservedSample = preserved as typeof inst.metadata.preservedSample;
 
           if (!inst.metadata.transformHistory) {
             inst.metadata.transformHistory = [];

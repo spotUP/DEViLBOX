@@ -61,29 +61,6 @@ export interface ModuleInfo {
   };
 }
 
-/** Metadata payload from ChiptunePlayer (libopenmpt) */
-interface ChiptuneMetadata {
-  title?: string;
-  type?: string;
-  channels?: number;
-  totalPatterns?: number;
-  patterns?: number;
-  totalOrders?: number;
-  orders?: number;
-  instruments?: number;
-  samples?: number;
-  dur?: number;
-  message?: string;
-  song?: {
-    channels?: string[];
-    instruments?: string[];
-    samples?: string[];
-    orders?: { name: string; pat: number }[];
-    patterns?: RawPattern[];
-    numSubsongs?: number;
-  };
-}
-
 /** Error payload from ChiptunePlayer */
 interface ChiptuneError {
   type?: string;
@@ -169,7 +146,8 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
             metaReject(new Error('Timeout waiting for metadata'));
           }, 5000);
 
-          player.onMetadata((meta: ChiptuneMetadata) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          player.onMetadata((meta: any) => {
             clearTimeout(timeout);
 
             // Extract song data if available

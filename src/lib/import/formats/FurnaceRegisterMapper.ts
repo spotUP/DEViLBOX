@@ -69,7 +69,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x40 + opOff), op.tl & 0x7F);
 
       // 0x50: RS (bits 6-7), AR (bits 0-4)
-      engine.write(chip, regBase | (0x50 + opOff), ((op.rs & 3) << 6) | (op.ar & 0x1F));
+      engine.write(chip, regBase | (0x50 + opOff), (((op.rs ?? 0) & 3) << 6) | (op.ar & 0x1F));
 
       // 0x60: AM (bit 7), DR (bits 0-4)
       engine.write(chip, regBase | (0x60 + opOff), (op.am ? 0x80 : 0) | (op.dr & 0x1F));
@@ -81,7 +81,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x80 + opOff), ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
 
       // 0x90: SSG-EG (bits 0-3)
-      engine.write(chip, regBase | (0x90 + opOff), op.ssg & 0x0F);
+      engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
   }
 
@@ -189,7 +189,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, 0x20 + slotOff, v20);
 
       // 0x40: KSL (6-7), TL (0-5)
-      engine.write(chip, 0x40 + slotOff, ((op.ksl & 3) << 6) | (op.tl & 0x3F));
+      engine.write(chip, 0x40 + slotOff, (((op.ksl ?? 0) & 3) << 6) | (op.tl & 0x3F));
 
       // 0x60: AR (4-7), DR (0-3)
       engine.write(chip, 0x60 + slotOff, ((op.ar >> 1) << 4) | (op.dr >> 1));
@@ -198,7 +198,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, 0x80 + slotOff, ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
 
       // 0xE0: Waveform Select (0-7)
-      engine.write(chip, 0xE0 + slotOff, op.ws & 0x07);
+      engine.write(chip, 0xE0 + slotOff, (op.ws ?? 0) & 0x07);
     });
   }
 
@@ -536,7 +536,7 @@ export class FurnaceRegisterMapper {
 
       // 0x02: Modulator KSL(6-7), TL(0-5)
       const modTL = Math.min(63, mod.tl >> 1);  // Scale 0-127 to 0-63
-      engine.write(chip, 0x02, ((mod.ksl & 3) << 6) | (modTL & 0x3F));
+      engine.write(chip, 0x02, (((mod.ksl ?? 0) & 3) << 6) | (modTL & 0x3F));
 
       // 0x03: Carrier waveform(4), Modulator waveform(3), FB(1-3), unused(0)
       // OPLL only has 2 waveforms: 0=sine, 1=half-sine
@@ -607,7 +607,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x40 + opOff), op.tl & 0x7F);
 
       // RS + AR
-      engine.write(chip, regBase | (0x50 + opOff), ((op.rs & 3) << 6) | (op.ar & 0x1F));
+      engine.write(chip, regBase | (0x50 + opOff), (((op.rs ?? 0) & 3) << 6) | (op.ar & 0x1F));
 
       // AM + DR
       engine.write(chip, regBase | (0x60 + opOff), (op.am ? 0x80 : 0) | (op.dr & 0x1F));
@@ -619,7 +619,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x80 + opOff), ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
 
       // SSG-EG
-      engine.write(chip, regBase | (0x90 + opOff), op.ssg & 0x0F);
+      engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
 
     console.log(`[mapOPNA] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
@@ -663,7 +663,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, 0x40 + opOff, op.tl & 0x7F);
 
       // RS + AR
-      engine.write(chip, 0x50 + opOff, ((op.rs & 3) << 6) | (op.ar & 0x1F));
+      engine.write(chip, 0x50 + opOff, (((op.rs ?? 0) & 3) << 6) | (op.ar & 0x1F));
 
       // AM + DR
       engine.write(chip, 0x60 + opOff, (op.am ? 0x80 : 0) | (op.dr & 0x1F));
@@ -675,7 +675,7 @@ export class FurnaceRegisterMapper {
       engine.write(chip, 0x80 + opOff, ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
 
       // SSG-EG
-      engine.write(chip, 0x90 + opOff, op.ssg & 0x0F);
+      engine.write(chip, 0x90 + opOff, (op.ssg ?? 0) & 0x0F);
     });
 
     console.log(`[mapOPN] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
@@ -713,11 +713,11 @@ export class FurnaceRegisterMapper {
       const dtNative = this.furnaceDtToOPN2(op.dt);
       engine.write(chip, regBase | (0x30 + opOff), ((dtNative & 7) << 4) | (op.mult & 0x0F));
       engine.write(chip, regBase | (0x40 + opOff), op.tl & 0x7F);
-      engine.write(chip, regBase | (0x50 + opOff), ((op.rs & 3) << 6) | (op.ar & 0x1F));
+      engine.write(chip, regBase | (0x50 + opOff), (((op.rs ?? 0) & 3) << 6) | (op.ar & 0x1F));
       engine.write(chip, regBase | (0x60 + opOff), (op.am ? 0x80 : 0) | (op.dr & 0x1F));
       engine.write(chip, regBase | (0x70 + opOff), op.d2r & 0x1F);
       engine.write(chip, regBase | (0x80 + opOff), ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
-      engine.write(chip, regBase | (0x90 + opOff), op.ssg & 0x0F);
+      engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
 
     console.log(`[mapOPNB] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
