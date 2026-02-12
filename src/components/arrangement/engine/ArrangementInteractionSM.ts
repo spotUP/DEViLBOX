@@ -22,7 +22,12 @@ export type ArrangementInteractionState =
   | 'drawing-clip'
   | 'moving-playhead'
   | 'editing-automation'
-  | 'erasing';
+  | 'erasing'
+  | 'resizing-track-height'
+  | 'moving-loop-start'
+  | 'moving-loop-end'
+  | 'moving-automation-point'
+  | 'adding-automation-point';
 
 export interface ArrangementDragContext {
   startX: number;
@@ -34,6 +39,17 @@ export interface ArrangementDragContext {
   targetClipId: string | null;
   selectedAtStart: Set<string>;
   originalClips: ArrangementClip[];
+  // For track height resize
+  trackId?: string;
+  startHeight?: number;
+  // For loop region editing
+  loopStart?: number;
+  loopEnd?: number;
+  // For automation editing
+  automationLaneId?: string;
+  automationPointIndex?: number;
+  automationStartValue?: number;
+  automationStartRow?: number;
 }
 
 export interface ArrangementRenderState {
@@ -124,13 +140,18 @@ export class ArrangementInteractionSM {
     let cursor: string;
     if (this._state !== 'idle') {
       switch (this._state) {
-        case 'moving-clips': cursor = 'move'; break;
+        case 'moving-clips': cursor = 'grabbing'; break;
         case 'resizing-clip-start':
         case 'resizing-clip-end': cursor = 'ew-resize'; break;
         case 'drawing-clip': cursor = 'crosshair'; break;
         case 'erasing': cursor = 'not-allowed'; break;
         case 'select-box': cursor = 'crosshair'; break;
         case 'moving-playhead': cursor = 'pointer'; break;
+        case 'resizing-track-height': cursor = 'ns-resize'; break;
+        case 'moving-loop-start':
+        case 'moving-loop-end': cursor = 'ew-resize'; break;
+        case 'moving-automation-point': cursor = 'move'; break;
+        case 'adding-automation-point': cursor = 'crosshair'; break;
         default: cursor = 'default';
       }
     } else if (this._tool === 'draw') {
@@ -143,13 +164,19 @@ export class ArrangementInteractionSM {
       switch (hit.zone) {
         case 'resize-start':
         case 'resize-end': cursor = 'ew-resize'; break;
-        case 'body': cursor = 'move'; break;
+        case 'body': cursor = 'grab'; break;
         default: cursor = 'default';
       }
     } else if (hit.type === 'ruler') {
       cursor = 'pointer';
     } else if (hit.type === 'track-resize') {
       cursor = 'ns-resize';
+    } else if (hit.type === 'loop-start' || hit.type === 'loop-end') {
+      cursor = 'ew-resize';
+    } else if (hit.type === 'automation-point') {
+      cursor = 'move';
+    } else if (hit.type === 'automation-segment') {
+      cursor = 'crosshair';
     } else {
       cursor = 'default';
     }

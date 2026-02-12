@@ -210,6 +210,92 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     setHighScores(scores);
   }, []);
 
+  const spawnFood = useCallback(() => {
+    let attempts = 0;
+    while (attempts < 1000) {
+      const x = Math.floor(Math.random() * WIDTH);
+      const y = Math.floor(Math.random() * HEIGHT);
+      const cell = gridRef.current[y]?.[x];
+      const cellBelow = y < HEIGHT - 1 ? gridRef.current[y + 1]?.[x] : 0;
+      const suitable = cell === 0 && (y === HEIGHT - 1 || cellBelow === 0);
+      if (suitable) {
+        currentNumberRef.current++;
+        gridRef.current[y][x] = 16 + currentNumberRef.current;
+        return;
+      }
+      attempts++;
+    }
+  }, []);
+
+  // Initialize Level
+  const initLevel = useCallback((lvlIdx: number) => {
+    const lvlData = NIBBLES_LEVELS[lvlIdx % NIBBLES_LEVELS.length];
+    const newGrid = lvlData.grid.map(row => [...row]);
+
+    let x1 = 2, y1 = 2, x2 = 48, y2 = 20;
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        const val = newGrid[y]?.[x];
+        if (val === 6) { x1 = x; y1 = y; newGrid[y][x] = 0; }
+        if (val === 7) { x2 = x; y2 = y; newGrid[y][x] = 0; }
+      }
+    }
+
+    gridRef.current = newGrid;
+
+    const mapDir = (d: number) => {
+      if (d === 0) return 2; // Left
+      if (d === 5) return 3; // Down
+      if (d === 6) return 0; // Right
+      if (d === 7) return 1; // Up
+      return 0;
+    };
+
+    p1DirRef.current = mapDir(lvlData.p1Dir);
+    p2DirRef.current = mapDir(lvlData.p2Dir);
+
+    p1Ref.current = Array(256).fill(null).map(() => ({ x: x1, y: y1 }));
+    p2Ref.current = Array(256).fill(null).map(() => ({ x: x2, y: y2 }));
+
+    p1LenRef.current = 5;
+    p2LenRef.current = 5;
+    p1NoClearRef.current = 0;
+    p2NoClearRef.current = 0;
+    currentNumberRef.current = 0;
+
+    if (gridRef.current[y1]) gridRef.current[y1][x1] = 6;
+    if (numPlayers === 2 && gridRef.current[y2]) gridRef.current[y2][x2] = 7;
+
+    inputBuffer1.current = [];
+    inputBuffer2.current = [];
+
+    if (!surround) spawnFood();
+  }, [numPlayers, surround, spawnFood]);
+
+  // Reset game state (including music-reactive state)
+  const resetGame = useCallback(() => {
+    // Reset core game state
+    levelRef.current = 0;
+    score1Ref.current = 0;
+    score2Ref.current = 0;
+    lives1Ref.current = 3;
+    lives2Ref.current = 3;
+
+    // Reset music-reactive state
+    setBeatIntensity(0);
+    setGridGlowIntensity(0);
+    setWormPulseScale(1);
+    setScoreMultiplier(1);
+    particlesRef.current = [];
+    beatFoodQueueRef.current = 0;
+    lastBeatSpawnRef.current = 0;
+    lastEatTimeRef.current = 0;
+
+    // Reinitialize level and sync UI
+    initLevel(0);
+    syncUI();
+  }, [initLevel, syncUI]);
+
   useEffect(() => {
     requestAnimationFrame(() => loadHighScores());
   }, [loadHighScores]);
@@ -303,68 +389,6 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     }
     return () => resizeObserver.disconnect();
   }, []);
-
-  const spawnFood = useCallback(() => {
-    let attempts = 0;
-    while (attempts < 1000) {
-      const x = Math.floor(Math.random() * WIDTH);
-      const y = Math.floor(Math.random() * HEIGHT);
-      const cell = gridRef.current[y]?.[x];
-      const cellBelow = y < HEIGHT - 1 ? gridRef.current[y + 1]?.[x] : 0;
-      const suitable = cell === 0 && (y === HEIGHT - 1 || cellBelow === 0);
-      if (suitable) {
-        currentNumberRef.current++;
-        gridRef.current[y][x] = 16 + currentNumberRef.current;
-        return;
-      }
-      attempts++;
-    }
-  }, []);
-
-  // Initialize Level
-  const initLevel = useCallback((lvlIdx: number) => {
-    const lvlData = NIBBLES_LEVELS[lvlIdx % NIBBLES_LEVELS.length];
-    const newGrid = lvlData.grid.map(row => [...row]);
-
-    let x1 = 2, y1 = 2, x2 = 48, y2 = 20;
-    for (let y = 0; y < HEIGHT; y++) {
-      for (let x = 0; x < WIDTH; x++) {
-        const val = newGrid[y]?.[x];
-        if (val === 6) { x1 = x; y1 = y; newGrid[y][x] = 0; }
-        if (val === 7) { x2 = x; y2 = y; newGrid[y][x] = 0; }
-      }
-    }
-
-    gridRef.current = newGrid;
-
-    const mapDir = (d: number) => {
-      if (d === 0) return 2; // Left
-      if (d === 5) return 3; // Down
-      if (d === 6) return 0; // Right
-      if (d === 7) return 1; // Up
-      return 0;
-    };
-
-    p1DirRef.current = mapDir(lvlData.p1Dir);
-    p2DirRef.current = mapDir(lvlData.p2Dir);
-
-    p1Ref.current = Array(256).fill(null).map(() => ({ x: x1, y: y1 }));
-    p2Ref.current = Array(256).fill(null).map(() => ({ x: x2, y: y2 }));
-
-    p1LenRef.current = 5;
-    p2LenRef.current = 5;
-    p1NoClearRef.current = 0;
-    p2NoClearRef.current = 0;
-    currentNumberRef.current = 0;
-
-    if (gridRef.current[y1]) gridRef.current[y1][x1] = 6;
-    if (numPlayers === 2 && gridRef.current[y2]) gridRef.current[y2][x2] = 7;
-
-    inputBuffer1.current = [];
-    inputBuffer2.current = [];
-
-    if (!surround) spawnFood();
-  }, [numPlayers, surround, spawnFood]);
 
   // Update and render particles
   const updateAndRenderParticles = useCallback((ctx: CanvasRenderingContext2D, cellSize: number, offsetX: number, offsetY: number) => {
@@ -500,14 +524,8 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     // No high scores, reset immediately
     loadHighScores();
     setShowHighScores(true);
-    levelRef.current = 0;
-    score1Ref.current = 0;
-    score2Ref.current = 0;
-    lives1Ref.current = 3;
-    lives2Ref.current = 3;
-    initLevel(0);
-    syncUI();
-  }, [numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
+    resetGame();
+  }, [numPlayers, speed, highScores, loadHighScores, resetGame]);
 
   // Handle name entry submission
   const handleNameSubmit = useCallback(async () => {
@@ -542,14 +560,8 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     // All done, show high scores and reset
     loadHighScores();
     setShowHighScores(true);
-    levelRef.current = 0;
-    score1Ref.current = 0;
-    score2Ref.current = 0;
-    lives1Ref.current = 3;
-    lives2Ref.current = 3;
-    initLevel(0);
-    syncUI();
-  }, [nameInput, nameEntryScore, nameEntryLevel, nameEntryPlayer, numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
+    resetGame();
+  }, [nameInput, nameEntryScore, nameEntryLevel, nameEntryPlayer, numPlayers, speed, highScores, loadHighScores, resetGame]);
 
   const isInvalid = useCallback((currentX: number, currentY: number, d: number) => {
     // Calculate the next position

@@ -187,6 +187,9 @@ export const useTrackerInput = () => {
   // Track held notes by key to enable proper release
   const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
 
+  // Track last Esc press for double-Esc panic (kill all notes)
+  const lastEscPressRef = useRef<number>(0);
+
   // FT2: Get the channel to use for note entry (multi-channel allocation)
   const getTargetChannel = useCallback(() => {
     const editMode = recordMode && !isPlaying;
@@ -799,10 +802,22 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Escape: Clear selection and volume effect prefix
+      // Escape: Clear selection, or double-Esc to kill all notes (panic)
       if (key === 'Escape') {
         e.preventDefault();
-        clearSelection();
+
+        const now = Date.now();
+        const timeSinceLastEsc = now - lastEscPressRef.current;
+
+        // Double-Esc within 500ms = panic (kill all stuck notes)
+        if (timeSinceLastEsc < 500) {
+          getToneEngine().releaseAll();
+          useUIStore.getState().setStatusMessage('PANIC - ALL NOTES OFF');
+          lastEscPressRef.current = 0; // Reset timer
+        } else {
+          clearSelection();
+          lastEscPressRef.current = now;
+        }
         return;
       }
 
@@ -850,6 +865,8 @@ export const useTrackerInput = () => {
         // FT2 behavior: If playing, stop. If not playing, toggle edit mode.
         if (isPlaying) {
           stop();
+          // Kill all active notes to prevent stuck/jammed synths
+          getToneEngine().releaseAll();
           useUIStore.getState().setStatusMessage('STOPPED');
         } else {
           // Toggle edit/record mode

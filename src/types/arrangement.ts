@@ -23,6 +23,19 @@ export interface ArrangementClip {
   sourceChannelIndex: number;   // Which channel of the pattern to use
   color: string | null;         // Override color (null = use track color)
   muted: boolean;
+
+  // Professional DAW features (all optional with defaults)
+  name?: string;                // Custom clip name (null = use pattern name)
+  fadeInRows?: number;          // Fade in length (default 0)
+  fadeOutRows?: number;         // Fade out length (default 0)
+  fadeInCurve?: 'linear' | 'exponential' | 'logarithmic';  // Fade curve type
+  fadeOutCurve?: 'linear' | 'exponential' | 'logarithmic';
+  gain?: number;                // Clip gain/volume (0-2, default 1.0 = 0dB)
+  transpose?: number;           // MIDI transpose in semitones (-24 to +24)
+  reversed?: boolean;           // Play clip backwards
+  timeStretch?: number;         // Time stretch factor (0.5 = half speed, 2.0 = double speed)
+  crossfadeInRows?: number;     // Crossfade with previous clip (default 0)
+  crossfadeOutRows?: number;    // Crossfade with next clip (default 0)
 }
 
 /**
@@ -44,6 +57,11 @@ export interface ArrangementTrack {
   instrumentId: number | null;  // Linked instrument
   automationVisible: boolean;
   automationParameter: string | null;
+
+  // Professional DAW features
+  icon?: 'piano' | 'drum' | 'guitar' | 'bass' | 'vocal' | 'synth' | 'fx' | 'audio';
+  frozen: boolean;              // Track freeze (render to audio to save CPU)
+  armRecord: boolean;           // Arm for recording
 }
 
 /**
@@ -54,6 +72,7 @@ export interface TrackGroup {
   name: string;
   color: string | null;
   collapsed: boolean;
+  folded: boolean;              // Visually fold child tracks (hide them)
   index: number;                // Sort order among groups
 }
 
@@ -75,6 +94,8 @@ export interface ArrangementMarker {
 export interface TimelineAutomationPoint {
   row: number;
   value: number;                // 0-1 normalized
+  curve: 'linear' | 'exponential' | 'logarithmic' | 's-curve';  // Interpolation curve
+  tension?: number;             // Curve tension/steepness (0-1, default 0.5)
 }
 
 /**

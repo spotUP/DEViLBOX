@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T21:07:46.211Z
+ * Generated: 2026-02-12T23:23:02.718Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '438';
-export const BUILD_HASH = '908879e';
+export const BUILD_NUMBER = '462';
+export const BUILD_HASH = 'fe3dab5';
 export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
@@ -31,8 +31,110 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-13',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add beat-synced food spawning"
+      },
+      {
+        type: 'feature',
+        "description": "Add beat-synced grid glow and worm pulse"
+      },
+      {
+        type: 'feature',
+        "description": "Add music-reactive background tiles"
+      },
+      {
+        type: 'feature',
+        "description": "Add audio analysis infrastructure"
+      }
+    ]
+  },
+  {
+    version: '2026-02-12',
     date: '2026-02-12',
     changes: [
+      {
+        type: 'fix',
+        "description": "Replace browser prompt with custom React component"
+      },
+      {
+        type: 'fix',
+        "description": "Change alignItems to stretch for full-height glass overlay"
+      },
+      {
+        type: 'fix',
+        "description": "Fix collision detection to check from current position"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure visualizer container has full height"
+      },
+      {
+        type: 'fix',
+        "description": "Scale playfield to fit visible canvas area"
+      },
+      {
+        type: 'fix',
+        "description": "Fill entire visualizer height and track container size"
+      },
+      {
+        type: 'fix',
+        "description": "Make viz-frame fill parent container height"
+      },
+      {
+        type: 'fix',
+        "description": "Make game fill entire visualizer area"
+      },
+      {
+        type: 'fix',
+        "description": "Remove glass and vignette overlays from compact visualizers"
+      },
+      {
+        type: 'fix',
+        "description": "Draw border inside canvas and double cell size"
+      },
+      {
+        type: 'fix',
+        "description": "Remove visualizer margin and make food more visible"
+      },
+      {
+        type: 'fix',
+        "description": "Fix game logic bugs preventing startup and gameplay"
+      },
+      {
+        type: 'fix',
+        "description": "Revert buttons to toggle, keep hotkeys as restart"
+      },
+      {
+        type: 'fix',
+        "description": "Make play hotkeys restart playback like buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Make play buttons restart playback instead of toggling"
+      },
+      {
+        type: 'fix',
+        "description": "Add 60fps to remaining visualizers"
+      },
+      {
+        type: 'fix',
+        "description": "Increase frame rate from 30fps to 60fps"
+      },
+      {
+        type: 'fix',
+        "description": "Add author email to package.json for Linux .deb builds"
+      },
+      {
+        type: 'feature',
+        "description": "Add playback visual feedback to clips"
+      },
+      {
+        type: 'fix',
+        "description": "Widen zoom level display to prevent text squishing"
+      },
       {
         type: 'feature',
         "description": "Add transport controls (Play/Stop) to toolbar"
@@ -142,102 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Split WAM plugins into effects and synths, add effect search, fix bugs"
-      },
-      {
-        type: 'feature',
-        "description": "Add complete Leap sample taxonomy with 17 categories and character tags"
-      },
-      {
-        type: 'fix',
-        "description": "Correct data model, add validation suite, and complete SDK coverage"
-      },
-      {
-        type: 'fix',
-        "description": "Polyfill URL constructor for AudioWorklet WASM loading"
-      },
-      {
-        type: 'feature',
-        "description": "Add NKS2 metadata builder, Leap expansion support, and NICA improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Implement full NKS SDK v2.0.2 specification"
-      },
-      {
-        type: 'fix',
-        "description": "Send correct MIDI note in writeKeyOff for all MAME synths"
-      },
-      {
-        type: 'fix',
-        "description": "Stop V2Speech looping on note release"
-      },
-      {
-        type: 'fix',
-        "description": "Register V2Speech in engine factory and ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Expand NKS parameter maps to all 170+ synths with dedicated profiles"
-      },
-      {
-        type: 'fix',
-        "description": "Show speech text input without preset, add Speech & Voice category"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: update changelog, NKS tweaks, TB303 panel fix"
-      },
-      {
-        type: 'fix',
-        "description": "Improve WAM plugin loading, GUI mounting, and registry cleanup"
-      },
-      {
-        type: 'feature',
-        "description": "Redesign effect editors with pedal-enclosure aesthetic"
-      },
-      {
-        type: 'feature',
-        "description": "Implement NKS2 specification with unified parameter routing"
-      },
-      {
-        type: 'fix',
-        "description": "Center WAM plugin GUI in container"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: update changelog, add 303 synthesis tips, update project docs"
-      },
-      {
-        type: 'feature',
-        "description": "Detect effect plugins and add internal tone generator"
-      },
-      {
-        type: 'feature',
-        "description": "Add filter scope visualization and quick tips to JC303 panel"
-      },
-      {
-        type: 'improvement',
-        "description": "Normalize all parameters to 0-1, add set() and applyConfig() API"
-      },
-      {
-        type: 'feature',
-        "description": "Register Open303 and OB-Xd, fix Dexed init voice, harden VSTBridge worklet"
-      },
-      {
-        type: 'improvement',
-        "description": "Ci: build Electron desktop apps on every deploy"
-      },
-      {
-        type: 'fix',
-        "description": "Enable file browser on GitHub Pages via static manifest fallback"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused patterns variable from TD-3 import"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
       }
     ]
   }

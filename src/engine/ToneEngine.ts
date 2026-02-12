@@ -545,26 +545,25 @@ export class ToneEngine {
       }
     }
 
-    // Wait for WASM synths (Open303/DB303) to initialize their AudioWorklet
-    const wasmConfigs = configs.filter((c) => c.synthType === 'TB303' || c.synthType === 'Buzz3o3');
-    if (wasmConfigs.length > 0) {
-      const wasmPromises: Promise<void>[] = [];
-      for (const config of wasmConfigs) {
-        const key = this.getInstrumentKey(config.id, -1);
-        const instrument = this.instruments.get(key);
-        if ((instrument as any)?.ensureInitialized) {
-          wasmPromises.push((instrument as any).ensureInitialized());
-        }
+    // Wait for ALL WASM-based synths to initialize their AudioWorklet
+    // This includes: MAME synths, Buzzmachine, Dexed, OBXd, TB303, V2, DubSiren, etc.
+    const wasmPromises: Promise<void>[] = [];
+    for (const config of configs) {
+      const key = this.getInstrumentKey(config.id, -1);
+      const instrument = this.instruments.get(key);
+      // Check if instrument has ensureInitialized method (all WASM-based synths should)
+      if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
+        wasmPromises.push((instrument as any).ensureInitialized());
       }
-      if (wasmPromises.length > 0) {
-        try {
-          console.log(`[ToneEngine] Waiting for ${wasmPromises.length} WASM synth(s) to initialize...`);
-          await Promise.all(wasmPromises);
-          if (generation !== this.preloadGeneration) return; // Superseded
-          console.log(`[ToneEngine] All WASM synths ready`);
-        } catch (error) {
-          console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
-        }
+    }
+    if (wasmPromises.length > 0) {
+      try {
+        console.log(`[ToneEngine] Waiting for ${wasmPromises.length} WASM synth(s) to initialize...`);
+        await Promise.all(wasmPromises);
+        if (generation !== this.preloadGeneration) return; // Superseded
+        console.log(`[ToneEngine] All WASM synths ready`);
+      } catch (error) {
+        console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
       }
     }
 
@@ -603,31 +602,13 @@ export class ToneEngine {
     }
 
     // Check ROM status for MAME chip synths that have romConfig.
-    // Wait for their init to complete, then update _romsLoaded or show upload dialog.
+    // Initialization is already handled above in the general WASM init loop.
     const romChipConfigs = configs.filter((c) => {
       const chipDef = CHIP_SYNTH_DEFS[c.synthType || ''];
       return chipDef?.romConfig;
     });
     if (romChipConfigs.length > 0) {
-      // Wait for all ROM-dependent chip synths to finish initializing
-      const romInitPromises: Promise<void>[] = [];
-      for (const config of romChipConfigs) {
-        const key = this.getInstrumentKey(config.id, -1);
-        const instrument = this.instruments.get(key);
-        if ((instrument as any)?.ensureInitialized) {
-          romInitPromises.push((instrument as any).ensureInitialized());
-        }
-      }
-      if (romInitPromises.length > 0) {
-        try {
-          await Promise.all(romInitPromises);
-        } catch {
-          // Individual synths handle their own errors
-        }
-        if (generation !== this.preloadGeneration) return; // Superseded
-      }
-
-      // Now check ROM loaded status for each chip (lazy import to avoid circular dep)
+      // Check ROM loaded status for each chip (lazy import to avoid circular dep)
       const { useInstrumentStore: romInstStore } = await import('../stores/useInstrumentStore');
       const instStore = romInstStore.getState();
       for (const config of romChipConfigs) {
@@ -2186,8 +2167,20 @@ export class ToneEngine {
     accent: boolean = false,
     slide: boolean = false
   ): void {
-    // Check if instrument is explicitly marked as monophonic
-    if (config.monophonic === true) {
+    // Monophonic synths (enforced at runtime for safety, even if config.monophonic isn't set)
+    // These synths are architecturally monophonic and will break with polyphonic note allocation
+    const monoSynthTypes = new Set([
+      // Speech synthesis (have speech sequencers that conflict with polyphony)
+      'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax', 'Sam', 'V2Speech',
+      // Single-voice generators
+      'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477', 'MAMEUPD931', 'MAMEUPD933',
+      // Monophonic synths
+      'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare',
+    ]);
+    const isMonoSynth = config.synthType ? monoSynthTypes.has(config.synthType) : false;
+
+    // Check if instrument is explicitly marked as monophonic or is an inherently mono synth
+    if (config.monophonic === true || isMonoSynth) {
       // Force monophonic: Release any previous notes for this instrument first
       // IMPORTANT: For 303 slide, we DON'T release first - the slide maintains the gate
       if (!slide) {
@@ -2815,6 +2808,10 @@ export class ToneEngine {
         } else if (isDevilboxSynth(instrument) && instrument.triggerRelease) {
           // DevilboxSynths don't have releaseAll(), use triggerRelease()
           instrument.triggerRelease!(undefined, now);
+          // Also stop any active speech synthesis
+          if (typeof (instrument as any).stopSpeaking === 'function') {
+            (instrument as any).stopSpeaking();
+          }
         }
 
         // CRITICAL: Force immediate silence by ramping volume to -Infinity
@@ -3280,6 +3277,12 @@ export class ToneEngine {
         if (config) {
           console.log(`[ToneEngine] speakMAMEChipText: creating instrument on-demand for id=${instrumentId}, type=${config.synthType}`);
           instrument = this.getInstrument(instrumentId, config) ?? undefined;
+          // Wait for WASM synth to initialize (ensures worklet is ready before speakText)
+          if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
+            await (instrument as any).ensureInitialized();
+          }
+          // Also wait for async effect chain to connect (buildInstrumentEffectChain is fire-and-forget in getInstrument)
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       } catch (_err) {
         console.warn('[ToneEngine] speakMAMEChipText: failed to lazy-create instrument:', _err);

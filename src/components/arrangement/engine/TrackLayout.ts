@@ -35,13 +35,17 @@ export class TrackLayout {
       groups.filter(g => g.collapsed).map(g => g.id)
     );
 
+    const foldedGroupIds = new Set(
+      groups.filter(g => g.folded).map(g => g.id)
+    );
+
     const sortedTracks = [...tracks].sort((a, b) => a.index - b.index);
 
     this.entries = [];
     let y = 0;
 
     for (const track of sortedTracks) {
-      const visible = !track.groupId || !collapsedGroupIds.has(track.groupId);
+      const visible = !track.groupId || (!collapsedGroupIds.has(track.groupId) && !foldedGroupIds.has(track.groupId));
 
       // Count visible automation lanes for this track
       const trackAutoLanes = automationLanes.filter(

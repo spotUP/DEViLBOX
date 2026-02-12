@@ -100,6 +100,7 @@ interface ArrangementStore {
   removeGroup: (groupId: string) => void;
   assignTrackToGroup: (trackId: string, groupId: string | null) => void;
   toggleGroupCollapse: (groupId: string) => void;
+  toggleGroupFold: (groupId: string) => void;
 
   // === Selection ===
   selectClip: (clipId: string, addToSelection?: boolean) => void;
@@ -193,7 +194,21 @@ export const useArrangementStore = create<ArrangementStore>()(
     addClip: (clipData) => {
       const id = generateId('clip');
       set((state) => {
-        state.clips.push({ ...clipData, id });
+        state.clips.push({
+          id,
+          ...clipData,
+          // Defaults for new DAW features (applied only if not provided)
+          fadeInRows: clipData.fadeInRows ?? 0,
+          fadeOutRows: clipData.fadeOutRows ?? 0,
+          fadeInCurve: clipData.fadeInCurve ?? 'linear',
+          fadeOutCurve: clipData.fadeOutCurve ?? 'linear',
+          gain: clipData.gain ?? 1.0,
+          transpose: clipData.transpose ?? 0,
+          reversed: clipData.reversed ?? false,
+          timeStretch: clipData.timeStretch ?? 1.0,
+          crossfadeInRows: clipData.crossfadeInRows ?? 0,
+          crossfadeOutRows: clipData.crossfadeOutRows ?? 0,
+        });
       });
       return id;
     },
@@ -272,19 +287,15 @@ export const useArrangementStore = create<ArrangementStore>()(
         const secondClipId = generateId('clip');
         const rowsBeforeSplit = splitRow - clip.startRow;
 
-        // Second half
+        // Second half - copy all properties from original clip
         state.clips.push({
+          ...clip, // Copy all existing properties
           id: secondClipId,
-          patternId: clip.patternId,
-          trackId: clip.trackId,
           startRow: splitRow,
           offsetRows: clip.offsetRows + rowsBeforeSplit,
           clipLengthRows: clip.clipLengthRows !== null
             ? clip.clipLengthRows - rowsBeforeSplit
             : null,
-          sourceChannelIndex: clip.sourceChannelIndex,
-          color: clip.color,
-          muted: clip.muted,
         });
 
         // Trim first half
@@ -343,6 +354,9 @@ export const useArrangementStore = create<ArrangementStore>()(
           instrumentId: instrumentId ?? null,
           automationVisible: false,
           automationParameter: null,
+          // New DAW features
+          frozen: false,
+          armRecord: false,
         });
       });
       return id;
@@ -439,6 +453,7 @@ export const useArrangementStore = create<ArrangementStore>()(
           name,
           color: null,
           collapsed: false,
+          folded: false,  // New feature
           index: state.groups.length,
         });
       });
@@ -464,6 +479,12 @@ export const useArrangementStore = create<ArrangementStore>()(
       set((state) => {
         const group = state.groups.find(g => g.id === groupId);
         if (group) group.collapsed = !group.collapsed;
+      }),
+
+    toggleGroupFold: (groupId) =>
+      set((state) => {
+        const group = state.groups.find(g => g.id === groupId);
+        if (group) group.folded = !group.folded;
       }),
 
     // === Selection ===
@@ -611,12 +632,18 @@ export const useArrangementStore = create<ArrangementStore>()(
       set((state) => {
         const lane = state.automationLanes.find(l => l.id === laneId);
         if (!lane) return;
+        // Add defaults for new curve features
+        const pointWithDefaults = {
+          ...point,
+          curve: point.curve ?? ('linear' as const),
+          tension: point.tension ?? 0.5,
+        };
         // Insert sorted by row
         const idx = lane.points.findIndex(p => p.row > point.row);
         if (idx === -1) {
-          lane.points.push(point);
+          lane.points.push(pointWithDefaults);
         } else {
-          lane.points.splice(idx, 0, point);
+          lane.points.splice(idx, 0, pointWithDefaults);
         }
       }),
 
@@ -709,6 +736,8 @@ export const useArrangementStore = create<ArrangementStore>()(
             instrumentId: channelData?.instrumentId ?? null,
             automationVisible: false,
             automationParameter: null,
+            frozen: false,
+            armRecord: false,
           });
         }
 
@@ -732,6 +761,16 @@ export const useArrangementStore = create<ArrangementStore>()(
               sourceChannelIndex: ch,
               color: null,
               muted: false,
+              fadeInRows: 0,
+              fadeOutRows: 0,
+              fadeInCurve: 'linear',
+              fadeOutCurve: 'linear',
+              gain: 1.0,
+              transpose: 0,
+              reversed: false,
+              timeStretch: 1.0,
+              crossfadeInRows: 0,
+              crossfadeOutRows: 0,
             });
           }
 
