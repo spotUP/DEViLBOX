@@ -154,6 +154,7 @@ export const InstrumentSpectrum: React.FC<InstrumentSpectrumProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   const canvas = (
