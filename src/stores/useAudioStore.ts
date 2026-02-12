@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 interface AudioStore {
   // State
@@ -121,7 +122,7 @@ export const useAudioStore = create<AudioStore>()(
           type: effectType,
           enabled: true,
           wet: 50,
-          parameters: {},
+          parameters: getDefaultEffectParameters(effectType),
         };
         state.masterEffects.push(newEffect);
 
@@ -147,6 +148,7 @@ export const useAudioStore = create<AudioStore>()(
         const newEffect: EffectConfig = {
           ...effect,
           id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          parameters: { ...getDefaultEffectParameters(effect.type), ...effect.parameters },
         };
         state.masterEffects.push(newEffect);
 
@@ -193,6 +195,10 @@ export const useAudioStore = create<AudioStore>()(
       set((state) => {
         const effect = state.masterEffects.find((e) => e.id === effectId);
         if (effect) {
+          // Ensure defaults are populated for effects with sparse parameters
+          if (updates.parameters && Object.keys(effect.parameters).length < Object.keys(getDefaultEffectParameters(effect.type)).length) {
+            effect.parameters = { ...getDefaultEffectParameters(effect.type), ...effect.parameters };
+          }
           Object.assign(effect, updates);
 
           // Notify ToneEngine to update effect

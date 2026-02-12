@@ -690,24 +690,36 @@
 
     // Sweep button
     document.getElementById('sweepBtn').addEventListener('click', async () => {
-      log('Sweeping cutoff 0→1...', 'warning');
-      
+      log('Sweeping cutoff 0→1 (smooth rAF)...', 'warning');
+
       // Setup for clear sweep
       db303Synth.setCutoff(0);
       db303Synth.setResonance(0.9);
       db303Synth.setEnvMod(0);
-      
+
       db303Synth.triggerAttack('C3');
-      
-      const steps = 20;
-      for (let i = 0; i <= steps; i++) {
-        const v = i / steps;
-        db303Synth.setCutoff(v);
-        document.getElementById('cutoff').value = v;
-        document.getElementById('cutoffVal').textContent = v.toFixed(2);
-        await new Promise(r => setTimeout(r, 75));
-      }
-      
+
+      const durationMs = 2000; // 2 second sweep
+      const startTime = performance.now();
+      const cutoffSlider = document.getElementById('cutoff');
+      const cutoffDisplay = document.getElementById('cutoffVal');
+
+      await new Promise(resolve => {
+        function tick(now) {
+          const elapsed = now - startTime;
+          const v = Math.min(1, elapsed / durationMs);
+          db303Synth.setCutoff(v);
+          cutoffSlider.value = v;
+          cutoffDisplay.textContent = v.toFixed(3);
+          if (v < 1) {
+            requestAnimationFrame(tick);
+          } else {
+            resolve();
+          }
+        }
+        requestAnimationFrame(tick);
+      });
+
       db303Synth.triggerRelease();
       log('Sweep complete!', 'success');
     });

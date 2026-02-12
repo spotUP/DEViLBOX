@@ -15,7 +15,6 @@ import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
 import { usePadTriggers } from './hooks/usePadTriggers';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
-import { useNKSAutoConnect } from './hooks/useNKSIntegration';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
@@ -107,9 +106,6 @@ function App() {
 
   // Register MIDI Pad triggers
   usePadTriggers();
-
-  // Auto-connect to paired NKS hardware (Komplete Kontrol, Maschine)
-  useNKSAutoConnect();
 
   const { updateMasterEffect } = useAudioStore();
 

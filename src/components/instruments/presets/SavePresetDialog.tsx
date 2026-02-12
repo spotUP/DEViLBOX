@@ -14,7 +14,7 @@ import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
-import { downloadAsNKSF } from '@/midi/nks/presetIntegration';
+import { downloadAsNKSF } from '@/midi/performance/presetIntegration';
 
 interface SavePresetDialogProps {
   instrument: InstrumentConfig;
