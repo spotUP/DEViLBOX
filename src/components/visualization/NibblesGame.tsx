@@ -893,13 +893,13 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       const offsetX = (canvas.width - playWidth) / 2;
       const offsetY = (canvas.height - playHeight) / 2;
 
-      // Draw music-reactive background tiles
-      if (musicReactive) {
-        ctx.save();
-        ctx.translate(offsetX, offsetY);
-        renderBackgroundTiles(ctx, cellSize);
-        ctx.restore();
-      }
+      // Background tiles disabled per user request
+      // if (musicReactive) {
+      //   ctx.save();
+      //   ctx.translate(offsetX, offsetY);
+      //   renderBackgroundTiles(ctx, cellSize);
+      //   ctx.restore();
+      // }
 
       // Draw playfield border
       if (surround) {
