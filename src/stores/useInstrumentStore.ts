@@ -622,9 +622,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const newInstrument: InstrumentConfig = config
           ? deepMerge(defaultInst, config as Partial<InstrumentConfig>)
           : defaultInst;
-        
+
         // Ensure ID is correct (deepMerge might have overwritten it if config had id)
         newInstrument.id = newId;
+
+        // Auto-set monophonic flag for synths that are inherently monophonic
+        // Only set if not explicitly specified in config
+        if (config?.monophonic === undefined) {
+          const monoSynthTypes = new Set([
+            // Tone.js monophonic synths
+            'MonoSynth', 'DuoSynth',
+            // Acid/bass synths
+            'TB303', 'Buzz3o3', 'DB303',
+            // Simple monophonic synths
+            'DubSiren', 'SpaceLaser', 'Synare',
+            // Speech synthesis chips (single voice)
+            'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
+            'Sam', 'V2Speech',
+            // Single-voice generator chips
+            'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477',
+            'MAMEUPD931', 'MAMEUPD933',
+          ]);
+
+          if (newInstrument.synthType && monoSynthTypes.has(newInstrument.synthType)) {
+            newInstrument.monophonic = true;
+          }
+        }
 
         state.instruments.push(newInstrument);
         state.currentInstrumentId = newId;
@@ -635,16 +658,34 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     addInstrument: (config) => {
       set((state) => {
+        // Auto-set monophonic flag for inherently monophonic synths (same as createInstrument)
+        const finalConfig = { ...config };
+        if (finalConfig.monophonic === undefined) {
+          const monoSynthTypes = new Set([
+            'MonoSynth', 'DuoSynth',
+            'TB303', 'Buzz3o3', 'DB303',
+            'DubSiren', 'SpaceLaser', 'Synare',
+            'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
+            'Sam', 'V2Speech',
+            'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477',
+            'MAMEUPD931', 'MAMEUPD933',
+          ]);
+
+          if (finalConfig.synthType && monoSynthTypes.has(finalConfig.synthType)) {
+            finalConfig.monophonic = true;
+          }
+        }
+
         // Check if instrument with this ID already exists
-        const existing = state.instruments.find((i) => i.id === config.id);
+        const existing = state.instruments.find((i) => i.id === finalConfig.id);
         if (existing) {
           // Update existing instrument
-          Object.assign(existing, config);
+          Object.assign(existing, finalConfig);
         } else {
           // Add new instrument
-          state.instruments.push({ ...config });
+          state.instruments.push(finalConfig);
         }
-        state.currentInstrumentId = config.id;
+        state.currentInstrumentId = finalConfig.id;
       });
     },
 

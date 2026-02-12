@@ -124,12 +124,12 @@ export class SP0250Synth extends MAMEBaseSynth {
 
   /** Set output volume (0-1) */
   setVolume(value: number): void {
-    this.sendMessage('setVolume', value);
+    this.setParameterById(SP0250Param.VOLUME, value);
   }
 
   /** Set vowel preset (0-7). Use SP0250Preset constants. */
   setVowel(value: number): void {
-    this.sendMessage('setVowel', value);
+    this.setParameterById(SP0250Param.VOWEL, value);
   }
 
   /** Set voiced excitation (true) or noise excitation (false) */
@@ -193,15 +193,18 @@ export class SP0250Synth extends MAMEBaseSynth {
 
     this._speechSequencer = new SpeechSequencer<SP0250Frame>(
       (frame) => {
+        console.log(`[SP0250] Frame: vowel=${frame.preset}, voiced=${frame.voiced}, brightness=${frame.brightness?.toFixed(2)}`);
         this.setVowel(frame.preset);
         this.setVoiced(frame.voiced);
         this.setBrightness(frame.brightness);
       },
       () => {
+        console.log('[SP0250] Speech complete');
         this._speechSequencer = null;
         this.triggerRelease();
       }
     );
+    console.log(`[SP0250] Starting speech sequencer with ${speechFrames.length} frames`);
     this._speechSequencer.speak(speechFrames);
   }
 
@@ -285,11 +288,6 @@ export class SP0250Synth extends MAMEBaseSynth {
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
     }
-  }
-
-  private sendMessage(type: string, value: number): void {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type, value });
   }
 }
 

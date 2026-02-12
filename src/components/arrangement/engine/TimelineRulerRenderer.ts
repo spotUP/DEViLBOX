@@ -106,6 +106,26 @@ export class TimelineRulerRenderer {
       const lw = (loopEnd - loopStart) * vp.pixelsPerRow;
       ctx.fillStyle = this.colors.loopRegion;
       ctx.fillRect(lx, 0, lw, RULER_HEIGHT);
+
+      // Loop start handle (vertical bar with triangle)
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(lx - 1, 0, 3, RULER_HEIGHT);
+      ctx.beginPath();
+      ctx.moveTo(lx + 1, RULER_HEIGHT - 8);
+      ctx.lineTo(lx - 5, RULER_HEIGHT);
+      ctx.lineTo(lx + 7, RULER_HEIGHT);
+      ctx.closePath();
+      ctx.fill();
+
+      // Loop end handle (vertical bar with triangle)
+      const ex = lx + lw;
+      ctx.fillRect(ex - 1, 0, 3, RULER_HEIGHT);
+      ctx.beginPath();
+      ctx.moveTo(ex + 1, RULER_HEIGHT - 8);
+      ctx.lineTo(ex - 5, RULER_HEIGHT);
+      ctx.lineTo(ex + 7, RULER_HEIGHT);
+      ctx.closePath();
+      ctx.fill();
     }
 
     // Determine tick spacing based on zoom

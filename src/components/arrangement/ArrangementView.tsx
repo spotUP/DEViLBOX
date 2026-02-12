@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { ArrangementToolbar } from './ArrangementToolbar';
 import { TrackHeaderPanel } from './TrackHeaderPanel';
@@ -22,7 +23,10 @@ export const ArrangementView: React.FC = () => {
     clearSelection, selectAllClipsOnTrack,
     pushUndo, undo, redo,
     importFromPatternOrder,
+    isArrangementMode,
+    setIsArrangementMode,
   } = useArrangementStore();
+  const transport = useTransportStore();
   const hasMigratedRef = useRef(false);
   const hasZoomedRef = useRef(false);
 
@@ -45,6 +49,34 @@ export const ArrangementView: React.FC = () => {
     hasZoomedRef.current = true;
     useArrangementStore.getState().zoomToFit();
   }, [tracks.length]);
+
+  // Enable arrangement mode when view is active
+  useEffect(() => {
+    if (!isArrangementMode && tracks.length > 0) {
+      setIsArrangementMode(true);
+      notify.info('Arrangement mode enabled');
+    }
+  }, [isArrangementMode, setIsArrangementMode, tracks.length]);
+
+  // Sync playback position with arrangement
+  useEffect(() => {
+    if (!transport.isPlaying || !isArrangementMode) return;
+
+    const rafId = requestAnimationFrame(function updatePlayback() {
+      // Get current global row from transport
+      const globalRow = transport.currentGlobalRow;
+
+      // Update arrangement playback position
+      useArrangementStore.getState().setPlaybackRow(globalRow);
+
+      // Continue updating while playing
+      if (useTransportStore.getState().isPlaying && useArrangementStore.getState().isArrangementMode) {
+        requestAnimationFrame(updatePlayback);
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [transport.isPlaying, transport.currentGlobalRow, isArrangementMode]);
 
   const layoutEntries = useMemo(() => {
     const sorted = tracks

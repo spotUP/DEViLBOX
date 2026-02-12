@@ -21,6 +21,13 @@ const TMS5220Param = {
   NOISE_MODE: 7,
   STEREO_WIDTH: 8,
   BRIGHTNESS: 9,
+  K4_INDEX: 10,
+  K5_INDEX: 11,
+  K6_INDEX: 12,
+  K7_INDEX: 13,
+  K8_INDEX: 14,
+  K9_INDEX: 15,
+  K10_INDEX: 16,
 } as const;
 
 /**
@@ -146,28 +153,31 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: 25, // 25ms per TMS5220 frame (200 samples at 8kHz)
     }));
 
-    // Activate a voice via the full triggerAttack path
-    this.triggerAttack(60, undefined, 0.8);
+    // Activate a voice for speech (no MIDI pitch)
+    this.activateSpeechVoice();
 
-    this._romSequencer = new SpeechSequencer<LPCFrame>(
-      (frame) => {
-        if (frame.energy === 0) return; // Silent frame
-        const k = frame.repeat ? lastK : frame.k;
-        if (!frame.repeat && frame.k.length >= 3) {
-          for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+    // Wait for voice activation before sending parameters
+    setTimeout(() => {
+      this._romSequencer = new SpeechSequencer<LPCFrame>(
+        (frame) => {
+          if (frame.energy === 0) return; // Silent frame
+          const k = frame.repeat ? lastK : frame.k;
+          if (!frame.repeat && frame.k.length >= 10) {
+            for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+          }
+          if (k.length >= 10) {
+            this.setFormants(k);
+          }
+          this.setNoiseMode(frame.unvoiced);
+          this.setEnergy(frame.energy);
+        },
+        () => {
+          this._romSequencer = null;
+          this.triggerRelease();
         }
-        if (k.length >= 3) {
-          this.setFormants(k[0], k[1], k[2]);
-        }
-        this.setNoiseMode(frame.unvoiced);
-        this.setEnergy(frame.energy);
-      },
-      () => {
-        this._romSequencer = null;
-        this.triggerRelease();
-      }
-    );
-    this._romSequencer.speak(speechFrames);
+      );
+      this._romSequencer.speak(speechFrames);
+    }, 50);
   }
 
   // ===========================================================================
@@ -225,19 +235,33 @@ export class TMS5220Synth extends MAMEBaseSynth {
     this.sendMessage('setVolume', value);
   }
 
-  /** Set K1/K2/K3 formant filter indices.
-   * k1: 0-31 (low=closed, high=open vowel)
-   * k2: 0-31 (low=back, high=front vowel)
-   * k3: 0-15 */
-  setFormants(k1: number, k2: number, k3: number): void {
+  /** Set K1-K10 formant filter indices (LPC reflection coefficients).
+   * k: Array of 10 indices [K1-K10]
+   * - K1, K2: 0-31 (5-bit)
+   * - K3-K7: 0-15 (4-bit)
+   * - K8-K10: 0-7 (3-bit) */
+  setFormants(k: number[]): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'setFormants', k1, k2, k3 });
+    if (k.length < 10) {
+      console.warn(`[TMS5220] setFormants: expected 10 K coefficients, got ${k.length}`);
+      return;
+    }
+    this.setParameterById(TMS5220Param.K1_INDEX, k[0]);
+    this.setParameterById(TMS5220Param.K2_INDEX, k[1]);
+    this.setParameterById(TMS5220Param.K3_INDEX, k[2]);
+    this.setParameterById(TMS5220Param.K4_INDEX, k[3]);
+    this.setParameterById(TMS5220Param.K5_INDEX, k[4]);
+    this.setParameterById(TMS5220Param.K6_INDEX, k[5]);
+    this.setParameterById(TMS5220Param.K7_INDEX, k[6]);
+    this.setParameterById(TMS5220Param.K8_INDEX, k[7]);
+    this.setParameterById(TMS5220Param.K9_INDEX, k[8]);
+    this.setParameterById(TMS5220Param.K10_INDEX, k[9]);
   }
 
   /** Set noise mode (true=unvoiced fricative, false=voiced) */
   setNoiseMode(noise: boolean): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'setNoiseMode', value: noise });
+    this.setParameterById(TMS5220Param.NOISE_MODE, noise ? 1 : 0);
   }
 
   /** Set chirp ROM type (0=original Speak & Spell, 1=later TMS5220) */
@@ -254,6 +278,12 @@ export class TMS5220Synth extends MAMEBaseSynth {
   /** Set brightness (0-2, scales higher K coefficients) */
   setBrightness(value: number): void {
     this.setParameterById(TMS5220Param.BRIGHTNESS, value);
+  }
+
+  /** Activate a voice for speech synthesis without MIDI pitch */
+  private activateSpeechVoice(): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'activateSpeechVoice' });
   }
 
   /** Load a phoneme preset (0-7). Use TMS5220Preset constants. */
@@ -301,21 +331,28 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice via the full triggerAttack path (sets up macros, note state, etc.)
-    this.triggerAttack(60, undefined, 0.8);
+    // Activate a voice for speech (no MIDI pitch)
+    this.activateSpeechVoice();
 
-    this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
-      (frame) => {
-        this.setFormants(frame.k[0], frame.k[1], frame.k[2]);
-        this.setNoiseMode(frame.unvoiced);
-        this.setEnergy(frame.energy);
-      },
-      () => {
-        this._speechSequencer = null;
-        this.triggerRelease();
-      }
-    );
-    this._speechSequencer.speak(speechFrames);
+    // Wait a bit for the voice to be activated in the worklet before sending parameters
+    setTimeout(() => {
+      this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
+        (frame) => {
+          console.log(`[TMS5220] Frame: k=[${frame.k.map(v => v.toFixed(0)).join(',')}], energy=${frame.energy}, pitch=${frame.pitch}, noise=${frame.unvoiced}`);
+          this.setFormants(frame.k);
+          this.setNoiseMode(frame.unvoiced);
+          this.setEnergy(frame.energy);
+          this.setParameterById(TMS5220Param.PITCH_INDEX, frame.pitch);
+        },
+        () => {
+          console.log('[TMS5220] Speech complete');
+          this._speechSequencer = null;
+          this.triggerRelease();
+        }
+      );
+      console.log(`[TMS5220] Starting speech sequencer with ${speechFrames.length} frames`);
+      this._speechSequencer.speak(speechFrames);
+    }, 50); // 50ms delay to ensure noteOn is processed
   }
 
   /** Stop current text-to-speech or ROM playback */
@@ -390,28 +427,31 @@ export class TMS5220Synth extends MAMEBaseSynth {
       durationMs: 25,
     }));
 
-    // Activate a voice via the full triggerAttack path
-    this.triggerAttack(60, undefined, 0.8);
+    // Activate a voice for speech (no MIDI pitch)
+    this.activateSpeechVoice();
 
-    this._romSequencer = new SpeechSequencer<LPCFrame>(
-      (frame) => {
-        if (frame.energy === 0) return;
-        const k = frame.repeat ? lastK : frame.k;
-        if (!frame.repeat && frame.k.length >= 3) {
-          for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+    // Wait for voice activation before sending parameters
+    setTimeout(() => {
+      this._romSequencer = new SpeechSequencer<LPCFrame>(
+        (frame) => {
+          if (frame.energy === 0) return;
+          const k = frame.repeat ? lastK : frame.k;
+          if (!frame.repeat && frame.k.length >= 10) {
+            for (let i = 0; i < frame.k.length; i++) lastK[i] = frame.k[i];
+          }
+          if (k.length >= 10) {
+            this.setFormants(k);
+          }
+          this.setNoiseMode(frame.unvoiced);
+          this.setEnergy(frame.energy);
+        },
+        () => {
+          this._romSequencer = null;
+          onDone();
         }
-        if (k.length >= 3) {
-          this.setFormants(k[0], k[1], k[2]);
-        }
-        this.setNoiseMode(frame.unvoiced);
-        this.setEnergy(frame.energy);
-      },
-      () => {
-        this._romSequencer = null;
-        onDone();
-      }
-    );
-    this._romSequencer.speak(speechFrames);
+      );
+      this._romSequencer.speak(speechFrames);
+    }, 50);
   }
 
   /**
@@ -465,20 +505,23 @@ export class TMS5220Synth extends MAMEBaseSynth {
         }));
 
         // Activate voice for phoneme TTS
-        this.triggerAttack(60, undefined, 0.8);
+        this.activateSpeechVoice();
 
-        this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
-          (frame) => {
-            this.setFormants(frame.k[0], frame.k[1], frame.k[2]);
-            this.setNoiseMode(frame.unvoiced);
-            this.setEnergy(frame.energy);
-          },
-          () => {
-            this._speechSequencer = null;
-            setTimeout(playNext, 200);
-          }
-        );
-        this._speechSequencer.speak(speechFrames);
+        // Wait for voice activation before sending parameters
+        setTimeout(() => {
+          this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
+            (frame) => {
+              this.setFormants(frame.k);
+              this.setNoiseMode(frame.unvoiced);
+              this.setEnergy(frame.energy);
+            },
+            () => {
+              this._speechSequencer = null;
+              setTimeout(playNext, 200);
+            }
+          );
+          this._speechSequencer.speak(speechFrames);
+        }, 50);
       }
     };
 
@@ -505,6 +548,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   private setParameterById(paramId: number, value: number): void {
     if (!this.workletNode || this._disposed) return;
+    // Debug: Log pitch parameter specifically
+    if (paramId === TMS5220Param.PITCH_INDEX) {
+      console.log(`[TMS5220] Setting PITCH_INDEX=${value}`);
+    }
     this.workletNode.port.postMessage({ type: 'setParameter', paramId, value });
   }
 

@@ -60,14 +60,26 @@ export class ClipRenderer {
     ghostClips: ArrangementClip[] | null,
     playbackRow?: number,
     isPlaying?: boolean,
+    hoveredClipId?: string | null,
   ): void {
     const trackMap = new Map(tracks.map(t => [t.id, t]));
     const entryMap = new Map(entries.map(e => [e.trackId, e]));
     const patternMap = new Map(patterns.map(p => [p.id, p]));
     const range = vp.getVisibleRowRange();
 
-    // Draw regular clips
-    for (const clip of clips) {
+    // Virtual scrolling: Pre-filter visible clips
+    const visibleClips = clips.filter(clip => {
+      const pattern = patternMap.get(clip.patternId);
+      const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
+      const clipEnd = clip.startRow + clipLen;
+
+      // Include clips that overlap with visible range (with small buffer)
+      const buffer = 10;
+      return clipEnd >= range.startRow - buffer && clip.startRow <= range.endRow + buffer;
+    });
+
+    // Draw regular clips (pre-filtered for performance)
+    for (const clip of visibleClips) {
       const entry = entryMap.get(clip.trackId);
       if (!entry || !entry.visible) continue;
       const track = trackMap.get(clip.trackId);
@@ -77,12 +89,10 @@ export class ClipRenderer {
       const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
       const clipEnd = clip.startRow + clipLen;
 
-      // Cull off-screen clips
-      if (clipEnd < range.startRow || clip.startRow > range.endRow) continue;
-
       const selected = selectedClipIds.has(clip.id);
       const isActive = isPlaying && playbackRow !== undefined && playbackRow >= clip.startRow && playbackRow < clipEnd;
-      this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, selected, false, isActive, playbackRow);
+      const isHovered = hoveredClipId === clip.id;
+      this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, selected, false, isActive, playbackRow, isHovered);
     }
 
     // Draw ghost clips (drag preview)
@@ -95,7 +105,7 @@ export class ClipRenderer {
 
         const pattern = patternMap.get(clip.patternId);
         const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
-        this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, false, true, false);
+        this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, false, true, false, undefined, false);
       }
     }
   }
@@ -112,6 +122,7 @@ export class ClipRenderer {
     ghost: boolean,
     isActive: boolean = false,
     playbackRow?: number,
+    isHovered: boolean = false,
   ): void {
     const x = vp.rowToPixelX(clip.startRow) + CLIP_PADDING;
     const y = vp.trackYToScreenY(entry.y) + CLIP_PADDING;
@@ -147,6 +158,10 @@ export class ClipRenderer {
     // Border
     if (selected) {
       ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (isHovered && !ghost) {
+      ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},0.9)`;
       ctx.lineWidth = 2;
       ctx.stroke();
     } else {
@@ -241,6 +256,77 @@ export class ClipRenderer {
       // Enhanced top bar for active clips
       ctx.fillStyle = `rgba(255,255,255,0.15)`;
       ctx.fillRect(x, y, w, HEADER_BAR_HEIGHT);
+    }
+
+    // Fade in overlay
+    if (clip.fadeInRows && clip.fadeInRows > 0 && !ghost) {
+      const fadeWidth = Math.min(w * 0.4, clip.fadeInRows * vp.pixelsPerRow);
+      if (fadeWidth > 2) {
+        const fadeCurve = clip.fadeInCurve || 'linear';
+        const gradient = ctx.createLinearGradient(x, y, x + fadeWidth, y);
+
+        if (fadeCurve === 'exponential') {
+          // Dark to transparent (exponential)
+          gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
+          gradient.addColorStop(0.3, 'rgba(0,0,0,0.3)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        } else if (fadeCurve === 'logarithmic') {
+          // Dark to transparent (logarithmic)
+          gradient.addColorStop(0, 'rgba(0,0,0,0.6)');
+          gradient.addColorStop(0.7, 'rgba(0,0,0,0.3)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        } else {
+          // Linear
+          gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, fadeWidth, h);
+
+        // Fade handle (small triangle at fade end)
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.moveTo(x + fadeWidth - 6, y);
+        ctx.lineTo(x + fadeWidth, y);
+        ctx.lineTo(x + fadeWidth, y + 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Fade out overlay
+    if (clip.fadeOutRows && clip.fadeOutRows > 0 && !ghost) {
+      const fadeWidth = Math.min(w * 0.4, clip.fadeOutRows * vp.pixelsPerRow);
+      if (fadeWidth > 2) {
+        const fadeCurve = clip.fadeOutCurve || 'linear';
+        const gradient = ctx.createLinearGradient(x + w - fadeWidth, y, x + w, y);
+
+        if (fadeCurve === 'exponential') {
+          gradient.addColorStop(0, 'rgba(0,0,0,0)');
+          gradient.addColorStop(0.7, 'rgba(0,0,0,0.3)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
+        } else if (fadeCurve === 'logarithmic') {
+          gradient.addColorStop(0, 'rgba(0,0,0,0)');
+          gradient.addColorStop(0.3, 'rgba(0,0,0,0.3)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
+        } else {
+          gradient.addColorStop(0, 'rgba(0,0,0,0)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x + w - fadeWidth, y, fadeWidth, h);
+
+        // Fade handle (small triangle at fade start)
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.moveTo(x + w - fadeWidth, y);
+        ctx.lineTo(x + w - fadeWidth + 6, y);
+        ctx.lineTo(x + w - fadeWidth, y + 6);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     // Muted overlay

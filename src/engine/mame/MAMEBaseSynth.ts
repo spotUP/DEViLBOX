@@ -198,6 +198,8 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   protected processPendingCall(call: { method: string; args: unknown[] }): void {
     if (call.method === 'setParam') {
       this.setParam(call.args[0] as string, call.args[1] as number);
+    } else if (call.method === 'triggerAttack') {
+      this.triggerAttack(call.args[0] as string | number, call.args[1] as number | undefined, call.args[2] as number);
     }
   }
 
@@ -210,6 +212,13 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    */
   triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
     if (this._disposed) return;
+
+    // If worklet isn't ready yet, queue the note attack
+    if (!this._isReady || !this.workletNode) {
+      console.log(`[${this.chipName}] triggerAttack: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing note ${note}`);
+      this._pendingCalls.push({ method: 'triggerAttack', args: [note, _time, velocity] });
+      return;
+    }
 
     // Convert note to MIDI number and frequency
     if (typeof note === 'string') {
@@ -233,9 +242,6 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     this.effectRouter.resetChannel(this.channelIndex);
 
     // Write to worklet
-    if (!this.workletNode) {
-      console.warn(`[${this.chipName}] triggerAttack: workletNode is null! ready=${this._isReady}, disposed=${this._disposed}`);
-    }
     this.writeKeyOn(this.currentNote, velocity);
   }
 

@@ -22,6 +22,10 @@ export type HitTestResult =
   | { type: 'ruler'; row: number }
   | { type: 'track-resize'; trackId: string }
   | { type: 'automation'; trackId: string; row: number }
+  | { type: 'loop-start'; row: number }
+  | { type: 'loop-end'; row: number }
+  | { type: 'automation-point'; laneId: string; pointIndex: number }
+  | { type: 'automation-segment'; laneId: string; insertAfterIndex: number; row: number; value: number }
   | { type: 'none' };
 
 interface ClipRect {
@@ -67,6 +71,8 @@ export class ArrangementHitTester {
 
   /**
    * Test a point (canvas CSS coordinates) against all clips and layout.
+   * Pass loopStart and loopEnd for loop handle hit testing.
+   * Pass automationHit for automation point/segment detection.
    */
   hitTest(
     px: number,
@@ -74,15 +80,52 @@ export class ArrangementHitTester {
     vp: ArrangementViewport,
     layout: TrackLayout,
     rulerHeight: number,
+    loopStart?: number | null,
+    loopEnd?: number | null,
+    automationHit?: { type: 'point' | 'segment' | 'none'; laneId: string; pointIndex?: number; insertAfterIndex?: number; row?: number; value?: number } | null,
   ): HitTestResult {
     // Ruler area
     if (py < rulerHeight) {
+      // Check loop handles first (they have priority over ruler clicks)
+      if (loopStart !== null && loopStart !== undefined) {
+        const lx = vp.rowToPixelX(loopStart);
+        if (Math.abs(px - lx) <= 7) {
+          return { type: 'loop-start', row: loopStart };
+        }
+      }
+
+      if (loopEnd !== null && loopEnd !== undefined) {
+        const ex = vp.rowToPixelX(loopEnd);
+        if (Math.abs(px - ex) <= 7) {
+          return { type: 'loop-end', row: loopEnd };
+        }
+      }
+
       return { type: 'ruler', row: Math.max(0, Math.round(vp.pixelXToRow(px))) };
     }
 
     // Adjust py for ruler offset
     const canvasY = py - rulerHeight;
     const row = Math.max(0, Math.round(vp.pixelXToRow(px)));
+
+    // Check automation first (highest priority for interaction)
+    if (automationHit && automationHit.type === 'point' && automationHit.pointIndex !== undefined) {
+      return {
+        type: 'automation-point',
+        laneId: automationHit.laneId,
+        pointIndex: automationHit.pointIndex,
+      };
+    }
+
+    if (automationHit && automationHit.type === 'segment' && automationHit.insertAfterIndex !== undefined && automationHit.row !== undefined && automationHit.value !== undefined) {
+      return {
+        type: 'automation-segment',
+        laneId: automationHit.laneId,
+        insertAfterIndex: automationHit.insertAfterIndex,
+        row: automationHit.row,
+        value: automationHit.value,
+      };
+    }
 
     // Check clips (last drawn = topmost)
     let bestClip: ClipRect | null = null;
@@ -164,12 +207,15 @@ export class ArrangementHitTester {
         case 'resize-end':
           return 'ew-resize';
         case 'body':
-          return 'move';
+          return 'grab';
       }
     }
 
     if (hit.type === 'track-resize') return 'ns-resize';
+    if (hit.type === 'loop-start' || hit.type === 'loop-end') return 'ew-resize';
     if (hit.type === 'ruler') return 'pointer';
+    if (hit.type === 'automation-point') return 'move';
+    if (hit.type === 'automation-segment') return 'crosshair';
 
     return 'default';
   }

@@ -45,6 +45,9 @@ class TMS5220Processor extends AudioWorkletProcessor {
       case 'allNotesOff':
         if (this.synth) this.synth.allNotesOff();
         break;
+      case 'activateSpeechVoice':
+        if (this.synth) this.synth.activateSpeechVoice();
+        break;
       case 'setParameter':
         if (this.synth) this.synth.setParameter(data.paramId, data.value);
         break;

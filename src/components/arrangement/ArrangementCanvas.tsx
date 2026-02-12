@@ -18,6 +18,7 @@ import { ArrangementHitTester } from './engine/ArrangementHitTester';
 import { ArrangementInteractionSM } from './engine/ArrangementInteractionSM';
 import { ArrangementEditCommand } from './engine/ArrangementEditCommand';
 import { AutomationLaneRenderer } from './engine/AutomationLaneRenderer';
+import { useArrangementKeyboardShortcuts } from './ArrangementKeyboardShortcuts';
 
 const RULER_HEIGHT = 36;
 
@@ -37,6 +38,19 @@ export const ArrangementCanvas: React.FC = () => {
   const ismRef = useRef(new ArrangementInteractionSM());
   const editCmdRef = useRef(new ArrangementEditCommand());
   const autoRendererRef = useRef(new AutomationLaneRenderer());
+
+  // Click suppression after drag
+  const dragClickSuppressRef = useRef(false);
+
+  // Hover state tracking
+  const [hoveredClipId, setHoveredClipId] = React.useState<string | null>(null);
+  const [hoveredTrackId, setHoveredTrackId] = React.useState<string | null>(null);
+
+  // Selected automation point (for deletion with Delete key)
+  const selectedAutomationPointRef = useRef<{ laneId: string; pointIndex: number } | null>(null);
+
+  // Keyboard shortcuts
+  useArrangementKeyboardShortcuts();
 
   // Mark dirty on any store change
   const markDirty = useCallback(() => { dirtyRef.current = true; }, []);
@@ -178,15 +192,32 @@ export const ArrangementCanvas: React.FC = () => {
         ctx.fillRect(lx, 0, lw, h - RULER_HEIGHT);
       }
 
+      // 2c. Track hover highlight (drawn before clips)
+      if (hoveredTrackId) {
+        const entry = layout.getEntryForTrack(hoveredTrackId);
+        if (entry && entry.visible) {
+          const y = vp.trackYToScreenY(entry.y);
+          ctx.fillStyle = 'rgba(59, 130, 246, 0.03)';
+          ctx.fillRect(0, y, w, entry.bodyHeight);
+        }
+      }
+
       // 3. Clips
       clipRendererRef.current.render(
         ctx, vp, state.clips, state.tracks, visibleEntries, patterns,
         state.selectedClipIds, rs.ghostClips.length > 0 ? rs.ghostClips : null,
-        state.playbackRow, transport.isPlaying,
+        state.playbackRow, transport.isPlaying, hoveredClipId,
       );
 
       // 4. Automation curves
-      autoRendererRef.current.render(ctx, vp, state.automationLanes, visibleEntries);
+      const ism = ismRef.current;
+      let activeLaneId: string | null = null;
+      let activePointIndex: number | null = null;
+      if (ism.state === 'moving-automation-point' && ism.drag) {
+        activeLaneId = ism.drag.automationLaneId ?? null;
+        activePointIndex = ism.drag.automationPointIndex ?? null;
+      }
+      autoRendererRef.current.render(ctx, vp, state.automationLanes, visibleEntries, activeLaneId, activePointIndex);
 
       // 5. Selection box
       if (rs.selectionBox) {
@@ -224,6 +255,45 @@ export const ArrangementCanvas: React.FC = () => {
           ctx.fillRect(px, py, pw, entry.bodyHeight);
           ctx.strokeRect(px, py, pw, entry.bodyHeight);
         }
+      }
+
+      // 6b. Track resize preview
+      if (ism.state === 'resizing-track-height' && ism.drag && ism.drag.trackId && ism.drag.startHeight !== undefined) {
+        const entry = layout.getEntryForTrack(ism.drag.trackId);
+        if (entry) {
+          const deltaY = ism.drag.currentY - ism.drag.startY;
+          const newHeight = Math.max(30, Math.min(200, ism.drag.startHeight + deltaY));
+          const previewY = vp.trackYToScreenY(entry.y + newHeight);
+
+          // Draw preview line at new height
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, previewY);
+          ctx.lineTo(w, previewY);
+          ctx.stroke();
+        }
+      }
+
+      // 6c. Snap grid during drag
+      if ((ism.state === 'moving-clips' || ism.state === 'drawing-clip' || ism.state === 'resizing-clip-start' || ism.state === 'resizing-clip-end') && state.view.snapDivision > 0) {
+        const snap = state.view.snapDivision;
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+
+        // Draw snap grid lines in visible range
+        const range = vp.getVisibleRowRange();
+        for (let row = Math.floor(range.startRow / snap) * snap; row <= range.endRow; row += snap) {
+          const x = vp.rowToPixelX(row);
+          if (x >= 0 && x <= w) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h - RULER_HEIGHT);
+            ctx.stroke();
+          }
+        }
+        ctx.setLineDash([]);
       }
 
       // 7. Playhead (in content area)
@@ -286,7 +356,10 @@ export const ArrangementCanvas: React.FC = () => {
     const ism = ismRef.current;
     const state = useArrangementStore.getState();
 
-    const hit = hitTesterRef.current.hitTest(x, y, vp, layout, RULER_HEIGHT);
+    // Check automation hit first
+    const autoHit = autoRendererRef.current.hitTest(x, y - RULER_HEIGHT, vp, state.automationLanes, layout.getEntries());
+
+    const hit = hitTesterRef.current.hitTest(x, y, vp, layout, RULER_HEIGHT, state.view.loopStart, state.view.loopEnd, autoHit);
 
     if (hit.type === 'ruler') {
       // Click on ruler = move playhead
@@ -296,22 +369,121 @@ export const ArrangementCanvas: React.FC = () => {
       return;
     }
 
+    if (hit.type === 'loop-start') {
+      // Start dragging loop start marker
+      const loopEnd = state.view.loopEnd;
+      ism.beginDrag('moving-loop-start', x, y, hit.row, 0, null, state.selectedClipIds, []);
+      if (ism.drag) {
+        ism.drag.loopStart = hit.row;
+        ism.drag.loopEnd = loopEnd ?? undefined;
+      }
+      return;
+    }
+
+    if (hit.type === 'loop-end') {
+      // Start dragging loop end marker
+      const loopStart = state.view.loopStart;
+      ism.beginDrag('moving-loop-end', x, y, hit.row, 0, null, state.selectedClipIds, []);
+      if (ism.drag) {
+        ism.drag.loopStart = loopStart ?? undefined;
+        ism.drag.loopEnd = hit.row;
+      }
+      return;
+    }
+
+    if (hit.type === 'track-resize') {
+      // Start dragging track height resize
+      const entry = layout.getEntryForTrack(hit.trackId);
+      if (entry) {
+        ism.beginDrag('resizing-track-height', x, y, 0, 0, null, state.selectedClipIds, []);
+        if (ism.drag) {
+          ism.drag.trackId = hit.trackId;
+          ism.drag.startHeight = entry.bodyHeight;
+        }
+      }
+      return;
+    }
+
+    if (hit.type === 'automation-point') {
+      // Select automation point
+      selectedAutomationPointRef.current = { laneId: hit.laneId, pointIndex: hit.pointIndex };
+
+      // Start dragging automation point
+      const lane = state.automationLanes.find(l => l.id === hit.laneId);
+      if (lane && lane.points[hit.pointIndex]) {
+        const point = lane.points[hit.pointIndex];
+        ism.beginDrag('moving-automation-point', x, y, 0, 0, null, state.selectedClipIds, []);
+        if (ism.drag) {
+          ism.drag.automationLaneId = hit.laneId;
+          ism.drag.automationPointIndex = hit.pointIndex;
+          ism.drag.automationStartValue = point.value;
+          ism.drag.automationStartRow = point.row;
+        }
+      }
+      return;
+    }
+
+    if (hit.type === 'automation-segment') {
+      // Add new automation point
+      const newPoint = {
+        row: hit.row,
+        value: hit.value,
+        curve: 'linear' as const,
+      };
+      state.addAutomationPoint(hit.laneId, newPoint);
+
+      // Start dragging the newly added point
+      const lane = state.automationLanes.find(l => l.id === hit.laneId);
+      if (lane) {
+        const newIndex = hit.insertAfterIndex + 1;
+        ism.beginDrag('moving-automation-point', x, y, 0, 0, null, state.selectedClipIds, []);
+        if (ism.drag) {
+          ism.drag.automationLaneId = hit.laneId;
+          ism.drag.automationPointIndex = newIndex;
+          ism.drag.automationStartValue = hit.value;
+          ism.drag.automationStartRow = hit.row;
+        }
+      }
+      return;
+    }
+
     if (ism.tool === 'select') {
       if (hit.type === 'clip') {
         if (hit.zone === 'body') {
-          // Select + begin move
-          if (!e.shiftKey && !state.selectedClipIds.has(hit.clipId)) {
-            state.selectClip(hit.clipId);
-          } else if (e.shiftKey) {
-            state.selectClip(hit.clipId, true);
+          // Cmd/Ctrl+Click: Toggle selection
+          if (e.metaKey || e.ctrlKey) {
+            state.selectClip(hit.clipId, true); // Toggle
+            return; // Don't start drag on Cmd+Click
           }
 
-          const selected = useArrangementStore.getState().selectedClipIds;
-          const originalClips = state.clips.filter(c => selected.has(c.id));
-          ism.beginDrag('moving-clips', x, y, hit.row, 0, hit.clipId, selected, originalClips);
+          // Shift+Click: Add to selection
+          if (e.shiftKey) {
+            state.selectClip(hit.clipId, true);
+          } else if (!state.selectedClipIds.has(hit.clipId)) {
+            // Regular click on unselected clip - select it
+            state.selectClip(hit.clipId);
+          }
 
-          // Push undo before move
-          editCmdRef.current.begin(state.getSnapshot(), 'Move clips');
+          // Alt+Drag: Duplicate selected clips
+          if (e.altKey) {
+            const selected = useArrangementStore.getState().selectedClipIds;
+            const newIds = state.duplicateClips([...selected]);
+
+            // Select the duplicates instead
+            state.clearSelection();
+            state.selectClips(newIds);
+
+            // Start dragging the duplicates
+            const duplicatedClips = state.clips.filter(c => newIds.includes(c.id));
+            ism.beginDrag('moving-clips', x, y, hit.row, 0, newIds[0], new Set(newIds), duplicatedClips);
+            editCmdRef.current.begin(state.getSnapshot(), 'Duplicate and move clips');
+          } else {
+            // Normal drag
+            const selected = useArrangementStore.getState().selectedClipIds;
+            const originalClips = state.clips.filter(c => selected.has(c.id));
+            ism.beginDrag('moving-clips', x, y, hit.row, 0, hit.clipId, selected, originalClips);
+            editCmdRef.current.begin(state.getSnapshot(), 'Move clips');
+          }
         } else if (hit.zone === 'resize-start') {
           state.selectClip(hit.clipId);
           ism.beginDrag('resizing-clip-start', x, y, hit.row, 0, hit.clipId, state.selectedClipIds, []);
@@ -365,13 +537,29 @@ export const ArrangementCanvas: React.FC = () => {
       const snap = state.view.snapDivision || 1;
 
       if (ism.state === 'moving-clips') {
-        const { deltaRow } = ism.getDragDelta(vp.pixelsPerRow, 60);
+        const { deltaRow, deltaTrackIndex } = ism.getDragDelta(vp.pixelsPerRow, 80);
         const snappedDelta = Math.round(deltaRow / snap) * snap;
-        // Ghost clips preview
-        const ghosts = ism.drag.originalClips.map(c => ({
-          ...c,
-          startRow: Math.max(0, c.startRow + snappedDelta),
-        }));
+
+        // Calculate target tracks for vertical movement
+        const tracksByIndex = [...state.tracks].sort((a, b) => a.index - b.index);
+
+        // Ghost clips preview (with both horizontal and vertical movement)
+        const ghosts = ism.drag.originalClips.map(c => {
+          const currentTrack = state.tracks.find(t => t.id === c.trackId);
+          let newTrackId = c.trackId;
+
+          if (currentTrack && deltaTrackIndex !== 0) {
+            const newIdx = Math.max(0, Math.min(tracksByIndex.length - 1, currentTrack.index + deltaTrackIndex));
+            const newTrack = tracksByIndex[newIdx];
+            if (newTrack) newTrackId = newTrack.id;
+          }
+
+          return {
+            ...c,
+            startRow: Math.max(0, c.startRow + snappedDelta),
+            trackId: newTrackId,
+          };
+        });
         ism.setGhostClips(ghosts);
       } else if (ism.state === 'select-box') {
         ism.setSelectionBox({ x1: ism.drag.startX, y1: ism.drag.startY, x2: x, y2: y });
@@ -403,15 +591,58 @@ export const ArrangementCanvas: React.FC = () => {
         const row = Math.max(0, Math.round(vp.pixelXToRow(x)));
         state.setPlaybackRow(row);
         useTransportStore.getState().setCurrentGlobalRow(row);
+      } else if (ism.state === 'moving-automation-point' && ism.drag && ism.drag.automationLaneId && ism.drag.automationPointIndex !== undefined) {
+        // Move automation point
+        const newRow = Math.max(0, Math.round(vp.pixelXToRow(x)));
+
+        // Find the lane and entry to calculate value from Y position
+        const lane = state.automationLanes.find(l => l.id === ism.drag!.automationLaneId);
+        if (lane) {
+          const entry = layout.getEntryForTrack(lane.trackId);
+          if (entry) {
+            // Find lane index within track
+            const trackLanes = state.automationLanes.filter(l => l.trackId === lane.trackId && l.visible && l.enabled);
+            const laneIndex = trackLanes.findIndex(l => l.id === lane.id);
+            if (laneIndex >= 0) {
+              const AUTOMATION_LANE_HEIGHT = 40;
+              const laneY = vp.trackYToScreenY(entry.automationY) + laneIndex * AUTOMATION_LANE_HEIGHT;
+              const laneH = AUTOMATION_LANE_HEIGHT;
+              const newValue = Math.max(0, Math.min(1, (laneY + laneH - (y - RULER_HEIGHT)) / laneH));
+
+              state.moveAutomationPoint(ism.drag.automationLaneId, ism.drag.automationPointIndex, newRow, newValue);
+            }
+          }
+        }
       }
+      // No need to update hover state during drag
     } else {
-      // Hover - update cursor
-      const hit = hitTesterRef.current.hitTest(x, y, vp, layout, RULER_HEIGHT);
+      // Hover - update cursor and hover state
+      const state = useArrangementStore.getState();
+
+      // Check automation hit first
+      const autoHit = autoRendererRef.current.hitTest(x, y - RULER_HEIGHT, vp, state.automationLanes, layout.getEntries());
+
+      const hit = hitTesterRef.current.hitTest(x, y, vp, layout, RULER_HEIGHT, state.view.loopStart, state.view.loopEnd, autoHit);
       ism.updateCursor(hit);
+
+      // Update hovered clip
+      if (hit.type === 'clip' && hit.clipId !== hoveredClipId) {
+        setHoveredClipId(hit.clipId);
+      } else if (hit.type !== 'clip' && hoveredClipId !== null) {
+        setHoveredClipId(null);
+      }
+
+      // Update hovered track
+      const newHoveredTrackId = hit.type === 'empty' || hit.type === 'clip' || hit.type === 'track-resize'
+        ? (hit.type === 'track-resize' ? hit.trackId : ('trackId' in hit ? hit.trackId : null))
+        : null;
+      if (newHoveredTrackId !== hoveredTrackId) {
+        setHoveredTrackId(newHoveredTrackId);
+      }
     }
 
     dirtyRef.current = true;
-  }, [getCanvasPos]);
+  }, [getCanvasPos, hoveredClipId, hoveredTrackId]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     const ism = ismRef.current;
@@ -419,11 +650,15 @@ export const ArrangementCanvas: React.FC = () => {
 
     if (ism.state === 'moving-clips' && ism.drag) {
       const snap = state.view.snapDivision || 1;
-      const { deltaRow } = ism.getDragDelta(vpRef.current.pixelsPerRow, 60);
+      const { deltaRow, deltaTrackIndex } = ism.getDragDelta(vpRef.current.pixelsPerRow, 80);
       const snappedDelta = Math.round(deltaRow / snap) * snap;
-      if (snappedDelta !== 0) {
-        state.moveClips([...state.selectedClipIds], snappedDelta, 0);
+
+      if (snappedDelta !== 0 || deltaTrackIndex !== 0) {
+        state.moveClips([...state.selectedClipIds], snappedDelta, deltaTrackIndex);
         editCmdRef.current.commit((snap) => state.pushUndo(snap));
+        // Suppress click after drag
+        dragClickSuppressRef.current = true;
+        setTimeout(() => { dragClickSuppressRef.current = false; }, 100);
       } else {
         editCmdRef.current.cancel();
       }
@@ -458,10 +693,66 @@ export const ArrangementCanvas: React.FC = () => {
       }
     } else if (ism.state === 'resizing-clip-start' || ism.state === 'resizing-clip-end') {
       editCmdRef.current.commit((snap) => state.pushUndo(snap));
+    } else if (ism.state === 'resizing-track-height' && ism.drag) {
+      // Commit track height change
+      const { trackId, startHeight } = ism.drag;
+      if (trackId && startHeight !== undefined) {
+        const deltaY = ism.drag.currentY - ism.drag.startY;
+        const newHeight = Math.max(30, Math.min(200, startHeight + deltaY));
+        state.setTrackHeight(trackId, newHeight);
+      }
+    } else if (ism.state === 'moving-loop-start' && ism.drag) {
+      // Commit loop start change
+      const { loopEnd } = ism.drag;
+      const vp = vpRef.current;
+      const snap = state.view.snapDivision || 1;
+      const newLoopStart = vp.snapRow(vp.pixelXToRow(ism.drag.currentX), snap);
+      state.setLoopRegion(newLoopStart, loopEnd ?? null);
+    } else if (ism.state === 'moving-loop-end' && ism.drag) {
+      // Commit loop end change
+      const { loopStart } = ism.drag;
+      const vp = vpRef.current;
+      const snap = state.view.snapDivision || 1;
+      const newLoopEnd = vp.snapRow(vp.pixelXToRow(ism.drag.currentX), snap);
+      state.setLoopRegion(loopStart ?? null, newLoopEnd);
+    } else if (ism.state === 'moving-automation-point') {
+      // Automation point move already committed during drag via moveAutomationPoint
+      // No additional action needed on mouse up
     }
 
     ism.endDrag();
     dirtyRef.current = true;
+  }, [getCanvasPos]);
+
+  // Double-click handler - open pattern in tracker view
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (dragClickSuppressRef.current) {
+      dragClickSuppressRef.current = false;
+      return;
+    }
+
+    const { x, y } = getCanvasPos(e);
+    const vp = vpRef.current;
+    const layout = layoutRef.current;
+    const state = useArrangementStore.getState();
+    const hit = hitTesterRef.current.hitTest(x, y, vp, layout, RULER_HEIGHT, state.view.loopStart, state.view.loopEnd);
+
+    if (hit.type === 'clip') {
+      const state = useArrangementStore.getState();
+      const clip = state.clips.find(c => c.id === hit.clipId);
+      if (!clip) return;
+
+      // Switch to tracker view
+      const uiStore = require('@stores/useUIStore').useUIStore.getState();
+      uiStore.setActiveView('tracker');
+
+      // Find pattern index and set as current
+      const patterns = useTrackerStore.getState().patterns;
+      const patternIndex = patterns.findIndex(p => p.id === clip.patternId);
+      if (patternIndex >= 0) {
+        useTrackerStore.getState().setCurrentPattern(patternIndex);
+      }
+    }
   }, [getCanvasPos]);
 
   // Window-level mouseup to handle drags that leave the canvas
@@ -475,6 +766,30 @@ export const ArrangementCanvas: React.FC = () => {
     };
     window.addEventListener('mouseup', handleWindowMouseUp);
     return () => window.removeEventListener('mouseup', handleWindowMouseUp);
+  }, []);
+
+  // Keyboard handler for deleting automation points
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selected = selectedAutomationPointRef.current;
+        if (selected) {
+          const state = useArrangementStore.getState();
+          state.removeAutomationPoint(selected.laneId, selected.pointIndex);
+          selectedAutomationPointRef.current = null;
+          dirtyRef.current = true;
+          e.preventDefault();
+        }
+      }
+    };
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      // Make canvas focusable and focus it
+      canvas.tabIndex = 0;
+      canvas.addEventListener('keydown', handleKeyDown);
+      return () => canvas.removeEventListener('keydown', handleKeyDown);
+    }
   }, []);
 
   // Wheel handler - use native listener with passive: false to allow preventDefault
@@ -513,6 +828,7 @@ export const ArrangementCanvas: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
       />
     </div>
   );

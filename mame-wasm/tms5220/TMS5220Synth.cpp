@@ -168,6 +168,13 @@ enum TMS5220ParamId {
     PARAM_NOISE_MODE = 7,   // 0=voiced, 1=unvoiced
     PARAM_STEREO_WIDTH = 8,
     PARAM_BRIGHTNESS = 9,   // adjusts higher K coefficients
+    PARAM_K4_INDEX = 10,    // 0-15
+    PARAM_K5_INDEX = 11,    // 0-15
+    PARAM_K6_INDEX = 12,    // 0-15
+    PARAM_K7_INDEX = 13,    // 0-15
+    PARAM_K8_INDEX = 14,    // 0-7
+    PARAM_K9_INDEX = 15,    // 0-7
+    PARAM_K10_INDEX = 16,   // 0-7
 };
 
 // ============================================================================
@@ -361,6 +368,50 @@ public:
         }
     }
 
+    // Activate a voice for speech synthesis without MIDI pitch
+    void activateSpeechVoice() {
+        int voiceIdx = allocateVoice();
+        TMS5220Voice& v = voices_[voiceIdx];
+
+        v.reset();
+        v.active = true;
+        v.midi_note = -1; // Mark as speech voice, not MIDI
+        v.velocity = 1.0f;
+
+        // Set full volume for speech
+        volume_ = 1.0f;
+
+        // Start with small energy so voice is ready to produce sound
+        v.target_energy = energy_table[1]; // Very quiet but not silent
+        v.target_pitch = pitch_table[30];  // Default pitch ~100Hz
+        v.noise_mode = false;
+
+        // Set neutral K coefficients (neutral vowel /ə/ schwa)
+        v.target_k[0] = k1_table[16];  // K1: mid-range
+        v.target_k[1] = k2_table[16];  // K2: mid-range
+        v.target_k[2] = k3_table[8];   // K3: mid-range
+        v.target_k[3] = k4_table[8];
+        v.target_k[4] = k5_table[8];
+        v.target_k[5] = k6_table[8];
+        v.target_k[6] = k7_table[8];
+        v.target_k[7] = k8_table[4];
+        v.target_k[8] = k9_table[4];
+        v.target_k[9] = k10_table[4];
+
+        // Copy to current for immediate effect
+        v.current_energy = v.target_energy;
+        v.current_pitch = v.target_pitch;
+        for (int i = 0; i < 10; i++) {
+            v.current_k[i] = v.target_k[i];
+        }
+
+        v.interp_count = 0;
+        v.interp_period = 8; // Standard interpolation period
+
+        // Initialize LFSR
+        v.RNG = 0x1FFF;
+    }
+
     // ========================================================================
     // Parameter control
     // ========================================================================
@@ -425,6 +476,62 @@ public:
                 break;
             case PARAM_BRIGHTNESS:
                 brightness_ = std::clamp(value, 0.0f, 2.0f);
+                break;
+            case PARAM_K4_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 15);
+                        voices_[i].target_k[3] = k4_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K5_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 15);
+                        voices_[i].target_k[4] = k5_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K6_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 15);
+                        voices_[i].target_k[5] = k6_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K7_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 15);
+                        voices_[i].target_k[6] = k7_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K8_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 7);
+                        voices_[i].target_k[7] = k8_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K9_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 7);
+                        voices_[i].target_k[8] = k9_table[idx];
+                    }
+                }
+                break;
+            case PARAM_K10_INDEX:
+                for (int i = 0; i < NUM_VOICES; i++) {
+                    if (voices_[i].active) {
+                        int idx = std::clamp((int)value, 0, 7);
+                        voices_[i].target_k[9] = k10_table[idx];
+                    }
+                }
                 break;
         }
     }
@@ -541,8 +648,8 @@ public:
             }
 
             // Apply master volume and scale
-            // TMS5220 output is 8-bit, so scale appropriately
-            float scale = volume_ * 0.25f;
+            // Increased from 0.25f for better audibility
+            float scale = volume_ * 1.0f;
             outL[i] = mixL * scale;
             outR[i] = mixR * scale;
         }
@@ -789,6 +896,7 @@ EMSCRIPTEN_BINDINGS(TMS5220Module) {
         .function("noteOn", &TMS5220Synth::noteOn)
         .function("noteOff", &TMS5220Synth::noteOff)
         .function("allNotesOff", &TMS5220Synth::allNotesOff)
+        .function("activateSpeechVoice", &TMS5220Synth::activateSpeechVoice)
         .function("setParameter", &TMS5220Synth::setParameter)
         .function("controlChange", &TMS5220Synth::controlChange)
         .function("pitchBend", &TMS5220Synth::pitchBend)

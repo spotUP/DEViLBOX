@@ -153,6 +153,34 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     if (param.type === 'text') {
       const textValue = String(parameters[paramKey] ?? param.defaultText ?? '');
       const isSpeechText = paramKey === 'speechText' && onSpeak;
+
+      // Track phoneme mode per-parameter
+      const [showPhonemes, setShowPhonemes] = React.useState(false);
+
+      // Convert text to phonemes or vice versa
+      const handlePhonemeToggle = () => {
+        if (!isSpeechText) return;
+
+        if (!showPhonemes) {
+          // Convert text to phonemes
+          try {
+            // Import speech reciter
+            import('@engine/speech/Reciter').then(({ textToPhonemes }) => {
+              const phonemes = textToPhonemes(textValue);
+              if (phonemes) {
+                onTextChange?.(paramKey, phonemes);
+                setShowPhonemes(true);
+              }
+            });
+          } catch (err) {
+            console.error('[ChipSynthControls] Failed to convert to phonemes:', err);
+          }
+        } else {
+          // Toggle back - user can manually edit back to text
+          setShowPhonemes(false);
+        }
+      };
+
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
           <span style={{ fontSize: 10, color: mutedColor, textTransform: 'uppercase', fontWeight: 600 }}>{param.label}</span>
@@ -166,11 +194,11 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
                   onSpeak!(textValue);
                 }
               }}
-              placeholder={param.placeholder || ''}
+              placeholder={param.placeholder || (showPhonemes ? 'Phonemes: /HEH LOW/ ...' : 'Enter text to speak')}
               style={{
                 background: isCyanTheme ? '#041010' : '#0d1117',
                 color: isCyanTheme ? '#00ffff' : accentColor,
-                border: `1px solid ${panelBorder}`,
+                border: `1px solid ${showPhonemes ? '#ff6b00' : panelBorder}`,
                 borderRadius: 6,
                 padding: '8px 12px',
                 fontSize: 13,
@@ -180,25 +208,47 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               }}
             />
             {isSpeechText && (
-              <button
-                onClick={() => onSpeak!(textValue)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: `1px solid ${accentColor}44`,
-                  background: `${accentColor}18`,
-                  color: accentColor,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  whiteSpace: 'nowrap',
-                  transition: 'background 0.15s',
-                }}
-              >
-                Speak
-              </button>
+              <>
+                <button
+                  onClick={handlePhonemeToggle}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    border: `1px solid ${showPhonemes ? '#ff6b00' : accentColor}44`,
+                    background: showPhonemes ? '#ff6b0020' : `${accentColor}18`,
+                    color: showPhonemes ? '#ff6b00' : accentColor,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
+                  }}
+                  title={showPhonemes ? 'Show normal text mode' : 'Convert to phonemes'}
+                >
+                  {showPhonemes ? '🔤 Text' : '🗣 Phonemes'}
+                </button>
+                <button
+                  onClick={() => onSpeak!(textValue)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    border: `1px solid ${accentColor}44`,
+                    background: `${accentColor}18`,
+                    color: accentColor,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  ▶ Speak
+                </button>
+              </>
             )}
           </div>
         </div>
