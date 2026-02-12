@@ -16,11 +16,13 @@ import { useMIDIActions } from './hooks/useMIDIActions';
 import { usePadTriggers } from './hooks/usePadTriggers';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { getToneEngine } from '@engine/ToneEngine';
-import type { EffectConfig } from './types/instrument';
+import type { EffectConfig, InstrumentConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
+import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
+import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
@@ -44,6 +46,10 @@ const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModa
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
 const PatternManagement = lazy(() => import('@components/pattern/PatternManagement').then(m => ({ default: m.PatternManagement })));
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
+const InstrumentEditorPopout = lazy(() => import('./components/instruments/InstrumentEditorPopout').then(m => ({ default: m.InstrumentEditorPopout })));
+const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
+const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
+const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
 
 function App() {
   // Check for application updates
@@ -61,7 +67,16 @@ function App() {
       setFFTNode: state.setFFTNode,
     }))
   );
-  const { showSamplePackModal, setShowSamplePackModal, applyAutoCompact } = useUIStore();
+  const {
+    showSamplePackModal, setShowSamplePackModal, applyAutoCompact,
+    activeView, toggleActiveView,
+    instrumentEditorPoppedOut, setInstrumentEditorPoppedOut,
+    masterEffectsPoppedOut, setMasterEffectsPoppedOut,
+    instrumentEffectsPoppedOut, setInstrumentEffectsPoppedOut,
+    pianoRollPoppedOut, setPianoRollPoppedOut,
+    oscilloscopePoppedOut, setOscilloscopePoppedOut,
+    arrangementPoppedOut, setArrangementPoppedOut,
+  } = useUIStore();
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -225,6 +240,13 @@ function App() {
         return;
       }
 
+      // Ctrl+Shift+A: Toggle Arrangement View
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        toggleActiveView();
+        return;
+      }
+
       // Ctrl+K: Toggle MIDI Knob Bar
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -287,7 +309,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, showInstrumentFX, handleUndo, handleRedo, saveProject]);
+  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, showInstrumentFX, handleUndo, handleRedo, saveProject, toggleActiveView]);
 
   const handleUpdateEffectParameter = (key: string, value: number | string) => {
     if (!editingEffect) return;
@@ -359,11 +381,11 @@ function App() {
           name: `Track ${i + 1}`,
           type: 'synth' as const,
           synthType: 'Synth' as const,
-          effects: [],
+          effects: [] as EffectConfig[],
           volume: -6,
           pan: 0,
-        }));
-        loadInstruments(instruments as any);
+        })) as InstrumentConfig[];
+        loadInstruments(instruments);
         setMetadata({
           name: midiResult.metadata.name,
           author: '',
@@ -393,7 +415,8 @@ function App() {
         const patLen = patterns[0]?.length || 64;
         const numChannels = patterns[0]?.[0]?.length || 4;
         
-        const convertedPatterns = patterns.map((pat: any[][], idx: number) => ({
+        interface FurnaceCell { note?: number; instrument?: number; volume?: number; effectType?: number; effectParam?: number }
+        const convertedPatterns = patterns.map((pat: FurnaceCell[][], idx: number) => ({
           id: `pattern-${idx}`,
           name: `Pattern ${idx}`,
           length: patLen,
@@ -407,7 +430,7 @@ function App() {
             pan: 0,
             instrumentId: null,
             color: null,
-            rows: pat.map((row: any[]) => {
+            rows: pat.map((row: FurnaceCell[]) => {
               const cell = row[ch] || {};
               return {
                 note: cell.note || 0,
@@ -422,7 +445,7 @@ function App() {
           })),
         }));
         
-        loadInstruments(instruments as any);
+        loadInstruments(instruments as InstrumentConfig[]);
         loadPatterns(convertedPatterns);
         if (patternOrder.length > 0) setPatternOrder(patternOrder);
         
@@ -501,7 +524,7 @@ function App() {
         // DEViLBOX instrument file
         const instrumentData = await importInstrument(file);
         if (instrumentData?.instrument) {
-          addInstrument(instrumentData.instrument as any);
+          addInstrument(instrumentData.instrument);
           notify.success(`Loaded instrument: ${instrumentData.instrument.name || 'Untitled'}`);
         } else {
           notify.error(`Failed to load instrument: ${file.name}`);
@@ -530,7 +553,7 @@ function App() {
           }
           
           updateInstrument(tb303Instrument.id, {
-            tb303: { ...tb303Instrument.tb303, ...presetConfig } as any
+            tb303: { ...tb303Instrument.tb303, ...presetConfig }
           });
           
           notify.success(`Loaded DB303 preset: ${file.name}`);
@@ -800,31 +823,41 @@ function App() {
         <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
         <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">
-          {/* Left side - Pattern Editor (expands when instrument panel is hidden) */}
+          {/* Left side - Pattern Editor or Arrangement View */}
           <div className="flex flex-col min-h-0 min-w-0 flex-1">
-            {/* Pattern Management (optional) */}
-            {showPatterns && (
-              <div className="h-48 border-b border-dark-border animate-fade-in">
-                <Suspense fallback={<div className="h-full flex items-center justify-center text-text-muted">Loading patterns...</div>}>
-                  <PatternManagement />
-                </Suspense>
-              </div>
+            {activeView === 'tracker' && (
+              <>
+                {/* Pattern Management (optional) */}
+                {showPatterns && (
+                  <div className="h-48 border-b border-dark-border animate-fade-in">
+                    <Suspense fallback={<div className="h-full flex items-center justify-center text-text-muted">Loading patterns...</div>}>
+                      <PatternManagement />
+                    </Suspense>
+                  </div>
+                )}
+                {/* Pattern Editor */}
+                <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+                  <TrackerView
+                    onShowPatterns={() => setShowPatterns(!showPatterns)}
+                    onShowExport={() => setShowExport(true)}
+                    onShowHelp={() => setShowHelp(true)}
+                    onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
+                    onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
+                    onShowInstruments={() => setShowInstrumentModal(true)}
+                    onShowDrumpads={() => setShowDrumpads(true)}
+                    showPatterns={showPatterns}
+                    showMasterFX={showMasterFX}
+                    showInstrumentFX={showInstrumentFX}
+                  />
+                </div>
+              </>
             )}
-            {/* Pattern Editor */}
-            <div className="flex-1 min-h-0 min-w-0 flex flex-col">
-              <TrackerView
-                onShowPatterns={() => setShowPatterns(!showPatterns)}
-                onShowExport={() => setShowExport(true)}
-                onShowHelp={() => setShowHelp(true)}
-                onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
-                onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
-                onShowInstruments={() => setShowInstrumentModal(true)}
-                onShowDrumpads={() => setShowDrumpads(true)}
-                showPatterns={showPatterns}
-                showMasterFX={showMasterFX}
-                showInstrumentFX={showInstrumentFX}
-              />
-            </div>
+
+            {activeView === 'arrangement' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading arrangement...</div>}>
+                <ArrangementView />
+              </Suspense>
+            )}
           </div>
 
         </div>
@@ -904,11 +937,108 @@ function App() {
         )}
       </Suspense>
 
+      {/* Popped-out Instrument Editor (rendered outside layout) */}
+      {instrumentEditorPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setInstrumentEditorPoppedOut(false)}
+            title="DEViLBOX — Instrument Editor"
+            width={1000}
+            height={800}
+          >
+            <InstrumentEditorPopout />
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Master Effects */}
+      {masterEffectsPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setMasterEffectsPoppedOut(false)}
+            title="DEViLBOX — Master Effects"
+            width={1000}
+            height={800}
+          >
+            <MasterEffectsModal isOpen={true} onClose={() => setMasterEffectsPoppedOut(false)} />
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Instrument Effects */}
+      {instrumentEffectsPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setInstrumentEffectsPoppedOut(false)}
+            title="DEViLBOX — Instrument Effects"
+            width={1000}
+            height={800}
+          >
+            <InstrumentEffectsModal isOpen={true} onClose={() => setInstrumentEffectsPoppedOut(false)} />
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Piano Roll */}
+      {pianoRollPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setPianoRollPoppedOut(false)}
+            title="DEViLBOX — Piano Roll"
+            width={1200}
+            height={600}
+          >
+            <div className="h-screen w-screen bg-dark-bgSecondary">
+              <PianoRoll />
+            </div>
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Arrangement View */}
+      {arrangementPoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setArrangementPoppedOut(false)}
+            title="DEViLBOX — Arrangement"
+            width={1400}
+            height={700}
+          >
+            <div className="h-screen w-screen bg-dark-bg">
+              <ArrangementView />
+            </div>
+          </PopOutWindow>
+        </Suspense>
+      )}
+
+      {/* Popped-out Oscilloscope/Visualizer */}
+      {oscilloscopePoppedOut && (
+        <Suspense fallback={null}>
+          <PopOutWindow
+            isOpen={true}
+            onClose={() => setOscilloscopePoppedOut(false)}
+            title="DEViLBOX — Visualizer"
+            width={800}
+            height={500}
+          >
+            <OscilloscopePopout />
+          </PopOutWindow>
+        </Suspense>
+      )}
+
       {/* Toast Notifications */}
       <ToastNotification />
 
       {/* Synth Error Dialog - Shows when synth initialization fails */}
       <SynthErrorDialog />
+
+      {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
+      <RomUploadDialog />
 
       {/* Update Notification */}
       {updateAvailable && !updateDismissed && (

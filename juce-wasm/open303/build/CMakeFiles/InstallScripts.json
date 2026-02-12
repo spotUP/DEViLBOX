@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/spot/Code/DEViLBOX/juce-wasm/open303/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

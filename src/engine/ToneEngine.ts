@@ -35,9 +35,11 @@ import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { WAMSynth } from './wam/WAMSynth';
+import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
+import { useRomDialogStore } from '../stores/useRomDialogStore';
 
 interface VoiceState {
-  instrument: any;
+  instrument: Tone.ToneAudioNode | DevilboxSynth;
   note: string;
   volumeEnv: TrackerEnvelope;
   panningEnv: TrackerEnvelope;
@@ -50,7 +52,7 @@ interface VoiceState {
   lastResonance: number;
   nodes: {
     gain: Tone.Gain;
-    filter: any;
+    filter: Tone.Filter | AudioWorkletNode;
     panner: Tone.Panner;
   };
 }
@@ -76,10 +78,10 @@ export class ToneEngine {
   private _nativeContext: AudioContext | null = null;
 
   // High-performance WASM instance for DSP and scheduling
-  private wasmInstance: any = null;
+  private wasmInstance: WebAssembly.Exports | null = null;
 
   // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
-  public instruments: Map<string, Tone.PolySynth | Tone.Synth | any>;
+  public instruments: Map<string, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
   private instrumentSynthTypes: Map<string, string> = new Map();
   // Track loading promises for samplers/players (keyed by instrument key)
@@ -258,7 +260,7 @@ export class ToneEngine {
     if (!ToneEngine.instance) {
       ToneEngine.instance = new ToneEngine();
       // Expose for console diagnostics (scripts/db303-knob-diag.js)
-      (window as any)._toneEngine = ToneEngine.instance;
+      (window as unknown as Record<string, unknown>)._toneEngine = ToneEngine.instance;
     }
     return ToneEngine.instance;
   }
@@ -278,21 +280,22 @@ export class ToneEngine {
    * Bridges the native → Tone.js boundary using getNativeAudioNode().
    */
   public connectNativeSynth(synthOutput: AudioNode, destination: Tone.ToneAudioNode): void {
-    const nativeDestination = getNativeAudioNode(destination);
+    const nativeDestination = getNativeAudioNode(destination as any);
     if (nativeDestination) {
       try {
         synthOutput.connect(nativeDestination);
       } catch (e) {
         console.error('[ToneEngine] connectNativeSynth failed:', e,
-          'synthOutput context:', (synthOutput as any).context?.constructor?.name,
-          'dest context:', (nativeDestination as any).context?.constructor?.name);
+          'synthOutput context:', (synthOutput as unknown as { context?: { constructor?: { name?: string } } }).context?.constructor?.name,
+          'dest context:', (nativeDestination as unknown as { context?: { constructor?: { name?: string } } }).context?.constructor?.name);
       }
     } else {
       console.warn('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');
       // Last resort: try connecting to Tone.js input property
-      if ((destination as any).input) {
+      const destWithInput = destination as unknown as { input?: AudioNode };
+      if (destWithInput.input) {
         try {
-          synthOutput.connect((destination as any).input);
+          synthOutput.connect(destWithInput.input);
         } catch (e) {
           console.error('[ToneEngine] connectNativeSynth fallback also failed:', e);
         }
@@ -346,7 +349,7 @@ export class ToneEngine {
   /**
    * Get the global high-performance WASM instance
    */
-  public getWasmInstance(): any {
+  public getWasmInstance(): WebAssembly.Exports | null {
     return this.wasmInstance;
   }
 
@@ -397,7 +400,7 @@ export class ToneEngine {
           const imports = { env: { abort: () => console.error('Main WASM Aborted') } };
           const { instance } = await WebAssembly.instantiate(dspBinary, imports);
           this.wasmInstance = instance.exports;
-          if (this.wasmInstance.init) this.wasmInstance.init();
+          if ((this.wasmInstance as any).init) (this.wasmInstance as any).init();
           console.log('[ToneEngine] Unified DevilboxDSP WASM instance ready');
         } catch (e) {
           console.error('[ToneEngine] Failed to init Main Thread WASM:', e);
@@ -427,11 +430,12 @@ export class ToneEngine {
             }
 
             ToneEngine.itFilterWorkletLoaded = true;
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error('[ToneEngine] Failed to load ITFilter worklet:', error);
-            // Only keep the promise if it's already registered. 
+            // Only keep the promise if it's already registered.
             // Otherwise, allow retry on next attempt.
-            const isAlreadyRegistered = error?.message?.includes('already') || error?.message?.includes('duplicate');
+            const errMsg = error instanceof Error ? error.message : '';
+            const isAlreadyRegistered = errMsg.includes('already') || errMsg.includes('duplicate');
             if (!isAlreadyRegistered) {
               ToneEngine.itFilterWorkletPromise = null;
             }
@@ -504,8 +508,8 @@ export class ToneEngine {
     const speechReadyPromises: Promise<void>[] = [];
     speechConfigs.forEach((config) => {
       const instrument = this.getInstrument(config.id, config);
-      if (instrument?.ready) {
-        speechReadyPromises.push(instrument.ready());
+      if ((instrument as any)?.ready) {
+        speechReadyPromises.push((instrument as any).ready());
       }
     });
 
@@ -548,8 +552,8 @@ export class ToneEngine {
       for (const config of wasmConfigs) {
         const key = this.getInstrumentKey(config.id, -1);
         const instrument = this.instruments.get(key);
-        if (instrument?.ensureInitialized) {
-          wasmPromises.push(instrument.ensureInitialized());
+        if ((instrument as any)?.ensureInitialized) {
+          wasmPromises.push((instrument as any).ensureInitialized());
         }
       }
       if (wasmPromises.length > 0) {
@@ -573,9 +577,10 @@ export class ToneEngine {
         const instrument = this.instruments.get(key);
         if (instrument && !isDevilboxSynth(instrument)) {
           try {
+            const inst = instrument as any;
             // Save original volume, set to silent
-            const originalVol = instrument.volume.value;
-            instrument.volume.value = -Infinity;
+            const originalVol = inst.volume.value;
+            inst.volume.value = -Infinity;
 
             // Trigger a very short note to warm up the synth
             if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
@@ -585,14 +590,70 @@ export class ToneEngine {
               // MembraneSynth is now regular Synth for performance
               (instrument as Tone.Synth).triggerAttackRelease('C2', 0.001, Tone.now());
             } else {
-              instrument.triggerAttackRelease?.('C4', 0.001, Tone.now());
+              inst.triggerAttackRelease?.('C4', 0.001, Tone.now());
             }
 
             // Restore volume
-            instrument.volume.value = originalVol;
-          } catch (e) {
+            inst.volume.value = originalVol;
+          } catch {
             // Ignore warm-up errors
           }
+        }
+      }
+    }
+
+    // Check ROM status for MAME chip synths that have romConfig.
+    // Wait for their init to complete, then update _romsLoaded or show upload dialog.
+    const romChipConfigs = configs.filter((c) => {
+      const chipDef = CHIP_SYNTH_DEFS[c.synthType || ''];
+      return chipDef?.romConfig;
+    });
+    if (romChipConfigs.length > 0) {
+      // Wait for all ROM-dependent chip synths to finish initializing
+      const romInitPromises: Promise<void>[] = [];
+      for (const config of romChipConfigs) {
+        const key = this.getInstrumentKey(config.id, -1);
+        const instrument = this.instruments.get(key);
+        if ((instrument as any)?.ensureInitialized) {
+          romInitPromises.push((instrument as any).ensureInitialized());
+        }
+      }
+      if (romInitPromises.length > 0) {
+        try {
+          await Promise.all(romInitPromises);
+        } catch {
+          // Individual synths handle their own errors
+        }
+        if (generation !== this.preloadGeneration) return; // Superseded
+      }
+
+      // Now check ROM loaded status for each chip (lazy import to avoid circular dep)
+      const { useInstrumentStore: romInstStore } = await import('../stores/useInstrumentStore');
+      const instStore = romInstStore.getState();
+      for (const config of romChipConfigs) {
+        const key = this.getInstrumentKey(config.id, -1);
+        const synth = this.instruments.get(key) as any;
+        const chipDef = CHIP_SYNTH_DEFS[config.synthType || ''];
+        if (!synth || !chipDef?.romConfig) continue;
+
+        const loaded = synth.romLoaded === true;
+        const inst = instStore.instruments.find((i: any) => i.id === config.id);
+        if (inst) {
+          instStore.updateInstrument(config.id, {
+            parameters: { ...inst.parameters, _romsLoaded: loaded ? 1 : 0 },
+          });
+        }
+
+        if (!loaded) {
+          // Show ROM upload dialog for the first failed chip
+          useRomDialogStore.getState().showRomDialog({
+            instrumentId: config.id,
+            synthType: config.synthType || '',
+            chipName: chipDef.name,
+            requiredZip: chipDef.romConfig.requiredZip,
+            bankCount: chipDef.romConfig.bankCount,
+          });
+          break; // Only show one dialog at a time
         }
       }
     }
@@ -613,8 +674,8 @@ export class ToneEngine {
     for (const config of wasmConfigs) {
       // Create the instrument if it doesn't exist yet
       const instrument = this.getInstrument(config.id, config);
-      if (instrument?.ensureInitialized) {
-        promises.push(instrument.ensureInitialized());
+      if ((instrument as any)?.ensureInitialized) {
+        promises.push((instrument as any).ensureInitialized());
       }
     }
     if (promises.length > 0) {
@@ -687,8 +748,8 @@ export class ToneEngine {
    */
   public processInstrumentTicks(time: number = Tone.now()): void {
     this.instruments.forEach((instrument) => {
-      if (instrument && typeof instrument.processTick === 'function') {
-        instrument.processTick(time);
+      if (instrument && typeof (instrument as any).processTick === 'function') {
+        (instrument as any).processTick(time);
       }
     });
   }
@@ -836,7 +897,7 @@ export class ToneEngine {
   /**
    * Create or get instrument (per-channel to avoid automation conflicts)
    */
-  public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.PolySynth | Tone.Synth | any {
+  public getInstrument(instrumentId: number, config: InstrumentConfig, channelIndex?: number): Tone.ToneAudioNode | DevilboxSynth | null {
     // CRITICAL FIX: Many synth types don't need per-channel instances
     // They're already polyphonic and don't have per-channel automation
     // Creating new instances causes them to reload samples/ROMs/WASM, causing silence and performance issues
@@ -859,7 +920,7 @@ export class ToneEngine {
       if (config.synthType && storedType && storedType !== config.synthType && storedType !== 'Player') {
         console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} stored as ${storedType} but config wants ${config.synthType} — dispose was missed!`);
       }
-      return cached;
+      return cached ?? null;
     }
 
     // PERFORMANCE FIX: Check for shared/legacy instrument before creating new one
@@ -869,14 +930,14 @@ export class ToneEngine {
     const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
     if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
-      return this.instruments.get(legacyKey);
+      return this.instruments.get(legacyKey) ?? null;
     }
 
     // Create new instrument based on config
-    let instrument: any;
+    let instrument: Tone.ToneAudioNode | DevilboxSynth | null = null;
 
     switch (config.synthType) {
-      case 'Synth':
+      case 'Synth': {
         // Adjust polyphony based on quality level for CPU savings
         const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                                this.currentPerformanceQuality === 'medium' ? 8 : 4;
@@ -885,8 +946,8 @@ export class ToneEngine {
           maxPolyphony: synthPolyphony,
           options: {
             oscillator: {
-              type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any,
-            },
+              type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
+            } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -895,14 +956,15 @@ export class ToneEngine {
             },
           },
           volume: config.volume || -12,
-        });
+        } as any);
         break;
+      }
 
       case 'MonoSynth':
         instrument = new Tone.MonoSynth({
           oscillator: {
-            type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any,
-          },
+            type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
+          } as any,
           envelope: {
             attack: (config.envelope?.attack ?? 10) / 1000,
             decay: (config.envelope?.decay ?? 200) / 1000,
@@ -916,7 +978,7 @@ export class ToneEngine {
       case 'DuoSynth':
         instrument = new Tone.DuoSynth({
           voice0: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -925,7 +987,7 @@ export class ToneEngine {
             },
           },
           voice1: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as any },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -939,7 +1001,7 @@ export class ToneEngine {
         });
         break;
 
-      case 'FMSynth':
+      case 'FMSynth': {
         // FMSynth is CPU-intensive, reduce polyphony on lower quality
         const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                             this.currentPerformanceQuality === 'medium' ? 6 : 3;
@@ -947,7 +1009,7 @@ export class ToneEngine {
           voice: Tone.FMSynth,
           maxPolyphony: fmPolyphony,
           options: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as any },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -957,10 +1019,11 @@ export class ToneEngine {
             modulationIndex: 10,
           },
           volume: config.volume || -12,
-        });
+        } as any);
         break;
+      }
 
-      case 'AMSynth':
+      case 'AMSynth': {
         // AMSynth has dual oscillators, reduce polyphony on lower quality
         const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                             this.currentPerformanceQuality === 'medium' ? 8 : 4;
@@ -968,7 +1031,7 @@ export class ToneEngine {
           voice: Tone.AMSynth,
           maxPolyphony: amPolyphony,
           options: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as any },
+            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
               decay: (config.envelope?.decay ?? 200) / 1000,
@@ -977,13 +1040,14 @@ export class ToneEngine {
             },
           },
           volume: config.volume || -12,
-        });
+        } as any);
         break;
+      }
 
-      case 'PluckSynth':
+      case 'PluckSynth': {
         const pluckPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
                                this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new (Tone.PolySynth as any)({
+        instrument = new (Tone.PolySynth as unknown as new (options: Record<string, unknown>) => Tone.PolySynth)({
           voice: Tone.PluckSynth,
           maxPolyphony: pluckPolyphony,
           options: {
@@ -994,6 +1058,7 @@ export class ToneEngine {
           volume: config.volume || -12,
         });
         break;
+      }
 
       case 'MetalSynth':
         // Use NoiseSynth as fast alternative for hi-hats/cymbals
@@ -1053,9 +1118,9 @@ export class ToneEngine {
             triggerAttackRelease: (duration: number, time?: number, velocity?: number) => {
               noiseSynth.triggerAttackRelease(duration, time, velocity);
             },
-            triggerAttack: (time?: number, velocity?: number) => {
+            triggerAttack: ((_note: string | number, time?: number, velocity?: number) => {
               noiseSynth.triggerAttack(time, velocity);
-            },
+            }) as any,
             triggerRelease: (time?: number) => {
               noiseSynth.triggerRelease(time);
             },
@@ -1066,7 +1131,7 @@ export class ToneEngine {
               filter.dispose();
             },
             volume: noiseSynth.volume,
-          };
+          } as unknown as Tone.ToneAudioNode;
         } else {
           instrument = noiseSynth;
         }
@@ -1081,7 +1146,7 @@ export class ToneEngine {
       case 'Sampler': {
         // Sample-based instrument - loads a sample URL and pitches it
         // Check both parameters.sampleUrl (legacy) and sample.url (new standard)
-        let sampleUrl = config.parameters?.sampleUrl || config.sample?.url;
+        let sampleUrl = (config.parameters?.sampleUrl || config.sample?.url) as string | undefined;
         // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
         const baseNote = config.sample?.baseNote || 'C4';
         const hasLoop = config.sample?.loop === true;
@@ -1119,7 +1184,7 @@ export class ToneEngine {
                 bytes[i] = binaryString.charCodeAt(i);
               }
               bufferToUse = bytes.buffer;
-            } catch (e) {
+            } catch {
               console.warn(`[ToneEngine] Sampler ${instrumentId}: audioBuffer is string but not valid base64, skipping`);
               bufferToUse = null;
             }
@@ -1222,8 +1287,8 @@ export class ToneEngine {
             this.instrumentSynthTypes.set(key, 'Player');
           } else {
             // Use multi-map if available, otherwise single sample
-            const urls = config.sample?.multiMap || {};
-            if (!config.sample?.multiMap) {
+            const urls: Record<string, string> = (config.sample?.multiMap || {}) as Record<string, string>;
+            if (!config.sample?.multiMap && sampleUrl) {
               urls[baseNote] = sampleUrl;
             }
 
@@ -1250,7 +1315,7 @@ export class ToneEngine {
 
       case 'Player': {
         // One-shot player (doesn't pitch)
-        const playerUrl = config.parameters?.sampleUrl;
+        const playerUrl = config.parameters?.sampleUrl as string | undefined;
 
         if (playerUrl) {
           instrument = new Tone.Player({
@@ -1272,7 +1337,7 @@ export class ToneEngine {
 
       case 'GranularSynth': {
         // Granular synthesis from sample
-        const granularUrl = config.granular?.sampleUrl || config.parameters?.sampleUrl;
+        const granularUrl = (config.granular?.sampleUrl || config.parameters?.sampleUrl) as string | undefined;
         const granularConfig = config.granular;
 
         if (granularUrl) {
@@ -1315,7 +1380,7 @@ export class ToneEngine {
       case 'WobbleBass':
       case 'Furnace':
       // Furnace chip-specific synth types - all use FurnaceSynth with different chip IDs
-      // FM Synthesis Chips
+      // FM Synthesis Chips -- falls through
       case 'FurnaceOPN':
       case 'FurnaceOPM':
       case 'FurnaceOPL':
@@ -1326,7 +1391,7 @@ export class ToneEngine {
       case 'FurnaceOPL4':
       case 'FurnaceY8950':
       case 'FurnaceESFM':
-      // Console PSG Chips
+      // Console PSG Chips -- falls through
       case 'FurnaceNES':
       case 'FurnaceGB':
       case 'FurnacePSG':
@@ -1335,13 +1400,13 @@ export class ToneEngine {
       case 'FurnaceVB':
       case 'FurnaceLynx':
       case 'FurnaceSWAN':
-      // NES Expansion Audio
+      // NES Expansion Audio -- falls through
       case 'FurnaceVRC6':
       case 'FurnaceVRC7':
       case 'FurnaceN163':
       case 'FurnaceFDS':
       case 'FurnaceMMC5':
-      // Computer Chips
+      // Computer Chips -- falls through
       case 'FurnaceC64':
       case 'FurnaceSID6581':
       case 'FurnaceSID8580':
@@ -1350,7 +1415,7 @@ export class ToneEngine {
       case 'FurnaceSAA':
       case 'FurnaceTED':
       case 'FurnaceVERA':
-      // Arcade PCM Chips
+      // Arcade PCM Chips -- falls through
       case 'FurnaceSEGAPCM':
       case 'FurnaceQSOUND':
       case 'FurnaceES5506':
@@ -1361,11 +1426,11 @@ export class ToneEngine {
       case 'FurnaceGA20':
       case 'FurnaceOKI':
       case 'FurnaceYMZ280B':
-      // Wavetable Chips
+      // Wavetable Chips -- falls through
       case 'FurnaceSCC':
       case 'FurnaceX1_010':
       case 'FurnaceBUBBLE':
-      // Other
+      // Other -- falls through
       case 'FurnaceTIA':
       case 'FurnaceSM8521':
       case 'FurnaceT6W28':
@@ -1395,10 +1460,10 @@ export class ToneEngine {
       case 'FurnacePCMDAC':
       case 'DrumKit':
       case 'ChiptuneModule':
-      // JUCE WASM Synths
+      // JUCE WASM Synths -- falls through
       case 'Dexed':
       case 'OBXd':
-      // MAME-based Synths
+      // MAME-based Synths -- falls through
       case 'MAMEVFX':
       case 'MAMEDOC':
       case 'MAMERSA':
@@ -1406,7 +1471,7 @@ export class ToneEngine {
       case 'CZ101':
       case 'CEM3394':
       case 'SCSP':
-      // MAME Per-Chip WASM Synths
+      // MAME Per-Chip WASM Synths -- falls through
       case 'MAMEAICA':
       case 'MAMEASC':
       case 'MAMEAstrocade':
@@ -1430,7 +1495,7 @@ export class ToneEngine {
       case 'MAMEYMF271':
       case 'MAMEYMOPQ':
       case 'MAMEVASynth':
-      // Buzzmachine Generators (WASM-emulated Buzz synths)
+      // Buzzmachine Generators (WASM-emulated Buzz synths) -- falls through
       case 'BuzzDTMF':
       case 'BuzzFreqBomb':
       case 'BuzzKick':
@@ -1477,10 +1542,10 @@ export class ToneEngine {
     }
 
     // Apply filter if specified
-    if (config.filter && instrument.filter) {
-      instrument.filter.type = config.filter.type;
-      instrument.filter.frequency.value = config.filter.frequency;
-      instrument.filter.Q.value = config.filter.Q;
+    if (config.filter && (instrument as any).filter) {
+      (instrument as any).filter.type = config.filter.type;
+      (instrument as any).filter.frequency.value = config.filter.frequency;
+      (instrument as any).filter.Q.value = config.filter.Q;
     }
 
     // Store instrument with composite key (per-channel)
@@ -1583,9 +1648,9 @@ export class ToneEngine {
       const isNative = isDevilboxSynth(instrument);
       try {
         if (isNative) {
-          instrument.output.disconnect();
+          (instrument as DevilboxSynth).output.disconnect();
         } else {
-          instrument.disconnect();
+          (instrument as Tone.ToneAudioNode).disconnect();
         }
       } catch {
         // May not be connected
@@ -1594,9 +1659,9 @@ export class ToneEngine {
       const effectChain = this.instrumentEffectChains.get(sharedKey);
       const connectTo = (dest: Tone.ToneAudioNode) => {
         if (isNative) {
-          this.connectNativeSynth(instrument.output, dest);
+          this.connectNativeSynth((instrument as DevilboxSynth).output, dest);
         } else {
-          instrument.connect(dest);
+          (instrument as Tone.ToneAudioNode).connect(dest);
         }
       };
 
@@ -1606,6 +1671,11 @@ export class ToneEngine {
         } else {
           connectTo(effectChain.output);
         }
+        // Reconnect effect chain output back to the correct bus
+        // (it was disconnected from synthBus/masterInput when the analyser was created)
+        try { effectChain.output.disconnect(analyser.input); } catch { /* not connected */ }
+        const dest = isNative ? this.synthBus : this.masterInput;
+        effectChain.output.connect(dest);
       } else {
         connectTo(isNative ? this.synthBus : this.masterInput);
       }
@@ -1653,7 +1723,7 @@ export class ToneEngine {
   /**
    * Apply automation to a specific instrument instance
    */
-  private applyAutomationToInstrument(instrument: any, parameter: string, value: number): void {
+  private applyAutomationToInstrument(instrument: Tone.ToneAudioNode | DevilboxSynth, parameter: string, value: number): void {
     // Get safe time for automation - skip if context not ready
     const now = this.getSafeTime();
     if (now === null) {
@@ -1670,36 +1740,39 @@ export class ToneEngine {
       }
 
       // Non-TB303 instruments
+      const inst = instrument as any;
       switch (parameter) {
         case 'cutoff':
-          if (instrument.filter) {
+          if (inst.filter) {
             const cutoffHz = 200 * Math.pow(100, value);
-            instrument.filter.frequency.setValueAtTime(cutoffHz, now);
+            inst.filter.frequency.setValueAtTime(cutoffHz, now);
           }
           break;
 
         case 'resonance':
-          if (instrument.filter) {
-            instrument.filter.Q.setValueAtTime(value * 10, now);
+          if (inst.filter) {
+            inst.filter.Q.setValueAtTime(value * 10, now);
           }
           break;
 
-        case 'volume':
+        case 'volume': {
           const volumeDb = -40 + value * 40;
           if (isDevilboxSynth(instrument)) {
             const gain = Math.pow(10, volumeDb / 20);
             (instrument.output as GainNode).gain.setValueAtTime(gain, now);
-          } else if (instrument.volume) {
-            instrument.volume.setValueAtTime(volumeDb, now);
+          } else if (inst.volume) {
+            inst.volume.setValueAtTime(volumeDb, now);
           }
           break;
+        }
 
-        case 'pan':
+        case 'pan': {
           const panValue = value * 2 - 1;
-          if (instrument.pan) {
-            instrument.pan.setValueAtTime(panValue, now);
+          if (inst.pan) {
+            inst.pan.setValueAtTime(panValue, now);
           }
           break;
+        }
 
         case 'distortion':
         case 'delay':
@@ -1711,8 +1784,8 @@ export class ToneEngine {
           // Handle WAM parameters or generic setParam
           if (instrument instanceof WAMSynth) {
             instrument.setParameter(parameter, value);
-          } else if (typeof instrument.setParam === 'function') {
-            instrument.setParam(parameter, value);
+          } else if (typeof inst.setParam === 'function') {
+            inst.setParam(parameter, value);
           }
           break;
       }
@@ -1740,7 +1813,7 @@ export class ToneEngine {
    * @returns Modified velocity (with accent boost applied)
    */
   private applySlideAndAccent(
-    instrument: any,
+    instrument: Tone.ToneAudioNode | DevilboxSynth,
     targetFreq: number,
     time: number,
     velocity: number,
@@ -1764,16 +1837,17 @@ export class ToneEngine {
         // Get the oscillator frequency parameter
         // Different synths have different structures
         let freqParam: Tone.Param<'frequency'> | null = null;
-        
-        if (instrument.oscillator?.frequency) {
+        const s = instrument as any;
+
+        if (s.oscillator?.frequency) {
           // Synth, MonoSynth, etc.
-          freqParam = instrument.oscillator.frequency;
-        } else if (instrument.voice0?.oscillator?.frequency) {
+          freqParam = s.oscillator.frequency;
+        } else if (s.voice0?.oscillator?.frequency) {
           // DuoSynth has voice0 and voice1
-          freqParam = instrument.voice0.oscillator.frequency;
-        } else if (instrument.frequency) {
+          freqParam = s.voice0.oscillator.frequency;
+        } else if (s.frequency) {
           // Some synths expose frequency directly
-          freqParam = instrument.frequency;
+          freqParam = s.frequency;
         }
         
         if (freqParam) {
@@ -1782,7 +1856,7 @@ export class ToneEngine {
             freqParam.setValueAtTime(lastNote.frequency, time);
             // Then exponentially approach target frequency (RC circuit style)
             freqParam.setTargetAtTime(targetFreq, time, ToneEngine.SLIDE_TIME_CONSTANT);
-          } catch (e) {
+          } catch {
             // Silently ignore if frequency manipulation fails
             // The note will still play at the target frequency
           }
@@ -1821,7 +1895,7 @@ export class ToneEngine {
     }
 
     // Check if instrument can play - allow triggerAttack (synths) or start (Players)
-    const canPlay = instrument.triggerAttack || instrument.start;
+    const canPlay = (instrument as any).triggerAttack || (instrument as any).start;
     if (!canPlay) {
       return;
     }
@@ -1901,7 +1975,7 @@ export class ToneEngine {
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
 
-            (player as any).playbackRate = playbackRate;
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
             // The sample's base note is the pitch at playbackRate 1.0
@@ -1910,7 +1984,7 @@ export class ToneEngine {
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
 
-            (player as any).playbackRate = playbackRate;
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
           }
 
           player.start(safeTime);
@@ -1984,7 +2058,7 @@ export class ToneEngine {
         membraneSynth.triggerAttack(note, safeTime, finalVelocity);
       } else if (instrument.constructor.name === 'BuzzmachineGenerator') {
         // Buzzmachine generators support accent/slide for 303 behavior
-        (instrument as any).triggerAttack(note, safeTime, velocity, accent, slide);
+        (instrument as unknown as { triggerAttack: (note: string, time: number, velocity: number, accent?: boolean, slide?: boolean) => void }).triggerAttack(note, safeTime, velocity, accent, slide);
       } else if (instrument instanceof WAMSynth) {
         instrument.triggerAttack(note, safeTime, velocity);
       } else {
@@ -1994,7 +2068,7 @@ export class ToneEngine {
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
         );
-        instrument.triggerAttack(note, safeTime, finalVelocity);
+        (instrument as any).triggerAttack(note, safeTime, finalVelocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteAttack for ${config.synthType}:`, error);
@@ -2013,7 +2087,7 @@ export class ToneEngine {
   ): void {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
-    if (!instrument || !instrument.triggerRelease) {
+    if (!instrument || !(instrument as any).triggerRelease) {
       return;
     }
 
@@ -2078,10 +2152,10 @@ export class ToneEngine {
         config.synthType.startsWith('MAME')
       ) {
         // These synths use triggerRelease(time) - no note parameter
-        instrument.triggerRelease(safeTime);
+        (instrument as any).triggerRelease(safeTime);
       } else {
         // PolySynth and others use triggerRelease(note, time)
-        instrument.triggerRelease(note, safeTime);
+        (instrument as any).triggerRelease(note, safeTime);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteRelease for ${config.synthType}:`, error);
@@ -2279,7 +2353,7 @@ export class ToneEngine {
       return;
     }
 
-    if (!instrument.triggerRelease) return;
+    if (!(instrument as any).triggerRelease) return;
 
     // Mono-style synths use triggerRelease(time) - no note parameter
     const isMonoStyle = synthType === 'MonoSynth' ||
@@ -2301,15 +2375,15 @@ export class ToneEngine {
 
     try {
       if (isMonoStyle) {
-        instrument.triggerRelease(safeTime);
+        (instrument as any).triggerRelease(safeTime);
       } else {
         // PolySynth and others take note parameter
-        instrument.triggerRelease(note, safeTime);
+        (instrument as any).triggerRelease(note, safeTime);
       }
     } catch {
       // Fallback: try without note if with note fails
       try {
-        instrument.triggerRelease(safeTime);
+        (instrument as any).triggerRelease(safeTime);
       } catch {
         // Silently ignore - note may have already been released
       }
@@ -2368,15 +2442,16 @@ export class ToneEngine {
 
       // 2. Create independent playback node for this voice
       // This is essential for IT NNA so overlapping notes have separate envelopes/filters
-      let voiceNode: any;
+      let voiceNode: Tone.ToneAudioNode | DevilboxSynth;
       if (config.synthType === 'Sampler' || config.synthType === 'Player') {
-        voiceNode = new Tone.Player(instrument.buffer);
+        const playerInst = instrument as Tone.Player;
+        voiceNode = new Tone.Player(playerInst.buffer);
         // FIX: Copy looping settings from parent instrument
-        voiceNode.loop = instrument.loop;
-        voiceNode.loopStart = instrument.loopStart;
-        voiceNode.loopEnd = instrument.loopEnd;
+        (voiceNode as Tone.Player).loop = playerInst.loop;
+        (voiceNode as Tone.Player).loopStart = playerInst.loopStart;
+        (voiceNode as Tone.Player).loopEnd = playerInst.loopEnd;
       } else if (config.synthType === 'Synth') {
-        voiceNode = new Tone.Synth(instrument.get());
+        voiceNode = new Tone.Synth((instrument as Tone.Synth).get());
       } else {
         voiceNode = instrument; // Fallback for specialized synths (mono synths like FurnaceSynth)
       }
@@ -2409,14 +2484,14 @@ export class ToneEngine {
             const modPlayback = config.metadata.modPlayback;
             const frequency = modPlayback.periodMultiplier / period;
             const sampleRate = config.sample?.sampleRate || 8363;
-            (voiceNode as any).playbackRate = frequency / sampleRate;
+            (voiceNode as unknown as { playbackRate: number }).playbackRate = frequency / sampleRate;
           } else {
             // FIX: Handle non-period playback for voice nodes (matches triggerNoteAttack)
             const baseNote = config.sample?.baseNote || 'C4';
             const baseFreq = Tone.Frequency(baseNote).toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
-            (voiceNode as any).playbackRate = playbackRate;
+            (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate;
           }
           const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
           voiceNode.start(safeTime, offset);
@@ -2506,13 +2581,13 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            (grainPlayer as any).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
           } else {
             // Calculate pitch shift from note (C4 = base pitch)
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            (grainPlayer as any).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
           }
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
@@ -2550,7 +2625,7 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            (player as any).playbackRate = playbackRate;
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided
             console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
@@ -2559,7 +2634,7 @@ export class ToneEngine {
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            (player as any).playbackRate = playbackRate;
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
           }
 
           // Apply sample offset (9xx command) if present
@@ -2596,8 +2671,9 @@ export class ToneEngine {
             // 9xx Sample offset: Use Player for offset support
             // Tone.Sampler doesn't support sample offset, so we create a one-shot Player
             const baseNote = config.sample?.baseNote || 'C4';
-            const buffer = (sampler as any)._buffers?.get(baseNote) ||
-                           (sampler as any)._buffers?._buffers?.[baseNote];
+            const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
+            const buffer = samplerInternal._buffers?.get?.(baseNote) ||
+                           samplerInternal._buffers?._buffers?.[baseNote];
 
             if (buffer && buffer.duration) {
               const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
@@ -2619,7 +2695,7 @@ export class ToneEngine {
                 const targetFreq = Tone.Frequency(note).toFrequency();
                 const playbackRate = targetFreq / baseFreq;
 
-                (offsetPlayer as any).playbackRate = playbackRate;
+                (offsetPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
 
                 // Start at offset, stop after duration
                 offsetPlayer.start(safeTime, clampedOffset);
@@ -2691,7 +2767,7 @@ export class ToneEngine {
   /**
    * Schedule pattern events
    */
-  public schedulePatternEvents(events: any[], _patternId: string): void {
+  public schedulePatternEvents(events: Array<{ instrumentId: number; note: string; duration: number; time: string; velocity: number; config: InstrumentConfig }>): void {
     // Clear any existing events for this pattern
     Tone.getTransport().cancel();
 
@@ -2733,19 +2809,20 @@ export class ToneEngine {
         } else if (instrument instanceof JC303Synth) {
           // TB303 has its own release method
           instrument.releaseAll();
-        } else if (instrument.releaseAll) {
+        } else if ((instrument as any).releaseAll) {
           // Synths and Samplers use releaseAll()
-          instrument.releaseAll(now);
+          (instrument as any).releaseAll(now);
         } else if (isDevilboxSynth(instrument) && instrument.triggerRelease) {
           // DevilboxSynths don't have releaseAll(), use triggerRelease()
-          instrument.triggerRelease(undefined, now);
+          instrument.triggerRelease!(undefined, now);
         }
 
         // CRITICAL: Force immediate silence by ramping volume to -Infinity
         // This prevents long release tails from continuing to sound
-        if (instrument.volume && typeof instrument.volume.rampTo === 'function') {
-          const currentVolume = instrument.volume.value;
-          instrument.volume.rampTo(-Infinity, 0.05, now); // 50ms fade out
+        const instAny = instrument as any;
+        if (instAny.volume && typeof instAny.volume.rampTo === 'function') {
+          const currentVolume = instAny.volume.value;
+          instAny.volume.rampTo(-Infinity, 0.05, now); // 50ms fade out
           // Cancel any pending restore for this key to prevent race conditions
           const prevTimeout = this.releaseRestoreTimeouts.get(key);
           if (prevTimeout) clearTimeout(prevTimeout);
@@ -2753,8 +2830,8 @@ export class ToneEngine {
           const timeout = setTimeout(() => {
             this.releaseRestoreTimeouts.delete(key);
             try {
-              if (instrument.volume) {
-                instrument.volume.value = currentVolume;
+              if (instAny.volume) {
+                instAny.volume.value = currentVolume;
               }
             } catch {
               // Instrument may be disposed
@@ -2807,11 +2884,11 @@ export class ToneEngine {
 
       // Release all notes on this synth before disposal
       try {
-        if (!instrument.disposed) {
-          if (instrument.releaseAll) instrument.releaseAll();
-          else if (instrument.triggerRelease) instrument.triggerRelease();
+        if (!(instrument as any).disposed) {
+          if ((instrument as any).releaseAll) (instrument as any).releaseAll();
+          else if ((instrument as any).triggerRelease) (instrument as any).triggerRelease();
         }
-      } catch (e) {
+      } catch {
         // Ignore release errors
       }
 
@@ -2820,10 +2897,10 @@ export class ToneEngine {
 
       // Dispose the synth itself
       try {
-        if (!instrument.disposed) {
+        if (!(instrument as any).disposed) {
           instrument.dispose();
         }
-      } catch (e) {
+      } catch {
         // Already disposed
       }
     }
@@ -2952,7 +3029,7 @@ export class ToneEngine {
     // Note: We create a fresh factory instance inside the offline context
     const result = await Tone.Offline(async () => {
       // Create the instrument in the offline context
-      const instrument = InstrumentFactory.createInstrument(config) as any;
+      const instrument = InstrumentFactory.createInstrument(config) as Tone.ToneAudioNode | DevilboxSynth;
       
       // Create effects chain if present
       if (config.effects && config.effects.length > 0) {
@@ -2960,35 +3037,35 @@ export class ToneEngine {
         let firstNode: Tone.ToneAudioNode;
         if (isDevilboxSynth(instrument)) {
           const bridge = new Tone.Gain(1);
-          const nativeBridge = getNativeAudioNode(bridge);
+          const nativeBridge = getNativeAudioNode(bridge as any);
           if (nativeBridge) instrument.output.connect(nativeBridge);
           firstNode = bridge;
         } else {
-          firstNode = instrument;
+          firstNode = instrument as Tone.ToneAudioNode;
         }
         let lastNode = firstNode;
         for (const effect of effects) {
-          lastNode.connect(effect);
-          lastNode = effect;
+          lastNode.connect(effect as Tone.ToneAudioNode);
+          lastNode = effect as Tone.ToneAudioNode;
         }
         lastNode.toDestination();
       } else {
         if (isDevilboxSynth(instrument)) {
           const bridge = new Tone.Gain(1);
-          const nativeBridge = getNativeAudioNode(bridge);
+          const nativeBridge = getNativeAudioNode(bridge as any);
           if (nativeBridge) instrument.output.connect(nativeBridge);
           bridge.toDestination();
         } else {
-          instrument.toDestination();
+          (instrument as Tone.ToneAudioNode).toDestination();
         }
       }
 
       // Trigger the specific note
-      if (instrument.triggerAttack) {
-        instrument.triggerAttack(note, 0);
+      if ((instrument as any).triggerAttack) {
+        (instrument as any).triggerAttack(note, 0);
         // Release after 1 second to allow for decay/release
-        if (instrument.triggerRelease) {
-          instrument.triggerRelease(1);
+        if ((instrument as any).triggerRelease) {
+          (instrument as any).triggerRelease(1);
         }
       }
 
@@ -3065,11 +3142,11 @@ export class ToneEngine {
     }
 
     // Find all FurnaceDispatchSynth instances for this instrument
-    const synths: any[] = [];
+    const synths: Array<{ uploadInstrumentData: (data: Uint8Array) => void }> = [];
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && (instrument as any).uploadInstrumentData) {
-        synths.push(instrument);
+      if (idPart === String(instrumentId) && (instrument as unknown as { uploadInstrumentData?: unknown }).uploadInstrumentData) {
+        synths.push(instrument as unknown as { uploadInstrumentData: (data: Uint8Array) => void });
       }
     });
 
@@ -3102,7 +3179,7 @@ export class ToneEngine {
     const key = this.getInstrumentKey(instrumentId, -1);
     const instrument = this.instruments.get(key);
     if (instrument instanceof MAMESynth) {
-      return (instrument as any).getHandle();
+      return (instrument as unknown as { getHandle: () => number }).getHandle();
     }
     return 0;
   }
@@ -3129,12 +3206,13 @@ export class ToneEngine {
   /**
    * Update MAME parameters in real-time
    */
-  public updateMAMEParameters(instrumentId: number, _config: Partial<import('@typedefs/instrument').MAMEConfig>): void {
+  public updateMAMEParameters(instrumentId: number, config: Partial<import('@typedefs/instrument').MAMEConfig>): void {
     const key = this.getInstrumentKey(instrumentId, -1);
     const instrument = this.instruments.get(key);
     if (instrument instanceof MAMESynth) {
       // MAMESynth instances are typically updated via register writes
-      // but we can apply global config changes like clock if needed
+      // Apply global config changes like clock if provided
+      void config; // Reserved for future per-register update support
     }
   }
 
@@ -3148,8 +3226,9 @@ export class ToneEngine {
     const instrumentKey = this.getInstrumentKey(instrumentId, -1);
     const instrument = this.instruments.get(instrumentKey);
     if (!instrument) return;
-    if (typeof (instrument as any).setParam === 'function') {
-      (instrument as any).setParam(key, value);
+    const inst = instrument as unknown as { setParam?: (key: string, value: number) => void };
+    if (typeof inst.setParam === 'function') {
+      inst.setParam(key, value);
     }
   }
 
@@ -3162,8 +3241,9 @@ export class ToneEngine {
     const instrumentKey = this.getInstrumentKey(instrumentId, -1);
     const instrument = this.instruments.get(instrumentKey);
     if (!instrument) return;
-    if (typeof (instrument as any).loadPreset === 'function') {
-      (instrument as any).loadPreset(program);
+    const inst = instrument as unknown as { loadPreset?: (program: number) => void };
+    if (typeof inst.loadPreset === 'function') {
+      inst.loadPreset(program);
     }
   }
 
@@ -3174,22 +3254,54 @@ export class ToneEngine {
     const instrumentKey = this.getInstrumentKey(instrumentId, -1);
     const instrument = this.instruments.get(instrumentKey);
     if (!instrument) return;
-    if (typeof (instrument as any).setTextParam === 'function') {
-      (instrument as any).setTextParam(key, value);
-    } else if (typeof (instrument as any).applyConfig === 'function') {
-      (instrument as any).applyConfig({ [key]: value });
+    const inst = instrument as unknown as { setTextParam?: (key: string, value: string) => void; applyConfig?: (config: Record<string, string>) => void };
+    if (typeof inst.setTextParam === 'function') {
+      inst.setTextParam(key, value);
+    } else if (typeof inst.applyConfig === 'function') {
+      inst.applyConfig({ [key]: value });
     }
   }
 
   /**
    * Trigger text-to-speech on a MAME speech chip synth.
+   * Lazily creates the instrument if it hasn't been preloaded into the engine yet.
    */
   public speakMAMEChipText(instrumentId: number, text: string): void {
     const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(instrumentKey);
-    if (!instrument) return;
-    if (typeof (instrument as any).speakText === 'function') {
-      (instrument as any).speakText(text);
+    let instrument = this.instruments.get(instrumentKey);
+
+    // If instrument not in engine map, create it on-demand from the instrument store
+    if (!instrument) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { useInstrumentStore } = require('../stores/useInstrumentStore');
+        const config = useInstrumentStore.getState().instruments.find(
+          (i: InstrumentConfig) => i.id === instrumentId
+        );
+        if (config) {
+          console.log(`[ToneEngine] speakMAMEChipText: creating instrument on-demand for id=${instrumentId}, type=${config.synthType}`);
+          instrument = this.getInstrument(instrumentId, config) ?? undefined;
+        }
+      } catch (_err) {
+        console.warn('[ToneEngine] speakMAMEChipText: failed to lazy-create instrument:', _err);
+      }
+    }
+
+    if (!instrument) {
+      console.warn(`[ToneEngine] speakMAMEChipText: no instrument config found for id=${instrumentId}`);
+      return;
+    }
+
+    const synth = instrument as unknown as { speakText?: (text: string) => void; _isReady?: boolean; workletNode?: unknown };
+    if (typeof synth.speakText === 'function') {
+      console.log(
+        `[ToneEngine] speakMAMEChipText: key="${instrumentKey}", ` +
+        `ready=${synth._isReady ?? '?'}, worklet=${!!synth.workletNode}, ` +
+        `ctxState=${this._nativeContext?.state ?? '?'}`
+      );
+      synth.speakText(text);
+    } else {
+      console.warn(`[ToneEngine] speakMAMEChipText: instrument key="${instrumentKey}" has no speakText method`);
     }
   }
 
@@ -3202,7 +3314,7 @@ export class ToneEngine {
     const instrument = this.instruments.get(instrumentKey);
     if (!instrument) return;
 
-    const synth = instrument as any;
+    const synth = instrument as unknown as { loadROM?: (bank: number, data: Uint8Array) => void; loadWaveROM?: (buffer: ArrayBuffer) => void; setRom?: (bank: number, data: Uint8Array) => void };
 
     if (synthType === 'MAMERSA') {
       // RdPianoSynth / D50Synth: loadROM(romId, data)
@@ -3212,7 +3324,7 @@ export class ToneEngine {
     } else if (synthType === 'MAMESWP30') {
       // MU2000Synth: loadWaveROM(data) - single ROM bank
       if (typeof synth.loadWaveROM === 'function') {
-        synth.loadWaveROM(data.buffer);
+        synth.loadWaveROM(data.buffer as ArrayBuffer);
       }
     } else {
       // Generic fallback: try loadROM, then setRom
@@ -3233,8 +3345,8 @@ export class ToneEngine {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
         // Use feature detection for more reliable check across HMR/bundling
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
           found = true;
         }
       }
@@ -3251,8 +3363,8 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
       }
     });
@@ -3265,8 +3377,8 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && (instrument as any).name === 'V2Synth') {
-          const v2 = instrument as any;
+        if (instrument && (instrument as unknown as { name?: string }).name === 'V2Synth') {
+          const v2 = instrument as unknown as { setParameter: (index: number, value: number) => void };
           
           // Ground Truth Mapping from V2 v2defs.cpp / Params[]
           
@@ -3352,8 +3464,8 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
       }
     });
@@ -3362,12 +3474,13 @@ export class ToneEngine {
   /**
    * Update Furnace parameters in real-time
    */
-  public updateFurnaceParameters(instrumentId: number, _config: NonNullable<InstrumentConfig['furnace']>): void {
+  public updateFurnaceParameters(instrumentId: number, config: NonNullable<InstrumentConfig['furnace']>): void {
+    void config; // Reserved for future direct parameter update support
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).updateParameters === 'function') {
-          (instrument as any).updateParameters();
+        if (instrument && typeof (instrument as unknown as { updateParameters?: unknown }).updateParameters === 'function') {
+          (instrument as unknown as { updateParameters: () => void }).updateParameters();
         }
       }
     });
@@ -3625,8 +3738,8 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
       }
     });
@@ -3639,8 +3752,8 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
       }
     });
@@ -3649,12 +3762,12 @@ export class ToneEngine {
   /**
    * Generic method to update complex synths that use the applyConfig pattern
    */
-  public updateComplexSynthParameters(instrumentId: number, config: any): void {
+  public updateComplexSynthParameters(instrumentId: number, config: unknown): void {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).applyConfig === 'function') {
-          (instrument as any).applyConfig(config);
+        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
+          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
       }
     });
@@ -3669,19 +3782,20 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart !== String(instrumentId)) return;
+      const inst = instrument as any;
 
       // Update oscillator type (discrete, no ramp needed)
-      if (config.oscillator?.type && instrument.oscillator) {
+      if (config.oscillator?.type && inst.oscillator) {
         try {
           const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-          instrument.oscillator.type = type;
+          inst.oscillator.type = type;
         } catch { /* PolySynth wraps oscillator differently */ }
       }
       // PolySynth: update via .set()
       if (instrument instanceof Tone.PolySynth && config.oscillator?.type) {
         try {
           const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-          instrument.set({ oscillator: { type: type as any } });
+          instrument.set({ oscillator: { type: type as Tone.ToneOscillatorType } } as any);
         } catch { /* ignore */ }
       }
 
@@ -3698,34 +3812,34 @@ export class ToneEngine {
                 release: (env.release ?? 1000) / 1000,
               }
             });
-          } else if (instrument.envelope) {
-            instrument.envelope.attack = (env.attack ?? 10) / 1000;
-            instrument.envelope.decay = (env.decay ?? 200) / 1000;
-            instrument.envelope.sustain = (env.sustain ?? 50) / 100;
-            instrument.envelope.release = (env.release ?? 1000) / 1000;
+          } else if (inst.envelope) {
+            inst.envelope.attack = (env.attack ?? 10) / 1000;
+            inst.envelope.decay = (env.decay ?? 200) / 1000;
+            inst.envelope.sustain = (env.sustain ?? 50) / 100;
+            inst.envelope.release = (env.release ?? 1000) / 1000;
           }
         } catch { /* ignore */ }
       }
 
       // Update filter (with ramp)
-      if (config.filter && instrument.filter) {
+      if (config.filter && inst.filter) {
         try {
           if (config.filter.frequency !== undefined) {
-            instrument.filter.frequency.rampTo(config.filter.frequency, R);
+            inst.filter.frequency.rampTo(config.filter.frequency, R);
           }
           if (config.filter.Q !== undefined) {
-            instrument.filter.Q.rampTo(config.filter.Q, R);
+            inst.filter.Q.rampTo(config.filter.Q, R);
           }
           if (config.filter.type) {
-            instrument.filter.type = config.filter.type;
+            inst.filter.type = config.filter.type;
           }
         } catch { /* ignore */ }
       }
 
       // Update volume (with ramp)
-      if (config.volume !== undefined && instrument.volume) {
+      if (config.volume !== undefined && inst.volume) {
         try {
-          instrument.volume.rampTo(config.volume, R);
+          inst.volume.rampTo(config.volume, R);
         } catch { /* ignore */ }
       }
     });
@@ -3738,9 +3852,10 @@ export class ToneEngine {
     this.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
       if (idPart === String(instrumentId)) {
-        if (instrument && typeof (instrument as any).setParameter === 'function') {
+        const inst = instrument as unknown as { setParameter?: (index: number, value: number) => void };
+        if (instrument && typeof inst.setParameter === 'function') {
           Object.entries(buzzmachine.parameters).forEach(([index, value]) => {
-            (instrument as any).setParameter(Number(index), value);
+            inst.setParameter!(Number(index), value);
           });
         }
       }
@@ -3767,13 +3882,13 @@ export class ToneEngine {
       return;
     }
 
-    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some((fx: any) => fx.enabled && fx.type === 'neural');
+    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some((fx: { enabled: boolean; type: string }) => fx.enabled && fx.type === 'neural');
 
     // Update all instances
     for (const synth of synths) {
       if (hasNeuralEffect) {
         // Find first enabled neural effect
-        const neuralEffect = pedalboard.chain.find((fx: any) => fx.enabled && fx.type === 'neural');
+        const neuralEffect = pedalboard.chain.find((fx: { enabled: boolean; type: string }) => fx.enabled && fx.type === 'neural');
         if (neuralEffect && neuralEffect.modelIndex !== undefined) {
           try {
             // Load GuitarML model and enable
@@ -4162,7 +4277,7 @@ export class ToneEngine {
       } else {
         instrument.disconnect();
       }
-    } catch (e) {
+    } catch {
       // May not be connected
     }
 
@@ -4182,22 +4297,22 @@ export class ToneEngine {
   ): void {
     // Find the chain - for throws, we typically look at the base instrument chain (-1)
     // or iterate all channels if it's a live instrument
-    const chains: any[] = [];
+    const chains: Array<{ effects: Tone.ToneAudioNode[]; output: Tone.Gain }> = [];
     this.instrumentEffectChains.forEach((chain, chainKey) => {
       const [idPart] = String(chainKey).split('-');
       if (idPart === String(instrumentId)) {
         chains.push(chain);
       }
     });
-    
+
     if (chains.length === 0) return;
 
     chains.forEach(chain => {
       // Find the target effect node in the chain
-      const targetFx = chain.effects.find((fx: any) => fx._fxType === effectType);
+      const targetFx = chain.effects.find((fx) => (fx as unknown as { _fxType?: string })._fxType === effectType);
 
-      if (targetFx && (targetFx as any).wet) {
-        const wetParam = (targetFx as any).wet as Tone.Param<"normalRange">;
+      if (targetFx && 'wet' in targetFx) {
+        const wetParam = (targetFx as unknown as { wet: Tone.Param<"normalRange"> }).wet;
         const now = Tone.immediate();
         
         // Ramp up instantly (10ms)
@@ -4389,7 +4504,7 @@ export class ToneEngine {
       case 'Distortion':
         if (node instanceof Tone.Distortion) {
           if ('drive' in changed) node.distortion = changed.drive as number;
-          if ('oversample' in changed) node.oversample = changed.oversample as any;
+          if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
         }
         break;
 
@@ -4532,19 +4647,21 @@ export class ToneEngine {
 
       case 'BiPhase':
         if (node instanceof BiPhaseEffect) {
-          if ('rateA' in changed) (node as any).rateA = Number(changed.rateA);
-          if ('depthA' in changed) (node as any).depthA = Number(changed.depthA);
-          if ('rateB' in changed) (node as any).rateB = Number(changed.rateB);
-          if ('depthB' in changed) (node as any).depthB = Number(changed.depthB);
-          if ('feedback' in changed) (node as any).feedback = Number(changed.feedback);
+          const biPhase = node as unknown as { rateA: number; depthA: number; rateB: number; depthB: number; feedback: number };
+          if ('rateA' in changed) biPhase.rateA = Number(changed.rateA);
+          if ('depthA' in changed) biPhase.depthA = Number(changed.depthA);
+          if ('rateB' in changed) biPhase.rateB = Number(changed.rateB);
+          if ('depthB' in changed) biPhase.depthB = Number(changed.depthB);
+          if ('feedback' in changed) biPhase.feedback = Number(changed.feedback);
         }
         break;
 
       case 'DubFilter':
         if (node instanceof DubFilterEffect) {
-          if ('cutoff' in changed) (node as any).cutoff = Number(changed.cutoff);
-          if ('resonance' in changed) (node as any).resonance = Number(changed.resonance);
-          if ('gain' in changed) (node as any).gain = Number(changed.gain);
+          const dubFilter = node as unknown as { cutoff: number; resonance: number; gain: number };
+          if ('cutoff' in changed) dubFilter.cutoff = Number(changed.cutoff);
+          if ('resonance' in changed) dubFilter.resonance = Number(changed.resonance);
+          if ('gain' in changed) dubFilter.gain = Number(changed.gain);
         }
         break;
 
@@ -4646,7 +4763,7 @@ export class ToneEngine {
       this.instrumentEffectChains.forEach((chain, key) => {
         // key format: "instrumentId-channelIndex" or just instrumentId
         const instrumentId = typeof key === 'number' ? key : Number(String(key).split('-')[0]);
-        const instrument = instruments.find((inst: any) => inst.id === instrumentId);
+        const instrument = instruments.find((inst: { id: number }) => inst.id === instrumentId);
         if (!instrument?.effects) return;
 
         const enabledEffects = instrument.effects.filter((fx: EffectConfig) => fx.enabled);
@@ -4715,7 +4832,7 @@ export class ToneEngine {
           break;
         case 'BiPhase':
           if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
-            (node as any).rateA = value;
+            (node as unknown as { rateA: number }).rateA = value;
           }
           break;
       }
@@ -4757,14 +4874,14 @@ export class ToneEngine {
   /**
    * Create a new voice chain for a note
    */
-  private createVoice(channelIndex: number, instrument: any, note: string, config: InstrumentConfig): VoiceState {
+  private createVoice(channelIndex: number, instrument: Tone.ToneAudioNode | DevilboxSynth, note: string, config: InstrumentConfig): VoiceState {
     const channelOutput = this.channelOutputs.get(channelIndex);
     if (!channelOutput) throw new Error(`Channel ${channelIndex} not initialized`);
 
     const gain = new Tone.Gain(1);
     
     // Hardware Quirk: Use IT-specific high-fidelity filter for IT modules
-    let filter: any;
+    let filter: Tone.Filter | AudioWorkletNode;
     const isIT = config.metadata?.importedFrom === 'IT';
     
     if (isIT && ToneEngine.itFilterWorkletLoaded) {
@@ -4970,9 +5087,10 @@ export class ToneEngine {
       // position 0x00..0x80
       const buffer = player.buffer;
       if (buffer.loaded) {
-        const originalLoopStart = (player as any)._originalLoopStart ?? player.loopStart;
-        if ((player as any)._originalLoopStart === undefined) {
-          (player as any)._originalLoopStart = player.loopStart;
+        const playerExt = player as unknown as { _originalLoopStart?: number };
+        const originalLoopStart = playerExt._originalLoopStart ?? player.loopStart;
+        if (playerExt._originalLoopStart === undefined) {
+          playerExt._originalLoopStart = player.loopStart as number;
         }
 
         // Shift loopStart based on position (approximate behavior)
@@ -5036,12 +5154,12 @@ export class ToneEngine {
   /**
    * Helper to apply pitch multiplier to a specific Tone node
    */
-  private applyPitchToNode(node: any, pitchMultiplier: number, baseRate: number, instrumentKey: string): void {
+  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: string): void {
     const synthType = this.instrumentSynthTypes.get(instrumentKey);
     const cents = 1200 * Math.log2(pitchMultiplier);
 
     if (node instanceof Tone.Player || node instanceof Tone.GrainPlayer) {
-      (node as any).playbackRate = baseRate * pitchMultiplier;
+      (node as unknown as { playbackRate: number }).playbackRate = baseRate * pitchMultiplier;
     } else if (synthType === 'Sampler') {
       if (node.detune !== undefined) node.detune.value = cents;
     } else {
@@ -5260,11 +5378,9 @@ export class ToneEngine {
     this.currentPerformanceQuality = quality;
 
     // Update all TB-303 synths (can reconfigure dynamically)
-    let tb303Count = 0;
-    this.instruments.forEach((instrument, _key) => {
+    this.instruments.forEach((instrument) => {
       if (instrument instanceof JC303Synth) {
         instrument.setQuality(quality);
-        tb303Count++;
       }
     });
 
@@ -5274,7 +5390,7 @@ export class ToneEngine {
       key: string;
       instrumentId: number;
       channelIndex: number | undefined;
-      config: any;
+      config: { synthType: string };
     }> = [];
 
     this.instruments.forEach((instrument, key) => {
@@ -5379,8 +5495,9 @@ export class ToneEngine {
         } else {
           // Pitch modulation (Additive semitones)
           const semitoneOffset = (envPitch - 32) / 32 * 12; // +/- 12 semitones
-          if ((voice.instrument as any).detune !== undefined) {
-            (voice.instrument as any).detune.value = semitoneOffset * 100;
+          const instWithDetune = voice.instrument as unknown as { detune?: { value: number } };
+          if (instWithDetune.detune !== undefined) {
+            instWithDetune.detune.value = semitoneOffset * 100;
           }
         }
       }
