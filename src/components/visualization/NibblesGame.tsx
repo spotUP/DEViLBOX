@@ -21,6 +21,11 @@ const BEAT_DETECTION_THRESHOLD = 15;
 const BEAT_INTENSITY_SCALE = 30;
 const BEAT_DECAY_RATE = 0.05;
 
+// Music visualization tuning
+const MIN_VISUALIZATION_INTENSITY = 0.05; // Skip tiles below 5% intensity
+const MIN_TILE_ALPHA = 0.2; // Minimum opacity for background tiles
+const ALPHA_INTENSITY_RANGE = 0.4; // Additional opacity based on intensity (max = 0.6)
+
 // Grid rendering
 const GRID_CELL_PADDING = 2;
 
@@ -39,6 +44,26 @@ const PALETTE = [
   '#434343', // 10
   '#D3D3D3', // 11
   '#FFFF00', // 12
+];
+
+// Music visualization tiles
+const TILE_COLORS = [
+  '#1a1a2e', // Dark blue (bass)
+  '#16213e',
+  '#0f3460',
+  '#533483', // Purple (mid-bass)
+  '#7b2cbf',
+  '#9d4edd', // Bright purple (mids)
+  '#c77dff',
+  '#e0aaff', // Light purple (high-mids)
+  '#ff006e', // Pink (treble)
+  '#fb5607', // Orange
+  '#ffbe0b', // Yellow
+  '#8ac926', // Green
+  '#1982c4', // Blue
+  '#6a4c93', // Purple
+  '#06ffa5', // Cyan
+  '#fffb00', // Bright yellow (high treble)
 ];
 
 type Coord = { x: number; y: number };
@@ -74,14 +99,13 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const [nameEntryLevel, setNameEntryLevel] = useState(0);
   const [nameInput, setNameInput] = useState('');
 
-  // Audio reactivity state (used in future tasks)
-  // @ts-expect-error - audioData will be used in Task 2 for background tile rendering
+  // Audio reactivity state
   const [audioData, setAudioData] = useState<Uint8Array>(new Uint8Array(128));
   // @ts-expect-error - beatIntensity will be used in Task 3 for beat-synced effects
   const [beatIntensity, setBeatIntensity] = useState(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const previousVolumeRef = useRef(0);
-  const audioBufferRef = useRef<Uint8Array | null>(null);
+  const audioBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
@@ -160,7 +184,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
     // Reuse buffer to avoid allocation on every frame
     if (!audioBufferRef.current || audioBufferRef.current.length !== analyser.frequencyBinCount) {
-      audioBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+      audioBufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
     }
     analyser.getByteFrequencyData(audioBufferRef.current);
     setAudioData(audioBufferRef.current);
@@ -264,6 +288,44 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   }, [numPlayers, surround, spawnFood]);
 
   // Handle Game Over
+  // Render music-reactive background tiles
+  const renderBackgroundTiles = useCallback((
+    ctx: CanvasRenderingContext2D,
+    cellSize: number
+  ) => {
+    if (!audioData || audioData.length === 0) return;
+
+    const cols = WIDTH;
+    const rows = HEIGHT;
+
+    for (let x = 0; x < cols; x++) {
+      // Compute per-column values once
+      const bandIndex = Math.floor((x / cols) * audioData.length);
+      const intensity = audioData[bandIndex] / 255;
+
+      if (intensity <= MIN_VISUALIZATION_INTENSITY) continue; // Skip early
+
+      const barHeight = Math.floor(intensity * rows);
+      const colorIndex = Math.min(
+        Math.floor((bandIndex / audioData.length) * TILE_COLORS.length),
+        TILE_COLORS.length - 1
+      );
+      const color = TILE_COLORS[colorIndex];
+      const alpha = MIN_TILE_ALPHA + (intensity * ALPHA_INTENSITY_RANGE);
+      const px = x * cellSize;
+
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+
+      // Only iterate y values that need drawing
+      for (let y = rows - barHeight; y < rows; y++) {
+        const py = y * cellSize;
+        ctx.fillRect(px, py, cellSize, cellSize);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }, [audioData]);
+
   const handleGameOver = useCallback(async () => {
     setIsPlaying(false);
 
@@ -598,6 +660,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       const offsetX = (canvas.width - playWidth) / 2;
       const offsetY = (canvas.height - playHeight) / 2;
 
+      // Draw music-reactive background tiles
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      renderBackgroundTiles(ctx, cellSize);
+      ctx.restore();
+
       // Draw playfield border
       ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan-500/30
       ctx.lineWidth = 2;
@@ -646,7 +714,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       isRunning = false;
       if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
     };
-  }, [grid, uiState.showMenu, uiState.showHighScores]);
+  }, [grid, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles]);
 
   // Initial Level Load (only once on mount)
   useEffect(() => {
