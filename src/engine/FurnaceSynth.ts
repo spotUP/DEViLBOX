@@ -207,7 +207,7 @@ export class FurnaceSynth implements DevilboxSynth {
         debugData: {
           chipType: this.config.chipType,
           channelIndex: this.channelIndex,
-          synthConfig: this.config as Record<string, unknown>,
+          synthConfig: this.config as unknown as Record<string, unknown>,
         },
       }
     );
@@ -494,12 +494,12 @@ export class FurnaceSynth implements DevilboxSynth {
       const opOffsets = [0x00, 0x08, 0x04, 0x0C];
       const opOff = opOffsets[opIndex] + chanOffset;
       // 0x50: RS (bits 6-7), AR (bits 0-4)
-      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x50 + opOff), ((op.rs & 3) << 6) | (ar & 0x1F));
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x50 + opOff), (((op.rs ?? 0) & 3) << 6) | (ar & 0x1F));
     } else if (this.config.chipType === FurnaceChipType.OPM || this.config.chipType === FurnaceChipType.OPZ) { // OPM (1) / OPZ (22)
       const opOffsets = [0x00, 0x10, 0x08, 0x18];
       const opOff = opOffsets[opIndex] + (chan & 7);
       const chip = this.config.chipType;
-      this.chipEngine.write(chip, 0x80 + opOff, ((op.rs & 3) << 6) | (ar & 0x1F));
+      this.chipEngine.write(chip, 0x80 + opOff, (((op.rs ?? 0) & 3) << 6) | (ar & 0x1F));
     }
   }
 

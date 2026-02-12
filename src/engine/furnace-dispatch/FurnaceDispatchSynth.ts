@@ -135,7 +135,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
     // the 0xF0 0xB1 format with proper offsets. Our encoder handles this conversion.
     const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
-    const binaryData = updateFurnaceInstrument(config as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
+    const binaryData = updateFurnaceInstrument(config as unknown as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
     this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
   }

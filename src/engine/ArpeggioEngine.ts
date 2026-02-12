@@ -276,8 +276,8 @@ export class ArpeggioEngine {
     // Create and start the loop
     const interval = this.getInterval();
 
-    this.loop = new Tone.Loop((time) => {
-      this.processStep(time);
+    this.loop = new Tone.Loop(() => {
+      this.processStep();
     }, interval);
 
     this.loop.start(0);

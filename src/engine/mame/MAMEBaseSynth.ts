@@ -180,7 +180,8 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
       case 'oscData':
         // Oscilloscope data from worklet
         if (data.buffer) {
-          this.oscBuffer = new Float32Array(data.buffer);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          this.oscBuffer = new Float32Array(data.buffer as any);
           this.oscCallbacks.forEach(cb => cb(this.oscBuffer!));
         }
         break;
