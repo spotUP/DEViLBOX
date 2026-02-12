@@ -49,17 +49,18 @@ export class ITHandler extends S3MHandler {
         result.setChannelVolume = state.channelVolume;
         break;
 
-      case 'N':
+      case 'N': {
         // Nxy: Channel Volume Slide
         if (param > 0) state.lastChannelVolumeSlide = param;
         const curParam = param > 0 ? param : (state.lastChannelVolumeSlide ?? 0);
-        this.activeEffects.set(_channel, { 
-          type: 'channelVolSlide', 
-          param: curParam, 
-          x: (curParam >> 4) & 0x0F, 
-          y: curParam & 0x0F 
+        this.activeEffects.set(_channel, {
+          type: 'channelVolSlide',
+          param: curParam,
+          x: (curParam >> 4) & 0x0F,
+          y: curParam & 0x0F
         });
         break;
+      }
 
       case 'Z':
         if (param <= 0x7F) {
@@ -97,8 +98,9 @@ export class ITHandler extends S3MHandler {
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
       
-      const defaultVol = (state as any).sampleDefaultVolume ?? 64;
-      const defaultFinetune = (state as any).sampleDefaultFinetune ?? 0;
+      const stateExt = state as unknown as Record<string, number | undefined>;
+      const defaultVol = stateExt.sampleDefaultVolume ?? 64;
+      const defaultFinetune = stateExt.sampleDefaultFinetune ?? 0;
 
       // In IT, instrument change resets volume if no volume column/effect override
       // (This is an approximation of IT's complex instrument mode)
@@ -161,7 +163,7 @@ export class ITHandler extends S3MHandler {
     const result = super.processTick(channel, tick, state);
 
     // IT Specific: Process Channel Volume Slide (Nxy)
-    const activeEffect = (this as any).activeEffects.get(channel);
+    const activeEffect = this.activeEffects.get(channel);
     if (activeEffect && activeEffect.type === 'channelVolSlide') {
       const { x, y } = activeEffect;
       

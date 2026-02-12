@@ -186,7 +186,8 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
 
   clearMIDIMapping: (padId: string) => {
     set((state) => {
-      const { [padId]: _, ...rest } = state.midiMappings;
+      const { [padId]: removedMapping, ...rest } = state.midiMappings;
+      void removedMapping;
       return { midiMappings: rest };
     });
     get().saveToStorage();

@@ -45,7 +45,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
     const { name: _name, type: _type, synthType: _synthType, ...config } = preset;
     void _name; void _type; void _synthType;
     
-    onChange(config as any);
+    onChange(config as Partial<InstrumentConfig>);
     setIsOpen(false);
   };
 

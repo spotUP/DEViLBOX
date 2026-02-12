@@ -673,8 +673,8 @@ export class BuzzmachineEngine {
       // Extract native context from Tone.js wrapper
       // Try direct property access first (matches Open303Synth pattern),
       // then fall back to BFS search via getNativeContext
-      const ctx = context as any;
-      const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
+      const ctx = context as unknown as Record<string, unknown>;
+      const nativeCtx = (ctx.rawContext || ctx._context || getNativeContext(context)) as AudioContext;
       this.nativeContext = nativeCtx;
 
       // Check if we got a valid context with AudioWorklet
@@ -693,7 +693,7 @@ export class BuzzmachineEngine {
         } catch {
           // Ignore resume errors
         }
-        if (nativeCtx.state !== 'running') {
+        if ((nativeCtx.state as string) !== 'running') {
           console.log('[BuzzmachineEngine] Waiting up to 5s for AudioContext to start...');
           const started = await Promise.race([
             new Promise<boolean>((resolve) => {
@@ -747,8 +747,8 @@ export class BuzzmachineEngine {
     }
 
     // Use native AudioWorkletNode directly (addModule was called on the native context)
-    const ctx = context as any;
-    const nativeCtx = ctx.rawContext || ctx._context || getNativeContext(context);
+    const ctx = context as unknown as Record<string, unknown>;
+    const nativeCtx = (ctx.rawContext || ctx._context || getNativeContext(context)) as AudioContext;
     const workletNode = new AudioWorkletNode(nativeCtx, 'buzzmachine-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 1,

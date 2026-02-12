@@ -198,7 +198,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(releaseX - 5, 5, 10, 10);
     }
-  }, [macro, minValue, maxValue, color, bipolar]);
+  }, [macro, minValue, maxValue, color, bipolar, canvasWidth, height]);
 
   useEffect(() => {
     drawMacro();
@@ -414,7 +414,7 @@ interface MacroListEditorProps {
 export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   macros,
   onChange,
-  chipType: _chipType = 0,  // Reserved for future chip-specific macro ranges
+  // chipType reserved for future chip-specific macro ranges
 }) => {
   const [expandedMacro, setExpandedMacro] = useState<number | null>(null);
 

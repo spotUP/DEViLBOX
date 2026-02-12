@@ -14,9 +14,11 @@ export interface PianoRollNote {
   velocity: number;          // Velocity (0-127)
   instrument: number | null; // Instrument number
 
-  // TB-303 specific properties
+  // TB-303 / TT-303 specific properties
   slide?: boolean;           // Slide/legato - pitch glides from previous note without retriggering
   accent?: boolean;          // Accent - boosts filter cutoff and volume
+  hammer?: boolean;          // Hammer-on - legato without pitch glide (TT-303)
+  mute?: boolean;            // Mute - step is silent but data preserved (TT-303)
 }
 
 /**
@@ -104,7 +106,7 @@ export const DEFAULT_PIANO_ROLL_VIEW: PianoRollViewState = {
   horizontalZoom: 16,        // 16 pixels per row
   verticalZoom: 12,          // 12 pixels per semitone
   scrollX: 0,
-  scrollY: 48,               // Start around C4
+  scrollY: 0,                // Start at C4 (middle C) at top, showing down to ~C1
   snapToGrid: true,
   gridDivision: 4,           // Quarter note grid
   showVelocity: true,

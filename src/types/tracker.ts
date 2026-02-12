@@ -255,7 +255,7 @@ export interface FurnaceInstrumentData {
   wavetables: FurnaceWavetableData[];
 
   // Chip-specific config (optional)
-  chipConfig?: Record<string, any>;
+  chipConfig?: Record<string, unknown>;
 }
 
 export interface ParsedInstrument {

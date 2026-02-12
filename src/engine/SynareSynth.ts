@@ -197,7 +197,8 @@ export class SynareSynth implements DevilboxSynth {
   }
 
   // Update methods
-  updateParameter(_key: string, _value: any) {
+  updateParameter(key: string, value: number) {
+    void key; void value;
     // Basic dynamic update
     this.applyConfig(this.config);
   }

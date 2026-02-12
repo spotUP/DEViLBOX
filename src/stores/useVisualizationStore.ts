@@ -63,7 +63,7 @@ interface VisualizationState {
   clearSamplePosition: (instrumentId: number) => void;
 }
 
-export const useVisualizationStore = create<VisualizationState>((set, _get) => ({
+export const useVisualizationStore = create<VisualizationState>((set) => ({
   activeNotes: new Map(),
   adsrStages: new Map(),
   adsrProgress: new Map(),

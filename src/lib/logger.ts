@@ -44,7 +44,7 @@ export const debugGroup = isDev
       fn();
       console.groupEnd();
     }
-  : (_label: string, _fn: () => void) => {};
+  : (() => {}) as (label: string, fn: () => void) => void;
 
 /**
  * Performance timing - Only in development
@@ -52,18 +52,18 @@ export const debugGroup = isDev
  */
 export const debugTime = isDev
   ? (label: string) => console.time(label)
-  : (_label: string) => {};
+  : (() => {}) as (label: string) => void;
 
 export const debugTimeEnd = isDev
   ? (label: string) => console.timeEnd(label)
-  : (_label: string) => {};
+  : (() => {}) as (label: string) => void;
 
 /**
  * Table output for debugging - Only in development
  */
 export const debugTable = isDev
   ? (data: unknown) => console.table(data)
-  : (_data: unknown) => {};
+  : (() => {}) as (data: unknown) => void;
 
 export default {
   debug,

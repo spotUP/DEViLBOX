@@ -207,7 +207,7 @@ export class FurnaceSynth implements DevilboxSynth {
         debugData: {
           chipType: this.config.chipType,
           channelIndex: this.channelIndex,
-          synthConfig: this.config as any,
+          synthConfig: this.config as Record<string, unknown>,
         },
       }
     );
@@ -231,10 +231,11 @@ export class FurnaceSynth implements DevilboxSynth {
       const val = macro.data[pos];
 
       switch (macro.type) {
-        case 0: // Volume (0-127) with velocity scaling
+        case 0: { // Volume (0-127) with velocity scaling
           const volGain = Math.max(0, (val / 127) * this.velocity);
           this.output.gain.setValueAtTime(volGain, time);
           break;
+        }
 
         case 1: // Arpeggio (relative semitones)
           this.updateFrequency(this.activeNoteFreq * Math.pow(2, val / 12));
@@ -249,11 +250,12 @@ export class FurnaceSynth implements DevilboxSynth {
           this.writeWavetableSelect(val);
           break;
 
-        case 4: // Pitch (relative cents, signed)
+        case 4: { // Pitch (relative cents, signed)
           // Furnace pitch macro uses signed values (-128 to 127 typical range)
           const signedPitch = val > 127 ? val - 256 : val;
           this.updateFrequency(this.activeNoteFreq * Math.pow(2, signedPitch / 1200));
           break;
+        }
 
         case 5: // Panning (-127 to 127)
           this.currentPan = val > 127 ? val - 256 : val;
@@ -411,9 +413,8 @@ export class FurnaceSynth implements DevilboxSynth {
       // GB has per-channel L/R in NR51 (0x25)
       // This is a global register, so we'd need to track all channels
       // For now, simplified implementation
-      let lr = 0;
-      if (pan <= 0) lr |= (1 << chan);       // Left
-      if (pan >= 0) lr |= (1 << (chan + 4)); // Right
+      // GB has per-channel L/R in NR51 (0x25) - for now set all channels both
+      // pan/chan info available for future per-channel panning implementation
       this.chipEngine.write(FurnaceChipType.GB, 0x25, 0xFF); // All channels both
     }
   }
@@ -1220,10 +1221,11 @@ export class FurnaceSynth implements DevilboxSynth {
         break;
       }
 
-      case FurnaceChipType.PSG: // PSG (3)
+      case FurnaceChipType.PSG: { // PSG (3)
         const atten = 15 - Math.min(15, vol);
         this.chipEngine.write(FurnaceChipType.PSG, 0, 0x90 | ((chan & 3) << 5) | atten);
         break;
+      }
 
       case FurnaceChipType.PCE: { // PCE (6)
         // Reference: Furnace pce.cpp:143-160 - updateWave() and pce.cpp:360 - key-on
@@ -1846,15 +1848,7 @@ export class FurnaceSynth implements DevilboxSynth {
       }
 
       // === NEW CHIPS - FM ===
-      case FurnaceChipType.OPN: { // 47 - YM2203
-        // Reference: Furnace ym2203.cpp - 3 FM channels + 3 SSG channels
-        // FM key-on same as OPN2 but only 3 channels
-        // Key-off before key-on
-        const opnChanOff = chan % 3;
-        this.chipEngine.write(FurnaceChipType.OPN, 0x28, opnChanOff);
-        this.chipEngine.write(FurnaceChipType.OPN, 0x28, 0xF0 | opnChanOff);
-        break;
-      }
+      // Note: FurnaceChipType.OPN is handled above (line ~1328)
 
       case FurnaceChipType.OPNB_B: { // 48 - YM2610B
         // Extended YM2610, same key-on format as OPNB
@@ -2154,7 +2148,7 @@ export class FurnaceSynth implements DevilboxSynth {
     }
   }
 
-  public triggerRelease(_time?: number): this {
+  public triggerRelease(): this {
     this.isNoteOn = false;
 
     // If WASM engine isn't available, nothing to release
@@ -2547,12 +2541,8 @@ export class FurnaceSynth implements DevilboxSynth {
         break;
 
       // === NEW CHIP TYPES (47-72) ===
-      case FurnaceChipType.OPN: { // 47 - YM2203
-        // Like OPNA but simpler - key-off by clearing operator bits
-        const chanOffset = chan % 3;
-        this.chipEngine.write(FurnaceChipType.OPN, 0x28, chanOffset); // Key off
-        break;
-      }
+      // Note: FurnaceChipType.OPN is handled above (line ~2270)
+
       case FurnaceChipType.OPNB_B: { // 48 - YM2610B
         // Same as OPNB
         const opnbBKonOffs = [1, 2, 5, 6];

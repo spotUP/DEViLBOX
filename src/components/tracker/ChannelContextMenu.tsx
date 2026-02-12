@@ -33,8 +33,8 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import type { AutomationParameter } from '@typedefs/automation';
 import type { ChannelData } from '@typedefs/tracker';
+import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { CHANNEL_COLORS } from '@typedefs/tracker';
 import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { notify } from '@stores/useNotificationStore';
@@ -59,7 +59,6 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   channelIndex,
   channel,
   patternId,
-  patternLength: _patternLength,
   onFillPattern,
   onClearChannel,
   onCopyChannel,
@@ -84,7 +83,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
       id: `channel-fx-${Date.now()}-${index}`,
     }));
 
-    updateInstrument(channel.instrumentId, { effects: effects as any });
+    updateInstrument(channel.instrumentId, { effects });
     notify.success(`Applied ${preset.name} to CH ${(channelIndex + 1).toString().padStart(2, '0')}`);
   }, [channel.instrumentId, channelIndex, updateInstrument]);
 
@@ -92,15 +91,16 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const curves = getCurvesForPattern(patternId, channelIndex);
   const hasCurves = curves.length > 0;
 
-  // Automation parameters for submenu
-  const automationParams: { id: AutomationParameter; label: string; color: string }[] = [
-    { id: 'cutoff', label: 'Cutoff', color: '#4f9d69' },
-    { id: 'resonance', label: 'Resonance', color: '#3b82f6' },
-    { id: 'envMod', label: 'Env Mod', color: '#f59e0b' },
-    { id: 'volume', label: 'Volume', color: '#ef4444' },
-    { id: 'pan', label: 'Pan', color: '#8b5cf6' },
-    { id: 'decay', label: 'Decay', color: '#06b6d4' },
-  ];
+  // Dynamic automation parameters from channel's instrument
+  const { params: nksParams } = useChannelAutomationParams(channelIndex);
+  const automationParams = useMemo(() =>
+    nksParams.slice(0, 8).map((p) => ({
+      id: p.key,
+      label: p.name,
+      color: p.color,
+    })),
+    [nksParams]
+  );
 
   // Build menu items based on mode
   const menuItems = useMemo((): MenuItemType[] => {
@@ -205,22 +205,14 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
               onClick: () => queueChannelAction(channelIndex, { type: 'volumeFade', direction: 'out', bars: 4 }),
             },
             { type: 'divider' },
-            {
-              id: 'auto-show-cutoff',
-              label: 'Show Cutoff',
+            ...automationParams.slice(0, 2).map((param) => ({
+              id: `auto-show-${param.id}`,
+              label: `Show ${param.label}`,
               onClick: () => {
-                setActiveParameter(channelIndex, 'cutoff');
+                setActiveParameter(channelIndex, param.id);
                 setShowLane(channelIndex, true);
               },
-            },
-            {
-              id: 'auto-show-volume',
-              label: 'Show Volume',
-              onClick: () => {
-                setActiveParameter(channelIndex, 'volume');
-                setShowLane(channelIndex, true);
-              },
-            },
+            })),
           ],
         },
         { type: 'divider' },
@@ -524,6 +516,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     setShowLane,
     removeCurve,
     handleApplyChannelFxPreset,
+    automationParams,
   ]);
 
   return (

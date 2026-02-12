@@ -498,7 +498,7 @@ export class S3MHandler extends BaseFormatHandler {
 
     // 1. Process Auto-Vibrato (for IT which extends S3M)
     if (this.format === 'IT') {
-      (this as any).processAutoVibrato(state, result, tick);
+      this.processAutoVibrato(state, result, tick);
     }
 
     const activeEffect = this.activeEffects.get(channel);

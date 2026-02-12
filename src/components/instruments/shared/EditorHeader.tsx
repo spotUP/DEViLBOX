@@ -12,6 +12,7 @@
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download, Zap } from 'lucide-react';
+import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -70,14 +71,6 @@ export interface EditorHeaderProps {
   onUnbake?: () => void;
   isBaked?: boolean;
   isBaking?: boolean;
-}
-
-/**
- * Get the Lucide icon component by name
- */
-function getIcon(iconName: string) {
-  const Icon = (LucideIcons as any)[iconName];
-  return Icon || LucideIcons.Music2;
 }
 
 /** Check if synth type uses Sample editor */
@@ -225,7 +218,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 }) => {
   const synthInfo = getSynthInfo(instrument.synthType);
   const synthHelp = getSynthHelp(instrument.synthType);
-  const SynthIcon = getIcon(synthInfo.icon);
 
   // If custom header is provided, render it instead of the default
   if (customHeader) {
@@ -250,7 +242,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 ${synthInfo.color}`}>
-            <SynthIcon size={20} />
+            <SynthIconDisplay iconName={synthInfo.icon} size={20} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -473,7 +465,7 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
       </div>
 
       {/* Visualization Display */}
-      <div className="flex-1 bg-black rounded overflow-hidden border border-gray-800" style={{ height: vizHeight }}>
+      <VisualizerFrame variant="compact" className="flex-1" style={{ height: vizHeight }}>
         {vizMode === 'oscilloscope' ? (
           <InstrumentOscilloscope
             instrumentId={instrument.id}
@@ -493,7 +485,7 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
             backgroundColor="#000000"
           />
         )}
-      </div>
+      </VisualizerFrame>
 
       {/* Level Meter */}
       <InstrumentLevelMeter
@@ -515,6 +507,12 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
       )}
     </div>
   );
+};
+
+/** Static sub-component to avoid creating icon components during render */
+const SynthIconDisplay: React.FC<{ iconName: string; size: number }> = ({ iconName, size }) => {
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName] || LucideIcons.Music2;
+  return React.createElement(Icon, { size });
 };
 
 export default EditorHeader;

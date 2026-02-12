@@ -20,6 +20,7 @@ interface MiniKeyboardProps {
 
 // Key configuration
 const NOTES_PER_OCTAVE = 12;
+// eslint-disable-next-line react-refresh/only-export-components
 export const WHITE_KEY_INDICES = [0, 2, 4, 5, 7, 9, 11]; // C, D, E, F, G, A, B
 const BLACK_KEY_INDICES = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A#
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

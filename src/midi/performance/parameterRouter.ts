@@ -61,6 +61,60 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
   'overdrive':    { type: 'config', path: 'tb303.overdrive.amount' },
   'slideTime':    { type: 'config', path: 'tb303.slide.time' },
 
+  // ── 303 Oscillator ──────────────────────────────────────────────
+  'tuning':               { type: 'config', path: 'tb303.tuning', transform: n => -1 + n * 2 },
+  'waveform':             { type: 'config', path: 'tb303.oscillator.waveformBlend' },
+  'pulseWidth':           { type: 'config', path: 'tb303.oscillator.pulseWidth' },
+  'subOscGain':           { type: 'config', path: 'tb303.oscillator.subOscGain' },
+  'subOscBlend':          { type: 'config', path: 'tb303.oscillator.subOscBlend' },
+  'pitchToPw':            { type: 'config', path: 'tb303.oscillator.pitchToPw' },
+  'volume':               { type: 'config', path: 'tb303.volume' },
+
+  // ── 303 MOJO (filter character) ──────────────────────────────────
+  'passbandCompensation': { type: 'config', path: 'tb303.devilFish.passbandCompensation' },
+  'resTracking':          { type: 'config', path: 'tb303.devilFish.resTracking' },
+  'filterInputDrive':     { type: 'config', path: 'tb303.devilFish.filterInputDrive' },
+  'diodeCharacter':       { type: 'config', path: 'tb303.devilFish.diodeCharacter' },
+  'duffingAmount':        { type: 'config', path: 'tb303.devilFish.duffingAmount', transform: n => -1 + n * 2 },
+  'filterFmDepth':        { type: 'config', path: 'tb303.devilFish.filterFmDepth' },
+  'lpBpMix':              { type: 'config', path: 'tb303.devilFish.lpBpMix' },
+
+  // ── 303 DevilFish (circuit mods) ───────────────────────────────
+  'normalDecay':          { type: 'config', path: 'tb303.devilFish.normalDecay' },
+  'accentDecay':          { type: 'config', path: 'tb303.devilFish.accentDecay' },
+  'softAttack':           { type: 'config', path: 'tb303.devilFish.softAttack' },
+  'accentSoftAttack':     { type: 'config', path: 'tb303.devilFish.accentSoftAttack' },
+  'filterTracking':       { type: 'config', path: 'tb303.devilFish.filterTracking' },
+  'stageNLAmount':        { type: 'config', path: 'tb303.devilFish.stageNLAmount' },
+  'ensembleAmount':       { type: 'config', path: 'tb303.devilFish.ensembleAmount' },
+
+  // ── 303 Korg (ladder filter) ───────────────────────────────────
+  'korgBite':             { type: 'config', path: 'tb303.devilFish.korgBite' },
+  'korgClip':             { type: 'config', path: 'tb303.devilFish.korgClip' },
+  'korgCrossmod':         { type: 'config', path: 'tb303.devilFish.korgCrossmod' },
+  'korgQSag':             { type: 'config', path: 'tb303.devilFish.korgQSag' },
+  'korgSharpness':        { type: 'config', path: 'tb303.devilFish.korgSharpness' },
+
+  // ── 303 LFO ────────────────────────────────────────────────────
+  'lfoRate':              { type: 'config', path: 'tb303.lfo.rate' },
+  'lfoContour':           { type: 'config', path: 'tb303.lfo.contour', transform: n => -1 + n * 2 },
+  'lfoPitchDepth':        { type: 'config', path: 'tb303.lfo.pitchDepth' },
+  'lfoPwmDepth':          { type: 'config', path: 'tb303.lfo.pwmDepth' },
+  'lfoFilterDepth':       { type: 'config', path: 'tb303.lfo.filterDepth' },
+  'lfoStiffDepth':        { type: 'config', path: 'tb303.lfo.stiffDepth' },
+
+  // ── 303 FX ─────────────────────────────────────────────────────
+  'chorusMix':            { type: 'config', path: 'tb303.chorus.mix' },
+  'phaserRate':           { type: 'config', path: 'tb303.phaser.rate' },
+  'phaserWidth':          { type: 'config', path: 'tb303.phaser.depth' },
+  'phaserFeedback':       { type: 'config', path: 'tb303.phaser.feedback' },
+  'phaserMix':            { type: 'config', path: 'tb303.phaser.mix' },
+  'delayTime':            { type: 'config', path: 'tb303.delay.time' },
+  'delayFeedback':        { type: 'config', path: 'tb303.delay.feedback' },
+  'delayTone':            { type: 'config', path: 'tb303.delay.tone' },
+  'delayMix':             { type: 'config', path: 'tb303.delay.mix' },
+  'delaySpread':          { type: 'config', path: 'tb303.delay.stereo' },
+
   // ── Siren ─────────────────────────────────────────────────────────
   'siren.osc.frequency':   { type: 'config', path: 'dubSiren.oscillator.frequency', transform: n => 60 + (n * 940) },
   'siren.lfo.rate':        { type: 'config', path: 'dubSiren.lfo.rate',             transform: n => 0.1 + (n * 19.9) },
@@ -178,7 +232,7 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
 // VSTBridge helper
 // ============================================================================
 
-function getVSTBridgeSynth(instrumentId: number): any {
+function getVSTBridgeSynth(instrumentId: number): unknown {
   const engine = getToneEngine();
   const key = `${instrumentId}--1`;
   return engine.instruments.get(key);
@@ -193,8 +247,9 @@ function sendDirectToSynth(instrumentId: number, param: string, value: number): 
     const engine = getToneEngine();
     engine.instruments.forEach((instrument, key) => {
       const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && typeof (instrument as any).set === 'function') {
-        (instrument as any).set(param, value);
+      const synthObj = instrument as Record<string, unknown>;
+      if (idPart === String(instrumentId) && typeof synthObj.set === 'function') {
+        (synthObj.set as (p: string, v: number) => void)(param, value);
       }
     });
   } catch {
@@ -217,8 +272,8 @@ function sendDirectToSynth(instrumentId: number, param: string, value: number): 
 function buildNestedUpdate(
   path: string,
   value: number,
-  instrument: Record<string, any>
-): Record<string, any> {
+  instrument: Record<string, unknown>
+): Record<string, unknown> {
   const parts = path.split('.');
 
   // Simple top-level property (e.g., 'volume', 'pan')
@@ -227,7 +282,7 @@ function buildNestedUpdate(
   }
 
   // Build the nested update by walking down from the instrument's existing data
-  function buildLevel(partIndex: number, current: any): any {
+  function buildLevel(partIndex: number, current: Record<string, unknown>): unknown {
     if (partIndex === parts.length - 1) {
       // Leaf: return the value
       return value;
@@ -240,8 +295,9 @@ function buildNestedUpdate(
     if (isNextArrayIndex) {
       // Array case: e.g., 'operators.0.tl'
       const arrayIndex = parseInt(nextKey);
-      const currentArray = Array.isArray(current?.[key]) ? [...current[key]] : [];
-      const arrayElement = currentArray[arrayIndex] ? { ...currentArray[arrayIndex] } : {};
+      const rawArr = current?.[key];
+      const currentArray = Array.isArray(rawArr) ? [...rawArr] as Record<string, unknown>[] : [] as Record<string, unknown>[];
+      const arrayElement: Record<string, unknown> = currentArray[arrayIndex] ? { ...currentArray[arrayIndex] } : {};
 
       // Recurse past the index
       const leafKey = parts[partIndex + 2];
@@ -258,7 +314,7 @@ function buildNestedUpdate(
     }
 
     // Object case: recurse
-    const childCurrent = current?.[key] || {};
+    const childCurrent = (current?.[key] || {}) as Record<string, unknown>;
     const childUpdate = buildLevel(partIndex + 1, childCurrent);
 
     // If child is the final value (leaf returned from recursion), set it
@@ -271,7 +327,7 @@ function buildNestedUpdate(
 
   // Start from the first key
   const rootKey = parts[0];
-  const rootCurrent = instrument[rootKey] || {};
+  const rootCurrent = (instrument[rootKey] || {}) as Record<string, unknown>;
 
   if (parts.length === 2) {
     // Simple 2-level: e.g., 'obxd.filterCutoff'
@@ -282,7 +338,7 @@ function buildNestedUpdate(
     // 3-level: e.g., 'tb303.filter.cutoff'
     const midKey = parts[1];
     const leafKey = parts[2];
-    const midCurrent = rootCurrent[midKey] || {};
+    const midCurrent = (rootCurrent[midKey] || {}) as Record<string, unknown>;
     return { [rootKey]: { ...rootCurrent, [midKey]: { ...midCurrent, [leafKey]: value } } };
   }
 
@@ -291,13 +347,14 @@ function buildNestedUpdate(
     const arrayKey = parts[1];
     const arrayIndex = parseInt(parts[2]);
     const leafKey = parts[3];
-    const currentArray = Array.isArray(rootCurrent[arrayKey]) ? [...rootCurrent[arrayKey]] : [];
+    const rawArr = rootCurrent[arrayKey];
+    const currentArray = Array.isArray(rawArr) ? [...rawArr] as Record<string, unknown>[] : [] as Record<string, unknown>[];
     currentArray[arrayIndex] = { ...currentArray[arrayIndex], [leafKey]: value };
     return { [rootKey]: { ...rootCurrent, [arrayKey]: currentArray } };
   }
 
   // Generic deep case (shouldn't normally be needed, but safe fallback)
-  return buildLevel(0, instrument);
+  return buildLevel(0, instrument) as Record<string, unknown>;
 }
 
 // ============================================================================
@@ -305,7 +362,7 @@ function buildNestedUpdate(
 // to avoid flooding the store/React with per-CC-message re-renders.
 // ============================================================================
 
-const _pendingConfigUpdates: Map<number, Record<string, any>> = new Map();
+const _pendingConfigUpdates: Map<number, Record<string, unknown>> = new Map();
 let _configFlushScheduled = false;
 
 function flushConfigUpdates(): void {
@@ -317,7 +374,7 @@ function flushConfigUpdates(): void {
   _pendingConfigUpdates.clear();
 }
 
-function scheduleConfigUpdate(instrumentId: number, update: Record<string, any>): void {
+function scheduleConfigUpdate(instrumentId: number, update: Record<string, unknown>): void {
   // Merge into any pending update for this instrument
   const existing = _pendingConfigUpdates.get(instrumentId);
   if (existing) {
@@ -335,18 +392,20 @@ function scheduleConfigUpdate(instrumentId: number, update: Record<string, any>)
 /** Recursively merge src into dst (mutates dst).
  *  Clones frozen sub-objects before writing — buildNestedUpdate may contain
  *  frozen references from the Zustand store that can't be mutated in-place. */
-function deepMerge(dst: Record<string, any>, src: Record<string, any>): void {
+function deepMerge(dst: Record<string, unknown>, src: Record<string, unknown>): void {
   for (const key of Object.keys(src)) {
+    const srcVal = src[key];
+    const dstVal = dst[key];
     if (
-      typeof src[key] === 'object' && src[key] !== null && !Array.isArray(src[key]) &&
-      typeof dst[key] === 'object' && dst[key] !== null && !Array.isArray(dst[key])
+      typeof srcVal === 'object' && srcVal !== null && !Array.isArray(srcVal) &&
+      typeof dstVal === 'object' && dstVal !== null && !Array.isArray(dstVal)
     ) {
-      if (Object.isFrozen(dst[key])) {
-        dst[key] = { ...dst[key] };
+      if (Object.isFrozen(dstVal)) {
+        dst[key] = { ...(dstVal as Record<string, unknown>) };
       }
-      deepMerge(dst[key], src[key]);
+      deepMerge(dst[key] as Record<string, unknown>, srcVal as Record<string, unknown>);
     } else {
-      dst[key] = src[key];
+      dst[key] = srcVal;
     }
   }
 }
@@ -389,21 +448,21 @@ export function routeParameterToEngine(
       // Send parameter directly to the synth engine for immediate audio response
       sendDirectToSynth(instrument.id, param, value);
       // Also update the store (throttled) for UI persistence
-      const update = buildNestedUpdate(route.path, value, instrument as any);
-      scheduleConfigUpdate(instrument.id, update);
+      const update = buildNestedUpdate(route.path, value, instrument as unknown as Record<string, unknown>);
+      scheduleConfigUpdate(instrument.id, update as Record<string, unknown>);
       break;
     }
 
     case 'vstbridge': {
       const synth = getVSTBridgeSynth(instrument.id);
-      if (synth && 'setParameter' in synth) {
-        (synth as any).setParameter(route.paramId, value);
+      if (synth && typeof synth === 'object' && 'setParameter' in (synth as Record<string, unknown>)) {
+        (synth as { setParameter: (id: number, v: number) => void }).setParameter(route.paramId, value);
       }
       break;
     }
 
     case 'effect': {
-      const fx = instrument.effects.find((e: any) => e.type === route.effectType);
+      const fx = instrument.effects.find((e) => e.type === route.effectType);
       if (fx) {
         instrumentStore.updateEffect(instrument.id, fx.id, {
           parameters: { ...fx.parameters, [route.param]: value },
@@ -436,8 +495,8 @@ export function routeVSTBridgeParam(
   value: number,
 ): void {
   const synth = getVSTBridgeSynth(instrumentId);
-  if (synth && 'setParameter' in synth) {
-    (synth as any).setParameter(vstParamId, value);
+  if (synth && typeof synth === 'object' && 'setParameter' in (synth as Record<string, unknown>)) {
+    (synth as { setParameter: (id: number, v: number) => void }).setParameter(vstParamId, value);
   }
 }
 

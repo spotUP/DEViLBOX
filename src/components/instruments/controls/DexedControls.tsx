@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Waves, Settings, Music } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -34,7 +34,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';

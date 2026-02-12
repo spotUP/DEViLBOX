@@ -25,7 +25,7 @@ export class V2Synth implements DevilboxSynth {
 
     // Ensure context is running before loading worklet
     if ((nativeCtx.state as string) !== 'running') {
-      try { await nativeCtx.resume(); } catch {}
+      try { await nativeCtx.resume(); } catch { /* context may not be resumable yet */ }
       if ((nativeCtx.state as string) !== 'running') {
         // Wait up to 5s for context to start
         await Promise.race([
@@ -46,7 +46,7 @@ export class V2Synth implements DevilboxSynth {
     const cacheBuster = `?v=${Date.now()}`;
     try {
       await nativeCtx.audioWorklet.addModule(`${baseUrl}V2Synth.worklet.js${cacheBuster}`);
-    } catch (e) {
+    } catch {
       // Worklet might already be added
     }
 
@@ -156,7 +156,7 @@ export class V2Synth implements DevilboxSynth {
     this._sendMIDI([0x90, midiNote, vel]);
   }
 
-  public triggerRelease(_time?: number) {
+  public triggerRelease() {
     if (!this._initialized) return;
     // We don't have the current note here, but V2 handles polyphony.
     // Standard trackers send Note Off for the note on that channel.

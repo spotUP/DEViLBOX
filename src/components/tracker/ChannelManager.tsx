@@ -55,10 +55,12 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
   // Clear selection when dialog closes
   useEffect(() => {
     if (!isOpen) {
-      setSelectedChannels(new Set());
-      setEditingName(null);
-      setDraggedChannel(null);
-      setDropTarget(null);
+      requestAnimationFrame(() => {
+        setSelectedChannels(new Set());
+        setEditingName(null);
+        setDraggedChannel(null);
+        setDropTarget(null);
+      });
     }
   }, [isOpen]);
 

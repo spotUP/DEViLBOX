@@ -18,8 +18,10 @@ import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
-import { X, Check, Search, Settings, Sparkles, Music2, Zap as _Zap, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { useUIStore } from '@stores/useUIStore';
+import { focusPopout } from '@components/ui/PopOutWindow';
+import type { InstrumentConfig, SynthType, BuzzmachineType } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
   DEFAULT_ENVELOPE,
@@ -63,6 +65,12 @@ function isBuzzmachineType(synthType: SynthType): boolean {
 }
 
 type EditorTab = 'sound' | 'effects';
+
+/** Static sub-component to avoid creating icon components during render */
+const SynthIconDisplay: React.FC<{ iconName: string; size: number }> = ({ iconName, size }) => {
+  const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[iconName] || LucideIcons.Music2;
+  return React.createElement(Icon, { size });
+};
 
 interface EditInstrumentModalProps {
   isOpen: boolean;
@@ -120,29 +128,31 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
   // Reset to create mode when prop changes
   useEffect(() => {
-    if (isOpen && createMode) {
-      setIsCreating(true);
-      setSelectedSynthType('TB303');
-      setInstrumentName('303 Classic');
-      setTempInstrument(createTempInstrument('TB303'));
-    } else if (isOpen && !createMode) {
-      if (instruments.length === 0) {
-        // No instruments exist - auto-enter create mode
+    requestAnimationFrame(() => {
+      if (isOpen && createMode) {
         setIsCreating(true);
         setSelectedSynthType('TB303');
         setInstrumentName('303 Classic');
         setTempInstrument(createTempInstrument('TB303'));
-      } else if (!currentInstrument) {
-        // Instruments exist but none selected - select first one
-        setIsCreating(false);
-        setTempInstrument(null);
-        setCurrentInstrument(instruments[0].id);
-      } else {
-        // Instrument already selected - just edit it
-        setIsCreating(false);
-        setTempInstrument(null);
+      } else if (isOpen && !createMode) {
+        if (instruments.length === 0) {
+          // No instruments exist - auto-enter create mode
+          setIsCreating(true);
+          setSelectedSynthType('TB303');
+          setInstrumentName('303 Classic');
+          setTempInstrument(createTempInstrument('TB303'));
+        } else if (!currentInstrument) {
+          // Instruments exist but none selected - select first one
+          setIsCreating(false);
+          setTempInstrument(null);
+          setCurrentInstrument(instruments[0].id);
+        } else {
+          // Instrument already selected - just edit it
+          setIsCreating(false);
+          setTempInstrument(null);
+        }
       }
-    }
+    });
   }, [isOpen, createMode, currentInstrument, instruments, setCurrentInstrument]);
 
   // Set preview instrument for MIDI keyboard in create mode
@@ -152,6 +162,14 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
       return () => setPreviewInstrument(null);
     }
   }, [isCreating, tempInstrument, setPreviewInstrument]);
+
+  // Handle close
+  const handleClose = () => {
+    setPreviewInstrument(null);
+    setIsCreating(false);
+    setTempInstrument(null);
+    onClose();
+  };
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -165,13 +183,9 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
 
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
+  // getIcon removed - using SynthIconDisplay sub-component at module scope instead
 
   // Filter synths based on search
   const filteredSynths = ALL_SYNTH_TYPES.filter((synthType) => {
@@ -209,12 +223,19 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     setTempInstrument(null);
   };
 
-  // Handle close
-  const handleClose = () => {
+  // Handle pop-out: close modal and open in separate window, or focus existing
+  const handlePopOut = () => {
+    const alreadyPoppedOut = useUIStore.getState().instrumentEditorPoppedOut;
+    if (alreadyPoppedOut) {
+      focusPopout('DEViLBOX — Instrument Editor');
+      onClose();
+      return;
+    }
     setPreviewInstrument(null);
     setIsCreating(false);
     setTempInstrument(null);
     onClose();
+    useUIStore.getState().setInstrumentEditorPoppedOut(true);
   };
 
   // Update temp instrument in create mode
@@ -232,9 +253,9 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   };
 
   // Handle synth type change from browse tab
-  const handleSynthTypeChange = useCallback((_synthType: SynthType) => {
+  const handleSynthTypeChange = useCallback(() => {
     setActiveTab('sound');
-  }, []);
+  }, [setActiveTab]) as (synthType: SynthType) => void;
 
   // Navigate to previous/next instrument
   const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
@@ -263,7 +284,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   // Get current instrument info
   const instrument = isCreating ? tempInstrument : currentInstrument;
   const synthInfo = instrument?.synthType ? getSynthInfo(instrument.synthType) : getSynthInfo('TB303');
-  const IconComponent = getIcon(synthInfo.icon);
+  // Icon rendered via SynthIconDisplay sub-component (module scope)
 
   // CREATE MODE UI
   if (isCreating) {
@@ -274,7 +295,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
           <div className="flex items-center justify-between px-4 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
             <div className="flex items-center gap-3">
               <div className={`p-1.5 rounded ${synthInfo.color} bg-dark-bgTertiary`}>
-                <IconComponent size={18} />
+                <SynthIconDisplay iconName={synthInfo.icon} size={18} />
               </div>
               <div className="flex items-center gap-3">
                 <h2 className="text-text-primary font-bold text-sm">CREATE INSTRUMENT</h2>
@@ -328,7 +349,6 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
               <div className="flex-1 overflow-y-auto scrollbar-modern">
                 {filteredSynths.map((synthType) => {
                   const synth = SYNTH_INFO[synthType];
-                  const SynthIcon = getIcon(synth.icon);
                   const isSelected = selectedSynthType === synthType;
 
                   return (
@@ -343,7 +363,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                         }
                       `}
                     >
-                      <SynthIcon size={14} className={isSelected ? 'text-dark-bg' : synth.color} />
+                      <SynthIconDisplay iconName={synth.icon} size={14} />
                       <div className="flex-1 min-w-0">
                         <div className={`font-bold text-xs truncate ${isSelected ? 'text-dark-bg' : 'text-text-primary'}`}>
                           {synth.shortName}
@@ -448,7 +468,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     </button>
 
                     <div className={`p-2 rounded-lg bg-dark-bg ${synthInfo?.color || 'text-text-primary'}`}>
-                      <IconComponent size={20} />
+                      <SynthIconDisplay iconName={synthInfo.icon} size={20} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1">
@@ -493,6 +513,14 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     >
                       <Save size={14} />
                       Save
+                    </button>
+                    <button
+                      onClick={handlePopOut}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-dark-bg hover:bg-dark-bgTertiary text-text-primary transition-colors text-sm border border-dark-border"
+                      title="Pop out to separate window"
+                    >
+                      <ExternalLink size={14} />
+                      Pop Out
                     </button>
                     <button
                       onClick={handleClose}
@@ -699,7 +727,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
     if (synthType === 'Buzz3o3') {
       base.buzzmachine = {
         ...DEFAULT_BUZZMACHINE,
-        machineType: 'OomekAggressor' as any,
+        machineType: 'OomekAggressor' as BuzzmachineType,
         parameters: {
           0: 0, 1: 0x78, 2: 0x40, 3: 0x40, 4: 0x40, 5: 0x40, 6: 100, 7: 100,
         }
@@ -729,7 +757,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       'Buzz3o3': 'OomekAggressor',
     };
     if (machineTypeMap[synthType]) {
-      base.buzzmachine.machineType = machineTypeMap[synthType] as any;
+      base.buzzmachine.machineType = machineTypeMap[synthType] as BuzzmachineType;
     }
   } else if (synthType === 'GranularSynth') {
     base.granular = { ...DEFAULT_GRANULAR };
@@ -766,8 +794,11 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
 
   const firstPreset = getFirstPresetForSynthType(synthType);
   if (firstPreset) {
-    const { name: _name, type: _type, synthType: _synthType, ...presetConfig } = firstPreset as any;
-    Object.assign(base, presetConfig);
+    const presetRecord = { ...(firstPreset as Record<string, unknown>) };
+    delete presetRecord.name;
+    delete presetRecord.type;
+    delete presetRecord.synthType;
+    Object.assign(base, presetRecord);
     // Preserve structural fields that must match the selected synthType
     base.synthType = synthType;
     base.id = -1;

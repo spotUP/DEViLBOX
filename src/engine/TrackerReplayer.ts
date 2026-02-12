@@ -286,10 +286,10 @@ export class TrackerReplayer {
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
       for (const p of ch.playerPool) {
-        try { p.dispose(); } catch (e) {}
+        try { p.dispose(); } catch { /* ignored */ }
       }
-      try { ch.gainNode.dispose(); } catch (e) {}
-      try { ch.panNode.dispose(); } catch (e) {}
+      try { ch.gainNode.dispose(); } catch { /* ignored */ }
+      try { ch.panNode.dispose(); } catch { /* ignored */ }
     }
 
     // Initialize channels
@@ -509,7 +509,7 @@ export class TrackerReplayer {
     this.schedulerTimerId = setInterval(schedulerTick, this.schedulerInterval * 1000);
   }
 
-  private calculateGrooveOffset(row: number, rowDuration: number, state: any): number {
+  private calculateGrooveOffset(row: number, rowDuration: number, state: { grooveTemplateId: string; swing: number; grooveSteps: number }): number {
     const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId);
 
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
@@ -699,7 +699,7 @@ export class TrackerReplayer {
       if (ch.player) {
         try {
           ch.player.stop(time);
-        } catch (e) {
+        } catch {
           // Ignore errors if already stopped
         }
         ch.player = null;
@@ -1583,7 +1583,7 @@ export class TrackerReplayer {
     if (ch.player) {
       try {
         ch.player.stop(safeTime);
-      } catch (e) {
+      } catch {
         // Player might already be stopped
       }
     }
@@ -1732,7 +1732,7 @@ export class TrackerReplayer {
     // With fast retrigger (E91) + lookahead, the pool can cycle back to a player
     // that's still in 'started' state from a previously scheduled note.
     if (player.state === 'started') {
-      try { player.stop(safeTime); } catch (e) {}
+      try { player.stop(safeTime); } catch { /* ignored */ }
     }
 
     // Configure the pooled player (no allocation, no connect - already done)
@@ -1777,7 +1777,7 @@ export class TrackerReplayer {
     for (const player of ch.playerPool) {
       try {
         if (player.state === 'started') player.stop();
-      } catch (e) {}
+      } catch { /* ignored */ }
     }
     ch.player = null;
     ch.lastPlayedNoteName = null; // Clear for next note sequence
@@ -1960,6 +1960,62 @@ export class TrackerReplayer {
   // GETTERS
   // ==========================================================================
 
+  /**
+   * Seek to a specific song position and pattern row.
+   * Stops all channels, resets state, then resumes if playing.
+   */
+  seekTo(songPos: number, pattPos: number): void {
+    if (!this.song) return;
+
+    const wasPlaying = this.playing;
+
+    // Pause the scheduler
+    if (this.schedulerTimerId !== null) {
+      clearInterval(this.schedulerTimerId);
+      this.schedulerTimerId = null;
+    }
+    this.playing = false;
+
+    // Stop all channels
+    for (const ch of this.channels) {
+      this.stopChannel(ch);
+    }
+
+    // Clear state queue
+    this.clearStateQueue();
+
+    // Set new position
+    this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
+    this.pattPos = Math.max(0, pattPos);
+    this.currentTick = 0;
+    this.totalTicksScheduled = 0;
+
+    // Clamp pattern position
+    const patternNum = this.song.songPositions[this.songPos];
+    const pattern = this.song.patterns[patternNum];
+    if (pattern && this.pattPos >= pattern.length) {
+      this.pattPos = 0;
+    }
+
+    // Reset pattern break/jump flags
+    this.pBreakFlag = false;
+    this.posJumpFlag = false;
+    this.patternDelay = 0;
+
+    // Notify UI
+    if (this.onRowChange) {
+      this.onRowChange(this.pattPos, patternNum, this.songPos);
+    }
+
+    // Resume if was playing
+    if (wasPlaying) {
+      this.playing = true;
+      this.startScheduler();
+    }
+
+    console.log(`[TrackerReplayer] Seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
+  }
+
   isPlaying(): boolean { return this.playing; }
   getBPM(): number { return this.bpm; }
   getSpeed(): number { return this.speed; }
@@ -1976,7 +2032,7 @@ export class TrackerReplayer {
     for (const ch of this.channels) {
       // Dispose all pooled players
       for (const player of ch.playerPool) {
-        try { player.dispose(); } catch (e) {}
+        try { player.dispose(); } catch { /* ignored */ }
       }
       ch.gainNode.dispose();
       ch.panNode.dispose();

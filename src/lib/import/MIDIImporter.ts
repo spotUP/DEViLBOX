@@ -2,7 +2,7 @@
  * MIDI Importer - Import Standard MIDI Files (.mid/.midi) as tracker patterns
  */
 
-import { Midi } from '@tonejs/midi';
+import { Midi, Track } from '@tonejs/midi';
 import type { Pattern, TrackerCell } from '@typedefs/tracker';
 import { midiToXMNote } from '../xmConversions';
 
@@ -120,7 +120,7 @@ function createPatternFromMIDI(
   );
 
   // Group notes by MIDI channel
-  const channelNotes: Map<number, Array<{ tick: number; note: any }>> = new Map();
+  const channelNotes: Map<number, Array<{ tick: number; note: { midi: number; velocity: number; ticks: number; durationTicks: number } }>> = new Map();
 
   midi.tracks.forEach(track => {
     track.notes.forEach(note => {
@@ -197,7 +197,7 @@ function createPatternFromMIDI(
  * Create a pattern from a single MIDI track
  */
 function createPatternFromTrack(
-  track: any,
+  track: Track,
   trackIndex: number,
   options: MIDIImportOptions,
   ppq: number,
@@ -227,7 +227,7 @@ function createPatternFromTrack(
   }));
 
   // Convert notes to tracker cells
-  track.notes.forEach((note: any) => {
+  track.notes.forEach((note: { midi: number; velocity: number; ticks: number; durationTicks: number }) => {
     const row = tickToRow(note.ticks, ppq, rowsPerBeat, options.quantize);
     if (row < 0 || row >= patternLength) return;
 

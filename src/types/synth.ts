@@ -29,12 +29,13 @@ export interface DevilboxSynth {
  * Type guard: is this a DevilboxSynth (native AudioNode output) rather than a ToneAudioNode?
  * ToneAudioNodes have toDestination/toMaster methods; DevilboxSynths do not.
  */
-export function isDevilboxSynth(synth: any): synth is DevilboxSynth {
+export function isDevilboxSynth(synth: unknown): synth is DevilboxSynth {
   if (!synth || typeof synth !== 'object') return false;
+  const obj = synth as Record<string, unknown>;
   // Must have a native AudioNode output
-  if (!synth.output || typeof synth.output !== 'object') return false;
+  if (!obj.output || typeof obj.output !== 'object') return false;
   // Native AudioNodes have connect/disconnect as functions and numberOfOutputs as number
-  const out = synth.output;
+  const out = obj.output as Record<string, unknown>;
   const isNativeNode = (
     typeof out.connect === 'function' &&
     typeof out.disconnect === 'function' &&
@@ -43,6 +44,6 @@ export function isDevilboxSynth(synth: any): synth is DevilboxSynth {
     typeof out.toDestination !== 'function'
   );
   // Also must NOT be a ToneAudioNode itself (those have toDestination on the synth object)
-  const isToneNode = typeof synth.toDestination === 'function';
+  const isToneNode = typeof obj.toDestination === 'function';
   return isNativeNode && !isToneNode;
 }

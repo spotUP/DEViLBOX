@@ -152,7 +152,8 @@ export class DubSirenSynth implements DevilboxSynth {
    * @param time Scheduling time
    * @param velocity Volume/Velocity
    */
-  triggerAttack(note?: string | number, time?: number, _velocity?: number) {
+  triggerAttack(note?: string | number, time?: number, velocity?: number) {
+    void velocity;
     const t = time || audioNow();
 
     if (note) {

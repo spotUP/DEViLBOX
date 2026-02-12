@@ -62,7 +62,7 @@ export async function runNeuralEnhancement(
     
     // 3. Post-processing: Create new AudioBuffer from result
     const outputDataRaw = results.output.data;
-    const outputData = outputDataRaw instanceof Float32Array ? outputDataRaw : new Float32Array(outputDataRaw as any);
+    const outputData = outputDataRaw instanceof Float32Array ? outputDataRaw : new Float32Array(outputDataRaw as ArrayLike<number>);
     
     const outputBuffer = new AudioBuffer({
       length: outputData.length,
@@ -73,7 +73,7 @@ export async function runNeuralEnhancement(
     const dataUrl = await bufferToDataUrl(outputBuffer);
     return { buffer: outputBuffer, dataUrl };
 
-  } catch (err) {
+  } catch {
     // FALLBACK: High-quality DSP Spectral Band Replication (SBR) simulation
     const renderedBuffer = await fallbackDSPUpsample(inputBuffer, options);
     const dataUrl = await bufferToDataUrl(renderedBuffer);
@@ -102,14 +102,14 @@ async function fallbackDSPUpsample(
   hp1.type = 'highpass';
   hp1.frequency.value = 4000;
   const ws1 = ctx.createWaveShaper();
-  ws1.curve = createHarmonicCurve(0.4) as any;
+  ws1.curve = createHarmonicCurve(0.4);
   
   // Band 2: 8k - 16k
   const hp2 = ctx.createBiquadFilter();
   hp2.type = 'highpass';
   hp2.frequency.value = 8000;
   const ws2 = ctx.createWaveShaper();
-  ws2.curve = createHarmonicCurve(0.7) as any;
+  ws2.curve = createHarmonicCurve(0.7);
   
   const mix1 = ctx.createGain();
   mix1.gain.value = 0.12 * options.strength;

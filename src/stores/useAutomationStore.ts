@@ -1,4 +1,3 @@
-// @ts-nocheck - AutomationParameter type incompatibility
 /**
  * Automation Store - Parameter Automation Curves
  */
@@ -10,7 +9,7 @@ import type {
   AutomationPreset,
   AutomationParameter,
 } from '@typedefs/automation';
-import { AUTOMATION_PRESETS } from '@typedefs/automation';
+import { AUTOMATION_PRESETS, interpolateAutomationValue } from '@typedefs/automation';
 
 interface AutomationData {
   [patternId: string]: {
@@ -80,6 +79,16 @@ interface AutomationStore {
   reset: () => void;
 }
 
+/** Rebuild the denormalized automation index from the curves array */
+function rebuildAutomationIndex(state: { automation: AutomationData; curves: AutomationCurve[] }): void {
+  state.automation = {};
+  state.curves.forEach((c) => {
+    if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
+    if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
+    state.automation[c.patternId][c.channelIndex][c.parameter] = c;
+  });
+}
+
 export const useAutomationStore = create<AutomationStore>()(
   immer((set, get) => ({
     // Initial state
@@ -106,12 +115,7 @@ export const useAutomationStore = create<AutomationStore>()(
         state.curves.push(newCurve);
         state.selectedCurveId = newCurve.id;
         // Rebuild automation data
-        state.automation = {};
-        state.curves.forEach((c) => {
-          if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-          if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-          state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-        });
+        rebuildAutomationIndex(state);
       });
       return newCurve.id;
     },
@@ -124,13 +128,7 @@ export const useAutomationStore = create<AutomationStore>()(
           if (state.selectedCurveId === curveId) {
             state.selectedCurveId = null;
           }
-          // Rebuild automation data
-          state.automation = {};
-          state.curves.forEach((c) => {
-            if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-            if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-            state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-          });
+          rebuildAutomationIndex(state);
         }
       }),
 
@@ -139,13 +137,7 @@ export const useAutomationStore = create<AutomationStore>()(
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           Object.assign(curve, updates);
-          // Rebuild automation data
-          state.automation = {};
-          state.curves.forEach((c) => {
-            if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-            if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-            state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-          });
+          rebuildAutomationIndex(state);
         }
       }),
 
@@ -174,13 +166,7 @@ export const useAutomationStore = create<AutomationStore>()(
             curve.points.push({ row, value });
             curve.points.sort((a, b) => a.row - b.row);
           }
-          // Rebuild automation data
-          state.automation = {};
-          state.curves.forEach((c) => {
-            if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-            if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-            state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-          });
+          rebuildAutomationIndex(state);
         }
       }),
 
@@ -191,13 +177,7 @@ export const useAutomationStore = create<AutomationStore>()(
           const index = curve.points.findIndex((p) => p.row === row);
           if (index !== -1) {
             curve.points.splice(index, 1);
-            // Rebuild automation data
-            state.automation = {};
-            state.curves.forEach((c) => {
-              if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-              if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-              state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-            });
+            rebuildAutomationIndex(state);
           }
         }
       }),
@@ -209,13 +189,7 @@ export const useAutomationStore = create<AutomationStore>()(
           const point = curve.points.find((p) => p.row === row);
           if (point) {
             point.value = value;
-            // Rebuild automation data
-            state.automation = {};
-            state.curves.forEach((c) => {
-              if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-              if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-              state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-            });
+            rebuildAutomationIndex(state);
           }
         }
       }),
@@ -225,13 +199,7 @@ export const useAutomationStore = create<AutomationStore>()(
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           curve.points = [];
-          // Rebuild automation data
-          state.automation = {};
-          state.curves.forEach((c) => {
-            if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-            if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-            state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-          });
+          rebuildAutomationIndex(state);
         }
       }),
 
@@ -241,13 +209,7 @@ export const useAutomationStore = create<AutomationStore>()(
         const curve = state.curves.find((c) => c.id === curveId);
         if (curve) {
           curve.points = [...preset.points];
-          // Rebuild automation data
-          state.automation = {};
-          state.curves.forEach((c) => {
-            if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-            if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-            state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-          });
+          rebuildAutomationIndex(state);
         }
       }),
 
@@ -261,45 +223,7 @@ export const useAutomationStore = create<AutomationStore>()(
     getValueAtRow: (curveId, row) => {
       const curve = get().curves.find((c) => c.id === curveId);
       if (!curve || curve.points.length === 0) return null;
-
-      // Find surrounding points
-      let before = null;
-      let after = null;
-
-      for (let i = 0; i < curve.points.length; i++) {
-        if (curve.points[i].row <= row) {
-          before = curve.points[i];
-        }
-        if (curve.points[i].row >= row) {
-          after = curve.points[i];
-          break;
-        }
-      }
-
-      // Exact match
-      if (before && before.row === row) return before.value;
-      if (after && after.row === row) return after.value;
-
-      // Interpolate between points
-      if (before && after && curve.interpolation === 'linear') {
-        const t = (row - before.row) / (after.row - before.row);
-        return before.value + (after.value - before.value) * t;
-      }
-
-      // Exponential interpolation
-      if (before && after && curve.interpolation === 'exponential') {
-        const t = (row - before.row) / (after.row - before.row);
-        const exponentialT = t * t;
-        return before.value + (after.value - before.value) * exponentialT;
-      }
-
-      // Step mode (no interpolation)
-      if (curve.mode === 'steps') {
-        return before ? before.value : after ? after.value : null;
-      }
-
-      // Default: use before value
-      return before ? before.value : after ? after.value : null;
+      return interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
     },
 
     getAutomation: (patternId, channelIndex, parameter) => {
@@ -348,17 +272,7 @@ export const useAutomationStore = create<AutomationStore>()(
           state.curves.push(curve);
         }
 
-        // Rebuild automation data
-        state.automation = {};
-        state.curves.forEach((c) => {
-          if (!state.automation[c.patternId]) {
-            state.automation[c.patternId] = {};
-          }
-          if (!state.automation[c.patternId][c.channelIndex]) {
-            state.automation[c.patternId][c.channelIndex] = {};
-          }
-          state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-        });
+        rebuildAutomationIndex(state);
       }),
 
     buildAutomationData: () => {
@@ -383,15 +297,7 @@ export const useAutomationStore = create<AutomationStore>()(
       set((state) => {
         state.curves = newCurves;
         state.selectedCurveId = null;
-
-        // Rebuild automation data
-        state.automation = {};
-        newCurves.forEach((c) => {
-          if (!state.automation[c.patternId]) state.automation[c.patternId] = {};
-          if (!state.automation[c.patternId][c.channelIndex]) state.automation[c.patternId][c.channelIndex] = {};
-          state.automation[c.patternId][c.channelIndex][c.parameter] = c;
-        });
-
+        rebuildAutomationIndex(state);
       }),
 
     getCurves: () => get().curves,
@@ -399,18 +305,18 @@ export const useAutomationStore = create<AutomationStore>()(
     // Channel lane UI state
     setActiveParameter: (channelIndex, parameter) =>
       set((state) => {
-        const existing = state.channelLanes.get(channelIndex) || { activeParameter: 'cutoff', showLane: false };
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', showLane: false };
         state.channelLanes.set(channelIndex, { ...existing, activeParameter: parameter });
       }),
 
     getActiveParameter: (channelIndex) => {
       const state = get();
-      return state.channelLanes.get(channelIndex)?.activeParameter || 'cutoff';
+      return state.channelLanes.get(channelIndex)?.activeParameter || '';
     },
 
     setShowLane: (channelIndex, show) =>
       set((state) => {
-        const existing = state.channelLanes.get(channelIndex) || { activeParameter: 'cutoff', showLane: false };
+        const existing = state.channelLanes.get(channelIndex) || { activeParameter: '', showLane: false };
         state.channelLanes.set(channelIndex, { ...existing, showLane: show });
       }),
 

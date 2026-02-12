@@ -1,29 +1,14 @@
 /**
  * AutomationLane - Inline automation curve editor for pattern editor
- * Displays a miniature automation curve below channel rows
+ * Displays a miniature automation curve below channel rows.
+ * Parameters are resolved dynamically from the channel's instrument via NKS maps.
  */
 
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useAutomationStore } from '@stores/useAutomationStore';
-import type { AutomationParameter } from '@typedefs/automation';
+import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
+import type { AutomatableParamInfo } from '@hooks/useChannelAutomationParams';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-
-// Automatable parameters with their display settings
-const AUTOMATION_PARAMETERS: {
-  id: AutomationParameter;
-  label: string;
-  shortLabel: string;
-  color: string;
-  min: number;
-  max: number;
-}[] = [
-  { id: 'cutoff', label: 'Filter Cutoff', shortLabel: 'Cut', color: '#4f9d69', min: 200, max: 20000 },
-  { id: 'resonance', label: 'Resonance', shortLabel: 'Res', color: '#3b82f6', min: 0, max: 100 },
-  { id: 'envMod', label: 'Env Mod', shortLabel: 'Env', color: '#f59e0b', min: 0, max: 100 },
-  { id: 'volume', label: 'Volume', shortLabel: 'Vol', color: '#ef4444', min: -60, max: 0 },
-  { id: 'pan', label: 'Pan', shortLabel: 'Pan', color: '#8b5cf6', min: -100, max: 100 },
-  { id: 'decay', label: 'Decay', shortLabel: 'Dec', color: '#06b6d4', min: 30, max: 3000 },
-];
 
 interface AutomationLaneProps {
   patternId: string;
@@ -44,7 +29,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   compact = false,
   onAutomationChange,
 }) => {
-  void _rowHeight; // Available for future use
+  void _rowHeight;
   const {
     getCurvesForPattern,
     addCurve,
@@ -54,16 +39,32 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isExpanded, setIsExpanded] = useState(!compact);
-  const [activeParameter, setActiveParameter] = useState<AutomationParameter>('cutoff');
+  const [activeParamKey, setActiveParamKey] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showParamMenu, setShowParamMenu] = useState(false);
 
+  // Dynamic params from channel's instrument
+  const { params } = useChannelAutomationParams(channelIndex);
+
+  // Auto-select first param when instrument changes
+  useEffect(() => {
+    if (params.length === 0) return;
+    if (!activeParamKey || !params.find((p) => p.key === activeParamKey)) {
+      requestAnimationFrame(() => setActiveParamKey(params[0].key));
+    }
+  }, [params, activeParamKey]);
+
+  const activeParameter = activeParamKey ?? params[0]?.key ?? 'tb303.cutoff';
+
   // Get curves for this channel
   const curves = getCurvesForPattern(patternId, channelIndex);
-  const activeCurve = curves.find((c) => c.parameter === activeParameter);
+  const activeCurve = useMemo(
+    () => curves.find((c) => c.parameter === activeParameter),
+    [curves, activeParameter]
+  );
 
   // Get parameter info
-  const paramInfo = AUTOMATION_PARAMETERS.find((p) => p.id === activeParameter);
+  const paramInfo: AutomatableParamInfo | undefined = params.find((p) => p.key === activeParameter);
 
   // Canvas dimensions
   const width = 200;
@@ -77,21 +78,17 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw grid lines
+    // Grid lines
     ctx.strokeStyle = '#2a2a3e';
     ctx.lineWidth = 1;
-
-    // Horizontal center line
     ctx.beginPath();
     ctx.moveTo(0, height / 2);
     ctx.lineTo(width, height / 2);
     ctx.stroke();
 
-    // Vertical lines (every 16 rows)
     for (let row = 0; row < patternLength; row += 16) {
       const x = (row / patternLength) * width;
       ctx.beginPath();
@@ -100,45 +97,36 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       ctx.stroke();
     }
 
-    // Draw curve if exists
+    // Resolve color — use CSS variable value or fallback
+    const color = paramInfo?.color ?? 'var(--color-synth-filter)';
+    // For canvas we need a concrete color; parse from CSS variable
+    const resolvedColor = getComputedColor(canvas, color);
+
     if (activeCurve && activeCurve.points.length > 0) {
-      ctx.strokeStyle = paramInfo?.color || '#4f9d69';
+      ctx.strokeStyle = resolvedColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
 
-      // Draw line through all points
       activeCurve.points.forEach((point, i) => {
         const x = (point.row / patternLength) * width;
-        const normalizedValue = paramInfo
-          ? (point.value - paramInfo.min) / (paramInfo.max - paramInfo.min)
-          : point.value / 100;
-        const y = height - normalizedValue * height;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+        // Values are 0-1 normalized
+        const y = height - point.value * height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       });
-
       ctx.stroke();
 
-      // Draw points
-      ctx.fillStyle = paramInfo?.color || '#4f9d69';
+      // Points
+      ctx.fillStyle = resolvedColor;
       activeCurve.points.forEach((point) => {
         const x = (point.row / patternLength) * width;
-        const normalizedValue = paramInfo
-          ? (point.value - paramInfo.min) / (paramInfo.max - paramInfo.min)
-          : point.value / 100;
-        const y = height - normalizedValue * height;
-
+        const y = height - point.value * height;
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fill();
       });
     }
 
-    // Draw "no automation" hint if empty
     if (!activeCurve || activeCurve.points.length === 0) {
       ctx.fillStyle = '#4a4a5e';
       ctx.font = '10px system-ui';
@@ -147,7 +135,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     }
   }, [activeCurve, patternLength, width, height, paramInfo]);
 
-  // Handle canvas click to add/edit points
+  // Handle canvas click
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
@@ -157,43 +145,22 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Calculate row and value from click position
       const row = Math.round((x / width) * patternLength);
-      const normalizedValue = 1 - y / height;
-      const value = paramInfo
-        ? paramInfo.min + normalizedValue * (paramInfo.max - paramInfo.min)
-        : normalizedValue * 100;
+      const value = Math.max(0, Math.min(1, 1 - y / height));
 
-      // Create curve if doesn't exist
       let curveId = activeCurve?.id;
       if (!curveId) {
         curveId = addCurve(patternId, channelIndex, activeParameter);
       }
-
-      // Add or update point
-      addPoint(curveId, row, Math.round(value));
+      addPoint(curveId, row, value);
       onAutomationChange?.();
     },
-    [
-      activeCurve,
-      patternId,
-      channelIndex,
-      activeParameter,
-      patternLength,
-      width,
-      height,
-      paramInfo,
-      addCurve,
-      addPoint,
-      onAutomationChange,
-    ]
+    [activeCurve, patternId, channelIndex, activeParameter, patternLength, width, height, addCurve, addPoint, onAutomationChange]
   );
 
-  // Handle mouse drag for continuous drawing
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isDragging || !activeCurve) return;
-
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -202,17 +169,12 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
       const y = e.clientY - rect.top;
 
       const row = Math.round((x / width) * patternLength);
-      const normalizedValue = 1 - y / height;
-      const value = paramInfo
-        ? paramInfo.min + normalizedValue * (paramInfo.max - paramInfo.min)
-        : normalizedValue * 100;
-
-      addPoint(activeCurve.id, row, Math.round(value));
+      const value = Math.max(0, Math.min(1, 1 - y / height));
+      addPoint(activeCurve.id, row, value);
     },
-    [isDragging, activeCurve, patternLength, width, height, paramInfo, addPoint]
+    [isDragging, activeCurve, patternLength, width, height, addPoint]
   );
 
-  // Handle clear automation
   const handleClear = useCallback(() => {
     if (activeCurve) {
       removeCurve(activeCurve.id);
@@ -221,7 +183,6 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
   }, [activeCurve, removeCurve, onAutomationChange]);
 
   if (compact && !isExpanded) {
-    // Mini collapsed view - just a bar with parameter indicator
     return (
       <div className="flex items-center gap-1 px-2 py-1 bg-dark-bgSecondary border-t border-dark-border">
         <button
@@ -229,7 +190,7 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
           className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
         >
           <ChevronDown size={10} />
-          <span style={{ color: paramInfo?.color }}>{paramInfo?.shortLabel}</span>
+          <span style={{ color: paramInfo?.color }}>{paramInfo?.shortLabel ?? '---'}</span>
           {activeCurve && activeCurve.points.length > 0 && (
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: paramInfo?.color }} />
           )}
@@ -264,26 +225,26 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
             </button>
 
             {showParamMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-10">
-                {AUTOMATION_PARAMETERS.map((param) => {
-                  const hasCurve = curves.some((c) => c.parameter === param.id);
+              <div className="absolute top-full left-0 mt-1 bg-dark-bgTertiary border border-dark-border rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+                {params.map((param) => {
+                  const hasCurve = curves.some((c) => c.parameter === param.key);
                   return (
                     <button
-                      key={param.id}
+                      key={param.key}
                       onClick={() => {
-                        setActiveParameter(param.id);
+                        setActiveParamKey(param.key);
                         setShowParamMenu(false);
                       }}
                       className={`
                         flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors
-                        ${activeParameter === param.id ? 'bg-dark-bgActive' : 'hover:bg-dark-bgHover'}
+                        ${activeParameter === param.key ? 'bg-dark-bgActive' : 'hover:bg-dark-bgHover'}
                       `}
                     >
                       <span
-                        className="w-2 h-2 rounded-full"
+                        className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{ backgroundColor: param.color }}
                       />
-                      <span className="text-text-secondary">{param.label}</span>
+                      <span className="text-text-secondary">{param.name}</span>
                       {hasCurve && (
                         <span className="ml-auto text-[10px] text-text-muted">has data</span>
                       )}
@@ -323,7 +284,6 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
         />
       </div>
 
-      {/* Value display */}
       {activeCurve && activeCurve.points.length > 0 && (
         <div className="px-2 pb-1 text-[10px] text-text-muted">
           {activeCurve.points.length} point{activeCurve.points.length !== 1 ? 's' : ''}
@@ -332,3 +292,11 @@ export const AutomationLane: React.FC<AutomationLaneProps> = ({
     </div>
   );
 };
+
+/** Resolve a CSS variable string to a concrete color for canvas rendering */
+function getComputedColor(element: HTMLElement, cssVar: string): string {
+  if (!cssVar.startsWith('var(')) return cssVar;
+  const varName = cssVar.slice(4, -1).trim();
+  const computed = getComputedStyle(element).getPropertyValue(varName).trim();
+  return computed || '#4f9d69';
+}

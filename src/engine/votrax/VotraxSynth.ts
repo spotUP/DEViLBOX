@@ -169,6 +169,12 @@ export class VotraxSynth extends MAMEBaseSynth {
 
   /** Speak English text using SAM's reciter and Votrax allophone mapping */
   speakText(text: string): void {
+    if (!this._isReady || !this.workletNode) {
+      console.warn(`[Votrax] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
+      this._pendingCalls.push({ method: 'speakText', args: [text] });
+      return;
+    }
+
     this.stopSpeaking();
 
     const phonemeStr = textToPhonemes(text);
@@ -177,6 +183,8 @@ export class VotraxSynth extends MAMEBaseSynth {
     const tokens = parsePhonemeString(phonemeStr);
     const frames = phonemesToVotraxFrames(tokens);
     if (frames.length === 0) return;
+
+    console.log(`[Votrax] speakText: "${text}" → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
 
     const speechFrames: SpeechFrame<VotraxFrame>[] = frames.map(f => ({
       data: f,
@@ -209,6 +217,20 @@ export class VotraxSynth extends MAMEBaseSynth {
   /** Whether text-to-speech is currently playing */
   get isSpeaking(): boolean {
     return this._speechSequencer?.isSpeaking ?? false;
+  }
+
+  // ===========================================================================
+  // Pending Call Handling
+  // ===========================================================================
+
+  protected override processPendingCall(call: { method: string; args: unknown[] }): void {
+    if (call.method === 'speakText') {
+      this.speakText(call.args[0] as string);
+    } else if (call.method === 'loadPreset') {
+      this.loadPreset(call.args[0] as number);
+    } else {
+      super.processPendingCall(call);
+    }
   }
 
   // ===========================================================================

@@ -22,6 +22,7 @@ export type ThemeType = 'ft2-blue' | 'dark' | 'custom';
 
 export type PanelType =
   | 'tracker'
+  | 'arrangement'
   | 'instrument-editor'
   | 'automation'
   | 'oscilloscope'

@@ -18,15 +18,30 @@ import { BuzzmachineEngine } from './engine/buzzmachines/BuzzmachineEngine';
 import { MAMEEngine } from './engine/MAMEEngine';
 import { getFirstPresetForSynthType } from './constants/factoryPresets';
 
+/** Extend Window with test-runner globals so we avoid `(window as any)` */
+interface TestRunnerWindow {
+  CAPTURED_CONSOLE_ERRORS: string[];
+  SYNTH_TEST_COMPLETE: boolean;
+  SYNTH_TEST_RESULTS: TestResults | null;
+  downloadConsoleErrors: () => void;
+  runAllTests: () => Promise<void>;
+  runFallbackTests: () => Promise<void>;
+  runVolumeTests: () => Promise<void>;
+  runBehaviorTests: () => Promise<void>;
+  runSamplePackTests: () => Promise<void>;
+  runEffectTests: () => Promise<void>;
+}
+
+declare const window: Window & TestRunnerWindow;
+
 // ============================================
 // SYNTH TEST CONFIGURATIONS
-// Using 'any' type since test configs don't need full type safety
 // ============================================
 
 // =============================================
 // FOCUSED TESTING: Fixed chips + MAME synths
 // =============================================
-const SYNTH_CONFIGS: Record<string, any> = {
+const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   // === Recently Fixed Chips (were silent) ===
   'FurnacePCSPKR': { synthType: 'FurnacePCSPKR', volume: -12, furnace: DEFAULT_FURNACE },
   'FurnaceRF5C68': { synthType: 'FurnaceRF5C68', volume: -12, furnace: DEFAULT_FURNACE },
@@ -462,7 +477,7 @@ interface TestResults {
   errors: { name: string; error: string }[];
   wasmUnavailSynths: string[];
   volumeLevels: { name: string; peakDb: number; rmsDb: number }[];
-  details: any[];
+  details: { name: string; status: string; constructor: string }[];
   samplePackResults: SamplePackTestResult[];
 }
 
@@ -507,7 +522,7 @@ console.warn = (...args) => {
 };
 
 // Make captured errors accessible to Playwright
-(window as any).CAPTURED_CONSOLE_ERRORS = capturedConsoleErrors;
+window.CAPTURED_CONSOLE_ERRORS = capturedConsoleErrors;
 
 // ============================================
 // HELPER FUNCTIONS
@@ -530,8 +545,8 @@ function logHtml(html: string) {
 
 function clearResults() {
   document.getElementById('results')!.innerHTML = '';
-  (window as any).SYNTH_TEST_COMPLETE = false;
-  (window as any).SYNTH_TEST_RESULTS = null;
+  window.SYNTH_TEST_COMPLETE = false;
+  window.SYNTH_TEST_RESULTS = null;
   document.title = 'DEViLBOX Synth Tests (Browser)';
   testResults = {
     passed: 0,
@@ -594,15 +609,19 @@ async function preWarmEngines(): Promise<void> {
     if (engineStatus.Furnace) {
       console.log('[PreWarm] Testing Furnace write capability...');
       furnaceEngine.testPing();
-      (furnaceEngine as any).testWrite?.();
+      const eng = furnaceEngine as unknown as Record<string, unknown>;
+      if (typeof eng.testWrite === 'function') eng.testWrite();
       await new Promise(r => setTimeout(r, 100)); // Give time for response
     }
-  } catch { engineStatus.Furnace = false; }
+  } catch { // ignored
+    engineStatus.Furnace = false;
+  }
 
   // FurnaceDispatch (for GB and other dispatch-based chips)
   try {
     const ctx = Tone.getContext();
-    const rawCtx = (ctx as any).rawContext || (ctx as any)._context || ctx;
+    const ctxRec = ctx as unknown as Record<string, unknown>;
+    const rawCtx = (ctxRec.rawContext || ctxRec._context || ctx) as BaseAudioContext;
     const furnaceDispatchEngine = FurnaceDispatchEngine.getInstance();
     engineStatus.FurnaceDispatch = await initTimeout(
       furnaceDispatchEngine.init(rawCtx),
@@ -616,7 +635,8 @@ async function preWarmEngines(): Promise<void> {
   // Buzzmachine - requires AudioWorklet which is only available in full browser environments
   try {
     const ctx = Tone.getContext();
-    const rawCtx = (ctx as any).rawContext || (ctx as any)._context || ctx;
+    const buzzCtxRec = ctx as unknown as Record<string, unknown>;
+    const rawCtx = (buzzCtxRec.rawContext || buzzCtxRec._context || ctx) as BaseAudioContext & { audioWorklet?: { addModule: (url: string) => Promise<void> } };
     // Use duck-typing instead of instanceof to handle standardized-audio-context wrappers
     const hasAudioWorklet = rawCtx && rawCtx.audioWorklet && typeof rawCtx.audioWorklet.addModule === 'function';
     if (hasAudioWorklet) {
@@ -641,7 +661,9 @@ async function preWarmEngines(): Promise<void> {
       mameEngine.init(),
       10000, 'MAMEEngine'
     );
-  } catch { engineStatus.MAME = false; }
+  } catch { // ignored
+    engineStatus.MAME = false;
+  }
 
   // Display engine status table
   logHtml('<table><tr><th>Engine</th><th>Status</th></tr>');
@@ -694,20 +716,22 @@ async function testSynthCreation() {
       } as InstrumentConfig;
 
       const synth = InstrumentFactory.createInstrument(fullConfig);
-      const ctorName = (synth as any).constructor?.name || 'Unknown';
+      const synthObj = synth as unknown as Record<string, unknown>;
+      const ctorName = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
 
       log(`✓ ${name}: Created (${ctorName})`, 'pass');
       testResults.passed++;
       testResults.details.push({ name, status: 'pass', constructor: ctorName });
 
       // Dispose to free resources
-      if (typeof (synth as any).dispose === 'function') {
-        (synth as any).dispose();
+      if (typeof synthObj.dispose === 'function') {
+        (synthObj.dispose as () => void)();
       }
-    } catch (e: any) {
-      log(`✗ ${name}: ${e.message}`, 'fail');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log(`✗ ${name}: ${msg}`, 'fail');
       testResults.failed++;
-      testResults.errors.push({ name, error: e.message });
+      testResults.errors.push({ name, error: msg });
     }
   }
 }
@@ -730,14 +754,15 @@ async function testFallbackDetection() {
         ...config
       } as InstrumentConfig;
 
-      const synth = InstrumentFactory.createInstrument(fullConfig) as any;
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
 
       // Check for fallback indicators
-      const hasUseWasm = 'useWasmEngine' in synth;
-      const hasFallback = 'fallbackSynth' in synth;
-      const useWasm = hasUseWasm ? synth.useWasmEngine : 'N/A';
-      const fallbackActive = hasFallback ? (synth.fallbackSynth !== null) : 'N/A';
-      const ctorName = synth.constructor?.name || 'Unknown';
+      const hasUseWasm = 'useWasmEngine' in synthObj;
+      const hasFallback = 'fallbackSynth' in synthObj;
+      const useWasm = hasUseWasm ? synthObj.useWasmEngine : 'N/A';
+      const fallbackActive = hasFallback ? (synthObj.fallbackSynth !== null) : 'N/A';
+      const ctorName = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
 
       let statusClass = 'native';
       let statusText = 'Native/WASM';
@@ -746,7 +771,7 @@ async function testFallbackDetection() {
         statusClass = 'fallback';
         statusText = 'FALLBACK';
         testResults.fallbacks.push(name);
-      } else if (hasFallback && synth.fallbackSynth !== null) {
+      } else if (hasFallback && synthObj.fallbackSynth !== null) {
         statusClass = 'fallback';
         statusText = 'FALLBACK';
         if (!testResults.fallbacks.includes(name)) {
@@ -766,12 +791,13 @@ async function testFallbackDetection() {
         <td>${ctorName}</td>
       </tr>`);
 
-      if (typeof synth.dispose === 'function') {
-        synth.dispose();
+      if (typeof synthObj.dispose === 'function') {
+        (synthObj.dispose as () => void)();
       }
-    } catch (e: any) {
-      logHtml(`<tr><td>${name}</td><td colspan="4" class="fail">Error: ${e.message}</td></tr>`);
-      testResults.errors.push({ name, error: e.message });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td colspan="4" class="fail">Error: ${msg}</td></tr>`);
+      testResults.errors.push({ name, error: msg });
     }
   }
 
@@ -799,7 +825,8 @@ async function testMethodAvailability() {
         ...config
       } as InstrumentConfig;
 
-      const synth = InstrumentFactory.createInstrument(fullConfig) as any;
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
 
       let methods = ['Player', 'GranularSynth'].includes(name) ? [...samplePlayerMethods] : [...coreMethods];
       if (name === 'TB303' || name === 'Buzz3o3') {
@@ -809,8 +836,8 @@ async function testMethodAvailability() {
         methods = [...methods, ...devilFishMethods];
       }
 
-      const available = methods.filter(m => typeof synth[m] === 'function');
-      const missing = methods.filter(m => typeof synth[m] !== 'function');
+      const available = methods.filter(m => typeof synthObj[m] === 'function');
+      const missing = methods.filter(m => typeof synthObj[m] !== 'function');
 
       if (missing.length > 0) {
         log(`${name}: Missing methods: ${missing.join(', ')}`, 'warn');
@@ -818,11 +845,12 @@ async function testMethodAvailability() {
         log(`${name}: All ${available.length} methods available`, 'pass');
       }
 
-      if (typeof synth.dispose === 'function') {
-        synth.dispose();
+      if (typeof synthObj.dispose === 'function') {
+        (synthObj.dispose as () => void)();
       }
-    } catch (e: any) {
-      log(`${name}: Error checking methods: ${e.message}`, 'fail');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log(`${name}: Error checking methods: ${msg}`, 'fail');
     }
   }
 }
@@ -843,15 +871,18 @@ async function testTriggers() {
         ...config
       } as InstrumentConfig;
 
-      const synth = InstrumentFactory.createInstrument(fullConfig) as any;
-      synth.connect(Tone.getDestination());
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
+      if (typeof synthObj.connect === 'function') {
+        (synthObj.connect as (dest: unknown) => void)(Tone.getDestination());
+      }
 
-      if (typeof synth.triggerAttack === 'function') {
-        synth.triggerAttack('C4');
+      if (typeof synthObj.triggerAttack === 'function') {
+        (synthObj.triggerAttack as (note: string) => void)('C4');
         await new Promise(r => setTimeout(r, 100));
 
-        if (typeof synth.triggerRelease === 'function') {
-          synth.triggerRelease();
+        if (typeof synthObj.triggerRelease === 'function') {
+          (synthObj.triggerRelease as () => void)();
         }
 
         log(`${name}: triggerAttack/Release works`, 'pass');
@@ -860,11 +891,12 @@ async function testTriggers() {
         log(`${name}: No triggerAttack method`, 'warn');
       }
 
-      if (typeof synth.dispose === 'function') {
-        synth.dispose();
+      if (typeof synthObj.dispose === 'function') {
+        (synthObj.dispose as () => void)();
       }
-    } catch (e: any) {
-      log(`${name}: Trigger test failed: ${e.message}`, 'fail');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log(`${name}: Trigger test failed: ${msg}`, 'fail');
       testResults.failed++;
     }
   }
@@ -904,7 +936,7 @@ async function testVolumeLevels() {
   for (const name of synthsToTest) {
     // Create a fresh meter for each synth test to avoid corruption from WASM synth disposal
     if (meter) {
-      try { meter.disconnect(); meter.dispose(); } catch {}
+      try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
     }
     meter = new Tone.Meter({ channels: 1, smoothing: 0 });
     meter.connect(Tone.getDestination());
@@ -951,7 +983,7 @@ async function testVolumeLevels() {
       // This ensures synths that need patch data (V2, MAME chips) produce sound.
       const preset = getFirstPresetForSynthType(config.synthType);
       const presetConfig = preset
-        ? (() => { const { name: _n, type: _t, synthType: _st, ...rest } = preset as any; return rest; })()
+        ? (() => { const p = { ...preset } as Record<string, unknown>; delete p.name; delete p.type; delete p.synthType; return p; })()
         : {};
 
       const fullConfig: InstrumentConfig = {
@@ -962,8 +994,11 @@ async function testVolumeLevels() {
         ...config          // Explicit test config wins
       } as InstrumentConfig;
 
-      const synth = InstrumentFactory.createInstrument(fullConfig) as any;
-      synth.connect(meter);
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
+      if (typeof synthObj.connect === 'function') {
+        (synthObj.connect as (dest: unknown) => void)(meter);
+      }
 
       // Ensure AudioContext is running before EVERY synth test.
       // Chrome may auto-suspend the context during long test runs (especially
@@ -971,13 +1006,14 @@ async function testVolumeLevels() {
       const isWasmSynth = requiredEngine !== null;
       try {
         await Tone.start();
-        const ctx = Tone.getContext() as any;
-        const rawCtx = ctx.rawContext || ctx._context;
-        if (rawCtx && rawCtx.state !== 'running') {
+        const ctx = Tone.getContext();
+        const ctxObj = ctx as unknown as Record<string, unknown>;
+        const rawCtx = (ctxObj.rawContext || ctxObj._context) as { state?: string; resume?: () => Promise<void> } | undefined;
+        if (rawCtx && rawCtx.state !== 'running' && typeof rawCtx.resume === 'function') {
           await rawCtx.resume();
         }
       } catch {
-        // Best effort
+        // ignored - best effort
       }
 
       // Wait for WASM initialization if this is a WASM-based synth
@@ -986,18 +1022,19 @@ async function testVolumeLevels() {
         Promise.race([promise, new Promise<null>(r => setTimeout(() => r(null), ms))]);
 
       let wasmInitFailed = false;
-      if (typeof synth.ensureInitialized === 'function') {
+      if (typeof synthObj.ensureInitialized === 'function') {
         try {
-          await initTimeout(synth.ensureInitialized(), 15000);
+          await initTimeout((synthObj.ensureInitialized as () => Promise<void>)(), 15000);
         } catch {
           wasmInitFailed = true;
-          // ensureInitialized threw
+          // ignored - ensureInitialized threw
         }
-      } else if (typeof synth.ready === 'function') {
+      } else if (typeof synthObj.ready === 'function') {
         try {
-          await initTimeout(synth.ready(), 15000);
+          await initTimeout((synthObj.ready as () => Promise<void>)(), 15000);
         } catch {
           wasmInitFailed = true;
+          // ignored
         }
       }
 
@@ -1013,11 +1050,11 @@ async function testVolumeLevels() {
       // Different synth types store init status in different properties.
       // Must use `=== true` checks because `false || undefined` yields `undefined`, not `false`.
       if (isWasmSynth && !wasmInitFailed) {
-        const hasInitProp = '_isReady' in synth || 'isInitialized' in synth ||
-                            '_initialized' in synth || 'useWasmEngine' in synth;
+        const hasInitProp = '_isReady' in synthObj || 'isInitialized' in synthObj ||
+                            '_initialized' in synthObj || 'useWasmEngine' in synthObj;
         if (hasInitProp) {
-          const isReady = synth._isReady === true || synth.isInitialized === true ||
-                          synth._initialized === true || synth.useWasmEngine === true;
+          const isReady = synthObj._isReady === true || synthObj.isInitialized === true ||
+                          synthObj._initialized === true || synthObj.useWasmEngine === true;
           if (!isReady) {
             wasmInitFailed = true;
           }
@@ -1031,8 +1068,8 @@ async function testVolumeLevels() {
         testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity });
         logHtml(`<tr><td>${name}</td><td>-</td><td class="warn">WASM UNAVAIL</td><td>N/A</td></tr>`);
         // Disconnect and dispose synth (meter is recreated at start of next iteration)
-        try { synth.disconnect?.(); } catch {}
-        try { synth.dispose?.(); } catch {}
+        try { if (typeof synthObj.disconnect === 'function') (synthObj.disconnect as () => void)(); } catch { /* ignored */ }
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         continue;
       }
 
@@ -1043,7 +1080,7 @@ async function testVolumeLevels() {
           await Tone.loaded();
           await new Promise(r => setTimeout(r, 200));
         } catch {
-          // Sample might not be loaded, continue anyway
+          // ignored - sample might not be loaded, continue anyway
         }
       }
 
@@ -1055,7 +1092,7 @@ async function testVolumeLevels() {
         testResults.passed++;
         testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN });
         logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs samples)</td><td>N/A</td></tr>`);
-        try { synth.dispose?.(); } catch {}
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         continue;
       }
 
@@ -1070,7 +1107,7 @@ async function testVolumeLevels() {
         testResults.passed++;
         testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN });
         logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs ROM)</td><td>N/A</td></tr>`);
-        try { synth.dispose?.(); } catch {}
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         continue;
       }
 
@@ -1078,7 +1115,7 @@ async function testVolumeLevels() {
       // Audio routes through native nodes (worklet → nativeGain → destination), so
       // Tone.Meter doesn't see it. Must be done after ensureInitialized().
       if (isDispatchSynth && !furnaceNativeMeter) {
-        const nativeGain = (synth as any)._nativeGain as GainNode | undefined;
+        const nativeGain = synthObj._nativeGain as GainNode | undefined;
         if (nativeGain && nativeGain.context) {
           furnaceNativeMeter = nativeGain.context.createAnalyser();
           furnaceNativeMeter.fftSize = 256;
@@ -1095,17 +1132,20 @@ async function testVolumeLevels() {
       if (START_STOP_SYNTHS.includes(name)) {
         try {
           // Check if buffer is loaded before starting
-          const hasBuffer = synth.buffer && synth.buffer.loaded;
+          const bufObj = synthObj.buffer as { loaded?: boolean } | undefined;
+          const hasBuffer = bufObj && bufObj.loaded;
           if (!hasBuffer) {
             // Try waiting longer for the buffer
             for (let wait = 0; wait < 20; wait++) {
               await new Promise(r => setTimeout(r, 100));
-              if (synth.buffer && synth.buffer.loaded) break;
+              const buf = synthObj.buffer as { loaded?: boolean } | undefined;
+              if (buf && buf.loaded) break;
             }
           }
 
-          if (synth.buffer && synth.buffer.loaded) {
-            synth.start();
+          const bufCheck = synthObj.buffer as { loaded?: boolean } | undefined;
+          if (bufCheck && bufCheck.loaded) {
+            (synthObj.start as () => void)();
 
             // Sample quickly at first (5ms intervals) to catch fast transients, then slower
             for (let i = 0; i < 30; i++) {
@@ -1114,32 +1154,33 @@ async function testVolumeLevels() {
               if (typeof level === 'number' && level > peakDb) peakDb = level;
             }
 
-            try { synth.stop(); } catch {}
+            try { (synthObj.stop as () => void)(); } catch { /* ignored */ }
           } else {
             console.warn(`[Test] ${name}: buffer not loaded after waiting`);
           }
-        } catch (triggerError: any) {
-          console.warn(`[Test] ${name} start/stop error:`, triggerError.message);
+        } catch (triggerError: unknown) {
+          const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
+          console.warn(`[Test] ${name} start/stop error:`, tMsg);
         }
-      } else if (typeof synth.triggerAttack === 'function') {
+      } else if (typeof synthObj.triggerAttack === 'function') {
         try {
           if (NO_NOTE_SYNTHS.includes(name)) {
             // Use triggerAttackRelease for percussion synths to ensure audible output
-            if (typeof synth.triggerAttackRelease === 'function') {
+            if (typeof synthObj.triggerAttackRelease === 'function') {
               // DrumMachine wrapper: (note, duration) - note is ignored, duration required
               // Standard Tone.js: (duration) - duration as first argument
               if (name === 'DrumMachine') {
-                synth.triggerAttackRelease('C4', 0.5); // Pass note (ignored) and duration
+                (synthObj.triggerAttackRelease as (note: string, dur: number) => void)('C4', 0.5);
               } else {
-                synth.triggerAttackRelease('8n');
+                (synthObj.triggerAttackRelease as (dur: string) => void)('8n');
               }
             } else {
-              synth.triggerAttack();
+              (synthObj.triggerAttack as () => void)();
             }
           } else {
             // TR707 uses GM drum mapping (MIDI 35-56), trigger C2 (36 = Bass Drum 1)
             const testNote = name === 'MAMETR707' ? 'C2' : 'C4';
-            synth.triggerAttack(testNote);
+            (synthObj.triggerAttack as (note: string) => void)(testNote);
           }
 
           // Sample at 5ms intervals initially, then slower at 30ms.
@@ -1172,11 +1213,12 @@ async function testVolumeLevels() {
             }
           }
 
-          if (typeof synth.triggerRelease === 'function') {
-            try { synth.triggerRelease(); } catch {}
+          if (typeof synthObj.triggerRelease === 'function') {
+            try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
           }
-        } catch (triggerError: any) {
-          console.warn(`[Test] ${name} trigger error:`, triggerError.message);
+        } catch (triggerError: unknown) {
+          const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
+          console.warn(`[Test] ${name} trigger error:`, tMsg);
         }
       }
 
@@ -1219,11 +1261,11 @@ async function testVolumeLevels() {
       </tr>`);
 
       // CRITICAL: Disconnect from meter BEFORE disposing to prevent meter corruption
-      if (typeof synth.disconnect === 'function') {
-        try { synth.disconnect(); } catch {}
+      if (typeof synthObj.disconnect === 'function') {
+        try { (synthObj.disconnect as () => void)(); } catch { /* ignored */ }
       }
-      if (typeof synth.dispose === 'function') {
-        try { synth.dispose(); } catch {}
+      if (typeof synthObj.dispose === 'function') {
+        try { (synthObj.dispose as () => void)(); } catch { /* ignored */ }
       }
 
       // Cleanup native meter for FM and dispatch Furnace synths
@@ -1233,12 +1275,12 @@ async function testVolumeLevels() {
           furnaceEngine.requestWorkletStatus();
           const nativeOutput = furnaceEngine.getNativeOutput();
           if (nativeOutput) {
-            try { nativeOutput.disconnect(furnaceNativeMeter); } catch {}
-            try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch {}
+            try { nativeOutput.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
+            try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch { /* ignored */ }
           }
         } else {
           // Dispatch synth — just disconnect the analyser
-          try { furnaceNativeMeter.disconnect(); } catch {}
+          try { furnaceNativeMeter.disconnect(); } catch { /* ignored */ }
         }
         furnaceNativeMeter = null;
         console.log(`[VolumeTest] ${name}: Cleaned up native meter, final peakDb=${peakDb.toFixed(2)}`);
@@ -1250,10 +1292,11 @@ async function testVolumeLevels() {
         const level = meter.getValue() as number;
         if (level <= -100 || level === -Infinity) break;
       }
-    } catch (e: any) {
-      logHtml(`<tr><td>${name}</td><td colspan="3" class="fail">Error: ${e.message}</td></tr>`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td colspan="3" class="fail">Error: ${msg}</td></tr>`);
       testResults.failed++;
-      testResults.errors.push({ name, error: e.message });
+      testResults.errors.push({ name, error: msg });
     }
   }
 
@@ -1295,7 +1338,7 @@ async function testVolumeLevels() {
     const furnaceEngine = FurnaceChipEngine.getInstance();
     // Deactivate all chips by sending deactivate for common chip types
     for (let chipType = 0; chipType < 75; chipType++) {
-      furnaceEngine.deactivate(chipType as any); // Cast to any since FurnaceChipType is a const enum
+      furnaceEngine.deactivate(chipType as unknown as Parameters<typeof furnaceEngine.deactivate>[0]);
     }
     console.log('[VolumeTest] Deactivated all Furnace chips');
   } catch (e) {
@@ -1328,8 +1371,8 @@ function displaySummary() {
   `);
 
   // Store results for Playwright to read
-  (window as any).SYNTH_TEST_RESULTS = testResults;
-  (window as any).SYNTH_TEST_COMPLETE = true;
+  window.SYNTH_TEST_RESULTS = testResults;
+  window.SYNTH_TEST_COMPLETE = true;
 
   // Update document title so automation can detect completion
   document.title = `DONE ${passed}p ${failed}f`;
@@ -1350,7 +1393,7 @@ function downloadConsoleErrors() {
 }
 
 // Make downloadConsoleErrors available globally
-(window as any).downloadConsoleErrors = downloadConsoleErrors;
+window.downloadConsoleErrors = downloadConsoleErrors;
 
 // ============================================
 // MAIN TEST RUNNERS
@@ -1371,8 +1414,9 @@ async function runAllTests() {
     await testTriggers();
     await testVolumeLevels();
     displaySummary();
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -1389,8 +1433,9 @@ async function runFallbackTests() {
     await initAudio();
     await testFallbackDetection();
     displaySummary();
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -1435,10 +1480,11 @@ async function runVolumeTests() {
       </div>
     `);
 
-    (window as any).SYNTH_TEST_RESULTS = testResults;
-    (window as any).SYNTH_TEST_COMPLETE = true;
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+    window.SYNTH_TEST_RESULTS = testResults;
+    window.SYNTH_TEST_COMPLETE = true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -1481,7 +1527,7 @@ async function testSustainReleaseBehavior() {
     try {
       const preset = getFirstPresetForSynthType(config.synthType);
       const presetConfig = preset
-        ? (() => { const { name: _n, type: _t, synthType: _st, ...rest } = preset as any; return rest; })()
+        ? (() => { const p = { ...preset } as Record<string, unknown>; delete p.name; delete p.type; delete p.synthType; return p; })()
         : {};
 
       const fullConfig: InstrumentConfig = {
@@ -1492,25 +1538,28 @@ async function testSustainReleaseBehavior() {
         ...config
       } as InstrumentConfig;
 
-      const synth = InstrumentFactory.createInstrument(fullConfig) as any;
-      synth.connect(meter);
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
+      if (typeof synthObj.connect === 'function') {
+        (synthObj.connect as (dest: unknown) => void)(meter);
+      }
 
       let sustainLevel = -Infinity;
       let afterReleaseLevel = -Infinity;
 
-      if (typeof synth.triggerAttack === 'function') {
+      if (typeof synthObj.triggerAttack === 'function') {
         // Trigger and hold for sustain measurement
-        synth.triggerAttack('C4');
+        (synthObj.triggerAttack as (note: string) => void)('C4');
 
         // Wait for attack/decay to complete, measure sustain
         await new Promise(r => setTimeout(r, 500));
         sustainLevel = meter.getValue() as number;
 
         // Release the note
-        if (typeof synth.triggerRelease === 'function') {
-          synth.triggerRelease();
-        } else if (typeof synth.releaseAll === 'function') {
-          synth.releaseAll();
+        if (typeof synthObj.triggerRelease === 'function') {
+          (synthObj.triggerRelease as () => void)();
+        } else if (typeof synthObj.releaseAll === 'function') {
+          (synthObj.releaseAll as () => void)();
         }
 
         // Wait for release to complete
@@ -1553,10 +1602,11 @@ async function testSustainReleaseBehavior() {
         <td class="${status === 'pass' ? '' : 'fail'}">${issue || 'OK'}</td>
       </tr>`);
 
-      if (typeof synth.dispose === 'function') {
-        synth.dispose();
+      if (typeof synthObj.dispose === 'function') {
+        (synthObj.dispose as () => void)();
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       results.push({
         name,
         sustainLevel: -Infinity,
@@ -1564,9 +1614,9 @@ async function testSustainReleaseBehavior() {
         goesSilent: true,
         playsForever: false,
         status: 'error',
-        error: e.message,
+        error: msg,
       });
-      logHtml(`<tr><td>${name}</td><td colspan="4" class="fail">Error: ${e.message}</td></tr>`);
+      logHtml(`<tr><td>${name}</td><td colspan="4" class="fail">Error: ${msg}</td></tr>`);
     }
   }
 
@@ -1600,9 +1650,10 @@ async function runBehaviorTests() {
   try {
     await initAudio();
     await testSustainReleaseBehavior();
-    (window as any).SYNTH_TEST_COMPLETE = true;
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+    window.SYNTH_TEST_COMPLETE = true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -1709,11 +1760,11 @@ async function testSamplePackLoading() {
               error: `HTTP ${response.status}`
             });
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           failed++;
           result.failedSamples.push({
             filename: sample.filename,
-            error: e.message
+            error: e instanceof Error ? e.message : String(e)
           });
         }
       }
@@ -1821,11 +1872,12 @@ async function testSamplePlayback() {
         // Small delay between samples
         await new Promise(r => setTimeout(r, 100));
 
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         logHtml(`<tr>
           <td>${sample.name}</td>
           <td>${category}</td>
-          <td colspan="2" class="fail">Error: ${e.message}</td>
+          <td colspan="2" class="fail">Error: ${msg}</td>
         </tr>`);
       }
     }
@@ -1928,8 +1980,9 @@ async function runSamplePackTests() {
     await testSamplePlayback();
     await testSampleCategories();
     displaySamplePackSummary();
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -1956,8 +2009,8 @@ function displaySamplePackSummary() {
     </div>
   `);
 
-  (window as any).SYNTH_TEST_RESULTS = testResults;
-  (window as any).SYNTH_TEST_COMPLETE = true;
+  window.SYNTH_TEST_RESULTS = testResults;
+  window.SYNTH_TEST_COMPLETE = true;
 }
 
 // ============================================
@@ -2414,11 +2467,12 @@ async function testEffectCreation() {
 
     try {
       const effect = await InstrumentFactory.createEffect(config);
-      const ctorName = (effect as any).constructor?.name || 'Unknown';
+      const effectObj = effect as unknown as Record<string, unknown>;
+      const ctorName = (effectObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
 
       // Verify it has connect/disconnect/dispose methods
-      const hasConnect = typeof (effect as any).connect === 'function';
-      const hasDispose = typeof (effect as any).dispose === 'function';
+      const hasConnect = typeof effectObj.connect === 'function';
+      const hasDispose = typeof effectObj.dispose === 'function';
 
       if (!hasConnect) {
         logHtml(`<tr><td>${name}</td><td>${category}</td><td>${ctorName}</td><td class="warn">NO connect()</td></tr>`);
@@ -2433,10 +2487,10 @@ async function testEffectCreation() {
 
       // Dispose
       if (hasDispose) {
-        try { (effect as any).dispose(); } catch { /* may fail */ }
+        try { (effectObj.dispose as () => void)(); } catch { /* ignored */ }
       }
-    } catch (e: any) {
-      const errMsg = e?.message || e?.name || e?.toString?.() || 'unknown error';
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? (e.message || e.name) : (typeof e === 'string' ? e : 'unknown error');
       logHtml(`<tr><td>${name}</td><td>${category}</td><td>-</td><td class="fail">Error: ${errMsg}</td></tr>`);
       testResults.failed++;
       testResults.errors.push({ name: `Effect: ${name}`, error: errMsg });
@@ -2584,18 +2638,19 @@ async function testEffectSignalPath() {
     try {
       const warmupSynth = new Tone.Synth({ volume: -18 });
       const warmupEffect = await InstrumentFactory.createEffect(config);
-      warmupSynth.connect(warmupEffect as any);
-      (warmupEffect as any).connect(meter);
+      const wEffObj = warmupEffect as unknown as Record<string, unknown>;
+      warmupSynth.connect(warmupEffect as Tone.ToneAudioNode);
+      if (typeof wEffObj.connect === 'function') (wEffObj.connect as (dest: unknown) => void)(meter);
 
       await new Promise(r => setTimeout(r, 50));
       warmupSynth.triggerAttackRelease('C4', '8n');
       await new Promise(r => setTimeout(r, 300));
 
       warmupSynth.dispose();
-      try { (warmupEffect as any).dispose(); } catch {}
+      try { if (typeof wEffObj.dispose === 'function') (wEffObj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
     } catch {
-      // Warmup effect failed - continue anyway
+      // ignored - warmup effect failed, continue anyway
     }
   }
 
@@ -2610,9 +2665,10 @@ async function testEffectSignalPath() {
     try {
       const synth = new Tone.Synth({ volume: -12 });
       const effect = await InstrumentFactory.createEffect(config);
+      const effectObj = effect as unknown as Record<string, unknown>;
 
-      synth.connect(effect as any);
-      (effect as any).connect(meter);
+      synth.connect(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(meter);
 
       // LFO-based effects need extra time for the oscillator to start
       const isLFOEffect = ['Chorus', 'Tremolo', 'Vibrato', 'AutoPanner', 'AutoFilter', 'Phaser'].includes(name);
@@ -2642,13 +2698,14 @@ async function testEffectSignalPath() {
 
       logHtml(`<tr><td>${name}</td><td>${peakDb === -Infinity ? '-∞' : peakDb.toFixed(1)}</td><td class="${status}">${statusText}</td></tr>`);
 
-      try { synth.dispose(); } catch {}
-      try { (effect as any).dispose(); } catch {}
+      try { synth.dispose(); } catch { /* ignored */ }
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
-    } catch (e: any) {
-      logHtml(`<tr><td>${name}</td><td>-</td><td class="fail">Error: ${e.message}</td></tr>`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td>-</td><td class="fail">Error: ${msg}</td></tr>`);
       testResults.failed++;
-      testResults.errors.push({ name: `EffectPath: ${name}`, error: e.message });
+      testResults.errors.push({ name: `EffectPath: ${name}`, error: msg });
     }
   }
 
@@ -2712,9 +2769,10 @@ async function testEffectBehavior() {
     try {
       const synth = new Tone.Synth({ volume: -12 });
       const effect = await InstrumentFactory.createEffect(config);
+      const effectObj = effect as unknown as Record<string, unknown>;
 
-      synth.connect(effect as any);
-      (effect as any).connect(meter);
+      synth.connect(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(meter);
       await new Promise(r => setTimeout(r, 30));
 
       // Measure with effect
@@ -2799,14 +2857,15 @@ async function testEffectBehavior() {
         <td class="${status}">${statusText}</td>
       </tr>`);
 
-      try { synth.dispose(); } catch {}
-      try { (effect as any).dispose(); } catch {}
+      try { synth.dispose(); } catch { /* ignored */ }
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
 
-    } catch (e: any) {
-      logHtml(`<tr><td>${name}</td><td>${behavior}</td><td>-</td><td>-</td><td>-</td><td class="fail">Error: ${e.message}</td></tr>`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td>${behavior}</td><td>-</td><td>-</td><td>-</td><td class="fail">Error: ${msg}</td></tr>`);
       testResults.failed++;
-      testResults.errors.push({ name: `EffectBehavior: ${name}`, error: e.message });
+      testResults.errors.push({ name: `EffectBehavior: ${name}`, error: msg });
     }
   }
 
@@ -2848,9 +2907,10 @@ async function testEffectWetDry() {
     try {
       const synth = new Tone.Synth({ volume: -12 });
       const effect = await InstrumentFactory.createEffect(config);
+      const effectObj = effect as unknown as Record<string, unknown>;
 
-      synth.connect(effect as any);
-      (effect as any).connect(meter);
+      synth.connect(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(meter);
       await new Promise(r => setTimeout(r, 30));
 
       synth.triggerAttack('C4');
@@ -2896,11 +2956,11 @@ async function testEffectWetDry() {
         <td class="${status}">${statusText}</td>
       </tr>`);
 
-      try { synth.dispose(); } catch {}
-      try { (effect as any).dispose(); } catch {}
+      try { synth.dispose(); } catch { /* ignored */ }
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
 
-    } catch (e: any) {
+    } catch {
       logHtml(`<tr><td>${wetPercent}%</td><td>-</td><td>-</td><td>-</td><td class="fail">Error</td></tr>`);
       testResults.failed++;
     }
@@ -2969,28 +3029,30 @@ async function testEffectParameters() {
       const config1 = { ...config, parameters: { ...config.parameters, [test.param]: test.val1 } };
       const synth1 = new Tone.Synth({ volume: -12 });
       const effect1 = await InstrumentFactory.createEffect(config1);
-      synth1.connect(effect1 as any);
-      (effect1 as any).connect(meter);
+      const eff1Obj = effect1 as unknown as Record<string, unknown>;
+      synth1.connect(effect1 as Tone.ToneAudioNode);
+      if (typeof eff1Obj.connect === 'function') (eff1Obj.connect as (dest: unknown) => void)(meter);
       await new Promise(r => setTimeout(r, 30));
       synth1.triggerAttack('C4');
       const level1 = await measureAverage(meter, 200);
       synth1.triggerRelease();
-      try { synth1.dispose(); } catch {}
-      try { (effect1 as any).dispose(); } catch {}
+      try { synth1.dispose(); } catch { /* ignored */ }
+      try { if (typeof eff1Obj.dispose === 'function') (eff1Obj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
 
       // Test with value 2
       const config2 = { ...config, parameters: { ...config.parameters, [test.param]: test.val2 } };
       const synth2 = new Tone.Synth({ volume: -12 });
       const effect2 = await InstrumentFactory.createEffect(config2);
-      synth2.connect(effect2 as any);
-      (effect2 as any).connect(meter);
+      const eff2Obj = effect2 as unknown as Record<string, unknown>;
+      synth2.connect(effect2 as Tone.ToneAudioNode);
+      if (typeof eff2Obj.connect === 'function') (eff2Obj.connect as (dest: unknown) => void)(meter);
       await new Promise(r => setTimeout(r, 30));
       synth2.triggerAttack('C4');
       const level2 = await measureAverage(meter, 200);
       synth2.triggerRelease();
-      try { synth2.dispose(); } catch {}
-      try { (effect2 as any).dispose(); } catch {}
+      try { synth2.dispose(); } catch { /* ignored */ }
+      try { if (typeof eff2Obj.dispose === 'function') (eff2Obj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
 
       const diff = Math.abs(level2 - level1);
@@ -3016,8 +3078,9 @@ async function testEffectParameters() {
         <td class="${status}">${statusText}</td>
       </tr>`);
 
-    } catch (e: any) {
-      logHtml(`<tr><td>${test.effect}</td><td>${test.param}</td><td colspan="6" class="fail">Error: ${e.message}</td></tr>`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${test.effect}</td><td>${test.param}</td><td colspan="6" class="fail">Error: ${msg}</td></tr>`);
       testResults.failed++;
     }
   }
@@ -3126,9 +3189,10 @@ async function testEffectABComparison() {
       const wetConfig = { ...config, wet: wetAmount };
       const wetSynth = new Tone.Synth({ volume: -12 });
       const effect = await InstrumentFactory.createEffect(wetConfig);
+      const effectObj = effect as unknown as Record<string, unknown>;
 
-      wetSynth.connect(effect as any);
-      (effect as any).connect(meter);
+      wetSynth.connect(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(meter);
 
       // Longer stabilization and meter priming
       await new Promise(r => setTimeout(r, stabilizeTime));
@@ -3142,7 +3206,7 @@ async function testEffectABComparison() {
       const wetTail = await measurePeak(meter, tailMeasureTime);
 
       wetSynth.dispose();
-      try { (effect as any).dispose(); } catch {}
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* ignored */ }
       await drainMeter(meter);
 
       // === ANALYSIS ===
@@ -3252,10 +3316,11 @@ async function testEffectABComparison() {
         <td class="${status}">${statusText}</td>
       </tr>`);
 
-    } catch (e: any) {
-      logHtml(`<tr><td>${test.name}</td><td>${test.expectation}</td><td colspan="7" class="fail">Error: ${e.message}</td></tr>`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${test.name}</td><td>${test.expectation}</td><td colspan="7" class="fail">Error: ${msg}</td></tr>`);
       testResults.failed++;
-      testResults.errors.push({ name: `A/B: ${test.name}`, error: e.message });
+      testResults.errors.push({ name: `A/B: ${test.name}`, error: msg });
     }
   }
 
@@ -3322,10 +3387,11 @@ async function runEffectTests() {
       </div>
     `);
 
-    (window as any).SYNTH_TEST_RESULTS = testResults;
-    (window as any).SYNTH_TEST_COMPLETE = true;
-  } catch (e: any) {
-    log('Test error: ' + e.message, 'fail');
+    window.SYNTH_TEST_RESULTS = testResults;
+    window.SYNTH_TEST_COMPLETE = true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
   }
 
   buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
@@ -3343,9 +3409,9 @@ document.getElementById('runSamplePackTests')?.addEventListener('click', runSamp
 document.getElementById('runEffectTests')?.addEventListener('click', runEffectTests);
 
 // Export for console access
-(window as any).runAllTests = runAllTests;
-(window as any).runFallbackTests = runFallbackTests;
-(window as any).runVolumeTests = runVolumeTests;
-(window as any).runBehaviorTests = runBehaviorTests;
-(window as any).runSamplePackTests = runSamplePackTests;
-(window as any).runEffectTests = runEffectTests;
+window.runAllTests = runAllTests;
+window.runFallbackTests = runFallbackTests;
+window.runVolumeTests = runVolumeTests;
+window.runBehaviorTests = runBehaviorTests;
+window.runSamplePackTests = runSamplePackTests;
+window.runEffectTests = runEffectTests;

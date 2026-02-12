@@ -17,7 +17,9 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
-import { ChevronDown, ChevronUp, FilePlus, Maximize2, Minimize2, MousePointerClick } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
+import { focusPopout } from '@components/ui/PopOutWindow';
+import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
@@ -41,6 +43,8 @@ import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
+import type { XMNote } from '@lib/import/formats/XMParser';
+import type { MODNote } from '@lib/import/formats/MODParser';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
@@ -267,7 +271,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const handleSave = () => {
     try {
       const sequence = patterns.map((p) => p.id);
-      const automationData: Record<string, any> = {};
+      const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
       patterns.forEach((pattern) => {
         pattern.channels.forEach((_channel, channelIndex) => {
           const channelCurves = curves.filter(
@@ -282,7 +286,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 acc[curve.parameter] = curve;
                 return acc;
               },
-              {} as Record<string, any>
+              {} as Record<string, unknown>
             );
           }
         });
@@ -318,19 +322,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         const channelCount = importMetadata.originalChannelCount;
         const instrumentNames = nativeInstruments?.map(i => i.name) || [];
         if (format === 'XM') {
-          result = convertXMModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+          result = convertXMModule(nativePatterns as XMNote[][][], channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
         } else if (format === 'MOD') {
-          result = convertMODModule(nativePatterns, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+          result = convertMODModule(nativePatterns as MODNote[][][], channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
         } else if (format === 'FUR' || format === 'DMF') {
           // Furnace and DefleMask patterns are already converted
           // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
           const patternOrder = importMetadata.modData?.patternOrderTable || [];
           const patLen = nativePatterns[0]?.length || 64;
-          const numChannels = importMetadata.originalChannelCount || nativePatterns[0]?.[0]?.length || 4;
+          const numChannels = importMetadata.originalChannelCount || (nativePatterns[0]?.[0] as unknown[] | undefined)?.length || 4;
           console.log(`[Import] ${format} pattern structure: ${nativePatterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
 
           result = {
-            patterns: nativePatterns.map((pat: any[][], idx: number) => ({
+            patterns: (nativePatterns as Record<string, unknown>[][][]).map((pat, idx) => ({
               id: `pattern-${idx}`,
               name: `Pattern ${idx}`,
               length: patLen,
@@ -345,8 +349,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 pan: 0,
                 instrumentId: null,
                 color: null,
-                rows: pat.map((row: any[]) => {
-                  const cell = row[ch] || {};
+                rows: pat.map((row: Record<string, unknown>[]) => {
+                  const cell = (row[ch] || {}) as Record<string, number>;
                   return {
                     note: cell.note || 0,
                     instrument: cell.instrument || 0,
@@ -398,7 +402,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (initialSpeed) setSpeed(initialSpeed);
       notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
       await engine.preloadInstruments(instruments);
-    } catch (err) {
+    } catch {
       notify.error(`Failed to import module`);
     } finally {
       setIsLoading(false);
@@ -683,12 +687,29 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 min-w-[120px] flex items-center justify-center border-l border-dark-border px-2 cursor-pointer relative group bg-black overflow-hidden rounded-[6px] m-1" onClick={() => {
+        <VisualizerFrame variant="compact" className="flex-1 min-w-[120px] border-l border-dark-border cursor-pointer group m-1" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
           const currentIndex = modes.indexOf(vizMode);
           const nextIndex = (currentIndex + 1) % modes.length;
           setVizMode(modes[nextIndex]);
         }}>
+          {/* Pop out button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const already = useUIStore.getState().oscilloscopePoppedOut;
+              if (already) {
+                focusPopout('DEViLBOX — Visualizer');
+              } else {
+                useUIStore.getState().setOscilloscopePoppedOut(true);
+              }
+            }}
+            className="absolute top-1 right-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-cyan-400 transition-all z-10"
+            title="Pop out visualizer"
+          >
+            <ExternalLink size={12} />
+          </button>
           {/* Version Number */}
           <div className="absolute bottom-1 right-2 text-[9px] font-mono text-text-muted opacity-40 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             v{CURRENT_VERSION}
@@ -725,24 +746,26 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             </>
           )}
         </div>
+        </VisualizerFrame>
       </div>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <ImportModuleDialog isOpen={showImportDialog} onClose={() => setShowImportDialog(false)} onImport={handleModuleImport} />
-      <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data: any, filename: string) => {
+      <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
           // Handle XML files (DB303 patterns or presets)
-          if (typeof data === 'string' && filename.toLowerCase().endsWith('.xml')) {
+          const dataStr = typeof (data as unknown) === 'string' ? (data as unknown as string) : null;
+          if (dataStr && filename.toLowerCase().endsWith('.xml')) {
             try {
               // Detect XML type
-              const isPreset = data.includes('<db303-preset');
-              const isPattern = data.includes('<db303-pattern');
+              const isPreset = dataStr.includes('<db303-preset');
+              const isPattern = dataStr.includes('<db303-pattern');
               
               if (isPreset) {
                 // Import as TB-303 preset
                 const { parseDb303Preset } = await import('@lib/import/Db303PresetConverter');
-                const presetConfig = parseDb303Preset(data);
+                const presetConfig = parseDb303Preset(dataStr);
                 
                 // Find or create TB-303 instrument and apply preset
                 let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
@@ -786,7 +809,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 }
                 
                 // Parse pattern with instrument ID
-                const { pattern: importedPattern, tempo } = parseDb303Pattern(data, patternName, tb303Instrument.id);
+                const { pattern: importedPattern, tempo } = parseDb303Pattern(dataStr, patternName, tb303Instrument.id);
                 
                 console.log('[XML Import] Parsed pattern:', {
                   name: importedPattern.name,
@@ -842,26 +865,28 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           }
 
           // Handle JSON project files
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const proj = data as any;
           const { needsMigration, migrateProject } = await import('@/lib/migration');
-          let projectPatterns = data.patterns, projectInstruments = data.instruments;
+          let projectPatterns = proj.patterns, projectInstruments = proj.instruments;
           if (needsMigration(projectPatterns, projectInstruments)) {
             const migrated = migrateProject(projectPatterns, projectInstruments);
             projectPatterns = migrated.patterns; projectInstruments = migrated.instruments;
           }
           if (projectPatterns) {
             loadPatterns(projectPatterns);
-            if (data.sequence && Array.isArray(data.sequence)) {
-              const patternIdToIndex = new Map(projectPatterns.map((p: any, i: any) => [p.id, i]));
-              const order = data.sequence.map((id: any) => patternIdToIndex.get(id)).filter((idx: any) => idx !== undefined);
+            if (proj.sequence && Array.isArray(proj.sequence)) {
+              const patternIdToIndex = new Map((projectPatterns as Array<{ id: string }>).map((p, i) => [p.id, i]));
+              const order = (proj.sequence as string[]).map((id: string) => patternIdToIndex.get(id)).filter((idx: unknown): idx is number => idx !== undefined);
               if (order.length > 0) setPatternOrder(order);
             }
           }
           if (projectInstruments) loadInstruments(projectInstruments);
-          if (data.metadata) setMetadata(data.metadata);
-          if (data.bpm) setBPM(data.bpm);
-          setGrooveTemplate(data.grooveTemplateId || 'straight');
-          notify.success(`Loaded: ${data.metadata?.name || filename}`);
-        } catch (error) { notify.error('Failed to load file'); }
+          if (proj.metadata) setMetadata(proj.metadata);
+          if (proj.bpm) setBPM(proj.bpm);
+          setGrooveTemplate(proj.grooveTemplateId || 'straight');
+          notify.success(`Loaded: ${proj.metadata?.name || filename}`);
+        } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
@@ -926,7 +951,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             const moduleInfo = await loadModuleFile(new File([buffer], filename));
             if (moduleInfo) await handleModuleImport(moduleInfo);
           }
-        } catch (error) { notify.error('Failed to load file'); }
+        } catch { notify.error('Failed to load file'); }
       }} />
 
       {/* Clear Modal */}

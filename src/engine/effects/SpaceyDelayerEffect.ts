@@ -131,8 +131,8 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
       // Load worklet module
       try {
         await context.audioWorklet.addModule(`${baseUrl}spacey-delayer/SpaceyDelayer.worklet.js`);
-      } catch (e: any) {
-        const msg = e?.message || String(e);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         if (!msg.includes('already') && !msg.includes('duplicate')) {
           throw new Error(`Failed to load SpaceyDelayer worklet: ${msg}`);
         }

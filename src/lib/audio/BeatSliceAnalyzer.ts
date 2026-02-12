@@ -12,7 +12,6 @@ import type {
   BeatSlice,
   BeatSliceConfig,
   TransientAnalysisResult,
-  GridAnalysisParams as _GridAnalysisParams,
 } from '../../types/beatSlicer';
 
 // FFT parameters for spectral analysis
@@ -601,11 +600,12 @@ export class BeatSliceAnalyzer {
     }
 
     switch (config.mode) {
-      case 'transient':
+      case 'transient': {
         const result = detectTransients(this.audioBuffer, config);
         return result.slices;
+      }
 
-      case 'grid':
+      case 'grid': {
         const effectiveBpm = bpm || 120;
         return generateGridSlices(
           this.audioBuffer,
@@ -613,6 +613,7 @@ export class BeatSliceAnalyzer {
           config.gridDivision,
           config
         );
+      }
 
       case 'manual':
         // Manual mode starts with single slice covering whole sample

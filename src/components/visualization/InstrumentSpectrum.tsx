@@ -66,7 +66,7 @@ export const InstrumentSpectrum: React.FC<InstrumentSpectrumProps> = ({
   // Handle responsive width
   useEffect(() => {
     if (width !== 'auto') {
-      setLogicalWidth(width);
+      requestAnimationFrame(() => setLogicalWidth(width));
       return;
     }
     const container = containerRef.current;

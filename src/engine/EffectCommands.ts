@@ -1,4 +1,3 @@
-// @ts-nocheck - Unused variable warnings
 /**
  * EffectCommands - FastTracker II Effect Command Processor
  *
@@ -216,7 +215,8 @@ export class EffectProcessor {
   private memory: EffectMemory = {};
   private channelStates: Map<number, EffectState> = new Map();
   private ticksPerRow: number = 6; // Default FT2 speed
-  private currentTick: number = 0;
+  // @ts-expect-error Reserved for future tick tracking
+  private _currentTick: number = 0;
 
   // Global state
   private globalVolume: number = 64; // 0-64
@@ -254,7 +254,8 @@ export class EffectProcessor {
    * Convert frequency to nearest note
    * @internal - Reserved for future use
    */
-  private frequencyToNote(freq: number): string {
+  // @ts-expect-error Reserved for future use
+  private _frequencyToNote(freq: number): string {
     try {
       return Tone.Frequency(freq).toNote();
     } catch {
@@ -269,10 +270,11 @@ export class EffectProcessor {
     const p = phase & 63;
 
     switch (waveform) {
-      case 'sine':
+      case 'sine': {
         // Use authentic ProTracker sine table
         const tableValue = VIBRATO_TABLE[p & 31];
         return p < 32 ? tableValue / 255 : -(tableValue / 255);
+      }
       case 'rampDown':
         return 1 - ((p % 32) / 16);
       case 'square':
@@ -463,18 +465,20 @@ export class EffectProcessor {
         break;
 
       // ========== Cxx - Set Volume ==========
-      case 0xC:
+      case 0xC: {
         const vol = Math.min(param, 64);
         mem.volume = vol;
         result.setVolume = vol;
         break;
+      }
 
       // ========== Dxx - Pattern Break ==========
-      case 0xD:
+      case 0xD: {
         // param is decimal-coded: D32 = row 32, not row 50
         const breakRow = x * 10 + y;
         result.patternBreak = { position: breakRow };
         break;
+      }
 
       // ========== Exx - Extended Commands ==========
       case 0xE:
@@ -705,11 +709,12 @@ export class EffectProcessor {
         break;
 
       // E4x - Vibrato Control (waveform)
-      case 0x4:
+      case 0x4: {
         const vibratoWaves: WaveformType[] = ['sine', 'rampDown', 'square', 'random'];
         mem.vibratoWaveform = vibratoWaves[y & 3];
         mem.vibratoNoRetrig = (y & 4) !== 0;
         break;
+      }
 
       // E5x - Set Finetune
       case 0x5:
@@ -735,11 +740,12 @@ export class EffectProcessor {
         break;
 
       // E7x - Tremolo Control (waveform)
-      case 0x7:
+      case 0x7: {
         const tremoloWaves: WaveformType[] = ['sine', 'rampDown', 'square', 'random'];
         mem.tremoloWaveform = tremoloWaves[y & 3];
         mem.tremoloNoRetrig = (y & 4) !== 0;
         break;
+      }
 
       // E8x - Set Panning (coarse, 16 positions)
       case 0x8:
@@ -824,7 +830,7 @@ export class EffectProcessor {
 
     // Arpeggio - cycle through base, +x, +y semitones
     if (state.arpeggio) {
-      const { baseFreq, x, y, step: _step } = state.arpeggio;
+      const { baseFreq, x, y } = state.arpeggio;
       const offsets = [0, x, y];
       const offset = offsets[tick % 3];
       result.frequencySet = baseFreq * Math.pow(2, offset / 12);

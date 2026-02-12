@@ -49,6 +49,48 @@ function isParamCategorized(name: string): boolean {
   return CATEGORIZED_PREFIXES.some(prefix => name.startsWith(prefix));
 }
 
+// ============================================================================
+// Module-scope ParamKnob component (extracted for react-hooks/static-components)
+// ============================================================================
+
+interface ParamKnobProps {
+  name: string;
+  label: string;
+  min?: number;
+  max?: number;
+  fmt?: (v: number) => string;
+  logarithmic?: boolean;
+  bipolar?: boolean;
+  size?: 'sm' | 'md';
+  paramByName: Map<string, VSTBridgeParam>;
+  paramValues: Map<number, number>;
+  setParam: (id: number, value: number) => void;
+  knobColor: string;
+}
+
+const ParamKnob: React.FC<ParamKnobProps> = ({
+  name, label, min, max, fmt, logarithmic, bipolar, size,
+  paramByName, paramValues, setParam, knobColor,
+}) => {
+  const p = paramByName.get(name);
+  if (!p) return null;
+  return (
+    <Knob
+      label={label}
+      value={paramValues.get(p.id) ?? p.defaultValue}
+      min={min ?? p.min}
+      max={max ?? p.max}
+      defaultValue={p.defaultValue}
+      onChange={(v) => setParam(p.id, v)}
+      size={size || 'sm'}
+      color={knobColor}
+      logarithmic={logarithmic}
+      bipolar={bipolar}
+      formatValue={fmt}
+    />
+  );
+};
+
 interface VitalControlsProps {
   instrument: InstrumentConfig;
   onChange: (updates: Partial<InstrumentConfig>) => void;
@@ -104,7 +146,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
         } else {
           if (!cancelled) setSynthReady(true);
         }
-      } catch (_e) {
+      } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };
@@ -124,35 +166,8 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
     }
   }, []);
 
-  /** Render a knob for a named parameter */
-  const ParamKnob = useCallback(({ name, label, min, max, fmt, logarithmic, bipolar, size }: {
-    name: string;
-    label: string;
-    min?: number;
-    max?: number;
-    fmt?: (v: number) => string;
-    logarithmic?: boolean;
-    bipolar?: boolean;
-    size?: 'sm' | 'md';
-  }) => {
-    const p = paramByName.get(name);
-    if (!p) return null;
-    return (
-      <Knob
-        label={label}
-        value={paramValues.get(p.id) ?? p.defaultValue}
-        min={min ?? p.min}
-        max={max ?? p.max}
-        defaultValue={p.defaultValue}
-        onChange={(v) => setParam(p.id, v)}
-        size={size || 'sm'}
-        color={knobColor}
-        logarithmic={logarithmic}
-        bipolar={bipolar}
-        formatValue={fmt}
-      />
-    );
-  }, [paramByName, paramValues, setParam, knobColor]);
+  // Shared props for ParamKnob instances
+  const paramKnobProps = { paramByName, paramValues, setParam, knobColor };
 
   if (!synthReady) {
     return (
@@ -202,19 +217,19 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                   Oscillator {n}
                 </h3>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  <ParamKnob name={`osc_${n}_transpose`} label="Transpose" min={-48} max={48} bipolar
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_transpose`} label="Transpose" min={-48} max={48} bipolar
                     fmt={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}st`} />
-                  <ParamKnob name={`osc_${n}_tune`} label="Tune" min={-1} max={1} bipolar
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_tune`} label="Tune" min={-1} max={1} bipolar
                     fmt={(v) => `${(v * 100).toFixed(0)}ct`} />
-                  <ParamKnob name={`osc_${n}_level`} label="Level" />
-                  <ParamKnob name={`osc_${n}_pan`} label="Pan" min={-1} max={1} bipolar
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_level`} label="Level" />
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_pan`} label="Pan" min={-1} max={1} bipolar
                     fmt={(v) => v === 0 ? 'C' : v < 0 ? `L${Math.round(Math.abs(v) * 100)}` : `R${Math.round(v * 100)}`} />
-                  <ParamKnob name={`osc_${n}_unison_voices`} label="Voices"
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_unison_voices`} label="Voices"
                     fmt={(v) => `${Math.round(v)}`} />
-                  <ParamKnob name={`osc_${n}_unison_detune`} label="Detune" />
-                  <ParamKnob name={`osc_${n}_wave_frame`} label="Frame" />
-                  <ParamKnob name={`osc_${n}_spectral_morph_amount`} label="Spec Morph" />
-                  <ParamKnob name={`osc_${n}_distortion_amount`} label="Distortion" />
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_unison_detune`} label="Detune" />
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_wave_frame`} label="Frame" />
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_spectral_morph_amount`} label="Spec Morph" />
+                  <ParamKnob {...paramKnobProps} name={`osc_${n}_distortion_amount`} label="Distortion" />
                 </div>
               </div>
             ))}
@@ -229,16 +244,16 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                   Filter {n}
                 </h3>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  <ParamKnob name={`filter_${n}_cutoff`} label="Cutoff"
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_cutoff`} label="Cutoff"
                     fmt={(v) => {
                       const hz = 20 * Math.pow(2, v * 10);
                       return hz >= 1000 ? `${(hz/1000).toFixed(1)}k` : `${Math.round(hz)}`;
                     }} />
-                  <ParamKnob name={`filter_${n}_resonance`} label="Resonance" />
-                  <ParamKnob name={`filter_${n}_drive`} label="Drive" />
-                  <ParamKnob name={`filter_${n}_blend`} label="Blend" />
-                  <ParamKnob name={`filter_${n}_keytrack`} label="Keytrack" bipolar />
-                  <ParamKnob name={`filter_${n}_mix`} label="Mix" />
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_resonance`} label="Resonance" />
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_drive`} label="Drive" />
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_blend`} label="Blend" />
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_keytrack`} label="Keytrack" bipolar />
+                  <ParamKnob {...paramKnobProps} name={`filter_${n}_mix`} label="Mix" />
                 </div>
               </div>
             ))}
@@ -247,11 +262,11 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                 FX Filter
               </h3>
               <div className="flex flex-wrap gap-3 justify-center">
-                <ParamKnob name="filter_fx_cutoff" label="Cutoff" />
-                <ParamKnob name="filter_fx_resonance" label="Resonance" />
-                <ParamKnob name="filter_fx_drive" label="Drive" />
-                <ParamKnob name="filter_fx_blend" label="Blend" />
-                <ParamKnob name="filter_fx_mix" label="Mix" />
+                <ParamKnob {...paramKnobProps} name="filter_fx_cutoff" label="Cutoff" />
+                <ParamKnob {...paramKnobProps} name="filter_fx_resonance" label="Resonance" />
+                <ParamKnob {...paramKnobProps} name="filter_fx_drive" label="Drive" />
+                <ParamKnob {...paramKnobProps} name="filter_fx_blend" label="Blend" />
+                <ParamKnob {...paramKnobProps} name="filter_fx_mix" label="Mix" />
               </div>
             </div>
           </>
@@ -265,21 +280,21 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
                   Envelope {n} {n === 1 ? '(Amp)' : n === 2 ? '(Filter)' : ''}
                 </h3>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  <ParamKnob name={`env_${n}_delay`} label="Delay"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_delay`} label="Delay"
                     fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`env_${n}_attack`} label="Attack"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_attack`} label="Attack"
                     fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`env_${n}_hold`} label="Hold"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_hold`} label="Hold"
                     fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`env_${n}_decay`} label="Decay"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_decay`} label="Decay"
                     fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`env_${n}_sustain`} label="Sustain"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_sustain`} label="Sustain"
                     fmt={(v) => `${Math.round(v * 100)}%`} />
-                  <ParamKnob name={`env_${n}_release`} label="Release"
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_release`} label="Release"
                     fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`env_${n}_attack_power`} label="A Curve" bipolar />
-                  <ParamKnob name={`env_${n}_decay_power`} label="D Curve" bipolar />
-                  <ParamKnob name={`env_${n}_release_power`} label="R Curve" bipolar />
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_attack_power`} label="A Curve" bipolar />
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_decay_power`} label="D Curve" bipolar />
+                  <ParamKnob {...paramKnobProps} name={`env_${n}_release_power`} label="R Curve" bipolar />
                 </div>
               </div>
             ))}
@@ -353,24 +368,24 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
               Master
             </h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              <ParamKnob name="volume" label="Volume" size="md" />
-              <ParamKnob name="polyphony" label="Polyphony" size="md"
+              <ParamKnob {...paramKnobProps} name="volume" label="Volume" size="md" />
+              <ParamKnob {...paramKnobProps} name="polyphony" label="Polyphony" size="md"
                 fmt={(v) => `${Math.round(v)}`} />
-              <ParamKnob name="portamento_time" label="Porta Time" size="md" />
-              <ParamKnob name="pitch_bend_range" label="PB Range" size="md"
+              <ParamKnob {...paramKnobProps} name="portamento_time" label="Porta Time" size="md" />
+              <ParamKnob {...paramKnobProps} name="pitch_bend_range" label="PB Range" size="md"
                 fmt={(v) => `${Math.round(v)}st`} />
-              <ParamKnob name="velocity_track" label="Vel Track" size="md" />
-              <ParamKnob name="oversampling" label="Oversample" size="md"
+              <ParamKnob {...paramKnobProps} name="velocity_track" label="Vel Track" size="md" />
+              <ParamKnob {...paramKnobProps} name="oversampling" label="Oversample" size="md"
                 fmt={(v) => `${Math.round(v)}x`} />
             </div>
             <h3 className="font-bold uppercase tracking-tight text-sm mb-3 mt-6" style={{ color: accentColor }}>
               Macros
             </h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              <ParamKnob name="macro_control_1" label="Macro 1" size="md" />
-              <ParamKnob name="macro_control_2" label="Macro 2" size="md" />
-              <ParamKnob name="macro_control_3" label="Macro 3" size="md" />
-              <ParamKnob name="macro_control_4" label="Macro 4" size="md" />
+              <ParamKnob {...paramKnobProps} name="macro_control_1" label="Macro 1" size="md" />
+              <ParamKnob {...paramKnobProps} name="macro_control_2" label="Macro 2" size="md" />
+              <ParamKnob {...paramKnobProps} name="macro_control_3" label="Macro 3" size="md" />
+              <ParamKnob {...paramKnobProps} name="macro_control_4" label="Macro 4" size="md" />
             </div>
           </div>
         )}

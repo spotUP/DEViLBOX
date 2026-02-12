@@ -281,9 +281,9 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     if (c64.initFilter) filterFlags |= 2;
     const dutyIsAbs = 'dutyIsAbs' in c64 ? c64.dutyIsAbs : false;
     if (dutyIsAbs) filterFlags |= 4;
-    const filterIsAbs = 'filterIsAbs' in c64 ? (c64 as any).filterIsAbs : false;
+    const filterIsAbs = c64.filterIsAbs ?? false;
     if (filterIsAbs) filterFlags |= 8;
-    const noTest = 'noTest' in c64 ? (c64 as any).noTest : false;
+    const noTest = c64.noTest ?? false;
     if (noTest) filterFlags |= 16;
     writer.writeUint8(filterFlags);
     writer.writeUint8(c64.filterResonance ?? c64.filterRes ?? 0);

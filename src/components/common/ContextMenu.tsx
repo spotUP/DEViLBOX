@@ -70,7 +70,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }
     if (y < 10) y = 10;
 
-    setAdjustedPosition({ x, y });
+    // Deferred to avoid cascading renders in effect
+    const frame = requestAnimationFrame(() => {
+      setAdjustedPosition({ x, y });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [position]);
 
   // Close on outside click
@@ -242,6 +246,7 @@ const ContextMenuPortal: React.FC<ContextMenuProps> = (props) => {
 };
 
 // Hook for context menu state
+// eslint-disable-next-line react-refresh/only-export-components
 export const useContextMenu = () => {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
 

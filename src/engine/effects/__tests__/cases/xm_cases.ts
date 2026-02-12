@@ -44,7 +44,7 @@ export const xmCases: ComplianceTestCase[] = [
           depth: 16,
           rate: 32
         }
-      } as any
+      }
     },
     steps: [
       { 
@@ -68,7 +68,7 @@ export const xmCases: ComplianceTestCase[] = [
           depth: 16,
           rate: 32
         }
-      } as any
+      }
     },
     // Enable linear slides for accurate XM simulation
     steps: [

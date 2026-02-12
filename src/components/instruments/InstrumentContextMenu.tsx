@@ -37,7 +37,7 @@ const RenameDialog: React.FC<{
 
   useEffect(() => {
     if (isOpen) {
-      setName(currentName);
+      requestAnimationFrame(() => setName(currentName));
       // Focus input after dialog opens
       setTimeout(() => inputRef.current?.select(), 0);
     }
@@ -289,7 +289,8 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
             try {
               const sourceInstrument = JSON.parse(clipboardData);
               // Copy everything except id and name
-              const { id, name, ...settings } = sourceInstrument;
+              const { id: _id, name: _name, ...settings } = sourceInstrument;
+              void _id; void _name;
               updateInstrument(instrumentId, settings);
             } catch (e) {
               console.error('Failed to paste instrument settings:', e);

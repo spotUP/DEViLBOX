@@ -38,7 +38,7 @@ export class AmigaFilter extends Tone.ToneAudioNode {
   private static readonly MAX_RETRIES = 3;
 
   // Static map to track loading promises per context to avoid multiple addModule calls
-  private static _loadPromises = new WeakMap<any, Promise<void>>();
+  private static _loadPromises = new WeakMap<BaseAudioContext, Promise<void>>();
 
   constructor() {
     super();
@@ -101,8 +101,8 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       // Get the Tone.js context wrapper (standardized-audio-context)
       // This is CRITICAL: we must use the wrapper for addModule so that 
       // createAudioWorkletNode (which also uses the wrapper) can find the processor.
-      const toneCtx = this.context as any;
-      const workletContext = toneCtx.rawContext || toneCtx._context;
+      const toneCtx = this.context as unknown as Record<string, BaseAudioContext | undefined>;
+      const workletContext = (toneCtx.rawContext || toneCtx._context) as AudioContext | undefined;
 
       // Verify we have a valid context with audioWorklet support
       if (!workletContext || !workletContext.audioWorklet) {
@@ -127,9 +127,10 @@ export class AmigaFilter extends Tone.ToneAudioNode {
         loadPromise = (async () => {
           try {
             await workletContext.audioWorklet.addModule(`${baseUrl}AmigaFilter.worklet.js${cacheBuster}`);
-          } catch (e: any) {
+          } catch (e: unknown) {
             // Module might already be registered - this is fine
-            const isAlreadyRegistered = e?.message?.includes('already') || e?.message?.includes('duplicate');
+            const err = e instanceof Error ? e : null;
+            const isAlreadyRegistered = err?.message?.includes('already') || err?.message?.includes('duplicate');
             if (isAlreadyRegistered) {
               console.log('[AmigaFilter] Worklet already registered');
             } else {
@@ -150,8 +151,9 @@ export class AmigaFilter extends Tone.ToneAudioNode {
       // addModule was called on the native context. Matches DB303/FurnaceChip pattern.
       try {
         this._worklet = new AudioWorkletNode(workletContext, 'amiga-filter-processor');
-      } catch (e: any) {
-        if (e?.name === 'InvalidStateError') {
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : null;
+        if (err?.name === 'InvalidStateError') {
           // This usually means the processor name is unknown, meaning addModule failed silently
           this._retryCount++;
           console.warn(`[AmigaFilter] Processor not registered after addModule (retry ${this._retryCount}/${AmigaFilter.MAX_RETRIES})`);
@@ -181,12 +183,12 @@ export class AmigaFilter extends Tone.ToneAudioNode {
 
       if (this._worklet) {
         // Disconnect bypass before connecting through worklet
-        try { this.input.disconnect(this.output); } catch {}
+        try { this.input.disconnect(this.output); } catch { /* ignored */ }
 
         // Connect using Tone.js compatible nodes
         // input (Tone.Gain) -> worklet -> output (Tone.Gain)
-        Tone.connect(this.input, this._worklet as any);
-        Tone.connect(this._worklet as any, this.output);
+        Tone.connect(this.input, this._worklet as unknown as Tone.ToneAudioNode);
+        Tone.connect(this._worklet as unknown as Tone.ToneAudioNode, this.output);
         this._initialized = true;
         console.log('[AmigaFilter] 1:1 hardware filter initialized successfully');
       } else {

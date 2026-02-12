@@ -39,6 +39,50 @@ export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' |
 
 export type MappableParameter =
   | TB303Parameter
+  // 303 Oscillator
+  | 'tuning'
+  | 'waveform'
+  | 'pulseWidth'
+  | 'subOscGain'
+  | 'subOscBlend'
+  | 'pitchToPw'
+  | 'volume'
+  // 303 MOJO (filter character)
+  | 'passbandCompensation'
+  | 'resTracking'
+  | 'filterInputDrive'
+  | 'diodeCharacter'
+  | 'duffingAmount'
+  | 'filterFmDepth'
+  | 'lpBpMix'
+  // 303 DevilFish (circuit mods)
+  | 'accentSoftAttack'
+  | 'stageNLAmount'
+  | 'ensembleAmount'
+  // 303 Korg (ladder filter)
+  | 'korgBite'
+  | 'korgClip'
+  | 'korgCrossmod'
+  | 'korgQSag'
+  | 'korgSharpness'
+  // 303 LFO
+  | 'lfoRate'
+  | 'lfoContour'
+  | 'lfoPitchDepth'
+  | 'lfoPwmDepth'
+  | 'lfoFilterDepth'
+  | 'lfoStiffDepth'
+  // 303 FX
+  | 'chorusMix'
+  | 'phaserRate'
+  | 'phaserWidth'
+  | 'phaserFeedback'
+  | 'phaserMix'
+  | 'delayTime'
+  | 'delayFeedback'
+  | 'delayTone'
+  | 'delayMix'
+  | 'delaySpread'
   // Dub Siren
   | 'siren.osc.frequency'
   | 'siren.lfo.rate'

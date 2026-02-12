@@ -453,7 +453,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * - Amiga C-2 (period 428) = modern C3 (MIDI 48)
  * - Sample recorded at 8363 Hz plays at natural pitch when triggered at period 428
  */
-function calculateBaseNote(relativeNote: number, _finetune: number): string {
+function calculateBaseNote(relativeNote: number, finetune: number): string {
+  void finetune;
   // Amiga C-2 base note = modern C3 (MIDI 48)
   // ProTracker period table: C-3 (period 428) = MIDI 48 = C3 in scientific notation
   const baseNoteNum = 48 + relativeNote; // C3 = MIDI 48 (Amiga C-2 reference)
@@ -512,7 +513,7 @@ export function analyzeSample(
 export function suggestSynthConfig(
   targetSynthType: SynthType,
   analysis: SampleAnalysis
-): any {
+): Record<string, unknown> {
   switch (targetSynthType) {
     case 'TB303':
       return {

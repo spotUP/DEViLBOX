@@ -633,7 +633,7 @@ const TitleText: React.FC<{ text: string }> = React.memo(({ text }) => {
       </span>
     );
     return [...acc, rotatedE, cur];
-  }, null as any);
+  }, null as React.ReactNode);
   return <>{result}</>;
 });
 

@@ -40,6 +40,8 @@ import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { notify } from '@stores/useNotificationStore';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
+import type { XMNote } from '@lib/import/formats/XMParser';
+import type { MODNote } from '@lib/import/formats/MODParser';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
 import { encodeWav } from '@lib/import/WavEncoder';
@@ -223,6 +225,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const statusMessage = useUIStore((state) => state.statusMessage);
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
+  const setActiveView = useUIStore((state) => state.setActiveView);
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -381,7 +384,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       let result;
       if (format === 'XM') {
         result = convertXMModule(
-          patterns,
+          patterns as XMNote[][][],
           importMetadata.originalChannelCount,
           importMetadata,
           parsedInstruments.map(i => i.name),
@@ -389,7 +392,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         );
       } else if (format === 'MOD') {
         result = convertMODModule(
-          patterns,
+          patterns as MODNote[][][],
           importMetadata.originalChannelCount,
           importMetadata,
           parsedInstruments.map(i => i.name),
@@ -400,11 +403,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
         const patternOrder = importMetadata.modData?.patternOrderTable || [];
         const patLen = patterns[0]?.length || 64;
-        const numChannels = importMetadata.originalChannelCount || patterns[0]?.[0]?.length || 4;
+        const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
         console.log(`[Import] ${format} pattern structure: ${patterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
 
         result = {
-          patterns: patterns.map((pat: any[][], idx: number) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
             id: `pattern-${idx}`,
             name: `Pattern ${idx}`,
             length: patLen,
@@ -440,7 +444,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       } else {
         // Unknown format - try MOD conversion as fallback
         result = convertMODModule(
-          patterns,
+          patterns as MODNote[][][],
           importMetadata.originalChannelCount,
           importMetadata,
           parsedInstruments.map(i => i.name),
@@ -731,7 +735,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             {viewMode === 'tb303' && <Radio size={14} className="text-text-secondary" />}
             <select
               value={viewMode}
-              onChange={(e) => setViewMode(e.target.value as ViewMode)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'arrangement') {
+                  setActiveView('arrangement');
+                } else {
+                  setViewMode(val as ViewMode);
+                }
+              }}
               className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
               title="Select editor view"
             >
@@ -739,6 +750,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <option value="grid">Grid</option>
               <option value="pianoroll">Piano Roll</option>
               <option value="tb303">TB-303</option>
+              <option value="arrangement">Arrangement</option>
             </select>
           </div>
 

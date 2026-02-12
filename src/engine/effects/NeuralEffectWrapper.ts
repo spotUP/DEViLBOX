@@ -92,13 +92,13 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
     // Tone.js uses standardized-audio-context which wraps native AudioNodes.
     // GuitarML uses truly native AudioNodes. To connect across these worlds,
     // we must extract the browser-native node via _nativeAudioNode.
-    const inputNode = getNativeAudioNode(this.input) as any;
+    const inputNode = getNativeAudioNode(this.input) as AudioNode & { _nativeAudioNode?: AudioNode } | null;
     const nativeInput = inputNode?._nativeAudioNode || inputNode;
     if (nativeInput) {
       nativeInput.connect(this.guitarML.getInput());
     }
 
-    const targetNode = getNativeAudioNode(this.neuralOutputGain) as any;
+    const targetNode = getNativeAudioNode(this.neuralOutputGain) as AudioNode & { _nativeAudioNode?: AudioNode } | null;
     const nativeTarget = targetNode?._nativeAudioNode || targetNode;
     if (nativeTarget) {
       this.guitarML.getOutput().connect(nativeTarget);

@@ -22,8 +22,8 @@ const WAM_API_VERSION = '2.0.0-alpha.6';
  */
 const addFunctionModule = (
   audioWorklet: AudioWorklet,
-  processorFunction: (...args: any[]) => void,
-  ...injection: any[]
+  processorFunction: (...args: unknown[]) => void,
+  ...injection: unknown[]
 ): Promise<void> => {
   const text = `(${processorFunction.toString()})(${injection.map((s) => JSON.stringify(s)).join(', ')});`;
   const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
@@ -36,7 +36,7 @@ const addFunctionModule = (
  * and executed inside the worklet, so it must be fully self-contained.
  */
 const initializeWamEnv = (apiVersion: string) => {
-  const audioWorkletGlobalScope = globalThis as any;
+  const audioWorkletGlobalScope = globalThis as Record<string, unknown>;
   if (audioWorkletGlobalScope.AudioWorkletProcessor
     && audioWorkletGlobalScope.webAudioModules) return;
 
@@ -54,19 +54,19 @@ const initializeWamEnv = (apiVersion: string) => {
       if (group.validate(groupKey)) return group;
       else throw new Error('Invalid key');
     }
-    addGroup(group: any) {
+    addGroup(group: { groupId: string }) {
       if (!groups.has(group.groupId)) groups.set(group.groupId, group);
     }
-    removeGroup(group: any) { groups.delete(group.groupId); }
-    addWam(wam: any) { groups.get(wam.groupId)?.addWam(wam); }
-    removeWam(wam: any) { groups.get(wam.groupId)?.removeWam(wam); }
+    removeGroup(group: { groupId: string }) { groups.delete(group.groupId); }
+    addWam(wam: { groupId: string }) { groups.get(wam.groupId)?.addWam(wam); }
+    removeWam(wam: { groupId: string }) { groups.get(wam.groupId)?.removeWam(wam); }
     connectEvents(groupId: string, fromId: string, toId: string, output = 0) {
       groups.get(groupId)?.connectEvents(fromId, toId, output);
     }
     disconnectEvents(groupId: string, fromId: string, toId?: string, output?: number) {
       groups.get(groupId)?.disconnectEvents(fromId, toId, output);
     }
-    emitEvents(from: any, ...events: any[]) {
+    emitEvents(from: { groupId: string }, ...events: unknown[]) {
       groups.get(from.groupId)?.emitEvents(from, ...events);
     }
   }
@@ -83,13 +83,13 @@ const initializeWamEnv = (apiVersion: string) => {
  * Equivalent to wam-sdk WamGroup.js — serialized and executed in the worklet.
  */
 const initializeWamGroup = (groupId: string, groupKey: string) => {
-  const audioWorkletGlobalScope = globalThis as any;
+  const audioWorkletGlobalScope = globalThis as Record<string, unknown>;
 
   class WamGroup {
     _groupId: string;
     _validate: (key: string) => boolean;
-    _processors = new Map();
-    _eventGraph = new Map();
+    _processors = new Map<string, { instanceId: string; scheduleEvents: (...events: unknown[]) => void }>();
+    _eventGraph = new Map<unknown, Array<Set<{ scheduleEvents: (...events: unknown[]) => void }>>>();
     constructor(gId: string, gKey: string) {
       this._groupId = gId;
       this._validate = (key: string) => key === gKey;
@@ -98,49 +98,49 @@ const initializeWamGroup = (groupId: string, groupKey: string) => {
     get processors() { return this._processors; }
     get eventGraph() { return this._eventGraph; }
     validate(key: string) { return this._validate(key); }
-    addWam(wam: any) { this._processors.set(wam.instanceId, wam); }
-    removeWam(wam: any) {
+    addWam(wam: { instanceId: string; scheduleEvents: (...events: unknown[]) => void }) { this._processors.set(wam.instanceId, wam); }
+    removeWam(wam: { instanceId: string }) {
       if (this._eventGraph.has(wam)) this._eventGraph.delete(wam);
-      this._eventGraph.forEach((outputMap: any[]) => {
-        outputMap.forEach((set: Set<any>) => { if (set) set.delete(wam); });
+      this._eventGraph.forEach((outputMap) => {
+        outputMap.forEach((set) => { if (set) set.delete(wam as { instanceId: string; scheduleEvents: (...events: unknown[]) => void }); });
       });
       this._processors.delete(wam.instanceId);
     }
     connectEvents(fromId: string, toId: string, output = 0) {
       const from = this._processors.get(fromId);
       const to = this._processors.get(toId);
-      let outputMap: any[];
-      if (this._eventGraph.has(from)) { outputMap = this._eventGraph.get(from); }
+      let outputMap: Array<Set<{ scheduleEvents: (...events: unknown[]) => void }>>;
+      if (this._eventGraph.has(from)) { outputMap = this._eventGraph.get(from)!; }
       else { outputMap = []; this._eventGraph.set(from, outputMap); }
-      if (outputMap[output]) { outputMap[output].add(to); }
-      else { const set = new Set(); set.add(to); outputMap[output] = set; }
+      if (outputMap[output]) { outputMap[output].add(to!); }
+      else { const set = new Set<{ scheduleEvents: (...events: unknown[]) => void }>(); set.add(to!); outputMap[output] = set; }
     }
     disconnectEvents(fromId: string, toId?: string, output?: number) {
       const from = this._processors.get(fromId);
       if (!this._eventGraph.has(from)) return;
-      const outputMap = this._eventGraph.get(from);
+      const outputMap = this._eventGraph.get(from)!;
       if (typeof toId === 'undefined') {
-        outputMap.forEach((set: Set<any>) => { if (set) set.clear(); });
+        outputMap.forEach((set) => { if (set) set.clear(); });
         return;
       }
       const to = this._processors.get(toId);
       if (typeof output === 'undefined') {
-        outputMap.forEach((set: Set<any>) => { if (set) set.delete(to); });
+        outputMap.forEach((set) => { if (set && to) set.delete(to); });
         return;
       }
       if (!outputMap[output]) return;
-      outputMap[output].delete(to);
+      if (to) outputMap[output].delete(to);
     }
-    emitEvents(from: any, ...events: any[]) {
+    emitEvents(from: unknown, ...events: unknown[]) {
       if (!this._eventGraph.has(from)) return;
-      this._eventGraph.get(from).forEach((set: Set<any>) => {
-        if (set) set.forEach((wam: any) => wam.scheduleEvents(...events));
+      this._eventGraph.get(from)!.forEach((set) => {
+        if (set) set.forEach((wam) => wam.scheduleEvents(...events));
       });
     }
   }
 
   if (audioWorkletGlobalScope.AudioWorkletProcessor) {
-    audioWorkletGlobalScope.webAudioModules.addGroup(new WamGroup(groupId, groupKey));
+    (audioWorkletGlobalScope as Record<string, { addGroup: (g: WamGroup) => void }>).webAudioModules.addGroup(new WamGroup(groupId, groupKey));
   }
 };
 
@@ -154,7 +154,7 @@ export class WAMSynth implements DevilboxSynth {
   readonly name = 'WAMSynth';
   readonly output: GainNode;
 
-  private _wamInstance: any = null;
+  private _wamInstance: Record<string, unknown> | null = null;
   private _wamNode: AudioNode | null = null;
   private _config: WAMConfig;
   private _isInitialized = false;
@@ -184,8 +184,8 @@ export class WAMSynth implements DevilboxSynth {
     const hostGroupKey = performance.now().toString();
 
     WAMSynth._hostInitPromise = (async () => {
-      await addFunctionModule(audioContext.audioWorklet, initializeWamEnv as any, WAM_API_VERSION);
-      await addFunctionModule(audioContext.audioWorklet, initializeWamGroup as any, hostGroupId, hostGroupKey);
+      await addFunctionModule(audioContext.audioWorklet, initializeWamEnv as (...args: unknown[]) => void, WAM_API_VERSION);
+      await addFunctionModule(audioContext.audioWorklet, initializeWamGroup as (...args: unknown[]) => void, hostGroupId, hostGroupKey);
 
       console.log(`[WAMSynth] WAM host initialized (groupId: ${hostGroupId})`);
       return [hostGroupId, hostGroupKey] as [string, string];
@@ -212,8 +212,8 @@ export class WAMSynth implements DevilboxSynth {
   }
 
   /** Returns the WAM descriptor (name, vendor, keywords, etc.) */
-  public get descriptor(): any {
-    return this._wamInstance?.descriptor || null;
+  public get descriptor(): Record<string, unknown> | null {
+    return (this._wamInstance?.descriptor as Record<string, unknown>) || null;
   }
 
   /**
@@ -245,24 +245,24 @@ export class WAMSynth implements DevilboxSynth {
 
       if (isClass && typeof WAMExport.createInstance === 'function') {
         // WAM 2.0 standard: static createInstance(groupId, audioContext)
-        this._wamInstance = await WAMExport.createInstance(hostGroupId, ctx);
+        this._wamInstance = await WAMExport.createInstance(hostGroupId, ctx) as Record<string, unknown>;
       } else if (isClass) {
         // Class without static createInstance — manual sequence
-        const wamPlugin = new WAMExport(hostGroupId, ctx);
+        const wamPlugin = new WAMExport(hostGroupId, ctx) as Record<string, unknown>;
         if (typeof wamPlugin.initialize === 'function') {
-          await wamPlugin.initialize();
+          await (wamPlugin.initialize as () => Promise<void>)();
         }
         this._wamInstance = wamPlugin;
       } else {
         // Legacy factory function pattern
-        this._wamInstance = await WAMExport(ctx, hostGroupId);
+        this._wamInstance = await WAMExport(ctx, hostGroupId) as Record<string, unknown>;
       }
 
       // 4. Get the audio node (createInstance sets it via initialize → createAudioNode)
       if (this._wamInstance.audioNode) {
-        this._wamNode = this._wamInstance.audioNode;
+        this._wamNode = this._wamInstance.audioNode as AudioNode;
       } else if (typeof this._wamInstance.createAudioNode === 'function') {
-        this._wamNode = await this._wamInstance.createAudioNode();
+        this._wamNode = await (this._wamInstance.createAudioNode as () => Promise<AudioNode>)();
       }
 
       if (!this._wamNode) {
@@ -270,7 +270,7 @@ export class WAMSynth implements DevilboxSynth {
       }
 
       // 5. Detect plugin type BEFORE connecting (needed for routing decision)
-      const descriptor = this._wamInstance.descriptor;
+      const descriptor = this._wamInstance.descriptor as Record<string, unknown> | undefined;
       if (descriptor) {
         // WAM 2.0 descriptors may have isInstrument/hasAudioInput booleans
         if (descriptor.isInstrument === true) {
@@ -279,7 +279,7 @@ export class WAMSynth implements DevilboxSynth {
           this._pluginType = 'effect';
         } else {
           // Fall back to keyword detection
-          const keywords: string[] = descriptor.keywords || [];
+          const keywords: string[] = (descriptor.keywords as string[]) || [];
           const kwInstrument = keywords.includes('instrument') || keywords.includes('synth') || keywords.includes('synthesizer');
           const kwEffect = keywords.includes('effect') || keywords.includes('fx') || keywords.includes('audio-effect');
           if (kwInstrument) {
@@ -323,9 +323,9 @@ export class WAMSynth implements DevilboxSynth {
       }
 
       // 7. Restore state if available
-      if (this._config.pluginState && this._wamInstance.setState) {
+      if (this._config.pluginState && this._wamInstance && typeof this._wamInstance.setState === 'function') {
         try {
-          await this._wamInstance.setState(this._config.pluginState);
+          await (this._wamInstance.setState as (s: unknown) => Promise<void>)(this._config.pluginState);
         } catch (stateErr) {
           console.warn('[WAMSynth] Failed to restore plugin state, starting fresh:', stateErr);
           this._config.pluginState = null;
@@ -334,7 +334,7 @@ export class WAMSynth implements DevilboxSynth {
 
       this._isInitialized = true;
 
-      console.log(`[WAMSynth] Loaded plugin: ${descriptor?.name || 'Unknown'} (type: ${this._pluginType})`,
+      console.log(`[WAMSynth] Loaded plugin: ${(descriptor?.name as string) || 'Unknown'} (type: ${this._pluginType})`,
         descriptor ? descriptor : '');
 
     } catch (error) {
@@ -362,20 +362,21 @@ export class WAMSynth implements DevilboxSynth {
    */
   private _sendMidi(event: number[], time: number): void {
     const bytes = new Uint8Array(event);
+    const wamNode = this._wamNode as AudioNode & Record<string, unknown> | null;
 
-    if ((this._wamNode as any)?.scheduleEvents) {
+    if (wamNode && typeof (wamNode as Record<string, unknown>).scheduleEvents === 'function') {
       // WAM 2.0 standard: WamNode.scheduleEvents()
-      (this._wamNode as any).scheduleEvents({
+      (wamNode as unknown as { scheduleEvents: (e: unknown) => void }).scheduleEvents({
         type: 'wam-midi',
         data: { bytes },
         time,
       });
-    } else if (this._wamInstance.onMidi) {
+    } else if (this._wamInstance && typeof this._wamInstance.onMidi === 'function') {
       // WAM 1.0 fallback
-      this._wamInstance.onMidi(event, time);
-    } else if ((this._wamNode as any)?.port) {
+      (this._wamInstance.onMidi as (event: number[], time: number) => void)(event, time);
+    } else if (wamNode && (wamNode as Record<string, unknown>).port) {
       // Direct port message fallback
-      (this._wamNode as any).port.postMessage({
+      ((wamNode as Record<string, unknown>).port as MessagePort).postMessage({
         type: 'wam-midi',
         data: { bytes },
         time,
@@ -520,26 +521,26 @@ export class WAMSynth implements DevilboxSynth {
   /**
    * Update plugin state
    */
-  async setPluginState(state: any): Promise<void> {
-    if (this._isInitialized && this._wamInstance?.setState) {
+  async setPluginState(state: unknown): Promise<void> {
+    if (this._isInitialized && this._wamInstance && typeof this._wamInstance.setState === 'function') {
       try {
-        await this._wamInstance.setState(state);
-        this._config.pluginState = state;
+        await (this._wamInstance.setState as (s: unknown) => Promise<void>)(state);
+        this._config.pluginState = state as Record<string, unknown> | null;
         this._config.pluginStateTimestamp = Date.now();
       } catch (err) {
         console.warn('[WAMSynth] Failed to set plugin state:', err);
       }
     } else {
-      this._config.pluginState = state;
+      this._config.pluginState = state as Record<string, unknown> | null;
     }
   }
 
   /**
    * Get current plugin state
    */
-  async getPluginState(): Promise<any> {
-    if (this._isInitialized && this._wamInstance?.getState) {
-      const state = await this._wamInstance.getState();
+  async getPluginState(): Promise<unknown> {
+    if (this._isInitialized && this._wamInstance && typeof this._wamInstance.getState === 'function') {
+      const state = await (this._wamInstance.getState as () => Promise<unknown>)();
       return { state, timestamp: Date.now(), version: 1 };
     }
     return this._config.pluginState;
@@ -553,21 +554,21 @@ export class WAMSynth implements DevilboxSynth {
   async setParameter(id: string | number, value: number): Promise<void> {
     if (!this._isInitialized || !this._wamInstance) return;
 
-    if (this._wamInstance.setParameterValues) {
+    if (typeof this._wamInstance.setParameterValues === 'function') {
       // WAM 2.0 standard
       const paramId = typeof id === 'number' ? id.toString() : id;
-      await this._wamInstance.setParameterValues({ [paramId]: { id: paramId, value } });
+      await (this._wamInstance.setParameterValues as (v: Record<string, { id: string; value: number }>) => Promise<void>)({ [paramId]: { id: paramId, value } });
     }
   }
 
   /**
    * Get all parameters
    */
-  async getParameters(): Promise<any> {
+  async getParameters(): Promise<Record<string, unknown>> {
     if (!this._isInitialized || !this._wamInstance) return {};
 
-    if (this._wamInstance.getParameterInfo) {
-      return await this._wamInstance.getParameterInfo();
+    if (typeof this._wamInstance.getParameterInfo === 'function') {
+      return await (this._wamInstance.getParameterInfo as () => Promise<Record<string, unknown>>)();
     }
     return {};
   }
@@ -581,17 +582,18 @@ export class WAMSynth implements DevilboxSynth {
       return null;
     }
 
-    const inst = this._wamInstance;
-    const pluginName = inst.descriptor?.name || inst.constructor?.name || 'unknown';
-    console.log(`[WAMSynth] createGui for "${pluginName}": hasMethod=${typeof inst.createGui === 'function'}, guiModuleUrl=${inst._guiModuleUrl || 'none'}`);
+    const inst = this._wamInstance!;
+    const descriptor = inst.descriptor as Record<string, unknown> | undefined;
+    const pluginName = descriptor?.name || (inst.constructor as { name?: string })?.name || 'unknown';
+    console.log(`[WAMSynth] createGui for "${pluginName}": hasMethod=${typeof inst.createGui === 'function'}, guiModuleUrl=${(inst._guiModuleUrl as string) || 'none'}`);
 
     // 1. Try the standard WAM 2.0 createGui()
     if (typeof inst.createGui === 'function') {
       try {
-        const gui = await inst.createGui();
+        const gui = await (inst.createGui as () => Promise<HTMLElement | null>)();
         if (gui) {
           console.log(`[WAMSynth] createGui returned element: <${gui.tagName?.toLowerCase()}>`);
-          return gui as HTMLElement;
+          return gui;
         }
         console.log('[WAMSynth] createGui returned null/undefined');
       } catch (err) {
@@ -644,8 +646,8 @@ export class WAMSynth implements DevilboxSynth {
     if (this._wamNode) {
       this._wamNode.disconnect();
     }
-    if (this._wamInstance?.destroy) {
-      this._wamInstance.destroy();
+    if (this._wamInstance && typeof this._wamInstance.destroy === 'function') {
+      (this._wamInstance.destroy as () => void)();
     }
     this.output.disconnect();
   }

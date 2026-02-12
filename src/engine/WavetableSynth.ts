@@ -341,7 +341,8 @@ class WavetableVoice {
   /**
    * Trigger attack with manual ADSR envelope scheduling
    */
-  triggerAttack(frequency: number, time: number, _velocity: number): void {
+  triggerAttack(frequency: number, time: number, velocity: number): void {
+    void velocity;
     this.oscillators.forEach((osc) => {
       osc.frequency.setValueAtTime(frequency, time);
       osc.start(time);
@@ -381,7 +382,7 @@ class WavetableVoice {
    */
   dispose(): void {
     this.oscillators.forEach((osc) => {
-      try { osc.stop(); } catch (_) { /* may already be stopped */ }
+      try { osc.stop(); } catch { /* may already be stopped */ }
       osc.disconnect();
     });
     this.gains.forEach((gain) => gain.disconnect());

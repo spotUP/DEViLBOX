@@ -36,7 +36,7 @@ const RenameDialog: React.FC<{
 
   useEffect(() => {
     if (isOpen) {
-      setName(currentName);
+      requestAnimationFrame(() => setName(currentName));
       setTimeout(() => inputRef.current?.select(), 0);
     }
   }, [isOpen, currentName]);

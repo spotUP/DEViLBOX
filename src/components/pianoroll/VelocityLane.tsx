@@ -26,8 +26,6 @@ const VelocityLaneComponent: React.FC<VelocityLaneProps> = ({
   horizontalZoom,
   scrollX,
   selectedNotes,
-  onVelocityChange: _onVelocityChange,
-  onMultiVelocityChange: _onMultiVelocityChange,
   onBeginDrag,
   onDragVelocity,
   onDragMultiVelocity,
@@ -129,7 +127,7 @@ const VelocityLaneComponent: React.FC<VelocityLaneProps> = ({
   // Grid lines for velocity reference
   const gridLines = useMemo(() => {
     const lines: React.ReactNode[] = [];
-    [32, 64, 96, 127].forEach((vel, _i) => {
+    [32, 64, 96, 127].forEach((vel) => {
       const y = LANE_HEIGHT - (vel / 127) * LANE_HEIGHT;
       lines.push(
         <div key={vel} className="absolute left-0 right-0 pointer-events-none" style={{ top: y }}>

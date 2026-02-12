@@ -287,6 +287,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 };
 
 // Hook for using cell context menu
+// eslint-disable-next-line react-refresh/only-export-components
 export const useCellContextMenu = () => {
   const [menuState, setMenuState] = React.useState<{
     position: { x: number; y: number } | null;

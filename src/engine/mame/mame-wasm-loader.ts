@@ -66,7 +66,7 @@ export async function ensureMAMEModuleLoaded(
   if (!loaded.has('__mame_init_helper__')) {
     try {
       await context.audioWorklet.addModule(`${baseUrl}mame/mame-worklet-init.js`);
-    } catch (_e) {
+    } catch {
       // Module might already be added
     }
     loaded.add('__mame_init_helper__');
@@ -76,7 +76,7 @@ export async function ensureMAMEModuleLoaded(
   if (!loaded.has(chipName)) {
     try {
       await context.audioWorklet.addModule(`${baseUrl}mame/${workletFile}`);
-    } catch (_e) {
+    } catch {
       // Module might already be added
     }
     loaded.add(chipName);
@@ -164,7 +164,7 @@ export function createMAMEWorkletNode(
     keepalive.gain.value = 0;
     workletNode.connect(keepalive);
     keepalive.connect(rawContext.destination);
-  } catch (_e) { /* keepalive failed */ }
+  } catch { /* keepalive failed */ }
 
   return { workletNode, readyPromise };
 }

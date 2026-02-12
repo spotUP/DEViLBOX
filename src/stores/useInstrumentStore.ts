@@ -10,6 +10,7 @@ import type {
   EffectConfig,
   FurnaceConfig,
   DeepPartial,
+  SynthType,
 } from '@typedefs/instrument';
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import {
@@ -78,7 +79,7 @@ const bakingInstruments = new Set<number>();
  */
 function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
   const base: Partial<InstrumentConfig> = {
-    synthType: synthType as any,
+    synthType: synthType as SynthType,
     effects: [],
     volume: -12,
     pan: 0,
@@ -149,7 +150,7 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       base.tb303 = { ...DEFAULT_TB303 };
       base.buzzmachine = {
         ...DEFAULT_BUZZMACHINE,
-        machineType: 'OomekAggressor' as any,
+        machineType: 'OomekAggressor',
         parameters: {
           0: 0,    // SAW
           1: 0x78, // Cutoff
@@ -195,9 +196,12 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
   // This is critical for synths like V2 (needs patch data) and MAME chips (need _program).
   const firstPreset = getFirstPresetForSynthType(synthType);
   if (firstPreset) {
-    const { name: _name, type: _type, synthType: _synthType, ...presetConfig } = firstPreset as any;
+    const presetObj = firstPreset as Record<string, unknown>;
+    const presetConfig = Object.fromEntries(
+      Object.entries(presetObj).filter(([k]) => k !== 'name' && k !== 'type' && k !== 'synthType')
+    );
     Object.assign(base, presetConfig);
-    base.synthType = synthType as any; // Preserve the requested synthType
+    base.synthType = synthType as SynthType; // Preserve the requested synthType
   }
 
   return base;
@@ -283,13 +287,17 @@ const createDefaultInstrument = (id: number): InstrumentConfig => ({
 /**
  * Scan patterns for unique notes used by a specific instrument
  */
-function getUniqueNotesForInstrument(patterns: any[], instrumentId: number): string[] {
+function getUniqueNotesForInstrument(patterns: Array<{ channels: Array<{ rows: Array<{ instrument: number; note: number }> }> }>, instrumentId: number): string[] {
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const notes = new Set<string>();
   patterns.forEach(pattern => {
-    pattern.rows.forEach((row: any) => {
-      row.cells.forEach((cell: any) => {
-        if (cell.instrument === instrumentId && cell.note) {
-          notes.add(cell.note);
+    pattern.channels.forEach(channel => {
+      channel.rows.forEach(cell => {
+        if (cell.instrument === instrumentId && cell.note > 0 && cell.note <= 96) {
+          const noteIndex = (cell.note - 1) % 12;
+          const octave = Math.floor((cell.note - 1) / 12);
+          const noteName = noteNames[noteIndex];
+          notes.add(noteName.includes('#') ? `${noteName}${octave}` : `${noteName}-${octave}`);
         }
       });
     });
@@ -380,18 +388,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const instrument = state.instruments.find((inst) => inst.id === id);
         if (instrument) {
           // Explicitly exclude 'id' from updates to prevent ID from being changed
-          const { id: _ignoredId, ...safeUpdates } = updates as any;
+          const safeUpdates = Object.fromEntries(
+            Object.entries(updates as Record<string, unknown>).filter(([k]) => k !== 'id')
+          );
 
           // Deep merge nested objects to preserve existing fields
           // IMPORTANT: Create new objects instead of mutating for React/Zustand change detection
           Object.keys(safeUpdates).forEach(key => {
             const value = safeUpdates[key];
-            if (value && typeof value === 'object' && !Array.isArray(value) && instrument[key as keyof InstrumentConfig]) {
+            const typedKey = key as keyof InstrumentConfig;
+            if (value && typeof value === 'object' && !Array.isArray(value) && instrument[typedKey]) {
               // Merge nested objects - create new object to trigger re-render
-              (instrument as any)[key] = { ...(instrument[key as keyof InstrumentConfig] as any), ...value };
+              (instrument[typedKey] as Record<string, unknown>) = { ...(instrument[typedKey] as Record<string, unknown>), ...(value as Record<string, unknown>) };
             } else {
               // Direct assignment for primitives and new objects
-              (instrument as any)[key] = value;
+              (instrument[typedKey] as unknown) = value;
             }
           });
 
@@ -444,17 +455,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             const firstPreset = getFirstPresetForSynthType(updates.synthType);
             if (firstPreset) {
-              const { name: _pn, type: _pt, synthType: _pst, ...presetConfig } = firstPreset as any;
+              const presetObj = firstPreset as Record<string, unknown>;
+              const presetConfig = Object.fromEntries(
+                Object.entries(presetObj).filter(([k]) => k !== 'name' && k !== 'type' && k !== 'synthType')
+              );
               Object.keys(presetConfig).forEach(key => {
                 const value = presetConfig[key];
-                if (value && typeof value === 'object' && !Array.isArray(value) && (instrument as any)[key]) {
-                  Object.assign((instrument as any)[key], value);
+                const typedKey = key as keyof InstrumentConfig;
+                if (value && typeof value === 'object' && !Array.isArray(value) && instrument[typedKey]) {
+                  Object.assign(instrument[typedKey] as Record<string, unknown>, value as Record<string, unknown>);
                 } else {
-                  (instrument as any)[key] = value;
+                  (instrument[typedKey] as unknown) = value;
                 }
               });
               // Preserve structural fields
-              instrument.synthType = updates.synthType as any;
+              instrument.synthType = updates.synthType as SynthType;
               if (savedChipType !== undefined && instrument.furnace) {
                 instrument.furnace.chipType = savedChipType;
               }
@@ -520,7 +535,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (updatedInstrument.synthType === 'Buzz3o3' && updatedInstrument.tb303 && updates.tb303) {
               // Sync TB303 config back to Buzz parameters
               const tb303 = updatedInstrument.tb303;
-              const currentBuzz = updatedInstrument.buzzmachine || { machineType: 'OomekAggressor' as any, parameters: {} };
+              const currentBuzz = updatedInstrument.buzzmachine || { machineType: 'OomekAggressor', parameters: {} };
               const newParams = { ...currentBuzz.parameters };
               
               // Mapping (same as UnifiedInstrumentEditor)
@@ -563,8 +578,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (complexSynthTypes.includes(updatedInstrument.synthType)) {
               // Find the config key for this synth type (e.g. 'superSaw' for 'SuperSaw')
               const configKey = updatedInstrument.synthType.charAt(0).toLowerCase() + updatedInstrument.synthType.slice(1);
-              const config = (updatedInstrument as any)[configKey];
-              if (config && (updates as any)[configKey]) {
+              const config = (updatedInstrument as Record<string, unknown>)[configKey];
+              if (config && (updates as Record<string, unknown>)[configKey]) {
                 engine.updateComplexSynthParameters(id, config);
                 return; // Handled
               }
@@ -604,9 +619,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const defaultInst = createDefaultInstrument(newId);
         // Use deepMerge to properly merge partial config into default
-        // Cast config to any because DeepPartial structure mismatch with strict types
-        const newInstrument: InstrumentConfig = config 
-          ? deepMerge(defaultInst, config as any) 
+        const newInstrument: InstrumentConfig = config
+          ? deepMerge(defaultInst, config as Partial<InstrumentConfig>)
           : defaultInst;
         
         // Ensure ID is correct (deepMerge might have overwritten it if config had id)
@@ -703,7 +717,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             if (currentSynthType === 'Buzz3o3') {
               instrument.buzzmachine = { 
                 ...DEFAULT_BUZZMACHINE, 
-                machineType: 'OomekAggressor' as any,
+                machineType: 'OomekAggressor',
                 parameters: {
                   0: 0,    // SAW
                   1: 0x78, // Cutoff
@@ -895,7 +909,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         if (inst) {
           engine.rebuildInstrumentEffects(id, inst.effects);
         }
-      } catch (e) {
+      } catch {
         // Ignored
       }
     },
@@ -1175,7 +1189,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       get().instruments.forEach((inst) => {
         try {
           engine.invalidateInstrument(inst.id);
-        } catch (e) {
+        } catch {
           // Ignore errors during invalidation
         }
       });
@@ -1315,7 +1329,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       }
 
       // Get suggested config based on strategy
-      let synthConfig: any;
+      let synthConfig: Record<string, unknown>;
 
       if (mappingStrategy === 'analyze') {
         // Import analysis functions (dynamic import to avoid circular dependencies)
@@ -1343,20 +1357,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
           synthConfig = suggestSynthConfig(targetSynthType, analysis);
 
           // Update the instrument with analyzed config
-          performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample, instrument);
+          performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample);
         });
       } else {
         // Use default config
         synthConfig = getDefaultConfigForSynthType(targetSynthType);
-        performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample, instrument);
+        performTransformation(instrumentId, targetSynthType, synthConfig, preservedSample);
       }
 
       function performTransformation(
         id: number,
         synthType: InstrumentConfig['synthType'],
-        config: any,
-        preserved: any,
-        _originalInst: InstrumentConfig
+        config: Record<string, unknown>,
+        preserved: Record<string, unknown>,
       ) {
         set((state) => {
           const inst = state.instruments.find((i) => i.id === id);
@@ -1381,8 +1394,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
           inst.synthType = synthType;
 
           // Assign synth-specific config
-          const synthKey = synthType.toLowerCase();
-          (inst as any)[synthKey] = config;
+          const synthKey = synthType.toLowerCase() as keyof InstrumentConfig;
+          (inst[synthKey] as unknown) = config;
 
           // Update metadata
           if (!inst.metadata) {
@@ -1414,7 +1427,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         }
       }
 
-      function getDefaultConfigForSynthType(synthType: InstrumentConfig['synthType']): any {
+      function getDefaultConfigForSynthType(synthType: InstrumentConfig['synthType']): Record<string, unknown> {
         switch (synthType) {
           case 'TB303':
             return { ...DEFAULT_TB303 };
@@ -1519,7 +1532,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer) return;
 
-      const rawBuffer = inst.sample.audioBuffer as any;
+      const rawBuffer = inst.sample.audioBuffer;
       const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
       const newBuffer = WaveformProcessor.reverse(audioBuffer);
       const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
@@ -1538,7 +1551,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer) return;
 
-      const rawBuffer = inst.sample.audioBuffer as any;
+      const rawBuffer = inst.sample.audioBuffer;
       const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
       const newBuffer = WaveformProcessor.normalize(audioBuffer);
       const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
@@ -1557,7 +1570,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer || !inst.sample.loop) return;
 
-      const rawBuffer = inst.sample.audioBuffer as any;
+      const rawBuffer = inst.sample.audioBuffer;
       const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
       const newBuffer = WaveformProcessor.invertLoop(
         audioBuffer, 
@@ -1744,7 +1757,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       get().instruments.forEach((inst) => {
         try {
           engine.invalidateInstrument(inst.id);
-        } catch (e) {
+        } catch {
           // Ignore errors during invalidation
         }
       });

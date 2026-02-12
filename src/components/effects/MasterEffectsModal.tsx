@@ -4,7 +4,9 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search } from 'lucide-react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink } from 'lucide-react';
+import { useUIStore } from '@stores/useUIStore';
+import { focusPopout } from '@components/ui/PopOutWindow';
 import {
   DndContext,
   closestCenter,
@@ -332,6 +334,23 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               </span>
             </div>
           )}
+
+          {/* Pop Out Button */}
+          <button
+            onClick={() => {
+              const already = useUIStore.getState().masterEffectsPoppedOut;
+              if (already) {
+                focusPopout('DEViLBOX — Master Effects');
+              } else {
+                onClose();
+                useUIStore.getState().setMasterEffectsPoppedOut(true);
+              }
+            }}
+            className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-cyan-400"
+            title="Pop out to separate window"
+          >
+            <ExternalLink size={20} />
+          </button>
 
           {/* Close Button */}
           <button

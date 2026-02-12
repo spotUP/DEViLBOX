@@ -1,7 +1,8 @@
 // Cache native constructor for performance
-const NativeBaseAudioContext = (globalThis as any).BaseAudioContext ||
-                               (globalThis as any).AudioContext ||
-                               (globalThis as any).webkitAudioContext;
+const _globalThis = globalThis as unknown as Record<string, unknown>;
+const NativeBaseAudioContext = (_globalThis.BaseAudioContext ||
+                               _globalThis.AudioContext ||
+                               _globalThis.webkitAudioContext) as (new (...args: unknown[]) => AudioContext) | undefined;
 
 // ── DEViLBOX-owned AudioContext ──────────────────────────────────────────
 // Module-level registration: ToneEngine sets this in its constructor,
@@ -33,6 +34,11 @@ export function getDevilboxAudioContext(): AudioContext {
  * Robustly retrieve the native BaseAudioContext/AudioContext from any wrapper.
  * CRITICAL: This must return the browser's true native context object.
  */
+/** Audio context wrapper type - Tone.js and SAC wrap contexts with various internal properties */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type AudioContextLike = { [key: string]: unknown };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getNativeContext(context: any): AudioContext {
   if (!context) {
     throw new Error('[audio-context] getNativeContext called with null/undefined context');
@@ -44,8 +50,8 @@ export function getNativeContext(context: any): AudioContext {
   }
 
   // BFS/DFS search for the hidden native context
-  let queue = [context];
-  let visited = new Set();
+  const queue = [context];
+  const visited = new Set();
   
   // Limit depth/breadth to avoid hangs
   let iterations = 0;
@@ -70,7 +76,7 @@ export function getNativeContext(context: any): AudioContext {
     if (current._context) queue.push(current._context);
   }
 
-  return context;
+  return context as AudioContext;
 }
 
 /**
@@ -80,6 +86,7 @@ export function getNativeContext(context: any): AudioContext {
  * We must use Tone.js's context methods to ensure compatibility.
  */
 export function createAudioWorkletNode(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: any,
   name: string,
   options?: AudioWorkletNodeOptions
@@ -87,25 +94,28 @@ export function createAudioWorkletNode(
   // Try the context's own createAudioWorkletNode method first
   // This works for both Tone.js contexts (uses standardized-audio-context internally)
   // and native AudioContexts
-  if (context && typeof context.createAudioWorkletNode === 'function') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (context && typeof (context as any).createAudioWorkletNode === 'function') {
     try {
-      return context.createAudioWorkletNode(name, options);
+      return (context as any).createAudioWorkletNode(name, options);
     } catch (e) {
       console.warn(`[audio-context] context.createAudioWorkletNode failed for "${name}":`, e);
     }
   }
 
   // For Tone.js Context wrapper, try rawContext
-  if (context && context.rawContext && typeof context.rawContext.createAudioWorkletNode === 'function') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawCtx = (context as any).rawContext;
+  if (context && rawCtx && typeof rawCtx.createAudioWorkletNode === 'function') {
     try {
-      return context.rawContext.createAudioWorkletNode(name, options);
+      return rawCtx.createAudioWorkletNode(name, options);
     } catch (e) {
       console.warn(`[audio-context] rawContext.createAudioWorkletNode failed for "${name}":`, e);
     }
   }
 
   // Last resort: try native browser constructor
-  const NativeNode = (globalThis as any).AudioWorkletNode;
+  const NativeNode = _globalThis.AudioWorkletNode as (new (ctx: AudioContext, name: string, options?: AudioWorkletNodeOptions) => AudioWorkletNode) | undefined;
   const nativeCtx = getNativeContext(context);
 
   if (NativeNode && nativeCtx) {
@@ -120,48 +130,72 @@ export function createAudioWorkletNode(
 }
 
 /**
- * Check if an object is a native AudioNode using duck-typing.
- * This is more reliable than instanceof checks which can fail across contexts.
+ * Check if an object is a true browser-native AudioNode.
+ *
+ * IMPORTANT: Tone.js v14 uses standardized-audio-context (SAC) internally.
+ * SAC creates wrapper classes (e.g. GainNode) that look like native nodes
+ * (same constructor name, same interface) but are NOT actual browser AudioNodes.
+ * Connecting a native node to a SAC wrapper via the browser's native connect()
+ * will silently fail or throw, breaking the audio chain.
+ *
+ * We use `instanceof` against the browser's real AudioNode class to distinguish
+ * native nodes from SAC wrappers. This is reliable because:
+ * - SAC wrappers do NOT extend the browser's native AudioNode
+ * - Tone.js wrappers also do NOT extend native AudioNode
+ * - Only actual browser-created nodes pass this check
  */
+/** Audio node wrapper type - Tone.js and SAC wrap nodes with various internal properties */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type AudioNodeLike = { [key: string]: unknown };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isNativeAudioNode(obj: any): obj is AudioNode {
   if (!obj || typeof obj !== 'object') return false;
 
-  // Check for core AudioNode properties
-  // All AudioNodes have: context, numberOfInputs, numberOfOutputs, connect, disconnect
-  const hasAudioNodeProperties = (
-    typeof obj.connect === 'function' &&
-    typeof obj.disconnect === 'function' &&
-    typeof obj.numberOfInputs === 'number' &&
-    typeof obj.numberOfOutputs === 'number' &&
-    obj.context !== undefined
-  );
+  // Primary check: use the browser's native AudioNode class
+  const NativeAudioNode = _globalThis.AudioNode as (new (...args: unknown[]) => AudioNode) | undefined;
+  if (NativeAudioNode && obj instanceof NativeAudioNode) {
+    // Exclude Tone.js wrappers that might extend native AudioNode
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = obj as any;
+    const isToneWrapper = typeof o.toDestination === 'function' || typeof o.toMaster === 'function';
+    return !isToneWrapper;
+  }
 
-  if (!hasAudioNodeProperties) return false;
+  return false;
+}
 
-  // Distinguish native AudioNode from Tone.js wrapper:
-  // - Native nodes: constructor.name ends with "Node" (GainNode, AudioWorkletNode, etc.)
-  // - Tone.js nodes: have a 'name' property that's a specific string like "Gain", "Oscillator"
-  //   AND they have toDestination/toMaster methods
-  const constructorName = obj.constructor?.name || '';
-  const isNativeByConstructor = constructorName.endsWith('Node') || constructorName === 'AudioNode';
+/**
+ * Unwrap a standardized-audio-context (SAC) node to get the real native AudioNode.
+ * SAC stores the browser's native node in `_nativeAudioNode`.
+ * Returns the node itself if it's already native, or null if unwrapping fails.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function unwrapToNative(obj: any): AudioNode | null {
+  if (!obj || typeof obj !== 'object') return null;
 
-  // Tone.js nodes have these methods that native nodes don't
-  const isToneWrapper = typeof obj.toDestination === 'function' || typeof obj.toMaster === 'function';
+  // Already a native node
+  if (isNativeAudioNode(obj)) return obj;
 
-  return isNativeByConstructor && !isToneWrapper;
+  // SAC wrapper: the real native node is stored in _nativeAudioNode
+  if (obj._nativeAudioNode && isNativeAudioNode(obj._nativeAudioNode)) {
+    return obj._nativeAudioNode;
+  }
+
+  return null;
 }
 
 /**
  * Get the native AudioNode from a Tone.js ToneAudioNode wrapper.
  * This is needed when connecting native AudioWorkletNodes to Tone.js nodes.
  *
- * Tone.js wraps native AudioNodes in various ways:
- * - Gain: the `input` and `output` properties ARE the native GainNode directly
- * - Other nodes: various internal properties
+ * The unwrapping chain for Tone.js v14 + standardized-audio-context v24:
+ *   Tone.Gain → .input (SAC GainNode) → ._nativeAudioNode (native GainNode)
  *
  * @param toneNode - A Tone.js audio node (e.g., Tone.Gain, or any ToneAudioNode)
  * @returns The native AudioNode, or null if not found
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getNativeAudioNode(toneNode: any): AudioNode | null {
   if (!toneNode) return null;
 
@@ -170,41 +204,36 @@ export function getNativeAudioNode(toneNode: any): AudioNode | null {
     return toneNode;
   }
 
-  // For Tone.Gain, the input/output properties ARE the native GainNode
-  // Check these first as they're the most common case
-  if (toneNode.input && isNativeAudioNode(toneNode.input)) {
-    return toneNode.input;
-  }
-  if (toneNode.output && isNativeAudioNode(toneNode.output)) {
-    return toneNode.output;
-  }
-
-  // Check other common Tone.js internal properties for native nodes
-  const candidates = [
-    toneNode._gainNode,        // Tone.Gain stores native GainNode here
+  // Check direct properties: input, output, and internal node references.
+  // For each candidate, try unwrapping SAC wrappers to find the real native node.
+  const directCandidates = [
+    toneNode.input,
+    toneNode.output,
+    toneNode._gainNode,        // Tone.Gain stores its GainNode here
     toneNode._node,            // Some Tone.js nodes use _node
     toneNode._input,           // Or _input
     toneNode._output,          // Or _output
     toneNode._nativeNode,      // Possible internal property
+    toneNode._nativeAudioNode, // SAC wrapper property
   ];
 
-  for (const candidate of candidates) {
-    if (isNativeAudioNode(candidate)) {
-      return candidate;
-    }
+  for (const candidate of directCandidates) {
+    const native = unwrapToNative(candidate);
+    if (native) return native;
   }
 
-  // Handle nested wrappers (e.g., Tone.js InputNode/OutputNode)
-  if (toneNode.input && typeof toneNode.input === 'object' && !isNativeAudioNode(toneNode.input)) {
+  // Handle nested wrappers (e.g., Tone.js InputNode/OutputNode that wrap SAC nodes)
+  if (toneNode.input && typeof toneNode.input === 'object') {
+    const inputObj = toneNode.input;
     const innerCandidates = [
-      toneNode.input._gainNode,
-      toneNode.input._node,
-      toneNode.input.input,
+      inputObj._gainNode,
+      inputObj._node,
+      inputObj.input,
+      inputObj._nativeAudioNode,
     ];
     for (const inner of innerCandidates) {
-      if (isNativeAudioNode(inner)) {
-        return inner;
-      }
+      const native = unwrapToNative(inner);
+      if (native) return native;
     }
   }
 

@@ -231,7 +231,7 @@ export function exportToTIunAText(
     const frameWrites = frameGroups.get(frame) || [];
 
     for (const write of frameWrites) {
-      let reg = write.port >= 0x15 ? write.port - 0x15 : write.port;
+      const reg = write.port >= 0x15 ? write.port - 0x15 : write.port;
       if (reg >= 0 && reg < 6) {
         currentState[reg] = write.data;
       }

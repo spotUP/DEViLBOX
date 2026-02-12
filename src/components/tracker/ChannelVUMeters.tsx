@@ -7,7 +7,7 @@
  * to avoid 60+ state updates per second during animation.
  */
 
-import React, { useEffect, useRef, useCallback, memo } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -89,79 +89,15 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
     return () => observer.disconnect();
   }, []);
 
-  // Animation loop using requestAnimationFrame - NO React state updates
-  // Runs at full 60fps for tight sync with audio
-  const animate = useCallback(() => {
+  // Refs for values needed inside the animation loop
+  const numChannelsRef = useRef(numChannels);
+  const scrollLeftPropRef = useRef(scrollLeftProp);
+  const meterHueRef = useRef(meterHue);
+  useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
+  useEffect(() => { scrollLeftPropRef.current = scrollLeftProp; }, [scrollLeftProp]);
+  useEffect(() => { meterHueRef.current = meterHue; }, [meterHue]);
 
-    const engine = getToneEngine();
-    const triggerLevels = engine.getChannelTriggerLevels(numChannels);
-
-    // Apply scroll offset to container from PROP
-    if (containerRef.current) {
-      containerRef.current.style.transform = `translateX(${-scrollLeftProp}px)`;
-    }
-
-    for (let i = 0; i < numChannels; i++) {
-      const meter = meterStates.current[i];
-      if (!meter) continue;
-
-      const trigger = triggerLevels[i] || 0;
-      const staggerOffset = i * 0.012;
-
-      // Update level - ProTracker style: instant jump to full on trigger, smooth decay
-      if (trigger > 0) {
-        // Instant jump to trigger level (no interpolation)
-        meter.level = trigger;
-      } else {
-        // Smooth decay with slight stagger for visual interest
-        const decayRate = DECAY_RATE - staggerOffset;
-        meter.level = meter.level * decayRate;
-        if (meter.level < 0.01) meter.level = 0;
-      }
-
-      // Update swing position
-      if (meter.level > 0.02) {
-        const distFromCenter = Math.abs(meter.position) / SWING_RANGE;
-        const easeZone = Math.max(0, (distFromCenter - 0.7) / 0.3);
-        const easedSpeed = SWING_SPEED * (1 - easeZone * 0.7);
-        meter.position += easedSpeed * meter.direction;
-
-        if (meter.position >= SWING_RANGE) {
-          meter.position = SWING_RANGE;
-          meter.direction = -1;
-        } else if (meter.position <= -SWING_RANGE) {
-          meter.position = -SWING_RANGE;
-          meter.direction = 1;
-        }
-      }
-
-      // Direct DOM updates - no React re-render
-      const meterEl = meterRefs.current[i];
-      if (meterEl) {
-        meterEl.style.transform = `translateX(${meter.position}px)`;
-      }
-
-      const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
-      const segments = segmentRefs.current[i];
-      if (segments) {
-        for (let s = 0; s < NUM_SEGMENTS; s++) {
-          const segEl = segments[s];
-          if (!segEl) continue;
-
-          const isLit = s < activeSegments;
-          const ratio = s / (NUM_SEGMENTS - 1);
-          const { bg, glow } = getSegmentColor(ratio, isLit, meterHue);
-
-          segEl.style.backgroundColor = bg;
-          segEl.style.boxShadow = glow;
-        }
-      }
-    }
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, [numChannels, meterHue, scrollLeftProp]);
-
-  // Start/stop animation
+  // Start/stop animation - loop defined inside effect to avoid self-referencing
   useEffect(() => {
     if (performanceQuality === 'low') {
       if (animationRef.current) {
@@ -171,14 +107,82 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
       return;
     }
 
-    animationRef.current = requestAnimationFrame(animate);
+    const tick = () => {
+      const engine = getToneEngine();
+      const nc = numChannelsRef.current;
+      const triggerLevels = engine.getChannelTriggerLevels(nc);
+
+      // Apply scroll offset to container from PROP
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translateX(${-scrollLeftPropRef.current}px)`;
+      }
+
+      for (let i = 0; i < nc; i++) {
+        const meter = meterStates.current[i];
+        if (!meter) continue;
+
+        const trigger = triggerLevels[i] || 0;
+        const staggerOffset = i * 0.012;
+
+        // Update level - ProTracker style: instant jump to full on trigger, smooth decay
+        if (trigger > 0) {
+          meter.level = trigger;
+        } else {
+          const decayRate = DECAY_RATE - staggerOffset;
+          meter.level = meter.level * decayRate;
+          if (meter.level < 0.01) meter.level = 0;
+        }
+
+        // Update swing position
+        if (meter.level > 0.02) {
+          const distFromCenter = Math.abs(meter.position) / SWING_RANGE;
+          const easeZone = Math.max(0, (distFromCenter - 0.7) / 0.3);
+          const easedSpeed = SWING_SPEED * (1 - easeZone * 0.7);
+          meter.position += easedSpeed * meter.direction;
+
+          if (meter.position >= SWING_RANGE) {
+            meter.position = SWING_RANGE;
+            meter.direction = -1;
+          } else if (meter.position <= -SWING_RANGE) {
+            meter.position = -SWING_RANGE;
+            meter.direction = 1;
+          }
+        }
+
+        // Direct DOM updates - no React re-render
+        const meterEl = meterRefs.current[i];
+        if (meterEl) {
+          meterEl.style.transform = `translateX(${meter.position}px)`;
+        }
+
+        const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
+        const segments = segmentRefs.current[i];
+        if (segments) {
+          for (let s = 0; s < NUM_SEGMENTS; s++) {
+            const segEl = segments[s];
+            if (!segEl) continue;
+
+            const isLit = s < activeSegments;
+            const ratio = s / (NUM_SEGMENTS - 1);
+            const { bg, glow } = getSegmentColor(ratio, isLit, meterHueRef.current);
+
+            segEl.style.backgroundColor = bg;
+            segEl.style.boxShadow = glow;
+          }
+        }
+      }
+
+      animationRef.current = requestAnimationFrame(tick);
+    };
+
+    animationRef.current = requestAnimationFrame(tick);
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
     };
-  }, [animate, performanceQuality]);
+  }, [performanceQuality]);
 
   // Disable VU meters on low quality
   if (performanceQuality === 'low') {
@@ -226,7 +230,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
             style={{
               left: `${centerX - METER_WIDTH / 2}px`,
               width: `${METER_WIDTH}px`,
-              height: `${containerHeightRef.current - 4}px`,
+              height: 'calc(100% - 4px)',
               display: 'flex',
               flexDirection: 'column-reverse',
               alignItems: 'stretch',

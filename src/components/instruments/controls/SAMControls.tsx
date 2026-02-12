@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { SamConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
-// @ts-ignore
+// @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
 
 interface SAMControlsProps {
@@ -16,10 +16,10 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
   onChange,
 }) => {
   const [showPhonemes, setShowPhonemes] = useState(false);
-  
+
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; });
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);

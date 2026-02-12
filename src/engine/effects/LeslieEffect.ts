@@ -30,6 +30,12 @@ export interface LeslieOptions {
  * Built from scratch. Classic electromechanical Leslie simulation
  * with crossover, AM/doppler, and speed ramping.
  */
+/** Extract the underlying native AudioNode from a Tone.js wrapper */
+function getRawNode(node: Tone.Gain): AudioNode {
+  const n = node as unknown as Record<string, AudioNode | undefined>;
+  return n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
+}
+
 export class LeslieEffect extends Tone.ToneAudioNode {
   readonly name = 'Leslie';
 
@@ -146,7 +152,7 @@ export class LeslieEffect extends Tone.ToneAudioNode {
 
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
-      try { await context.audioWorklet.addModule(`${baseUrl}leslie/Leslie.worklet.js`); } catch (e) {}
+      try { await context.audioWorklet.addModule(`${baseUrl}leslie/Leslie.worklet.js`); } catch { /* ignored */ }
 
       if (!this.wasmBinary || !this.jsCode) {
         try {
@@ -190,11 +196,11 @@ export class LeslieEffect extends Tone.ToneAudioNode {
         this.fallbackLeslie!.process(inL, inR, outL, outR);
       };
 
-      const rawInput = (this.input as any)._nativeAudioNode || (this.input as any)._node || this.input;
-      const rawWet = (this.wetGain as any)._nativeAudioNode || (this.wetGain as any)._node || this.wetGain;
+      const rawInput = getRawNode(this.input);
+      const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(getRawNode(this.output));
       this.usingFallback = true;
     } catch (err) {
       console.warn('[Leslie] Fallback init failed:', err);
@@ -208,15 +214,15 @@ export class LeslieEffect extends Tone.ToneAudioNode {
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
       if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch (_) {}
+        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
         this.fallbackNode.onaudioprocess = null;
         this.usingFallback = false;
       }
-      const rawInput = (this.input as any)._nativeAudioNode || (this.input as any)._node || this.input;
-      const rawWet = (this.wetGain as any)._nativeAudioNode || (this.wetGain as any)._node || this.wetGain;
+      const rawInput = getRawNode(this.input);
+      const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(getRawNode(this.output));
       const keepalive = rawContext.createGain();
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
@@ -235,12 +241,12 @@ export class LeslieEffect extends Tone.ToneAudioNode {
   dispose(): this {
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
-      try { this.workletNode.disconnect(); } catch (_) {}
+      try { this.workletNode.disconnect(); } catch { /* ignored */ }
       this.workletNode = null;
     }
     if (this.fallbackNode) {
       this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch (_) {}
+      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
       this.fallbackNode = null;
     }
     this.dryGain.dispose();

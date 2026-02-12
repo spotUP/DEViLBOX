@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import type { MAMEConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Cpu, Database, Save, Activity, HardDrive } from 'lucide-react';
@@ -34,7 +34,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -59,7 +59,7 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
         const loadedZip = await zip.loadAsync(file);
         
         // Get all files, filter out directories and metadata/text files
-        const files: { name: string, entry: any }[] = [];
+        const files: { name: string, entry: JSZip.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|txt|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {

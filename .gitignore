@@ -30,6 +30,7 @@ Reference Code/
 */.cache/
 juce-wasm/build/
 juce-wasm/*/build/
+juce-wasm/**/build/
 mame-wasm/build/
 furnace-wasm/build/
 spacey-delayer-wasm/build/
@@ -40,6 +41,12 @@ public/rdpiano/roms/
 public/roms/Mirage4Amiga/
 public/roms/**/*.zip
 *.zip
+
+# NDA documents
+NI_NDA-NKS-SDK*
+
+# Diagnostic scripts
+scripts/db303-knob-diag.js
 
 # Test artifacts
 .playwright-mcp/

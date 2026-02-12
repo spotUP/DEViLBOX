@@ -17,21 +17,21 @@ export const legacyCases: ComplianceTestCase[] = [
   },
   {
     name: 'MultiTracker (MTM)',
-    format: 'MTM' as any,
+    format: 'MTM',
     steps: [
       { row: 0, effect: 'A01', expected: [{ tick: 0, period: 0 }] }
     ]
   },
   {
     name: 'DigiBooster Pro (DBM)',
-    format: 'DBM' as any,
+    format: 'DBM',
     steps: [
       { row: 0, effect: 'C40', expected: [{ tick: 0, volume: 64 }] }
     ]
   },
   {
     name: 'ProTracker 3.6 (PT36)',
-    format: 'PT36' as any,
+    format: 'PT36',
     steps: [
       { row: 0, effect: 'E01', expected: [{ tick: 0, period: 0 }] }
     ]

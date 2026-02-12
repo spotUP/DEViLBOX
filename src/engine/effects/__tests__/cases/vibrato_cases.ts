@@ -13,8 +13,7 @@ export const vibratoCases: ComplianceTestCase[] = [
           depth: 16,
           rate: 32
         }
-      } as any
-    },
+      }    },
     steps: [
       { 
         row: 0, 
@@ -43,8 +42,7 @@ export const vibratoCases: ComplianceTestCase[] = [
           depth: 10,
           rate: 32
         }
-      } as any
-    },
+      }    },
     steps: [
       {
         row: 0,
@@ -122,8 +120,7 @@ export const vibratoCases: ComplianceTestCase[] = [
           depth: 10,
           rate: 32
         }
-      } as any
-    },
+      }    },
     steps: [
       {
         row: 0,

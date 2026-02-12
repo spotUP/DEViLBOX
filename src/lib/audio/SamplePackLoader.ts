@@ -132,7 +132,7 @@ export async function loadSamplePackFromDirectory(files: FileList): Promise<Samp
 
   let packName = '';
   let coverImage: string | undefined;
-  let potentialCovers: { file: File, priority: number }[] = [];
+  const potentialCovers: { file: File, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
 
   // Process each file
@@ -242,9 +242,9 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
     fx: [], bass: [], leads: [], pads: [], loops: [], vocals: [], other: [],
   };
 
-  let packName = file.name.replace(/\.zip$/i, '');
+  const packName = file.name.replace(/\.zip$/i, '');
   let coverImage: string | undefined;
-  let potentialCovers: { path: string, filename: string, priority: number }[] = [];
+  const potentialCovers: { path: string, filename: string, priority: number }[] = [];
   const categories = new Set<SampleCategory>();
 
   try {

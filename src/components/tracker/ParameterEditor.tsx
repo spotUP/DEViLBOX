@@ -8,7 +8,7 @@
  * - Support for volume, effect parameters, and custom ranges
  */
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useTrackerStore, useUIStore } from '@stores';
 import { Button } from '@components/ui/Button';
 import { X, RotateCcw, Wand2, ArrowUpDown } from 'lucide-react';
@@ -83,12 +83,6 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [editMode, setEditMode] = useState<EditMode>('overwrite');
-  const [values, setValues] = useState<number[]>([]);
-  const [previewValues, setPreviewValues] = useState<number[] | null>(null);
-  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
-
   const patterns = useTrackerStore((state) => state.patterns);
   const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
   const setCell = useTrackerStore((state) => state.setCell);
@@ -96,26 +90,24 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
   const preset = EFFECT_PRESETS[field];
   const rowCount = endRow - startRow + 1;
 
-  // Canvas dimensions
-  const BAR_WIDTH = 12;
-  const BAR_GAP = 2;
-  const PADDING = 20;
-  const canvasWidth = Math.max(400, rowCount * (BAR_WIDTH + BAR_GAP) + PADDING * 2);
-  const canvasHeight = 200;
+  const [isDragging, setIsDragging] = useState(false);
+  const [editMode, setEditMode] = useState<EditMode>('overwrite');
+  const [previewValues, setPreviewValues] = useState<number[] | null>(null);
+  const useHexNumbers = useUIStore((state) => state.useHexNumbers);
 
-  // Initialize values from pattern data
-  useEffect(() => {
+  // Extract values from pattern data (memoized, recomputed when source data changes)
+  const patternValues = useMemo(() => {
     const pattern = patterns[currentPatternIndex];
-    if (!pattern) return;
+    if (!pattern) return [];
 
     const channel = pattern.channels[channelIndex];
-    if (!channel) return;
+    if (!channel) return [];
 
-    const extractedValues: number[] = [];
+    const result: number[] = [];
     for (let row = startRow; row <= endRow; row++) {
       const cell = channel.rows[row];
       if (!cell) {
-        extractedValues.push(preset.default);
+        result.push(preset.default);
         continue;
       }
 
@@ -143,10 +135,30 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
           value = cell.instrument ?? preset.default;
           break;
       }
-      extractedValues.push(value);
+      result.push(value);
     }
-    setValues(extractedValues);
+    return result;
   }, [patterns, currentPatternIndex, channelIndex, startRow, endRow, field, preset.default]);
+
+  // Local editing state. Tracks pattern source identity to detect when to reinitialize.
+  const [values, setValues] = useState<number[]>(patternValues);
+  const [lastPatternKey, setLastPatternKey] = useState(() =>
+    `${currentPatternIndex}-${channelIndex}-${startRow}-${endRow}-${field}`
+  );
+
+  // Detect when we should reinitialize from pattern data
+  const patternKey = `${currentPatternIndex}-${channelIndex}-${startRow}-${endRow}-${field}`;
+  if (patternKey !== lastPatternKey) {
+    setLastPatternKey(patternKey);
+    setValues(patternValues);
+  }
+
+  // Canvas dimensions
+  const BAR_WIDTH = 12;
+  const BAR_GAP = 2;
+  const PADDING = 20;
+  const canvasWidth = Math.max(400, rowCount * (BAR_WIDTH + BAR_GAP) + PADDING * 2);
+  const canvasHeight = 200;
 
   // Draw the parameter bars
   const draw = useCallback(() => {
@@ -263,10 +275,11 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
         case 'add':
           newValues[rowIndex] = Math.max(preset.min, Math.min(preset.max, currentValue + (value - preset.max / 2)));
           break;
-        case 'scale':
+        case 'scale': {
           const factor = value / preset.max;
           newValues[rowIndex] = Math.round(currentValue * factor);
           break;
+        }
       }
 
       return newValues;
@@ -339,17 +352,19 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
         case 'volume':
           updates.volume = value;
           break;
-        case 'effect':
+        case 'effect': {
           // Update effect type, keep parameter
           const currentEffect = cell.effect || '000';
           const param = currentEffect.length >= 3 ? currentEffect.substring(1) : '00';
           updates.effect = preset.format(value) + param;
           break;
-        case 'effectParam':
+        }
+        case 'effectParam': {
           // Update parameter, keep effect type
           const effectType = cell.effect?.[0] || '0';
           updates.effect = effectType + value.toString(16).toUpperCase().padStart(2, '0');
           break;
+        }
         case 'note':
           updates.note = value;
           break;
@@ -402,48 +417,10 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
     setValues(newValues);
   }, [values]);
 
-  // Reset to original values
+  // Reset to original values from pattern
   const reset = useCallback(() => {
-    const pattern = patterns[currentPatternIndex];
-    if (!pattern) return;
-
-    const channel = pattern.channels[channelIndex];
-    if (!channel) return;
-
-    const extractedValues: number[] = [];
-    for (let row = startRow; row <= endRow; row++) {
-      const cell = channel.rows[row];
-      let value = preset.default;
-
-      if (cell) {
-        switch (field) {
-          case 'volume':
-            value = cell.volume ?? preset.default;
-            break;
-          case 'effect':
-            if (cell.effect && cell.effect !== '...') {
-              value = parseInt(cell.effect[0], 16) || 0;
-            }
-            break;
-          case 'effectParam':
-            if (cell.effect && cell.effect !== '...' && cell.effect.length >= 3) {
-              value = parseInt(cell.effect.substring(1), 16) || 0;
-            }
-            break;
-          case 'note':
-            if (cell.note && cell.note !== 0) {
-              value = cell.note;
-            }
-            break;
-          case 'instrument':
-            value = cell.instrument ?? preset.default;
-            break;
-        }
-      }
-      extractedValues.push(value);
-    }
-    setValues(extractedValues);
-  }, [patterns, currentPatternIndex, channelIndex, startRow, endRow, field, preset.default]);
+    setValues(patternValues);
+  }, [patternValues]);
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">

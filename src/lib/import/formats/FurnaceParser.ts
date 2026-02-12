@@ -74,7 +74,7 @@ export class FurnaceParser {
             break;
         }
         reader.seek(featEnd);
-      } catch (e) {
+      } catch {
         break;
       }
     }

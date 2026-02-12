@@ -117,7 +117,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
         } else {
           if (!cancelled) setSynthReady(true);
         }
-      } catch (_e) {
+      } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };
@@ -137,8 +137,8 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
     }
   }, []);
 
-  /** Render a knob for a named parameter */
-  const ParamKnob = useCallback(({ name, label, min, max, fmt, logarithmic, bipolar, size }: {
+  /** Render a knob for a named parameter (helper function, not a component) */
+  const renderParamKnob = useCallback((props: {
     name: string;
     label: string;
     min?: number;
@@ -148,21 +148,22 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
     bipolar?: boolean;
     size?: 'sm' | 'md';
   }) => {
-    const p = paramByName.get(name);
+    const p = paramByName.get(props.name);
     if (!p) return null;
     return (
       <Knob
-        label={label}
+        key={p.id}
+        label={props.label}
         value={paramValues.get(p.id) ?? p.defaultValue}
-        min={min ?? p.min}
-        max={max ?? p.max}
+        min={props.min ?? p.min}
+        max={props.max ?? p.max}
         defaultValue={p.defaultValue}
         onChange={(v) => setParam(p.id, v)}
-        size={size || 'sm'}
+        size={props.size || 'sm'}
         color={knobColor}
-        logarithmic={logarithmic}
-        bipolar={bipolar}
-        formatValue={fmt}
+        logarithmic={props.logarithmic}
+        bipolar={props.bipolar}
+        formatValue={props.fmt}
       />
     );
   }, [paramByName, paramValues, setParam, knobColor]);
@@ -248,8 +249,8 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                     {activeScene} - Oscillator {n}
                   </h3>
                   <div className="flex flex-wrap gap-3 justify-center">
-                    <ParamKnob name={`${activeScene} Osc ${n} Pitch`} label="Pitch" bipolar
-                      fmt={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}st`} />
+                    {renderParamKnob({ name: `${activeScene} Osc ${n} Pitch`, label: 'Pitch', bipolar: true,
+                      fmt: (v) => `${v > 0 ? '+' : ''}${Math.round(v)}st` })}
                     {oscParams
                       .filter(p => !p.name.includes('Pitch') && !p.name.includes('Type'))
                       .map(p => {
@@ -287,10 +288,10 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                     {activeScene} - Filter {n}
                   </h3>
                   <div className="flex flex-wrap gap-3 justify-center">
-                    <ParamKnob name={`${activeScene} Filter ${n} Frequency`} label="Cutoff" logarithmic />
-                    <ParamKnob name={`${activeScene} Filter ${n} Resonance`} label="Resonance" />
-                    <ParamKnob name={`${activeScene} Filter ${n} Env Depth`} label="Env Depth" bipolar />
-                    <ParamKnob name={`${activeScene} Filter ${n} Keytrack`} label="Keytrack" bipolar />
+                    {renderParamKnob({ name: `${activeScene} Filter ${n} Frequency`, label: 'Cutoff', logarithmic: true })}
+                    {renderParamKnob({ name: `${activeScene} Filter ${n} Resonance`, label: 'Resonance' })}
+                    {renderParamKnob({ name: `${activeScene} Filter ${n} Env Depth`, label: 'Env Depth', bipolar: true })}
+                    {renderParamKnob({ name: `${activeScene} Filter ${n} Keytrack`, label: 'Keytrack', bipolar: true })}
                     {filParams
                       .filter(p => {
                         const n = p.name.toLowerCase();
@@ -328,17 +329,17 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
                   {activeScene} - {egName}
                 </h3>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  <ParamKnob name={`${activeScene} ${egName} Attack`} label="Attack"
-                    fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`${activeScene} ${egName} Decay`} label="Decay"
-                    fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`${activeScene} ${egName} Sustain`} label="Sustain"
-                    fmt={(v) => `${Math.round(v * 100)}%`} />
-                  <ParamKnob name={`${activeScene} ${egName} Release`} label="Release"
-                    fmt={(v) => `${(v * 1000).toFixed(0)}ms`} />
-                  <ParamKnob name={`${activeScene} ${egName} Attack Shape`} label="A Shape" bipolar />
-                  <ParamKnob name={`${activeScene} ${egName} Decay Shape`} label="D Shape" bipolar />
-                  <ParamKnob name={`${activeScene} ${egName} Release Shape`} label="R Shape" bipolar />
+                  {renderParamKnob({ name: `${activeScene} ${egName} Attack`, label: 'Attack',
+                    fmt: (v) => `${(v * 1000).toFixed(0)}ms` })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Decay`, label: 'Decay',
+                    fmt: (v) => `${(v * 1000).toFixed(0)}ms` })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Sustain`, label: 'Sustain',
+                    fmt: (v) => `${Math.round(v * 100)}%` })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Release`, label: 'Release',
+                    fmt: (v) => `${(v * 1000).toFixed(0)}ms` })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Attack Shape`, label: 'A Shape', bipolar: true })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Decay Shape`, label: 'D Shape', bipolar: true })}
+                  {renderParamKnob({ name: `${activeScene} ${egName} Release Shape`, label: 'R Shape', bipolar: true })}
                 </div>
               </div>
             ))}
@@ -374,17 +375,17 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               Global
             </h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              <ParamKnob name="Volume" label="Volume" size="md" />
-              <ParamKnob name="Active Scene" label="Scene"
-                fmt={(v) => v < 0.5 ? 'A' : 'B'} />
-              <ParamKnob name="Scene Mode" label="Mode"
-                fmt={(v) => ['Single', 'Key Split', 'Dual', 'Ch Split'][Math.round(v)] || `${Math.round(v)}`} />
-              <ParamKnob name="Split Point" label="Split" size="md"
-                fmt={(v) => `${Math.round(v)}`} />
-              <ParamKnob name="FX Return A" label="FX Ret A" size="md" />
-              <ParamKnob name="FX Return B" label="FX Ret B" size="md" />
-              <ParamKnob name="Polyphony" label="Poly"
-                fmt={(v) => `${Math.round(v)}`} />
+              {renderParamKnob({ name: 'Volume', label: 'Volume', size: 'md' })}
+              {renderParamKnob({ name: 'Active Scene', label: 'Scene',
+                fmt: (v) => v < 0.5 ? 'A' : 'B' })}
+              {renderParamKnob({ name: 'Scene Mode', label: 'Mode',
+                fmt: (v) => ['Single', 'Key Split', 'Dual', 'Ch Split'][Math.round(v)] || `${Math.round(v)}` })}
+              {renderParamKnob({ name: 'Split Point', label: 'Split', size: 'md',
+                fmt: (v) => `${Math.round(v)}` })}
+              {renderParamKnob({ name: 'FX Return A', label: 'FX Ret A', size: 'md' })}
+              {renderParamKnob({ name: 'FX Return B', label: 'FX Ret B', size: 'md' })}
+              {renderParamKnob({ name: 'Polyphony', label: 'Poly',
+                fmt: (v) => `${Math.round(v)}` })}
             </div>
           </div>
         )}

@@ -76,7 +76,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
         } else {
           if (!cancelled) setSynthReady(true);
         }
-      } catch (_e) {
+      } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };

@@ -30,8 +30,6 @@ import type {
   ParsedSample,
   ImportMetadata,
   FurnaceInstrumentData,
-  FurnaceMacroData as _FurnaceMacroData,
-  FurnaceWavetableData as _FurnaceWavetableData,
 } from '../../../types/tracker';
 import type { FurnaceConfig, FurnaceOperatorConfig, SynthType } from '../../../types/instrument';
 import { DEFAULT_FURNACE } from '../../../types/instrument';
@@ -561,10 +559,10 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
 
   if (version >= 240) {
     // New format (INF2)
-    await parseNewFormat(reader, module, version, data.buffer as ArrayBuffer);
+    await parseNewFormat(reader, module, version);
   } else {
     // Old format (INFO)
-    await parseOldFormat(reader, module, version, data.buffer as ArrayBuffer);
+    await parseOldFormat(reader, module, version);
   }
 
   return module;
@@ -576,8 +574,7 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
 async function parseNewFormat(
   reader: BinaryReader,
   module: FurnaceModule,
-  version: number,
-  _buffer: ArrayBuffer
+  version: number
 ): Promise<void> {
   // Read header
   const magic = reader.readMagic(4);
@@ -737,7 +734,7 @@ async function parseNewFormat(
     const ptr = insPtr[i];
     reader.seek(ptr);
     const startOffset = reader.getOffset();
-    const inst = parseInstrument(reader, version);
+    const inst = parseInstrument(reader);
     const endOffset = reader.getOffset();
     
     // Capture raw binary data for upload to WASM
@@ -816,8 +813,7 @@ async function parseNewFormat(
 async function parseOldFormat(
   reader: BinaryReader,
   module: FurnaceModule,
-  version: number,
-  _buffer: ArrayBuffer
+  version: number
 ): Promise<void> {
   // Read header
   const magic = reader.readMagic(4);
@@ -1081,7 +1077,7 @@ async function parseOldFormat(
     reader.seek(ptr);
     const startOffset = reader.getOffset();
     try {
-      const inst = parseInstrument(reader, version);
+      const inst = parseInstrument(reader);
       const endOffset = reader.getOffset();
       
       // Capture raw binary data for upload to WASM
@@ -1270,7 +1266,7 @@ function parseSubSong(reader: BinaryReader, chans: number, version: number): Fur
 /**
  * Parse instrument
  */
-function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrument {
+function parseInstrument(reader: BinaryReader): FurnaceInstrument {
   const magic = reader.readMagic(4);
 
   const inst: FurnaceInstrument = {
@@ -1287,7 +1283,7 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
     if (magic === 'INS2') {
       reader.readUint32(); // Block size
     }
-    const insVersion = reader.readUint16();
+    reader.readUint16(); // insVersion (consumed, not used)
     inst.type = reader.readUint16();
 
     // Read features until EN
@@ -1303,10 +1299,10 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
           inst.name = readString(reader);
           break;
         case 'FM':
-          inst.fm = parseFMData(reader, insVersion);
+          inst.fm = parseFMData(reader);
           break;
         case 'MA':
-          parseMacroData(reader, inst, insVersion);
+          parseMacroData(reader, inst);
           break;
         case 'SM': {
           // Sample/Amiga data — Reference: instrument.cpp:2031-2057
@@ -1461,7 +1457,7 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
   } else if (magic === 'INST') {
     // Old instrument format
     reader.readUint32(); // Block size
-    const insVersion = reader.readUint16();
+    reader.readUint16(); // insVersion (consumed, not used)
     inst.type = reader.readUint8();
     reader.readUint8(); // reserved
     inst.name = readString(reader);
@@ -1469,7 +1465,7 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
     // Parse based on instrument type
     if (inst.type === 0 || inst.type === 1) {
       // FM instrument
-      inst.fm = parseFMDataOld(reader, insVersion);
+      inst.fm = parseFMDataOld(reader);
     }
   } else {
     throw new Error(`Unknown instrument format: "${magic}"`);
@@ -1481,7 +1477,7 @@ function parseInstrument(reader: BinaryReader, _version: number): FurnaceInstrum
 /**
  * Parse FM data (new format)
  */
-function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
+function parseFMData(reader: BinaryReader): FurnaceConfig {
   const config: FurnaceConfig = {
     ...DEFAULT_FURNACE,
     operators: [],
@@ -1559,7 +1555,7 @@ function parseFMData(reader: BinaryReader, _version: number): FurnaceConfig {
 /**
  * Parse FM data (old format)
  */
-function parseFMDataOld(reader: BinaryReader, _version: number): FurnaceConfig {
+function parseFMDataOld(reader: BinaryReader): FurnaceConfig {
   const config: FurnaceConfig = {
     ...DEFAULT_FURNACE,
     operators: [],
@@ -1610,7 +1606,7 @@ function parseFMDataOld(reader: BinaryReader, _version: number): FurnaceConfig {
 /**
  * Parse macro data
  */
-function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument, _version: number): void {
+function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument): void {
   const headerLen = reader.readUint16();
   const headerEnd = reader.getOffset() + headerLen;
 
@@ -2009,12 +2005,23 @@ function parsePattern(
   return pat;
 }
 
+/** Converted pattern cell in XM-compatible format */
+interface ConvertedPatternCell {
+  note: number;
+  instrument: number;
+  volume: number;
+  effectType: number;
+  effectParam: number;
+  effectType2: number;
+  effectParam2: number;
+}
+
 /**
  * Convert Furnace module to DEViLBOX format
  */
 export function convertFurnaceToDevilbox(module: FurnaceModule): {
   instruments: ParsedInstrument[];
-  patterns: any[][][]; // [pattern][row][channel]
+  patterns: ConvertedPatternCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
   // Convert instruments with full Furnace data preservation
@@ -2080,7 +2087,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
         ams: inst.fm.ams,
         ops: inst.fm.ops,
         opllPreset: inst.fm.opllPreset,
-        operators: inst.fm.operators.map((op: any) => ({
+        operators: inst.fm.operators.map((op: FurnaceOperatorConfig) => ({
           enabled: op.enabled,
           mult: op.mult,
           tl: op.tl,
@@ -2108,7 +2115,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     }
 
     // Pass through chip-specific data
-    const chipConfig: Record<string, any> = {};
+    const chipConfig: Record<string, FurnaceGBData | FurnaceC64Data | FurnaceSNESData | FurnaceN163Data | FurnaceFDSData> = {};
     if (inst.gb) chipConfig.gb = inst.gb;
     if (inst.c64) chipConfig.c64 = inst.c64;
     if (inst.snes) chipConfig.snes = inst.snes;
@@ -2131,7 +2138,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   });
 
   // Convert patterns - flatten subsong 0 patterns
-  const patterns: any[][][] = [];
+  const patterns: ConvertedPatternCell[][][] = [];
   const subsong = module.subsongs[0];
   if (!subsong) {
     return { instruments, patterns: [], metadata: createMetadata(module) };
@@ -2147,10 +2154,10 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   // Each channel can play a different pattern at each song position.
   // We must look up each channel's pattern from its own order table.
   for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
-    const patternRows: any[][] = [];
+    const patternRows: ConvertedPatternCell[][] = [];
 
     for (let row = 0; row < subsong.patLen; row++) {
-      const rowCells: any[] = [];
+      const rowCells: ConvertedPatternCell[] = [];
 
       for (let ch = 0; ch < module.chans; ch++) {
         // Look up this channel's pattern index for this order position
@@ -2304,7 +2311,7 @@ function convertFurnaceSample(furSample: FurnaceSample, id: number): ParsedSampl
 /**
  * Convert Furnace pattern cell to XM-compatible format
  */
-function convertFurnaceCell(cell: FurnacePatternCell): any {
+function convertFurnaceCell(cell: FurnacePatternCell): ConvertedPatternCell {
   let note = 0;
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {

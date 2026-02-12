@@ -22,9 +22,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Tone from 'tone';
-import { PianoKeyboard } from './PianoKeyboard';
-import { PianoRollGrid } from './PianoRollGrid';
-import { VelocityLane } from './VelocityLane';
+import { PianoKeyboardCanvas } from './PianoKeyboardCanvas';
+import { PianoRollCanvas } from './PianoRollCanvas';
+import { VelocityLaneCanvas } from './VelocityLaneCanvas';
 import { PianoRollContextMenu } from './PianoRollContextMenu';
 import { usePianoRollStore } from '../../stores/usePianoRollStore';
 import { usePianoRollData } from '../../hooks/pianoroll/usePianoRollData';
@@ -53,7 +53,10 @@ import {
   BarChart3,
   Music,
   Layers,
+  ExternalLink,
 } from 'lucide-react';
+import { useUIStore } from '../../stores';
+import { focusPopout } from '../ui/PopOutWindow';
 
 // QWERTY keyboard note mapping (defined outside component to avoid re-creation per render)
 const QWERTY_NOTE_MAP: Record<string, number> = {
@@ -100,11 +103,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   } = usePianoRollStore();
 
   const {
-    notes, pattern, addNote, deleteNote, deleteNotes, moveNote, resizeNote,
-    setNoteVelocity, setMultipleVelocities,
+    notes, pattern, addNote, deleteNote, deleteNotes, moveNote, resizeNote, resizeNoteStart,
     beginVelocityDrag, setVelocityNoUndo, setMultipleVelocitiesNoUndo, endVelocityDrag,
-    toggleSlide, toggleAccent,
-    quantizeNotes, pasteNotes,
+    setMultipleVelocities, toggleSlide, toggleAccent,
+    quantizeNotes, transposeNotes, adjustNoteLengths, duplicateNotes, adjustVelocities,
+    pasteNotes,
   } = usePianoRollData(
     view.multiChannel ? undefined : (channelIndex ?? view.channelIndex)
   );
@@ -131,6 +134,29 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     }
   }, [channelIndex, setChannelIndex]);
 
+  // Auto-scroll to center on notes when they first appear or pattern changes
+  const autoScrollDoneForPattern = useRef<number | null>(null);
+  useEffect(() => {
+    if (notes.length === 0) return;
+    // Only auto-scroll once per pattern
+    const patIdx = useTrackerStore.getState().currentPatternIndex;
+    if (autoScrollDoneForPattern.current === patIdx) return;
+    autoScrollDoneForPattern.current = patIdx;
+
+    // Find the center of the note range
+    const midiNotes = notes.map(n => n.midiNote);
+    const minNote = Math.min(...midiNotes);
+    const maxNote = Math.max(...midiNotes);
+    const centerNote = (minNote + maxNote) / 2;
+
+    // Scroll so centerNote is in the middle of the viewport
+    // noteToPixelY(centerNote) = (scrollY + 60 - centerNote) * verticalZoom = gridHeight / 2
+    // scrollY = centerNote - 60 + gridHeight / (2 * verticalZoom)
+    const viewHeight = containerHeight - (view.showVelocityLane ? 80 : 0);
+    const newScrollY = centerNote - 60 + viewHeight / (2 * view.verticalZoom);
+    setScroll(0, Math.max(0, Math.min(127, newScrollY)));
+  }, [notes, containerHeight, view.showVelocityLane, view.verticalZoom, setScroll]);
+
   // Auto-scroll during playback to keep playhead at piano keys edge
   const prevCurrentRowRef = useRef<number | null>(null);
   const prevPatternRef = useRef<Pattern | null>(null);
@@ -148,7 +174,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         prevPatternRef.current = pattern;
         prevCurrentRowRef.current = currentRow;
       } else if (prevCurrentRowRef.current === null || currentRow >= prevCurrentRowRef.current) {
-        const targetPlayheadX = 48;
+        const targetPlayheadX = 72;
         const currentPlayheadX = (currentRow - view.scrollX) * view.horizontalZoom;
 
         if (currentPlayheadX > targetPlayheadX + view.horizontalZoom) {
@@ -213,6 +239,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     return new Set(getScaleNotes(view.scaleRoot, scale));
   }, [view.scaleKey, view.scaleRoot]);
 
+  // Compute drag target MIDI note for piano keyboard highlight
+  const dragTargetMidi = useMemo(() => {
+    if (!drag.isDragging || drag.mode !== 'move' || !drag.noteId) return null;
+    const note = notes.find(n => n.id === drag.noteId);
+    if (!note) return null;
+    const deltaPitch = -Math.round((drag.currentY - drag.startY) / view.verticalZoom);
+    return Math.max(0, Math.min(127, note.midiNote + deltaPitch));
+  }, [drag.isDragging, drag.mode, drag.noteId, drag.currentY, drag.startY, view.verticalZoom, notes]);
+
   // Get effective note length
   const getEffectiveNoteLength = useCallback(() => {
     if (view.noteLengthPreset > 0) return view.noteLengthPreset;
@@ -269,10 +304,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   // ============ NOTE DRAG ============
 
   const handleNoteDragStart = useCallback(
-    (noteId: string, mode: 'move' | 'resize-end', e: React.MouseEvent) => {
+    (noteId: string, mode: 'move' | 'resize-start' | 'resize-end', e: React.MouseEvent) => {
+      // Alt+drag: clone the note first, then drag the original (clone stays in place)
+      if (e.altKey && mode === 'move') {
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          // Create a duplicate at the same position (it becomes the "original" that stays)
+          addNote(note.midiNote, note.startRow, note.endRow - note.startRow, note.velocity, note.channelIndex);
+        }
+      }
       startDrag(mode, e.clientX, e.clientY, noteId);
     },
-    [startDrag]
+    [startDrag, notes, addNote]
   );
 
   // ============ GRID CLICK ============
@@ -296,6 +339,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     [tool, view.channelIndex, addNote, clearSelection, hideContextMenu, drag.isDragging, snapToScale, getEffectiveNoteLength]
   );
 
+  // Draw-continuous handler (paint notes while dragging in draw mode)
+  const handleGridDraw = useCallback(
+    (row: number, midiNote: number) => {
+      if (tool !== 'draw') return;
+      const targetNote = snapToScale(midiNote);
+      const duration = getEffectiveNoteLength();
+      addNote(targetNote, row, duration, 100, view.channelIndex);
+    },
+    [tool, view.channelIndex, addNote, snapToScale, getEffectiveNoteLength]
+  );
+
   // ============ CONTEXT MENU ============
 
   const handleGridRightClick = useCallback(
@@ -312,6 +366,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       showContextMenu(x, y, clickedNote?.id || null, row, midiNote);
     },
     [notes, selection.notes, selectNote, showContextMenu]
+  );
+
+  // ============ NOTE ERASE (for canvas erase tool) ============
+
+  const handleNoteErase = useCallback(
+    (noteId: string) => {
+      deleteNote(noteId);
+    },
+    [deleteNote]
   );
 
   // ============ SELECTION BOX ============
@@ -360,35 +423,40 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     };
   }, []);
 
+  const animateScrollRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    animateScrollRef.current = () => {
+      const lerp = 0.25;
+      const epsilon = 0.1;
+
+      const currentX = usePianoRollStore.getState().view.scrollX;
+      const currentY = usePianoRollStore.getState().view.scrollY;
+      const tx = targetScrollX.current;
+      const ty = targetScrollY.current;
+
+      const dx = tx - currentX;
+      const dy = ty - currentY;
+
+      if (Math.abs(dx) < epsilon && Math.abs(dy) < epsilon) {
+        setScroll(tx, ty);
+        lastExternalScrollX.current = tx;
+        lastExternalScrollY.current = ty;
+        scrollAnimFrame.current = null;
+        return;
+      }
+
+      const newX = currentX + dx * lerp;
+      const newY = currentY + dy * lerp;
+      setScroll(newX, newY);
+      lastExternalScrollX.current = newX;
+      lastExternalScrollY.current = newY;
+
+      scrollAnimFrame.current = requestAnimationFrame(() => animateScrollRef.current());
+    };
+  });
   const animateScroll = useCallback(() => {
-    const lerp = 0.25;
-    const epsilon = 0.1;
-
-    const currentX = usePianoRollStore.getState().view.scrollX;
-    const currentY = usePianoRollStore.getState().view.scrollY;
-    const tx = targetScrollX.current;
-    const ty = targetScrollY.current;
-
-    const dx = tx - currentX;
-    const dy = ty - currentY;
-
-    if (Math.abs(dx) < epsilon && Math.abs(dy) < epsilon) {
-      // Snap to target and stop animating
-      setScroll(tx, ty);
-      lastExternalScrollX.current = tx;
-      lastExternalScrollY.current = ty;
-      scrollAnimFrame.current = null;
-      return;
-    }
-
-    const newX = currentX + dx * lerp;
-    const newY = currentY + dy * lerp;
-    setScroll(newX, newY);
-    lastExternalScrollX.current = newX;
-    lastExternalScrollY.current = newY;
-
-    scrollAnimFrame.current = requestAnimationFrame(animateScroll);
-  }, [setScroll]);
+    animateScrollRef.current();
+  }, []);
 
   const handleScroll = useCallback(
     (deltaX: number, deltaY: number) => {
@@ -412,17 +480,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       if (!currentDrag.isDragging) return;
       updateDrag(e.clientX, e.clientY);
 
-      // Generate ghost notes for move/resize drag preview
+      // Generate ghost notes for move/resize drag preview (snapped to grid)
+      const gridStep = view.snapToGrid ? Math.max(1, Math.floor(4 / view.gridDivision)) : 1;
+
       if (currentDrag.mode === 'move' && currentDrag.noteId) {
         const deltaX = e.clientX - currentDrag.startX;
         const deltaY = e.clientY - currentDrag.startY;
-        const deltaRow = Math.round(deltaX / view.horizontalZoom);
+        const rawDeltaRow = deltaX / view.horizontalZoom;
+        const snappedDeltaRow = Math.round(rawDeltaRow / gridStep) * gridStep;
         const deltaPitch = -Math.round(deltaY / view.verticalZoom);
 
-        if (deltaRow !== 0 || deltaPitch !== 0) {
+        if (snappedDeltaRow !== 0 || deltaPitch !== 0) {
           const note = notes.find(n => n.id === currentDrag.noteId);
           if (note) {
-            // Ghost for the dragged note (and all selected notes)
             const selectedIds = usePianoRollStore.getState().selection.notes;
             const ghostIds = selectedIds.has(note.id)
               ? Array.from(selectedIds)
@@ -433,14 +503,32 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
               if (!n) return null;
               return {
                 ...n,
-                startRow: Math.max(0, n.startRow + deltaRow),
-                endRow: Math.max(1, n.endRow + deltaRow),
+                startRow: Math.max(0, n.startRow + snappedDeltaRow),
+                endRow: Math.max(1, n.endRow + snappedDeltaRow),
                 midiNote: Math.max(0, Math.min(127, n.midiNote + deltaPitch)),
               };
             }).filter(Boolean) as PianoRollNote[];
 
             setGhostNotes(ghosts);
           }
+        }
+      }
+
+      // Resize ghost preview (snapped)
+      if ((currentDrag.mode === 'resize-end' || currentDrag.mode === 'resize-start') && currentDrag.noteId) {
+        const deltaX = e.clientX - currentDrag.startX;
+        const rawDeltaRow = deltaX / view.horizontalZoom;
+        const snappedDeltaRow = Math.round(rawDeltaRow / gridStep) * gridStep;
+
+        const note = notes.find(n => n.id === currentDrag.noteId);
+        if (note && snappedDeltaRow !== 0) {
+          const ghost = { ...note };
+          if (currentDrag.mode === 'resize-end') {
+            ghost.endRow = Math.max(note.startRow + 1, note.endRow + snappedDeltaRow);
+          } else {
+            ghost.startRow = Math.min(note.endRow - 1, Math.max(0, note.startRow + snappedDeltaRow));
+          }
+          setGhostNotes([ghost]);
         }
       }
 
@@ -472,7 +560,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       }
     };
 
-    const handleMouseUp = (_e: MouseEvent) => {
+    const handleMouseUp = () => {
       const currentDrag = usePianoRollStore.getState().drag;
       if (!currentDrag.isDragging) return;
 
@@ -486,10 +574,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         return;
       }
 
-      // Calculate delta in rows and pitch
+      // Calculate delta in rows and pitch (snapped to grid)
       const deltaX = currentDrag.currentX - currentDrag.startX;
       const deltaY = currentDrag.currentY - currentDrag.startY;
-      const deltaRow = Math.round(deltaX / view.horizontalZoom);
+      const commitGridStep = view.snapToGrid ? Math.max(1, Math.floor(4 / view.gridDivision)) : 1;
+      const deltaRow = Math.round((deltaX / view.horizontalZoom) / commitGridStep) * commitGridStep;
       const deltaPitch = -Math.round(deltaY / view.verticalZoom);
 
       if (currentDrag.mode === 'move' && (deltaRow !== 0 || deltaPitch !== 0)) {
@@ -498,6 +587,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         const note = notes.find((n) => n.id === currentDrag.noteId);
         if (note) {
           resizeNote(currentDrag.noteId, note.endRow + deltaRow);
+        }
+      } else if (currentDrag.mode === 'resize-start') {
+        const note = notes.find((n) => n.id === currentDrag.noteId);
+        if (note) {
+          resizeNoteStart(currentDrag.noteId, note.startRow + deltaRow);
         }
       }
 
@@ -510,7 +604,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [view.horizontalZoom, view.verticalZoom, view.scrollX, view.scrollY, notes, moveNote, resizeNote, updateDrag, endDrag, selectNotes, setGhostNotes]);
+  }, [view.horizontalZoom, view.verticalZoom, view.scrollX, view.scrollY, view.snapToGrid, view.gridDivision, notes, moveNote, resizeNote, resizeNoteStart, updateDrag, endDrag, selectNotes, setGhostNotes]);
 
   // ============ CLIPBOARD OPERATIONS ============
 
@@ -650,6 +744,46 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         return;
       }
 
+      // Duplicate selection (Ctrl/Cmd+D)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'd' && selection.notes.size > 0) {
+        e.preventDefault();
+        duplicateNotes(Array.from(selection.notes));
+        return;
+      }
+
+      // Arrow key shortcuts for selected notes
+      if (selection.notes.size > 0 && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+        e.preventDefault();
+        const ids = Array.from(selection.notes);
+
+        if (key === 'ArrowUp') {
+          transposeNotes(ids, e.shiftKey ? 12 : 1);
+          return;
+        }
+        if (key === 'ArrowDown') {
+          transposeNotes(ids, e.shiftKey ? -12 : -1);
+          return;
+        }
+        if (key === 'ArrowLeft' && e.shiftKey) {
+          const gridStep = Math.max(1, Math.floor(4 / view.gridDivision));
+          adjustNoteLengths(ids, -gridStep);
+          return;
+        }
+        if (key === 'ArrowRight' && e.shiftKey) {
+          const gridStep = Math.max(1, Math.floor(4 / view.gridDivision));
+          adjustNoteLengths(ids, gridStep);
+          return;
+        }
+      }
+
+      // Velocity adjustment (+/- keys)
+      if ((key === '+' || key === '=' || key === '-' || key === '_') && selection.notes.size > 0 && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const delta = (key === '+' || key === '=') ? 10 : -10;
+        adjustVelocities(Array.from(selection.notes), delta);
+        return;
+      }
+
       // Tool shortcuts (only when no modifiers)
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         // Quantize
@@ -722,6 +856,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     handleQuantize, handleToggleSlide, handleToggleAccent, handleUndo, handleRedo,
     clearSelection, hideContextMenu, setTool, snapToScale, getEffectiveNoteLength,
     previewNoteSound, releasePreviewNote,
+    transposeNotes, adjustNoteLengths, duplicateNotes, adjustVelocities,
   ]);
 
   // ============ VELOCITY LANE HEIGHT ADJUSTMENT ============
@@ -946,25 +1081,44 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           {selection.notes.size > 0 && ` (${selection.notes.size} sel)`}
           {clipboard && ` | clip:${clipboard.notes.length}`}
         </span>
+
+        <div className="w-px h-4 bg-dark-border" />
+
+        {/* Pop out */}
+        <button
+          onClick={() => {
+            const already = useUIStore.getState().pianoRollPoppedOut;
+            if (already) {
+              focusPopout('DEViLBOX — Piano Roll');
+            } else {
+              useUIStore.getState().setPianoRollPoppedOut(true);
+            }
+          }}
+          className="p-1 rounded transition-colors text-text-muted hover:text-cyan-400"
+          title="Pop out to separate window"
+        >
+          <ExternalLink size={14} />
+        </button>
       </div>
 
       {/* Main editor area */}
       <div className="flex-1 flex flex-col w-full overflow-hidden min-h-0">
         <div className="flex-1 flex w-full overflow-hidden min-h-0">
-          {/* Piano keyboard */}
-          <PianoKeyboard
+          {/* Piano keyboard (canvas) */}
+          <PianoKeyboardCanvas
             verticalZoom={view.verticalZoom}
             scrollY={view.scrollY}
             visibleNotes={visibleNotes}
             containerHeight={gridHeight}
             activeNotes={activeNotes}
             scaleNotes={scaleNotesSet}
+            dragTargetMidi={dragTargetMidi}
             onNotePreview={previewNoteSound}
             onNoteRelease={releasePreviewNote}
           />
 
-          {/* Grid and notes */}
-          <PianoRollGrid
+          {/* Grid and notes (canvas) */}
+          <PianoRollCanvas
             notes={notes}
             patternLength={patternLength}
             horizontalZoom={view.horizontalZoom}
@@ -977,30 +1131,32 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             playheadRow={isPlaying ? currentRow : null}
             containerHeight={gridHeight}
             scaleNotes={scaleNotesSet}
+            tool={tool}
             onNoteSelect={handleNoteSelect}
             onNoteDragStart={handleNoteDragStart}
             onGridClick={handleGridClick}
             onGridRightClick={handleGridRightClick}
             onScroll={handleScroll}
             onSelectionBoxStart={handleSelectionBoxStart}
+            onNoteErase={handleNoteErase}
+            onGridDraw={handleGridDraw}
           />
         </div>
 
-        {/* Velocity editing lane */}
+        {/* Velocity editing lane (canvas) */}
         {view.showVelocityLane && (
           <div className="flex w-full shrink-0">
-            <div className="shrink-0" style={{ width: 48 }} /> {/* Keyboard spacer */}
-            <VelocityLane
+            <div className="shrink-0" style={{ width: 72 }} /> {/* Keyboard spacer */}
+            <VelocityLaneCanvas
               notes={notes}
               horizontalZoom={view.horizontalZoom}
               scrollX={view.scrollX}
               selectedNotes={selection.notes}
-              onVelocityChange={setNoteVelocity}
-              onMultiVelocityChange={setMultipleVelocities}
               onBeginDrag={beginVelocityDrag}
               onDragVelocity={setVelocityNoUndo}
               onDragMultiVelocity={setMultipleVelocitiesNoUndo}
               onEndDrag={endVelocityDrag}
+              onAdjustVelocity={adjustVelocities}
             />
           </div>
         )}
@@ -1016,8 +1172,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         onQuantize={handleQuantize}
         onToggleSlide={handleToggleSlide}
         onToggleAccent={handleToggleAccent}
+        onSetVelocity={(vel) => setMultipleVelocities(Array.from(selection.notes), vel)}
         hasSelection={selection.notes.size > 0}
         hasClipboard={clipboard !== null}
+        selectionVelocity={
+          selection.notes.size > 0
+            ? Math.round(
+                notes
+                  .filter(n => selection.notes.has(n.id))
+                  .reduce((sum, n) => sum + n.velocity, 0) /
+                Math.max(1, notes.filter(n => selection.notes.has(n.id)).length)
+              )
+            : undefined
+        }
       />
 
       {/* Acid Pattern Generator Dialog */}

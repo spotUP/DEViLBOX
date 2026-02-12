@@ -39,6 +39,7 @@ export function ResponsiveProvider({ children }: ResponsiveProviderProps) {
  * Hook to access responsive context
  * Must be used within a ResponsiveProvider
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useResponsive(): ResponsiveContextValue {
   const context = useContext(ResponsiveContext);
 
@@ -53,6 +54,7 @@ export function useResponsive(): ResponsiveContextValue {
  * Hook to access responsive context with fallback
  * Safe to use outside of ResponsiveProvider (returns defaults)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useResponsiveSafe(): ResponsiveContextValue {
   const context = useContext(ResponsiveContext);
 

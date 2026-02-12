@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { SpaceLaserConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
@@ -19,7 +19,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -103,7 +103,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
               {['exponential', 'linear'].map((curve) => (
                 <button
                   key={curve}
-                  onClick={() => updateLaser({ sweepCurve: curve as any })}
+                  onClick={() => updateLaser({ sweepCurve: curve as 'exponential' | 'linear' })}
                   className={`
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.laser.sweepCurve === curve
@@ -145,7 +145,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
               {['white', 'pink', 'brown'].map((type) => (
                 <button
                   key={type}
-                  onClick={() => updateNoise({ type: type as any })}
+                  onClick={() => updateNoise({ type: type as 'white' | 'pink' | 'brown' })}
                   className={`
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.noise.type === type
@@ -208,7 +208,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             {['lowpass', 'highpass', 'bandpass', 'notch'].map((type) => (
               <button
                 key={type}
-                onClick={() => updateFilter({ type: type as any })}
+                onClick={() => updateFilter({ type: type as 'lowpass' | 'highpass' | 'bandpass' | 'notch' })}
                 className={`
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type

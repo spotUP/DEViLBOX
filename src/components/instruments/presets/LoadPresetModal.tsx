@@ -85,16 +85,16 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   // Handle preview instrument sync
   useEffect(() => {
     if (selectedPreset) {
-      const previewConfig: InstrumentConfig = {
+      const previewConfig = {
         ...selectedPreset,
         id: 999,
         isLive: true,
-      } as any; // Cast as any because selectedPreset is partial but ToneEngine needs full
+      } as InstrumentConfig;
 
       setPreviewInstrument(previewConfig);
       try {
         getToneEngine().invalidateInstrument(999);
-      } catch (e) {
+      } catch {
         // Ignored
       }
     } else {
@@ -129,7 +129,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       const note = keyMap[e.key.toLowerCase()];
       if (note && selectedPreset) {
         const engine = getToneEngine();
-        const previewConfig = { ...selectedPreset, id: 999, isLive: true } as any;
+        const previewConfig = { ...selectedPreset, id: 999, isLive: true } as InstrumentConfig;
         engine.triggerPolyNoteAttack(999, note, 1, previewConfig);
       }
     };
@@ -149,7 +149,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
       const note = keyMap[e.key.toLowerCase()];
       if (note && selectedPreset) {
         const engine = getToneEngine();
-        const previewConfig = { ...selectedPreset, id: 999, isLive: true } as any;
+        const previewConfig = { ...selectedPreset, id: 999, isLive: true } as InstrumentConfig;
         engine.triggerPolyNoteRelease(999, note, previewConfig);
       }
     };
@@ -164,7 +164,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
   // Get icon for synth type
   const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
+    const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[iconName];
     return Icon || LucideIcons.Music2;
   };
 
@@ -215,7 +215,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
     setSelectedUserPresetId(null);
 
     const engine = getToneEngine();
-    const previewConfig = { ...preset, id: 999, isLive: true } as any;
+    const previewConfig = { ...preset, id: 999, isLive: true } as InstrumentConfig;
     engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
     setTimeout(() => {
       engine.triggerPolyNoteRelease(999, 'C4', previewConfig);
@@ -228,7 +228,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
     setSelectedPresetName(null);
 
     const engine = getToneEngine();
-    const previewConfig = { ...config, id: 999, isLive: true } as any;
+    const previewConfig = { ...config, id: 999, isLive: true } as InstrumentConfig;
     engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
     setTimeout(() => {
       engine.triggerPolyNoteRelease(999, 'C4', previewConfig);

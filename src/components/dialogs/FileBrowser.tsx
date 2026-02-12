@@ -8,7 +8,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File } from 'lucide-react';
-import { FileManager as _FileManager } from '@cubone/react-file-manager';
 import '@cubone/react-file-manager/dist/style.css';
 import {
   isFileSystemAccessSupported,
@@ -172,7 +171,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             if (!a.isDirectory && b.isDirectory) return 1;
             return a.name.localeCompare(b.name);
           });
-        } catch (err) {
+        } catch {
           // Server may not be available, fall through to manifest
           setHasServerFS(false);
         }
@@ -272,7 +271,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       }
 
       // Load file content
-      let data: any;
+      let data: object | string;
       const isXmlFile = selectedFile.name.toLowerCase().endsWith('.xml');
 
       // Check if Electron or Web FS API or Server FS or static manifest
@@ -296,7 +295,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         throw new Error('Cannot read file');
       }
 
-      onLoad(data, selectedFile.name);
+      onLoad(data as object, selectedFile.name);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load file');

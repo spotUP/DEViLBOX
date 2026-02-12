@@ -26,7 +26,8 @@ export class VSTBridgeSynth implements DevilboxSynth {
   private _paramValues = new Map<number, number>();
   private _pendingNotes: Array<{ note: number; velocity: number }> = [];
 
-  constructor(descriptor: VSTBridgeDescriptor, _config?: InstrumentConfig) {
+  constructor(descriptor: VSTBridgeDescriptor, config?: InstrumentConfig) {
+    void config;
     this._descriptor = descriptor;
     this.name = `VSTBridge:${descriptor.id}`;
 
@@ -120,7 +121,8 @@ export class VSTBridgeSynth implements DevilboxSynth {
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  triggerRelease(frequency?: number | string, time?: number): this {
+    void time;
     if (!this._worklet) return this;
 
     if (frequency !== undefined) {

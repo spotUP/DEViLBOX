@@ -101,7 +101,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
         } else {
           if (!cancelled) setSynthReady(true);
         }
-      } catch (_e) {
+      } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };
@@ -338,21 +338,6 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
   const sliderRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    isDraggingRef.current = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    updateValue(e.clientY);
-  }, []);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDraggingRef.current) return;
-    updateValue(e.clientY);
-  }, []);
-
-  const handlePointerUp = useCallback(() => {
-    isDraggingRef.current = false;
-  }, []);
-
   const updateValue = useCallback((clientY: number) => {
     if (!sliderRef.current) return;
     const rect = sliderRef.current.getBoundingClientRect();
@@ -361,6 +346,21 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
     const stepped = Math.round(pct * 8);
     onChange(stepped);
   }, [onChange]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    isDraggingRef.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    updateValue(e.clientY);
+  }, [updateValue]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    updateValue(e.clientY);
+  }, [updateValue]);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
 
   const fillPct = (value / 8) * 100;
 

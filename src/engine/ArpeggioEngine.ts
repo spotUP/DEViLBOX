@@ -11,7 +11,7 @@
  */
 
 import * as Tone from 'tone';
-import type { ArpeggioConfig, ArpeggioStep, ArpeggioMode as _ArpeggioMode, ArpeggioSpeedUnit as _ArpeggioSpeedUnit } from '@typedefs/instrument';
+import type { ArpeggioConfig, ArpeggioStep } from '@typedefs/instrument';
 
 export interface ArpeggioEngineOptions {
   config: ArpeggioConfig;
@@ -71,14 +71,15 @@ export class ArpeggioEngine {
         // Direct Hz: convert to seconds
         return 1 / Math.max(1, Math.min(60, speed));
 
-      case 'ticks':
+      case 'ticks': {
         // Ticks per step: convert to note value
         // 48 ticks = quarter note in standard resolution
         const ticksPerBeat = 48;
         const beats = speed / ticksPerBeat;
         return (60 / bpm) * beats;
+      }
 
-      case 'division':
+      case 'division': {
         // Note division: 1 = whole, 2 = half, 4 = quarter, 8 = eighth, etc.
         const divisionMap: Record<number, string> = {
           1: '1n',
@@ -91,6 +92,7 @@ export class ArpeggioEngine {
         };
         // Find closest division or use numeric value
         return divisionMap[speed] || `${speed}n`;
+      }
 
       default:
         return 1 / 15; // Default 15 Hz
@@ -128,7 +130,7 @@ export class ArpeggioEngine {
         // Simple loop: 0,1,2,3,0,1,2,3...
         return (this.currentStepIndex + 1) % numSteps;
 
-      case 'pingpong':
+      case 'pingpong': {
         // Ping-pong: 0,1,2,3,2,1,0,1,2,3...
         let next = this.currentStepIndex + this.pingPongDirection;
 
@@ -146,8 +148,9 @@ export class ArpeggioEngine {
         }
 
         return Math.max(0, Math.min(numSteps - 1, next));
+      }
 
-      case 'oneshot':
+      case 'oneshot': {
         // One-shot: 0,1,2,3 then stop
         const nextOneShot = this.currentStepIndex + 1;
         if (nextOneShot >= numSteps) {
@@ -156,6 +159,7 @@ export class ArpeggioEngine {
           return numSteps - 1;
         }
         return nextOneShot;
+      }
 
       case 'random':
         // Random: pick any step
@@ -199,7 +203,7 @@ export class ArpeggioEngine {
   /**
    * Process a single arpeggio step
    */
-  private processStep(_time: number): void {
+  private processStep(): void {
     if (!this.isPlaying) return;
 
     const steps = this.getSteps();

@@ -168,8 +168,8 @@ export class CZ101Synth implements DevilboxSynth {
 
     try {
       await ctx.audioWorklet.addModule(`${baseUrl}cz101/CZ101.worklet.js`);
-    } catch (err: any) {
-      if (!err?.message?.includes('already')) {
+    } catch (err: unknown) {
+      if (!(err instanceof Error && err.message?.includes('already'))) {
         throw err;
       }
     }
@@ -188,7 +188,7 @@ export class CZ101Synth implements DevilboxSynth {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(ctx.destination);
-    } catch (_e) { /* keepalive failed */ }
+    } catch { /* keepalive failed */ }
 
     // Wait for worklet ready
     await new Promise<void>((resolve, reject) => {
@@ -377,7 +377,8 @@ export class CZ101Synth implements DevilboxSynth {
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): void {
+  triggerRelease(note: string | number, time?: number): void {
+    void time;
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
 
     // Find the voice playing this note

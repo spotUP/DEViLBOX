@@ -67,6 +67,37 @@ export class AcidNote {
 }
 
 /**
+ * JSON representation of an AcidNote
+ */
+interface AcidNoteJSON {
+  key: number;
+  octave: number;
+  accent: boolean;
+  slide: boolean;
+  gate: boolean;
+  mute: boolean;
+  hammer: boolean;
+}
+
+/**
+ * JSON representation of an AcidPattern
+ */
+export interface AcidPatternJSON {
+  numSteps: number;
+  stepLength: number;
+  notes: AcidNoteJSON[];
+}
+
+/**
+ * JSON representation of AcidSequencer state
+ */
+export interface AcidSequencerJSON {
+  patterns: AcidPatternJSON[];
+  bpm: number;
+  activePattern: number;
+}
+
+/**
  * 16-step acid pattern
  */
 export class AcidPattern {
@@ -250,7 +281,7 @@ export class AcidPattern {
   /**
    * Export pattern to JSON
    */
-  toJSON(): any {
+  toJSON(): AcidPatternJSON {
     return {
       numSteps: this.numSteps,
       stepLength: this.stepLength,
@@ -269,7 +300,7 @@ export class AcidPattern {
   /**
    * Import pattern from JSON
    */
-  static fromJSON(data: any): AcidPattern {
+  static fromJSON(data: AcidPatternJSON): AcidPattern {
     const pattern = new AcidPattern();
     if (data.numSteps) pattern.numSteps = data.numSteps;
     if (data.stepLength) pattern.stepLength = data.stepLength;
@@ -599,7 +630,7 @@ export class AcidSequencer {
   /**
    * Load all patterns from JSON
    */
-  loadPatternsFromJSON(data: any): void {
+  loadPatternsFromJSON(data: AcidSequencerJSON): void {
     if (data.patterns && Array.isArray(data.patterns)) {
       for (let i = 0; i < Math.min(data.patterns.length, this.patterns.length); i++) {
         this.patterns[i] = AcidPattern.fromJSON(data.patterns[i]);
@@ -610,7 +641,7 @@ export class AcidSequencer {
   /**
    * Export all patterns to JSON
    */
-  exportPatternsToJSON(): any {
+  exportPatternsToJSON(): AcidSequencerJSON {
     return {
       patterns: this.patterns.map(p => p.toJSON()),
       bpm: this.bpm,

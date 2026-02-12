@@ -74,15 +74,17 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const gradientId = useId();
   // Stable refs for values needed during drag (avoids stale closures)
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
   const minRef = useRef(min);
-  minRef.current = min;
   const maxRef = useRef(max);
-  maxRef.current = max;
   const logarithmicRef = useRef(logarithmic);
-  logarithmicRef.current = logarithmic;
   const stepRef = useRef(step);
-  stepRef.current = step;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    minRef.current = min;
+    maxRef.current = max;
+    logarithmicRef.current = logarithmic;
+    stepRef.current = step;
+  }, [onChange, min, max, logarithmic, step]);
 
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);

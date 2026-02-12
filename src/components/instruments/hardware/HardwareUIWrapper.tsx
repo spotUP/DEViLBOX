@@ -24,7 +24,7 @@ interface HardwareUIWrapperProps {
 /**
  * Map of synth types to their hardware UI components
  */
-const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<any>>> = {
+const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<{ parameters: Record<string, number>; onParamChange: (key: string, value: number) => void }>>> = {
   // Drum Machines
   MAMETR707: TR707Hardware,
   DrumMachine: TR808Hardware,   // Roland TR-808/909 Rhythm Composers (1980/1983)
@@ -47,6 +47,7 @@ const HARDWARE_UI_MAP: Partial<Record<SynthType, React.ComponentType<any>>> = {
 /**
  * Check if a synth type has a hardware UI available
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasHardwareUI(synthType: SynthType): boolean {
   return synthType in HARDWARE_UI_MAP;
 }
@@ -54,7 +55,8 @@ export function hasHardwareUI(synthType: SynthType): boolean {
 /**
  * Get the hardware UI component for a synth type
  */
-export function getHardwareUI(synthType: SynthType): React.ComponentType<any> | null {
+// eslint-disable-next-line react-refresh/only-export-components
+export function getHardwareUI(synthType: SynthType): React.ComponentType<{ parameters: Record<string, number>; onParamChange: (key: string, value: number) => void }> | null {
   return HARDWARE_UI_MAP[synthType] || null;
 }
 

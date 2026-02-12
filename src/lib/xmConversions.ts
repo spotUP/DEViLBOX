@@ -303,7 +303,8 @@ export function formatVolumeColumn(volume: number): string {
  * @param finetune Finetune value (-8 to +7)
  * @returns XM note number (1-96)
  */
-export function periodToXMNote(period: number, _finetune: number = 0): number {
+export function periodToXMNote(period: number, finetune: number = 0): number {
+  void finetune;
   // Period 0 = empty cell (no note)
   if (period === 0) {
     return 0;
@@ -355,7 +356,8 @@ export function periodToXMNote(period: number, _finetune: number = 0): number {
  * @param finetune Finetune value (-8 to +7)
  * @returns Amiga period (113-856)
  */
-export function xmNoteToPeriod(xmNote: number, _finetune: number = 0): number {
+export function xmNoteToPeriod(xmNote: number, finetune: number = 0): number {
+  void finetune;
   if (xmNote === 0 || xmNote === 97) {
     return 0; // No note or note off
   }

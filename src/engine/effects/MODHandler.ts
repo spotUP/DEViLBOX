@@ -137,8 +137,9 @@ export class MODHandler extends BaseFormatHandler {
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
       
-      const defaultVol = (state as any).activeInstrument?.defaultVolume ?? 64;
-      const defaultFinetune = (state as any).activeInstrument?.finetune ?? 0;
+      const instExt = (state as unknown as { activeInstrument?: { defaultVolume?: number; finetune?: number } }).activeInstrument;
+      const defaultVol = instExt?.defaultVolume ?? 64;
+      const defaultFinetune = instExt?.finetune ?? 0;
 
       state.volume = defaultVol;
       result.setVolume = state.volume;
@@ -165,7 +166,7 @@ export class MODHandler extends BaseFormatHandler {
     }
 
     if (effect) {
-      const effectResult = this.processEffectTick0(channel, effect, state, note, instrument);
+      const effectResult = this.processEffectTick0(channel, effect, state, note);
       Object.assign(result, effectResult);
       
       const tick0Continuous = this.processTick(channel, 0, state);
@@ -219,7 +220,6 @@ export class MODHandler extends BaseFormatHandler {
     effect: string,
     state: ChannelState,
     note: string | null,
-    _instrument: number | null
   ): TickResult {
     const result: TickResult = {};
     const parsed = this.parseEffect(effect);
@@ -522,9 +522,10 @@ export class MODHandler extends BaseFormatHandler {
   protected getWaveformValueInt(waveform: WaveformType, pos: number): number {
     const p = pos & 0x3F;
     switch (waveform) {
-      case 'sine':
+      case 'sine': {
         const val = VIBRATO_TABLE[p & 0x1F];
         return p < 32 ? val : -val;
+      }
       case 'rampDown':
         return 255 - (p * 4);
       case 'square':

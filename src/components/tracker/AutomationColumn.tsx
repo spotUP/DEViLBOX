@@ -5,7 +5,7 @@
 
 import React, { useMemo } from 'react';
 import { useAutomationStore } from '@stores';
-import type { AutomationCurve } from '@typedefs/automation';
+import { interpolateAutomationValue } from '@typedefs/automation';
 
 interface AutomationColumnProps {
   channelIndex: number;
@@ -17,68 +17,29 @@ interface AutomationColumnProps {
   parameter?: string; // Default to 'cutoff'
 }
 
-// Interpolate value between automation points
-const getInterpolatedValue = (
-  curve: AutomationCurve,
-  row: number
-): number | null => {
-  if (!curve || curve.points.length === 0) return null;
+import { getSectionColor } from '@hooks/useChannelAutomationParams';
+import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import { useInstrumentStore, useTrackerStore } from '@stores';
+import type { SynthType } from '@typedefs/instrument';
 
-  const points = curve.points;
+// Get color based on parameter's NKS section (resolved from instrument)
+const useParameterColor = (parameter: string, channelIndex: number): string => {
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const instruments = useInstrumentStore((s) => s.instruments);
 
-  // Find surrounding points
-  let before = null;
-  let after = null;
+  return React.useMemo(() => {
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return 'var(--color-synth-filter)';
+    const channel = pattern.channels[channelIndex];
+    if (!channel || channel.instrumentId === null) return 'var(--color-synth-filter)';
+    const instrument = instruments.find((i) => i.id === channel.instrumentId);
+    if (!instrument) return 'var(--color-synth-filter)';
 
-  for (let i = 0; i < points.length; i++) {
-    if (points[i].row <= row) {
-      before = points[i];
-    }
-    if (points[i].row >= row) {
-      after = points[i];
-      break;
-    }
-  }
-
-  // Exact match or single point cases
-  if (before && before.row === row) return before.value;
-  if (after && after.row === row) return after.value;
-  if (!before && after) return after.value;
-  if (before && !after) return before.value;
-
-  // Interpolate
-  if (before && after) {
-    const t = (row - before.row) / (after.row - before.row);
-    return before.value + (after.value - before.value) * t;
-  }
-
-  return null;
-};
-
-// Get color based on parameter type (uses CSS variables for theming)
-const getParameterColor = (parameter: string): string => {
-  switch (parameter) {
-    case 'cutoff':
-    case 'resonance':
-      return 'var(--color-synth-filter)';
-    case 'envMod':
-    case 'decay':
-      return 'var(--color-synth-envelope)';
-    case 'accent':
-      return 'var(--color-synth-accent)';
-    case 'overdrive':
-    case 'distortion':
-      return 'var(--color-synth-drive)';
-    case 'volume':
-      return 'var(--color-synth-volume)';
-    case 'pan':
-      return 'var(--color-synth-pan)';
-    case 'delay':
-    case 'reverb':
-      return 'var(--color-synth-effects)';
-    default:
-      return 'var(--color-synth-filter)';
-  }
+    const nksParams = getNKSParametersForSynth(instrument.synthType as SynthType);
+    const nksParam = nksParams.find((p) => p.id === parameter);
+    return nksParam ? getSectionColor(nksParam.section) : 'var(--color-synth-filter)';
+  }, [parameter, channelIndex, patterns, currentPatternIndex, instruments]);
 };
 
 export const AutomationColumn: React.FC<AutomationColumnProps> = ({
@@ -86,8 +47,6 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
   patternId,
   patternLength,
   rowHeight,
-  scrollOffset: _scrollOffset,
-  containerHeight: _containerHeight,
   parameter = 'cutoff',
 }) => {
   const { getAutomation } = useAutomationStore();
@@ -108,7 +67,7 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
 
     // Generate value for each row
     for (let row = 0; row < patternLength; row++) {
-      const value = getInterpolatedValue(curve, row);
+      const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
       if (value !== null) {
         const x = value * (width - 4) + 2; // Map 0-1 to 2-(width-2)
         const y = row * rowHeight + rowHeight / 2;
@@ -137,7 +96,7 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
 
     // Generate value for each row (going up)
     for (let row = patternLength - 1; row >= 0; row--) {
-      const value = getInterpolatedValue(curve, row);
+      const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
       if (value !== null) {
         const x = value * (width - 4) + 2;
         const y = row * rowHeight + rowHeight / 2;
@@ -152,7 +111,7 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
     return points.join(' ');
   }, [curve, patternLength, rowHeight]);
 
-  const color = getParameterColor(parameter);
+  const color = useParameterColor(parameter, channelIndex);
 
   return (
     <div
@@ -213,9 +172,10 @@ export const AutomationColumn: React.FC<AutomationColumnProps> = ({
 // Header component for the automation column
 export const AutomationColumnHeader: React.FC<{
   parameter: string;
+  channelIndex?: number;
   onParameterChange?: (param: string) => void;
-}> = ({ parameter }) => {
-  const color = getParameterColor(parameter);
+}> = ({ parameter, channelIndex = 0 }) => {
+  const color = useParameterColor(parameter, channelIndex);
 
   return (
     <div
@@ -231,7 +191,7 @@ export const AutomationColumnHeader: React.FC<{
         transform: 'rotate(180deg)',
       }}
     >
-      {parameter.slice(0, 3)}
+      {(parameter.includes('.') ? parameter.split('.').pop()! : parameter).slice(0, 3)}
     </div>
   );
 };

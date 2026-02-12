@@ -35,7 +35,7 @@ export class ChiptunePlayer {
   private gain: GainNode | null = null;
   private processNode: AudioWorkletNode | null = null;
   private config: ChiptuneConfig;
-  private handlers: Map<string, EventHandler<any>[]> = new Map();
+  private handlers: Map<string, Array<(data?: unknown) => void>> = new Map();
   private initialized = false;
   private initError: string | null = null;
   private initPromise: Promise<void> | null = null;
@@ -151,7 +151,7 @@ export class ChiptunePlayer {
     if (!this.handlers.has(eventName)) {
       this.handlers.set(eventName, []);
     }
-    this.handlers.get(eventName)!.push(handler);
+    this.handlers.get(eventName)!.push(handler as (data?: unknown) => void);
   }
 
   // Event handlers

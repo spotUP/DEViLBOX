@@ -1,4 +1,4 @@
-// @ts-ignore - SamJs is a JavaScript library without types
+// @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
 
 /**

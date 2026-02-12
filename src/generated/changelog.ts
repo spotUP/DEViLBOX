@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T02:58:47.658Z
+ * Generated: 2026-02-12T18:31:46.030Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '420';
-export const BUILD_HASH = 'bf1e85c';
+export const BUILD_NUMBER = '426';
+export const BUILD_HASH = 'd21bb32';
 export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
@@ -31,6 +31,36 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-12',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Route TrackerReplayer through master effects chain"
+      },
+      {
+        type: 'fix',
+        "description": "Misc engine, store, and UI improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Tabbed MOJO/DevilFish/Korg/LFO/FX UI, always-active filter params"
+      },
+      {
+        type: 'feature',
+        "description": "Add Speak & Spell ROM data and fix TTS voice activation"
+      },
+      {
+        type: 'improvement',
+        "description": "Reorganize NKS into performance module"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove old song data files and unused hardware images"
+      }
+    ]
+  },
+  {
+    version: '2026-02-11',
     date: '2026-02-11',
     changes: [
       {
@@ -208,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Clean up VitalControls component"
-      },
-      {
-        type: 'fix',
-        "description": "Register Vital, Odin2, and Surge panel components in synth registry"
-      },
-      {
-        type: 'feature',
-        "description": "Test: add swing timing test scripts and XML test patterns"
-      },
-      {
-        type: 'feature',
-        "description": "Add Tonewheel Organ, Vital, Odin2, Surge, and Melodica controls"
-      },
-      {
-        type: 'feature',
-        "description": "Add effect engine modules, BPM sync, and compiled WASM binaries"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add documentation, changelog, test pages, and gitignore updates"
       }
     ]
   }

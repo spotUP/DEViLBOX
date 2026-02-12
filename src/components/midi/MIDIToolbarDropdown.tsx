@@ -35,8 +35,8 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
   // Initialize MIDI on mount (when isSupported is null, we haven't checked yet)
   useEffect(() => {
     if (!isInitialized && isSupported === null) {
-      setIsInitializing(true);
-      init().finally(() => setIsInitializing(false));
+      requestAnimationFrame(() => setIsInitializing(true));
+      init().finally(() => requestAnimationFrame(() => setIsInitializing(false)));
     }
   }, [isInitialized, isSupported, init]);
 
@@ -59,7 +59,7 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
   const [showActivity, setShowActivity] = useState(false);
   useEffect(() => {
     if (lastActivityTimestamp > 0) {
-      setShowActivity(true);
+      requestAnimationFrame(() => setShowActivity(true));
       const timer = setTimeout(() => setShowActivity(false), 100);
       return () => clearTimeout(timer);
     }

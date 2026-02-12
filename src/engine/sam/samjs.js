@@ -15,26 +15,26 @@
  * @param {Number} mask The mask to test.
  * @return {boolean}
  */
-let matchesBitmask = (bits, mask) => {
+const matchesBitmask = (bits, mask) => {
   return (bits & mask) !== 0;
 };
-let text2Uint8Array = text => {
-  let buffer = new Uint8Array(text.length);
+const text2Uint8Array = text => {
+  const buffer = new Uint8Array(text.length);
   text.split('').forEach((e, index) => {
     buffer[index] = e.charCodeAt(0);
   });
   return buffer;
 };
-let Uint32ToUint8Array = uint32 => {
-  let result = new Uint8Array(4);
+const Uint32ToUint8Array = uint32 => {
+  const result = new Uint8Array(4);
   result[0] = uint32;
   result[1] = uint32 >> 8;
   result[2] = uint32 >> 16;
   result[3] = uint32 >> 24;
   return result;
 };
-let Uint16ToUint8Array = uint16 => {
-  let result = new Uint8Array(2);
+const Uint16ToUint8Array = uint16 => {
+  const result = new Uint8Array(2);
   result[0] = uint16;
   result[1] = uint16 >> 8;
   return result;
@@ -47,12 +47,12 @@ let Uint16ToUint8Array = uint16 => {
  *
  * @return {Promise}
  */
-let Play = (context, audiobuffer) => {
+const Play = (context, audiobuffer) => {
   let abort;
-  let promise = new Promise((resolve, reject) => {
-    let source = context.createBufferSource();
-    let soundBuffer = context.createBuffer(1, audiobuffer.length, 22050);
-    let buffer = soundBuffer.getChannelData(0);
+  const promise = new Promise((resolve, reject) => {
+    const source = context.createBufferSource();
+    const soundBuffer = context.createBuffer(1, audiobuffer.length, 22050);
+    const buffer = soundBuffer.getChannelData(0);
     for (let i = 0; i < audiobuffer.length; i++) {
       buffer[i] = audiobuffer[i];
     }
@@ -79,7 +79,7 @@ let context = null;
  *
  * @return {Promise}
  */
-let PlayBuffer = audiobuffer => {
+const PlayBuffer = audiobuffer => {
   if (null === context) {
     context = new AudioContext();
   }
@@ -98,8 +98,8 @@ let PlayBuffer = audiobuffer => {
  *
  * @return {Float32Array}
  */
-let Uint8ArrayToFloat32Array = buffer => {
-  let audio = new Float32Array(buffer.length);
+const Uint8ArrayToFloat32Array = buffer => {
+  const audio = new Float32Array(buffer.length);
   for (let i = 0; i < buffer.length; i++) {
     audio[i] = (buffer[i] - 128) / 256;
   }
@@ -113,9 +113,9 @@ let Uint8ArrayToFloat32Array = buffer => {
  *
  * @return {Uint8Array}
  */
-let ToWavBuffer = audiobuffer => {
+const ToWavBuffer = audiobuffer => {
   // Calculate buffer size.
-  let realbuffer = new Uint8Array(4 +
+  const realbuffer = new Uint8Array(4 +
   // "RIFF"
   4 +
   // uint32 filesize
@@ -143,7 +143,7 @@ let ToWavBuffer = audiobuffer => {
   // uint32 chunk length
   audiobuffer.length);
   let pos = 0;
-  let write = buffer => {
+  const write = buffer => {
     realbuffer.set(buffer, pos);
     pos += buffer.length;
   };
@@ -174,14 +174,14 @@ let ToWavBuffer = audiobuffer => {
  *
  * @return void
  */
-let RenderBuffer = audiobuffer => {
-  let filename = "sam.wav";
-  let blob = new Blob([ToWavBuffer(audiobuffer)], {
+const RenderBuffer = audiobuffer => {
+  const filename = "sam.wav";
+  const blob = new Blob([ToWavBuffer(audiobuffer)], {
     type: "audio/vnd.wave"
   });
-  let url = window.URL || window.webkitURL;
-  let fileURL = url.createObjectURL(blob);
-  let a = document.createElement('a');
+  const url = window.URL || window.webkitURL;
+  const fileURL = url.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = fileURL;
   a.target = '_blank';
   a.download = filename;
@@ -203,7 +203,7 @@ let RenderBuffer = audiobuffer => {
  *  0x40        is vowel or Y
  *  0x80        alpha or '
  */
-let charFlags = {
+const charFlags = {
   ' ': 0,
   '!': 0 | 0x02,
   '"': 0 | 0x02,
@@ -270,17 +270,17 @@ let charFlags = {
   '_': 0,
   '`': 0 | 0x20
 };
-let rules$1 = ' (A.)=EH4Y. |' + '(A) =AH|' + ' (ARE) =AAR|' + ' (AR)O=AXR|' + '(AR)#=EH4R|' + ' ^(AS)#=EY4S|' + '(A)WA=AX|' + '(AW)=AO5|' + ' :(ANY)=EH4NIY|' + '(A)^+#=EY5|' + '#:(ALLY)=ULIY|' + ' (AL)#=UL|' + '(AGAIN)=AXGEH4N|' + '#:(AG)E=IHJ|' + '(A)^%=EY|' + '(A)^+:#=AE|' + ' :(A)^+ =EY4|' + ' (ARR)=AXR|' + '(ARR)=AE4R|' + ' ^(AR) =AA5R|' + '(AR)=AA5R|' + '(AIR)=EH4R|' + '(AI)=EY4|' + '(AY)=EY5|' + '(AU)=AO4|' + '#:(AL) =UL|' + '#:(ALS) =ULZ|' + '(ALK)=AO4K|' + '(AL)^=AOL|' + ' :(ABLE)=EY4BUL|' + '(ABLE)=AXBUL|' + '(A)VO=EY4|' + '(ANG)+=EY4NJ|' + '(ATARI)=AHTAA4RIY|' + '(A)TOM=AE|' + '(A)TTI=AE|' + ' (AT) =AET|' + ' (A)T=AH|' + '(A)=AE|' + ' (B) =BIY4|' + ' (BE)^#=BIH|' + '(BEING)=BIY4IHNX|' + ' (BOTH) =BOW4TH|' + ' (BUS)#=BIH4Z|' + '(BREAK)=BREY5K|' + '(BUIL)=BIH4L|' + '(B)=B|' + ' (C) =SIY4|' + ' (CH)^=K|' + '^E(CH)=K|' + '(CHA)R#=KEH5|' + '(CH)=CH|' + ' S(CI)#=SAY4|' + '(CI)A=SH|' + '(CI)O=SH|' + '(CI)EN=SH|' + '(CITY)=SIHTIY|' + '(C)+=S|' + '(CK)=K|' + '(COMMODORE)=KAA4MAHDOHR|' + '(COM)=KAHM|' + '(CUIT)=KIHT|' + '(CREA)=KRIYEY|' + '(C)=K|' + ' (D) =DIY4|' + ' (DR.) =DAA4KTER|' + '#:(DED) =DIHD|' + '.E(D) =D|' + '#:^E(D) =T|' + ' (DE)^#=DIH|' + ' (DO) =DUW|' + ' (DOES)=DAHZ|' + '(DONE) =DAH5N|' + '(DOING)=DUW4IHNX|' + ' (DOW)=DAW|' + '#(DU)A=JUW|' + '#(DU)^#=JAX|' + '(D)=D|' + ' (E) =IYIY4|' + '#:(E) =|' + '\':^(E) =|' + ' :(E) =IY|' + '#(ED) =D|' + '#:(E)D =|' + '(EV)ER=EH4V|' + '(E)^%=IY4|' + '(ERI)#=IY4RIY|' + '(ERI)=EH4RIH|' + '#:(ER)#=ER|' + '(ERROR)=EH4ROHR|' + '(ERASE)=IHREY5S|' + '(ER)#=EHR|' + '(ER)=ER|' + ' (EVEN)=IYVEHN|' + '#:(E)W=|' + '@(EW)=UW|' + '(EW)=YUW|' + '(E)O=IY|' + '#:&(ES) =IHZ|' + '#:(E)S =|' + '#:(ELY) =LIY|' + '#:(EMENT)=MEHNT|' + '(EFUL)=FUHL|' + '(EE)=IY4|' + '(EARN)=ER5N|' + ' (EAR)^=ER5|' + '(EAD)=EHD|' + '#:(EA) =IYAX|' + '(EA)SU=EH5|' + '(EA)=IY5|' + '(EIGH)=EY4|' + '(EI)=IY4|' + ' (EYE)=AY4|' + '(EY)=IY|' + '(EU)=YUW5|' + '(EQUAL)=IY4KWUL|' + '(E)=EH|' + ' (F) =EH4F|' + '(FUL)=FUHL|' + '(FRIEND)=FREH5ND|' + '(FATHER)=FAA4DHER|' + '(F)F=|' + '(F)=F|' + ' (G) =JIY4|' + '(GIV)=GIH5V|' + ' (G)I^=G|' + '(GE)T=GEH5|' + 'SU(GGES)=GJEH4S|' + '(GG)=G|' + ' B#(G)=G|' + '(G)+=J|' + '(GREAT)=GREY4T|' + '(GON)E=GAO5N|' + '#(GH)=|' + ' (GN)=N|' + '(G)=G|' + ' (H) =EY4CH|' + ' (HAV)=/HAE6V|' + ' (HERE)=/HIYR|' + ' (HOUR)=AW5ER|' + '(HOW)=/HAW|' + '(H)#=/H|' + '(H)=|' + ' (IN)=IHN|' + ' (I) =AY4|' + '(I) =AY|' + '(IN)D=AY5N|' + 'SEM(I)=IY|' + ' ANT(I)=AY|' + '(IER)=IYER|' + '#:R(IED) =IYD|' + '(IED) =AY5D|' + '(IEN)=IYEHN|' + '(IE)T=AY4EH|' + '(I\')=AY5|' + ' :(I)^%=AY5|' + ' :(IE) =AY4|' + '(I)%=IY|' + '(IE)=IY4|' + ' (IDEA)=AYDIY5AH|' + '(I)^+:#=IH|' + '(IR)#=AYR|' + '(IZ)%=AYZ|' + '(IS)%=AYZ|' + 'I^(I)^#=IH|' + '+^(I)^+=AY|' + '#:^(I)^+=IH|' + '(I)^+=AY|' + '(IR)=ER|' + '(IGH)=AY4|' + '(ILD)=AY5LD|' + ' (IGN)=IHGN|' + '(IGN) =AY4N|' + '(IGN)^=AY4N|' + '(IGN)%=AY4N|' + '(ICRO)=AY4KROH|' + '(IQUE)=IY4K|' + '(I)=IH|' + ' (J) =JEY4|' + '(J)=J|' + ' (K) =KEY4|' + ' (K)N=|' + '(K)=K|' + ' (L) =EH4L|' + '(LO)C#=LOW|' + 'L(L)=|' + '#:^(L)%=UL|' + '(LEAD)=LIYD|' + ' (LAUGH)=LAE4F|' + '(L)=L|' + ' (M) =EH4M|' + ' (MR.) =MIH4STER|' + ' (MS.)=MIH5Z|' + ' (MRS.) =MIH4SIXZ|' + '(MOV)=MUW4V|' + '(MACHIN)=MAHSHIY5N|' + 'M(M)=|' + '(M)=M|' + ' (N) =EH4N|' + 'E(NG)+=NJ|' + '(NG)R=NXG|' + '(NG)#=NXG|' + '(NGL)%=NXGUL|' + '(NG)=NX|' + '(NK)=NXK|' + ' (NOW) =NAW4|' + 'N(N)=|' + '(NON)E=NAH4N|' + '(N)=N|' + ' (O) =OH4W|' + '(OF) =AHV|' + ' (OH) =OW5|' + '(OROUGH)=ER4OW|' + '#:(OR) =ER|' + '#:(ORS) =ERZ|' + '(OR)=AOR|' + ' (ONE)=WAHN|' + '#(ONE) =WAHN|' + '(OW)=OW|' + ' (OVER)=OW5VER|' + 'PR(O)V=UW4|' + '(OV)=AH4V|' + '(O)^%=OW5|' + '(O)^EN=OW|' + '(O)^I#=OW5|' + '(OL)D=OW4L|' + '(OUGHT)=AO5T|' + '(OUGH)=AH5F|' + ' (OU)=AW|' + 'H(OU)S#=AW4|' + '(OUS)=AXS|' + '(OUR)=OHR|' + '(OULD)=UH5D|' + '(OU)^L=AH5|' + '(OUP)=UW5P|' + '(OU)=AW|' + '(OY)=OY|' + '(OING)=OW4IHNX|' + '(OI)=OY5|' + '(OOR)=OH5R|' + '(OOK)=UH5K|' + 'F(OOD)=UW5D|' + 'L(OOD)=AH5D|' + 'M(OOD)=UW5D|' + '(OOD)=UH5D|' + 'F(OOT)=UH5T|' + '(OO)=UW5|' + '(O\')=OH|' + '(O)E=OW|' + '(O) =OW|' + '(OA)=OW4|' + ' (ONLY)=OW4NLIY|' + ' (ONCE)=WAH4NS|' + '(ON\'T)=OW4NT|' + 'C(O)N=AA|' + '(O)NG=AO|' + ' :^(O)N=AH|' + 'I(ON)=UN|' + '#:(ON)=UN|' + '#^(ON)=UN|' + '(O)ST=OW|' + '(OF)^=AO4F|' + '(OTHER)=AH5DHER|' + 'R(O)B=RAA|' + '^R(O):#=OW5|' + '(OSS) =AO5S|' + '#:^(OM)=AHM|' + '(O)=AA|' + ' (P) =PIY4|' + '(PH)=F|' + '(PEOPL)=PIY5PUL|' + '(POW)=PAW4|' + '(PUT) =PUHT|' + '(P)P=|' + '(P)S=|' + '(P)N=|' + '(PROF.)=PROHFEH4SER|' + '(P)=P|' + ' (Q) =KYUW4|' + '(QUAR)=KWOH5R|' + '(QU)=KW|' + '(Q)=K|' + ' (R) =AA5R|' + ' (RE)^#=RIY|' + '(R)R=|' + '(R)=R|' + ' (S) =EH4S|' + '(SH)=SH|' + '#(SION)=ZHUN|' + '(SOME)=SAHM|' + '#(SUR)#=ZHER|' + '(SUR)#=SHER|' + '#(SU)#=ZHUW|' + '#(SSU)#=SHUW|' + '#(SED)=ZD|' + '#(S)#=Z|' + '(SAID)=SEHD|' + '^(SION)=SHUN|' + '(S)S=|' + '.(S) =Z|' + '#:.E(S) =Z|' + '#:^#(S) =S|' + 'U(S) =S|' + ' :#(S) =Z|' + '##(S) =Z|' + ' (SCH)=SK|' + '(S)C+=|' + '#(SM)=ZUM|' + '#(SN)\'=ZUM|' + '(STLE)=SUL|' + '(S)=S|' + ' (T) =TIY4|' + ' (THE) #=DHIY|' + ' (THE) =DHAX|' + '(TO) =TUX|' + ' (THAT)=DHAET|' + ' (THIS) =DHIHS|' + ' (THEY)=DHEY|' + ' (THERE)=DHEHR|' + '(THER)=DHER|' + '(THEIR)=DHEHR|' + ' (THAN) =DHAEN|' + ' (THEM) =DHAEN|' + '(THESE) =DHIYZ|' + ' (THEN)=DHEHN|' + '(THROUGH)=THRUW4|' + '(THOSE)=DHOHZ|' + '(THOUGH) =DHOW|' + '(TODAY)=TUXDEY|' + '(TOMO)RROW=TUMAA5|' + '(TO)TAL=TOW5|' + ' (THUS)=DHAH4S|' + '(TH)=TH|' + '#:(TED)=TIXD|' + 'S(TI)#N=CH|' + '(TI)O=SH|' + '(TI)A=SH|' + '(TIEN)=SHUN|' + '(TUR)#=CHER|' + '(TU)A=CHUW|' + ' (TWO)=TUW|' + '&(T)EN =|' + '(T)=T|' + ' (U) =YUW4|' + ' (UN)I=YUWN|' + ' (UN)=AHN|' + ' (UPON)=AXPAON|' + '@(UR)#=UH4R|' + '(UR)#=YUH4R|' + '(UR)=ER|' + '(U)^ =AH|' + '(U)^^=AH5|' + '(UY)=AY5|' + ' G(U)#=|' + 'G(U)%=|' + 'G(U)#=W|' + '#N(U)=YUW|' + '@(U)=UW|' + '(U)=YUW|' + ' (V) =VIY4|' + '(VIEW)=VYUW5|' + '(V)=V|' + ' (W) =DAH4BULYUW|' + ' (WERE)=WER|' + '(WA)SH=WAA|' + '(WA)ST=WEY|' + '(WA)S=WAH|' + '(WA)T=WAA|' + '(WHERE)=WHEHR|' + '(WHAT)=WHAHT|' + '(WHOL)=/HOWL|' + '(WHO)=/HUW|' + '(WH)=WH|' + '(WAR)#=WEHR|' + '(WAR)=WAOR|' + '(WOR)^=WER|' + '(WR)=R|' + '(WOM)A=WUHM|' + '(WOM)E=WIHM|' + '(WEA)R=WEH|' + '(WANT)=WAA5NT|' + 'ANS(WER)=ER|' + '(W)=W|' + ' (X) =EH4KR|' + ' (X)=Z|' + '(X)=KS|' + ' (Y) =WAY4|' + '(YOUNG)=YAHNX|' + ' (YOUR)=YOHR|' + ' (YOU)=YUW|' + ' (YES)=YEHS|' + ' (Y)=Y|' + 'F(Y)=AY|' + 'PS(YCH)=AYK|' + '#:^(Y)=IY|' + '#:^(Y)I=IY|' + ' :(Y) =AY|' + ' :(Y)#=AY|' + ' :(Y)^+:#=IH|' + ' :(Y)^#=AY|' + '(Y)=IH|' + ' (Z) =ZIY4|' + '(Z)=Z';
-let rules2$1 = '(A)=|' + '(!)=.|' + '(") =-AH5NKWOWT-|' + '(")=KWOW4T-|' + '(#)= NAH4MBER|' + '($)= DAA4LER|' + '(%)= PERSEH4NT|' + '(&)= AEND|' + '(\')=|' + '(*)= AE4STERIHSK|' + '(+)= PLAH4S|' + '(,)=,|' + ' (-) =-|' + '(-)=|' + '(.)= POYNT|' + '(/)= SLAE4SH|' + '(0)= ZIY4ROW|' + ' (1ST)=FER4ST|' + ' (10TH)=TEH4NTH|' + '(1)= WAH4N|' + ' (2ND)=SEH4KUND|' + '(2)= TUW4|' + ' (3RD)=THER4D|' + '(3)= THRIY4|' + '(4)= FOH4R|' + ' (5TH)=FIH4FTH|' + '(5)= FAY4V|' + ' (64) =SIH4KSTIY FOHR|' + '(6)= SIH4KS|' + '(7)= SEH4VUN|' + ' (8TH)=EY4TH|' + '(8)= EY4T|' + '(9)= NAY4N|' + '(:)=.|' + '(;)=.|' + '(<)= LEH4S DHAEN|' + '(=)= IY4KWULZ|' + '(>)= GREY4TER DHAEN|' + '(?)=?|' + '(@)= AE6T|' + '(^)= KAE4RIXT';
+const rules$1 = ' (A.)=EH4Y. |' + '(A) =AH|' + ' (ARE) =AAR|' + ' (AR)O=AXR|' + '(AR)#=EH4R|' + ' ^(AS)#=EY4S|' + '(A)WA=AX|' + '(AW)=AO5|' + ' :(ANY)=EH4NIY|' + '(A)^+#=EY5|' + '#:(ALLY)=ULIY|' + ' (AL)#=UL|' + '(AGAIN)=AXGEH4N|' + '#:(AG)E=IHJ|' + '(A)^%=EY|' + '(A)^+:#=AE|' + ' :(A)^+ =EY4|' + ' (ARR)=AXR|' + '(ARR)=AE4R|' + ' ^(AR) =AA5R|' + '(AR)=AA5R|' + '(AIR)=EH4R|' + '(AI)=EY4|' + '(AY)=EY5|' + '(AU)=AO4|' + '#:(AL) =UL|' + '#:(ALS) =ULZ|' + '(ALK)=AO4K|' + '(AL)^=AOL|' + ' :(ABLE)=EY4BUL|' + '(ABLE)=AXBUL|' + '(A)VO=EY4|' + '(ANG)+=EY4NJ|' + '(ATARI)=AHTAA4RIY|' + '(A)TOM=AE|' + '(A)TTI=AE|' + ' (AT) =AET|' + ' (A)T=AH|' + '(A)=AE|' + ' (B) =BIY4|' + ' (BE)^#=BIH|' + '(BEING)=BIY4IHNX|' + ' (BOTH) =BOW4TH|' + ' (BUS)#=BIH4Z|' + '(BREAK)=BREY5K|' + '(BUIL)=BIH4L|' + '(B)=B|' + ' (C) =SIY4|' + ' (CH)^=K|' + '^E(CH)=K|' + '(CHA)R#=KEH5|' + '(CH)=CH|' + ' S(CI)#=SAY4|' + '(CI)A=SH|' + '(CI)O=SH|' + '(CI)EN=SH|' + '(CITY)=SIHTIY|' + '(C)+=S|' + '(CK)=K|' + '(COMMODORE)=KAA4MAHDOHR|' + '(COM)=KAHM|' + '(CUIT)=KIHT|' + '(CREA)=KRIYEY|' + '(C)=K|' + ' (D) =DIY4|' + ' (DR.) =DAA4KTER|' + '#:(DED) =DIHD|' + '.E(D) =D|' + '#:^E(D) =T|' + ' (DE)^#=DIH|' + ' (DO) =DUW|' + ' (DOES)=DAHZ|' + '(DONE) =DAH5N|' + '(DOING)=DUW4IHNX|' + ' (DOW)=DAW|' + '#(DU)A=JUW|' + '#(DU)^#=JAX|' + '(D)=D|' + ' (E) =IYIY4|' + '#:(E) =|' + '\':^(E) =|' + ' :(E) =IY|' + '#(ED) =D|' + '#:(E)D =|' + '(EV)ER=EH4V|' + '(E)^%=IY4|' + '(ERI)#=IY4RIY|' + '(ERI)=EH4RIH|' + '#:(ER)#=ER|' + '(ERROR)=EH4ROHR|' + '(ERASE)=IHREY5S|' + '(ER)#=EHR|' + '(ER)=ER|' + ' (EVEN)=IYVEHN|' + '#:(E)W=|' + '@(EW)=UW|' + '(EW)=YUW|' + '(E)O=IY|' + '#:&(ES) =IHZ|' + '#:(E)S =|' + '#:(ELY) =LIY|' + '#:(EMENT)=MEHNT|' + '(EFUL)=FUHL|' + '(EE)=IY4|' + '(EARN)=ER5N|' + ' (EAR)^=ER5|' + '(EAD)=EHD|' + '#:(EA) =IYAX|' + '(EA)SU=EH5|' + '(EA)=IY5|' + '(EIGH)=EY4|' + '(EI)=IY4|' + ' (EYE)=AY4|' + '(EY)=IY|' + '(EU)=YUW5|' + '(EQUAL)=IY4KWUL|' + '(E)=EH|' + ' (F) =EH4F|' + '(FUL)=FUHL|' + '(FRIEND)=FREH5ND|' + '(FATHER)=FAA4DHER|' + '(F)F=|' + '(F)=F|' + ' (G) =JIY4|' + '(GIV)=GIH5V|' + ' (G)I^=G|' + '(GE)T=GEH5|' + 'SU(GGES)=GJEH4S|' + '(GG)=G|' + ' B#(G)=G|' + '(G)+=J|' + '(GREAT)=GREY4T|' + '(GON)E=GAO5N|' + '#(GH)=|' + ' (GN)=N|' + '(G)=G|' + ' (H) =EY4CH|' + ' (HAV)=/HAE6V|' + ' (HERE)=/HIYR|' + ' (HOUR)=AW5ER|' + '(HOW)=/HAW|' + '(H)#=/H|' + '(H)=|' + ' (IN)=IHN|' + ' (I) =AY4|' + '(I) =AY|' + '(IN)D=AY5N|' + 'SEM(I)=IY|' + ' ANT(I)=AY|' + '(IER)=IYER|' + '#:R(IED) =IYD|' + '(IED) =AY5D|' + '(IEN)=IYEHN|' + '(IE)T=AY4EH|' + '(I\')=AY5|' + ' :(I)^%=AY5|' + ' :(IE) =AY4|' + '(I)%=IY|' + '(IE)=IY4|' + ' (IDEA)=AYDIY5AH|' + '(I)^+:#=IH|' + '(IR)#=AYR|' + '(IZ)%=AYZ|' + '(IS)%=AYZ|' + 'I^(I)^#=IH|' + '+^(I)^+=AY|' + '#:^(I)^+=IH|' + '(I)^+=AY|' + '(IR)=ER|' + '(IGH)=AY4|' + '(ILD)=AY5LD|' + ' (IGN)=IHGN|' + '(IGN) =AY4N|' + '(IGN)^=AY4N|' + '(IGN)%=AY4N|' + '(ICRO)=AY4KROH|' + '(IQUE)=IY4K|' + '(I)=IH|' + ' (J) =JEY4|' + '(J)=J|' + ' (K) =KEY4|' + ' (K)N=|' + '(K)=K|' + ' (L) =EH4L|' + '(LO)C#=LOW|' + 'L(L)=|' + '#:^(L)%=UL|' + '(LEAD)=LIYD|' + ' (LAUGH)=LAE4F|' + '(L)=L|' + ' (M) =EH4M|' + ' (MR.) =MIH4STER|' + ' (MS.)=MIH5Z|' + ' (MRS.) =MIH4SIXZ|' + '(MOV)=MUW4V|' + '(MACHIN)=MAHSHIY5N|' + 'M(M)=|' + '(M)=M|' + ' (N) =EH4N|' + 'E(NG)+=NJ|' + '(NG)R=NXG|' + '(NG)#=NXG|' + '(NGL)%=NXGUL|' + '(NG)=NX|' + '(NK)=NXK|' + ' (NOW) =NAW4|' + 'N(N)=|' + '(NON)E=NAH4N|' + '(N)=N|' + ' (O) =OH4W|' + '(OF) =AHV|' + ' (OH) =OW5|' + '(OROUGH)=ER4OW|' + '#:(OR) =ER|' + '#:(ORS) =ERZ|' + '(OR)=AOR|' + ' (ONE)=WAHN|' + '#(ONE) =WAHN|' + '(OW)=OW|' + ' (OVER)=OW5VER|' + 'PR(O)V=UW4|' + '(OV)=AH4V|' + '(O)^%=OW5|' + '(O)^EN=OW|' + '(O)^I#=OW5|' + '(OL)D=OW4L|' + '(OUGHT)=AO5T|' + '(OUGH)=AH5F|' + ' (OU)=AW|' + 'H(OU)S#=AW4|' + '(OUS)=AXS|' + '(OUR)=OHR|' + '(OULD)=UH5D|' + '(OU)^L=AH5|' + '(OUP)=UW5P|' + '(OU)=AW|' + '(OY)=OY|' + '(OING)=OW4IHNX|' + '(OI)=OY5|' + '(OOR)=OH5R|' + '(OOK)=UH5K|' + 'F(OOD)=UW5D|' + 'L(OOD)=AH5D|' + 'M(OOD)=UW5D|' + '(OOD)=UH5D|' + 'F(OOT)=UH5T|' + '(OO)=UW5|' + '(O\')=OH|' + '(O)E=OW|' + '(O) =OW|' + '(OA)=OW4|' + ' (ONLY)=OW4NLIY|' + ' (ONCE)=WAH4NS|' + '(ON\'T)=OW4NT|' + 'C(O)N=AA|' + '(O)NG=AO|' + ' :^(O)N=AH|' + 'I(ON)=UN|' + '#:(ON)=UN|' + '#^(ON)=UN|' + '(O)ST=OW|' + '(OF)^=AO4F|' + '(OTHER)=AH5DHER|' + 'R(O)B=RAA|' + '^R(O):#=OW5|' + '(OSS) =AO5S|' + '#:^(OM)=AHM|' + '(O)=AA|' + ' (P) =PIY4|' + '(PH)=F|' + '(PEOPL)=PIY5PUL|' + '(POW)=PAW4|' + '(PUT) =PUHT|' + '(P)P=|' + '(P)S=|' + '(P)N=|' + '(PROF.)=PROHFEH4SER|' + '(P)=P|' + ' (Q) =KYUW4|' + '(QUAR)=KWOH5R|' + '(QU)=KW|' + '(Q)=K|' + ' (R) =AA5R|' + ' (RE)^#=RIY|' + '(R)R=|' + '(R)=R|' + ' (S) =EH4S|' + '(SH)=SH|' + '#(SION)=ZHUN|' + '(SOME)=SAHM|' + '#(SUR)#=ZHER|' + '(SUR)#=SHER|' + '#(SU)#=ZHUW|' + '#(SSU)#=SHUW|' + '#(SED)=ZD|' + '#(S)#=Z|' + '(SAID)=SEHD|' + '^(SION)=SHUN|' + '(S)S=|' + '.(S) =Z|' + '#:.E(S) =Z|' + '#:^#(S) =S|' + 'U(S) =S|' + ' :#(S) =Z|' + '##(S) =Z|' + ' (SCH)=SK|' + '(S)C+=|' + '#(SM)=ZUM|' + '#(SN)\'=ZUM|' + '(STLE)=SUL|' + '(S)=S|' + ' (T) =TIY4|' + ' (THE) #=DHIY|' + ' (THE) =DHAX|' + '(TO) =TUX|' + ' (THAT)=DHAET|' + ' (THIS) =DHIHS|' + ' (THEY)=DHEY|' + ' (THERE)=DHEHR|' + '(THER)=DHER|' + '(THEIR)=DHEHR|' + ' (THAN) =DHAEN|' + ' (THEM) =DHAEN|' + '(THESE) =DHIYZ|' + ' (THEN)=DHEHN|' + '(THROUGH)=THRUW4|' + '(THOSE)=DHOHZ|' + '(THOUGH) =DHOW|' + '(TODAY)=TUXDEY|' + '(TOMO)RROW=TUMAA5|' + '(TO)TAL=TOW5|' + ' (THUS)=DHAH4S|' + '(TH)=TH|' + '#:(TED)=TIXD|' + 'S(TI)#N=CH|' + '(TI)O=SH|' + '(TI)A=SH|' + '(TIEN)=SHUN|' + '(TUR)#=CHER|' + '(TU)A=CHUW|' + ' (TWO)=TUW|' + '&(T)EN =|' + '(T)=T|' + ' (U) =YUW4|' + ' (UN)I=YUWN|' + ' (UN)=AHN|' + ' (UPON)=AXPAON|' + '@(UR)#=UH4R|' + '(UR)#=YUH4R|' + '(UR)=ER|' + '(U)^ =AH|' + '(U)^^=AH5|' + '(UY)=AY5|' + ' G(U)#=|' + 'G(U)%=|' + 'G(U)#=W|' + '#N(U)=YUW|' + '@(U)=UW|' + '(U)=YUW|' + ' (V) =VIY4|' + '(VIEW)=VYUW5|' + '(V)=V|' + ' (W) =DAH4BULYUW|' + ' (WERE)=WER|' + '(WA)SH=WAA|' + '(WA)ST=WEY|' + '(WA)S=WAH|' + '(WA)T=WAA|' + '(WHERE)=WHEHR|' + '(WHAT)=WHAHT|' + '(WHOL)=/HOWL|' + '(WHO)=/HUW|' + '(WH)=WH|' + '(WAR)#=WEHR|' + '(WAR)=WAOR|' + '(WOR)^=WER|' + '(WR)=R|' + '(WOM)A=WUHM|' + '(WOM)E=WIHM|' + '(WEA)R=WEH|' + '(WANT)=WAA5NT|' + 'ANS(WER)=ER|' + '(W)=W|' + ' (X) =EH4KR|' + ' (X)=Z|' + '(X)=KS|' + ' (Y) =WAY4|' + '(YOUNG)=YAHNX|' + ' (YOUR)=YOHR|' + ' (YOU)=YUW|' + ' (YES)=YEHS|' + ' (Y)=Y|' + 'F(Y)=AY|' + 'PS(YCH)=AYK|' + '#:^(Y)=IY|' + '#:^(Y)I=IY|' + ' :(Y) =AY|' + ' :(Y)#=AY|' + ' :(Y)^+:#=IH|' + ' :(Y)^#=AY|' + '(Y)=IH|' + ' (Z) =ZIY4|' + '(Z)=Z';
+const rules2$1 = '(A)=|' + '(!)=.|' + '(") =-AH5NKWOWT-|' + '(")=KWOW4T-|' + '(#)= NAH4MBER|' + '($)= DAA4LER|' + '(%)= PERSEH4NT|' + '(&)= AEND|' + '(\')=|' + '(*)= AE4STERIHSK|' + '(+)= PLAH4S|' + '(,)=,|' + ' (-) =-|' + '(-)=|' + '(.)= POYNT|' + '(/)= SLAE4SH|' + '(0)= ZIY4ROW|' + ' (1ST)=FER4ST|' + ' (10TH)=TEH4NTH|' + '(1)= WAH4N|' + ' (2ND)=SEH4KUND|' + '(2)= TUW4|' + ' (3RD)=THER4D|' + '(3)= THRIY4|' + '(4)= FOH4R|' + ' (5TH)=FIH4FTH|' + '(5)= FAY4V|' + ' (64) =SIH4KSTIY FOHR|' + '(6)= SIH4KS|' + '(7)= SEH4VUN|' + ' (8TH)=EY4TH|' + '(8)= EY4T|' + '(9)= NAY4N|' + '(:)=.|' + '(;)=.|' + '(<)= LEH4S DHAEN|' + '(=)= IY4KWULZ|' + '(>)= GREY4TER DHAEN|' + '(?)=?|' + '(@)= AE6T|' + '(^)= KAE4RIXT';
 
-let FLAG_NUMERIC = 0x01;
-let FLAG_RULESET2 = 0x02;
-let FLAG_VOICED$1 = 0x04; // FIXME: is this correct?
-let FLAG_0X08 = 0x08; // unknown.
-let FLAG_DIPHTHONG$1 = 0x10; // FIXME: is this correct?
-let FLAG_CONSONANT$1 = 0x20; // FIXME: is this correct?
-let FLAG_VOWEL_OR_Y = 0x40;
-let FLAG_ALPHA_OR_QUOT = 0x80;
+const FLAG_NUMERIC = 0x01;
+const FLAG_RULESET2 = 0x02;
+const FLAG_VOICED$1 = 0x04; // FIXME: is this correct?
+const FLAG_0X08 = 0x08; // unknown.
+const FLAG_DIPHTHONG$1 = 0x10; // FIXME: is this correct?
+const FLAG_CONSONANT$1 = 0x20; // FIXME: is this correct?
+const FLAG_VOWEL_OR_Y = 0x40;
+const FLAG_ALPHA_OR_QUOT = 0x80;
 
 /**
  * Test if the char matches against the flags in the reciter table.
@@ -288,7 +288,7 @@ let FLAG_ALPHA_OR_QUOT = 0x80;
  * @param {Number} flg
  * @return {boolean}
  */
-let flags = (c, flg) => {
+const flags = (c, flg) => {
   return (charFlags[c] & flg) !== 0;
 };
 
@@ -299,7 +299,7 @@ let flags = (c, flg) => {
  * @param {Number} flg
  * @return {boolean}
  */
-let flagsAt = (text, pos, flg) => {
+const flagsAt = (text, pos, flg) => {
   return flags(text[pos], flg);
 };
 /**
@@ -309,7 +309,7 @@ let flagsAt = (text, pos, flg) => {
  *
  * @return {boolean}
  */
-let isOneOf = (c, list) => {
+const isOneOf = (c, list) => {
   return list.indexOf(c) !== -1;
 };
 
@@ -327,8 +327,8 @@ let isOneOf = (c, list) => {
  * @param {String} ruleString 'xxx(yyy)zzz=foobar' 'xxx(yyy)zzz' is the source value, 'foobar' is the destination value.
  * @return {result}
  */
-let reciterRule = ruleString => {
-  let splitted = ruleString.split('=');
+const reciterRule = ruleString => {
+  const splitted = ruleString.split('=');
   const
     // Must pop and join here because of rule for '=' itself.
     target = splitted.pop(),
@@ -337,8 +337,8 @@ let reciterRule = ruleString => {
     pre = source[0],
     match = tmp[0],
     post = tmp[1];
-  let TCS = ['T', 'C', 'S'];
-  let EIY = ['E', 'I', 'Y'];
+  const TCS = ['T', 'C', 'S'];
+  const EIY = ['E', 'I', 'Y'];
 
   /**
    * Test if the rule prefix matches.
@@ -346,9 +346,9 @@ let reciterRule = ruleString => {
    * @param {Number} pos  The input position we are working from.
    * @return {boolean}
    */
-  let checkPrefix = (text, pos) => {
+  const checkPrefix = (text, pos) => {
     for (let rulePos = pre.length - 1; rulePos > -1; rulePos--) {
-      let ruleByte = pre[rulePos];
+      const ruleByte = pre[rulePos];
       if (!flags(ruleByte, FLAG_ALPHA_OR_QUOT)) {
         if (!{
           // '' - previous char must not be alpha or quotation mark.
@@ -364,7 +364,7 @@ let reciterRule = ruleString => {
             if (flagsAt(text, --pos, FLAG_VOICED$1)) {
               return true;
             }
-            let inputChar = text[pos];
+            const inputChar = text[pos];
             // 'H'
             if (inputChar !== 'H') return false;
             // FIXME: this is always true?!? is there a "--pos" missing in original code?
@@ -406,9 +406,9 @@ let reciterRule = ruleString => {
    * @param {Number} pos  The input position we are working from.
    * @return {boolean}
    */
-  let checkSuffix = (text, pos) => {
+  const checkSuffix = (text, pos) => {
     for (let rulePos = 0; rulePos < post.length; rulePos++) {
-      let ruleByte = post[rulePos];
+      const ruleByte = post[rulePos];
       // do we have to handle the byte specially?
       if (!flags(ruleByte, FLAG_ALPHA_OR_QUOT)) {
         // pos37226:
@@ -426,7 +426,7 @@ let reciterRule = ruleString => {
             if (flagsAt(text, ++pos, FLAG_VOICED$1)) {
               return true;
             }
-            let inputChar = text[pos];
+            const inputChar = text[pos];
             if (inputChar !== 'H')
               // 'H'
               return false;
@@ -509,7 +509,7 @@ let reciterRule = ruleString => {
    * @param {Number} pos  The input position we are working from.
    * @return {boolean}
    */
-  let matches = (text, pos) => {
+  const matches = (text, pos) => {
     // check if content in brackets matches.
     if (!text.startsWith(match, pos)) {
       return false;
@@ -533,7 +533,7 @@ let reciterRule = ruleString => {
    *
    * @return {boolean}
    */
-  let result = (text, inputPos, callback) => {
+  const result = (text, inputPos, callback) => {
     if (matches(text, inputPos)) {
       {
         console.log(`${source} -> ${target}`);
@@ -547,14 +547,14 @@ let reciterRule = ruleString => {
 };
 
 // Map all rules and generate processors from them.
-let rules = {};
+const rules = {};
 rules$1.split('|').map(rule => {
-  let r = reciterRule(rule),
+  const r = reciterRule(rule),
     c = r.c;
   rules[c] = rules[c] || [];
   rules[c].push(r);
 });
-let rules2 = rules2$1.split('|').map(reciterRule);
+const rules2 = rules2$1.split('|').map(reciterRule);
 
 /**
  * Convert the text to a phoneme string.
@@ -563,8 +563,8 @@ let rules2 = rules2$1.split('|').map(reciterRule);
  *
  * @return {boolean|string}
  */
-let TextToPhonemes = input => {
-  let text = ' ' + input.toUpperCase();
+const TextToPhonemes = input => {
+  const text = ' ' + input.toUpperCase();
   let inputPos = 0,
     output = '';
   /**
@@ -573,17 +573,17 @@ let TextToPhonemes = input => {
    * @param {string} append    The string to append.
    * @param {Number} inputSkip The amount or chars to move ahead in the input.
    */
-  let successCallback = (append, inputSkip) => {
+  const successCallback = (append, inputSkip) => {
     inputPos += inputSkip;
     output += append;
   };
   let c = 0;
   while (inputPos < text.length && c++ < 10000) {
     {
-      let tmp = text.toLowerCase();
+      const tmp = text.toLowerCase();
       console.log(`processing "${tmp.substr(0, inputPos)}%c${tmp[inputPos].toUpperCase()}%c${tmp.substr(inputPos + 1)}"`, 'color: red;', 'color:normal;');
     }
-    let currentChar = text[inputPos];
+    const currentChar = text[inputPos];
 
     // NOT '.' or '.' followed by number.
     if (currentChar !== '.' || flagsAt(text, inputPos + 1, FLAG_NUMERIC)) {
@@ -617,8 +617,8 @@ let TextToPhonemes = input => {
   return output;
 };
 
-let StressTable = '*12345678'.split('');
-let PhonemeNameTable = (' *' +
+const StressTable = '*12345678'.split('');
+const PhonemeNameTable = (' *' +
 // 00
 '.*' +
 // 01
@@ -835,7 +835,7 @@ let PhonemeNameTable = (' *' +
  *    'P*', '**', '**', 'T*', '**', '**', 'K*', '**', '**', 'KX', '**',
  *    '**', 'UM', 'UN'
  */
-let phonemeFlags = [0 | 0x8000,
+const phonemeFlags = [0 | 0x8000,
 // ' *' 00
 0 | 0x8000 | 0x4000 | 0x0100,
 // '.*' 01
@@ -1007,7 +1007,7 @@ let phonemeFlags = [0 | 0x8000,
  *  phonemeLengthTable[i] = combinedPhonemeLengthTable[i] & 0xFF
  *  phonemeStressedLengthTable[i] = combinedPhonemeLengthTable[i] >> 8
  */
-let combinedPhonemeLengthTable = [0x0000 | 0x0000,
+const combinedPhonemeLengthTable = [0x0000 | 0x0000,
 // ' *' 00
 0x0012 | 0x1200,
 // '.*' 01
@@ -1282,8 +1282,8 @@ SPECIAL
  * @param {string} sign2
  * @return {boolean|Number}
  */
-let full_match = (sign1, sign2) => {
-  let index = PhonemeNameTable.findIndex(value => {
+const full_match = (sign1, sign2) => {
+  const index = PhonemeNameTable.findIndex(value => {
     return value === sign1 + sign2 && value[1] !== '*';
   });
   return index !== -1 ? index : false;
@@ -1295,8 +1295,8 @@ let full_match = (sign1, sign2) => {
  * @param {string} sign1
  * @return {boolean|Number}
  */
-let single_match = sign1 => {
-  let index = PhonemeNameTable.findIndex(value => {
+const single_match = sign1 => {
+  const index = PhonemeNameTable.findIndex(value => {
     return value === sign1 + '*';
   });
   return index !== -1 ? index : false;
@@ -1355,14 +1355,14 @@ let single_match = sign1 => {
  *
  * @return {undefined}
  */
-let Parser1 = (input, addPhoneme, addStress) => {
+const Parser1 = (input, addPhoneme, addStress) => {
   for (let srcPos = 0; srcPos < input.length; srcPos++) {
     {
-      let tmp = input.toLowerCase();
+      const tmp = input.toLowerCase();
       console.log(`processing "${tmp.substr(0, srcPos)}%c${tmp.substr(srcPos, 2).toUpperCase()}%c${tmp.substr(srcPos + 2)}"`, 'color: red;', 'color:normal;');
     }
-    let sign1 = input[srcPos];
-    let sign2 = input[srcPos + 1] || '';
+    const sign1 = input[srcPos];
+    const sign2 = input[srcPos + 1] || '';
     let match;
     if ((match = full_match(sign1, sign2)) !== false) {
       // Matched both characters (no single char mark)
@@ -1398,45 +1398,45 @@ let Parser1 = (input, addPhoneme, addStress) => {
  *
  * @return {boolean}
  */
-let phonemeHasFlag = (phoneme, flag) => {
+const phonemeHasFlag = (phoneme, flag) => {
   return matchesBitmask(phonemeFlags[phoneme], flag);
 };
 
-let pR = 23;
-let pD = 57;
-let pT = 69;
-let PHONEME_PERIOD = 1;
-let PHONEME_QUESTION = 2;
-let FLAG_FRICATIVE = 0x2000;
+const pR = 23;
+const pD = 57;
+const pT = 69;
+const PHONEME_PERIOD = 1;
+const PHONEME_QUESTION = 2;
+const FLAG_FRICATIVE = 0x2000;
 
 /**
  * liquic consonant
  */
-let FLAG_LIQUIC = 0x1000;
-let FLAG_NASAL = 0x0800;
-let FLAG_ALVEOLAR = 0x0400;
-let FLAG_PUNCT = 0x0100;
-let FLAG_VOWEL = 0x0080;
-let FLAG_CONSONANT = 0x0040;
+const FLAG_LIQUIC = 0x1000;
+const FLAG_NASAL = 0x0800;
+const FLAG_ALVEOLAR = 0x0400;
+const FLAG_PUNCT = 0x0100;
+const FLAG_VOWEL = 0x0080;
+const FLAG_CONSONANT = 0x0040;
 /**
  *  diphthong ending with YX
  *
  */
-let FLAG_DIP_YX = 0x0020;
-let FLAG_DIPHTHONG = 0x0010;
+const FLAG_DIP_YX = 0x0020;
+const FLAG_DIPHTHONG = 0x0010;
 /** unknown:
  *    'M*', 'N*', 'NX', 'DX', 'Q*', 'CH', 'J*', 'B*', '**', '**', 'D*',
  *    '**', '**', 'G*', '**', '**', 'GX', '**', '**', 'P*', '**', '**',
  *    'T*', '**', '**', 'K*', '**', '**', 'KX', '**', '**'
  */
-let FLAG_0008 = 0x0008;
-let FLAG_VOICED = 0x0004;
+const FLAG_0008 = 0x0008;
+const FLAG_VOICED = 0x0004;
 
 /**
  * stop consonant
  */
-let FLAG_STOPCONS = 0x0002;
-let FLAG_UNVOICED_STOPCONS = 0x0001;
+const FLAG_STOPCONS = 0x0002;
+const FLAG_UNVOICED_STOPCONS = 0x0001;
 
 /**
  * Rewrites the phonemes using the following rules:
@@ -1471,7 +1471,7 @@ let FLAG_UNVOICED_STOPCONS = 0x0001;
  *
  * @return undefined
  */
-let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
+const Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
   /**
    * Rewrites:
    *  'UW' => 'UX' if alveolar flag set on previous phoneme.
@@ -1480,7 +1480,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
    * @param phoneme
    * @param pos
    */
-  let handleUW_CH_J = (phoneme, pos) => {
+  const handleUW_CH_J = (phoneme, pos) => {
     switch (phoneme) {
       // 'UW' Example: NEW, DEW, SUE, ZOO, THOO, TOO
       case 53:
@@ -1514,7 +1514,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
         }
     }
   };
-  let changeAX = (position, suffix) => {
+  const changeAX = (position, suffix) => {
     {
       console.log(`${position} RULE: ${PhonemeNameTable[getPhoneme(position)]} -> AX ${PhonemeNameTable[suffix]}`);
     }
@@ -1576,7 +1576,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
       }
       continue;
     }
-    let priorPhoneme = pos === 0 ? null : getPhoneme(pos - 1);
+    const priorPhoneme = pos === 0 ? null : getPhoneme(pos - 1);
     if (phoneme === pR) {
       // RULES FOR PHONEMES BEFORE R
       switch (priorPhoneme) {
@@ -1637,7 +1637,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
     if (phoneme === 60) {
       // G <VOWEL OR DIPHTHONG NOT ENDING WITH IY> -> GX <VOWEL OR DIPHTHONG NOT ENDING WITH IY>
       // Example: GO
-      let phoneme = getPhoneme(pos + 1);
+      const phoneme = getPhoneme(pos + 1);
       // If diphthong ending with YX, move continue processing next phoneme
       if (!phonemeHasFlag(phoneme, FLAG_DIP_YX) && phoneme !== null) {
         // replace G with GX and continue processing next phoneme
@@ -1653,7 +1653,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
     if (phoneme === 72) {
       // K <VOWEL OR DIPHTHONG NOT ENDING WITH IY> -> KX <VOWEL OR DIPHTHONG NOT ENDING WITH IY>
       // Example: COW
-      let Y = getPhoneme(pos + 1);
+      const Y = getPhoneme(pos + 1);
       // If at end, replace current phoneme with KX
       if (!phonemeHasFlag(Y, FLAG_DIP_YX) || Y === null) {
         // VOWELS AND DIPHTHONGS ENDING WITH IY SOUND flag set?
@@ -1728,7 +1728,7 @@ let Parser2 = (insertPhoneme, setPhoneme, getPhoneme, getStress) => {
  *
  * @return undefined
  */
-let AdjustLengths = (getPhoneme, setLength, getLength) => {
+const AdjustLengths = (getPhoneme, setLength, getLength) => {
   {
     console.log(`AdjustLengths()`);
   }
@@ -1746,7 +1746,7 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
     if (!phonemeHasFlag(getPhoneme(position), FLAG_PUNCT)) {
       continue;
     }
-    let loopIndex = position;
+    const loopIndex = position;
     while (--position > 1 && !phonemeHasFlag(getPhoneme(position), FLAG_VOWEL)) {/* back up while not a vowel */}
     // If beginning of phonemes, exit loop.
     if (position === 0) {
@@ -1754,11 +1754,11 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
     }
 
     // Now handle everything between position and loopIndex
-    let vowel = position;
+    const vowel = position;
     for (; position < loopIndex; position++) {
       // test for not fricative/unvoiced or not voiced
       if (!phonemeHasFlag(getPhoneme(position), FLAG_FRICATIVE) || phonemeHasFlag(getPhoneme(position), FLAG_VOICED)) {
-        let A = getLength(position);
+        const A = getLength(position);
         // change phoneme length to (length * 1.5) + 1
         {
           console.log(position + ' RULE: Lengthen <!FRICATIVE> or <VOICED> ' + PhonemeNameTable[getPhoneme(position)] + ' between VOWEL:' + PhonemeNameTable[getPhoneme(vowel)] + ' and PUNCTUATION:' + PhonemeNameTable[getPhoneme(position)] + ' by 1.5');
@@ -1793,7 +1793,7 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
       }
       // Got here if not <VOWEL>
       // FIXME: the case when phoneme === END is taken over by !phonemeHasFlag(phoneme, FLAG_CONSONANT)
-      let flags = phoneme === null ? FLAG_CONSONANT | FLAG_UNVOICED_STOPCONS : phonemeFlags[phoneme];
+      const flags = phoneme === null ? FLAG_CONSONANT | FLAG_UNVOICED_STOPCONS : phonemeFlags[phoneme];
       // Unvoiced
       if (!matchesBitmask(flags, FLAG_VOICED)) {
         // *, .*, ?*, ,*, -*, DX, S*, SH, F*, TH, /H, /X, CH, P*, T*, K*, KX
@@ -1805,7 +1805,7 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
           {
             console.log(`${loopIndex} <VOWEL> <UNVOICED PLOSIVE> - decrease vowel by 1/8th`);
           }
-          let A = getLength(loopIndex);
+          const A = getLength(loopIndex);
           setLength(loopIndex, A - (A >> 3));
         }
         continue;
@@ -1818,7 +1818,7 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
         console.log(`${loopIndex} RULE: <VOWEL> <VOWEL or VOICED CONSONANT> - increase vowel by 1/4 + 1`);
       }
       // increase length
-      let A = getLength(loopIndex);
+      const A = getLength(loopIndex);
       setLength(loopIndex, (A >> 2) + A + 1); // 5/4*A + 1
       continue;
     }
@@ -1906,7 +1906,7 @@ let AdjustLengths = (getPhoneme, setLength, getLength) => {
  *
  * @return undefined
  */
-let CopyStress = (getPhoneme, getStress, setStress) => {
+const CopyStress = (getPhoneme, getStress, setStress) => {
   // loop through all the phonemes to be output
   let position = 0;
   let phoneme;
@@ -1917,7 +1917,7 @@ let CopyStress = (getPhoneme, getStress, setStress) => {
       // if the following phoneme is the end, or a vowel, skip
       if (phoneme !== null && phonemeHasFlag(phoneme, FLAG_VOWEL)) {
         // get the stress value at the next position
-        let stress = getStress(position + 1);
+        const stress = getStress(position + 1);
         if (stress !== 0 && stress < 0x80) {
           // if next phoneme is stressed, and a VOWEL OR ER
           // copy stress from next phoneme to this one
@@ -1938,11 +1938,11 @@ let CopyStress = (getPhoneme, getStress, setStress) => {
  *
  * @return undefined
  */
-let SetPhonemeLength = (getPhoneme, getStress, setLength) => {
+const SetPhonemeLength = (getPhoneme, getStress, setLength) => {
   let position = 0;
   let phoneme;
   while ((phoneme = getPhoneme(position)) !== null) {
-    let stress = getStress(position);
+    const stress = getStress(position);
     if (stress === 0 || stress > 0x7F) {
       setLength(position, combinedPhonemeLengthTable[phoneme] & 0xFF);
     } else {
@@ -1962,7 +1962,7 @@ let SetPhonemeLength = (getPhoneme, getStress, setLength) => {
  *
  * @return undefined
  */
-let ProlongPlosiveStopConsonantsCode41240 = (getPhoneme, insertPhoneme, getStress) => {
+const ProlongPlosiveStopConsonantsCode41240 = (getPhoneme, insertPhoneme, getStress) => {
   let pos = -1;
   let index;
   while ((index = getPhoneme(++pos)) !== null) {
@@ -1997,11 +1997,11 @@ let ProlongPlosiveStopConsonantsCode41240 = (getPhoneme, insertPhoneme, getStres
  *
  * @return {Array|Boolean} The parsed data.
  */
-let Parser = input => {
+const Parser = input => {
   if (!input) {
     return false;
   }
-  let getPhoneme = pos => {
+  const getPhoneme = pos => {
     {
       if (pos < 0 || pos > phonemeindex.length) {
         throw new Error('Out of bounds: ' + pos);
@@ -2009,7 +2009,7 @@ let Parser = input => {
     }
     return pos === phonemeindex.length ? null : phonemeindex[pos];
   };
-  let setPhoneme = (pos, value) => {
+  const setPhoneme = (pos, value) => {
     {
       console.log(`${pos} CHANGE: ${PhonemeNameTable[phonemeindex[pos]]} -> ${PhonemeNameTable[value]}`);
     }
@@ -2024,7 +2024,7 @@ let Parser = input => {
    *
    * @return {undefined}
    */
-  let insertPhoneme = (pos, value, stressValue, length) => {
+  const insertPhoneme = (pos, value, stressValue, length) => {
     {
       console.log(`${pos} INSERT: ${PhonemeNameTable[value]}`);
     }
@@ -2037,15 +2037,15 @@ let Parser = input => {
     phonemeLength[pos] = length | 0;
     stress[pos] = stressValue;
   };
-  let getStress = pos => stress[pos] | 0;
-  let setStress = (pos, stressValue) => {
+  const getStress = pos => stress[pos] | 0;
+  const setStress = (pos, stressValue) => {
     {
       console.log(`${pos} "${PhonemeNameTable[phonemeindex[pos]]}" SET STRESS: ${stress[pos]} -> ${stressValue}`);
     }
     stress[pos] = stressValue;
   };
-  let getLength = pos => phonemeLength[pos] | 0;
-  let setLength = (pos, length) => {
+  const getLength = pos => phonemeLength[pos] | 0;
+  const setLength = (pos, length) => {
     {
       console.log(`${pos} "${PhonemeNameTable[phonemeindex[pos]]}" SET LENGTH: ${phonemeLength[pos]} -> ${length}`);
       if ((length & 128) !== 0) {
@@ -2057,9 +2057,9 @@ let Parser = input => {
     }
     phonemeLength[pos] = length;
   };
-  let stress = []; //numbers from 0 to 8
-  let phonemeLength = [];
-  let phonemeindex = [];
+  const stress = []; //numbers from 0 to 8
+  const phonemeLength = [];
+  const phonemeindex = [];
   let pos = 0;
   Parser1(input, value => {
     stress[pos] = 0;
@@ -2096,9 +2096,9 @@ let Parser = input => {
  *
  * @return undefined
  */
-let PrintPhonemes = (phonemeindex, phonemeLength, stress) => {
-  let pad = num => {
-    let s = '000' + num;
+const PrintPhonemes = (phonemeindex, phonemeLength, stress) => {
+  const pad = num => {
+    const s = '000' + num;
     return s.substr(s.length - 3);
   };
   console.log('==================================');
@@ -2106,7 +2106,7 @@ let PrintPhonemes = (phonemeindex, phonemeLength, stress) => {
   console.log(' pos  idx  phoneme  length  stress');
   console.log('----------------------------------');
   for (let i = 0; i < phonemeindex.length; i++) {
-    let name = () => {
+    const name = () => {
       if (phonemeindex[i] < 81) {
         return PhonemeNameTable[phonemeindex[i]];
       }
@@ -2119,20 +2119,20 @@ let PrintPhonemes = (phonemeindex, phonemeLength, stress) => {
 
 // Values substituted for zero bits in unvoiced consonant samples.
 // tab48426
-let sampledConsonantValues0 = [0x18, 0x1A, 0x17, 0x17, 0x17];
-let stressPitch_tab47492 = [0x00, 0xE0, 0xE6, 0xEC, 0xF3, 0xF9, 0x00, 0x06, 0xC, 0x06];
+const sampledConsonantValues0 = [0x18, 0x1A, 0x17, 0x17, 0x17];
+const stressPitch_tab47492 = [0x00, 0xE0, 0xE6, 0xEC, 0xF3, 0xF9, 0x00, 0x06, 0xC, 0x06];
 
 // Used to decide which phoneme's blend lengths. The candidate with the lower score is selected.
 // tab45856
-let blendRank = [0x00, 0x1F, 0x1F, 0x1F, 0x1F, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x05, 0x05, 0x02, 0x0A, 0x02, 0x08, 0x05, 0x05, 0x0B, 0x0A, 0x09, 0x08, 0x08, 0xA0, 0x08, 0x08, 0x17, 0x1F, 0x12, 0x12, 0x12, 0x12, 0x1E, 0x1E, 0x14, 0x14, 0x14, 0x14, 0x17, 0x17, 0x1A, 0x1A, 0x1D, 0x1D, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x17];
+const blendRank = [0x00, 0x1F, 0x1F, 0x1F, 0x1F, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x05, 0x05, 0x02, 0x0A, 0x02, 0x08, 0x05, 0x05, 0x0B, 0x0A, 0x09, 0x08, 0x08, 0xA0, 0x08, 0x08, 0x17, 0x1F, 0x12, 0x12, 0x12, 0x12, 0x1E, 0x1E, 0x14, 0x14, 0x14, 0x14, 0x17, 0x17, 0x1A, 0x1A, 0x1D, 0x1D, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x1A, 0x1D, 0x1B, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x1D, 0x17, 0x17, 0x17];
 
 // Number of frames at the end of a phoneme devoted to interpolating to next phoneme's final value
 //tab45696
-let outBlendLength = [0x00, 0x02, 0x02, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x03, 0x02, 0x04, 0x04, 0x02, 0x02, 0x02, 0x02, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x05, 0x05, 0x05, 0x05, 0x05, 0x04, 0x04, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x02, 0x02, 0x00, 0x01, 0x03, 0x00, 0x02, 0x03, 0x00, 0x02, 0xA0, 0xA0];
+const outBlendLength = [0x00, 0x02, 0x02, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x03, 0x02, 0x04, 0x04, 0x02, 0x02, 0x02, 0x02, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x05, 0x05, 0x05, 0x05, 0x05, 0x04, 0x04, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02, 0x00, 0x02, 0x02, 0x00, 0x01, 0x03, 0x00, 0x02, 0x03, 0x00, 0x02, 0xA0, 0xA0];
 
 // Number of frames at beginning of a phoneme devoted to interpolating to phoneme's final value
 // tab45776
-let inBlendLength = [0x00, 0x02, 0x02, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x03, 0x03, 0x04, 0x04, 0x03, 0x03, 0x03, 0x03, 0x03, 0x01, 0x02, 0x03, 0x02, 0x01, 0x03, 0x03, 0x03, 0x03, 0x01, 0x01, 0x03, 0x03, 0x03, 0x02, 0x02, 0x03, 0x02, 0x03, 0x00, 0x00, 0x05, 0x05, 0x05, 0x05, 0x04, 0x04, 0x02, 0x00, 0x02, 0x02, 0x00, 0x03, 0x02, 0x00, 0x04, 0x02, 0x00, 0x03, 0x02, 0x00, 0x02, 0x02, 0x00, 0x02, 0x03, 0x00, 0x03, 0x03, 0x00, 0x03, 0xB0, 0xA0];
+const inBlendLength = [0x00, 0x02, 0x02, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x03, 0x03, 0x04, 0x04, 0x03, 0x03, 0x03, 0x03, 0x03, 0x01, 0x02, 0x03, 0x02, 0x01, 0x03, 0x03, 0x03, 0x03, 0x01, 0x01, 0x03, 0x03, 0x03, 0x02, 0x02, 0x03, 0x02, 0x03, 0x00, 0x00, 0x05, 0x05, 0x05, 0x05, 0x04, 0x04, 0x02, 0x00, 0x02, 0x02, 0x00, 0x03, 0x02, 0x00, 0x04, 0x02, 0x00, 0x03, 0x02, 0x00, 0x02, 0x02, 0x00, 0x02, 0x03, 0x00, 0x03, 0x03, 0x00, 0x03, 0xB0, 0xA0];
 
 // Consists of two bitfields:
 // Low 3 bits (masked by 7) select a 256-byte section in sampleTable,
@@ -2155,10 +2155,10 @@ let inBlendLength = [0x00, 0x02, 0x02, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x04,
 // 67: P'    27          00011011
 // 70: T'    25          00011001
 // tab45936
-let sampledConsonantFlags = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0xE2, 0xD3, 0xBB, 0x7C, 0x95, 0x01, 0x02, 0x03, 0x03, 0x00, 0x72, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+const sampledConsonantFlags = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0xE2, 0xD3, 0xBB, 0x7C, 0x95, 0x01, 0x02, 0x03, 0x03, 0x00, 0x72, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
 //
-let frequencyData = [
+const frequencyData = [
 //tab45056 |tab451356 |tab45216
 //  freq1  |  freq2   |  freq3
 0x000000 | 0x000000 | 0x000000,
@@ -2328,7 +2328,7 @@ let frequencyData = [
  * ampl2data[X] = (ampldata[X] >> 8)  & 0xFF; // F2 amplitude
  * ampl3data[X] = (ampldata[X] >> 16) & 0xFF; // F3 amplitude
  */
-let ampldata = [
+const ampldata = [
 // ampl1   | ampl2    | ampl3
 0x000000 | 0x000000 | 0x000000,
 // ' *' 00
@@ -2492,7 +2492,7 @@ let ampldata = [
 ];
 
 // Sampled data for consonants, consisting of five 256-byte sections
-let sampleTable = [
+const sampleTable = [
 //00  T', S, Z  (coronal)
 0x38, 0x84, 0x6B, 0x19, 0xC6, 0x63, 0x18, 0x86, 0x73, 0x98, 0xC6, 0xB1, 0x1C, 0xCA, 0x31, 0x8C, 0xC7, 0x31, 0x88, 0xC2, 0x30, 0x98, 0x46, 0x31, 0x18, 0xC6, 0x35, 0x0C, 0xCA, 0x31, 0x0C, 0xC6,
 //20
@@ -2586,11 +2586,11 @@ let sampleTable = [
  *
  * @return {Array}
  */
-let SetMouthThroat = (mouth, throat) => {
-  let trans = (factor, initialFrequency) => {
+const SetMouthThroat = (mouth, throat) => {
+  const trans = (factor, initialFrequency) => {
     return (factor * initialFrequency >> 8 & 0xFF) << 1;
   };
-  let freqdata = [[], [], []];
+  const freqdata = [[], [], []];
   frequencyData.map((v, i) => {
     freqdata[0][i] = v & 0xFF;
     freqdata[1][i] = v >> 8 & 0xFF;
@@ -2658,7 +2658,7 @@ let SetMouthThroat = (mouth, throat) => {
  *
  * @return {Number}
  */
-let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
+const CreateTransitions = (pitches, frequency, amplitude, tuples) => {
   // 0=pitches
   // 1=frequency1
   // 2=frequency2
@@ -2666,8 +2666,8 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
   // 4=amplitude1
   // 5=amplitude2
   // 6=amplitude3
-  let tables = [pitches, frequency[0], frequency[1], frequency[2], amplitude[0], amplitude[1], amplitude[2]];
-  let Read = (table, pos) => {
+  const tables = [pitches, frequency[0], frequency[1], frequency[2], amplitude[0], amplitude[1], amplitude[2]];
+  const Read = (table, pos) => {
     {
       if (table < 0 || table > tables.length - 1) {
         throw new Error(`Error invalid table in Read: ${table}`);
@@ -2677,10 +2677,10 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
   };
 
   // linearly interpolate values
-  let interpolate = (width, table, frame, change) => {
-    let sign = change < 0;
-    let remainder = Math.abs(change) % width;
-    let div = change / width | 0;
+  const interpolate = (width, table, frame, change) => {
+    const sign = change < 0;
+    const remainder = Math.abs(change) % width;
+    const div = change / width | 0;
     let error = 0;
     let pos = width;
     while (--pos > 0) {
@@ -2711,12 +2711,12 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
   let inBlendFrames;
   let boundary = 0;
   for (let pos = 0; pos < tuples.length - 1; pos++) {
-    let phoneme = tuples[pos][0];
-    let next_phoneme = tuples[pos + 1][0];
+    const phoneme = tuples[pos][0];
+    const next_phoneme = tuples[pos + 1][0];
 
     // get the ranking of each phoneme
-    let next_rank = blendRank[next_phoneme];
-    let rank = blendRank[phoneme];
+    const next_rank = blendRank[next_phoneme];
+    const rank = blendRank[phoneme];
 
     // compare the rank - lower rank value is stronger
     if (rank === next_rank) {
@@ -2734,9 +2734,9 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
       inBlendFrames = inBlendLength[phoneme];
     }
     boundary += tuples[pos][1];
-    let trans_end = boundary + inBlendFrames;
-    let trans_start = boundary - outBlendFrames;
-    let trans_length = outBlendFrames + inBlendFrames; // total transition
+    const trans_end = boundary + inBlendFrames;
+    const trans_start = boundary - outBlendFrames;
+    const trans_length = outBlendFrames + inBlendFrames; // total transition
 
     if ((trans_length - 2 & 128) === 0) {
       // unlike the other values, the pitches[] interpolates from
@@ -2744,9 +2744,9 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
       // next phoneme
 
       // half the width of the current and next phoneme
-      let cur_width = tuples[pos][1] >> 1;
-      let next_width = tuples[pos + 1][1] >> 1;
-      let pitch = pitches[boundary + next_width] - pitches[boundary - cur_width];
+      const cur_width = tuples[pos][1] >> 1;
+      const next_width = tuples[pos + 1][1] >> 1;
+      const pitch = pitches[boundary + next_width] - pitches[boundary - cur_width];
       // interpolate the values
       interpolate(cur_width + next_width, 0, trans_start, pitch);
       for (let table = 1; table < 7; table++) {
@@ -2758,7 +2758,7 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
         // 4  amplitude1
         // 5  amplitude2
         // 6  amplitude3
-        let value = Read(table, trans_end) - Read(table, trans_start);
+        const value = Read(table, trans_end) - Read(table, trans_start);
         interpolate(trans_length, table, trans_start, value);
       }
     }
@@ -2768,8 +2768,8 @@ let CreateTransitions = (pitches, frequency, amplitude, tuples) => {
   return boundary + tuples[tuples.length - 1][1];
 };
 
-let RISING_INFLECTION = 255;
-let FALLING_INFLECTION = 1;
+const RISING_INFLECTION = 255;
+const FALLING_INFLECTION = 1;
 
 /** CREATE FRAMES
  *
@@ -2794,14 +2794,14 @@ let FALLING_INFLECTION = 1;
  *
  * @return Array
  */
-let CreateFrames = (pitch, tuples, frequencyData) => {
+const CreateFrames = (pitch, tuples, frequencyData) => {
   /**
    * Create a rising or falling inflection 30 frames prior to index X.
    * A rising inflection is used for questions, and a falling inflection is used for statements.
    */
-  let AddInflection = (inflection, pos, pitches) => {
+  const AddInflection = (inflection, pos, pitches) => {
     // store the location of the punctuation
-    let end = pos;
+    const end = pos;
     if (pos < 30) {
       pos = 0;
     } else {
@@ -2822,14 +2822,14 @@ let CreateFrames = (pitch, tuples, frequencyData) => {
       while (++pos !== end && pitches[pos] === 255) {/* keep looping */}
     }
   };
-  let pitches = [];
-  let frequency = [[], [], []];
-  let amplitude = [[], [], []];
-  let sampledConsonantFlag = [];
+  const pitches = [];
+  const frequency = [[], [], []];
+  const amplitude = [[], [], []];
+  const sampledConsonantFlag = [];
   let X = 0;
   for (let i = 0; i < tuples.length; i++) {
     // get the phoneme at the index
-    let phoneme = tuples[i][0];
+    const phoneme = tuples[i][0];
     if (phoneme === PHONEME_PERIOD) {
       AddInflection(FALLING_INFLECTION, X, pitches);
     } else if (phoneme === PHONEME_QUESTION) {
@@ -2837,7 +2837,7 @@ let CreateFrames = (pitch, tuples, frequencyData) => {
     }
 
     // get the stress amount (more stress = higher pitch)
-    let phase1 = stressPitch_tab47492[tuples[i][2]];
+    const phase1 = stressPitch_tab47492[tuples[i][2]];
     // get number of frames to write
     // copy from the source to the frames list
     for (let frames = tuples[i][1]; frames > 0; frames--) {
@@ -2855,8 +2855,8 @@ let CreateFrames = (pitch, tuples, frequencyData) => {
   return [pitches, frequency, amplitude, sampledConsonantFlag];
 };
 
-let PrepareFrames = (phonemes, pitch, mouth, throat, singmode) => {
-  let freqdata = SetMouthThroat(mouth, throat);
+const PrepareFrames = (phonemes, pitch, mouth, throat, singmode) => {
+  const freqdata = SetMouthThroat(mouth, throat);
 
   /**
    * RENDER THE PHONEMES IN THE LIST
@@ -2874,7 +2874,7 @@ let PrepareFrames = (phonemes, pitch, mouth, throat, singmode) => {
    */
 
   const [pitches, frequency, amplitude, sampledConsonantFlag] = CreateFrames(pitch, phonemes, freqdata);
-  let t = CreateTransitions(pitches, frequency, amplitude, phonemes);
+  const t = CreateTransitions(pitches, frequency, amplitude, phonemes);
   if (!singmode) {
     /* ASSIGN PITCH CONTOUR
      *
@@ -2894,29 +2894,29 @@ let PrepareFrames = (phonemes, pitch, mouth, throat, singmode) => {
    *
    * Rescale volume from decibels to the linear scale.
    */
-  let amplitudeRescale = [0x00, 0x01, 0x02, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x06, 0x08, 0x09, 0x0B, 0x0D, 0x0F];
+  const amplitudeRescale = [0x00, 0x01, 0x02, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x06, 0x08, 0x09, 0x0B, 0x0D, 0x0F];
   for (let i = amplitude[0].length - 1; i >= 0; i--) {
     amplitude[0][i] = amplitudeRescale[amplitude[0][i]];
     amplitude[1][i] = amplitudeRescale[amplitude[1][i]];
     amplitude[2][i] = amplitudeRescale[amplitude[2][i]];
   }
-  let result = [t, frequency, pitches, amplitude, sampledConsonantFlag];
+  const result = [t, frequency, pitches, amplitude, sampledConsonantFlag];
   return result;
 };
 
-let CreateOutputBuffer = buffersize => {
-  let buffer = new Uint8Array(buffersize);
+const CreateOutputBuffer = buffersize => {
+  const buffer = new Uint8Array(buffersize);
   let bufferpos = 0;
   let oldTimeTableIndex = 0;
   // Scale by 16 and write five times.
-  let writer = (index, A) => {
-    let scaled = (A & 15) * 16;
+  const writer = (index, A) => {
+    const scaled = (A & 15) * 16;
     writer.ary(index, [scaled, scaled, scaled, scaled, scaled]);
   };
   // Write the five given values.
   writer.ary = (index, array) => {
     // timetable for more accurate c64 simulation
-    let timetable = [[162, 167, 167, 127, 128],
+    const timetable = [[162, 167, 167, 127, 128],
     // formants synth
     [226, 60, 60, 0, 0],
     // unvoiced sample 0
@@ -2944,10 +2944,10 @@ let CreateOutputBuffer = buffersize => {
   return writer;
 };
 
-let RenderSample = (Output, lastSampleOffset, consonantFlag, pitch) => {
+const RenderSample = (Output, lastSampleOffset, consonantFlag, pitch) => {
   // mask low three bits and subtract 1 get value to
   // convert 0 bits on unvoiced samples.
-  let kind = (consonantFlag & 7) - 1;
+  const kind = (consonantFlag & 7) - 1;
 
   // determine which value to use from table { 0x18, 0x1A, 0x17, 0x17, 0x17 }
   // T', S, Z               0          0x18   coronal
@@ -2956,10 +2956,10 @@ let RenderSample = (Output, lastSampleOffset, consonantFlag, pitch) => {
   // /H                     3          0x17   palatal
   // /X                     4          0x17   glottal
 
-  let samplePage = kind * 256 & 0xFFFF; // unsigned short
+  const samplePage = kind * 256 & 0xFFFF; // unsigned short
   let off = consonantFlag & 248; // unsigned char
 
-  let renderSample = (index1, value1, index0, value0) => {
+  const renderSample = (index1, value1, index0, value0) => {
     let bit = 8;
     let sample = sampleTable[samplePage + off];
     do {
@@ -2984,7 +2984,7 @@ let RenderSample = (Output, lastSampleOffset, consonantFlag, pitch) => {
   }
   // unvoiced
   off = off ^ 255 & 0xFF; // unsigned char
-  let value0 = sampledConsonantValues0[kind] & 0xFF; // unsigned char
+  const value0 = sampledConsonantValues0[kind] & 0xFF; // unsigned char
   do {
     renderSample(2, 5, 1, value0);
   } while (++off & 0xFF);
@@ -2992,7 +2992,7 @@ let RenderSample = (Output, lastSampleOffset, consonantFlag, pitch) => {
 };
 
 // Removed sine table stored a pre calculated sine wave but in modern CPU, we can calculate inline.
-let sinus = x => Math.sin(2 * Math.PI * (x / 256)) * 127 | 0;
+const sinus = x => Math.sin(2 * Math.PI * (x / 256)) * 127 | 0;
 
 /**
  * PROCESS THE FRAMES
@@ -3004,7 +3004,7 @@ let sinus = x => Math.sin(2 * Math.PI * (x / 256)) * 127 | 0;
  * To simulate them being driven by the glottal pulse, the waveforms are
  * reset at the beginning of each glottal pulse.
  */
-let ProcessFrames = (Output, frameCount, speed, frequency, pitches, amplitude, sampledConsonantFlag) => {
+const ProcessFrames = (Output, frameCount, speed, frequency, pitches, amplitude, sampledConsonantFlag) => {
   let speedcounter = speed;
   let phase1 = 0;
   let phase2 = 0;
@@ -3014,7 +3014,7 @@ let ProcessFrames = (Output, frameCount, speed, frequency, pitches, amplitude, s
   let glottal_pulse = pitches[0];
   let mem38 = glottal_pulse * .75 | 0;
   while (frameCount) {
-    let flags = sampledConsonantFlag[pos];
+    const flags = sampledConsonantFlag[pos];
 
     // unvoiced sampled phoneme?
     if ((flags & 248) !== 0) {
@@ -3030,7 +3030,7 @@ let ProcessFrames = (Output, frameCount, speed, frequency, pitches, amplitude, s
         // 128-255 = 0x70
 
         // simulate the glottal pulse and formants
-        let ary = [];
+        const ary = [];
         let /* unsigned int */p1 = phase1 * 256; // Fixed point integers because we need to divide later on
         let /* unsigned int */p2 = phase2 * 256;
         let /* unsigned int */p3 = phase3 * 256;
@@ -3104,16 +3104,16 @@ let ProcessFrames = (Output, frameCount, speed, frequency, pitches, amplitude, s
  *
  * @return Uint8Array
  */
-let Renderer = (phonemes, pitch, mouth, throat, speed, singmode) => {
+const Renderer = (phonemes, pitch, mouth, throat, speed, singmode) => {
   pitch = pitch === undefined ? 64 : pitch & 0xFF;
   mouth = mouth === undefined ? 128 : mouth & 0xFF;
   throat = throat === undefined ? 128 : throat & 0xFF;
   speed = (speed || 72) & 0xFF;
   singmode = singmode || false;
-  let sentences = PrepareFrames(phonemes, pitch, mouth, throat, singmode);
+  const sentences = PrepareFrames(phonemes, pitch, mouth, throat, singmode);
 
   // Reserve 176.4*speed samples (=8*speed ms) for each frame.
-  let Output = CreateOutputBuffer(176.4 // = (22050/125)
+  const Output = CreateOutputBuffer(176.4 // = (22050/125)
   * phonemes.reduce((pre, v) => pre + v[1], 0) // Combined phoneme length in frames.
   * speed | 0);
   const [t, frequency, pitches, amplitude, sampledConsonantFlag] = sentences;
@@ -3123,9 +3123,9 @@ let Renderer = (phonemes, pitch, mouth, throat, speed, singmode) => {
   ProcessFrames(Output, t, speed, frequency, pitches, amplitude, sampledConsonantFlag);
   return Output.get();
 };
-let PrintOutput = (pitches, frequency, amplitude, sampledConsonantFlag) => {
-  let pad = num => {
-    let s = '00000' + num;
+const PrintOutput = (pitches, frequency, amplitude, sampledConsonantFlag) => {
+  const pad = num => {
+    const s = '00000' + num;
     return s.substr(s.length - 5);
   };
   console.log('===========================================');
@@ -3153,8 +3153,8 @@ let PrintOutput = (pitches, frequency, amplitude, sampledConsonantFlag) => {
  *
  * @return {Float32Array|Boolean}
  */
-let SamBuffer = (input, options) => {
-  let buffer = SamProcess(input, options);
+const SamBuffer = (input, options) => {
+  const buffer = SamProcess(input, options);
   if (false === buffer) {
     return false;
   }
@@ -3175,18 +3175,18 @@ let SamBuffer = (input, options) => {
  *
  * @return {Uint8Array|Boolean}
  */
-let SamProcess = function (input) {
-  let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-  let parsed = Parser(input);
+const SamProcess = function (input) {
+  const options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  const parsed = Parser(input);
   if (false === parsed) {
     return false;
   }
   return Renderer(parsed, options.pitch, options.mouth, options.throat, options.speed, options.singmode);
 };
 
-let convert = TextToPhonemes;
-let buf8 = SamProcess;
-let buf32 = SamBuffer;
+const convert = TextToPhonemes;
+const buf8 = SamProcess;
+const buf32 = SamBuffer;
 
 /**
  * @param {object}  [options]
@@ -3201,8 +3201,8 @@ let buf32 = SamBuffer;
  * @constructor
  */
 function SamJs(options) {
-  let opts = options || {};
-  let ensurePhonetic = (text, phonetic) => {
+  const opts = options || {};
+  const ensurePhonetic = (text, phonetic) => {
     if (!(phonetic || opts.phonetic)) {
       return convert(text);
     }

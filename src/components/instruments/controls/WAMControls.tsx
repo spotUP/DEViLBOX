@@ -82,7 +82,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
 
         // Skip createGui() for plugins that declare "no GUI" in their descriptor
         const desc = synth.descriptor;
-        const declaredNoGui = desc && /no gui/i.test(desc.name || '');
+        const declaredNoGui = desc && /no gui/i.test(String(desc.name || ''));
 
         console.log('[WAMControls] Creating native GUI...');
         const gui = declaredNoGui ? null : await synth.createGui();
@@ -141,11 +141,11 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
           console.warn('[WAMControls] Plugin did not provide a usable GUI, trying parameter discovery');
           // No native GUI — try parameter discovery for fallback UI
           try {
-            const params = await synth.getParameters();
+            const params = await synth.getParameters() as Record<string, WAMParamInfo>;
             if (params && Object.keys(params).length > 0 && isMounted) {
               setFallbackParams(params);
               const initialValues: Record<string, number> = {};
-              Object.entries(params).forEach(([id, info]: [string, any]) => {
+              Object.entries(params).forEach(([id, info]) => {
                 initialValues[id] = info.defaultValue ?? info.minValue ?? 0;
               });
               setParamValues(initialValues);

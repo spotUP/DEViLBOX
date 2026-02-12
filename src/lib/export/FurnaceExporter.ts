@@ -850,7 +850,8 @@ class FurnaceExporter {
   }
 
   private writeGBData(inst: ParsedInstrument): void {
-    const chipConfig = inst.furnace?.chipConfig;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chipConfig = inst.furnace?.chipConfig as Record<string, any> | undefined;
 
     // Envelope volume (1 byte)
     this.writer.writeUint8(chipConfig?.envVol ?? 15);
@@ -875,7 +876,8 @@ class FurnaceExporter {
   }
 
   private writeC64Data(inst: ParsedInstrument): void {
-    const chipConfig = inst.furnace?.chipConfig;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chipConfig = inst.furnace?.chipConfig as Record<string, any> | undefined;
 
     // Triangle wave (1 byte)
     this.writer.writeUint8(chipConfig?.triOn ? 1 : 0);
@@ -938,7 +940,8 @@ class FurnaceExporter {
     this.writer.writeUint8(chipConfig?.ch3off ? 1 : 0);
   }
 
-  private writeAmigaData(_inst: ParsedInstrument): void {
+  private writeAmigaData(inst: ParsedInstrument): void {
+    void inst;
     // Sample map (120 entries × 2 bytes each = 240 bytes)
     // Maps notes to sample indices
     for (let i = 0; i < 120; i++) {
@@ -1185,7 +1188,8 @@ class FurnaceExporter {
     this.writer.writeUint32At(sizeOffset, blockEnd - blockStart - 8);
   }
 
-  private writePatternRow(cell: TrackerCell | undefined, _channel: number, _row: number): void {
+  private writePatternRow(cell: TrackerCell | undefined, channel: number, row: number): void {
+    void channel; void row;
     if (!cell) {
       // Empty cell: note=0, octave=0, ins=-1, vol=-1, effects empty
       this.writer.writeUint8(0);   // note

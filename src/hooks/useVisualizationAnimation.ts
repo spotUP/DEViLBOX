@@ -13,7 +13,7 @@
  * - Skips animation entirely when idle
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 // 30fps = ~33.33ms per frame
 export const FRAME_INTERVAL = 1000 / 30;
@@ -58,61 +58,65 @@ export function useVisualizationAnimation({
   const isAnimatingRef = useRef<boolean>(false);
   const idleFramesRef = useRef<number>(0);
   const onFrameRef = useRef(onFrame);
+  const frameIntervalRef = useRef(1000 / fps);
+  const idleThresholdRef = useRef(idleThreshold);
 
-  // Keep onFrame ref up to date
-  useEffect(() => {
-    onFrameRef.current = onFrame;
-  }, [onFrame]);
-
-  const frameInterval = 1000 / fps;
-
-  // Animation loop
-  const animate = useCallback((timestamp: number) => {
-    if (!isAnimatingRef.current) return;
-
-    // Frame rate limiting
-    const elapsed = timestamp - lastFrameTimeRef.current;
-
-    // When idle, check even less frequently
-    const currentInterval = idleFramesRef.current > idleThreshold
-      ? frameInterval * 2  // Half rate when idle
-      : frameInterval;
-
-    if (elapsed < currentInterval) {
-      animationRef.current = requestAnimationFrame(animate);
-      return;
-    }
-
-    lastFrameTimeRef.current = timestamp - (elapsed % currentInterval);
-
-    // Call frame callback
-    const hadActivity = onFrameRef.current(timestamp);
-
-    // Track idle frames
-    if (hadActivity) {
-      idleFramesRef.current = 0;
-    } else {
-      idleFramesRef.current++;
-    }
-
-    // Continue animation
-    animationRef.current = requestAnimationFrame(animate);
-  }, [frameInterval, idleThreshold]);
+  // Keep refs up to date via effects (not during render)
+  useEffect(() => { onFrameRef.current = onFrame; }, [onFrame]);
+  useEffect(() => { frameIntervalRef.current = 1000 / fps; }, [fps]);
+  useEffect(() => { idleThresholdRef.current = idleThreshold; }, [idleThreshold]);
 
   // Start/stop animation based on enabled state
+  // The animation loop function is defined inside the effect to avoid
+  // self-referencing useCallback issues with the React compiler.
   useEffect(() => {
-    if (enabled) {
-      isAnimatingRef.current = true;
-      idleFramesRef.current = 0;
-      lastFrameTimeRef.current = 0;
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
+    if (!enabled) {
       isAnimatingRef.current = false;
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+      return;
     }
+
+    isAnimatingRef.current = true;
+    idleFramesRef.current = 0;
+    lastFrameTimeRef.current = 0;
+
+    const tick = (timestamp: number) => {
+      if (!isAnimatingRef.current) return;
+
+      // Frame rate limiting
+      const elapsed = timestamp - lastFrameTimeRef.current;
+      const frameInterval = frameIntervalRef.current;
+
+      // When idle, check even less frequently
+      const currentInterval = idleFramesRef.current > idleThresholdRef.current
+        ? frameInterval * 2  // Half rate when idle
+        : frameInterval;
+
+      if (elapsed < currentInterval) {
+        animationRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      lastFrameTimeRef.current = timestamp - (elapsed % currentInterval);
+
+      // Call frame callback
+      const hadActivity = onFrameRef.current(timestamp);
+
+      // Track idle frames
+      if (hadActivity) {
+        idleFramesRef.current = 0;
+      } else {
+        idleFramesRef.current++;
+      }
+
+      // Continue animation
+      animationRef.current = requestAnimationFrame(tick);
+    };
+
+    animationRef.current = requestAnimationFrame(tick);
 
     return () => {
       isAnimatingRef.current = false;
@@ -121,7 +125,7 @@ export function useVisualizationAnimation({
         animationRef.current = null;
       }
     };
-  }, [enabled, animate]);
+  }, [enabled]);
 
   return {
     isAnimating: isAnimatingRef,
@@ -144,30 +148,32 @@ export function useHighFpsAnimation({
   const isAnimatingRef = useRef<boolean>(false);
   const onFrameRef = useRef(onFrame);
 
+  useEffect(() => { onFrameRef.current = onFrame; }, [onFrame]);
+
+  // The animation loop is defined inside the effect to avoid
+  // self-referencing useCallback issues with the React compiler.
   useEffect(() => {
-    onFrameRef.current = onFrame;
-  }, [onFrame]);
-
-  const animate = useCallback((timestamp: number) => {
-    if (!isAnimatingRef.current) return;
-
-    // 60fps - no frame limiting
-    onFrameRef.current(timestamp);
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, []);
-
-  useEffect(() => {
-    if (enabled) {
-      isAnimatingRef.current = true;
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
+    if (!enabled) {
       isAnimatingRef.current = false;
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+      return;
     }
+
+    isAnimatingRef.current = true;
+
+    const tick = (timestamp: number) => {
+      if (!isAnimatingRef.current) return;
+
+      // 60fps - no frame limiting
+      onFrameRef.current(timestamp);
+
+      animationRef.current = requestAnimationFrame(tick);
+    };
+
+    animationRef.current = requestAnimationFrame(tick);
 
     return () => {
       isAnimatingRef.current = false;
@@ -176,7 +182,7 @@ export function useHighFpsAnimation({
         animationRef.current = null;
       }
     };
-  }, [enabled, animate]);
+  }, [enabled]);
 
   return isAnimatingRef;
 }

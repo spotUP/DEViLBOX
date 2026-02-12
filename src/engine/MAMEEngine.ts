@@ -24,9 +24,26 @@ const TYPE_MAP: Record<MAMESynthType, number> = {
   'upd933': 6
 };
 
+/** Emscripten WASM module interface for MAME chip emulation */
+interface EmscriptenMAMEModule {
+  wasmMemory: WebAssembly.Memory;
+  _malloc(size: number): number;
+  _free(ptr: number): void;
+  _mame_create_instance(type: number, clock: number): number;
+  _mame_delete_instance(handle: number): void;
+  _mame_write(handle: number, offset: number, value: number): void;
+  _mame_write16(handle: number, offset: number, value: number): void;
+  _mame_read(handle: number, offset: number): number;
+  _mame_set_rom(bank: number, ptr: number, length: number): void;
+  _mame_add_midi_event(handle: number, ptr: number, length: number): void;
+  _mame_render(handle: number, leftPtr: number, rightPtr: number, numSamples: number): void;
+  _rsa_load_roms(handle: number, ptr5: number, ptr6: number, ptr7: number): void;
+  [key: string]: unknown;
+}
+
 export class MAMEEngine {
   private static instance: MAMEEngine;
-  private module: any = null;
+  private module: EmscriptenMAMEModule | null = null;
   private isInitialized: boolean = false;
   private heapU8: Uint8Array | null = null;
 
@@ -66,7 +83,7 @@ export class MAMEEngine {
       this.module = await moduleFactory({ wasmBinary });
 
       // Create HEAP view from wasmMemory (HEAPU8 is not exported, but wasmMemory is)
-      if (this.module.wasmMemory) {
+      if (this.module && this.module.wasmMemory) {
         this.heapU8 = new Uint8Array(this.module.wasmMemory.buffer);
       }
 
@@ -83,7 +100,7 @@ export class MAMEEngine {
    * @returns handle to the instance
    */
   public createInstance(type: MAMESynthType, clock: number): number {
-    if (!this.isInitialized) return 0;
+    if (!this.isInitialized || !this.module) return 0;
     const typeInt = TYPE_MAP[type];
     return this.module._mame_create_instance(typeInt, clock);
   }
@@ -92,7 +109,7 @@ export class MAMEEngine {
    * Delete a synth instance
    */
   public deleteInstance(handle: number): void {
-    if (!this.isInitialized || handle === 0) return;
+    if (!this.isInitialized || handle === 0 || !this.module) return;
     this.module._mame_delete_instance(handle);
   }
 
@@ -100,7 +117,7 @@ export class MAMEEngine {
    * Write to a chip register
    */
   public write(handle: number, offset: number, value: number): void {
-    if (!this.isInitialized || handle === 0) return;
+    if (!this.isInitialized || handle === 0 || !this.module) return;
     this.module._mame_write(handle, offset, value);
   }
 
@@ -108,7 +125,7 @@ export class MAMEEngine {
    * Write 16-bit word to a chip register
    */
   public write16(handle: number, offset: number, value: number): void {
-    if (!this.isInitialized || handle === 0) return;
+    if (!this.isInitialized || handle === 0 || !this.module) return;
     this.module._mame_write16(handle, offset, value);
   }
 
@@ -116,7 +133,7 @@ export class MAMEEngine {
    * Read from a chip register
    */
   public read(handle: number, offset: number): number {
-    if (!this.isInitialized || handle === 0) return 0;
+    if (!this.isInitialized || handle === 0 || !this.module) return 0;
     return this.module._mame_read(handle, offset);
   }
 
@@ -124,7 +141,7 @@ export class MAMEEngine {
    * Set a ROM bank
    */
   public setRom(bank: number, data: Uint8Array): void {
-    if (!this.isInitialized || !this.heapU8) return;
+    if (!this.isInitialized || !this.heapU8 || !this.module) return;
 
     const ptr = this.module._malloc(data.length);
     this.heapU8.set(data, ptr);
@@ -135,7 +152,7 @@ export class MAMEEngine {
    * Send MIDI/SysEx event to the instance
    */
   public addMidiEvent(handle: number, data: Uint8Array): void {
-    if (!this.isInitialized || handle === 0 || !this.heapU8) return;
+    if (!this.isInitialized || handle === 0 || !this.heapU8 || !this.module) return;
 
     const ptr = this.module._malloc(data.length);
     this.heapU8.set(data, ptr);
@@ -147,7 +164,7 @@ export class MAMEEngine {
    * Load specialized Roland SA ROMs
    */
   public rsaLoadRoms(handle: number, ic5: Uint8Array, ic6: Uint8Array, ic7: Uint8Array): void {
-    if (!this.isInitialized || handle === 0 || !this.heapU8) return;
+    if (!this.isInitialized || handle === 0 || !this.heapU8 || !this.module) return;
 
     const ptr5 = this.module._malloc(ic5.length);
     const ptr6 = this.module._malloc(ic6.length);
@@ -164,7 +181,7 @@ export class MAMEEngine {
    * Render audio
    */
   public render(handle: number, numSamples: number = 128): { left: Float32Array, right: Float32Array } {
-    if (!this.isInitialized || handle === 0 || !this.module.wasmMemory) {
+    if (!this.isInitialized || handle === 0 || !this.module || !this.module.wasmMemory) {
       return { left: new Float32Array(numSamples), right: new Float32Array(numSamples) };
     }
 

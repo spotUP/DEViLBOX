@@ -152,6 +152,90 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
   ],
 };
 
+/**
+ * 303 sub-pages — one per UI tab, plus oscillator page.
+ * Page 0 = Main (cutoff, resonance, envMod, decay, accent, drive, slide, volume)
+ * Page 1 = MOJO (filter character)
+ * Page 2 = DevilFish (circuit mods)
+ * Page 3 = Korg (ladder filter)
+ * Page 4 = LFO
+ * Page 5 = FX
+ * Page 6 = Oscillator (tune, wave, pwm, sub)
+ */
+const KNOB_303_PAGES: KnobAssignment[][] = [
+  // Page 0: Main
+  KNOB_BANKS['303'],
+  // Page 1: MOJO
+  [
+    { cc: 70, param: 'passbandCompensation', label: 'Bass' },
+    { cc: 71, param: 'resTracking', label: 'Rez' },
+    { cc: 72, param: 'filterInputDrive', label: 'Satur' },
+    { cc: 73, param: 'diodeCharacter', label: 'Bite' },
+    { cc: 74, param: 'duffingAmount', label: 'Tensn' },
+    { cc: 75, param: 'filterFmDepth', label: 'F.FM' },
+    { cc: 76, param: 'lpBpMix', label: 'LP/BP' },
+    { cc: 77, param: 'filterTracking', label: 'K.Trk' },
+  ],
+  // Page 2: DevilFish
+  [
+    { cc: 70, param: 'normalDecay', label: 'N.Dec' },
+    { cc: 71, param: 'accentDecay', label: 'A.Dec' },
+    { cc: 72, param: 'softAttack', label: 'S.Atk' },
+    { cc: 73, param: 'accentSoftAttack', label: 'A.Atk' },
+    { cc: 74, param: 'slideTime', label: 'Slide' },
+    { cc: 75, param: 'stageNLAmount', label: 'StgNL' },
+    { cc: 76, param: 'ensembleAmount', label: 'Ensem' },
+    { cc: 77, param: 'overdrive', label: 'Drive' },
+  ],
+  // Page 3: Korg
+  [
+    { cc: 70, param: 'korgBite', label: 'Bite' },
+    { cc: 71, param: 'korgClip', label: 'Clip' },
+    { cc: 72, param: 'korgCrossmod', label: 'XMod' },
+    { cc: 73, param: 'korgQSag', label: 'Q.Sag' },
+    { cc: 74, param: 'korgSharpness', label: 'Sharp' },
+    { cc: 75, param: 'mixer.volume', label: '-' },
+    { cc: 76, param: 'mixer.volume', label: '-' },
+    { cc: 77, param: 'mixer.volume', label: '-' },
+  ],
+  // Page 4: LFO
+  [
+    { cc: 70, param: 'lfoRate', label: 'Rate' },
+    { cc: 71, param: 'lfoContour', label: 'Contour' },
+    { cc: 72, param: 'lfoPitchDepth', label: 'Pitch' },
+    { cc: 73, param: 'lfoPwmDepth', label: 'PWM' },
+    { cc: 74, param: 'lfoFilterDepth', label: 'Filter' },
+    { cc: 75, param: 'lfoStiffDepth', label: 'Stiff' },
+    { cc: 76, param: 'mixer.volume', label: '-' },
+    { cc: 77, param: 'mixer.volume', label: '-' },
+  ],
+  // Page 5: FX
+  [
+    { cc: 70, param: 'chorusMix', label: 'Chorus' },
+    { cc: 71, param: 'phaserRate', label: 'Ph.Rate' },
+    { cc: 72, param: 'phaserFeedback', label: 'Ph.FB' },
+    { cc: 73, param: 'phaserMix', label: 'Ph.Mix' },
+    { cc: 74, param: 'delayTime', label: 'Dly.T' },
+    { cc: 75, param: 'delayFeedback', label: 'Dly.FB' },
+    { cc: 76, param: 'delayMix', label: 'Dly.Mix' },
+    { cc: 77, param: 'delaySpread', label: 'Spread' },
+  ],
+  // Page 6: Oscillator
+  [
+    { cc: 70, param: 'tuning', label: 'Tune' },
+    { cc: 71, param: 'waveform', label: 'Wave' },
+    { cc: 72, param: 'pulseWidth', label: 'PWM' },
+    { cc: 73, param: 'subOscGain', label: 'SubG' },
+    { cc: 74, param: 'subOscBlend', label: 'SubB' },
+    { cc: 75, param: 'pitchToPw', label: 'P→PW' },
+    { cc: 76, param: 'mixer.volume', label: '-' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+];
+
+/** 303 tab names for LCD display (indexed by page number) */
+const KNOB_303_PAGE_NAMES = ['303 Main', 'MOJO', 'DevilFish', 'Korg', 'LFO', 'FX', 'Oscillator'];
+
 /** Joystick axis mappings per bank (X = pitch bend, Y = CC1 mod wheel) */
 export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
   '303': {
@@ -288,8 +372,11 @@ export function getKnobAssignmentsForSynth(synthType: SynthType): KnobAssignment
  * Get the display name for a synth's current knob page.
  * Used for LCD display on hardware controllers.
  */
-export function getKnobPageName(synthType: SynthType): string {
+export function getKnobPageName(synthType: SynthType, page?: number): string {
   const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank === '303' && page !== undefined && page < KNOB_303_PAGE_NAMES.length) {
+    return KNOB_303_PAGE_NAMES[page];
+  }
   if (legacyBank) return legacyBank;
   return synthType;
 }
@@ -298,10 +385,16 @@ export function getKnobPageName(synthType: SynthType): string {
  * Get knob assignments for a specific page of an NKS2 profile.
  * page 0 = params [0..7], page 1 = params [8..15].
  * Falls back to legacy KNOB_BANKS (1 page only) or Mixer as last resort.
+ * Special case: 303 has 6 sub-pages (Main, MOJO, DevilFish, Korg, LFO, FX).
  */
 export function getKnobAssignmentsForPage(synthType: SynthType, page: number): KnobAssignment[] {
-  // Legacy synths with hardcoded banks: always 1 page
+  // 303: multi-page (one per UI tab)
   const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank === '303') {
+    return page >= 0 && page < KNOB_303_PAGES.length ? KNOB_303_PAGES[page] : [];
+  }
+
+  // Other legacy synths: always 1 page
   if (legacyBank) {
     return page === 0 ? KNOB_BANKS[legacyBank] : [];
   }
@@ -323,10 +416,11 @@ export function getKnobAssignmentsForPage(synthType: SynthType, page: number): K
 
 /**
  * Get total page count for a synth's NKS2 profile.
- * Legacy synths = 1 page. NKS2 synths = ceil(performanceParams / 8).
+ * Legacy synths = 1 page (except 303 = 6 pages). NKS2 synths = ceil(performanceParams / 8).
  */
 export function getKnobPageCount(synthType: SynthType): number {
   const legacyBank = getKnobBankForSynth(synthType);
+  if (legacyBank === '303') return KNOB_303_PAGES.length;
   if (legacyBank) return 1;
 
   const allParams = getPerformanceParams(synthType);

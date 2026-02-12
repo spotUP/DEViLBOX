@@ -27,9 +27,8 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pattern = patterns[currentPatternIndex];
-  if (!pattern) return null;
 
-  const patternLength = pattern.length;
+  const patternLength = pattern?.length ?? 64;
   const rowHeight = height / patternLength;
   const activeRow = Math.min(
     isPlaying ? currentRow : cursor.rowIndex,
@@ -38,6 +37,7 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
 
   // Calculate note density per row (memoized)
   const density = useMemo(() => {
+    if (!pattern) return new Uint8Array(0);
     const d = new Uint8Array(patternLength);
     for (let row = 0; row < patternLength; row++) {
       let count = 0;
@@ -52,12 +52,6 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
     return d;
   }, [pattern, patternLength]);
 
-  // Use reduce instead of spread to avoid call stack limits on large patterns
-  let maxDensity = 1;
-  for (let i = 0; i < density.length; i++) {
-    if (density[i] > maxDensity) maxDensity = density[i];
-  }
-
   // Click to jump to row
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -67,6 +61,14 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
     const clampedRow = Math.max(0, Math.min(patternLength - 1, row));
     useTrackerStore.getState().moveCursorToRow(clampedRow);
   }, [height, patternLength]);
+
+  if (!pattern) return null;
+
+  // Use reduce instead of spread to avoid call stack limits on large patterns
+  let maxDensity = 1;
+  for (let i = 0; i < density.length; i++) {
+    if (density[i] > maxDensity) maxDensity = density[i];
+  }
 
   return (
     <div

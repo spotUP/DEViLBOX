@@ -1,4 +1,3 @@
-// @ts-nocheck - Null check issues
 /**
  * AutomationPlayer - Real-time automation value reader and applier
  * Reads automation from tracker columns or curve data and applies to Tone.js parameters
@@ -11,7 +10,8 @@ import { DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import { isDevilboxSynth } from '@typedefs/synth';
 import type { TrackerCell, Pattern } from '@typedefs';
-import type { AutomationCurve, AutomationParameter } from '@typedefs/automation';
+import { interpolateAutomationValue } from '@typedefs/automation';
+import type { AutomationCurve } from '@typedefs/automation';
 
 interface AutomationData {
   [patternId: string]: {
@@ -55,10 +55,13 @@ export class AutomationPlayer {
    * Get automation value from tracker column
    * Returns 0-1 normalized value
    */
-  private getColumnValue(cell: TrackerCell, parameter: AutomationParameter): number | null {
+  private getColumnValue(cell: TrackerCell, parameter: string): number | null {
+    // Map NKS param id suffix to TrackerCell field
+    // e.g. 'tb303.cutoff' → 'cutoff', 'obxd.filterCutoff' → no match (curve-only)
+    const shortName = parameter.includes('.') ? parameter.split('.').pop()! : parameter;
     let rawValue: number | undefined;
 
-    switch (parameter) {
+    switch (shortName) {
       case 'cutoff':
         rawValue = cell.cutoff;
         break;
@@ -77,10 +80,8 @@ export class AutomationPlayer {
         // 0x10-0x50: set volume 0-64 (value = volumeByte - 0x10)
         // 0x60+: volume effects (handled separately)
         if (cell.volume !== null && cell.volume >= 0x10 && cell.volume <= 0x50) {
-          // Extract volume value (0-64) and return it (will be normalized below)
           rawValue = cell.volume - 0x10;
         } else {
-          // Skip automation for 0x00-0x0F (nothing) and effects (0x60+)
           rawValue = undefined;
         }
         break;
@@ -91,7 +92,7 @@ export class AutomationPlayer {
     if (rawValue === undefined) return null;
 
     // Normalize to 0-1
-    if (parameter === 'volume') {
+    if (shortName === 'volume') {
       return rawValue / 0x40; // Volume is 0-64 (0x40), normalize to 0-1
     } else {
       return rawValue / 0xff; // Others are 0x00-0xFF
@@ -105,73 +106,12 @@ export class AutomationPlayer {
   private getCurveValue(
     patternId: string,
     channelIndex: number,
-    parameter: AutomationParameter,
+    parameter: string,
     row: number
   ): number | null {
     const curve = this.automationData[patternId]?.[channelIndex]?.[parameter];
     if (!curve || !curve.enabled || curve.points.length === 0) return null;
-
-    const sortedPoints = [...curve.points].sort((a, b) => a.row - b.row);
-
-    // If before first point
-    if (row < sortedPoints[0].row) {
-      return sortedPoints[0].value;
-    }
-
-    // If after last point
-    if (row >= sortedPoints[sortedPoints.length - 1].row) {
-      return sortedPoints[sortedPoints.length - 1].value;
-    }
-
-    // Find surrounding points
-    let prevPoint = sortedPoints[0];
-    let nextPoint = sortedPoints[sortedPoints.length - 1];
-
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-      if (sortedPoints[i].row <= row && sortedPoints[i + 1].row > row) {
-        prevPoint = sortedPoints[i];
-        nextPoint = sortedPoints[i + 1];
-        break;
-      }
-    }
-
-    // If exactly on a point
-    if (prevPoint.row === row) return prevPoint.value;
-    if (nextPoint.row === row) return nextPoint.value;
-
-    // Interpolate between points
-    const rowDiff = nextPoint.row - prevPoint.row;
-    const valueDiff = nextPoint.value - prevPoint.value;
-    const t = (row - prevPoint.row) / rowDiff;
-
-    switch (curve.interpolation) {
-      case 'linear':
-        return prevPoint.value + valueDiff * t;
-
-      case 'exponential':
-        return prevPoint.value + valueDiff * (t * t);
-
-      case 'easeIn':
-        // Cubic ease in
-        return prevPoint.value + valueDiff * (t * t * t);
-
-      case 'easeOut':
-        // Cubic ease out
-        const tInv = 1 - t;
-        return prevPoint.value + valueDiff * (1 - tInv * tInv * tInv);
-
-      case 'easeBoth':
-        // Cubic ease in-out
-        if (t < 0.5) {
-          return prevPoint.value + valueDiff * (4 * t * t * t);
-        } else {
-          const tShift = 2 * t - 2;
-          return prevPoint.value + valueDiff * (1 + tShift * tShift * tShift / 2 + 0.5);
-        }
-
-      default:
-        return prevPoint.value + valueDiff * t;
-    }
+    return interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
   }
 
   /**
@@ -181,7 +121,7 @@ export class AutomationPlayer {
     cell: TrackerCell,
     patternId: string,
     channelIndex: number,
-    parameter: AutomationParameter,
+    parameter: string,
     row: number
   ): number | null {
     // Check column value first (takes precedence)
@@ -198,14 +138,15 @@ export class AutomationPlayer {
    */
   private applyParameter(
     instrumentId: number,
-    parameter: AutomationParameter,
+    parameter: string,
     value: number, // 0-1 normalized
     channelIndex?: number
   ): void {
     // Check for manual override - if user is controlling this via knobs, skip automation
+    // Override manager stores short names ('cutoff'), so extract from NKS id ('tb303.cutoff')
+    const shortName = parameter.includes('.') ? parameter.split('.').pop()! : parameter;
     const overrideManager = getManualOverrideManager();
-    if (overrideManager.isOverridden(parameter as any)) {
-      console.log(`[AutomationPlayer] BLOCKED by manual override: ${parameter}`);
+    if (overrideManager.isOverridden(shortName as 'cutoff' | 'resonance' | 'envMod' | 'decay' | 'accent' | 'overdrive' | 'tuning' | 'volume' | 'pan' | 'distortion' | 'delay' | 'reverb')) {
       return; // Manual control takes precedence
     }
 
@@ -232,72 +173,56 @@ export class AutomationPlayer {
     if (!instrument) return;
 
     try {
-      // TB303-style synths (JC303Synth or Buzz3o3) — delegate to set() for all params
-      const isTB303 = instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator';
-      if (isTB303 && 'set' in instrument) {
-        instrument.set(parameter, value);
+      // Any instrument with a set() method — delegate directly
+      if (isDevilboxSynth(instrument) && instrument.set) {
+        instrument.set(shortName, value);
         return;
       }
 
-      // Non-TB303 instruments: generic parameter application
-      switch (parameter) {
+      // TB303-style synths
+      const isTB303 = instrument instanceof JC303Synth || instrument.constructor.name === 'BuzzmachineGenerator';
+      if (isTB303 && 'set' in instrument) {
+        (instrument as unknown as { set: (p: string, v: number) => void }).set(shortName, value);
+        return;
+      }
+
+      // Generic Tone.js fallback for common params
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inst = instrument as any;
+      switch (shortName) {
         case 'cutoff':
-          if (isDevilboxSynth(instrument) && instrument.set) {
-            instrument.set('cutoff', value);
-          } else if (instrument.filter?.frequency) {
-            instrument.filter.frequency.setValueAtTime(200 * Math.pow(5000 / 200, value), Tone.now());
+          if (inst.filter?.frequency) {
+            inst.filter.frequency.setValueAtTime(200 * Math.pow(5000 / 200, value), Tone.now());
           }
           break;
-
         case 'resonance':
-          if (isDevilboxSynth(instrument) && instrument.set) {
-            instrument.set('resonance', value);
-          } else if (instrument.filter?.Q) {
-            const qValue = value * 30;
-            instrument.filter.Q.setValueAtTime(qValue, Tone.now());
+          if (inst.filter?.Q) {
+            inst.filter.Q.setValueAtTime(value * 30, Tone.now());
           }
           break;
-
-        case 'volume':
-          // Map 0-1 to -40dB to 0dB
+        case 'volume': {
           const volumeDb = -40 + value * 40;
-          if (isDevilboxSynth(instrument)) {
-            const gain = Math.pow(10, volumeDb / 20);
-            (instrument.output as GainNode).gain.setValueAtTime(gain, Tone.now());
-          } else if (instrument.volume) {
-            instrument.volume.setValueAtTime(volumeDb, Tone.now());
+          if (inst.volume) {
+            inst.volume.setValueAtTime(volumeDb, Tone.now());
           }
           break;
-
-        case 'pan':
+        }
+        case 'pan': {
           const panValue = value * 2 - 1;
-          if (instrument.pan) {
-            instrument.pan.setValueAtTime(panValue, Tone.now());
+          if (inst.pan) {
+            inst.pan.setValueAtTime(panValue, Tone.now());
           }
           break;
-
+        }
         case 'distortion':
-          if (instrument.distortion) {
-            instrument.distortion.setValueAtTime(value, Tone.now());
-          }
+          if (inst.distortion) inst.distortion.setValueAtTime(value, Tone.now());
           break;
-
         case 'delay':
-          if (instrument.delayWet) {
-            instrument.delayWet.setValueAtTime(value, Tone.now());
-          }
+          if (inst.delayWet) inst.delayWet.setValueAtTime(value, Tone.now());
           break;
-
         case 'reverb':
-          if (instrument.reverbWet) {
-            instrument.reverbWet.setValueAtTime(value, Tone.now());
-          }
+          if (inst.reverbWet) inst.reverbWet.setValueAtTime(value, Tone.now());
           break;
-
-        default:
-          if (isDevilboxSynth(instrument) && instrument.set) {
-            instrument.set(parameter, value);
-          }
       }
     } catch (error) {
       console.error(`Failed to apply automation for ${parameter}:`, error);
@@ -316,42 +241,25 @@ export class AutomationPlayer {
   ): void {
     if (instrumentId === null) return;
 
-    // Supported automation parameters
-    const parameters: AutomationParameter[] = [
-      // TB-303 core parameters
-      'cutoff',
-      'resonance',
-      'envMod',
-      'decay',
-      'accent',
-      'tuning',
-      'overdrive',
-      // Devil Fish parameters
-      'normalDecay',
-      'accentDecay',
-      'vegDecay',
-      'vegSustain',
-      'softAttack',
-      'filterTracking',
-      'filterFM',
-      // General mixer parameters
-      'volume',
-      'pan',
-      'distortion',
-      'delay',
-      'reverb',
-    ];
-
-    parameters.forEach((parameter) => {
-      const value = this.getAutomationValue(cell, patternId, channelIndex, parameter, row);
-      if (value !== null) {
-        // Log every 8 rows to reduce spam
-        if (row % 8 === 0) {
-          console.log(`[AutomationPlayer] Row ${row} Ch ${channelIndex}: ${parameter}=${value.toFixed(3)}`);
-        }
-        this.applyParameter(instrumentId, parameter, value, channelIndex);
+    // Column-based params (always checked — these come from TrackerCell hex columns)
+    const columnParams = ['cutoff', 'resonance', 'envMod', 'pan', 'volume'];
+    for (const param of columnParams) {
+      const colValue = this.getColumnValue(cell, param);
+      if (colValue !== null) {
+        this.applyParameter(instrumentId, param, colValue, channelIndex);
       }
-    });
+    }
+
+    // Curve-based params — iterate over whatever curves exist for this channel
+    const channelCurves = this.automationData[patternId]?.[channelIndex];
+    if (channelCurves) {
+      for (const parameter of Object.keys(channelCurves)) {
+        const curveValue = this.getCurveValue(patternId, channelIndex, parameter, row);
+        if (curveValue !== null) {
+          this.applyParameter(instrumentId, parameter, curveValue, channelIndex);
+        }
+      }
+    }
   }
 
   /**
@@ -365,7 +273,7 @@ export class AutomationPlayer {
       const instrumentId = cell.instrument !== null ? cell.instrument : channel.instrumentId;
 
       if (instrumentId !== null) {
-        this.processRow(this.currentPattern.id, channelIndex, row, cell, instrumentId);
+        this.processRow(this.currentPattern!.id, channelIndex, row, cell, instrumentId);
       }
     });
   }
@@ -384,7 +292,7 @@ export class AutomationPlayer {
   public getCurrentValue(
     patternId: string,
     channelIndex: number,
-    parameter: AutomationParameter,
+    parameter: string,
     row: number
   ): number | null {
     if (!this.currentPattern) return null;
@@ -397,22 +305,24 @@ export class AutomationPlayer {
 
   /**
    * Export automation data for a specific pattern and channel
+   * Exports all curve-based parameters that have data
    */
   public exportAutomation(patternId: string, channelIndex: number): Record<string, number[]> {
     if (!this.currentPattern) return {};
 
     const result: Record<string, number[]> = {};
-    const parameters: AutomationParameter[] = ['cutoff', 'resonance', 'envMod', 'volume', 'pan'];
+    const channelCurves = this.automationData[patternId]?.[channelIndex];
+    if (!channelCurves) return result;
 
-    parameters.forEach((parameter) => {
+    for (const parameter of Object.keys(channelCurves)) {
       const values: number[] = [];
-      for (let row = 0; row < this.currentPattern!.length; row++) {
-        const cell = this.currentPattern!.channels[channelIndex].rows[row];
+      for (let row = 0; row < this.currentPattern.length; row++) {
+        const cell = this.currentPattern.channels[channelIndex].rows[row];
         const value = this.getAutomationValue(cell, patternId, channelIndex, parameter, row);
         values.push(value !== null ? value : 0);
       }
       result[parameter] = values;
-    });
+    }
 
     return result;
   }

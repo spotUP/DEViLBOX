@@ -55,7 +55,7 @@ export function ChannelOscilloscope({
   const animFrameRef = useRef<number>(0);
   const lastDrawTime = useRef(0);
 
-  const { channelData: _channelData, numChannels, isActive } = useOscilloscopeStore();
+  const { numChannels, isActive } = useOscilloscopeStore();
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 

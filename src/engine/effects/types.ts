@@ -26,6 +26,20 @@ export interface FormatConfig {
 // Vibrato/Tremolo waveform types
 export type WaveformType = 'sine' | 'rampDown' | 'rampUp' | 'square' | 'random';
 
+// Metadata attached to the active instrument (auto-vibrato, MOD defaults, IT envelopes)
+export interface ActiveInstrumentMeta {
+  autoVibrato?: {
+    type: 'sine' | 'square' | 'rampDown' | 'rampUp';
+    sweep: number;
+    depth: number;
+    rate: number;
+  };
+  defaultVolume?: number;
+  finetune?: number;
+  envelopes?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 // Per-channel state for effect processing
 export interface ChannelState {
   // Pitch
@@ -90,7 +104,7 @@ export interface ChannelState {
   // Auto-vibrato state
   autoVibratoPos?: number;    // 0-255
   autoVibratoSweep?: number;  // Current depth multiplier (0-255)
-  activeInstrument?: any;     // Metadata for current instrument (XM/IT auto-vibrato)
+  activeInstrument?: ActiveInstrumentMeta; // Metadata for current instrument (XM/IT auto-vibrato)
   nnaMode?: number;           // 0=Cut, 1=Continue, 2=Off, 3=Fade
   
   // Memory values (for effects that remember last parameter)

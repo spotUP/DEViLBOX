@@ -16,8 +16,6 @@ import type {
   FormantSynthConfig,
   DubSirenConfig,
   SpaceLaserConfig,
-  WavetableConfig as _WavetableConfig,
-  GranularConfig as _GranularConfig,
 } from '@typedefs/instrument';
 
 export interface SynthPreset {
@@ -25,7 +23,7 @@ export interface SynthPreset {
   name: string;
   description: string;
   category: 'bass' | 'lead' | 'pad' | 'key' | 'fx' | 'drum' | 'pluck' | 'string';
-  config: Partial<any>;
+  config: Record<string, unknown>;
 }
 
 // ============================================

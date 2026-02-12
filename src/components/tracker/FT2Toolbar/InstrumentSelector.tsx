@@ -101,7 +101,7 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
 
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
+    const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName];
     return Icon || LucideIcons.Music2;
   };
 

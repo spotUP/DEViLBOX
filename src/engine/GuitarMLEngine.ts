@@ -117,7 +117,7 @@ export class GuitarMLEngine {
   /**
    * Handle messages from worklet
    */
-  private handleWorkletMessage(data: any): void {
+  private handleWorkletMessage(data: { type: string; success?: boolean; error?: string }): void {
     switch (data.type) {
       case 'modelLoaded':
         if (data.success) {

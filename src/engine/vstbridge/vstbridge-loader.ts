@@ -34,7 +34,7 @@ export async function ensureVSTBridgeLoaded(
   if (!workletRegistered.get(context)) {
     try {
       await context.audioWorklet.addModule(`${baseUrl}vstbridge/VSTBridge.worklet.js`);
-    } catch (_e) {
+    } catch {
       // Module might already be added (e.g. hot reload)
     }
     workletRegistered.set(context, true);
@@ -131,7 +131,7 @@ export function createVSTBridgeNode(
     keepalive.gain.value = 0;
     workletNode.connect(keepalive);
     keepalive.connect(rawContext.destination);
-  } catch (_e) {
+  } catch {
     /* keepalive failed */
   }
 

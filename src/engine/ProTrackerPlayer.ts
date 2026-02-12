@@ -515,12 +515,12 @@ export class ProTrackerReplayer {
 
       case 0x1: // Fine portamento up
         ch.n_period = Math.max(113, ch.n_period - y);
-        this.updatePeriod(ch, time);
+        this.updatePeriod(ch);
         break;
 
       case 0x2: // Fine portamento down
         ch.n_period = Math.min(856, ch.n_period + y);
-        this.updatePeriod(ch, time);
+        this.updatePeriod(ch);
         break;
 
       case 0x3: // Glissando control
@@ -616,35 +616,35 @@ export class ProTrackerReplayer {
     switch (effect) {
       case 0x0: // Arpeggio
         if (param !== 0) {
-          this.doArpeggio(ch, param, time);
+          this.doArpeggio(ch, param);
         }
         break;
 
       case 0x1: // Portamento up
         ch.n_period = Math.max(113, ch.n_period - param);
-        this.updatePeriod(ch, time);
+        this.updatePeriod(ch);
         break;
 
       case 0x2: // Portamento down
         ch.n_period = Math.min(856, ch.n_period + param);
-        this.updatePeriod(ch, time);
+        this.updatePeriod(ch);
         break;
 
       case 0x3: // Tone portamento
-        this.doTonePortamento(ch, time);
+        this.doTonePortamento(ch);
         break;
 
       case 0x4: // Vibrato
-        this.doVibrato(ch, time);
+        this.doVibrato(ch);
         break;
 
       case 0x5: // Tone portamento + volume slide
-        this.doTonePortamento(ch, time);
+        this.doTonePortamento(ch);
         this.doVolumeSlide(ch, param, time);
         break;
 
       case 0x6: // Vibrato + volume slide
-        this.doVibrato(ch, time);
+        this.doVibrato(ch);
         this.doVolumeSlide(ch, param, time);
         break;
 
@@ -689,7 +689,7 @@ export class ProTrackerReplayer {
   /**
    * Arpeggio effect (0xy)
    */
-  private doArpeggio(ch: ChannelState, param: number, time: number): void {
+  private doArpeggio(ch: ChannelState, param: number): void {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
@@ -704,7 +704,7 @@ export class ProTrackerReplayer {
     }
 
     ch.n_period = period;
-    this.updatePeriod(ch, time);
+    this.updatePeriod(ch);
   }
 
   /**
@@ -730,7 +730,7 @@ export class ProTrackerReplayer {
   /**
    * Tone portamento effect (3xx)
    */
-  private doTonePortamento(ch: ChannelState, time: number): void {
+  private doTonePortamento(ch: ChannelState): void {
     if (ch.n_wantedperiod === 0 || ch.n_period === ch.n_wantedperiod) return;
 
     if (ch.n_period < ch.n_wantedperiod) {
@@ -745,13 +745,13 @@ export class ProTrackerReplayer {
       }
     }
 
-    this.updatePeriod(ch, time);
+    this.updatePeriod(ch);
   }
 
   /**
    * Vibrato effect (4xy)
    */
-  private doVibrato(ch: ChannelState, time: number): void {
+  private doVibrato(ch: ChannelState): void {
     const speed = (ch.n_vibratocmd >> 4) & 0x0F;
     const depth = ch.n_vibratocmd & 0x0F;
 
@@ -776,7 +776,7 @@ export class ProTrackerReplayer {
     if (ch.n_vibratopos >= 32) periodDelta = -periodDelta;
 
     const newPeriod = ch.n_period + periodDelta;
-    this.updatePeriodDirect(ch, newPeriod, time);
+    this.updatePeriodDirect(ch, newPeriod);
 
     // Advance position
     ch.n_vibratopos = (ch.n_vibratopos + speed) & 63;
@@ -905,7 +905,7 @@ export class ProTrackerReplayer {
           ch.player.stop();
         }
         ch.player.dispose();
-      } catch (e) {
+      } catch {
         // Ignore disposal errors
       }
       ch.player = null;
@@ -915,14 +915,14 @@ export class ProTrackerReplayer {
   /**
    * Update period (playback rate) for a channel
    */
-  private updatePeriod(ch: ChannelState, time: number): void {
-    this.updatePeriodDirect(ch, ch.n_period, time);
+  private updatePeriod(ch: ChannelState): void {
+    this.updatePeriodDirect(ch, ch.n_period);
   }
 
   /**
    * Update period with direct value (for vibrato etc)
    */
-  private updatePeriodDirect(ch: ChannelState, period: number, _time: number): void {
+  private updatePeriodDirect(ch: ChannelState, period: number): void {
     if (!ch.player || period === 0) return;
 
     const frequency = AMIGA_PAL_FREQUENCY / period;

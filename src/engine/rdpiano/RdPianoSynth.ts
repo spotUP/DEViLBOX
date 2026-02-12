@@ -449,7 +449,8 @@ export class RdPianoSynth implements DevilboxSynth {
     });
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): void {
+  triggerRelease(frequency?: number | string, time?: number): void {
+    void time;
     if (!this._worklet) return;
 
     if (frequency !== undefined) {

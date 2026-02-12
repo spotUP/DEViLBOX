@@ -9,11 +9,12 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
 import { LoadPresetModal } from './presets';
+import { focusPopout } from '@components/ui/PopOutWindow';
 import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
@@ -56,7 +57,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   showEditButton = false,
   onEditInstrument,
   variant = 'default',
-  onCreateNew: _onCreateNew,
 }) => {
   const {
     instruments,
@@ -76,9 +76,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     updateInstrument: state.updateInstrument,
   })));
 
-  const { useHexNumbers, setShowSamplePackModal } = useUIStore(useShallow(s => ({
+  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut } = useUIStore(useShallow(s => ({
     useHexNumbers: s.useHexNumbers,
-    setShowSamplePackModal: s.setShowSamplePackModal
+    setShowSamplePackModal: s.setShowSamplePackModal,
+    setInstrumentEditorPoppedOut: s.setInstrumentEditorPoppedOut,
+    instrumentEditorPoppedOut: s.instrumentEditorPoppedOut,
   })));
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -195,12 +197,23 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     }
   };
 
+  // Pop out instrument editor for a specific instrument
+  const handlePopOut = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setCurrentInstrument(id);
+    if (instrumentEditorPoppedOut) {
+      focusPopout('DEViLBOX — Instrument Editor');
+    } else {
+      setInstrumentEditorPoppedOut(true);
+    }
+  };
+
   // Sort instruments by ID
   const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
 
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
+    const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName];
     return Icon || LucideIcons.Music2;
   };
 
@@ -327,6 +340,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {showActions && (
                   <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
+                      onClick={(e) => handlePopOut(e, instrument.id)}
+                      className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-cyan-400`}
+                      title="Pop out editor"
+                    >
+                      <ExternalLink size={10} />
+                    </button>
+                    <button
                       onClick={(e) => handleClone(e, instrument.id)}
                       className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'}`}
                       title="Duplicate"
@@ -427,7 +447,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Actions (on hover) */}
                 {showActions && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                    <button
+                      onClick={(e) => handlePopOut(e, instrument.id)}
+                      className="p-1 text-text-muted hover:text-cyan-400"
+                      title="Pop out editor"
+                    >
+                      <ExternalLink size={12} />
+                    </button>
                     <button
                       onClick={(e) => handleClone(e, instrument.id)}
                       className="p-1 text-text-muted hover:text-accent-primary"

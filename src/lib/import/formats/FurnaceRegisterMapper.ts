@@ -231,6 +231,7 @@ export class FurnaceRegisterMapper {
    * Based on Furnace gb.cpp reset() sequence
    */
   public static mapGB(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.GB;
     console.log('[mapGB] Writing GB init registers: NR10=0x00, NR52=0x8F, NR51=0xFF, NR50=0xFF');
 
@@ -453,6 +454,7 @@ export class FurnaceRegisterMapper {
    * Reference: ay.cpp reset()
    */
   public static mapAY(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.AY;
     // Reference: ay.cpp line 582: rWrite(0x07,0x38)
     // Mixer register: bits 0-2 = tone enable (0=on), bits 3-5 = noise enable (1=off)
@@ -465,6 +467,7 @@ export class FurnaceRegisterMapper {
    * Reference: pce.cpp reset()
    */
   public static mapPCE(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.PCE;
     // Reference: pce.cpp line 390-391
     engine.write(chip, 0x00, 0x00);  // Channel select = global
@@ -476,6 +479,7 @@ export class FurnaceRegisterMapper {
    * Reference: snes.cpp reset()
    */
   public static mapSNES(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SNES;
     // Reference: snes.cpp reset() lines 873-877
     // Sample directory is at 0x200, so DIR register = 0x02
@@ -724,6 +728,7 @@ export class FurnaceRegisterMapper {
    * Reference: vrc6.cpp reset()
    */
   public static mapVRC6(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.VRC6;
     // Reference: vrc6.cpp line 217-219
     engine.write(chip, 0x9003, 0x00);  // Control register (halt off)
@@ -734,6 +739,7 @@ export class FurnaceRegisterMapper {
    * Reference: n163.cpp reset()
    */
   public static mapN163(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.N163;
     // Reference: n163.cpp line 406
     // 0x7F = sound enable + channel count
@@ -746,6 +752,7 @@ export class FurnaceRegisterMapper {
    * Reference: scc.cpp reset()
    */
   public static mapSCC(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SCC;
     // Reference: scc.cpp line 303-307
     // Set all channel volumes to max
@@ -761,6 +768,7 @@ export class FurnaceRegisterMapper {
    * Reference: fds.cpp reset()
    */
   public static mapFDS(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.FDS;
     // Reference: fds.cpp lines 234-237
     engine.write(chip, 0x4023, 0x00);  // Disable first
@@ -773,6 +781,7 @@ export class FurnaceRegisterMapper {
    * Reference: mmc5.cpp reset()
    */
   public static mapMMC5(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.MMC5;
     // Reference: mmc5.cpp lines 188-189
     engine.write(chip, 0x5015, 0x03);  // Enable both pulse channels
@@ -784,6 +793,7 @@ export class FurnaceRegisterMapper {
    * Reference: tia.cpp reset()
    */
   public static mapTIA(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.TIA;
     // Reference: tia.cpp - TIA is very simple, mostly self-initializing
     // Ensure volume is max
@@ -796,6 +806,7 @@ export class FurnaceRegisterMapper {
    * Reference: saa.cpp reset()
    */
   public static mapSAA(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SAA;
     // Reference: saa.cpp lines 307-310
     // Reset sequence
@@ -808,6 +819,7 @@ export class FurnaceRegisterMapper {
    * Reference: swan.cpp reset()
    */
   public static mapSWAN(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SWAN;
     // Reference: swan.cpp lines 324-330
     // Set all channel volumes to max
@@ -823,6 +835,7 @@ export class FurnaceRegisterMapper {
    * Reference: msm6295.cpp reset()
    */
   public static mapOKI(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.OKI;
     // Reference: msm6295.cpp line 230
     engine.write(chip, 12, 0x00);  // Rate select (normal speed)
@@ -833,6 +846,7 @@ export class FurnaceRegisterMapper {
    * Reference: es5506.cpp reset()
    */
   public static mapES5506(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Reference: es5506.cpp - complex paging system
     // Minimal init - ES5506 has 32 voices with page-based registers
     // Most setup happens per-voice
@@ -993,6 +1007,7 @@ export class FurnaceRegisterMapper {
    * Reference: segapcm.cpp reset()
    */
   public static mapSEGAPCM(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SEGAPCM;
     // Reference: segapcm.cpp lines 193-198
     // Initialize all 16 channels
@@ -1009,6 +1024,7 @@ export class FurnaceRegisterMapper {
    * Reference: ymz280b.cpp reset()
    */
   public static mapYMZ280B(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.YMZ280B;
     // Reference: ymz280b.cpp lines 294-298
     engine.write(chip, 0xFF, 0x80);  // Enable
@@ -1024,6 +1040,7 @@ export class FurnaceRegisterMapper {
    * Reference: rf5c68.cpp reset()
    */
   public static mapRF5C68(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.RF5C68;
     // Reference: rf5c68.cpp lines 189-194
     engine.write(chip, 0x08, 0xFF);  // Channel key-off all
@@ -1040,6 +1057,7 @@ export class FurnaceRegisterMapper {
    * Reference: ga20.cpp reset()
    */
   public static mapGA20(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.GA20;
     // Reference: ga20.cpp lines 137-140
     for (let i = 0; i < 4; i++) {
@@ -1053,6 +1071,7 @@ export class FurnaceRegisterMapper {
    * Reference: c140.cpp reset()
    */
   public static mapC140(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.C140;
     // Reference: c140.cpp lines 286-290
     for (let i = 0; i < 24; i++) {
@@ -1065,6 +1084,7 @@ export class FurnaceRegisterMapper {
    * Reference: qsound.cpp reset()
    */
   public static mapQSOUND(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.QSOUND;
     // Reference: qsound.cpp lines 339-342
     // QSound uses register-pair writes (data, address)
@@ -1077,6 +1097,7 @@ export class FurnaceRegisterMapper {
    * Reference: vic20.cpp reset()
    */
   public static mapVIC(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.VIC;
     // Reference: vic20.cpp line 173
     engine.write(chip, 14, 15);  // Volume = max
@@ -1087,6 +1108,7 @@ export class FurnaceRegisterMapper {
    * Reference: ted.cpp reset()
    */
   public static mapTED(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.TED;
     // Reference: ted.cpp line 148
     engine.write(chip, 0x11, 15);  // Volume = max
@@ -1097,6 +1119,7 @@ export class FurnaceRegisterMapper {
    * Reference: supervision.cpp reset()
    */
   public static mapSUPERVISION(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Reference: supervision.cpp - uses supervision_sound_reset()
     // Minimal init needed - chip self-initializes
   }
@@ -1106,6 +1129,7 @@ export class FurnaceRegisterMapper {
    * Reference: vera.cpp reset()
    */
   public static mapVERA(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.VERA;
     // Reference: vera.cpp lines 319-324
     // VERA audio is at 0x1F9C0-0x1F9FF
@@ -1120,6 +1144,7 @@ export class FurnaceRegisterMapper {
    * Reference: sm8521.cpp reset()
    */
   public static mapSM8521(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.SM8521;
     // Reference: sm8521.cpp line 161
     engine.write(chip, 0x40, 0x80);  // SGC init (enable)
@@ -1130,6 +1155,7 @@ export class FurnaceRegisterMapper {
    * Reference: bubsyswsg.cpp reset()
    */
   public static mapBUBBLE(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Reference: bubsyswsg.cpp - uses k005289.reset()
     // Minimal initialization - chip self-initializes via reset
   }
@@ -1139,6 +1165,7 @@ export class FurnaceRegisterMapper {
    * Reference: k007232.cpp reset()
    */
   public static mapK007232(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.K007232;
     // Reference: k007232.cpp - uses k007232.reset()
     // Initialize volumes
@@ -1151,6 +1178,7 @@ export class FurnaceRegisterMapper {
    * Reference: k053260.cpp reset()
    */
   public static mapK053260(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.K053260;
     // Reference: k053260.cpp lines 196-198
     engine.write(chip, 0x28, 0x00);  // Key off all
@@ -1162,6 +1190,7 @@ export class FurnaceRegisterMapper {
    * Reference: x1_010.cpp reset()
    */
   public static mapX1_010(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.X1_010;
     // Reference: x1_010.cpp lines 337-340
     for (let i = 0; i < 16; i++) {
@@ -1174,6 +1203,7 @@ export class FurnaceRegisterMapper {
    * Reference: scvtone.cpp reset()
    */
   public static mapUPD1771(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Reference: scvtone.cpp - uses device_reset()
     // Minimal init - chip self-initializes via device reset
   }
@@ -1183,6 +1213,7 @@ export class FurnaceRegisterMapper {
    * Reference: t6w28.cpp reset()
    */
   public static mapT6W28(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.T6W28;
     // Reference: t6w28.cpp line 127
     engine.write(chip, 1, 0xE7);  // Noise mode
@@ -1193,6 +1224,7 @@ export class FurnaceRegisterMapper {
    * Reference: vb.cpp reset()
    */
   public static mapVB(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.VB;
     // Reference: vb.cpp - chWrite(c,a,v) = 0x400 + (c<<6) + (a<<2)
     // Registers: 0=INT, 1=LRV, 2=FQL, 3=FQH, 4=EV0, 5=EV1, 6=RAM
@@ -1208,6 +1240,7 @@ export class FurnaceRegisterMapper {
    * Reference: lynx.cpp reset()
    */
   public static mapLYNX(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _channel; void _config;
     const chip = FurnaceChipType.LYNX;
     // Reference: Mikey.cpp - stereo bits are INVERTED (0 = enabled, 1 = disabled)
     // Bits 0-3: left enable for ch 0-3 (0=on)
@@ -1220,6 +1253,7 @@ export class FurnaceRegisterMapper {
    * Reference: namco.cpp sound_enable_w()
    */
   public static mapNAMCO(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Namco WSG uses pacman_sound_w - no special init needed
     // Frequency/waveform set via noteOn handlers
   }
@@ -1229,6 +1263,7 @@ export class FurnaceRegisterMapper {
    * Reference: pet.cpp
    */
   public static mapPET(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // PET uses simple square wave - no special init needed
   }
 
@@ -1237,6 +1272,7 @@ export class FurnaceRegisterMapper {
    * Reference: pokey.cpp
    */
   public static mapPOKEY(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // POKEY has 4 channels with frequency/volume control
     // No special init needed - handled by noteOn
   }
@@ -1246,6 +1282,7 @@ export class FurnaceRegisterMapper {
    * Reference: paula.cpp
    */
   public static mapAMIGA(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // Amiga Paula is sample-based - no register init needed
   }
 
@@ -1254,6 +1291,7 @@ export class FurnaceRegisterMapper {
    * Reference: pcspk.cpp
    */
   public static mapPCSPKR(_engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
+    void _engine; void _channel; void _config;
     // PC Speaker is simple square wave - no register init needed
   }
 
@@ -1317,15 +1355,16 @@ export class FurnaceRegisterMapper {
         }
         break;
 
-      case FurnaceChipType.BUBBLE: // Bubble System (38)
+      case FurnaceChipType.BUBBLE: {
         // Bubble System has 2 channels of 32-byte wavetables
         // Upload same wavetable to both channels for consistent sound
         const bubbleWave = new Uint8Array(data.slice(0, 32));
         engine.setWavetable(FurnaceChipType.BUBBLE, 0, bubbleWave);
         engine.setWavetable(FurnaceChipType.BUBBLE, 1, bubbleWave);
         break;
+      }
 
-      case FurnaceChipType.X1_010: // X1-010 (41)
+      case FurnaceChipType.X1_010: {
         // X1-010 wavetable RAM: 128 bytes per channel at 0x1000+(waveBank<<11)+(chan<<7)
         // Reference: x1_010.cpp waveWrite macro: (v-128)&0xff
         // X1-010 uses signed 8-bit samples: -128 to +127 (stored as 0x80 to 0x7F)
@@ -1354,6 +1393,7 @@ export class FurnaceRegisterMapper {
           }
         }
         break;
+      }
     }
   }
 

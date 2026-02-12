@@ -109,6 +109,7 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean }> = ({ 
 /**
  * Hook to manage What's New modal visibility
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useWhatsNew() {
   const [showModal, setShowModal] = useState(false);
 
@@ -116,7 +117,9 @@ export function useWhatsNew() {
     // Check if user has seen the current version
     const seenVersion = localStorage.getItem(STORAGE_KEY);
     if (seenVersion !== CURRENT_VERSION) {
-      setShowModal(true);
+      // Deferred to avoid synchronous setState in effect
+      const frame = requestAnimationFrame(() => setShowModal(true));
+      return () => cancelAnimationFrame(frame);
     }
   }, []);
 

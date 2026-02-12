@@ -3,7 +3,7 @@
  * Provides controls for filter, pitch, and volume modulation
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { LFOVisualizer } from '@components/visualization';
 import { Waves, Volume2, Music, Filter, Power } from 'lucide-react';
@@ -33,7 +33,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const lfoRef = useRef(lfo);
-  lfoRef.current = lfo;
+  useEffect(() => { lfoRef.current = lfo; }, [lfo]);
 
   // Update LFO config
   const updateLFO = (updates: Partial<LFOConfig>) => {

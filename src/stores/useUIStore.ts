@@ -33,6 +33,18 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
+  // View switching (tracker vs arrangement)
+  activeView: 'tracker' | 'arrangement';
+
+  // Pop-out window state
+  tb303PoppedOut: boolean;
+  instrumentEditorPoppedOut: boolean;
+  masterEffectsPoppedOut: boolean;
+  instrumentEffectsPoppedOut: boolean;
+  pianoRollPoppedOut: boolean;
+  oscilloscopePoppedOut: boolean;
+  arrangementPoppedOut: boolean;
+
   // Transient UI state (not persisted)
   statusMessage: string;
   prevStatusMessage: string;
@@ -66,13 +78,26 @@ interface UIStore {
   // Performance actions
   setPerformanceQuality: (quality: PerformanceQuality) => void;
 
+  // View switching actions
+  setActiveView: (view: 'tracker' | 'arrangement') => void;
+  toggleActiveView: () => void;
+
+  // Pop-out window actions
+  setTB303PoppedOut: (v: boolean) => void;
+  setInstrumentEditorPoppedOut: (v: boolean) => void;
+  setMasterEffectsPoppedOut: (v: boolean) => void;
+  setInstrumentEffectsPoppedOut: (v: boolean) => void;
+  setPianoRollPoppedOut: (v: boolean) => void;
+  setOscilloscopePoppedOut: (v: boolean) => void;
+  setArrangementPoppedOut: (v: boolean) => void;
+
   // Module import actions
   setPendingModuleFile: (file: File | null) => void;
 }
 
 export const useUIStore = create<UIStore>()(
   persist(
-    immer((set, _get) => ({
+    immer((set) => ({
       // Initial state
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
@@ -95,6 +120,18 @@ export const useUIStore = create<UIStore>()(
 
       // Performance settings (default to high quality)
       performanceQuality: 'high',
+
+      // View switching
+      activeView: 'tracker' as const,
+
+      // Pop-out window state
+      tb303PoppedOut: false,
+      instrumentEditorPoppedOut: false,
+      masterEffectsPoppedOut: false,
+      instrumentEffectsPoppedOut: false,
+      pianoRollPoppedOut: false,
+      oscilloscopePoppedOut: false,
+      arrangementPoppedOut: false,
 
       // Transient state
       statusMessage: 'All Right',
@@ -180,15 +217,16 @@ export const useUIStore = create<UIStore>()(
 
           // Clear after timeout if specified
           if (timeout > 0) {
-            if ((window as any)._statusTimeout) {
-              clearTimeout((window as any)._statusTimeout);
+            const win = window as unknown as Record<string, unknown>;
+            if (win._statusTimeout) {
+              clearTimeout(win._statusTimeout as ReturnType<typeof setTimeout>);
             }
 
-            (window as any)._statusTimeout = setTimeout(() => {
+            win._statusTimeout = setTimeout(() => {
               // We need to use the store's set method directly here as we're in a timeout
               const prevMsg = useUIStore.getState().prevStatusMessage;
               useUIStore.getState().setStatusMessage(prevMsg || 'All Right', false, 0);
-              (window as any)._statusTimeout = null;
+              win._statusTimeout = null;
             }, timeout);
           }
         }),
@@ -262,6 +300,53 @@ export const useUIStore = create<UIStore>()(
           state.performanceQuality = quality;
         }),
 
+      // View switching actions
+      setActiveView: (view) =>
+        set((state) => {
+          state.activeView = view;
+        }),
+
+      toggleActiveView: () =>
+        set((state) => {
+          state.activeView = state.activeView === 'tracker' ? 'arrangement' : 'tracker';
+        }),
+
+      // Pop-out window actions
+      setTB303PoppedOut: (v) =>
+        set((state) => {
+          state.tb303PoppedOut = v;
+        }),
+
+      setInstrumentEditorPoppedOut: (v) =>
+        set((state) => {
+          state.instrumentEditorPoppedOut = v;
+        }),
+
+      setMasterEffectsPoppedOut: (v) =>
+        set((state) => {
+          state.masterEffectsPoppedOut = v;
+        }),
+
+      setInstrumentEffectsPoppedOut: (v) =>
+        set((state) => {
+          state.instrumentEffectsPoppedOut = v;
+        }),
+
+      setPianoRollPoppedOut: (v) =>
+        set((state) => {
+          state.pianoRollPoppedOut = v;
+        }),
+
+      setOscilloscopePoppedOut: (v) =>
+        set((state) => {
+          state.oscilloscopePoppedOut = v;
+        }),
+
+      setArrangementPoppedOut: (v) =>
+        set((state) => {
+          state.arrangementPoppedOut = v;
+        }),
+
       // Module import actions
       setPendingModuleFile: (file) =>
         set((state) => {
@@ -283,6 +368,7 @@ export const useUIStore = create<UIStore>()(
         chordEntryMode: state.chordEntryMode,
         blankEmptyCells: state.blankEmptyCells,
         performanceQuality: state.performanceQuality,
+        activeView: state.activeView,
         uiVersion: state.uiVersion,
       }),
     }

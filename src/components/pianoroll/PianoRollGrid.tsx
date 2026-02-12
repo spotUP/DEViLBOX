@@ -3,7 +3,7 @@
  * Supports selection box, ghost notes, scale highlighting, and multi-channel
  */
 
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import { NoteBlock } from './NoteBlock';
 import type { PianoRollNote } from '../../types/pianoRoll';
 import { isBlackKey } from '../../types/pianoRoll';
@@ -81,7 +81,7 @@ const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
   }, [horizontalZoom, containerWidth]);
 
   const visibleNotes = useMemo(() => {
-    const height = containerHeight || containerRef.current?.clientHeight || 400;
+    const height = containerHeight || 400;
     return Math.ceil(height / verticalZoom) + 2;
   }, [verticalZoom, containerHeight]);
 
@@ -236,19 +236,26 @@ const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
   const tool = usePianoRollStore((state) => state.tool);
   const cursorStyle = tool === 'draw' ? 'cursor-crosshair' : tool === 'erase' ? 'cursor-not-allowed' : 'cursor-default';
 
+  // Track container bounding rect for selection box calculation
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    if (drag.mode === 'select-box' && drag.isDragging && containerRef.current) {
+      setContainerRect(containerRef.current.getBoundingClientRect());
+    }
+  }, [drag.mode, drag.isDragging]);
+
   // Compute selection box rectangle
   const selectionBoxRect = useMemo(() => {
     if (drag.mode !== 'select-box' || !drag.isDragging) return null;
-    if (!containerRef.current) return null;
+    if (!containerRect) return null;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const sx = Math.min(drag.startX, drag.currentX) - rect.left;
-    const sy = Math.min(drag.startY, drag.currentY) - rect.top;
+    const sx = Math.min(drag.startX, drag.currentX) - containerRect.left;
+    const sy = Math.min(drag.startY, drag.currentY) - containerRect.top;
     const sw = Math.abs(drag.currentX - drag.startX);
     const sh = Math.abs(drag.currentY - drag.startY);
 
     return { left: sx, top: sy, width: sw, height: sh };
-  }, [drag]);
+  }, [drag, containerRect]);
 
   return (
     <div

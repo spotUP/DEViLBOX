@@ -243,7 +243,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </div>
                 <select
                   value={audioLatency}
-                  onChange={(e) => setAudioLatency(e.target.value as any)}
+                  onChange={(e) => setAudioLatency(e.target.value as 'interactive' | 'balanced' | 'playback')}
                   className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
                 >
                   <option value="interactive">Interactive (10ms)</option>

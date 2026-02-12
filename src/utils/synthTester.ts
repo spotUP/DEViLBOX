@@ -98,7 +98,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
       const nativeInput = getNativeAudioNode(analyser);
       if (nativeInput) instrument.output.connect(nativeInput);
     } else {
-      (instrument as any).connect(analyser);
+      (instrument as unknown as { connect: (dest: unknown) => void }).connect(analyser);
     }
     analyser.toDestination();
 
@@ -108,7 +108,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
         instrument.triggerAttack('C4', Tone.now(), 0.8);
         result.noteOnWorked = true;
       } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-        (instrument as any).triggerAttackRelease('C4', '8n', Tone.now(), 0.8);
+        (instrument as unknown as { triggerAttackRelease: (note: string, dur: string, time: number, vel: number) => void }).triggerAttackRelease('C4', '8n', Tone.now(), 0.8);
         result.noteOnWorked = true;
       }
     } catch (e) {
@@ -123,7 +123,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
       const values = analyser.getValue() as Float32Array;
       const hasSignal = values.some((v) => Math.abs(v) > 0.001);
       result.producedSound = hasSignal;
-    } catch (e) {
+    } catch {
       // Some synths may not produce sound in test context
     }
 
@@ -133,7 +133,7 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
         instrument.triggerRelease('C4', Tone.now());
         result.noteOffWorked = true;
       }
-    } catch (e) {
+    } catch {
       // Note off not critical
     }
 
@@ -141,16 +141,16 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
     await new Promise((resolve) => setTimeout(resolve, 50));
     try {
       if (isDevilboxSynth(instrument)) {
-        try { instrument.output.disconnect(); } catch {}
+        try { instrument.output.disconnect(); } catch { /* already disconnected */ }
       } else {
-        (instrument as any).disconnect();
+        (instrument as unknown as { disconnect: () => void }).disconnect();
       }
       analyser.disconnect();
       if ('dispose' in instrument && typeof instrument.dispose === 'function') {
         instrument.dispose();
       }
       analyser.dispose();
-    } catch (e) {
+    } catch {
       // Cleanup errors not critical
     }
   } catch (e) {
@@ -330,10 +330,11 @@ export async function quickTestSynths(): Promise<SynthTestSummary> {
 
 // Export for browser console access
 if (typeof window !== 'undefined') {
-  (window as any).testAllSynths = testAllSynths;
-  (window as any).testToneSynths = testToneSynths;
-  (window as any).testCustomSynths = testCustomSynths;
-  (window as any).testFurnaceSynths = testFurnaceSynths;
-  (window as any).testBuzzmachineSynths = testBuzzmachineSynths;
-  (window as any).quickTestSynths = quickTestSynths;
+  const w = window as unknown as Record<string, unknown>;
+  w.testAllSynths = testAllSynths;
+  w.testToneSynths = testToneSynths;
+  w.testCustomSynths = testCustomSynths;
+  w.testFurnaceSynths = testFurnaceSynths;
+  w.testBuzzmachineSynths = testBuzzmachineSynths;
+  w.quickTestSynths = quickTestSynths;
 }

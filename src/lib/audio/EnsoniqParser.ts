@@ -42,14 +42,15 @@ export class EnsoniqParser {
   /**
    * ESQ-1 Patch Parser (102 bytes per patch)
    */
-  private static parseESQ1(_data: Uint8Array): EnsoniqPatch {
+  private static parseESQ1(data: Uint8Array): EnsoniqPatch {
+    void data;
     // ESQ-1 SysEx format is nibbleized (2 bytes per internal byte)
     // or sometimes packed depending on the message type.
     // For now, we'll implement a simple name extraction and basic mapping.
     
     // Extract name (last 6 bytes of the 102 byte patch usually)
     // This varies by dump type, but we'll try a common offset
-    let name = "ESQ1 PATCH";
+    const name = "ESQ1 PATCH";
     
     return {
       name,

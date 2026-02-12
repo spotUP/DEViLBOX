@@ -11,13 +11,14 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+import type { InstrumentConfig, SynthType, EffectConfig } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
+import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { useAutoPreview } from '@hooks/useAutoPreview';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
@@ -46,7 +47,7 @@ import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
 import { MAMEMacroEditor, type MacroData } from './MAMEMacroEditor';
-import { WavetableListEditor } from './WavetableEditor';
+import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { isMAMEChipType, getChipSynthDef } from '@constants/chipParameters';
@@ -454,32 +455,33 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // Handle TB303 config updates
   const handleTB303Change = useCallback((updates: Partial<typeof instrument.tb303>) => {
     handleChange({
-      tb303: { ...instrument.tb303, ...updates } as any,
+      tb303: { ...instrument.tb303, ...updates } as typeof instrument.tb303,
     });
   }, [instrument.tb303, handleChange]);
 
   // Handle full TB303 preset load (synth config + effects chain)
-  const handleTB303PresetLoad = useCallback(async (preset: any) => {
+  const handleTB303PresetLoad = useCallback(async (preset: Record<string, unknown>) => {
     // Apply TB-303 synth config
     if (preset.tb303) {
       handleChange({
-        tb303: { ...instrument.tb303, ...preset.tb303 } as any,
+        tb303: { ...instrument.tb303, ...preset.tb303 as Record<string, unknown> } as typeof instrument.tb303,
       });
     }
 
     // Apply effects chain (or clear if preset has none)
     if (preset.effects !== undefined) {
-      const effects = preset.effects.map((fx: any, i: number) => ({
+      const fxArray = preset.effects as Array<Record<string, unknown>>;
+      const effects = fxArray.map((fx, i: number) => ({
         ...fx,
-        id: fx.id || `tb303-fx-${Date.now()}-${i}`,
-      }));
+        id: (fx.id as string) || `tb303-fx-${Date.now()}-${i}`,
+      })) as EffectConfig[];
       handleChange({ effects });
 
       // Rebuild audio chain immediately
       try {
         const engine = getToneEngine();
         await engine.rebuildInstrumentEffects(instrument.id, effects);
-      } catch (e) {
+      } catch {
         // Engine not initialized yet
       }
     }
@@ -540,7 +542,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.updateMAMEParameters(instrument.id, newConfig);
-    } catch (e) {
+    } catch {
       // Ignored
     }
   }, [instrument.mame, instrument.synthType, instrument.id, handleChange]);
@@ -553,7 +555,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipParam(instrument.id, key, value);
-    } catch (_e) { /* ignored */ }
+    } catch { /* ignored */ }
   }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle MAME chip synth text parameter changes (e.g. speech text)
@@ -564,7 +566,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipTextParam(instrument.id, key, value);
-    } catch (_e) { /* ignored */ }
+    } catch { /* ignored */ }
   }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle MAME chip synth preset load
@@ -574,7 +576,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.loadMAMEChipPreset(instrument.id, program);
-    } catch (_e) { /* ignored */ }
+    } catch { /* ignored */ }
   }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle ROM upload for chip synths that require ROMs
@@ -582,7 +584,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.loadSynthROM(instrument.id, instrument.synthType, bank, data);
-    } catch (_e) { /* ignored */ }
+    } catch { /* ignored */ }
   }, [instrument.id, instrument.synthType]);
 
   // Handle speech text-to-speech trigger for MAME speech chips
@@ -590,7 +592,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.speakMAMEChipText(instrument.id, text);
-    } catch (_e) { /* ignored */ }
+    } catch (e) {
+      console.error('[UnifiedInstrumentEditor] handleChipSpeak error:', e);
+    }
   }, [instrument.id]);
 
   // Handle Dexed (DX7) config updates
@@ -605,7 +609,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.updateDexedParameters(instrument.id, newConfig);
-    } catch (e) {
+    } catch {
       // Ignored
     }
   }, [instrument.dexed, instrument.id, handleChange]);
@@ -622,7 +626,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     try {
       const engine = getToneEngine();
       engine.updateOBXdParameters(instrument.id, newConfig);
-    } catch (e) {
+    } catch {
       // Ignored
     }
   }, [instrument.obxd, instrument.id, handleChange]);
@@ -709,10 +713,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         {/* Channel Oscilloscope for native dispatch synths */}
         {isNativeDispatch && (
           <div className="px-4 pt-3">
-            <ChannelOscilloscope
-              channelNames={channelNames[instrument.synthType] || []}
-              height={160}
-            />
+            <VisualizerFrame variant="compact">
+              <ChannelOscilloscope
+                channelNames={channelNames[instrument.synthType] || []}
+                height={160}
+              />
+            </VisualizerFrame>
           </div>
         )}
 
@@ -996,7 +1002,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const chipDef = getChipSynthDef(instrument.synthType);
 
     // Get/initialize macro data from instrument config
-    const macros: MacroData[] = instrument.parameters?.macros || [];
+    const macros: MacroData[] = (instrument.parameters?.macros as MacroData[]) || [];
 
     const handleMacrosChange = (newMacros: MacroData[]) => {
       handleChange({
@@ -1008,9 +1014,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     };
 
     // Get/initialize wavetable data from instrument config
-    const wavetables = instrument.parameters?.wavetables || [];
+    const wavetables = (instrument.parameters?.wavetables as WavetableData[]) || [];
 
-    const handleWavetablesChange = (newWavetables: any[]) => {
+    const handleWavetablesChange = (newWavetables: WavetableData[]) => {
       handleChange({
         parameters: {
           ...instrument.parameters,
@@ -1054,7 +1060,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             /* Hardware UI Mode */
             <HardwareUIWrapper
               synthType={instrument.synthType}
-              parameters={instrument.parameters || {}}
+              parameters={(instrument.parameters || {}) as Record<string, number>}
               onParamChange={handleChipParamChange}
             />
           ) : (
@@ -1070,7 +1076,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               {/* Chip Parameters */}
               <ChipSynthControls
                 synthType={instrument.synthType}
-                parameters={instrument.parameters || {}}
+                parameters={(instrument.parameters || {}) as Record<string, number | string>}
                 instrumentId={instrument.id}
                 onParamChange={handleChipParamChange}
                 onTextChange={handleChipTextChange}
@@ -1753,7 +1759,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         <div className="synth-editor-content overflow-y-auto p-4 space-y-4">
           <HardwareUIWrapper
             synthType={instrument.synthType}
-            parameters={instrument.parameters || {}}
+            parameters={(instrument.parameters || {}) as Record<string, number>}
             onParamChange={(key, value) => {
               handleChange({
                 parameters: {

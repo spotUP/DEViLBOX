@@ -18,7 +18,7 @@ export interface SongExport {
   instruments: InstrumentConfig[];
   patterns: Pattern[];
   sequence: string[]; // Pattern IDs in playback order
-  automation?: Record<string, any>; // Legacy nested format or array of curves
+  automation?: Record<string, unknown>; // Legacy nested format or array of curves
   automationCurves?: AutomationCurve[]; // New: flat array of all automation curves
   masterEffects?: EffectConfig[]; // Global effects chain
   grooveTemplateId?: string; // Groove/swing template ID
@@ -54,7 +54,7 @@ export function exportSong(
   instruments: InstrumentConfig[],
   patterns: Pattern[],
   sequence: string[],
-  automation: Record<string, any> | undefined,
+  automation: Record<string, unknown> | undefined,
   masterEffects: EffectConfig[] | undefined,
   automationCurves: AutomationCurve[] | undefined,
   options: ExportOptions = {},

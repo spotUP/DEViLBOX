@@ -170,8 +170,9 @@ export class XMHandler extends BaseFormatHandler {
     if (instrument !== null && instrument > 0) {
       state.instrumentId = instrument;
       
-      const defaultVol = (state as any).sampleDefaultVolume ?? 64;
-      const defaultFinetune = (state as any).sampleDefaultFinetune ?? 0;
+      const stateExt = state as unknown as Record<string, number | undefined>;
+      const defaultVol = stateExt.sampleDefaultVolume ?? 64;
+      const defaultFinetune = stateExt.sampleDefaultFinetune ?? 0;
 
       // In XM, instrument change resets volume IF no volume column or effect Cxx override
       const parsed = this.parseEffect(effect);

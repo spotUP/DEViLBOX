@@ -260,14 +260,14 @@ export class DrumKitSynth implements DevilboxSynth {
   private disposeVoice(voice: ActiveVoice): void {
     try {
       voice.source.stop();
-    } catch (_e) {
+    } catch {
       // source may already have stopped
     }
     try {
       voice.source.disconnect();
       voice.panner.disconnect();
       voice.gain.disconnect();
-    } catch (_e) {
+    } catch {
       // Ignore disconnection errors
     }
   }

@@ -94,6 +94,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private _releaseTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map(); // chan -> pending release timeout
   private _volumeOffsetDb = 0; // Volume normalization offset in dB
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
+  private _nativeGain: GainNode | null = null; // Shared native GainNode for audio routing
 
   constructor(platformType: number = FurnaceDispatchPlatform.GB) {
     this.output = getDevilboxAudioContext().createGain();
@@ -126,7 +127,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * @param config - FurnaceConfig to encode
    * @param name - Instrument name
    */
-  public async uploadInstrumentFromConfig(config: any, name: string): Promise<void> {
+  public async uploadInstrumentFromConfig(config: Record<string, unknown>, name: string): Promise<void> {
     await this.ensureInitialized();
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
     
@@ -134,7 +135,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
     // the 0xF0 0xB1 format with proper offsets. Our encoder handles this conversion.
     const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
-    const binaryData = updateFurnaceInstrument(config, name, this.furnaceInstrumentIndex);
+    const binaryData = updateFurnaceInstrument(config as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
     this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
   }
@@ -160,8 +161,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    */
   public setVolumeOffset(db: number): void {
     this._volumeOffsetDb = db;
-    const nativeGain = (this as any)._nativeGain as GainNode | undefined;
-    if (nativeGain) {
+    if (this._nativeGain) {
+      const nativeGain = this._nativeGain;
       nativeGain.gain.value = Math.pow(10, db / 20);
     }
   }
@@ -170,7 +171,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     try {
       const nativeCtx = getDevilboxAudioContext();
 
-      await this.engine.init(nativeCtx);
+      await this.engine.init(nativeCtx as unknown as Record<string, unknown>);
       if (this._disposed) return;
 
       // Create the chip and wait for worklet to confirm creation
@@ -187,7 +188,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // audio route should exist (managed by the engine).
       const sharedGain = this.engine.getOrCreateSharedGain();
       if (sharedGain) {
-        (this as any)._nativeGain = sharedGain;
+        this._nativeGain = sharedGain;
         // Apply volume normalization (last writer wins — acceptable since
         // all instruments share the same chip output)
         if (this._volumeOffsetDb !== 0) {
@@ -581,7 +582,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     }
   }
 
-  triggerRelease(note?: string | number, _time?: number): void {
+  triggerRelease(note?: string | number, time?: number): void {
+    void time;
     if (!this._ready || this._disposed) return;
 
     if (note !== undefined) {
@@ -688,7 +690,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     // The _nativeGain is the engine's shared gain node — don't disconnect it
     // here as other synths may still be using it. The engine manages its lifecycle.
-    (this as any)._nativeGain = null;
+    this._nativeGain = null;
 
     // Don't dispose the engine singleton — other synths may use it
     this.output.disconnect();
