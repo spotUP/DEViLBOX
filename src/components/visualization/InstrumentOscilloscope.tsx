@@ -178,6 +178,7 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   const canvas = (
