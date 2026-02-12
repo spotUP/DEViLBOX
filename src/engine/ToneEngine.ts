@@ -3266,15 +3266,14 @@ export class ToneEngine {
    * Trigger text-to-speech on a MAME speech chip synth.
    * Lazily creates the instrument if it hasn't been preloaded into the engine yet.
    */
-  public speakMAMEChipText(instrumentId: number, text: string): void {
+  public async speakMAMEChipText(instrumentId: number, text: string): Promise<void> {
     const instrumentKey = this.getInstrumentKey(instrumentId, -1);
     let instrument = this.instruments.get(instrumentKey);
 
     // If instrument not in engine map, create it on-demand from the instrument store
     if (!instrument) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { useInstrumentStore } = require('../stores/useInstrumentStore');
+        const { useInstrumentStore } = await import('../stores/useInstrumentStore');
         const config = useInstrumentStore.getState().instruments.find(
           (i: InstrumentConfig) => i.id === instrumentId
         );
