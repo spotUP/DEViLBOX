@@ -37,6 +37,11 @@ const GRID_GLOW_BLUR_MULTIPLIER = 10;
 const BEAT_SPAWN_INTENSITY_THRESHOLD = 0.5;
 const BEAT_SPAWN_COOLDOWN_MS = 2000;
 
+// Score multiplier
+const SCORE_MULTIPLIER_BEAT_THRESHOLD = 0.3;
+const SCORE_MULTIPLIER_ON_BEAT = 2;
+const SCORE_MULTIPLIER_DISPLAY_MS = 500;
+
 // Grid rendering
 const GRID_CELL_PADDING = 2;
 
@@ -120,6 +125,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   // Visual effects
   const [gridGlowIntensity, setGridGlowIntensity] = useState(0);
   const [wormPulseScale, setWormPulseScale] = useState(1);
+
+  // Score multiplier
+  const [scoreMultiplier, setScoreMultiplier] = useState(1);
+  const lastEatTimeRef = useRef(0);
 
   // Beat-synced food spawning
   const lastBeatSpawnRef = useRef(0);
@@ -531,17 +540,47 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
     const cell1 = gridRef.current[nextP1.y][nextP1.x];
     if (cell1 >= 16) {
-      score1Ref.current += (cell1 - 16) * 999 * (levelRef.current + 1);
+      const now = Date.now();
+      const points = (cell1 - 16) * 999 * (levelRef.current + 1);
+
+      // Bonus multiplier if eaten during beat
+      const onBeat = beatIntensity > SCORE_MULTIPLIER_BEAT_THRESHOLD;
+      const multiplier = onBeat ? SCORE_MULTIPLIER_ON_BEAT : 1;
+
+      score1Ref.current += points * multiplier;
       p1NoClearRef.current = p1LenRef.current >> 1;
       p1Eating = true;
+
+      // Show visual feedback for multiplier
+      if (onBeat) {
+        setScoreMultiplier(SCORE_MULTIPLIER_ON_BEAT);
+        setTimeout(() => setScoreMultiplier(1), SCORE_MULTIPLIER_DISPLAY_MS);
+      }
+
+      lastEatTimeRef.current = now;
     }
 
     if (nextP2) {
       const cell2 = gridRef.current[nextP2.y][nextP2.x];
       if (cell2 >= 16) {
-        score2Ref.current += (cell2 - 16) * 999 * (levelRef.current + 1);
+        const now = Date.now();
+        const points = (cell2 - 16) * 999 * (levelRef.current + 1);
+
+        // Bonus multiplier if eaten during beat
+        const onBeat = beatIntensity > SCORE_MULTIPLIER_BEAT_THRESHOLD;
+        const multiplier = onBeat ? SCORE_MULTIPLIER_ON_BEAT : 1;
+
+        score2Ref.current += points * multiplier;
         p2NoClearRef.current = p2LenRef.current >> 1;
         p2Eating = true;
+
+        // Show visual feedback for multiplier
+        if (onBeat) {
+          setScoreMultiplier(SCORE_MULTIPLIER_ON_BEAT);
+          setTimeout(() => setScoreMultiplier(1), SCORE_MULTIPLIER_DISPLAY_MS);
+        }
+
+        lastEatTimeRef.current = now;
       }
     }
 
@@ -789,7 +828,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     >
       {/* HUD Overlay */}
       <div className={`absolute top-0 left-0 w-full flex justify-between px-2 py-0.5 pointer-events-none z-10 bg-black/40 backdrop-blur-sm transition-opacity opacity-0 ${uiState.isPlaying ? 'group-hover:opacity-100' : ''}`}>
-        <div className="font-mono text-[8px] text-white uppercase">P1: {uiState.score1} | L:{uiState.lives1}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[8px] text-white uppercase">P1: {uiState.score1} | L:{uiState.lives1}</span>
+          {scoreMultiplier > 1 && (
+            <span className="text-yellow-400 font-bold text-[9px] animate-pulse">
+              x{scoreMultiplier}
+            </span>
+          )}
+        </div>
         <div className="font-mono text-[8px] text-accent-primary font-bold">LVL {uiState.level + 1}</div>
         <div className="font-mono text-[8px] text-white uppercase">P2: {uiState.score2} | L:{uiState.lives2}</div>
       </div>
