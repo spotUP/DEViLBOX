@@ -267,7 +267,11 @@ export class TrackerReplayer {
   public onTickProcess: ((tick: number, row: number) => void) | null = null;
 
   constructor() {
-    this.masterGain = new Tone.Gain(1).toDestination();
+    // Connect to ToneEngine's masterInput so TrackerReplayer audio flows through
+    // the Amiga filter and master effects chain, not directly to destination.
+    const engine = getToneEngine();
+    this.masterGain = new Tone.Gain(1);
+    this.masterGain.connect(engine.masterInput);
   }
 
   // ==========================================================================
