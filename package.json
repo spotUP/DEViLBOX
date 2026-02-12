@@ -8,6 +8,10 @@
     "type": "git",
     "url": "https://github.com/spotUP/DEViLBOX.git"
   },
+  "author": {
+    "name": "spotUP",
+    "email": "spotup@gmail.com"
+  },
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
