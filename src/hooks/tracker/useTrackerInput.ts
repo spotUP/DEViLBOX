@@ -167,11 +167,13 @@ export const useTrackerInput = () => {
     currentRow: playbackRow,
     stop,
     play,
+    setIsLooping,
   } = useTransportStore(useShallow((state) => ({
     isPlaying: state.isPlaying,
     currentRow: state.currentRow,
     stop: state.stop,
     play: state.play,
+    setIsLooping: state.setIsLooping,
   })));
 
   const {
@@ -393,7 +395,10 @@ export const useTrackerInput = () => {
         } else if (e.ctrlKey || e.metaKey) {
           const jumpRow = getPtnJumpPos(0);
           moveCursorToRow(jumpRow);
-          play();
+          // Restart playback from jumped position
+          if (isPlaying) stop();
+          setIsLooping(false);
+          getToneEngine().init().then(() => play());
         } else {
           moveCursorToRow(0);
         }
@@ -406,7 +411,10 @@ export const useTrackerInput = () => {
         } else if (e.ctrlKey || e.metaKey) {
           const jumpRow = getPtnJumpPos(1);
           moveCursorToRow(jumpRow);
-          play();
+          // Restart playback from jumped position
+          if (isPlaying) stop();
+          setIsLooping(false);
+          getToneEngine().init().then(() => play());
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.25));
         }
@@ -419,7 +427,10 @@ export const useTrackerInput = () => {
         } else if (e.ctrlKey || e.metaKey) {
           const jumpRow = getPtnJumpPos(2);
           moveCursorToRow(jumpRow);
-          play();
+          // Restart playback from jumped position
+          if (isPlaying) stop();
+          setIsLooping(false);
+          getToneEngine().init().then(() => play());
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.5));
         }
@@ -432,7 +443,10 @@ export const useTrackerInput = () => {
         } else if (e.ctrlKey || e.metaKey) {
           const jumpRow = getPtnJumpPos(3);
           moveCursorToRow(jumpRow);
-          play();
+          // Restart playback from jumped position
+          if (isPlaying) stop();
+          setIsLooping(false);
+          getToneEngine().init().then(() => play());
         } else {
           moveCursorToRow(Math.floor(pattern.length * 0.75));
         }
@@ -802,21 +816,30 @@ export const useTrackerInput = () => {
         if (!recordMode) {
           toggleRecordMode(); // Enable record mode
         }
-        play();
+        // Always restart playback from beginning
+        if (isPlaying) stop();
+        setIsLooping(false);
+        getToneEngine().init().then(() => play());
         return;
       }
 
       // FT2: Right Ctrl = Play song
       if (e.key === 'Control' && e.location === 2) {
         e.preventDefault();
-        play();
+        // Always restart song playback from beginning
+        if (isPlaying) stop();
+        setIsLooping(false);
+        getToneEngine().init().then(() => play());
         return;
       }
 
-      // FT2: Right Alt = Play pattern (same as play for now)
+      // FT2: Right Alt = Play pattern
       if (e.key === 'Alt' && e.location === 2) {
         e.preventDefault();
-        play();
+        // Always restart pattern playback from beginning
+        if (isPlaying) stop();
+        setIsLooping(true);
+        getToneEngine().init().then(() => play());
         return;
       }
 
@@ -840,7 +863,10 @@ export const useTrackerInput = () => {
       // Ctrl+Enter or Right Enter: Play song
       if (key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        play();
+        // Always restart song playback from beginning
+        if (isPlaying) stop();
+        setIsLooping(false);
+        getToneEngine().init().then(() => play());
         useUIStore.getState().setStatusMessage('PLAYING');
         return;
       }
