@@ -26,6 +26,9 @@ const MIN_VISUALIZATION_INTENSITY = 0.05; // Skip tiles below 5% intensity
 const MIN_TILE_ALPHA = 0.2; // Minimum opacity for background tiles
 const ALPHA_INTENSITY_RANGE = 0.4; // Additional opacity based on intensity (max = 0.6)
 
+// Frequency-based worm colors
+const FREQUENCY_COLOR_INTENSITY_THRESHOLD = 0.3;
+
 // Dynamic speed modulation
 const SPEED_MOD_MIN = 0.9;  // -10% speed at silence
 const SPEED_MOD_RANGE = 0.3; // +20% speed at max energy (0.9 + 0.3 = 1.2)
@@ -386,6 +389,40 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   }, []);
 
   // Handle Game Over
+  // Get worm segment index for a grid position
+  const getSegmentIndex = useCallback((x: number, y: number, isPlayer2: boolean) => {
+    const worm = isPlayer2 ? p2Ref.current : p1Ref.current;
+    const len = isPlayer2 ? p2LenRef.current : p1LenRef.current;
+
+    for (let i = 0; i < len; i++) {
+      const seg = worm[i];
+      if (seg && seg.x === x && seg.y === y) {
+        return i;
+      }
+    }
+    return 0; // Fallback
+  }, []);
+
+  // Get frequency-based color for worm segments
+  const getFrequencyColor = useCallback((segmentIndex: number, playerColor: number) => {
+    if (audioData.length === 0) return PALETTE[playerColor];
+
+    // Map segment index to frequency band
+    const bandIndex = (segmentIndex * 3) % audioData.length;
+    const intensity = audioData[bandIndex] / 255;
+
+    // Blend player color with frequency color
+    if (intensity > FREQUENCY_COLOR_INTENSITY_THRESHOLD) {
+      const freqColorIndex = Math.min(
+        Math.floor((bandIndex / audioData.length) * TILE_COLORS.length),
+        TILE_COLORS.length - 1
+      );
+      return TILE_COLORS[freqColorIndex];
+    }
+
+    return PALETTE[playerColor];
+  }, [audioData]);
+
   // Render music-reactive background tiles
   const renderBackgroundTiles = useCallback((
     ctx: CanvasRenderingContext2D,
@@ -877,10 +914,20 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
             ctx.textBaseline = 'middle';
             ctx.fillText((val - 16).toString(), px + cellSize / 2, py + cellSize / 2 + 1);
           } else {
+            // Worm segments (val 1-15)
+            let segmentColor = PALETTE[val] || '#fff';
+
+            // Apply frequency-based colors to worm segments
+            if (val >= 1 && val <= 15) {
+              const isPlayer2 = val === 7; // P2 head is 7, P1 head is 6
+              const segmentIndex = getSegmentIndex(x, y, isPlayer2);
+              segmentColor = getFrequencyColor(segmentIndex, val);
+            }
+
             if (grid) {
               ctx.fillStyle = '#000';
               ctx.fillRect(px, py, cellSize, cellSize);
-              ctx.fillStyle = PALETTE[val] || '#fff';
+              ctx.fillStyle = segmentColor;
 
               // Apply pulse effect to worm segments
               const inset = GRID_CELL_PADDING / wormPulseScale;
@@ -892,7 +939,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
                 size
               );
             } else {
-              ctx.fillStyle = PALETTE[val] || '#fff';
+              ctx.fillStyle = segmentColor;
               ctx.fillRect(px, py, cellSize, cellSize);
             }
           }
@@ -909,7 +956,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       isRunning = false;
       if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
     };
-  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles, updateAndRenderParticles]);
+  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles, updateAndRenderParticles, getSegmentIndex, getFrequencyColor]);
 
   // Initial Level Load (only once on mount)
   useEffect(() => {
