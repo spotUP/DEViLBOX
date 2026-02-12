@@ -38,6 +38,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [actualWidth, setActualWidth] = useState(408);
+  const [actualHeight, setActualHeight] = useState(height);
   
   // UI Sync State (for rendering only)
   const [uiState, setUiSync] = useState({
@@ -117,11 +118,15 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     const updateSize = () => {
       if (containerRef.current) {
         setActualWidth(containerRef.current.clientWidth);
+        setActualHeight(containerRef.current.clientHeight);
       }
     };
     updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    const resizeObserver = new ResizeObserver(updateSize);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    return () => resizeObserver.disconnect();
   }, []);
 
   const spawnFood = useCallback(() => {
@@ -498,7 +503,6 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     <div
       ref={containerRef}
       className="w-full h-full flex flex-col items-stretch relative group overflow-hidden"
-      style={{ height: `${height}px` }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* HUD Overlay */}
@@ -511,7 +515,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       <canvas
         ref={canvasRef}
         width={actualWidth}
-        height={height}
+        height={actualHeight}
         className="cursor-pointer w-full h-full"
         onClick={(e) => {
           e.stopPropagation();
