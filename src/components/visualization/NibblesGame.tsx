@@ -241,13 +241,30 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     syncUI();
   }, [numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
 
-  const isInvalid = useCallback((x: number, y: number, d: number) => {
+  const isInvalid = useCallback((currentX: number, currentY: number, d: number) => {
+    // Calculate the next position
+    let nextX = currentX;
+    let nextY = currentY;
+    if (d === 0) nextX++;
+    else if (d === 1) nextY--;
+    else if (d === 2) nextX--;
+    else if (d === 3) nextY++;
+
+    // Check if next position is out of bounds (when not wrapping)
     if (!wrap) {
-      if ((x === 0 && d === 2) || (x === WIDTH - 1 && d === 0) || (y === 0 && d === 1) || (y === HEIGHT - 1 && d === 3)) {
+      if (nextX < 0 || nextX >= WIDTH || nextY < 0 || nextY >= HEIGHT) {
         return true;
       }
+    } else {
+      // Wrap coordinates for collision check
+      if (nextX < 0) nextX = WIDTH - 1;
+      if (nextX >= WIDTH) nextX = 0;
+      if (nextY < 0) nextY = HEIGHT - 1;
+      if (nextY >= HEIGHT) nextY = 0;
     }
-    const cell = gridRef.current[y]?.[x];
+
+    // Check if next position has an obstacle
+    const cell = gridRef.current[nextY]?.[nextX];
     return cell >= 1 && cell <= 15;
   }, [wrap]);
 
@@ -282,11 +299,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       return { x, y };
     };
 
+    // Check collision from current position before moving
+    const die1 = isInvalid(p1Ref.current[0]!.x, p1Ref.current[0]!.y, p1DirRef.current);
+    const die2 = numPlayers === 2 ? isInvalid(p2Ref.current[0]!.x, p2Ref.current[0]!.y, p2DirRef.current) : false;
+
     const nextP1 = updateCoord(p1Ref.current[0]!, p1DirRef.current);
     const nextP2 = numPlayers === 2 ? updateCoord(p2Ref.current[0]!, p2DirRef.current) : null;
-
-    const die1 = isInvalid(nextP1.x, nextP1.y, p1DirRef.current);
-    const die2 = nextP2 ? isInvalid(nextP2.x, nextP2.y, p2DirRef.current) : false;
     const headOnHead = nextP2 && nextP1.x === nextP2.x && nextP1.y === nextP2.y;
     
     if (die1 || die2 || headOnHead) {
