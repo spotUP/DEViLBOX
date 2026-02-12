@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
-import { NKSSettingsPanel } from './NKSSettingsPanel';
+import { PerformancePanel } from './PerformancePanel';
 import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2 } from 'lucide-react';
 
 
@@ -186,7 +186,7 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
 
               {/* NKS Panel */}
               <div className="border-t border-dark-border">
-                <NKSSettingsPanel />
+                <PerformancePanel />
               </div>
 
               {/* Activity Indicator */}

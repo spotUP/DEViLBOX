@@ -185,6 +185,24 @@ function getVSTBridgeSynth(instrumentId: number): any {
 }
 
 // ============================================================================
+// Direct synth engine call — bypass store/React for immediate audio response
+// ============================================================================
+
+function sendDirectToSynth(instrumentId: number, param: string, value: number): void {
+  try {
+    const engine = getToneEngine();
+    engine.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId) && typeof (instrument as any).set === 'function') {
+        (instrument as any).set(param, value);
+      }
+    });
+  } catch {
+    // Engine not initialized yet — store update will handle it later
+  }
+}
+
+// ============================================================================
 // Deep-set helper for nested config paths
 // ============================================================================
 
@@ -283,6 +301,57 @@ function buildNestedUpdate(
 }
 
 // ============================================================================
+// Throttle for config routes — coalesce rapid MIDI CC updates to ~60Hz
+// to avoid flooding the store/React with per-CC-message re-renders.
+// ============================================================================
+
+const _pendingConfigUpdates: Map<number, Record<string, any>> = new Map();
+let _configFlushScheduled = false;
+
+function flushConfigUpdates(): void {
+  _configFlushScheduled = false;
+  const instrumentStore = useInstrumentStore.getState();
+  for (const [instrumentId, update] of _pendingConfigUpdates) {
+    instrumentStore.updateInstrument(instrumentId, update);
+  }
+  _pendingConfigUpdates.clear();
+}
+
+function scheduleConfigUpdate(instrumentId: number, update: Record<string, any>): void {
+  // Merge into any pending update for this instrument
+  const existing = _pendingConfigUpdates.get(instrumentId);
+  if (existing) {
+    deepMerge(existing, update);
+  } else {
+    _pendingConfigUpdates.set(instrumentId, update);
+  }
+
+  if (!_configFlushScheduled) {
+    _configFlushScheduled = true;
+    requestAnimationFrame(flushConfigUpdates);
+  }
+}
+
+/** Recursively merge src into dst (mutates dst).
+ *  Clones frozen sub-objects before writing — buildNestedUpdate may contain
+ *  frozen references from the Zustand store that can't be mutated in-place. */
+function deepMerge(dst: Record<string, any>, src: Record<string, any>): void {
+  for (const key of Object.keys(src)) {
+    if (
+      typeof src[key] === 'object' && src[key] !== null && !Array.isArray(src[key]) &&
+      typeof dst[key] === 'object' && dst[key] !== null && !Array.isArray(dst[key])
+    ) {
+      if (Object.isFrozen(dst[key])) {
+        dst[key] = { ...dst[key] };
+      }
+      deepMerge(dst[key], src[key]);
+    } else {
+      dst[key] = src[key];
+    }
+  }
+}
+
+// ============================================================================
 // Main Router
 // ============================================================================
 
@@ -317,8 +386,11 @@ export function routeParameterToEngine(
 
   switch (route.type) {
     case 'config': {
+      // Send parameter directly to the synth engine for immediate audio response
+      sendDirectToSynth(instrument.id, param, value);
+      // Also update the store (throttled) for UI persistence
       const update = buildNestedUpdate(route.path, value, instrument as any);
-      instrumentStore.updateInstrument(instrument.id, update);
+      scheduleConfigUpdate(instrument.id, update);
       break;
     }
 
