@@ -109,6 +109,7 @@ export class ES5503Synth extends MAMEBaseSynth {
       // Load custom wavetables into wave RAM (pages 8+)
       this.loadWaveData(romData, 2048);  // Start at page 8 (offset 2048)
 
+      this.romLoaded = true;
       console.log('[ES5503] Mirage wavetable ROM loaded successfully');
     } catch (error) {
       console.error('[ES5503] ROM loading failed:', error);

@@ -81,6 +81,7 @@ export class K054539Synth extends MAMEBaseSynth {
       // Load ROMs into the synth
       this.loadROM(0, romData);
 
+      this.romLoaded = true;
       console.log('[K054539] ROM loaded successfully');
     } catch (error) {
       console.error('[K054539] ROM loading failed:', error);

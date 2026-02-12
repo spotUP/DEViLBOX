@@ -116,8 +116,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
       }
 
       this._romLoaded = true;
+      this.romLoaded = true;
       console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} named words`);
-    } catch (e) {
+    } catch {
       console.log('[TMS5220] VSM ROMs not available (optional for text-to-speech)');
     }
   }
@@ -271,14 +272,29 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   /** Speak English text using SAM's reciter and TMS5220 LPC mapping */
   speakText(text: string): void {
+    // Guard: WASM must be ready before TTS can work
+    if (!this._isReady || !this.workletNode) {
+      console.warn(`[TMS5220] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
+      this._pendingCalls.push({ method: 'speakText', args: [text] });
+      return;
+    }
+
     this.stopSpeaking();
 
     const phonemeStr = textToPhonemes(text);
-    if (!phonemeStr) return;
+    if (!phonemeStr) {
+      console.warn(`[TMS5220] speakText: SAM failed to convert "${text}"`);
+      return;
+    }
 
     const tokens = parsePhonemeString(phonemeStr);
     const frames = phonemesToTMS5220Frames(tokens);
-    if (frames.length === 0) return;
+    if (frames.length === 0) {
+      console.warn(`[TMS5220] speakText: no frames generated from ${tokens.length} tokens`);
+      return;
+    }
+
+    console.log(`[TMS5220] speakText: "${text}" → ${tokens.length} tokens → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
 
     const speechFrames: SpeechFrame<TMS5220Frame>[] = frames.map(f => ({
       data: f,
@@ -398,6 +414,77 @@ export class TMS5220Synth extends MAMEBaseSynth {
     this._romSequencer.speak(speechFrames);
   }
 
+  /**
+   * Hybrid TTS: plays ROM recordings for known vocabulary, phoneme TTS for unknown words.
+   * Splits text into words, looks each up in the ROM word table. Known words get
+   * authentic Speak & Spell playback; unknown words fall through to SAM phoneme synthesis.
+   */
+  speakTextHybrid(text: string): void {
+    this.stopSpeaking();
+
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return;
+
+    let wordIndex = 0;
+
+    const playNext = () => {
+      if (wordIndex >= words.length) {
+        this.triggerRelease();
+        return;
+      }
+
+      const word = words[wordIndex++];
+      const romIdx = this._romLoaded
+        ? this._romWords.findIndex(w => w.name.toLowerCase() === word.toLowerCase())
+        : -1;
+
+      if (romIdx >= 0) {
+        // ROM word found — play authentic recording, then continue chain
+        this._speakWordChained(romIdx, () => {
+          setTimeout(playNext, 200);
+        });
+      } else {
+        // Unknown word — synthesize with SAM phonemes
+        const phonemeStr = textToPhonemes(word);
+        if (!phonemeStr) {
+          // SAM can't parse it — skip and continue
+          setTimeout(playNext, 100);
+          return;
+        }
+
+        const tokens = parsePhonemeString(phonemeStr);
+        const frames = phonemesToTMS5220Frames(tokens);
+        if (frames.length === 0) {
+          setTimeout(playNext, 100);
+          return;
+        }
+
+        const speechFrames: SpeechFrame<TMS5220Frame>[] = frames.map(f => ({
+          data: f,
+          durationMs: f.durationMs,
+        }));
+
+        // Activate voice for phoneme TTS
+        this.triggerAttack(60, undefined, 0.8);
+
+        this._speechSequencer = new SpeechSequencer<TMS5220Frame>(
+          (frame) => {
+            this.setFormants(frame.k[0], frame.k[1], frame.k[2]);
+            this.setNoiseMode(frame.unvoiced);
+            this.setEnergy(frame.energy);
+          },
+          () => {
+            this._speechSequencer = null;
+            setTimeout(playNext, 200);
+          }
+        );
+        this._speechSequencer.speak(speechFrames);
+      }
+    };
+
+    playNext();
+  }
+
   // ===========================================================================
   // MIDI CC and pitch bend
   // ===========================================================================
@@ -442,6 +529,16 @@ export class TMS5220Synth extends MAMEBaseSynth {
     const paramId = paramMap[param];
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
+    }
+  }
+
+  protected override processPendingCall(call: { method: string; args: unknown[] }): void {
+    if (call.method === 'speakText') {
+      this.speakText(call.args[0] as string);
+    } else if (call.method === 'loadPreset') {
+      this.loadPreset(call.args[0] as number);
+    } else {
+      super.processPendingCall(call);
     }
   }
 

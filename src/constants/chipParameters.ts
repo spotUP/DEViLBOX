@@ -158,6 +158,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'Ensoniq DOC 32-Voice Wavetable (1986)',
     color: '#3b82f6',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'es5503.zip (Ensoniq Mirage wavetable ROM)',
+      bankCount: 1,
+      romType: 'es5503',
+    },
     parameters: [
       { key: 'waveform', label: 'Waveform', group: 'Oscillator', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'Sine' }, { value: 1, label: 'Saw' }, { value: 2, label: 'Square' },
@@ -485,6 +490,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#d946ef',
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'AE', 'UH', 'SH'],
+    romConfig: {
+      requiredZip: '.vsm files (TI Speak & Spell speech ROM)',
+      bankCount: 2,
+      romType: 'tms5220',
+    },
     parameters: [
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
@@ -541,6 +551,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'Roland TR-707 Drum Machine (1984)',
     color: '#dc2626',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'tr707.zip (Roland TR-707 voice ROMs)',
+      bankCount: 3,
+      romType: 'tr707',
+    },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Master', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'bass', label: 'Bass', group: 'Levels', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
@@ -644,6 +659,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'ICS WaveFront 32-Voice Synthesizer',
     color: '#64748b',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'ics2115.zip (ICS WaveFront wavetable ROM)',
+      bankCount: 1,
+      romType: 'ics2115',
+    },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'active_osc', label: 'Active Voices', group: 'Oscillator', type: 'knob', min: 1, max: 32, step: 1, default: 8, formatValue: 'int' },
@@ -657,6 +677,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'Konami K054539 PCM/ADPCM (8-Channel)',
     color: '#78716c',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'k054539.zip (Konami PCM sample ROM)',
+      bankCount: 1,
+      romType: 'k054539',
+    },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'reverb_enable', label: 'Reverb', group: 'Effects', type: 'toggle', min: 0, max: 1, default: 0 },
@@ -670,6 +695,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'Namco C352 32-Voice PCM',
     color: '#94a3b8',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'c352.zip (Namco C352 sample ROM)',
+      bankCount: 1,
+      romType: 'c352',
+    },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
     ],
@@ -682,6 +712,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     subtitle: 'Ricoh RF5C400 32-Voice PCM',
     color: '#6b7280',
     presetCount: 0,
+    romConfig: {
+      requiredZip: 'rf5c400.zip (Ricoh RF5C400 sample ROM)',
+      bankCount: 1,
+      romType: 'rf5c400',
+    },
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
     ],

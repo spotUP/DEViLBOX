@@ -11,7 +11,7 @@
  */
 
 import type { DevilboxSynth } from '@/types/synth';
-import { getDevilboxAudioContext, audioNow, timeToSeconds } from '@/utils/audio-context';
+import { getDevilboxAudioContext, timeToSeconds } from '@/utils/audio-context';
 import { ensureMAMEModuleLoaded, createMAMEWorkletNode } from './mame-wasm-loader';
 import type {
   MacroState,
@@ -55,7 +55,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   // WASM worklet
   protected workletNode: AudioWorkletNode | null = null;
   protected _initPromise!: Promise<void>;
-  protected _pendingCalls: Array<{ method: string; args: any[] }> = [];
+  protected _pendingCalls: Array<{ method: string; args: unknown[] }> = [];
   protected _isReady = false;
   protected _disposed = false;
 
@@ -69,6 +69,9 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
 
   // Configuration
   public config: Record<string, unknown> = {};
+
+  // ROM loading status (for ROM-dependent chips)
+  public romLoaded = false;
 
   // Note state
   protected currentNote: number = 60;  // MIDI note
@@ -162,7 +165,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   /**
    * Handle messages from worklet
    */
-  protected handleWorkletMessage(data: any): void {
+  protected handleWorkletMessage(data: Record<string, unknown>): void {
     switch (data.type) {
       case 'ready':
         console.log(`[${this.chipName}] WASM node ready`);
@@ -191,9 +194,9 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   /**
    * Process a pending call (override in subclasses for custom params)
    */
-  protected processPendingCall(call: { method: string; args: any[] }): void {
+  protected processPendingCall(call: { method: string; args: unknown[] }): void {
     if (call.method === 'setParam') {
-      this.setParam(call.args[0], call.args[1]);
+      this.setParam(call.args[0] as string, call.args[1] as number);
     }
   }
 
@@ -229,6 +232,9 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     this.effectRouter.resetChannel(this.channelIndex);
 
     // Write to worklet
+    if (!this.workletNode) {
+      console.warn(`[${this.chipName}] triggerAttack: workletNode is null! ready=${this._isReady}, disposed=${this._disposed}`);
+    }
     this.writeKeyOn(this.currentNote, velocity);
   }
 
@@ -592,7 +598,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    *
    * Advances macros and applies their values to the synth.
    */
-  processTick(_time: number = audioNow()): void {
+  processTick(): void {
     if (!this.isNoteOn) return;
 
     // Process each active macro
@@ -629,18 +635,20 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    */
   protected applyMacroValue(type: MacroType, value: number): void {
     switch (type) {
-      case MacroType.VOLUME:
+      case MacroType.VOLUME: {
         // Volume: 0-127 scale
         const vol = (value / 127) * this.currentVelocity;
         this.writeVolume(vol);
         break;
+      }
 
-      case MacroType.ARPEGGIO:
+      case MacroType.ARPEGGIO: {
         // Arpeggio: relative semitones (signed)
         const semitones = value > 127 ? value - 256 : value;
         const freq = this.currentFreq * Math.pow(2, semitones / 12);
         this.writeFrequency(freq);
         break;
+      }
 
       case MacroType.DUTY:
         // Duty cycle / noise mode
@@ -652,7 +660,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
         this.writeWavetableSelect(value);
         break;
 
-      case MacroType.PITCH:
+      case MacroType.PITCH: {
         // Pitch: relative cents (signed)
         const signedPitch = value > 127 ? value - 256 : value;
         this.basePitchOffset = signedPitch;
@@ -662,12 +670,14 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
         );
         this.writeFrequency(pitchedFreq);
         break;
+      }
 
-      case MacroType.PANNING:
+      case MacroType.PANNING: {
         // Panning: -127 to 127, convert to 0-255
         const pan = value > 127 ? value - 256 : value;
         this.writePanning(128 + pan);
         break;
+      }
 
       case MacroType.PHASE_RESET:
         // Phase reset on non-zero
@@ -949,6 +959,107 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
       loop,
       format: format ?? 0,
     });
+  }
+
+  // ===========================================================================
+  // Audio Diagnostics
+  // ===========================================================================
+
+  /**
+   * Diagnostic: bypass Tone.js routing and test worklet audio directly.
+   *
+   * Call from browser console:
+   *   window._toneEngine.instruments.get("0--1").debugTestAudio()
+   *
+   * If you hear sound → routing chain is broken (worklet is fine).
+   * If silence → worklet/WASM is the issue.
+   */
+  debugTestAudio(): void {
+    const ctx = getDevilboxAudioContext();
+    console.log(`[${this.chipName}] === DEBUG TEST AUDIO ===`);
+    console.log(`  AudioContext state: ${ctx.state}`);
+    console.log(`  sampleRate: ${ctx.sampleRate}`);
+    console.log(`  workletNode: ${this.workletNode ? 'exists' : 'NULL'}`);
+    console.log(`  _isReady: ${this._isReady}`);
+    console.log(`  _disposed: ${this._disposed}`);
+    console.log(`  output.gain.value: ${this.output.gain.value}`);
+    console.log(`  currentNote: ${this.currentNote}`);
+
+    if (!this.workletNode) {
+      console.error(`[${this.chipName}] Cannot test: workletNode is null`);
+      return;
+    }
+
+    // Create a bypass gain node connected directly to destination
+    const bypass = ctx.createGain();
+    bypass.gain.value = 0.3;
+
+    // Connect: workletNode → bypass → destination
+    this.workletNode.connect(bypass);
+    bypass.connect(ctx.destination);
+
+    // Also create an AnalyserNode to measure if audio is present
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    this.workletNode.connect(analyser);
+
+    console.log(`[${this.chipName}] Bypass connected. Sending noteOn...`);
+
+    // Send a note
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note: 60,
+      velocity: 100,
+    });
+
+    // Check analyser data after a short delay
+    setTimeout(() => {
+      const dataArray = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(dataArray);
+      const maxVal = dataArray.reduce((max, v) => Math.max(max, Math.abs(v)), 0);
+      console.log(`[${this.chipName}] Analyser peak after 200ms: ${maxVal.toFixed(6)}`);
+      if (maxVal > 0.0001) {
+        console.log(`[${this.chipName}] ✓ Worklet IS producing audio! Peak: ${maxVal.toFixed(4)}`);
+        console.log(`[${this.chipName}] → The bug is in the Tone.js routing chain, not in WASM.`);
+      } else {
+        console.log(`[${this.chipName}] ✗ Worklet is NOT producing audio.`);
+        console.log(`[${this.chipName}] → The bug is in the WASM/worklet, not in routing.`);
+      }
+    }, 200);
+
+    // Clean up after 3 seconds
+    setTimeout(() => {
+      this.workletNode?.port.postMessage({ type: 'noteOff', note: 60 });
+      try {
+        this.workletNode?.disconnect(bypass);
+        this.workletNode?.disconnect(analyser);
+        bypass.disconnect();
+        analyser.disconnect();
+      } catch { /* ignore */ }
+      console.log(`[${this.chipName}] Bypass test cleaned up.`);
+    }, 3000);
+  }
+
+  /**
+   * Diagnostic: dump the full audio routing state for this synth.
+   * Call from browser console:
+   *   window._toneEngine.instruments.get("0--1").debugDumpRouting()
+   */
+  debugDumpRouting(): void {
+    const ctx = getDevilboxAudioContext();
+    console.log(`[${this.chipName}] === ROUTING DEBUG ===`);
+    console.log(`  AudioContext.state: ${ctx.state}`);
+    console.log(`  output: GainNode, gain=${this.output.gain.value.toFixed(4)}`);
+    console.log(`  output.numberOfOutputs: ${this.output.numberOfOutputs}`);
+    console.log(`  output.context === audioCtx: ${this.output.context === ctx}`);
+    console.log(`  workletNode: ${this.workletNode ? 'exists' : 'NULL'}`);
+    if (this.workletNode) {
+      console.log(`  workletNode.numberOfOutputs: ${this.workletNode.numberOfOutputs}`);
+      console.log(`  workletNode.channelCount: ${this.workletNode.channelCount}`);
+    }
+    console.log(`  _isReady: ${this._isReady}`);
+    console.log(`  _disposed: ${this._disposed}`);
+    console.log(`  isNoteOn: ${this.isNoteOn}`);
   }
 
   // ===========================================================================
