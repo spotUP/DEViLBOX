@@ -489,7 +489,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   const pattern = patterns[currentPatternIndex];
   const patternLength = pattern?.length || 64;
-  const songLength = patterns.length;
+  const songLength = patternOrder.length;
 
   const handlePositionChange = (newPos: number) => {
     setCurrentPosition(newPos);
@@ -505,18 +505,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setCurrentPattern(newPat);
   };
 
-  // Handle song length changes (add/remove patterns)
+  // Handle song length changes (add/remove from pattern order)
   const handleSongLengthChange = (newLength: number) => {
-    const currentLength = patterns.length;
+    const currentLength = patternOrder.length;
     if (newLength > currentLength) {
-      // Add new empty patterns
+      // Add more pattern slots to the order
+      const newOrder = [...patternOrder];
       for (let i = currentLength; i < newLength; i++) {
-        addPattern(patternLength);
+        // Add the last pattern in the order, or pattern 0 if order is empty
+        newOrder.push(patternOrder[patternOrder.length - 1] ?? 0);
       }
+      setPatternOrder(newOrder);
     } else if (newLength < currentLength && newLength >= 1) {
-      // Remove patterns from the end
-      for (let i = currentLength - 1; i >= newLength; i--) {
-        deletePattern(i);
+      // Remove positions from the end of the order
+      const newOrder = patternOrder.slice(0, newLength);
+      setPatternOrder(newOrder);
+      // Ensure current position is valid
+      if (currentPositionIndex >= newLength) {
+        setCurrentPosition(newLength - 1);
       }
     }
   };
