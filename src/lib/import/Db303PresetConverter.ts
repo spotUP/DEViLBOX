@@ -89,12 +89,12 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
       accentDecay: getFloat('devilfish accentDecay', 0.5),
       softAttack: getFloat('devilfish softAttack', 0),
       accentSoftAttack: getFloat('devilfish accentSoftAttack', 0.5),
-      passbandCompensation: getFloat('devilfish passbandCompensation', 0.09),
-      resTracking: 1 - getFloat('devilfish resTracking', 0.257), // XML stores inverted value (db303 format)
+      passbandCompensation: getFloat('devilfish passbandCompensation', 0.9),
+      resTracking: 1 - getFloat('devilfish resTracking', 0.3), // XML stores inverted value (db303 format); app default knob=0.7
       filterInputDrive: getFloat('devilfish filterInputDrive', 0),
       filterSelect,
-      diodeCharacter: getFloat('devilfish diodeCharacter', 1),
-      duffingAmount: getFloat('devilfish duffingAmount', 0.03),
+      diodeCharacter: getFloat('devilfish diodeCharacter', 0),
+      duffingAmount: getFloat('devilfish duffingAmount', 0),
       filterFmDepth: getFloat('devilfish filterFmDepth', 0),
       lpBpMix: getFloat('devilfish lpBpMix', 0),
       filterTracking: getFloat('devilfish filterTracking', 0),
@@ -206,12 +206,12 @@ export function convertToDb303Preset(config: TB303Config): string {
     lines.push(`    <accentDecay>${(df.accentDecay ?? 0.5).toFixed(3)}</accentDecay>`);
     lines.push(`    <softAttack>${(df.softAttack ?? 0).toFixed(3)}</softAttack>`);
     lines.push(`    <accentSoftAttack>${(df.accentSoftAttack ?? 0.5).toFixed(3)}</accentSoftAttack>`);
-    lines.push(`    <passbandCompensation>${(df.passbandCompensation ?? 0.09).toFixed(3)}</passbandCompensation>`);
-    lines.push(`    <resTracking>${(1 - (df.resTracking ?? 0.743)).toFixed(3)}</resTracking>`);
-    lines.push(`    <filterInputDrive>${(df.filterInputDrive ?? 0.169).toFixed(3)}</filterInputDrive>`);
+    lines.push(`    <passbandCompensation>${(df.passbandCompensation ?? 0.9).toFixed(3)}</passbandCompensation>`);
+    lines.push(`    <resTracking>${(1 - (df.resTracking ?? 0.7)).toFixed(3)}</resTracking>`);
+    lines.push(`    <filterInputDrive>${(df.filterInputDrive ?? 0).toFixed(3)}</filterInputDrive>`);
     lines.push(`    <filterSelect>${df.filterSelect ?? 1}</filterSelect>`);
-    lines.push(`    <diodeCharacter>${(df.diodeCharacter ?? 1).toFixed(3)}</diodeCharacter>`);
-    lines.push(`    <duffingAmount>${(df.duffingAmount ?? 0.03).toFixed(3)}</duffingAmount>`);
+    lines.push(`    <diodeCharacter>${(df.diodeCharacter ?? 0).toFixed(3)}</diodeCharacter>`);
+    lines.push(`    <duffingAmount>${(df.duffingAmount ?? 0).toFixed(3)}</duffingAmount>`);
     lines.push(`    <filterFmDepth>${(df.filterFmDepth ?? 0).toFixed(3)}</filterFmDepth>`);
     lines.push(`    <lpBpMix>${(df.lpBpMix ?? 0).toFixed(3)}</lpBpMix>`);
     lines.push(`    <stageNLAmount>${(df.stageNLAmount ?? 0).toFixed(3)}</stageNLAmount>`);

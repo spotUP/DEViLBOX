@@ -244,7 +244,7 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 // Falls back to legacy KNOB_BANKS for synths with hardcoded banks.
 // ============================================================================
 
-import { getKnob8Params, getPerformanceParams } from './nks/synthParameterMaps';
+import { getKnob8Params, getPerformanceParams } from './performance/synthParameterMaps';
 
 /** CC numbers for the 8 knobs on Akai MPK Mini MK3 (CC 70-77) */
 const KNOB_CC_START = 70;

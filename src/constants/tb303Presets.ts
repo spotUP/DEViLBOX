@@ -1,113 +1,86 @@
 /**
  * TB-303 Factory Presets
- * Authentic acid bass presets optimized for the new 4-pole diode ladder engine
- * All values are 0-1 normalized matching the db303-pages-dev source truth.
+ * All values are 0-1 normalized matching db303.pages.dev app defaults (ne object).
+ *
+ * IMPORTANT: All presets MUST include devilFish config with at minimum:
+ *   enabled, oversamplingOrder, filterSelect, passbandCompensation, resTracking
+ * Without these, the WASM engine's filter character is undefined.
+ *
+ * tb303.volume should be 1.0 (WASM internal volume, 0-1 normalized).
+ * Top-level volume is in dB — use 0 for unity level.
  */
 
 import type { InstrumentPreset } from '@typedefs/instrument';
 
+/** Shared Devil Fish defaults matching the `ne` object from db303-index-unmin.js */
+const DF_DEFAULTS = {
+  enabled: true,
+  oversamplingOrder: 2 as const,  // 4x oversampling — MUST be set (type: 0|1|2|3|4)
+  filterSelect: 1,                // Enhanced diode ladder
+  normalDecay: 0.5,
+  accentDecay: 0.1,
+  softAttack: 0,
+  accentSoftAttack: 0.5,
+  passbandCompensation: 0.9,      // 0.9 knob → WASM 0.1 = minimal compensation = more resonance peak
+  resTracking: 0.7,
+  filterInputDrive: 0,
+  diodeCharacter: 0,
+  duffingAmount: 0,
+  filterFmDepth: 0,
+  lpBpMix: 0,
+  filterTracking: 0,
+  stageNLAmount: 0,
+  ensembleAmount: 0,
+  accentSweepEnabled: true,
+  sweepSpeed: 'normal' as const,
+  highResonance: false,
+  muffler: 'off' as const,
+  vegDecay: 0.5,
+  vegSustain: 0,
+};
+
 export const TB303_PRESETS: InstrumentPreset['config'][] = [
-  // === DEFAULT JC303/DB303 PRESET ===
-  // Based on db303-default-preset.xml
+  // === DEFAULT PRESET ===
+  // Matches db303.pages.dev startup defaults (ne object, NOT default-preset.xml)
   {
     type: 'synth' as const,
-    name: 'JC303 Default',
+    name: 'DB303 Default',
     synthType: 'TB303',
     tb303: {
-      engineType: 'jc303',
-      oscillator: {
-        type: 'sawtooth',
-        pulseWidth: 0,
-        subOscGain: 0,
-        subOscBlend: 1,
-      },
-      filter: {
-        cutoff: 0.5,
-        resonance: 0.5,
-      },
-      filterEnvelope: {
-        envMod: 0.5,
-        decay: 0.5,
-      },
-      accent: {
-        amount: 0.5,
-      },
-      slide: {
-        time: 0.17,
-        mode: 'exponential',
-      },
-      devilFish: {
-        enabled: true,
-        normalDecay: 0.164,
-        accentDecay: 0.006,
-        softAttack: 0,
-        accentSoftAttack: 0.1,
-        passbandCompensation: 0.09,
-        resTracking: 0.743,
-        filterSelect: 1,
-        diodeCharacter: 1,
-        duffingAmount: 0.03,
-        lpBpMix: 0,
-        stageNLAmount: 0,
-        ensembleAmount: 0,
-        oversamplingOrder: 2,
-        filterTracking: 0,
-        filterFmDepth: 0,
-        accentSweepEnabled: true,
-        sweepSpeed: 'normal',
-        highResonance: false,
-        muffler: 'off',
-        vegDecay: 0.5,
-        vegSustain: 0,
-      },
-      lfo: {
-        waveform: 0,
-        rate: 0,
-        contour: 0,
-        pitchDepth: 0,
-        pwmDepth: 0,
-        filterDepth: 0,
-      },
-      chorus: {
-        enabled: false,
-        mode: 0,
-        mix: 0.5,
-      },
-      phaser: {
-        enabled: false,
-        rate: 0.5,
-        depth: 0.7,
-        feedback: 0,
-        mix: 0,
-      },
-      delay: {
-        enabled: false,
-        time: 0.1875, // 3 in XML? Assuming units of 16 steps or similar. Using 0.1875 as reasonable default.
-        feedback: 0.3,
-        tone: 0.5,
-        mix: 0,
-        stereo: 0.5,
-      },
+      engineType: 'db303',
+      volume: 1.0,
+      oscillator: { type: 'sawtooth', pulseWidth: 1, subOscGain: 0, subOscBlend: 1 },
+      filter: { cutoff: 0.5, resonance: 0.5 },
+      filterEnvelope: { envMod: 0.5, decay: 0.4 },
+      accent: { amount: 0.5 },
+      slide: { time: 0.17, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
+      lfo: { waveform: 0, rate: 0, contour: 0, pitchDepth: 0, pwmDepth: 0, filterDepth: 0 },
+      chorus: { enabled: false, mode: 0, mix: 0.5 },
+      phaser: { enabled: false, rate: 0.5, depth: 0.7, feedback: 0, mix: 0 },
+      delay: { enabled: false, time: 0.5, feedback: 0, tone: 0.5, mix: 0, stereo: 0.75 },
     },
     effects: [],
-    volume: 0.75, // -12dB approx 0.75 in 0-1 scale
+    volume: 0,
     pan: 0,
   },
 
-  // === CLASSIC PRESETS (Normalized) ===
+  // === CLASSIC PRESETS ===
   {
     type: 'synth' as const,
     name: '303 Classic',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.4, resonance: 0.65 },
       filterEnvelope: { envMod: 0.6, decay: 0.3 },
       accent: { amount: 0.7 },
       slide: { time: 0.17, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [],
-    volume: 0.75,
+    volume: 0,
     pan: 0,
   },
   {
@@ -115,14 +88,20 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: '303 Squelchy',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.55, resonance: 0.82 },
       filterEnvelope: { envMod: 0.85, decay: 0.4 },
       accent: { amount: 0.9 },
       slide: { time: 0.15, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.15,   // Slight drive into filter for grit
+        normalDecay: 0.4,
+      },
     },
     effects: [],
-    volume: 0.7,
+    volume: 0,
     pan: 0,
   },
   {
@@ -130,14 +109,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: '303 Deep Sub',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.15, resonance: 0.35 },
       filterEnvelope: { envMod: 0.25, decay: 0.2 },
       accent: { amount: 0.45 },
       slide: { time: 0.3, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [],
-    volume: 0.8,
+    volume: 0,
     pan: 0,
   },
 
@@ -147,14 +128,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: '303 Square',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'square' },
       filter: { cutoff: 0.45, resonance: 0.68 },
       filterEnvelope: { envMod: 0.55, decay: 0.25 },
       accent: { amount: 0.65 },
       slide: { time: 0.15, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [],
-    volume: 0.75,
+    volume: 0,
     pan: 0,
   },
 
@@ -164,23 +147,24 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: '303 Screamer',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.75, resonance: 0.88 },
-      filterEnvelope: { envMod: 0.95, decay: 0.5 },
+      filter: { cutoff: 0.7, resonance: 0.92 },
+      filterEnvelope: { envMod: 0.95, decay: 0.4 },
       accent: { amount: 1.0 },
       slide: { time: 0.1, mode: 'exponential' },
-    },
-    effects: [
-      {
-        id: 'distortion-1',
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 35,
-        parameters: { distortion: 0.6 },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.4,    // Drive into filter = saturation before resonance
+        diodeCharacter: 0.25,     // Slight diode nonlinearity for extra grit
+        duffingAmount: 0.3,       // Nonlinear stiffness adds harmonics
+        normalDecay: 0.35,        // Snappier decay
+        accentDecay: 0.15,
+        passbandCompensation: 0.95, // → WASM 0.05 = almost no compensation = maximum resonance peak
       },
-    ],
-    volume: 0.6,
+    },
+    effects: [],
+    volume: 0,
     pan: 0,
   },
 
@@ -190,45 +174,71 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'DF Chaos Engine',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.65, resonance: 0.8 },
       filterEnvelope: { envMod: 0.75, decay: 0.45 },
       accent: { amount: 0.95 },
       slide: { time: 0.08, mode: 'exponential' },
       devilFish: {
-        enabled: true,
+        ...DF_DEFAULTS,
         normalDecay: 0.2,
         accentDecay: 0.1,
-        vegDecay: 0.3,
-        vegSustain: 0.15,
         softAttack: 0.05,
         filterTracking: 0.6,
-        filterFmDepth: 0.5,
-        sweepSpeed: 'fast',
-        accentSweepEnabled: true,
-        highResonance: false,
-        muffler: 'soft',
+        filterFmDepth: 0.5,       // Filter FM for chaotic modulation
+        filterInputDrive: 0.35,   // Drive for saturation
+        diodeCharacter: 0.4,      // Moderate diode character
+        duffingAmount: 0.5,       // Strong nonlinearity
+        sweepSpeed: 'fast' as const,
       },
     },
     effects: [],
-    volume: 0.6,
+    volume: 0,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'DF Acid Burn',
+    synthType: 'TB303',
+    tb303: {
+      volume: 1.0,
+      oscillator: { type: 'sawtooth' },
+      filter: { cutoff: 0.6, resonance: 0.88 },
+      filterEnvelope: { envMod: 0.9, decay: 0.35 },
+      accent: { amount: 0.95 },
+      slide: { time: 0.12, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.5,    // Heavy drive
+        diodeCharacter: 0.15,
+        duffingAmount: 0.2,
+        normalDecay: 0.3,
+        accentDecay: 0.12,
+        passbandCompensation: 0.95, // Max resonance peak
+      },
+    },
+    effects: [],
+    volume: 0,
     pan: 0,
   },
 
   // === ACID EFFECT CHAIN PRESETS ===
-  // Classic acid house/techno ran the 303 through external pedals.
-  // These presets use DEViLBOX's per-instrument effects system.
-
   {
     type: 'synth' as const,
     name: 'Acid RAT',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.55, resonance: 0.75 },
       filterEnvelope: { envMod: 0.7, decay: 0.35 },
       accent: { amount: 0.85 },
       slide: { time: 0.12, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.2,
+      },
     },
     effects: [
       {
@@ -250,7 +260,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { threshold: -15, ratio: 4, attack: 0.005, release: 0.15 },
       },
     ],
-    volume: 0.6,
+    volume: 0,
     pan: 0,
   },
   {
@@ -258,11 +268,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid DS-1',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.5, resonance: 0.7 },
       filterEnvelope: { envMod: 0.65, decay: 0.3 },
       accent: { amount: 0.8 },
       slide: { time: 0.15, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.15,
+      },
     },
     effects: [
       {
@@ -290,7 +305,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { threshold: -15, ratio: 4, attack: 0.005, release: 0.15 },
       },
     ],
-    volume: 0.6,
+    volume: 0,
     pan: 0,
   },
   {
@@ -298,11 +313,13 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Warm',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.45, resonance: 0.6 },
       filterEnvelope: { envMod: 0.5, decay: 0.4 },
       accent: { amount: 0.65 },
       slide: { time: 0.2, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [
       {
@@ -322,7 +339,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.2 },
       },
     ],
-    volume: 0.7,
+    volume: 0,
     pan: 0,
   },
   {
@@ -330,11 +347,13 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Dub',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.35, resonance: 0.55 },
       filterEnvelope: { envMod: 0.45, decay: 0.5 },
       accent: { amount: 0.6 },
       slide: { time: 0.25, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [
       {
@@ -362,7 +381,25 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { decay: 0.6, damping: 0.5, tension: 0.4, mix: 0.5, drip: 0.3 },
       },
     ],
-    volume: 0.7,
+    volume: 0,
+    pan: 0,
+  },
+  {
+    type: 'synth' as const,
+    name: 'Acid Echo',
+    synthType: 'TB303',
+    tb303: {
+      volume: 1.0,
+      oscillator: { type: 'sawtooth', pulseWidth: 1, subOscGain: 0, subOscBlend: 1 },
+      filter: { cutoff: 0.5, resonance: 0.5 },
+      filterEnvelope: { envMod: 0.5, decay: 0.4 },
+      accent: { amount: 0.5 },
+      slide: { time: 0.17, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
+      delay: { enabled: true, time: 0.3, feedback: 0.3, tone: 0.5, mix: 0.5, stereo: 0.75 },
+    },
+    effects: [],
+    volume: 0,
     pan: 0,
   },
   {
@@ -370,11 +407,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Trance',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.6, resonance: 0.72 },
       filterEnvelope: { envMod: 0.75, decay: 0.4 },
       accent: { amount: 0.8 },
       slide: { time: 0.15, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.1,
+      },
     },
     effects: [
       {
@@ -402,7 +444,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { decay: 3, preDelay: 0.03 },
       },
     ],
-    volume: 0.65,
+    volume: 0,
     pan: 0,
   },
   {
@@ -410,21 +452,20 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Techno',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.65, resonance: 0.8 },
+      filter: { cutoff: 0.65, resonance: 0.85 },
       filterEnvelope: { envMod: 0.85, decay: 0.35 },
       accent: { amount: 0.9 },
       slide: { time: 0.1, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.3,
+        diodeCharacter: 0.15,
+        normalDecay: 0.3,
+      },
     },
     effects: [
-      {
-        id: 'acid-techno-dist',
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 50,
-        parameters: { distortion: 0.55 },
-      },
       {
         id: 'acid-techno-comp',
         category: 'tonejs',
@@ -433,16 +474,8 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         wet: 100,
         parameters: { threshold: -12, ratio: 6, attack: 0.002, release: 0.1 },
       },
-      {
-        id: 'acid-techno-eq',
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 2, mid: 3, high: 1 },
-      },
     ],
-    volume: 0.55,
+    volume: 0,
     pan: 0,
   },
   {
@@ -450,29 +483,23 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Industrial',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.7, resonance: 0.85 },
       filterEnvelope: { envMod: 0.9, decay: 0.45 },
       accent: { amount: 0.95 },
       slide: { time: 0.08, mode: 'exponential' },
+      devilFish: {
+        ...DF_DEFAULTS,
+        filterInputDrive: 0.6,    // Heavy drive
+        diodeCharacter: 0.5,      // Strong diode character
+        duffingAmount: 0.6,       // Aggressive nonlinearity
+        normalDecay: 0.25,
+        accentDecay: 0.1,
+        passbandCompensation: 0.95,
+      },
     },
     effects: [
-      {
-        id: 'acid-ind-cheby',
-        category: 'tonejs',
-        type: 'Chebyshev',
-        enabled: true,
-        wet: 35,
-        parameters: { order: 6 },
-      },
-      {
-        id: 'acid-ind-dist',
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 50,
-        parameters: { distortion: 0.7 },
-      },
       {
         id: 'acid-ind-comp',
         category: 'tonejs',
@@ -482,7 +509,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.08 },
       },
     ],
-    volume: 0.5,
+    volume: 0,
     pan: 0,
   },
   {
@@ -490,11 +517,13 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     name: 'Acid Space',
     synthType: 'TB303',
     tb303: {
+      volume: 1.0,
       oscillator: { type: 'sawtooth' },
       filter: { cutoff: 0.4, resonance: 0.5 },
       filterEnvelope: { envMod: 0.4, decay: 0.55 },
       accent: { amount: 0.5 },
       slide: { time: 0.3, mode: 'exponential' },
+      devilFish: { ...DF_DEFAULTS },
     },
     effects: [
       {
@@ -522,7 +551,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         parameters: { decay: 5, preDelay: 0.05 },
       },
     ],
-    volume: 0.65,
+    volume: 0,
     pan: 0,
   },
 ];

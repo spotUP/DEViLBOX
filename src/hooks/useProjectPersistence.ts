@@ -11,6 +11,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import { needsMigration, migrateProject } from '@/lib/migration';
 
+
 const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
@@ -21,8 +22,18 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
  * History:
  * - 2: Fixed filterSelect=255 bug (was invalid, now defaults to 1)
  * - 3: Split WAM plugins — effects moved to effect browser, synths are individual types
+ * - 4: Fixed DB303 defaults to match db303 default-preset.xml (diodeCharacter=1, filterInputDrive=0.169, etc.)
+ * - 5: Fixed DB303 Korg parameter mirroring + inversions (HMR could save schema 4 with stale configs)
+ * - 6: Fixed DB303 defaults — was using preset XML values (passbandCompensation=0.09, diodeCharacter=1)
+ *      instead of app startup defaults (0.9, 0). Old values nearly neutralized the filter.
+ * - 7: Fixed DB303 volume 0.8→1.0 (reference never sets volume; lower values starve filter nonlinearities)
+ *      Fixed applyConfig param order: oversamplingOrder+filterSelect now set FIRST (matching reference init).
+ * - 8: DevilFish now defaults to disabled (vanilla 303). Volume knob restored.
+ *      Fixed volume mismatch between default instrument (was -6dB) and presets (was 1dB).
+ * - 9: Added korgEnabled, lfo.enabled toggles. pulseWidth default 1→0 (50% duty = true square).
+ *      Wave blend knob replaces SAW/SQR toggle.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 9;
 
 interface SavedProject {
   version: string;
