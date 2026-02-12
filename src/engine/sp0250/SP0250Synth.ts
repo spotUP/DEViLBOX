@@ -180,8 +180,8 @@ export class SP0250Synth extends MAMEBaseSynth {
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice so WASM processes parameter changes
-    this.writeKeyOn(60, 0.8);
+    // Activate a voice via the full triggerAttack path
+    this.triggerAttack(60, undefined, 0.8);
 
     this._speechSequencer = new SpeechSequencer<SP0250Frame>(
       (frame) => {
@@ -191,7 +191,7 @@ export class SP0250Synth extends MAMEBaseSynth {
       },
       () => {
         this._speechSequencer = null;
-        this.writeKeyOff();
+        this.triggerRelease();
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -204,7 +204,7 @@ export class SP0250Synth extends MAMEBaseSynth {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.writeKeyOff();
+    if (wasSpeaking) this.triggerRelease();
   }
 
   /** Whether text-to-speech is currently playing */
