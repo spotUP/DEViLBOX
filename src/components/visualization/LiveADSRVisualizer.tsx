@@ -176,6 +176,7 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   return (

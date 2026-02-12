@@ -341,6 +341,7 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   return (

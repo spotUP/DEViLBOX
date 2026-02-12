@@ -206,6 +206,7 @@ export const InstrumentLevelMeter: React.FC<InstrumentLevelMeterProps> = ({
   useVisualizationAnimation({
     onFrame,
     enabled: true,
+    fps: 60,
   });
 
   return (
