@@ -124,12 +124,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  const spawnFood = () => {
+  const spawnFood = useCallback(() => {
     let attempts = 0;
     while (attempts < 1000) {
       const x = Math.floor(Math.random() * WIDTH);
       const y = Math.floor(Math.random() * HEIGHT);
-      const suitable = gridRef.current[y][x] === 0 && (y === HEIGHT - 1 || gridRef.current[y + 1][x] === 0);
+      const cell = gridRef.current[y]?.[x];
+      const cellBelow = y < HEIGHT - 1 ? gridRef.current[y + 1]?.[x] : 0;
+      const suitable = cell === 0 && (y === HEIGHT - 1 || cellBelow === 0);
       if (suitable) {
         currentNumberRef.current++;
         gridRef.current[y][x] = 16 + currentNumberRef.current;
@@ -137,7 +139,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       }
       attempts++;
     }
-  };
+  }, []);
 
   // Initialize Level
   const initLevel = useCallback((lvlIdx: number) => {
@@ -147,7 +149,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     let x1 = 2, y1 = 2, x2 = 48, y2 = 20;
     for (let y = 0; y < HEIGHT; y++) {
       for (let x = 0; x < WIDTH; x++) {
-        const val = newGrid[y][x];
+        const val = newGrid[y]?.[x];
         if (val === 6) { x1 = x; y1 = y; newGrid[y][x] = 0; }
         if (val === 7) { x2 = x; y2 = y; newGrid[y][x] = 0; }
       }
@@ -175,14 +177,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     p2NoClearRef.current = 0;
     currentNumberRef.current = 0;
 
-    gridRef.current[y1][x1] = 6;
-    if (numPlayers === 2) gridRef.current[y2][x2] = 7;
+    if (gridRef.current[y1]) gridRef.current[y1][x1] = 6;
+    if (numPlayers === 2 && gridRef.current[y2]) gridRef.current[y2][x2] = 7;
 
     inputBuffer1.current = [];
     inputBuffer2.current = [];
 
     if (!surround) spawnFood();
-  }, [numPlayers, surround]);
+  }, [numPlayers, surround, spawnFood]);
 
   // Handle Game Over
   const handleGameOver = useCallback(async () => {
@@ -234,15 +236,15 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     syncUI();
   }, [numPlayers, speed, highScores, loadHighScores, syncUI, initLevel]);
 
-  const isInvalid = (x: number, y: number, d: number) => {
+  const isInvalid = useCallback((x: number, y: number, d: number) => {
     if (!wrap) {
       if ((x === 0 && d === 2) || (x === WIDTH - 1 && d === 0) || (y === 0 && d === 1) || (y === HEIGHT - 1 && d === 3)) {
         return true;
       }
     }
-    const cell = gridRef.current[y][x];
+    const cell = gridRef.current[y]?.[x];
     return cell >= 1 && cell <= 15;
-  };
+  }, [wrap]);
 
   const move = useCallback(() => {
     if (!isPlayingRef.current) return;
@@ -345,16 +347,20 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         p1LenRef.current++;
       } else {
         const tail = p1Ref.current[p1LenRef.current];
-        if (tail) gridRef.current[tail.y][tail.x] = 0;
+        if (tail && gridRef.current[tail.y]) {
+          gridRef.current[tail.y][tail.x] = 0;
+        }
       }
-      
+
       if (numPlayers === 2) {
         if (p2NoClearRef.current > 0 && p2LenRef.current < 255) {
           p2NoClearRef.current--;
           p2LenRef.current++;
         } else {
           const tail = p2Ref.current[p2LenRef.current];
-          if (tail) gridRef.current[tail.y][tail.x] = 0;
+          if (tail && gridRef.current[tail.y]) {
+            gridRef.current[tail.y][tail.x] = 0;
+          }
         }
       }
     }
@@ -363,8 +369,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     if (numPlayers === 2) score2Ref.current = Math.max(0, score2Ref.current - 17);
 
     // Update Grid
-    gridRef.current[nextP1.y][nextP1.x] = 6;
-    if (nextP2) gridRef.current[nextP2.y][nextP2.x] = 7;
+    if (gridRef.current[nextP1.y]) {
+      gridRef.current[nextP1.y][nextP1.x] = 6;
+    }
+    if (nextP2 && gridRef.current[nextP2.y]) {
+      gridRef.current[nextP2.y][nextP2.x] = 7;
+    }
 
     syncUI();
   }, [numPlayers, wrap, surround, initLevel, handleGameOver, syncUI, isInvalid]);
@@ -410,12 +420,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     if (!ctx) return;
 
     let isRunning = true;
+    let renderFrameId: number | null = null;
+
     const render = () => {
       if (!isRunning) return;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       if (uiState.showMenu || uiState.showHighScores) {
-        animationRef.current = requestAnimationFrame(render);
+        renderFrameId = requestAnimationFrame(render);
         return;
       }
       const cellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
@@ -447,17 +459,21 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
           }
         }
       }
-      animationRef.current = requestAnimationFrame(render);
+      renderFrameId = requestAnimationFrame(render);
     };
-    const animId = requestAnimationFrame(render);
-    return () => { isRunning = false; cancelAnimationFrame(animId); };
+    renderFrameId = requestAnimationFrame(render);
+    return () => {
+      isRunning = false;
+      if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
+    };
   }, [grid, uiState.showMenu, uiState.showHighScores]);
 
-  // Initial Level Load
+  // Initial Level Load (only once on mount)
   useEffect(() => {
     initLevel(0);
     syncUI();
-  }, [initLevel, syncUI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div 
