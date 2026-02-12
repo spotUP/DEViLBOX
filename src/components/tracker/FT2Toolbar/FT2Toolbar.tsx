@@ -526,19 +526,25 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handlePlaySong = async () => {
-    // Always restart song playback from beginning
-    if (isPlaying) stop();
-    setIsLooping(false);
-    await engine.init();
-    play();
+    // Toggle: if already playing song, stop. Otherwise start song.
+    if (isPlaying && !isLooping) stop();
+    else {
+      if (isPlaying) stop();
+      setIsLooping(false);
+      await engine.init();
+      play();
+    }
   };
 
   const handlePlayPattern = async () => {
-    // Always restart pattern playback from beginning
-    if (isPlaying) stop();
-    setIsLooping(true);
-    await engine.init();
-    play();
+    // Toggle: if already playing pattern, stop. Otherwise start pattern.
+    if (isPlaying && isLooping) stop();
+    else {
+      if (isPlaying) stop();
+      setIsLooping(true);
+      await engine.init();
+      play();
+    }
   };
 
   const isPlayingSong = isPlaying && !isLooping;
