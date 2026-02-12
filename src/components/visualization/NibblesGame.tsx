@@ -495,11 +495,11 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   }, []);
 
   return (
-    <div 
-      ref={containerRef} 
-      className="w-full h-full flex flex-col items-center relative group overflow-hidden" 
+    <div
+      ref={containerRef}
+      className="w-full h-full flex flex-col items-stretch relative group overflow-hidden"
       style={{ height: `${height}px` }}
-      onClick={(e) => e.stopPropagation()} 
+      onClick={(e) => e.stopPropagation()}
     >
       {/* HUD Overlay */}
       <div className={`absolute top-0 left-0 w-full flex justify-between px-2 py-0.5 pointer-events-none z-10 bg-black/40 backdrop-blur-sm transition-opacity opacity-0 ${uiState.isPlaying ? 'group-hover:opacity-100' : ''}`}>
@@ -512,7 +512,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         ref={canvasRef}
         width={actualWidth}
         height={height}
-        className="cursor-pointer"
+        className="cursor-pointer w-full h-full"
         onClick={(e) => {
           e.stopPropagation();
           if (!uiState.isPlaying) setIsPlaying(true);
