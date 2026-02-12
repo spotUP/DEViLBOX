@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { NIBBLES_LEVELS } from './nibblesLevels';
 import { scoreLibrary, type NibblesScore } from '@/lib/scoreLibrary';
+import { useAudioStore } from '@stores';
 
 interface NibblesGameProps {
   height?: number;
@@ -14,6 +15,14 @@ interface NibblesGameProps {
 const NI_SPEEDS = [12, 8, 6, 4]; // Novice, Average, Pro, Up Rough (60Hz ticks)
 const WIDTH = 51;
 const HEIGHT = 23;
+
+// Audio reactivity tuning
+const BEAT_DETECTION_THRESHOLD = 15;
+const BEAT_INTENSITY_SCALE = 30;
+const BEAT_DECAY_RATE = 0.05;
+
+// Grid rendering
+const GRID_CELL_PADDING = 2;
 
 // Colors matching FT2 bmpCustomPalette
 const PALETTE = [
@@ -57,12 +66,22 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const [wrap, setWrap] = useState(false);
   const [grid, setGrid] = useState(true);
   const [surround, setSurround] = useState(false);
+  const [twoKeyMode, setTwoKeyMode] = useState(true);
   const [highScores, setHighScores] = useState<NibblesScore[]>([]);
   const [showNameEntry, setShowNameEntry] = useState(false);
   const [nameEntryPlayer, setNameEntryPlayer] = useState(1);
   const [nameEntryScore, setNameEntryScore] = useState(0);
   const [nameEntryLevel, setNameEntryLevel] = useState(0);
   const [nameInput, setNameInput] = useState('');
+
+  // Audio reactivity state (used in future tasks)
+  // @ts-expect-error - audioData will be used in Task 2 for background tile rendering
+  const [audioData, setAudioData] = useState<Uint8Array>(new Uint8Array(128));
+  // @ts-expect-error - beatIntensity will be used in Task 3 for beat-synced effects
+  const [beatIntensity, setBeatIntensity] = useState(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const previousVolumeRef = useRef(0);
+  const audioBufferRef = useRef<Uint8Array | null>(null);
 
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
@@ -117,6 +136,54 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   useEffect(() => {
     requestAnimationFrame(() => loadHighScores());
   }, [loadHighScores]);
+
+  // Setup audio analysis
+  const setupAudioAnalysis = useCallback(() => {
+    try {
+      const { analyserNode } = useAudioStore.getState();
+      if (!analyserNode) return;
+
+      // Use Tone.js analyser's internal native AnalyserNode
+      const nativeAnalyser = analyserNode.input as unknown as AnalyserNode;
+      if (!nativeAnalyser || !nativeAnalyser.context) return;
+
+      analyserRef.current = nativeAnalyser;
+    } catch (e) {
+      console.warn('Audio analysis setup failed:', e);
+    }
+  }, []);
+
+  // Extract audio data for visualization
+  const updateAudioData = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+
+    // Reuse buffer to avoid allocation on every frame
+    if (!audioBufferRef.current || audioBufferRef.current.length !== analyser.frequencyBinCount) {
+      audioBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+    }
+    analyser.getByteFrequencyData(audioBufferRef.current);
+    setAudioData(audioBufferRef.current);
+
+    // Beat detection: measure sudden volume increase
+    const volume = audioBufferRef.current.reduce((a, b) => a + b, 0) / audioBufferRef.current.length;
+    const volumeDelta = volume - previousVolumeRef.current;
+
+    if (volumeDelta > BEAT_DETECTION_THRESHOLD) {
+      // Beat detected
+      setBeatIntensity(Math.min(volumeDelta / BEAT_INTENSITY_SCALE, 1));
+    } else {
+      // Decay beat intensity
+      setBeatIntensity(prev => Math.max(0, prev - BEAT_DECAY_RATE));
+    }
+
+    previousVolumeRef.current = volume;
+  }, []);
+
+  // Initialize on mount
+  useEffect(() => {
+    setupAudioAnalysis();
+  }, [setupAudioAnalysis]);
 
   // Resize handler
   useEffect(() => {
@@ -310,6 +377,8 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const move = useCallback(() => {
     if (!isPlayingRef.current) return;
 
+    updateAudioData();
+
     if (inputBuffer1.current.length > 0) {
       const d = inputBuffer1.current.shift()!;
       if (!((d === 0 && p1DirRef.current === 2) || (d === 2 && p1DirRef.current === 0) || 
@@ -439,7 +508,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
     }
 
     syncUI();
-  }, [numPlayers, wrap, surround, initLevel, handleGameOver, syncUI, isInvalid]);
+  }, [numPlayers, wrap, surround, initLevel, handleGameOver, syncUI, isInvalid, updateAudioData]);
 
   // Main Loop
   useEffect(() => {
@@ -461,18 +530,49 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlayingRef.current) return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); inputBuffer1.current.push(0); }
-      if (e.key === 'ArrowUp')    { e.preventDefault(); inputBuffer1.current.push(1); }
-      if (e.key === 'ArrowLeft')  { e.preventDefault(); inputBuffer1.current.push(2); }
-      if (e.key === 'ArrowDown')  { e.preventDefault(); inputBuffer1.current.push(3); }
-      if (e.key.toLowerCase() === 'd') { e.preventDefault(); inputBuffer2.current.push(0); }
-      if (e.key.toLowerCase() === 'w') { e.preventDefault(); inputBuffer2.current.push(1); }
-      if (e.key.toLowerCase() === 'a') { e.preventDefault(); inputBuffer2.current.push(2); }
-      if (e.key.toLowerCase() === 's') { e.preventDefault(); inputBuffer2.current.push(3); }
+
+      if (twoKeyMode) {
+        // Two-key mode: left/right only (relative to current direction)
+        // 0=right, 1=up, 2=left, 3=down
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const currentDir = p1DirRef.current;
+          const newDir = (currentDir + 1) % 4; // Turn left (counter-clockwise)
+          inputBuffer1.current.push(newDir);
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const currentDir = p1DirRef.current;
+          const newDir = (currentDir + 3) % 4; // Turn right (clockwise)
+          inputBuffer1.current.push(newDir);
+        }
+        if (e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          const currentDir = p2DirRef.current;
+          const newDir = (currentDir + 1) % 4; // Turn left
+          inputBuffer2.current.push(newDir);
+        }
+        if (e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          const currentDir = p2DirRef.current;
+          const newDir = (currentDir + 3) % 4; // Turn right
+          inputBuffer2.current.push(newDir);
+        }
+      } else {
+        // Four-way mode: absolute directions
+        if (e.key === 'ArrowRight') { e.preventDefault(); inputBuffer1.current.push(0); }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); inputBuffer1.current.push(1); }
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); inputBuffer1.current.push(2); }
+        if (e.key === 'ArrowDown')  { e.preventDefault(); inputBuffer1.current.push(3); }
+        if (e.key.toLowerCase() === 'd') { e.preventDefault(); inputBuffer2.current.push(0); }
+        if (e.key.toLowerCase() === 'w') { e.preventDefault(); inputBuffer2.current.push(1); }
+        if (e.key.toLowerCase() === 'a') { e.preventDefault(); inputBuffer2.current.push(2); }
+        if (e.key.toLowerCase() === 's') { e.preventDefault(); inputBuffer2.current.push(3); }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [twoKeyMode]);
 
   // Canvas Drawing
   useEffect(() => {
@@ -512,10 +612,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
           if (val >= 16) {
             // Food: Draw filled cell with number (same size as worm segment)
             if (grid) {
-              ctx.fillStyle = '#222';
+              ctx.fillStyle = '#000';
               ctx.fillRect(px, py, cellSize, cellSize);
               ctx.fillStyle = PALETTE[12]; // Yellow background
-              ctx.fillRect(px + 1, py + 1, cellSize - 1, cellSize - 1);
+              ctx.fillRect(px + GRID_CELL_PADDING, py + GRID_CELL_PADDING, cellSize - (GRID_CELL_PADDING * 2), cellSize - (GRID_CELL_PADDING * 2));
             } else {
               ctx.fillStyle = PALETTE[12]; // Yellow background
               ctx.fillRect(px, py, cellSize, cellSize);
@@ -528,10 +628,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
             ctx.fillText((val - 16).toString(), px + cellSize / 2, py + cellSize / 2 + 1);
           } else {
             if (grid) {
-              ctx.fillStyle = '#222';
+              ctx.fillStyle = '#000';
               ctx.fillRect(px, py, cellSize, cellSize);
               ctx.fillStyle = PALETTE[val] || '#fff';
-              ctx.fillRect(px + 1, py + 1, cellSize - 1, cellSize - 1);
+              ctx.fillRect(px + GRID_CELL_PADDING, py + GRID_CELL_PADDING, cellSize - (GRID_CELL_PADDING * 2), cellSize - (GRID_CELL_PADDING * 2));
             } else {
               ctx.fillStyle = PALETTE[val] || '#fff';
               ctx.fillRect(px, py, cellSize, cellSize);
@@ -727,13 +827,22 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
               Grid
             </label>
             <label className="flex items-center gap-1 text-[9px] text-text-muted cursor-pointer uppercase font-mono">
-              <input 
-                type="checkbox" 
-                checked={surround} 
-                onChange={e => { e.stopPropagation(); setSurround(e.target.checked); }} 
-                className="accent-accent-primary" 
+              <input
+                type="checkbox"
+                checked={surround}
+                onChange={e => { e.stopPropagation(); setSurround(e.target.checked); }}
+                className="accent-accent-primary"
               />
               Surround
+            </label>
+            <label className="flex items-center gap-1 text-[9px] text-text-muted cursor-pointer uppercase font-mono">
+              <input
+                type="checkbox"
+                checked={twoKeyMode}
+                onChange={e => { e.stopPropagation(); setTwoKeyMode(e.target.checked); }}
+                className="accent-accent-primary"
+              />
+              2-Key
             </label>
           </div>
         </div>
