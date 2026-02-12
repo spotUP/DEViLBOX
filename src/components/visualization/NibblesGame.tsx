@@ -425,6 +425,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   }, [audioData]);
 
   // Render music-reactive background tiles
+  // Performance optimizations:
+  // - Early exit for no audio data
+  // - Per-column calculations (bandIndex, intensity, color, alpha) computed once per column
+  // - Skip columns with intensity below threshold (5%)
+  // - Only iterate rows that need drawing (barHeight optimization)
+  // - Memoized via useCallback (audioData changes every frame during playback)
   const renderBackgroundTiles = useCallback((
     ctx: CanvasRenderingContext2D,
     cellSize: number
