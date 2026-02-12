@@ -435,8 +435,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         renderFrameId = requestAnimationFrame(render);
         return;
       }
-      const baseCellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
-      const cellSize = baseCellSize * 2; // Double the size
+      const cellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
       const playWidth = WIDTH * cellSize;
       const playHeight = HEIGHT * cellSize;
       const offsetX = (canvas.width - playWidth) / 2;
