@@ -130,6 +130,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   const [grid, setGrid] = useState(true);
   const [surround, setSurround] = useState(false);
   const [twoKeyMode, setTwoKeyMode] = useState(true);
+  const [musicReactive, setMusicReactive] = useState(true);
   const [highScores, setHighScores] = useState<NibblesScore[]>([]);
   const [showNameEntry, setShowNameEntry] = useState(false);
   const [nameEntryPlayer, setNameEntryPlayer] = useState(1);
@@ -866,10 +867,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       const offsetY = (canvas.height - playHeight) / 2;
 
       // Draw music-reactive background tiles
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
-      renderBackgroundTiles(ctx, cellSize);
-      ctx.restore();
+      if (musicReactive) {
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        renderBackgroundTiles(ctx, cellSize);
+        ctx.restore();
+      }
 
       // Draw playfield border
       if (surround) {
@@ -956,7 +959,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       isRunning = false;
       if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
     };
-  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles, updateAndRenderParticles, getSegmentIndex, getFrequencyColor]);
+  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, musicReactive, renderBackgroundTiles, updateAndRenderParticles, getSegmentIndex, getFrequencyColor]);
 
   // Initial Level Load (only once on mount)
   useEffect(() => {
@@ -1160,6 +1163,15 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
                 className="accent-accent-primary"
               />
               2-Key
+            </label>
+            <label className="flex items-center gap-1 text-[9px] text-text-muted cursor-pointer uppercase font-mono">
+              <input
+                type="checkbox"
+                checked={musicReactive}
+                onChange={e => { e.stopPropagation(); setMusicReactive(e.target.checked); }}
+                className="accent-accent-primary"
+              />
+              Music FX
             </label>
           </div>
         </div>
