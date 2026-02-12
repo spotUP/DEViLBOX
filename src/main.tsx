@@ -25,7 +25,7 @@ useSettingsStore.subscribe(
       if (!state.autoLatency || isPlaying) {
         getToneEngine().setAudioLatency(state.audioLatency);
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 );
 
@@ -50,7 +50,7 @@ useTransportStore.subscribe(
           engine.setAudioLatency('interactive');
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 );
 

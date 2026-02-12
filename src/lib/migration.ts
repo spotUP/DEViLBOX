@@ -40,7 +40,7 @@ export function deepMerge<T extends object>(target: T, source: Partial<T>): T {
     const targetVal = target[key];
     if (sourceVal !== undefined && sourceVal !== null) {
       if (typeof sourceVal === 'object' && !Array.isArray(sourceVal) && typeof targetVal === 'object' && !Array.isArray(targetVal)) {
-        result[key] = deepMerge(targetVal as any, sourceVal as any);
+        result[key] = deepMerge(targetVal as T[keyof T] & object, sourceVal as Partial<T[keyof T] & object>) as T[keyof T];
       } else {
         result[key] = sourceVal as T[keyof T];
       }
@@ -192,8 +192,8 @@ export function migrateCell(cell: TrackerCell): TrackerCell {
   }
 
   // Migrate effects (string → effTyp + eff)
-  if ('effect' in cell && typeof (cell as any).effect === 'string') {
-    const effectStr = (cell as any).effect;
+  if (cell.effect !== undefined && typeof cell.effect === 'string') {
+    const effectStr = cell.effect;
     if (effectStr && effectStr !== '...' && effectStr !== '000') {
       const [effTyp, eff] = effectStringToXM(effectStr);
       migratedCell.effTyp = effTyp;
@@ -203,20 +203,20 @@ export function migrateCell(cell: TrackerCell): TrackerCell {
       migratedCell.eff = 0;
     }
     // Remove old effect field
-    delete (migratedCell as any).effect;
+    delete migratedCell.effect;
   }
 
   // Ensure effTyp and eff fields exist (if not already set)
-  if (!(migratedCell as any).effTyp && migratedCell.effTyp !== 0) {
-    (migratedCell as any).effTyp = 0;
+  if (!migratedCell.effTyp && migratedCell.effTyp !== 0) {
+    migratedCell.effTyp = 0;
   }
-  if (!(migratedCell as any).eff && migratedCell.eff !== 0) {
-    (migratedCell as any).eff = 0;
+  if (!migratedCell.eff && migratedCell.eff !== 0) {
+    migratedCell.eff = 0;
   }
 
   // Migrate effect2 (old string format → numeric effTyp2 + eff2)
-  if ('effect2' in cell && typeof (cell as any).effect2 === 'string') {
-    const effect2Str = (cell as any).effect2 as string;
+  if (cell.effect2 !== undefined && typeof cell.effect2 === 'string') {
+    const effect2Str = cell.effect2;
     if (effect2Str && effect2Str !== '...' && effect2Str !== '000') {
       // Parse: first char → effect type (hex 0-F → 0-15), remaining → param (hex 00-FF → 0-255)
       const [effTyp2, eff2] = effectStringToXM(effect2Str);
@@ -227,7 +227,7 @@ export function migrateCell(cell: TrackerCell): TrackerCell {
       migratedCell.eff2 = 0;
     }
     // Remove old effect2 field
-    delete (migratedCell as any).effect2;
+    delete migratedCell.effect2;
   }
 
   // Ensure effTyp2 and eff2 fields exist
@@ -295,7 +295,7 @@ export function migrateInstruments(instruments: InstrumentConfig[]): InstrumentC
     return {
       ...completeInst,
       id: newId,
-      type: (inst as any).type || type, // Preserve existing type or infer
+      type: inst.type || type, // Preserve existing type or infer
     };
   });
 }
@@ -361,7 +361,7 @@ export function needsMigration(
   const hasOldIds = hasOldInstrumentIds(instruments);
 
   // Check if any instrument is missing the type field
-  const missingTypeField = instruments.some(inst => !(inst as any).type);
+  const missingTypeField = instruments.some(inst => !inst.type);
 
   // Check if any instrument has incomplete config
   const hasIncomplete = instruments.some(inst => hasIncompleteConfig(inst));

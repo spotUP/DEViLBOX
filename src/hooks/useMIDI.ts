@@ -78,7 +78,7 @@ function parseMIDIMessage(data: Uint8Array): MIDIMessage {
         raw: data,
       };
 
-    case 0x0e: // Pitch Bend
+    case 0x0e: { // Pitch Bend
       const pitchValue = (byte2 << 7) | byte1;
       return {
         type: 'pitchbend',
@@ -86,6 +86,7 @@ function parseMIDIMessage(data: Uint8Array): MIDIMessage {
         value: pitchValue,
         raw: data,
       };
+    }
 
     case 0x0d: // Channel Aftertouch
       return {
@@ -109,22 +110,18 @@ function parseMIDIMessage(data: Uint8Array): MIDIMessage {
  */
 export function useMIDI(): UseMIDIReturn {
   const [devices, setDevices] = useState<MIDIDevice[]>([]);
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported] = useState(() => 'requestMIDIAccess' in navigator);
   const [isEnabled, setIsEnabled] = useState(false);
   const [lastMessage, setLastMessage] = useState<MIDIMessage | null>(null);
 
-  const midiAccessRef = useRef<any>(null);
+  const midiAccessRef = useRef<MIDIAccess | null>(null);
   const stateChangeHandlerRef = useRef<(() => void) | null>(null);
   const messageListenersRef = useRef<Set<(message: MIDIMessage) => void>>(new Set());
 
-  // Check for Web MIDI API support
-  useEffect(() => {
-    setIsSupported('requestMIDIAccess' in navigator);
-  }, []);
-
   // Handle MIDI input message
-  const handleMIDIMessage = useCallback((event: any) => {
-    const message = parseMIDIMessage(event.data);
+  const handleMIDIMessage = useCallback((event: Event) => {
+    const midiEvent = event as MIDIMessageEvent;
+    const message = parseMIDIMessage(midiEvent.data);
     setLastMessage(message);
 
     // Notify all listeners
@@ -134,10 +131,10 @@ export function useMIDI(): UseMIDIReturn {
   }, []);
 
   // Update device list from MIDI access
-  const updateDevices = useCallback((midiAccess: any) => {
+  const updateDevices = useCallback((midiAccess: MIDIAccess) => {
     const deviceList: MIDIDevice[] = [];
 
-    midiAccess.inputs.forEach((input: any) => {
+    midiAccess.inputs.forEach((input: MIDIInput) => {
       deviceList.push({
         id: input.id,
         name: input.name || 'Unknown Device',
@@ -160,42 +157,38 @@ export function useMIDI(): UseMIDIReturn {
       return;
     }
 
-    try {
-      const midiAccess = await navigator.requestMIDIAccess();
-      midiAccessRef.current = midiAccess;
+    const midiAccess = await navigator.requestMIDIAccess();
+    midiAccessRef.current = midiAccess;
 
-      // Listen to all inputs
+    // Listen to all inputs
+    midiAccess.inputs.forEach((input) => {
+      input.addEventListener('midimessage', handleMIDIMessage as EventListener);
+    });
+
+    // Create and store state change handler to prevent memory leaks
+    const stateChangeHandler = () => {
+      updateDevices(midiAccess);
+
+      // Only attach listeners to new inputs that don't have them
       midiAccess.inputs.forEach((input) => {
+        // Check if listener already exists by removing/re-adding
+        input.removeEventListener('midimessage', handleMIDIMessage as EventListener);
         input.addEventListener('midimessage', handleMIDIMessage as EventListener);
       });
+    };
 
-      // Create and store state change handler to prevent memory leaks
-      const stateChangeHandler = () => {
-        updateDevices(midiAccess);
+    stateChangeHandlerRef.current = stateChangeHandler;
+    midiAccess.addEventListener('statechange', stateChangeHandler);
 
-        // Only attach listeners to new inputs that don't have them
-        midiAccess.inputs.forEach((input) => {
-          // Check if listener already exists by removing/re-adding
-          input.removeEventListener('midimessage', handleMIDIMessage as EventListener);
-          input.addEventListener('midimessage', handleMIDIMessage as EventListener);
-        });
-      };
-
-      stateChangeHandlerRef.current = stateChangeHandler;
-      midiAccess.addEventListener('statechange', stateChangeHandler);
-
-      updateDevices(midiAccess);
-      setIsEnabled(true);
-    } catch (error) {
-      throw error;
-    }
+    updateDevices(midiAccess);
+    setIsEnabled(true);
   }, [isSupported, isEnabled, handleMIDIMessage, updateDevices]);
 
   // Disable MIDI access
   const disableMIDI = useCallback(() => {
     if (midiAccessRef.current) {
       // Remove all input listeners
-      midiAccessRef.current.inputs.forEach((input: any) => {
+      midiAccessRef.current.inputs.forEach((input: MIDIInput) => {
         input.removeEventListener('midimessage', handleMIDIMessage as EventListener);
       });
 

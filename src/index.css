@@ -2314,6 +2314,112 @@ html[data-theme="cyan-lineart"] #root > * {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   Visualizer Frame — Hardware-style recessed display with glass
+   ────────────────────────────────────────────────────────────────── */
+
+.viz-frame {
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #050505;
+  /* Recessed groove: dark inset shadow + subtle top highlight = panel cutout look */
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+    inset 2px 0 4px rgba(0, 0, 0, 0.4),
+    inset -2px 0 4px rgba(0, 0, 0, 0.4),
+    /* Outer bevel — raised edge around the cutout */
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 -1px 0 rgba(0, 0, 0, 0.5);
+  /* Subtle outer border for definition */
+  border: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+.viz-frame__content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Glass reflection — diagonal highlight across top third */
+.viz-frame__glass {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 6px;
+  background:
+    /* Primary reflection — bright diagonal band at top */
+    linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.03) 15%,
+      rgba(255, 255, 255, 0.0) 35%,
+      transparent 50%
+    ),
+    /* Secondary reflection — fainter, wider */
+    linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.025) 0%,
+      transparent 45%
+    ),
+    /* Bottom edge subtle reflection from bezel */
+    linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0%,
+      transparent 8%
+    );
+}
+
+/* Vignette — darkened edges for depth/focus */
+.viz-frame__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 30px rgba(0, 0, 0, 0.4),
+    inset 0 0 60px rgba(0, 0, 0, 0.15);
+}
+
+/* Compact variant — tighter shadow for small displays */
+.viz-frame--compact .viz-frame__vignette {
+  box-shadow:
+    inset 0 0 15px rgba(0, 0, 0, 0.4),
+    inset 0 0 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Large variant — more dramatic glass and vignette */
+.viz-frame--large .viz-frame__glass {
+  background:
+    linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 12%,
+      rgba(255, 255, 255, 0.0) 30%,
+      transparent 50%
+    ),
+    linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 40%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      transparent 10%
+    );
+}
+
+.viz-frame--large .viz-frame__vignette {
+  box-shadow:
+    inset 0 0 50px rgba(0, 0, 0, 0.5),
+    inset 0 0 100px rgba(0, 0, 0, 0.2);
+}
+
 /* Section within tab content - no scroll */
 .synth-tab-section {
   height: 100%;

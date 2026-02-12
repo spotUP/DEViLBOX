@@ -239,7 +239,8 @@ export class MAMESynth implements DevilboxSynth {
     return this;
   }
 
-  public triggerRelease(note: string, _time?: number): this {
+  public triggerRelease(note: string, time?: number): this {
+    void time;
     if (!this.isInitialized || this.handle === 0) return this;
     
     const voice = this.voices.find(v => v.active && v.note === note);

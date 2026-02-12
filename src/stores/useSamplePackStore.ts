@@ -20,7 +20,7 @@ interface SamplePackStore {
 }
 
 export const useSamplePackStore = create<SamplePackStore>()(
-  immer((set, _get) => ({
+  immer((set) => ({
     // Initial state
     userPacks: [],
 

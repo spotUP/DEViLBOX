@@ -4,8 +4,10 @@
  * No more separate tabs - all 60 effects available for any instrument
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { X, Settings, Sliders, Cpu, Globe, AlertTriangle, ChevronDown, Search } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { X, Settings, Sliders, Cpu, Globe, AlertTriangle, ChevronDown, Search, ExternalLink } from 'lucide-react';
+import { useUIStore } from '@stores/useUIStore';
+import { focusPopout } from '@components/ui/PopOutWindow';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
@@ -35,36 +37,35 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   // Get current instrument
   const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId);
 
+  // Ref-based counter for unique IDs (avoids impure Date.now() during render)
+  const idCounterRef = useRef(0);
+
   // Load a factory preset
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
     if (currentInstrumentId === null) return;
-    
+
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
-      id: `instrument-fx-${Date.now()}-${index}`,
+      id: `instrument-fx-${++idCounterRef.current}-${index}`,
     }));
-    
-    updateInstrument(currentInstrumentId, { effects: effects as any });
+
+    updateInstrument(currentInstrumentId, { effects });
     setShowPresetMenu(false);
     notify.success(`Applied ${preset.name} to ${currentInstrument?.name}`);
   }, [currentInstrumentId, updateInstrument, currentInstrument?.name]);
 
-  if (!currentInstrument) {
-    return null;
-  }
-
-  const effects = currentInstrument.effects || [];
+  const effects = currentInstrument?.effects || [];
 
   // Count neural effects for performance warning (User Decision #2)
   const neuralEffectCount = effects.filter(fx => fx.category === 'neural').length;
 
-  const handleAddEffect = (availableEffect: AvailableEffect) => {
+  const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
     if (currentInstrumentId === null) return;
 
     // User Decision #2: Warn before adding 4th neural effect
     if (availableEffect.category === 'neural' && neuralEffectCount >= 3) {
-      const proceed = confirm(
-        '⚠️ Performance Warning\n\n' +
+      const proceed = window.confirm(
+        'Performance Warning\n\n' +
         'You are adding a 4th neural effect. Multiple neural effects can cause high CPU usage and audio glitches.\n\n' +
         'Consider using Tone.js effects or reducing the neural effect count.\n\n' +
         'Continue anyway?'
@@ -74,7 +75,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
 
     // Build new effect config
     const newEffect: EffectConfig = {
-      id: `effect-${Date.now()}`,
+      id: `effect-${++idCounterRef.current}`,
       category: availableEffect.category,
       type: (availableEffect.type as EffectType) || 'Distortion', // Default to Distortion for neural
       enabled: true,
@@ -97,47 +98,47 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
     }
 
     addEffectConfig(currentInstrumentId, newEffect);
-  };
+  }, [currentInstrumentId, neuralEffectCount, addEffectConfig]);
 
-  const handleRemoveEffect = (effectId: string) => {
+  const handleRemoveEffect = useCallback((effectId: string) => {
     if (currentInstrumentId !== null) {
       removeEffect(currentInstrumentId, effectId);
     }
-  };
+  }, [currentInstrumentId, removeEffect]);
 
-  const handleToggle = (effectId: string) => {
+  const handleToggle = useCallback((effectId: string) => {
     const effect = effects.find((fx) => fx.id === effectId);
     if (effect && currentInstrumentId !== null) {
       updateEffect(currentInstrumentId, effectId, { enabled: !effect.enabled });
     }
-  };
+  }, [effects, currentInstrumentId, updateEffect]);
 
-  const handleWetChange = (effectId: string, wet: number) => {
+  const handleWetChange = useCallback((effectId: string, wet: number) => {
     if (currentInstrumentId !== null) {
       updateEffect(currentInstrumentId, effectId, { wet });
     }
-  };
+  }, [currentInstrumentId, updateEffect]);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
-  };
+  }, [onClose]);
 
-  // Group effects for the add menu, filtered by search
+  // Group effects for the add menu, filtered by search (must be before conditional return)
   const effectsByGroup = getEffectsByGroup();
   const filteredEffectsByGroup = useMemo(() => {
     if (!searchQuery.trim()) return effectsByGroup;
     const q = searchQuery.toLowerCase();
     const filtered: Record<string, typeof effectsByGroup[string]> = {};
-    for (const [group, effects] of Object.entries(effectsByGroup)) {
-      const matched = effects.filter(e => e.label.toLowerCase().includes(q));
+    for (const [group, groupEffects] of Object.entries(effectsByGroup)) {
+      const matched = groupEffects.filter(e => e.label.toLowerCase().includes(q));
       if (matched.length > 0) filtered[group] = matched;
     }
     return filtered;
   }, [effectsByGroup, searchQuery]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentInstrument) return null;
 
   return (
     <div
@@ -207,6 +208,23 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
               </span>
             </div>
           )}
+
+          {/* Pop Out Button */}
+          <button
+            onClick={() => {
+              const already = useUIStore.getState().instrumentEffectsPoppedOut;
+              if (already) {
+                focusPopout('DEViLBOX — Instrument Effects');
+              } else {
+                onClose();
+                useUIStore.getState().setInstrumentEffectsPoppedOut(true);
+              }
+            }}
+            className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-cyan-400"
+            title="Pop out to separate window"
+          >
+            <ExternalLink size={20} />
+          </button>
 
           {/* Close Button */}
           <button

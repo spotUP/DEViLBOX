@@ -255,6 +255,7 @@ class MIDIManager {
     if (deviceId) {
       const output = this.outputs.get(deviceId);
       if (output) {
+        // Output selected; opens lazily when sending messages
       }
     }
   }
@@ -312,14 +313,6 @@ class MIDIManager {
       } else if (message.type === 'start' || message.type === 'stop' || message.type === 'continue') {
         this.processTransportCommand(message.type);
       }
-    }
-
-    // Log parsed messages (except clock which is too frequent)
-    if (message.type === 'cc') {
-    } else if (message.type === 'noteOn') {
-    } else if (message.type === 'noteOff') {
-    } else if (message.type === 'pitchBend') {
-    } else if (message.type === 'programChange') {
     }
 
     // Dispatch to all handlers

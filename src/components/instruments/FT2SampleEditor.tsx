@@ -13,12 +13,12 @@
  * - Save/Export range
  */
 
-import React, { useRef, useState, useCallback, useEffect, useMemo as _useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   Upload, Play, Square, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut as _ZoomOut, Scissors, Copy, ClipboardPaste, Crop,
+  ZoomIn, Scissors, Copy, ClipboardPaste, Crop,
   Repeat, RotateCcw, Maximize2, Volume2, Waves, Sparkles,
-  Save, Trash2, Music, ArrowLeft, ArrowRight, Undo2 as _Undo2,
+  Save, Trash2, Music, ArrowLeft, ArrowRight,
   FlipHorizontal, Settings2
 } from 'lucide-react';
 import { useInstrumentStore, notify } from '../../stores';
@@ -130,7 +130,7 @@ export const FT2SampleEditor: React.FC<FT2SampleEditorProps> = ({ instrument, on
   const [showEffects, setShowEffects] = useState(false);
 
   // Get sample URL from instrument
-  const sampleUrl = instrument.sample?.url || instrument.parameters?.sampleUrl || null;
+  const sampleUrl = instrument.sample?.url || (instrument.parameters?.sampleUrl as string) || null;
 
   // ============================================================================
   // DERIVED VALUES
@@ -166,7 +166,8 @@ export const FT2SampleEditor: React.FC<FT2SampleEditorProps> = ({ instrument, on
       try {
         const response = await fetch(sampleUrl);
         const arrayBuffer = await response.arrayBuffer();
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const audioContext = new AudioCtx();
         const buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
         // Initialize loop points from instrument if available

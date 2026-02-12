@@ -55,7 +55,7 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
       }
       releaseTimerRef.current = null;
     }, RELEASE_DELAY_MS);
-  }, [instrumentId, instrument.synthType]);
+  }, [instrumentId, instrument]);
 
   // Cleanup on unmount: release any active preview note immediately
   useEffect(() => {

@@ -176,6 +176,12 @@ export class MEA8000Synth extends MAMEBaseSynth {
 
   /** Speak English text using SAM's reciter and MEA8000 formant mapping */
   speakText(text: string): void {
+    if (!this._isReady || !this.workletNode) {
+      console.warn(`[MEA8000] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
+      this._pendingCalls.push({ method: 'speakText', args: [text] });
+      return;
+    }
+
     this.stopSpeaking();
 
     const phonemeStr = textToPhonemes(text);
@@ -184,6 +190,8 @@ export class MEA8000Synth extends MAMEBaseSynth {
     const tokens = parsePhonemeString(phonemeStr);
     const frames = phonemesToMEA8000Frames(tokens);
     if (frames.length === 0) return;
+
+    console.log(`[MEA8000] speakText: "${text}" → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
 
     const speechFrames: SpeechFrame<MEA8000Frame>[] = frames.map(f => ({
       data: f,
@@ -220,6 +228,20 @@ export class MEA8000Synth extends MAMEBaseSynth {
   /** Whether text-to-speech is currently playing */
   get isSpeaking(): boolean {
     return this._speechSequencer?.isSpeaking ?? false;
+  }
+
+  // ===========================================================================
+  // Pending Call Handling
+  // ===========================================================================
+
+  protected override processPendingCall(call: { method: string; args: unknown[] }): void {
+    if (call.method === 'speakText') {
+      this.speakText(call.args[0] as string);
+    } else if (call.method === 'loadPreset') {
+      this.loadPreset(call.args[0] as number);
+    } else {
+      super.processPendingCall(call);
+    }
   }
 
   // ===========================================================================

@@ -143,8 +143,8 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
 
       try {
         await context.audioWorklet.addModule(`${baseUrl}re-tape-echo/RETapeEcho.worklet.js`);
-      } catch (e: any) {
-        const msg = e?.message || String(e);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         if (!msg.includes('already') && !msg.includes('duplicate')) {
           throw new Error(`Failed to load RETapeEcho worklet: ${msg}`);
         }

@@ -132,7 +132,7 @@ export async function parseXM(buffer: ArrayBuffer): Promise<{
     // XM instruments are 1-indexed (1-128) in pattern data
     instrument.parsed.id = i + 1;
     // Also update sample IDs to match
-    instrument.parsed.samples.forEach((sample, _sampleIdx) => {
+    instrument.parsed.samples.forEach((sample) => {
       sample.id = i + 1; // Use instrument ID for sample (XM typically has 1 sample per instrument)
     });
     instruments.push(instrument.parsed);
@@ -421,7 +421,7 @@ function readXMInstrument(view: DataView, offset: number): {
     offset += 1;
 
     autoVibrato = {
-      type: ['sine', 'square', 'rampDown', 'rampUp'][vibratoType] as any,
+      type: (['sine', 'square', 'rampDown', 'rampUp'] as const)[vibratoType],
       sweep: vibratoSweep,
       depth: vibratoDepth,
       rate: vibratoRate,

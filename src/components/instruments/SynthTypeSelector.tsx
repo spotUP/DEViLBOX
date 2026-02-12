@@ -18,12 +18,6 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
   const { updateInstrument } = useInstrumentStore();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Get icon component dynamically
-  const getIcon = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || LucideIcons.Music2;
-  };
-
   // Filter synths based on search query
   const filteredSynths = useMemo(() => {
     if (!searchQuery.trim()) return ALL_SYNTH_TYPES;
@@ -72,26 +66,8 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
       </div>
 
       {/* Current selection */}
-      <div className="mb-4 p-3 bg-dark-bgSecondary rounded-lg border border-dark-border">
-        <div className="flex items-center gap-3">
-          {(() => {
-            const info = getSynthInfo(instrument.synthType);
-            const IconComponent = getIcon(info.icon);
-            return (
-              <>
-                <div className={`p-2 rounded-md bg-dark-bgTertiary ${info.color}`}>
-                  <IconComponent size={20} />
-                </div>
-                <div>
-                  <span className="text-text-muted text-sm">Current: </span>
-                  <span className="text-accent-primary font-bold font-mono">{info.name}</span>
-                  <p className="text-xs text-text-muted">{info.description}</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      </div>
+      <CurrentSynthDisplay instrument={instrument} />
+
 
       {/* Results count when searching */}
       {searchQuery && (
@@ -102,36 +78,14 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
 
       {/* All synths grid */}
       <div className="grid grid-cols-3 gap-2">
-        {filteredSynths.map((synthType) => {
-          const synth = SYNTH_INFO[synthType];
-          const isActive = instrument.synthType === synthType;
-          const IconComponent = getIcon(synth.icon);
-
-          return (
-            <button
-              key={synthType}
-              onClick={() => handleTypeChange(synthType)}
-              className={`
-                p-3 border rounded-lg transition-all text-left
-                ${
-                  isActive
-                    ? 'bg-accent-primary/15 border-accent-primary'
-                    : 'bg-dark-bgSecondary border-dark-border hover:border-dark-borderLight hover:bg-dark-bgHover'
-                }
-              `}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <IconComponent size={16} className={isActive ? 'text-accent-primary' : synth.color} />
-                <span className={`font-mono text-xs font-bold ${isActive ? 'text-accent-primary' : 'text-text-primary'}`}>
-                  {synth.shortName}
-                </span>
-              </div>
-              <div className={`text-[10px] leading-tight ${isActive ? 'text-accent-primary/80' : 'text-text-muted'}`}>
-                {synth.bestFor.slice(0, 2).join(', ')}
-              </div>
-            </button>
-          );
-        })}
+        {filteredSynths.map((synthType) => (
+          <SynthGridItem
+            key={synthType}
+            synthType={synthType}
+            isActive={instrument.synthType === synthType}
+            onSelect={handleTypeChange}
+          />
+        ))}
       </div>
 
       {/* No results message */}
@@ -147,5 +101,63 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
         </div>
       )}
     </div>
+  );
+};
+
+/** Static icon helper to avoid creating components during render */
+const SynthIcon: React.FC<{ iconName: string; size: number; className?: string }> = ({ iconName, size, className }) => {
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName] || LucideIcons.Music2;
+  return <Icon size={size} className={className} />;
+};
+
+/** Extracted to avoid creating components during render */
+const CurrentSynthDisplay: React.FC<{
+  instrument: InstrumentConfig;
+}> = ({ instrument }) => {
+  const info = getSynthInfo(instrument.synthType);
+  return (
+    <div className="mb-4 p-3 bg-dark-bgSecondary rounded-lg border border-dark-border">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-md bg-dark-bgTertiary ${info.color}`}>
+          <SynthIcon iconName={info.icon} size={20} />
+        </div>
+        <div>
+          <span className="text-text-muted text-sm">Current: </span>
+          <span className="text-accent-primary font-bold font-mono">{info.name}</span>
+          <p className="text-xs text-text-muted">{info.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Extracted to avoid creating components during render */
+const SynthGridItem: React.FC<{
+  synthType: SynthType;
+  isActive: boolean;
+  onSelect: (type: SynthType) => void;
+}> = ({ synthType, isActive, onSelect }) => {
+  const synth = SYNTH_INFO[synthType];
+  return (
+    <button
+      onClick={() => onSelect(synthType)}
+      className={`
+        p-3 border rounded-lg transition-all text-left
+        ${isActive
+          ? 'bg-accent-primary/15 border-accent-primary'
+          : 'bg-dark-bgSecondary border-dark-border hover:border-dark-borderLight hover:bg-dark-bgHover'
+        }
+      `}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <SynthIcon iconName={synth.icon} size={16} className={isActive ? 'text-accent-primary' : synth.color} />
+        <span className={`font-mono text-xs font-bold ${isActive ? 'text-accent-primary' : 'text-text-primary'}`}>
+          {synth.shortName}
+        </span>
+      </div>
+      <div className={`text-[10px] leading-tight ${isActive ? 'text-accent-primary/80' : 'text-text-muted'}`}>
+        {synth.bestFor.slice(0, 2).join(', ')}
+      </div>
+    </button>
   );
 };

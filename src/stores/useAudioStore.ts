@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 interface AudioStore {
@@ -17,7 +18,7 @@ interface AudioStore {
   masterMuted: boolean;
   analyserNode: Tone.Analyser | null;
   fftNode: Tone.FFT | null;
-  toneEngineInstance: any | null; // Will be ToneEngine class instance
+  toneEngineInstance: ToneEngine | null;
 
   // Master Effects Chain
   masterEffects: EffectConfig[];
@@ -30,7 +31,7 @@ interface AudioStore {
   toggleMasterMute: () => void;
   setAnalyserNode: (node: Tone.Analyser | null) => void;
   setFFTNode: (node: Tone.FFT | null) => void;
-  setToneEngineInstance: (instance: any) => void;
+  setToneEngineInstance: (instance: ToneEngine) => void;
 
   // Master Effects Actions
   addMasterEffect: (effectType: EffectType) => void;

@@ -8,6 +8,15 @@ import * as Tone from 'tone';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
+/** Common interface for instruments returned by InstrumentFactory */
+interface BakeableInstrument {
+  connect?(destination: Tone.ToneAudioNode | AudioNode): void;
+  triggerAttackRelease?(note: string, duration: number, time?: number): void;
+  triggerAttack?(note: string, time?: number): void;
+  triggerRelease?(note?: string, time?: number): void;
+  dispose?(): void;
+}
+
 export class SynthBaker {
   /**
    * Bake a synth instrument to a sample (AudioBuffer)
@@ -29,28 +38,28 @@ export class SynthBaker {
 
     try {
       // 3. Create the real instrument instance in the offline context
-      const instrument = InstrumentFactory.createInstrument(config);
-      
+      const instrument = InstrumentFactory.createInstrument(config) as BakeableInstrument;
+
       // Connect to offline destination - must use raw Web Audio connection if node is not a Tone object
-      if ('connect' in instrument && typeof (instrument as any).connect === 'function') {
-        (instrument as any).connect(Tone.getContext().destination);
+      if (instrument.connect) {
+        instrument.connect(Tone.getContext().destination);
       }
-      
+
       // Trigger note
-      if ((instrument as any).triggerAttackRelease) {
-        (instrument as any).triggerAttackRelease(note, duration * 0.8, 0);
-      } else if ((instrument as any).triggerAttack) {
-        (instrument as any).triggerAttack(note, 0);
+      if (instrument.triggerAttackRelease) {
+        instrument.triggerAttackRelease(note, duration * 0.8, 0);
+      } else if (instrument.triggerAttack) {
+        instrument.triggerAttack(note, 0);
         setTimeout(() => {
-          if ((instrument as any).triggerRelease) (instrument as any).triggerRelease(note, duration * 0.8);
+          if (instrument.triggerRelease) instrument.triggerRelease(note, duration * 0.8);
         }, duration * 800);
       }
 
       // 4. Render
       const renderedBuffer = await offlineContext.startRendering();
-      
+
       // Cleanup instrument
-      if ((instrument as any).dispose) (instrument as any).dispose();
+      if (instrument.dispose) instrument.dispose();
       
       return renderedBuffer;
     } finally {

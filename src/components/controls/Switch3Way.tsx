@@ -78,4 +78,4 @@ export const Switch3Way = React.memo(Switch3WayComponent, (prevProps, nextProps)
   );
 }) as typeof Switch3WayComponent;
 
-(Switch3Way as any).displayName = 'Switch3Way';
+(Switch3Way as { displayName?: string }).displayName = 'Switch3Way';

@@ -10,6 +10,7 @@ import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePac
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getToneEngine } from '@engine/ToneEngine';
+import type { InstrumentConfig } from '@typedefs/instrument';
 
 interface SamplePackBrowserProps {
   onClose: () => void;
@@ -26,7 +27,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [_isPlaying, setIsPlaying] = useState(false);
+  const [, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
   const previewVersionRef = useRef(0); // Track preview version to prevent stale callbacks
@@ -67,7 +68,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       effects: [],
       volume: -6,
       pan: 0,
-    } as any;
+    } as InstrumentConfig;
   }, [primarySample]);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       // Force engine to reload the new sample for the preview ID
       try {
         getToneEngine().invalidateInstrument(999);
-      } catch (e) {
+      } catch {
         // Ignored
       }
     } else {
@@ -370,7 +371,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           setActiveCategory(pack.categories[0]);
         }
       }
-    } catch (error) {
+    } catch {
       if (isMountedRef.current) {
         alert('Failed to load ZIP pack. Ensure it contains audio files.');
       }
@@ -398,7 +399,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           setActiveCategory(pack.categories[0]);
         }
       }
-    } catch (error) {
+    } catch {
       if (isMountedRef.current) {
         alert('Failed to load directory. Ensure it contains audio files.');
       }
@@ -511,7 +512,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           <input
             ref={dirInputRef}
             type="file"
-            {...({ webkitdirectory: '', directory: '' } as any)}
+            {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
             className="hidden"
             onChange={handleDirUpload}
           />

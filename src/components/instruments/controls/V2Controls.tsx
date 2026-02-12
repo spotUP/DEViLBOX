@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
@@ -19,7 +19,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);

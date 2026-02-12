@@ -381,12 +381,14 @@ function createInvalidMOD(): ArrayBuffer {
   return buffer;
 }
 
-function createMODWithSamples(_samples: any[]): ArrayBuffer {
+function createMODWithSamples(samples: unknown[]): ArrayBuffer {
+  void samples;
   // Simplified - would need full MOD structure
   return createMinimalMOD();
 }
 
-function createMODWithPattern(_options: { rows: any[] }): ArrayBuffer {
+function createMODWithPattern(options: { rows: unknown[] }): ArrayBuffer {
+  void options;
   // Simplified - would need full MOD structure
   return createMinimalMOD();
 }

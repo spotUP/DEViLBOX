@@ -742,10 +742,12 @@ export function getWavetableForChip(
     case 'swan': // WonderSwan: 32 samples, 4-bit (0-15)
       return convertWavetableForChip(wave, 15);
 
-    case 'scc': // Konami SCC: 32 samples, 8-bit signed (-128 to 127)
+    case 'scc': {
+      // Konami SCC: 32 samples, 8-bit signed (-128 to 127)
       // Convert unsigned to signed
       const scaled = convertWavetableForChip(wave, 255);
       return scaled.map(v => v - 128);
+    }
 
     case 'lynx': // Atari Lynx: variable length, 8-bit (0-255)
       return convertWavetableForChip(wave, 255);

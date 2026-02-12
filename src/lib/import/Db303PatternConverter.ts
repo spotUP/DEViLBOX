@@ -109,8 +109,8 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
       }
 
       rows.push({
-        note: note as any,
-        instrument: step.gate ? instrumentId as any : 0, // Only set instrument on gated notes
+        note,
+        instrument: step.gate ? instrumentId : 0, // Only set instrument on gated notes
         volume: 0,
         effTyp: 0,
         eff: 0,
@@ -123,7 +123,7 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
     } else {
       // Empty step
       rows.push({
-        note: 0 as any,
+        note: 0,
         instrument: 0,
         volume: 0,
         effTyp: 0,
@@ -264,7 +264,7 @@ export function createEmptyDb303Pattern(numSteps: number = 16, name: string = 'N
   const rows: TrackerCell[] = [];
   for (let i = 0; i < numSteps; i++) {
     rows.push({
-      note: 0 as any,
+      note: 0,
       instrument: 0,
       volume: 0,
       effTyp: 0,
@@ -354,7 +354,12 @@ export async function exportCurrentPatternToDb303(
 
 // Expose export function to browser console
 if (typeof window !== 'undefined') {
-  (window as any).exportCurrentPatternToDb303 = exportCurrentPatternToDb303;
-  (window as any).convertToDb303Pattern = convertToDb303Pattern;
-  (window as any).downloadDb303Pattern = downloadDb303Pattern;
+  const win = window as Window & {
+    exportCurrentPatternToDb303?: typeof exportCurrentPatternToDb303;
+    convertToDb303Pattern?: typeof convertToDb303Pattern;
+    downloadDb303Pattern?: typeof downloadDb303Pattern;
+  };
+  win.exportCurrentPatternToDb303 = exportCurrentPatternToDb303;
+  win.convertToDb303Pattern = convertToDb303Pattern;
+  win.downloadDb303Pattern = downloadDb303Pattern;
 }

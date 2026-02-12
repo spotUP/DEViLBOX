@@ -5,7 +5,7 @@
  * Integrates with a TB-303 engine for complete acid bassline playback.
  */
 
-import { AcidSequencer, AcidPattern, SequencerMode, type SequencerEvent } from './AcidSequencer';
+import { AcidSequencer, AcidPattern, SequencerMode, type SequencerEvent, type AcidSequencerJSON } from './AcidSequencer';
 import { getNativeContext } from '@utils/audio-context';
 
 /** Minimal interface for a TB-303 engine that the sequencer can drive */
@@ -227,14 +227,14 @@ export class SequencerEngine {
   /**
    * Load patterns from JSON
    */
-  loadPatterns(data: any): void {
+  loadPatterns(data: AcidSequencerJSON): void {
     this.sequencer.loadPatternsFromJSON(data);
   }
 
   /**
    * Export patterns to JSON
    */
-  exportPatterns(): any {
+  exportPatterns(): AcidSequencerJSON {
     return this.sequencer.exportPatternsToJSON();
   }
 

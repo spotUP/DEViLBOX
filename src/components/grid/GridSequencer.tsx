@@ -69,7 +69,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // Use a ref to access current steps without causing callback recreation
   const stepsRef = useRef(gridPattern.steps);
-  stepsRef.current = gridPattern.steps;
+  useEffect(() => { stepsRef.current = gridPattern.steps; }, [gridPattern.steps]);
 
   // Focus management for keyboard navigation
   const [focusedCell, setFocusedCell] = useState<{ noteIndex: number; stepIndex: number } | null>(null);
@@ -89,7 +89,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Initialize focus to first cell
   useEffect(() => {
     if (focusedCell === null && maxSteps > 0) {
-      setFocusedCell({ noteIndex: 11, stepIndex: 0 });
+      requestAnimationFrame(() => setFocusedCell({ noteIndex: 11, stepIndex: 0 }));
     }
   }, [focusedCell, maxSteps]);
 

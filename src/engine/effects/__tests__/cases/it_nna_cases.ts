@@ -18,8 +18,7 @@ export const itNNACases: ComplianceTestCase[] = [
             loopEndPoint: null,
           }
         }
-      } as any
-    },
+      }    },
     steps: [
       { 
         row: 0, 
@@ -56,8 +55,7 @@ export const itNNACases: ComplianceTestCase[] = [
             loopEndPoint: null,
           }
         }
-      } as any
-    },
+      }    },
     steps: [
       { 
         row: 0, 
@@ -95,8 +93,7 @@ export const itNNACases: ComplianceTestCase[] = [
           }
         },
         fadeout: 1024 // Fade out by 1024 units per tick (1/64 of max 65536)
-      } as any
-    },
+      }    },
     steps: [
       { 
         row: 0, 

@@ -160,12 +160,12 @@ export class FT2EffectHandler {
 
     // Process main effect
     if (effect) {
-      this.processTickZeroEffect(effect, mem, currentRow, triggerNote, cell);
+      this.processTickZeroEffect(effect, mem, currentRow);
     }
 
     // Process second effect (volume column)
     if (effect2) {
-      this.processTickZeroEffect(effect2, mem, currentRow, triggerNote, cell);
+      this.processTickZeroEffect(effect2, mem, currentRow);
     }
 
     // Trigger note if present (unless delayed by EDx)
@@ -206,8 +206,6 @@ export class FT2EffectHandler {
     effect: string,
     mem: ChannelMemory,
     currentRow: number,
-    _triggerNote: (note: string, instrument: number | null) => void,
-    _cell: TrackerCell
   ): void {
     const cmd = effect.charAt(0).toUpperCase();
     const param = parseInt(effect.substring(1), 16);
@@ -221,15 +219,16 @@ export class FT2EffectHandler {
         mem.currentVolume = Math.min(param, 0x40);
         break;
 
-      case 'D': // Pattern break
+      case 'D': { // Pattern break
         // Convert BCD to decimal
         const row = Math.floor(param / 16) * 10 + (param % 16);
         this.flowControl.patternBreak = row;
         break;
+      }
 
       case 'F': // Set speed/BPM
         if (param === 0) {
-          // F00 = stop playback (implementation-specific)
+          // F00 = stop playback (implementation-specific, ignored)
         } else if (param < 0x20) {
           this.playbackState.speed = param;
         } else {
@@ -270,19 +269,21 @@ export class FT2EffectHandler {
         }
         break;
 
-      case '4': // Vibrato - update memory
+      case '4': { // Vibrato - update memory
         const x = (param >> 4) & 0x0F;
         const y = param & 0x0F;
         if (x > 0) mem.vibratoSpeed = x;
         if (y > 0) mem.vibratoDepth = y;
         break;
+      }
 
-      case '7': // Tremolo - update memory
+      case '7': { // Tremolo - update memory
         const tx = (param >> 4) & 0x0F;
         const ty = param & 0x0F;
         if (tx > 0) mem.tremoloSpeed = tx;
         if (ty > 0) mem.tremoloDepth = ty;
         break;
+      }
 
       case 'A': // Volume slide - update memory
         if (param > 0) {
@@ -379,14 +380,16 @@ export class FT2EffectHandler {
     this.processVolumeSlide(mem);
     this.processNoteCut(mem, currentTick);
     this.processNoteRetrigger(mem, currentTick);
+
   }
 
   /**
    * 0xy - Arpeggio
    */
-  private processArpeggio(_mem: ChannelMemory, _tick: number): void {
+  private processArpeggio(mem: ChannelMemory, tick: number): void {
     // Arpeggio cycles every 3 ticks: base, +x semitones, +y semitones
     // Implementation would modulate pitch based on tick % 3
+    void mem; void tick;
   }
 
   /**
@@ -473,15 +476,17 @@ export class FT2EffectHandler {
   /**
    * ECx - Note cut at tick x
    */
-  private processNoteCut(_mem: ChannelMemory, _tick: number): void {
+  private processNoteCut(mem: ChannelMemory, tick: number): void {
     // Would be triggered by stored cut tick from tick 0 processing
+    void mem; void tick;
   }
 
   /**
    * E9x - Note retrigger every x ticks
    */
-  private processNoteRetrigger(_mem: ChannelMemory, _tick: number): void {
+  private processNoteRetrigger(mem: ChannelMemory, tick: number): void {
     // Would retrigger note based on stored interval
+    void mem; void tick;
   }
 
   /**

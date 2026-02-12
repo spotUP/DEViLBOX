@@ -326,7 +326,7 @@ export class VFXSynth implements DevilboxSynth {
     this.writeVoiceReg(voiceIndex, ES5506_REG.ACCUM, 0);
 
     // Start playing (clear stop bit)
-    let control = ES5506Control.LOOP_ENABLE;
+    const control = ES5506Control.LOOP_ENABLE;
     this.writeVoiceReg(voiceIndex, ES5506_REG.CONTROL, control);
   }
 
@@ -346,7 +346,8 @@ export class VFXSynth implements DevilboxSynth {
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): void {
+  triggerRelease(note: string | number, time?: number): void {
+    void time;
     if (!this.isInitialized) return;
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;

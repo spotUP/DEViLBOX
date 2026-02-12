@@ -2495,7 +2495,7 @@ export class ToneEngine {
           }
           const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
           voiceNode.start(safeTime, offset);
-        } else if (voiceNode.triggerAttack) {
+        } else if ((voiceNode as any).triggerAttack) {
           // Safety: ensure DevilboxSynth output gain isn't stuck at 0
           if (isDevilboxSynth(voiceNode)) {
             const gain = (voiceNode.output as GainNode).gain;
@@ -2504,7 +2504,7 @@ export class ToneEngine {
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
             const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
-            voiceNode.triggerAttack(safeTime, finalVelocity);
+            (voiceNode as any).triggerAttack(safeTime, finalVelocity);
           } else if (voiceNode instanceof JC303Synth) {
             // JC303 WASM engine (now supports accent/slide)
             voiceNode.triggerAttack(note, safeTime, velocity, accent, slide);
@@ -2518,7 +2518,7 @@ export class ToneEngine {
               voiceNode, targetFreq, safeTime, velocity,
               accent, slide, channelIndex, instrumentId
             );
-            voiceNode.triggerAttack(note, safeTime, finalVelocity);
+            (voiceNode as any).triggerAttack(note, safeTime, finalVelocity);
           }
         }
       } catch (e) {
@@ -2540,10 +2540,10 @@ export class ToneEngine {
     try {
       // Fallback for non-channel triggers (like pre-listening)
       if (instrument instanceof JC303Synth) {
-        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
+        (instrument as any).triggerAttackRelease(note, duration, safeTime, velocity, accent, slide);
       } else if (instrument instanceof DB303Synth) {
         // DB303Synth supports hammer for legato without pitch glide (TT-303 extension)
-        instrument.triggerAttackRelease(note, duration, safeTime, velocity, accent, slide, hammer);
+        (instrument as any).triggerAttackRelease(note, duration, safeTime, velocity, accent, slide, hammer);
       } else if (config.synthType === 'NoiseSynth') {
         // NoiseSynth doesn't take note parameter: triggerAttackRelease(duration, time, velocity)
         (instrument as Tone.NoiseSynth).triggerAttackRelease(duration, safeTime, velocity);
@@ -2732,24 +2732,24 @@ export class ToneEngine {
       ) {
         // New synths with triggerAttackRelease interface
         // Apply slide/accent for mono synths (PolySynth can't slide between notes)
-        if (instrument.triggerAttackRelease) {
+        if ((instrument as any).triggerAttackRelease) {
           const targetFreq = Tone.Frequency(note).toFrequency();
           const finalVelocity = this.applySlideAndAccent(
             instrument, targetFreq, safeTime, velocity,
             accent, slide, channelIndex, instrumentId
           );
-          instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
+          (instrument as any).triggerAttackRelease(note, duration, safeTime, finalVelocity);
         }
       } else if (instrument instanceof WAMSynth) {
-        instrument.triggerAttackRelease(note, duration, safeTime, velocity);
+        (instrument as any).triggerAttackRelease(note, duration, safeTime, velocity);
       } else if (config.synthType === 'DrumMachine') {
         // DrumMachine - some drum types don't take note parameter
         // Apply accent (velocity boost) but not slide (drums don't pitch slide)
-        if (instrument.triggerAttackRelease) {
+        if ((instrument as any).triggerAttackRelease) {
           const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
-          instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
+          (instrument as any).triggerAttackRelease(note, duration, safeTime, finalVelocity);
         }
-      } else if (instrument.triggerAttackRelease) {
+      } else if ((instrument as any).triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)
         // Apply slide/accent for 303-style effects on all synths
         const targetFreq = Tone.Frequency(note).toFrequency();
@@ -2757,7 +2757,7 @@ export class ToneEngine {
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
         );
-        instrument.triggerAttackRelease(note, duration, safeTime, finalVelocity);
+        (instrument as any).triggerAttackRelease(note, duration, safeTime, finalVelocity);
       }
     } catch (error) {
       console.error(`[ToneEngine] Error triggering note for ${config.synthType}:`, error);
@@ -3889,15 +3889,16 @@ export class ToneEngine {
       if (hasNeuralEffect) {
         // Find first enabled neural effect
         const neuralEffect = pedalboard.chain.find((fx: { enabled: boolean; type: string }) => fx.enabled && fx.type === 'neural');
-        if (neuralEffect && neuralEffect.modelIndex !== undefined) {
+        const fx = neuralEffect as EffectConfig | undefined;
+        if (fx && fx.neuralModelIndex !== undefined) {
           try {
             // Load GuitarML model and enable
-            await synth.loadGuitarMLModel(neuralEffect.modelIndex);
+            await synth.loadGuitarMLModel(fx.neuralModelIndex);
             await synth.setGuitarMLEnabled(true);
 
             // Set dry/wet mix if specified
-            if (neuralEffect.parameters?.dryWet !== undefined) {
-              synth.setGuitarMLMix(neuralEffect.parameters.dryWet);
+            if (fx.parameters?.dryWet !== undefined) {
+              synth.setGuitarMLMix(fx.parameters.dryWet as number);
             }
           } catch (err) {
             console.error('[ToneEngine] Failed to update GuitarML:', err);
@@ -3924,8 +3925,8 @@ export class ToneEngine {
 
     // Find all channel instances of this instrument
     this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`) && instrument.updateArpeggio) {
-        instrument.updateArpeggio(arpeggioConfig);
+      if (key.startsWith(`${instrumentId}-`) && (instrument as any).updateArpeggio) {
+        (instrument as any).updateArpeggio(arpeggioConfig);
       }
     });
   }
@@ -3938,8 +3939,8 @@ export class ToneEngine {
   public getChipSynthArpeggioStep(instrumentId: number): number {
     // Find first channel instance with arpeggio engine
     for (const [key, instrument] of this.instruments.entries()) {
-      if (key.startsWith(`${instrumentId}-`) && instrument.getCurrentArpeggioStep) {
-        return instrument.getCurrentArpeggioStep();
+      if (key.startsWith(`${instrumentId}-`) && (instrument as any).getCurrentArpeggioStep) {
+        return (instrument as any).getCurrentArpeggioStep();
       }
     }
     return 0;
@@ -3953,8 +3954,8 @@ export class ToneEngine {
   public isChipSynthArpeggioPlaying(instrumentId: number): boolean {
     // Find first channel instance with arpeggio engine
     for (const [key, instrument] of this.instruments.entries()) {
-      if (key.startsWith(`${instrumentId}-`) && instrument.isArpeggioPlaying) {
-        return instrument.isArpeggioPlaying();
+      if (key.startsWith(`${instrumentId}-`) && (instrument as any).isArpeggioPlaying) {
+        return (instrument as any).isArpeggioPlaying();
       }
     }
     return false;
@@ -4213,9 +4214,9 @@ export class ToneEngine {
     }
 
     // Create effect nodes (async for neural effects)
-    const effectNodes = await Promise.all(
+    const effectNodes = (await Promise.all(
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
-    );
+    )) as Tone.ToneAudioNode[];
 
     // Build full chain: instrument → [bridge?] → effect[0] → ... → effect[N-1] → output → destination
     let bridge: Tone.Gain | undefined;
@@ -4225,16 +4226,16 @@ export class ToneEngine {
         // Insert a Tone.Gain bridge whose .input IS a native GainNode.
         bridge = new Tone.Gain(1);
         connectInstrumentTo(bridge);
-        bridge.connect(effectNodes[0]);
+        bridge.connect(effectNodes[0] as Tone.ToneAudioNode);
       } else {
-        (instrument as Tone.ToneAudioNode).connect(effectNodes[0]);
+        (instrument as Tone.ToneAudioNode).connect(effectNodes[0] as Tone.ToneAudioNode);
       }
       // Chain effects together
       for (let i = 0; i < effectNodes.length - 1; i++) {
-        effectNodes[i].connect(effectNodes[i + 1]);
+        (effectNodes[i] as Tone.ToneAudioNode).connect(effectNodes[i + 1] as Tone.ToneAudioNode);
       }
       // Connect last effect to output
-      effectNodes[effectNodes.length - 1].connect(output);
+      (effectNodes[effectNodes.length - 1] as Tone.ToneAudioNode).connect(output);
     } else {
       connectInstrumentTo(output);
     }
@@ -4250,11 +4251,11 @@ export class ToneEngine {
       output.connect(isNativeSynth ? this.synthBus : this.masterInput);
     }
 
-    this.instrumentEffectChains.set(key, { effects: effectNodes, output, bridge });
+    this.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
 
     // Register individual effect nodes for real-time parameter updates
     enabledEffects.forEach((config, i) => {
-      this.instrumentEffectNodes.set(config.id, { node: effectNodes[i], config });
+      this.instrumentEffectNodes.set(config.id, { node: effectNodes[i] as Tone.ToneAudioNode, config });
     });
   }
 
@@ -4384,14 +4385,14 @@ export class ToneEngine {
     }
 
     // Create effect nodes (async for neural effects)
-    const effectNodes = await Promise.all(
+    const effectNodes = (await Promise.all(
       enabledEffects.map((config) => InstrumentFactory.createEffect(config))
     );
 
     // Store nodes and configs
     effectNodes.forEach((node, index) => {
-      this.masterEffectsNodes.push(node);
-      this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
+      this.masterEffectsNodes.push(node as Tone.ToneAudioNode);
+      this.masterEffectConfigs.set(enabledEffects[index].id, { node: node as Tone.ToneAudioNode, config: enabledEffects[index] });
     });
 
     // Connect chain: masterEffectsInput → effects[0] → effects[n] → masterChannel
@@ -4929,7 +4930,7 @@ export class ToneEngine {
       fadeout: 65536,
       fadeoutStep: config.metadata?.modPlayback?.fadeout || 0,
       isKeyOff: false,
-      isFilterEnvelope: envs?.pitchEnvelope?.type === 'filter',
+      isFilterEnvelope: (envs?.pitchEnvelope as any)?.type === 'filter',
       lastCutoff: 127,
       lastResonance: 0,
       nodes: { gain, filter, panner }
@@ -4940,13 +4941,13 @@ export class ToneEngine {
    * Helper to stop a specific voice
    */
   private stopVoice(voice: VoiceState, time: number): void {
-    if (voice.instrument.stop) voice.instrument.stop(time);
-    else if (voice.instrument.triggerRelease) voice.instrument.triggerRelease(time);
-    
+    if ((voice.instrument as any).stop) (voice.instrument as any).stop(time);
+    else if ((voice.instrument as any).triggerRelease) (voice.instrument as any).triggerRelease(time);
+
     // Dispose nodes after a short delay to allow for audio tail/clipping prevention
     setTimeout(() => {
       voice.nodes.gain.dispose();
-      if (typeof voice.nodes.filter.dispose === 'function') voice.nodes.filter.dispose();
+      if (typeof (voice.nodes.filter as any).dispose === 'function') (voice.nodes.filter as any).dispose();
       voice.nodes.panner.dispose();
     }, 100);
   }
@@ -5094,7 +5095,7 @@ export class ToneEngine {
         }
 
         // Shift loopStart based on position (approximate behavior)
-        const shiftSeconds = (position / 128) * (player.loopEnd as number - originalLoopStart as number);
+        const shiftSeconds = (position / 128) * ((player.loopEnd as number) - (originalLoopStart as number));
         player.loopStart = (originalLoopStart as number) + shiftSeconds;
       }
     }

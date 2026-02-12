@@ -972,7 +972,7 @@ export class FurnaceDispatchEngine {
    * Initialize the engine with the given AudioContext.
    * Loads worklet module and WASM binary.
    */
-  async init(context: any): Promise<void> {
+  async init(context: Record<string, unknown>): Promise<void> {
     if (this.initialized || this.initializing) return;
     this.initializing = true;
 
@@ -1089,9 +1089,9 @@ export class FurnaceDispatchEngine {
       try {
         await context.audioWorklet.addModule(`${baseUrl}furnace-dispatch/FurnaceDispatch.worklet.js${cacheBuster}`);
         console.log('[FurnaceDispatch] ensureModuleLoaded: worklet module added');
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Only swallow "already registered" errors; re-throw real failures
-        const msg = e?.message || String(e);
+        const msg = (e instanceof Error ? e.message : String(e));
         if (!msg.includes('already') && !msg.includes('duplicate')) {
           throw new Error(`Failed to load FurnaceDispatch worklet: ${msg}`);
         }
@@ -1129,7 +1129,7 @@ export class FurnaceDispatchEngine {
     return initPromise;
   }
 
-  private handleWorkletMessage(data: any): void {
+  private handleWorkletMessage(data: Record<string, unknown>): void {
     switch (data.type) {
       case 'ready':
         console.log('[FurnaceDispatch] Worklet ready');
@@ -1139,11 +1139,11 @@ export class FurnaceDispatchEngine {
         }
         break;
 
-      case 'chipCreated':
+      case 'chipCreated': {
         // Track chip in multi-chip map (Furnace disCont[] pattern)
-        this.chips.set(data.platformType, {
-          handle: data.handle,
-          numChannels: data.numChannels
+        this.chips.set(data.platformType as number, {
+          handle: data.handle as number,
+          numChannels: data.numChannels as number
         });
         // Rebuild osc data array for total channels across all chips
         let totalOscChannels = 0;
@@ -1155,18 +1155,19 @@ export class FurnaceDispatchEngine {
           this._chipCreatedResolve = null;
         }
         break;
+      }
 
       case 'oscData':
-        this.latestOscData = data.channels;
+        this.latestOscData = data.channels as (Int16Array | null)[];
         for (const cb of this.oscCallbacks) {
-          cb(data.channels);
+          cb(data.channels as (Int16Array | null)[]);
         }
         break;
 
       case 'error':
         console.error('[FurnaceDispatch] Worklet error:', data.message);
         if (this._wasmReadyReject) {
-          this._wasmReadyReject(new Error(data.message));
+          this._wasmReadyReject(new Error(data.message as string));
           this._wasmReadyReject = null;
           this._wasmReadyResolve = null;
         }

@@ -158,11 +158,11 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
   const delayNode = doc.querySelector('delay');
   if (delayNode) {
     const mix = getFloat('delay mix', 0);
-    // DB303 delay time is in sixteenths (0-16), convert to normalized 0-1
+    // DB303 delay time is raw 0-16 (16th note subdivisions) — store as-is
     const timeSixteenths = getFloat('delay time', 4);
     config.delay = {
       enabled: mix > 0.01,
-      time: timeSixteenths / 16, // Normalize: 16 sixteenths = 1.0
+      time: timeSixteenths, // Raw 0-16 value passed directly to WASM
       feedback: getFloat('delay feedback', 0.3),
       tone: getFloat('delay tone', 0.5),
       mix: mix,
@@ -260,7 +260,7 @@ export function convertToDb303Preset(config: TB303Config): string {
   const delay = config.delay;
   if (delay) {
     lines.push('  <delay>');
-    lines.push(`    <time>${(delay.time ?? 0.5).toFixed(3)}</time>`);
+    lines.push(`    <time>${(delay.time ?? 3).toFixed(3)}</time>`);
     lines.push(`    <feedback>${(delay.feedback ?? 0.3).toFixed(3)}</feedback>`);
     lines.push(`    <tone>${(delay.tone ?? 0.5).toFixed(3)}</tone>`);
     lines.push(`    <mix>${(delay.mix ?? 0).toFixed(3)}</mix>`);

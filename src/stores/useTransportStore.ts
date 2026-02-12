@@ -36,6 +36,9 @@ interface TransportStore extends TransportState {
   // Use MPC swing scale (50-75%) instead of 0-200%
   useMpcScale: boolean;
 
+  // Arrangement timeline position
+  currentGlobalRow: number;
+
   // Actions
   setBPM: (bpm: number) => void;
   setTimeSignature: (numerator: number, denominator: number) => void;
@@ -60,6 +63,8 @@ interface TransportStore extends TransportState {
   setGrooveTemplate: (templateId: string) => void;
   setGrooveSteps: (steps: number) => void;
   getGrooveTemplate: () => GrooveTemplate;
+  setCurrentGlobalRow: (row: number) => void;
+  seekToGlobalRow: (row: number) => void;
   reset: () => void;
 }
 
@@ -92,6 +97,7 @@ export const useTransportStore = create<TransportStore>()(
     grooveSteps: 2, // Default to 2 steps (standard 16th swing)
     jitter: 0,
     useMpcScale: false,
+    currentGlobalRow: 0,
 
     // Actions
     setBPM: (bpm) =>
@@ -101,7 +107,7 @@ export const useTransportStore = create<TransportStore>()(
         // Add status message
         try {
           useUIStore.getState().setStatusMessage(`BPM ${state.bpm}`, false, 1500);
-        } catch (e) {
+        } catch {
           // Ignore errors if store is being cleaned up
         }
       }),
@@ -323,6 +329,16 @@ export const useTransportStore = create<TransportStore>()(
       return GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId) || GROOVE_TEMPLATES[0];
     },
 
+    setCurrentGlobalRow: (row) =>
+      set((state) => {
+        state.currentGlobalRow = row;
+      }),
+
+    seekToGlobalRow: (row) =>
+      set((state) => {
+        state.currentGlobalRow = Math.max(0, row);
+      }),
+
     // Reset to initial state (for new project/tab)
     reset: () =>
       set((state) => {
@@ -342,6 +358,7 @@ export const useTransportStore = create<TransportStore>()(
         state.grooveSteps = 2;
         state.jitter = 0;
         state.useMpcScale = false;
+        state.currentGlobalRow = 0;
       }),
   }))
 );

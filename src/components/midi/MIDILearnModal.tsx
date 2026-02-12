@@ -102,7 +102,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
   useEffect(() => {
     if (isEnabled && devices.length > 0) {
       const mpkDisplay = getMPKMiniDisplay();
-      setIsMPKMiniConnected(mpkDisplay.checkConnection());
+      requestAnimationFrame(() => setIsMPKMiniConnected(mpkDisplay.checkConnection()));
     }
   }, [isEnabled, devices]);
 
@@ -166,16 +166,18 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
   useEffect(() => {
     if (devices.length > 0) {
       const detected = detectControllerProfile(devices[0].name || '');
-      setDetectedProfile(detected);
-      if (detected && !selectedProfile) {
-        setSelectedProfile(detected);
-      }
+      requestAnimationFrame(() => {
+        setDetectedProfile(detected);
+        if (detected && !selectedProfile) {
+          setSelectedProfile(detected);
+        }
+      });
     }
   }, [devices, selectedProfile]);
 
   // Subscribe to mapping changes
   useEffect(() => {
-    refreshMappings();
+    requestAnimationFrame(() => refreshMappings());
     return ccManager.onMappingChange(refreshMappings);
   }, [ccManager, refreshMappings]);
 
@@ -183,7 +185,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
   useEffect(() => {
     if (!isLearning || !learningTarget) return;
 
-    const handleLearn = (isLearning: boolean, _parameterPath: string | null) => {
+    const handleLearn = (isLearning: boolean) => {
       if (!isLearning) {
         setIsLearning(false);
         setLearningTarget(null);

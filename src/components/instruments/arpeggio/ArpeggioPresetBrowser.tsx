@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { X, Search, Music, Gamepad2, Cpu, Play as _Play, CheckCircle } from 'lucide-react';
+import { X, Search, Music, Gamepad2, Cpu, CheckCircle } from 'lucide-react';
 import {
   ALL_PRESETS,
   PRESETS_BY_ERA,

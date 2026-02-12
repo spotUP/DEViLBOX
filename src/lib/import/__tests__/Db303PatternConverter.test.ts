@@ -155,7 +155,7 @@ describe('DB303 Pattern Converter', () => {
       const emptyPattern = createEmptyDb303Pattern(1);
 
       // Set C-3 (note 37)
-      emptyPattern.channels[0].rows[0].note = 37 as any;
+      emptyPattern.channels[0].rows[0].note = 37;
 
       const xml = convertToDb303Pattern(emptyPattern);
 
@@ -167,7 +167,7 @@ describe('DB303 Pattern Converter', () => {
       const emptyPattern = createEmptyDb303Pattern(1);
 
       // Set C-2 (note 25)
-      emptyPattern.channels[0].rows[0].note = 25 as any;
+      emptyPattern.channels[0].rows[0].note = 25;
 
       const xml = convertToDb303Pattern(emptyPattern);
 
@@ -179,7 +179,7 @@ describe('DB303 Pattern Converter', () => {
       const emptyPattern = createEmptyDb303Pattern(1);
 
       // Set C-4 (note 49)
-      emptyPattern.channels[0].rows[0].note = 49 as any;
+      emptyPattern.channels[0].rows[0].note = 49;
 
       const xml = convertToDb303Pattern(emptyPattern);
 
@@ -191,7 +191,7 @@ describe('DB303 Pattern Converter', () => {
       const emptyPattern = createEmptyDb303Pattern(1);
 
       // Set F-3 (note 42 = C-3 37 + 5 semitones)
-      emptyPattern.channels[0].rows[0].note = 42 as any;
+      emptyPattern.channels[0].rows[0].note = 42;
 
       const xml = convertToDb303Pattern(emptyPattern);
 

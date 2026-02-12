@@ -64,18 +64,20 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const [showEnhancer, setShowEnhancer] = useState(false);
 
   // Get sample data from instrument
-  const sampleUrl: string | null = instrument.parameters?.sampleUrl || instrument.granular?.sampleUrl || null;
-  const sampleInfo: SampleInfo | null = instrument.parameters?.sampleInfo || null;
+  // Cast parameters to a concrete type so property accesses are typed correctly
+  const params = (instrument.parameters || {}) as Record<string, unknown>;
+  const sampleUrl: string | null = (params.sampleUrl as string) || (instrument.granular?.sampleUrl as string) || null;
+  const sampleInfo: SampleInfo | null = (params.sampleInfo as SampleInfo) || null;
 
   // Sample parameters
-  const startTime = instrument.parameters?.startTime ?? 0;
-  const endTime = instrument.parameters?.endTime ?? 1;
-  const loopEnabled = instrument.parameters?.loopEnabled ?? false;
-  const loopStart = instrument.parameters?.loopStart ?? 0;
-  const loopEnd = instrument.parameters?.loopEnd ?? 1;
-  const baseNote = instrument.parameters?.baseNote ?? 'C4';
-  const playbackRate = instrument.parameters?.playbackRate ?? 1;
-  const reverse = instrument.parameters?.reverse ?? false;
+  const startTime = (params.startTime as number) ?? 0;
+  const endTime = (params.endTime as number) ?? 1;
+  const loopEnabled = (params.loopEnabled as boolean) ?? false;
+  const loopStart = (params.loopStart as number) ?? 0;
+  const loopEnd = (params.loopEnd as number) ?? 1;
+  const baseNote = (params.baseNote as string) ?? 'C4';
+  const playbackRate = (params.playbackRate as number) ?? 1;
+  const reverse = (params.reverse as boolean) ?? false;
 
   // Granular-specific parameters
   const granular = instrument.granular;
@@ -93,7 +95,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       try {
         const response = await fetch(sampleUrl);
         const arrayBuffer = await response.arrayBuffer();
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioContext = new (window.AudioContext || (window as unknown as Record<string, typeof AudioContext>).webkitAudioContext)();
         const buffer = await audioContext.decodeAudioData(arrayBuffer);
         setAudioBuffer(buffer);
 
@@ -305,7 +307,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   }, [audioBuffer, zoom, startTime, endTime, loopEnabled, loopStart, loopEnd, isPlaying, playbackPosition, isGranular, granular]);
 
   // Update parameter helper
-  const updateParam = useCallback((key: string, value: any) => {
+  const updateParam = useCallback((key: string, value: string | number | boolean | null) => {
     updateInstrument(instrument.id, {
       parameters: {
         ...instrument.parameters,
@@ -315,7 +317,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   }, [instrument.id, instrument.parameters, updateInstrument]);
 
   // Update granular parameter helper
-  const updateGranular = useCallback((key: string, value: any) => {
+  const updateGranular = useCallback((key: string, value: string | number | boolean) => {
     updateInstrument(instrument.id, {
       granular: {
         ...DEFAULT_GRANULAR,
@@ -674,7 +676,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                   try {
                     await reverseSample(instrument.id);
                     notify.success('Sample reversed destructively');
-                  } catch (e) {
+                  } catch {
                     notify.error('Failed to reverse sample');
                   } finally {
                     setIsLoading(false);
@@ -691,7 +693,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                   try {
                     await normalizeSample(instrument.id);
                     notify.success('Sample normalized');
-                  } catch (e) {
+                  } catch {
                     notify.error('Failed to normalize sample');
                   } finally {
                     setIsLoading(false);
@@ -708,7 +710,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                   try {
                     await invertLoopSample(instrument.id);
                     notify.success('Loop area inverted (Funk Repeat)');
-                  } catch (e) {
+                  } catch {
                     notify.error('Failed to invert loop');
                   } finally {
                     setIsLoading(false);

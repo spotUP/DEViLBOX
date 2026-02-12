@@ -226,7 +226,7 @@ export class DrumPadEngine {
       voice.filterNode.disconnect();
       voice.panNode.disconnect();
       voice.cleanupSource?.disconnect();
-    } catch (error) {
+    } catch {
       // Ignore errors from already-stopped sources
     }
   }

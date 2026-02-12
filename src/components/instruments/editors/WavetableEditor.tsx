@@ -125,7 +125,8 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
         }
       } else {
         // Parse audio file
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const audioCtx = new AudioCtx();
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);
@@ -236,7 +237,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
       }
     });
     ctx.stroke();
-  }, [wavetable, maxValue, length, color]);
+  }, [wavetable, maxValue, length, color, height]);
 
   useEffect(() => {
     drawWavetable();

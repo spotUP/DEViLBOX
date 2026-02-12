@@ -57,8 +57,37 @@ export interface ModuleInfo {
     format: 'XM' | 'MOD' | 'FUR' | 'DMF';
     importMetadata: ImportMetadata;
     instruments: ParsedInstrument[];
-    patterns: any[][];  // XMNote[][] or MODNote[][] or converted patterns
+    patterns: unknown[][];  // XMNote[][] or MODNote[][] or converted patterns
   };
+}
+
+/** Metadata payload from ChiptunePlayer (libopenmpt) */
+interface ChiptuneMetadata {
+  title?: string;
+  type?: string;
+  channels?: number;
+  totalPatterns?: number;
+  patterns?: number;
+  totalOrders?: number;
+  orders?: number;
+  instruments?: number;
+  samples?: number;
+  dur?: number;
+  message?: string;
+  song?: {
+    channels?: string[];
+    instruments?: string[];
+    samples?: string[];
+    orders?: { name: string; pat: number }[];
+    patterns?: RawPattern[];
+    numSubsongs?: number;
+  };
+}
+
+/** Error payload from ChiptunePlayer */
+interface ChiptuneError {
+  type?: string;
+  message?: string;
 }
 
 /**
@@ -85,7 +114,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);
           try {
-            const nativeData = await loadWithNativeParser(arrayBuffer, ext, file.name);
+            const nativeData = await loadWithNativeParser(arrayBuffer, ext);
             console.log('[ModuleLoader] Native parser result:', {
               hasData: !!nativeData,
               format: nativeData?.format,
@@ -108,7 +137,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
               let player: ChiptunePlayer | undefined;
               if (ext !== '.fur' && ext !== '.dmf') {
-                player = await loadWithLibopenmpt(arrayBuffer, file);
+                player = await loadWithLibopenmpt(arrayBuffer);
               }
 
               resolve({
@@ -132,7 +161,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
         }
 
         // Fall back to libopenmpt (only for supported formats)
-        const player = await loadWithLibopenmpt(arrayBuffer, file);
+        const player = await loadWithLibopenmpt(arrayBuffer);
 
         // Set up metadata handler
         const metadata = await new Promise<ModuleMetadata>((metaResolve, metaReject) => {
@@ -140,7 +169,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
             metaReject(new Error('Timeout waiting for metadata'));
           }, 5000);
 
-          player.onMetadata((meta: any) => {
+          player.onMetadata((meta: ChiptuneMetadata) => {
             clearTimeout(timeout);
 
             // Extract song data if available
@@ -170,7 +199,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
             });
           });
 
-          player.onError((err: any) => {
+          player.onError((err: ChiptuneError) => {
             clearTimeout(timeout);
             metaReject(new Error(`Failed to load module: ${err.type || err.message || 'unknown error'}`));
           });
@@ -215,8 +244,7 @@ export function stopPreview(info: ModuleInfo): void {
  */
 async function loadWithNativeParser(
   buffer: ArrayBuffer,
-  ext: string,
-  _filename: string
+  ext: string
 ): Promise<ModuleInfo['nativeData'] | null> {
   try {
     if (ext === '.xm') {
@@ -225,7 +253,7 @@ async function loadWithNativeParser(
         format: 'XM',
         importMetadata: result.metadata,
         instruments: result.instruments,
-        patterns: result.patterns as any,
+        patterns: result.patterns as unknown[][],
       };
     } else if (ext === '.mod') {
       const result = await parseMOD(buffer);
@@ -233,7 +261,7 @@ async function loadWithNativeParser(
         format: 'MOD',
         importMetadata: result.metadata,
         instruments: result.instruments,
-        patterns: result.patterns as any,
+        patterns: result.patterns as unknown[][],
       };
     } else if (ext === '.fur') {
       console.log('[ModuleLoader] Parsing Furnace file...');
@@ -248,7 +276,7 @@ async function loadWithNativeParser(
         format: 'FUR', // Furnace format - patterns already converted
         importMetadata: result.metadata,
         instruments: result.instruments,
-        patterns: result.patterns as any,
+        patterns: result.patterns as unknown[][],
       };
     } else if (ext === '.dmf') {
       console.log('[ModuleLoader] Parsing DefleMask file...');
@@ -263,7 +291,7 @@ async function loadWithNativeParser(
         format: 'DMF', // DefleMask format - patterns already converted
         importMetadata: result.metadata,
         instruments: result.instruments,
-        patterns: result.patterns as any,
+        patterns: result.patterns as unknown[][],
       };
     }
   } catch (error) {
@@ -277,8 +305,7 @@ async function loadWithNativeParser(
  * Load using libopenmpt (legacy path)
  */
 async function loadWithLibopenmpt(
-  arrayBuffer: ArrayBuffer,
-  _file: File
+  arrayBuffer: ArrayBuffer
 ): Promise<ChiptunePlayer> {
   const player = new ChiptunePlayer({
     repeatCount: 0, // Don't loop
@@ -296,7 +323,7 @@ async function loadWithLibopenmpt(
       initResolve(true);
     });
 
-    player.onError((err: any) => {
+    player.onError((err: ChiptuneError) => {
       if (err.type === 'init') {
         clearTimeout(timeout);
         initResolve(false);
@@ -344,12 +371,21 @@ export function isSupportedModule(filename: string): boolean {
   return getSupportedExtensions().includes(ext);
 }
 
+/** Converted DMF cell in XM-compatible format */
+interface DMFConvertedCell {
+  note: number;
+  instrument: number;
+  volume: number;
+  effectType: number;
+  effectParam: number;
+}
+
 /**
  * Convert DefleMask module to DEViLBOX format
  */
 function convertDefleMaskToDevilbox(dmf: DMFModule): {
   instruments: ParsedInstrument[];
-  patterns: any[][][]; // [pattern][row][channel]
+  patterns: DMFConvertedCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
   // Convert instruments
@@ -366,13 +402,13 @@ function convertDefleMaskToDevilbox(dmf: DMFModule): {
   // DefleMask stores patterns per-channel, we need to combine them
   // Pattern storage: patterns[ch * matrixRows + matrixPos]
   // Each pattern has rows[row][ch] with the note data
-  const patterns: any[][][] = [];
+  const patterns: DMFConvertedCell[][][] = [];
 
   for (let matrixPos = 0; matrixPos < dmf.matrixRows; matrixPos++) {
-    const patternRows: any[][] = [];
+    const patternRows: DMFConvertedCell[][] = [];
 
     for (let row = 0; row < dmf.patternRows; row++) {
-      const rowCells: any[] = [];
+      const rowCells: DMFConvertedCell[] = [];
 
       for (let ch = 0; ch < dmf.channelCount; ch++) {
         // Get the pattern index used at this matrix position for this channel
@@ -441,7 +477,7 @@ function convertDMFCell(dmfNote: {
   volume: number;
   instrument: number;
   effects: Array<{ code: number; value: number }>;
-}): any {
+}): DMFConvertedCell {
   let note = 0;
 
   if (dmfNote.note === 100) {

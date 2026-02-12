@@ -181,7 +181,10 @@ export type SynthType =
   | 'Surge'            // Surge XT Hybrid Synthesizer
   | 'TonewheelOrgan'   // Hammond-style Tonewheel Organ (VSTBridge)
   | 'Melodica'         // Melodica Reed Instrument (VSTBridge)
-  | 'Monique';         // Monique Morphing Monosynth (VSTBridge)
+  | 'Monique'         // Monique Morphing Monosynth (VSTBridge)
+  // Virtual instruments (aliased MAME)
+  | 'VFX'             // Ensoniq VFX (alias for MAMEVFX)
+  | 'D50';            // Roland D-50 (virtual analog)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -275,6 +278,10 @@ export interface DevilFishConfig {
   // Effects
   ensembleAmount?: number; // 0-100% - built-in ensemble/chorus effect
 
+  // Extended range toggles (Wide mode — bypasses standard 303 mapping)
+  extendedCutoff?: boolean;  // When true, cutoff knob sends setCutoffHz(10-5000Hz)
+  extendedEnvMod?: boolean;  // When true, envMod knob sends setEnvModPercent(0-300%)
+
   // Audio quality
   oversamplingOrder?: 0 | 1 | 2 | 3 | 4; // 0=none, 1=2x, 2=4x, 3=8x, 4=16x oversampling
 
@@ -341,7 +348,7 @@ export interface TB303Config {
   };
   pedalboard?: {
     enabled: boolean;
-    chain: any[];
+    chain: EffectConfig[];
   };
   overdrive?: {
     amount: number; // 0-100%
@@ -1488,21 +1495,21 @@ export interface FurnaceOperatorConfig {
   sl: number;        // Sustain Level 0-15
   rr: number;        // Release Rate 0-15
   dt: number;        // Detune -3 to +3 (signed)
-  dt2: number;       // Detune 2 / Coarse tune 0-3 (OPM/OPZ)
-  rs: number;        // Rate Scaling 0-3
+  dt2?: number;      // Detune 2 / Coarse tune 0-3 (OPM/OPZ)
+  rs?: number;       // Rate Scaling 0-3
 
   // Modulation flags
-  am: boolean;       // Amplitude Modulation enable
+  am?: boolean;      // Amplitude Modulation enable
 
   // OPL-specific
-  ksr: boolean;      // Key Scale Rate
-  ksl: number;       // Key Scale Level 0-3
-  sus: boolean;      // Sustain flag
-  vib: boolean;      // Vibrato flag
-  ws: number;        // Waveform Select 0-7
+  ksr?: boolean;     // Key Scale Rate
+  ksl?: number;      // Key Scale Level 0-3
+  sus?: boolean;     // Sustain flag
+  vib?: boolean;     // Vibrato flag
+  ws?: number;       // Waveform Select 0-7
 
   // SSG-EG (OPN family)
-  ssg: number;       // SSG-EG mode 0-15
+  ssg?: number;      // SSG-EG mode 0-15
 
   // OPZ-specific (added from Furnace) - optional for backward compatibility
   dam?: number;      // AM depth 0-7
@@ -1593,6 +1600,9 @@ export interface FurnaceC64Config {
   filterBP?: boolean;    // Band-pass filter
   filterHP?: boolean;    // High-pass filter
   filterCh3Off?: boolean; // Disable channel 3
+  dutyIsAbs?: boolean;   // Duty is absolute
+  filterIsAbs?: boolean; // Filter cutoff is absolute
+  noTest?: boolean;      // Disable test bit
 }
 
 // Amiga (DIV_INS_AMIGA)
@@ -2208,8 +2218,8 @@ export interface EffectConfig {
 
 export interface InstrumentMetadata {
   importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
-  originalEnvelope?: any; // Preserved point-based envelope for future editor
-  autoVibrato?: any; // Preserved auto-vibrato settings
+  originalEnvelope?: EnvelopePoints; // Preserved point-based envelope for future editor
+  autoVibrato?: AutoVibrato; // Preserved auto-vibrato settings
   preservedSample?: {
     audioBuffer: ArrayBuffer;
     url: string;
@@ -2234,9 +2244,9 @@ export interface InstrumentMetadata {
     fadeout?: number; // Fadeout rate
   };
   envelopes?: Record<number, {
-    volumeEnvelope?: any;
-    panningEnvelope?: any;
-    pitchEnvelope?: any;
+    volumeEnvelope?: EnvelopePoints;
+    panningEnvelope?: EnvelopePoints;
+    pitchEnvelope?: EnvelopePoints;
     fadeout?: number;
   }>;
   preservedSynth?: {
@@ -2248,6 +2258,7 @@ export interface InstrumentMetadata {
 
 // Import beat slicer types
 import type { BeatSlice, BeatSliceConfig } from './beatSlicer';
+import type { EnvelopePoints, AutoVibrato } from './tracker';
 
 export interface SampleConfig {
   audioBuffer?: ArrayBuffer;
@@ -2592,7 +2603,7 @@ export const DEFAULT_SAM: SamConfig = {
  */
 export interface WAMConfig {
   moduleUrl: string;              // URL to the WAM entry point (e.g. index.js)
-  pluginState: any;               // Serialized state of the plugin
+  pluginState: Record<string, unknown> | null;  // Serialized state of the plugin
   pluginStateVersion?: number;    // Tracks state schema for staleness detection
   pluginStateTimestamp?: number;  // When state was last saved
   parameterValues?: Record<string, number>;  // Individual parameter overrides
@@ -2834,7 +2845,7 @@ export interface InstrumentConfig {
   monophonic?: boolean; // If true, force monophonic playback (one voice at a time)
   isLive?: boolean; // If true, bypass lookahead buffer for instant triggering during playback
   lfo?: LFOConfig; // Global LFO for filter/pitch/volume modulation
-  parameters?: Record<string, any>; // Additional synth-specific parameters (e.g., sample URLs)
+  parameters?: Record<string, unknown>; // Additional synth-specific parameters (e.g., sample URLs)
   metadata?: InstrumentMetadata; // Import metadata and transformation history
 }
 
@@ -2956,7 +2967,7 @@ export const DEFAULT_TB303: TB303Config = {
   },
   delay: {
     enabled: false,     // db303 default: delayMix=0 (disabled)
-    time: 0.5,          // db303 default: delayTime=0.5
+    time: 3,            // db303 WASM expects raw 0-16 (16th note subdivisions)
     feedback: 0,        // db303 default: delayFeedback=0
     tone: 0.5,          // db303 default: delayTone=0.5
     mix: 0,

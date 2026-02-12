@@ -51,7 +51,7 @@ export interface EffectCommand {
   code: string; // e.g., "A0F", "C40"
   type: string; // e.g., "volumeSlide", "setVolume"
   parameters: number[];
-  apply: (synth: any, time: number) => void;
+  apply: (synth: unknown, time: number) => void;
 }
 
 export const DEFAULT_BPM = 135;

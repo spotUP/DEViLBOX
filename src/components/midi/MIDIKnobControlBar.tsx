@@ -14,7 +14,7 @@ export const MIDIKnobControlBar: React.FC = () => {
   const selectedDevice = inputDevices.find(d => d.id === selectedInputId) || inputDevices[0];
   const deviceName = selectedDevice?.name || 'MIDI Controller';
 
-  const banks: { id: KnobBankMode; label: string; icon: any }[] = [
+  const banks: { id: KnobBankMode; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
     { id: '303', label: '303/Synth', icon: Settings },
     { id: 'Siren', label: 'Dub Siren', icon: Activity },
     { id: 'FX', label: 'Effects', icon: Waves },

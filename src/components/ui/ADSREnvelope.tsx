@@ -5,6 +5,9 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 
+// Stable padding constants (module scope to avoid re-creation)
+const PADDING = { top: 10, right: 10, bottom: 25, left: 10 } as const;
+
 interface ADSREnvelopeProps {
   attack: number; // ms
   decay: number; // ms
@@ -48,10 +51,10 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Padding and dimensions
-  const padding = { top: 10, right: 10, bottom: 25, left: 10 };
-  const graphWidth = width - padding.left - padding.right;
-  const graphHeight = height - padding.top - padding.bottom;
+  // Padding and dimensions (destructured from module-scope constant for stable deps)
+  const { top: padTop, right: padRight, bottom: padBottom, left: padLeft } = PADDING;
+  const graphWidth = width - padLeft - padRight;
+  const graphHeight = height - padTop - padBottom;
 
   // Calculate proportional widths to always fill the graph
   // Each stage gets a proportion of the total width based on its time value
@@ -68,21 +71,21 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   const levelToY = (level: number) => graphHeight - (level / 100) * graphHeight;
 
   // Control points - always fill the full width
-  const attackX = padding.left + attackWidth;
-  const attackY = padding.top; // Attack goes to top (100%)
+  const attackX = padLeft + attackWidth;
+  const attackY = padTop; // Attack goes to top (100%)
 
   const decayX = attackX + decayWidth;
-  const decayY = padding.top + levelToY(sustain);
+  const decayY = padTop + levelToY(sustain);
 
   const sustainEndX = decayX + sustainWidth;
   const sustainY = decayY;
 
-  const releaseX = padding.left + graphWidth; // Always at the right edge
-  const releaseY = padding.top + graphHeight; // Release goes to bottom (0%)
+  const releaseX = padLeft + graphWidth; // Always at the right edge
+  const releaseY = padTop + graphHeight; // Release goes to bottom (0%)
 
   // Build the envelope path
   const envelopePath = `
-    M ${padding.left} ${padding.top + graphHeight}
+    M ${padLeft} ${padTop + graphHeight}
     L ${attackX} ${attackY}
     L ${decayX} ${decayY}
     L ${sustainEndX} ${sustainY}
@@ -92,8 +95,8 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   // Fill path (closed)
   const fillPath = `
     ${envelopePath}
-    L ${releaseX} ${padding.top + graphHeight}
-    L ${padding.left} ${padding.top + graphHeight}
+    L ${releaseX} ${padTop + graphHeight}
+    L ${padLeft} ${padTop + graphHeight}
     Z
   `;
 
@@ -113,8 +116,8 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
     if (!dragging || !svgRef.current) return;
 
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - padding.left;
-    const y = e.clientY - rect.top - padding.top;
+    const x = e.clientX - rect.left - padLeft;
+    const y = e.clientY - rect.top - padTop;
 
     // Calculate position as proportion of available width (excluding sustain)
     const availableWidth = graphWidth * timeProportion;
@@ -151,7 +154,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         break;
       }
     }
-  }, [dragging, attack, decay, onChange, graphWidth, graphHeight, attackWidth, decayWidth, sustainWidth, timeProportion]);
+  }, [dragging, onChange, graphWidth, graphHeight, attackWidth, decayWidth, sustainWidth, timeProportion, padLeft, padTop]);
 
   // Handle drag end
   const handleMouseUp = useCallback(() => {
@@ -173,25 +176,21 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   // Format time for display
   const formatTime = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 
-  // Control point component
-  const ControlPoint: React.FC<{
-    x: number;
-    y: number;
-    id: typeof dragging;
-    label: string;
-  }> = ({ x, y, id, label }) => (
+  // Render a control point (helper function, not a component)
+  const renderControlPoint = (cpX: number, cpY: number, id: typeof dragging, cpLabel: string) => (
     <g
+      key={id}
       onMouseDown={handleMouseDown(id)}
       onMouseEnter={() => setHovered(id)}
       onMouseLeave={() => setHovered(null)}
       style={{ cursor: 'grab' }}
     >
       {/* Larger hit area */}
-      <circle cx={x} cy={y} r={12} fill="transparent" />
+      <circle cx={cpX} cy={cpY} r={12} fill="transparent" />
       {/* Glow effect */}
       <circle
-        cx={x}
-        cy={y}
+        cx={cpX}
+        cy={cpY}
         r={8}
         fill={color}
         opacity={hovered === id || dragging === id ? 0.3 : 0}
@@ -199,8 +198,8 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
       />
       {/* Main point */}
       <circle
-        cx={x}
-        cy={y}
+        cx={cpX}
+        cy={cpY}
         r={6}
         fill={dragging === id ? color : '#1a1a1a'}
         stroke={color}
@@ -210,15 +209,15 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
       {/* Label on hover */}
       {(hovered === id || dragging === id) && (
         <text
-          x={x}
-          y={y - 14}
+          x={cpX}
+          y={cpY - 14}
           textAnchor="middle"
           fill={color}
           fontSize="10"
           fontFamily="monospace"
           fontWeight="bold"
         >
-          {label}
+          {cpLabel}
         </text>
       )}
     </g>
@@ -238,10 +237,10 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
           {[0, 25, 50, 75, 100].map((level) => (
             <line
               key={level}
-              x1={padding.left}
-              y1={padding.top + levelToY(level)}
-              x2={width - padding.right}
-              y2={padding.top + levelToY(level)}
+              x1={padLeft}
+              y1={padTop + levelToY(level)}
+              x2={width - padRight}
+              y2={padTop + levelToY(level)}
               strokeDasharray={level === 0 || level === 100 ? 'none' : '2,4'}
               opacity={level === 0 || level === 100 ? 0.5 : 0.3}
             />
@@ -268,17 +267,17 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
 
         {/* Stage labels */}
         <g fontSize="9" fill="#666" fontFamily="monospace">
-          <text x={padding.left + attackWidth / 2} y={height - 5} textAnchor="middle">A</text>
+          <text x={padLeft + attackWidth / 2} y={height - 5} textAnchor="middle">A</text>
           <text x={attackX + decayWidth / 2} y={height - 5} textAnchor="middle">D</text>
           <text x={decayX + sustainWidth / 2} y={height - 5} textAnchor="middle">S</text>
           <text x={sustainEndX + releaseWidth / 2} y={height - 5} textAnchor="middle">R</text>
         </g>
 
         {/* Control points */}
-        <ControlPoint x={attackX} y={attackY} id="attack" label={formatTime(attack)} />
-        <ControlPoint x={decayX} y={decayY} id="decay" label={formatTime(decay)} />
-        <ControlPoint x={sustainEndX} y={sustainY} id="sustain" label={`${sustain}%`} />
-        <ControlPoint x={releaseX} y={releaseY} id="release" label={formatTime(release)} />
+        {renderControlPoint(attackX, attackY, 'attack', formatTime(attack))}
+        {renderControlPoint(decayX, decayY, 'decay', formatTime(decay))}
+        {renderControlPoint(sustainEndX, sustainY, 'sustain', `${sustain}%`)}
+        {renderControlPoint(releaseX, releaseY, 'release', formatTime(release))}
       </svg>
 
       {/* Values display */}

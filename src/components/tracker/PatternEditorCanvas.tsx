@@ -1006,23 +1006,27 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
 
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY]);
+
+  // Ref to keep render callback up to date for the animation loop
+  const renderRef = useRef(render);
+  useEffect(() => { renderRef.current = render; }, [render]);
 
   // Animation loop - unlocked framerate for maximum smoothness
-  const animate = useCallback(() => {
-    render();
-    rafRef.current = requestAnimationFrame(animate);
-  }, [render]);
-
-  // Start animation loop
+  // Defined inside effect to avoid self-referencing
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(animate);
+    const tick = () => {
+      renderRef.current();
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [animate]);
+  }, []);
 
   // Handle resize
   useEffect(() => {
@@ -1119,7 +1123,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }
 
   const mobileChannel = pattern.channels[mobileChannelIndex];
-  const mobileTrigger = channelTriggersRef.current[mobileChannelIndex] || { level: 0, triggered: false };
+  // Note: trigger levels are animation-driven and updated via RAF - provide defaults for render
+  const mobileTrigger = { level: 0, triggered: false };
 
   return (
     <div className="flex flex-col h-full" {...(isMobile ? swipeHandlers : {})}>
@@ -1205,7 +1210,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
                 {pattern.channels.map((channel, idx) => {
-                  const trigger = channelTriggersRef.current[idx] || { level: 0, triggered: false };
+                  // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
+                  const trigger = { level: 0, triggered: false };
                   
                   return (
                     <div

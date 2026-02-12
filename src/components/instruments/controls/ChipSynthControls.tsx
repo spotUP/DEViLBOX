@@ -5,7 +5,7 @@
  * (knobs, selects, toggles) grouped by section. Supports operator tabs for FM synths.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameters';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
@@ -14,7 +14,7 @@ import JSZip from 'jszip';
 
 interface ChipSynthControlsProps {
   synthType: SynthType;
-  parameters: Record<string, any>;
+  parameters: Record<string, number | string>;
   instrumentId: number;
   onParamChange: (key: string, value: number) => void;
   onTextChange?: (key: string, value: string) => void;
@@ -26,7 +26,6 @@ interface ChipSynthControlsProps {
 export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   synthType,
   parameters,
-  instrumentId: _instrumentId,
   onParamChange,
   onTextChange,
   onLoadPreset,
@@ -41,12 +40,11 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const parametersRef = useRef(parameters);
-  parametersRef.current = parameters;
+  useEffect(() => { parametersRef.current = parameters; }, [parameters]);
 
-  if (!chipDef) return null;
-
-  // Group parameters by their group field
+  // Group parameters by their group field (must be before conditional return)
   const grouped = useMemo(() => {
+    if (!chipDef) return {};
     const groups: Record<string, ChipParameterDef[]> = {};
     for (const param of chipDef.parameters) {
       if (!groups[param.group]) groups[param.group] = [];
@@ -68,14 +66,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     return value.toFixed(2);
   }, []);
 
-  const accentColor = isCyanTheme ? '#00ffff' : chipDef.color;
-  const knobColor = isCyanTheme ? '#00ffff' : chipDef.color;
-  const bgColor = isCyanTheme ? 'rgba(0, 20, 20, 0.4)' : 'rgba(0,0,0,0.3)';
-  const textColor = isCyanTheme ? '#00ffff' : '#e2e8f0';
-  const mutedColor = isCyanTheme ? '#006060' : '#94a3b8';
-  const panelBorder = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.08)';
-
-  // ROM upload handler (for ROM-dependent synths)
+  // ROM upload handler (for ROM-dependent synths) - must be before conditional return
   const handleRomFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, bank: number) => {
     const file = e.target.files?.[0];
     if (!file || !onRomUpload) return;
@@ -85,7 +76,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
         const zip = new JSZip();
         const loadedZip = await zip.loadAsync(file);
 
-        const files: { name: string; entry: any }[] = [];
+        const files: { name: string; entry: JSZip.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {
@@ -119,6 +110,15 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     e.target.value = '';
   }, [onRomUpload, onParamChange]);
 
+  if (!chipDef) return null;
+
+  const accentColor = isCyanTheme ? '#00ffff' : chipDef.color;
+  const knobColor = isCyanTheme ? '#00ffff' : chipDef.color;
+  const bgColor = isCyanTheme ? 'rgba(0, 20, 20, 0.4)' : 'rgba(0,0,0,0.3)';
+  const textColor = isCyanTheme ? '#00ffff' : '#e2e8f0';
+  const mutedColor = isCyanTheme ? '#006060' : '#94a3b8';
+  const panelBorder = isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.08)';
+
   const renderParam = (param: ChipParameterDef, keyPrefix = '') => {
     const paramKey = keyPrefix ? `${keyPrefix}${param.key}` : param.key;
     const currentValue = parameters[paramKey] ?? param.default;
@@ -151,7 +151,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     }
 
     if (param.type === 'text') {
-      const textValue = parameters[paramKey] ?? param.defaultText ?? '';
+      const textValue = String(parameters[paramKey] ?? param.defaultText ?? '');
       const isSpeechText = paramKey === 'speechText' && onSpeak;
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 100%' }}>
@@ -209,7 +209,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <select
-            value={Math.round(currentValue)}
+            value={Math.round(Number(currentValue))}
             onChange={(e) => onParamChange(paramKey, Number(e.target.value))}
             style={{
               background: isCyanTheme ? '#041010' : '#1e293b',
@@ -233,7 +233,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     return (
       <Knob
         key={paramKey}
-        value={currentValue}
+        value={Number(currentValue)}
         min={param.min ?? 0}
         max={param.max ?? 1}
         step={param.step ?? 0.01}

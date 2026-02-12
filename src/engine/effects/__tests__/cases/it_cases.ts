@@ -102,7 +102,7 @@ export const itCases: ComplianceTestCase[] = [
 
                                                       }
 
-                                                    } as any
+                                                    }
 
                                                   },
 

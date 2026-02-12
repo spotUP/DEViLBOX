@@ -19,8 +19,21 @@ import { VIBRATO_TABLE, periodToFrequency, noteStringToPeriod, periodToNoteStrin
 /**
  * Abstract base class for effect handlers
  */
+/** Type for accessing activeInstrument on ChannelState (set by subclass) */
+interface InstrumentAutoVibrato {
+  depth: number;
+  sweep: number;
+  rate: number;
+  type?: WaveformType;
+}
+
 export abstract class BaseFormatHandler implements FormatHandler {
   abstract readonly format: ModuleFormat;
+
+  /** Convert period to Hz; subclasses must implement */
+  public periodToHz(period: number): number {
+    return periodToFrequency(period);
+  }
 
   protected config: FormatConfig = {
     format: 'NATIVE',
@@ -199,7 +212,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
    * Process auto-vibrato (XM and IT shared logic)
    */
   protected processAutoVibrato(state: ChannelState, result: TickResult, tick: number): void {
-    const inst = (state as any).activeInstrument;
+    const inst = (state as unknown as { activeInstrument?: { autoVibrato?: InstrumentAutoVibrato } }).activeInstrument;
     if (!inst?.autoVibrato || inst.autoVibrato.depth === 0) return;
 
     // XM quirk: Auto-vibrato only runs on ticks 1+
@@ -237,7 +250,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
       const currentPeriod = result.setPeriod !== undefined ? result.setPeriod : state.period;
       result.setPeriod = currentPeriod + autoDelta;
       // Frequency MUST be updated when period changes
-      result.setFrequency = (this as any).periodToHz(result.setPeriod);
+      result.setFrequency = this.periodToHz(result.setPeriod!);
     } else if (this.format === 'IT') {
       // IT pitch-based auto-vibrato scaling
       // Uses current note frequency as base for percentage-based modulation
@@ -275,7 +288,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
     const minLimit = (this.config.amigaLimits) ? 113 : limit;
     if (state.period < minLimit) state.period = minLimit;
 
-    state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+    state.frequency = this.periodToHz(state.period);
     result.setPeriod = state.period;
     result.setFrequency = state.frequency;
   }
@@ -292,7 +305,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
     const maxLimit = (this.config.amigaLimits) ? 856 : limit;
     if (state.period > maxLimit) state.period = maxLimit;
 
-    state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+    state.frequency = this.periodToHz(state.period);
     result.setPeriod = state.period;
     result.setFrequency = state.frequency;
   }
@@ -322,7 +335,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
       if (state.period > 856) state.period = 856;
     }
 
-    state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+    state.frequency = this.periodToHz(state.period);
     result.setPeriod = state.period;
     result.setFrequency = state.frequency;
   }
@@ -338,7 +351,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
 
     const finalPeriod = state.period + delta;
     result.setPeriod = finalPeriod;
-    result.setFrequency = (this as any).periodToHz ? (this as any).periodToHz(finalPeriod) : periodToFrequency(finalPeriod);
+    result.setFrequency = this.periodToHz(finalPeriod);
 
     // Advance position for next tick
     state.vibratoPos = (state.vibratoPos + state.vibratoSpeed) & 0x3F;
@@ -459,7 +472,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
     if (speed > 0 && state.period > 0) {
       state.period -= speed * multiplier;
       if (state.period < minLimit) state.period = minLimit;
-      state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+      state.frequency = this.periodToHz(state.period);
       result.setPeriod = state.period;
       result.setFrequency = state.frequency;
     }
@@ -472,7 +485,7 @@ export abstract class BaseFormatHandler implements FormatHandler {
     if (speed > 0 && state.period > 0) {
       state.period += speed * multiplier;
       if (state.period > maxLimit) state.period = maxLimit;
-      state.frequency = (this as any).periodToHz ? (this as any).periodToHz(state.period) : periodToFrequency(state.period);
+      state.frequency = this.periodToHz(state.period);
       result.setPeriod = state.period;
       result.setFrequency = state.frequency;
     }

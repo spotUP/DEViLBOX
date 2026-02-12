@@ -376,7 +376,7 @@ export async function loadChipROMs(config: ChipROMConfig): Promise<Uint8Array> {
           console.log(`✓ Loaded ${config.chipName} combined ROM:`, data.length, 'bytes');
           return data;
         }
-      } catch (e) {
+      } catch {
         console.log(`[${config.chipName}] Combined ROM not found, trying individual files...`);
       }
     }
@@ -455,7 +455,7 @@ export async function loadTR707ROMs(useExpansion: boolean = false): Promise<Uint
     try {
       console.log('[TR707] Attempting to load expansion ROM...');
       return await loadChipROMs(TR707_EXPANSION_ROM_CONFIG);
-    } catch (error) {
+    } catch {
       console.warn('[TR707] Expansion ROM not found, falling back to standard ROM');
       // Fall through to standard ROM
     }

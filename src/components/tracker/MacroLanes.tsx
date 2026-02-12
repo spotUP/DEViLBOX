@@ -65,6 +65,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
   const setCell = useTrackerStore((state) => state.setCell);
   
   const [isDrawing, setIsDrawing] = useState(false);
+  const [activeLane, setActiveLane] = useState<{ channelIndex: number, parameter: string } | null>(null);
   const activeLaneRef = useRef<{ channelIndex: number, parameter: string } | null>(null);
 
   const parameters: ('cutoff' | 'resonance' | 'envMod' | 'pan')[] = useMemo(() => {
@@ -75,6 +76,36 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
     if (columnVisibility.pan) active.push('pan');
     return active;
   }, [columnVisibility]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
+    if (!isDrawing || !activeLaneRef.current) return;
+
+    const { channelIndex, parameter } = activeLaneRef.current;
+
+    // Find the SVG element's bounding rect
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+
+    // Calculate row from Y position
+    const relativeY = e.clientY - rect.top;
+    const rowIndex = Math.floor(relativeY / rowHeight);
+
+    // Calculate value from X position within the lane
+    if (rowIndex >= 0 && rowIndex < pattern.length) {
+      // In a 14px lane, we use 2px padding on each side
+      const laneX = e.clientX - rect.left;
+      const normalizedX = Math.max(0, Math.min(1, (laneX - 2) / (LANE_WIDTH - 4)));
+      const value = Math.round(normalizedX * 255);
+
+      setCell(channelIndex, rowIndex, { [parameter]: value });
+    }
+  }, [isDrawing, pattern.length, rowHeight, setCell]);
+
+  const handleGlobalMouseUp = useCallback(() => {
+    setIsDrawing(false);
+    activeLaneRef.current = null;
+    setActiveLane(null);
+  }, [setIsDrawing, setActiveLane]);
 
   const handleMouseDown = (channelIndex: number, parameter: string, e: React.MouseEvent) => {
     if (e.shiftKey) {
@@ -88,41 +119,11 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
       return;
     }
     setIsDrawing(true);
-    activeLaneRef.current = { channelIndex, parameter };
+    const lane = { channelIndex, parameter };
+    activeLaneRef.current = lane;
+    setActiveLane(lane);
     handleMouseMove(e);
   };
-
-  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
-    if (!isDrawing || !activeLaneRef.current) return;
-
-    const { channelIndex, parameter } = activeLaneRef.current;
-    
-    // Find the SVG element's bounding rect
-    const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    
-    // Calculate row from Y position
-    const relativeY = e.clientY - rect.top;
-    const rowIndex = Math.floor(relativeY / rowHeight);
-    
-    // Calculate value from X position within the lane
-    // Since we're in a shared container, we need to know where the lane is
-    // Actually, it's easier to attach listener to each lane div
-    
-    if (rowIndex >= 0 && rowIndex < pattern.length) {
-      // In a 14px lane, we use 2px padding on each side
-      const laneX = e.clientX - rect.left;
-      const normalizedX = Math.max(0, Math.min(1, (laneX - 2) / (LANE_WIDTH - 4)));
-      const value = Math.round(normalizedX * 255);
-      
-      setCell(channelIndex, rowIndex, { [parameter]: value });
-    }
-  }, [isDrawing, pattern.length, rowHeight, setCell]);
-
-  const handleGlobalMouseUp = useCallback(() => {
-    setIsDrawing(false);
-    activeLaneRef.current = null;
-  }, []);
 
   React.useEffect(() => {
     if (isDrawing) {
@@ -169,7 +170,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
                 width: LANE_WIDTH,
                 height: pattern.length * rowHeight,
                 pointerEvents: 'auto',
-                backgroundColor: isDrawing && activeLaneRef.current?.channelIndex === channelIndex && activeLaneRef.current?.parameter === param 
+                backgroundColor: isDrawing && activeLane?.channelIndex === channelIndex && activeLane?.parameter === param
                   ? 'rgba(255,255,255,0.05)' 
                   : 'transparent'
               }}

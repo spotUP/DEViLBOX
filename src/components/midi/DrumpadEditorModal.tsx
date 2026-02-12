@@ -31,6 +31,10 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
     );
   }, [instruments]);
 
+  const refreshMappings = useCallback(() => {
+    setMappings(padManager.getAllMappings());
+  }, [padManager]);
+
   // Auto-populate pads from drum machine
   const handleLoadDrumMachine = (drumMachineId: number) => {
     const drumMachine = instruments.find(inst => inst.id === drumMachineId);
@@ -93,12 +97,12 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   };
 
   // Load General Preset
-  const handleLoadPreset = (_type: 'auto' | '808' | '909' | 'drumnibus') => {
+  const handleLoadPreset = () => {
     // Clear existing for these notes
     // Standard Akai MPK Mini notes Ch 10
     const startNote = 36;
     const notes = Array.from({ length: 16 }, (_, i) => startNote + i);
-    
+
     notes.forEach(n => {
       const mapping = padManager.getMapping(9, n);
       if (mapping) padManager.removeMapping(mapping.id);
@@ -107,10 +111,10 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
     // Helper to find instrument by keywords or synth type
     const findInst = (keywords: string[], synthType?: string) => {
       // 1. Try exact name match
-      let found = instruments.find(inst => 
+      let found = instruments.find(inst =>
         keywords.some(k => inst.name.toLowerCase().includes(k.toLowerCase()))
       );
-      
+
       // 2. Fallback to synth type match if keywords match synth name (e.g. "Synare", "DrumMachine")
       if (!found && synthType) {
         found = instruments.find(inst => inst.synthType === synthType);
@@ -118,7 +122,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
 
       // 3. Fallback to broader keyword search in metadata
       if (!found) {
-        found = instruments.find(inst => 
+        found = instruments.find(inst =>
           keywords.some(k => inst.synthType.toLowerCase().includes(k.toLowerCase()))
         );
       }
@@ -162,13 +166,11 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   useEffect(() => {
     if (isOpen && isEnabled) {
       padManager.init();
-      refreshMappings();
+      // Defer state update to avoid synchronous setState in effect
+      const frame = requestAnimationFrame(() => refreshMappings());
+      return () => cancelAnimationFrame(frame);
     }
-  }, [isOpen, isEnabled]);
-
-  const refreshMappings = useCallback(() => {
-    setMappings(padManager.getAllMappings());
-  }, [padManager]);
+  }, [isOpen, isEnabled, padManager, refreshMappings]);
 
   // Auto-populate from profile if empty
   useEffect(() => {
@@ -351,7 +353,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
               <div className="flex items-center gap-2 bg-dark-bgSecondary p-1 rounded-lg">
                 <span className="text-[10px] font-bold text-text-muted uppercase px-2">Auto-Map:</span>
                 <button
-                  onClick={() => handleLoadPreset('auto')}
+                  onClick={() => handleLoadPreset()}
                   className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-white rounded transition-colors uppercase"
                 >
                   Match Names

@@ -31,7 +31,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * Convert a raw pattern cell to our TrackerCell format (libopenmpt legacy)
  */
 function convertCell(rawCell: RawPatternCell): TrackerCell {
-  const [noteNum, instrument, _volumeEffect, effectType, volume, parameter] = rawCell;
+  const [noteNum, instrument, , effectType, volume, parameter] = rawCell;
 
   // Convert note number to XM format
   let xmNote = 0;
@@ -125,9 +125,10 @@ function convertVolumeColumnEffect(volumeByte: number): [number, number] | null 
       return [0x19, param];
     case 0xE: // Panning slide right → Px0 (effTyp=0x19, eff=x0)
       return [0x19, param << 4];
-    case 0xF: // Tone portamento → 3xx (effTyp=0x3, eff=param*16)
+    case 0xF: { // Tone portamento → 3xx (effTyp=0x3, eff=param*16)
       const speed = param > 0 ? param * 16 : 0;
       return [0x3, speed];
+    }
     default:
       return null;
   }

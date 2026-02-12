@@ -13,6 +13,31 @@ import * as Tone from 'tone';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { WAMSynth } from './WAMSynth';
 
+/** Minimal WAM 2.0 plugin instance interface */
+interface WAMInstance {
+  audioNode?: AudioNode;
+  createAudioNode?: () => Promise<AudioNode>;
+  createGui?: () => Promise<HTMLElement>;
+  getParameterInfo?: () => Promise<Record<string, WAMParameterInfo>>;
+  destroy?: () => void;
+  descriptor?: { name?: string };
+  initialize?: () => Promise<void>;
+}
+
+/** WAM parameter info returned from getParameterInfo() */
+interface WAMParameterInfo {
+  label?: string;
+  type?: string;
+  defaultValue?: number;
+  minValue?: number;
+  maxValue?: number;
+}
+
+/** WAM audio node with parameter control */
+interface WAMAudioNode extends AudioNode {
+  setParameterValues?: (values: Record<string, { value: number }>) => Promise<void>;
+}
+
 export interface WAMEffectNodeOptions {
   moduleUrl: string;
   wet?: number; // 0-1
@@ -30,8 +55,8 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
   private wetGain: Tone.Gain;
 
   // WAM state
-  private _wamInstance: any = null;
-  private _wamNode: AudioNode | null = null;
+  private _wamInstance: WAMInstance | null = null;
+  private _wamNode: WAMAudioNode | null = null;
   private _moduleUrl: string;
   private _audioContext: AudioContext;
   private _initPromise: Promise<void>;
@@ -109,10 +134,10 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       }
 
       // 4. Get audio node
-      if (this._wamInstance.audioNode) {
-        this._wamNode = this._wamInstance.audioNode;
-      } else if (typeof this._wamInstance.createAudioNode === 'function') {
-        this._wamNode = await this._wamInstance.createAudioNode();
+      if (this._wamInstance!.audioNode) {
+        this._wamNode = this._wamInstance!.audioNode;
+      } else if (typeof this._wamInstance!.createAudioNode === 'function') {
+        this._wamNode = await this._wamInstance!.createAudioNode();
       }
 
       if (!this._wamNode) {
@@ -122,9 +147,9 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       // 5. Connect wet path: input → WAM → wetGain → output
       // Use Tone.js connect for input (Tone.Gain → native AudioNode)
       // and native connect for WAM → wetGain → output
-      const inputRaw = (this.input as any)._gainNode as GainNode;
-      const wetRaw = (this.wetGain as any)._gainNode as GainNode;
-      const outRaw = (this.output as any)._gainNode as GainNode;
+      const inputRaw = (this.input as unknown as { _gainNode: GainNode })._gainNode;
+      const wetRaw = (this.wetGain as unknown as { _gainNode: GainNode })._gainNode;
+      const outRaw = (this.output as unknown as { _gainNode: GainNode })._gainNode;
 
       inputRaw.connect(this._wamNode);
       this._wamNode.connect(wetRaw);
@@ -155,7 +180,7 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
   /**
    * Get WAM parameters for fallback slider UI
    */
-  async getParameters(): Promise<Record<string, any> | null> {
+  async getParameters(): Promise<Record<string, WAMParameterInfo> | null> {
     if (!this._wamInstance) return null;
     try {
       if (typeof this._wamInstance.getParameterInfo === 'function') {
@@ -173,8 +198,8 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
   async setParameter(id: string, value: number): Promise<void> {
     if (!this._wamInstance || !this._wamNode) return;
     try {
-      if ((this._wamNode as any).setParameterValues) {
-        await (this._wamNode as any).setParameterValues({ [id]: { value } });
+      if (this._wamNode.setParameterValues) {
+        await this._wamNode.setParameterValues({ [id]: { value } });
       }
     } catch {
       // Silently ignore parameter set failures
@@ -193,7 +218,7 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
   /**
    * Get the WAM descriptor
    */
-  get descriptor(): any {
+  get descriptor(): { name?: string } | null {
     return this._wamInstance?.descriptor || null;
   }
 

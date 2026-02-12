@@ -5,21 +5,22 @@
  * Run with: npm test -- src/engine/__tests__/AllSynths.test.ts
  */
 
-// @ts-nocheck - Test file with intentionally partial configurations
 import { describe, it, expect, afterEach } from 'vitest';
 import * as Tone from 'tone';
 
 // Import synth types and factory
 import { InstrumentFactory } from '../InstrumentFactory';
-import type { SynthType, InstrumentConfig, TB303Config } from '@/types/instrument';
+import type { SynthType, InstrumentConfig } from '@/types/instrument';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Import all preset files
 import { TB303_PRESETS as SYNTH_PRESETS } from '@/constants/synthPresets';
 import { TB303_PRESETS } from '@/constants/tb303Presets';
 import { DEVIL_FISH_PRESETS as TB303_DEVILFISH_PRESETS } from '@/constants/tb303DevilFishPresets';
 import { WAVETABLE_PRESETS } from '@/constants/wavetablePresets';
-import { FURNACE_PRESETS } from '@/constants/furnacePresets';
-import { BUZZMACHINE_PRESETS } from '@/constants/buzzmachinePresets';
+// FURNACE_PRESETS and BUZZMACHINE_PRESETS not used directly in preset tests
+// (they are tested via WASM synth creation instead)
 import { DUB_SIREN_PRESETS } from '@/constants/dubSirenPresets';
 import { SPACE_LASER_PRESETS } from '@/constants/spaceLaserPresets';
 import { SAM_PRESETS } from '@/constants/samPresets';
@@ -146,11 +147,14 @@ const SAMPLER_TYPES: SynthType[] = [
 // ============================================
 
 function getDefaultConfig(synthType: SynthType): InstrumentConfig {
-  const config: InstrumentConfig = {
+  const config: any = {
     id: 999,
     name: `Test ${synthType}`,
+    type: 'synth' as const,
     synthType,
     volume: -12,
+    effects: [],
+    pan: 0,
   };
 
   // Add required config for specific synth types
@@ -161,7 +165,7 @@ function getDefaultConfig(synthType: SynthType): InstrumentConfig {
         filter: { cutoff: 1000, resonance: 50 },
         filterEnvelope: { envMod: 50, decay: 200 },
         accent: { amount: 50 },
-        slide: { time: 60 },
+        slide: { time: 60, mode: 'exponential' as const },
         oscillator: { type: 'sawtooth' },
         overdrive: { amount: 0 },
       };
@@ -169,12 +173,15 @@ function getDefaultConfig(synthType: SynthType): InstrumentConfig {
 
     case 'Wavetable':
       config.wavetable = {
-        waveformIndex: 0,
+        wavetableId: 'basic-saw',
         morphPosition: 0,
-        attack: 0.01,
-        decay: 0.3,
-        sustain: 0.5,
-        release: 0.5,
+        morphModSource: 'none',
+        morphModAmount: 50,
+        morphLFORate: 2,
+        unison: { voices: 1, detune: 10, stereoSpread: 50 },
+        envelope: { attack: 10, decay: 300, sustain: 50, release: 500 },
+        filter: { type: 'lowpass', cutoff: 8000, resonance: 20, envelopeAmount: 0 },
+        filterEnvelope: { attack: 10, decay: 300, sustain: 50, release: 500 },
       };
       break;
 
@@ -184,58 +191,78 @@ function getDefaultConfig(synthType: SynthType): InstrumentConfig {
       config.sample = {
         url: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=', // Silent WAV
         baseNote: 'C4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: 0,
+        reverse: false,
+        playbackRate: 1,
       };
       break;
 
     case 'GranularSynth':
       config.granular = {
-        grainSize: 0.1,
-        overlap: 0.5,
-        pitch: 1,
+        sampleUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+        grainSize: 100,
+        grainOverlap: 50,
         playbackRate: 1,
+        detune: 0,
+        randomPitch: 0,
+        randomPosition: 0,
+        scanPosition: 0,
+        scanSpeed: 0,
+        density: 4,
+        reverse: false,
+        envelope: { attack: 10, release: 50 },
+        filter: { type: 'lowpass', cutoff: 20000, resonance: 0 },
       };
       config.sample = {
         url: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
         baseNote: 'C4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: 0,
+        reverse: false,
+        playbackRate: 1,
       };
       break;
 
     case 'DubSiren':
       config.dubSiren = {
-        frequency: 440,
-        lfoRate: 5,
-        lfoDepth: 100,
-        waveform: 'sine',
-        filterFreq: 2000,
+        oscillator: { type: 'sine', frequency: 440 },
+        lfo: { enabled: true, type: 'sine', rate: 5, depth: 100 },
+        delay: { enabled: false, time: 0.3, feedback: 0.4, wet: 0.3 },
+        filter: { enabled: true, frequency: 2000, type: 'lowpass', rolloff: -24 },
+        reverb: { enabled: false, decay: 1.5, wet: 0.3 },
       };
       break;
 
     case 'SpaceLaser':
       config.spaceLaser = {
-        startFreq: 1000,
-        endFreq: 100,
-        duration: 0.5,
-        waveform: 'sawtooth',
+        laser: { startFreq: 5000, endFreq: 100, sweepTime: 500, sweepCurve: 'exponential' },
+        fm: { amount: 50, ratio: 2 },
+        noise: { amount: 10, type: 'white' },
+        filter: { type: 'lowpass', cutoff: 8000, resonance: 20 },
+        delay: { enabled: false, time: 0.3, feedback: 0.3, wet: 0.2 },
+        reverb: { enabled: false, decay: 1.0, wet: 0.2 },
       };
       break;
 
     case 'V2':
-      config.v2 = {
-        oscillators: [{ type: 'sawtooth', detune: 0 }],
-        filter: { frequency: 2000, Q: 1 },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.5 },
-      };
+      // V2Config is complex - use type assertion for test fixture
+      config.v2 = {} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
 
     case 'Sam':
       config.sam = {
         text: 'HELLO',
-        phonemes: 'HEHLOW',
         pitch: 64,
         speed: 72,
         mouth: 128,
         throat: 128,
-        singMode: false,
+        singmode: false,
+        phonetic: false,
       };
       break;
 
@@ -282,39 +309,31 @@ function getDefaultConfig(synthType: SynthType): InstrumentConfig {
       break;
 
     case 'FormantSynth':
-      config.formant = {
-        vowel: 'A',
-        brightness: 0.5,
-      };
+      config.formantSynth = {} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
 
     case 'ChipSynth':
-      config.chip = {
-        chipType: 'nes',
-        dutyCycle: 0.5,
-      };
+      config.chipSynth = {} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
 
     case 'DrumMachine':
       config.drumMachine = {
-        kit: 'tr808',
+        drumType: 'kick',
       };
       break;
 
-    // Furnace synths
+    // Furnace synths - use type assertion since test fixtures don't need full FurnaceConfig
     case 'Furnace':
     case 'FurnaceGB':
       config.furnace = {
-        chipType: 'GB',
-        channelIndex: 0,
-      };
+        chipType: 0,
+      } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
 
     case 'FurnaceNES':
       config.furnace = {
-        chipType: 'NES',
-        channelIndex: 0,
-      };
+        chipType: 0,
+      } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
 
     case 'FurnaceOPN':
@@ -322,27 +341,25 @@ function getDefaultConfig(synthType: SynthType): InstrumentConfig {
     case 'FurnaceOPL':
     case 'FurnaceOPLL':
       config.furnace = {
-        chipType: synthType.replace('Furnace', ''),
-        channelIndex: 0,
-      };
+        chipType: 1,
+      } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
       break;
   }
 
   // Default furnace config for any Furnace type not handled above
   if (synthType.startsWith('Furnace') && !config.furnace) {
     config.furnace = {
-      chipType: synthType.replace('Furnace', '') || 'GB',
-      channelIndex: 0,
-    };
+      chipType: 0,
+    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
   return config;
 }
 
-function disposeInstrument(instrument: any) {
+function disposeInstrument(instrument: unknown) {
   try {
-    if (instrument && typeof instrument.dispose === 'function') {
-      instrument.dispose();
+    if (instrument && typeof (instrument as any).dispose === 'function') {
+      (instrument as { dispose: () => void }).dispose();
     }
   } catch {
     // Ignore disposal errors
@@ -381,7 +398,7 @@ function testSynthCreation(
     expect(instrument).not.toBeNull();
 
     if (callback) {
-      callback(instrument);
+      callback(instrument as any);
     }
   } catch (error) {
     const errorMsg = (error as Error).message;
@@ -423,7 +440,7 @@ function testPresetCreation(
 }
 
 // Track created instruments for cleanup
-let createdInstruments: any[] = [];
+let createdInstruments: unknown[] = [];
 
 afterEach(() => {
   // Clean up all created instruments
@@ -512,10 +529,10 @@ describe('Synth Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
-        synthType: (preset as any).synthType || 'Synth',
+        synthType: (preset as any).synthType as SynthType || 'Synth',
         ...(preset as any),
       };
       testPresetCreation(name, config);
@@ -532,7 +549,7 @@ describe('TB303 Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'TB303',
@@ -552,7 +569,7 @@ describe('TB303 Devil Fish Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'TB303',
@@ -572,7 +589,7 @@ describe('Wavetable Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'Wavetable',
@@ -592,7 +609,7 @@ describe('Dub Siren Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'DubSiren',
@@ -612,7 +629,7 @@ describe('Space Laser Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'SpaceLaser',
@@ -632,7 +649,7 @@ describe('Synare Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'Synare',
@@ -652,7 +669,7 @@ describe('V2 Presets', () => {
 
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
         synthType: 'V2',
@@ -673,10 +690,10 @@ describe('Factory Presets', () => {
   if (presets.length > 0) {
     it.each(presets)('should load preset: %s', (name, preset) => {
       const presetData = preset as any;
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name,
-        synthType: presetData.synthType || 'Synth',
+        synthType: presetData.synthType as SynthType || 'Synth',
         ...presetData,
       };
       testPresetCreation(name, config);
@@ -852,7 +869,7 @@ describe('TriggerAttack/Release Tests', () => {
 
 describe('Config Validation Tests', () => {
   it('TB303 should throw without tb303 config', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Test TB303',
       synthType: 'TB303',
@@ -866,7 +883,7 @@ describe('Config Validation Tests', () => {
   });
 
   it('should handle minimal config for Synth', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Minimal Synth',
       synthType: 'Synth',
@@ -888,7 +905,7 @@ describe('Config Validation Tests', () => {
   });
 
   it('should use default config for Synare without synare config', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Default Synare',
       synthType: 'Synare',
@@ -911,7 +928,7 @@ describe('Config Validation Tests', () => {
   });
 
   it('should use default config for Sam without sam config', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Default Sam',
       synthType: 'Sam',
@@ -969,7 +986,7 @@ describe('Dispose/Cleanup Tests', () => {
 
 describe('Edge Case Tests', () => {
   it('should handle zero volume', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Zero Volume Synth',
       synthType: 'Synth',
@@ -991,7 +1008,7 @@ describe('Edge Case Tests', () => {
   });
 
   it('should handle max volume', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Max Volume Synth',
       synthType: 'Synth',
@@ -1105,16 +1122,19 @@ describe('Regression Tests', () => {
     const config: InstrumentConfig = {
       id: 999,
       name: 'Sam Regression Test',
+      type: 'synth' as const,
       synthType: 'Sam',
       volume: -12,
+      effects: [],
+      pan: 0,
       sam: {
         text: 'TEST',
-        phonemes: 'TEST',
         pitch: 64,
         speed: 72,
         mouth: 128,
         throat: 128,
-        singMode: false,
+        singmode: false,
+        phonetic: false,
       },
     };
 
@@ -1139,8 +1159,11 @@ describe('Regression Tests', () => {
     const config: InstrumentConfig = {
       id: 999,
       name: 'Synare Regression Test',
+      type: 'synth' as const,
       synthType: 'Synare',
       volume: -12,
+      effects: [],
+      pan: 0,
       // Note: No synare config - uses DEFAULT_SYNARE
     };
 
@@ -1231,13 +1254,13 @@ describe('Preset Property Validation', () => {
     const presets = TB303_PRESETS || [];
 
     for (const preset of presets) {
-      const p = preset as any;
+      const p = preset as Record<string, Record<string, unknown>>;
       // Each TB303 preset should have tb303 config with core properties
-      expect(p.tb303).toBeDefined(`${p.name || 'preset'} missing tb303`);
+      expect(p.tb303).toBeDefined();
       if (p.tb303) {
-        expect(p.tb303.filter).toBeDefined(`${p.name} missing filter`);
-        expect(p.tb303.filterEnvelope).toBeDefined(`${p.name} missing filterEnvelope`);
-        expect(p.tb303.oscillator).toBeDefined(`${p.name} missing oscillator`);
+        expect(p.tb303.filter).toBeDefined();
+        expect(p.tb303.filterEnvelope).toBeDefined();
+        expect(p.tb303.oscillator).toBeDefined();
       }
     }
   });
@@ -1247,10 +1270,10 @@ describe('Preset Property Validation', () => {
     const presets = SYNARE_PRESETS || [];
 
     for (const preset of presets) {
-      const p = preset as any;
+      const p = preset as Record<string, Record<string, Record<string, unknown>>>;
       if (p.synare && p.synare.oscillator) {
         // If oscillator exists, tune should be defined
-        expect(p.synare.oscillator.tune).toBeDefined(`${p.name} oscillator missing tune`);
+        expect(p.synare.oscillator.tune).toBeDefined();
       }
     }
   });
@@ -1260,7 +1283,7 @@ describe('Preset Property Validation', () => {
     const presets = DUB_SIREN_PRESETS || [];
 
     for (const preset of presets) {
-      const p = preset as any;
+      const p = preset as Record<string, Record<string, Record<string, unknown>>>;
       // DubSiren presets need dubSiren.oscillator.frequency
       const hasFreq = p.dubSiren && p.dubSiren.oscillator &&
                       p.dubSiren.oscillator.frequency !== undefined;
@@ -1275,7 +1298,7 @@ describe('Preset Property Validation', () => {
 
 describe('Synth Preset Coverage', () => {
   // Map synth types to their expected preset collections
-  const SYNTH_PRESET_MAP: Record<string, any[]> = {
+  const SYNTH_PRESET_MAP: Record<string, unknown[]> = {
     'TB303': TB303_PRESETS || [],
     'Buzz3o3': TB303_DEVILFISH_PRESETS || [],
     'Wavetable': WAVETABLE_PRESETS || [],
@@ -1386,14 +1409,10 @@ describe('Synth Control Completeness', () => {
 
 describe('VST-Style Interface Compliance', () => {
   // Modern VST-style synths should have these properties/methods
-  const VST_INTERFACE = {
-    // Standard VST-like interface
-    standardMethods: ['connect', 'disconnect', 'dispose', 'triggerAttack', 'triggerRelease'],
-    // Volume control
-    volumeProperty: 'volume',
-    // Modern synths should support parameter automation
-    parameterMethods: ['setParameter', 'getParameter', 'getParameters'],
-  };
+  // VST-style interface expectations documented here for reference:
+  // standardMethods: ['connect', 'disconnect', 'dispose', 'triggerAttack', 'triggerRelease']
+  // volumeProperty: 'volume'
+  // parameterMethods: ['setParameter', 'getParameter', 'getParameters']
 
   // Synths expected to have modern VST-style interface
   const MODERN_SYNTHS: SynthType[] = [
@@ -1447,12 +1466,8 @@ describe('VST-Style Interface Compliance', () => {
 
 describe('Octave and Pitch Correctness', () => {
   // Test that synths respond to correct octave ranges
-  const NOTE_TESTS = [
-    { note: 'C0', expectedHz: 16.35 },
-    { note: 'C4', expectedHz: 261.63 },  // Middle C
-    { note: 'A4', expectedHz: 440 },     // A440 tuning standard
-    { note: 'C8', expectedHz: 4186 },
-  ];
+  // Reference note data for testing:
+  // C0=16.35Hz, C4=261.63Hz (Middle C), A4=440Hz, C8=4186Hz
 
   it('TB303 should trigger notes in correct octave range', () => {
     testSynthCreation('TB303', (synth) => {
@@ -1485,7 +1500,7 @@ describe('Octave and Pitch Correctness', () => {
 
   it('should verify synths use A440 tuning by default', () => {
     // This is a documentation test - verifies the standard is followed
-    testSynthCreation('Synth', (synth) => {
+    testSynthCreation('Synth', () => {
       // Tone.js uses A440 as default
       expect(Tone.Frequency('A4').toFrequency()).toBeCloseTo(440, 0);
     });
@@ -1679,7 +1694,7 @@ describe('Parameter Edge Cases', () => {
 
     it('synth volume should clamp to valid range', () => {
       // Test that extreme volumes don't cause issues
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name: 'Extreme Volume Test',
         synthType: 'Synth',
@@ -1707,13 +1722,13 @@ describe('Parameter Edge Cases', () => {
 
 describe('Effect Chain Tests', () => {
   it('should create synth with reverb effect', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Synth with Reverb',
       synthType: 'Synth',
       volume: -12,
       effects: [
-        { type: 'reverb', wet: 0.5, decay: 1.5 },
+        { type: 'Reverb', wet: 0.5, decay: 1.5 },
       ],
     };
 
@@ -1731,13 +1746,13 @@ describe('Effect Chain Tests', () => {
   });
 
   it('should create synth with delay effect', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Synth with Delay',
       synthType: 'Synth',
       volume: -12,
       effects: [
-        { type: 'delay', wet: 0.3, delayTime: 0.25, feedback: 0.4 },
+        { type: 'Delay', wet: 0.3, delayTime: 0.25, feedback: 0.4 },
       ],
     };
 
@@ -1755,7 +1770,7 @@ describe('Effect Chain Tests', () => {
   });
 
   it('should create synth with multiple effects chain', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Synth with Effect Chain',
       synthType: 'TB303',
@@ -1764,14 +1779,14 @@ describe('Effect Chain Tests', () => {
         filter: { cutoff: 1000, resonance: 50 },
         filterEnvelope: { envMod: 50, decay: 200 },
         accent: { amount: 50 },
-        slide: { time: 60 },
+        slide: { time: 60, mode: 'exponential' as const },
         oscillator: { type: 'sawtooth' },
         overdrive: { amount: 0 },
       },
       effects: [
-        { type: 'distortion', wet: 0.5, distortion: 0.4 },
-        { type: 'delay', wet: 0.3, delayTime: 0.125, feedback: 0.3 },
-        { type: 'reverb', wet: 0.2, decay: 1.0 },
+        { type: 'Distortion', wet: 0.5, distortion: 0.4 },
+        { type: 'Delay', wet: 0.3, delayTime: 0.125, feedback: 0.3 },
+        { type: 'Reverb', wet: 0.2, decay: 1.0 },
       ],
     };
 
@@ -1789,7 +1804,7 @@ describe('Effect Chain Tests', () => {
   });
 
   it('should handle empty effects array', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Synth no effects',
       synthType: 'Synth',
@@ -1870,7 +1885,7 @@ describe('Polyphony Tests', () => {
 
 describe('Config Serialization Tests', () => {
   it('TB303 config should be JSON serializable', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Serialization Test',
       synthType: 'TB303',
@@ -1879,7 +1894,7 @@ describe('Config Serialization Tests', () => {
         filter: { cutoff: 1000, resonance: 50 },
         filterEnvelope: { envMod: 50, decay: 200 },
         accent: { amount: 50 },
-        slide: { time: 60 },
+        slide: { time: 60, mode: 'exponential' as const },
         oscillator: { type: 'sawtooth' },
         overdrive: { amount: 0 },
       },
@@ -1915,7 +1930,7 @@ describe('Config Serialization Tests', () => {
   });
 
   it('recreated synth from deserialized config should work', () => {
-    const originalConfig: InstrumentConfig = {
+    const originalConfig: any = {
       id: 999,
       name: 'Round Trip Test',
       synthType: 'Synth',
@@ -1945,7 +1960,7 @@ describe('Config Serialization Tests', () => {
 
 describe('Sample and URL Error Handling', () => {
   it('should handle invalid sample URL gracefully', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Invalid URL Test',
       synthType: 'Sampler',
@@ -1953,6 +1968,12 @@ describe('Sample and URL Error Handling', () => {
       sample: {
         url: 'invalid://not-a-valid-url',
         baseNote: 'C4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: 0,
+        reverse: false,
+        playbackRate: 1,
       },
     };
 
@@ -1961,14 +1982,14 @@ describe('Sample and URL Error Handling', () => {
       createdInstruments.push(instrument);
       // May succeed with lazy loading
       expect(true).toBe(true);
-    } catch (error) {
+    } catch {
       // Error is acceptable for invalid URL
       expect(true).toBe(true);
     }
   });
 
   it('should handle missing sample URL', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Missing URL Test',
       synthType: 'Sampler',
@@ -1976,6 +1997,12 @@ describe('Sample and URL Error Handling', () => {
       sample: {
         url: '',
         baseNote: 'C4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: 0,
+        reverse: false,
+        playbackRate: 1,
       },
     };
 
@@ -1983,14 +2010,14 @@ describe('Sample and URL Error Handling', () => {
       const instrument = InstrumentFactory.createInstrument(config);
       createdInstruments.push(instrument);
       expect(true).toBe(true);
-    } catch (error) {
+    } catch {
       // Error is acceptable for missing URL
       expect(true).toBe(true);
     }
   });
 
   it('should handle sample config without URL', () => {
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'No URL Test',
       synthType: 'Sampler',
@@ -2002,7 +2029,7 @@ describe('Sample and URL Error Handling', () => {
       const instrument = InstrumentFactory.createInstrument(config);
       createdInstruments.push(instrument);
       expect(true).toBe(true);
-    } catch (error) {
+    } catch {
       // May throw for missing required config
       expect(true).toBe(true);
     }
@@ -2064,7 +2091,7 @@ describe('Default Value Validation', () => {
   ];
 
   it.each(synthsWithDefaults)('%s should work with minimal config', (synthType) => {
-    const minimalConfig: InstrumentConfig = {
+    const minimalConfig: any = {
       id: 999,
       name: `Minimal ${synthType}`,
       synthType,
@@ -2094,7 +2121,7 @@ describe('Default Value Validation', () => {
     const minimalSynths: SynthType[] = ['TB303', 'Wavetable', 'Furnace'];
 
     for (const synthType of minimalSynths) {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name: `Test ${synthType}`,
         synthType,
@@ -2136,7 +2163,7 @@ describe('Furnace Chip-Specific Tests', () => {
   for (const [chipType, maxChannels] of Object.entries(CHIP_CHANNEL_LIMITS)) {
     it(`${chipType} should validate channel index (max ${maxChannels})`, () => {
       // Valid channel index
-      const validConfig: InstrumentConfig = {
+      const validConfig: any = {
         id: 999,
         name: `${chipType} Valid Channel`,
         synthType: chipType as SynthType,
@@ -2151,7 +2178,7 @@ describe('Furnace Chip-Specific Tests', () => {
         const instrument = InstrumentFactory.createInstrument(validConfig);
         createdInstruments.push(instrument);
         expect(instrument).toBeDefined();
-      } catch (error) {
+      } catch {
         // WASM not available is expected
         expect(true).toBe(true);
       }
@@ -2204,7 +2231,7 @@ describe('303-Specific Feature Tests', () => {
 
   describe('Oscillator Type', () => {
     it('TB303 should support sawtooth waveform', () => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name: 'TB303 Saw',
         synthType: 'TB303',
@@ -2213,7 +2240,7 @@ describe('303-Specific Feature Tests', () => {
           filter: { cutoff: 1000, resonance: 50 },
           filterEnvelope: { envMod: 50, decay: 200 },
           accent: { amount: 50 },
-          slide: { time: 60 },
+          slide: { time: 60, mode: 'exponential' as const },
           oscillator: { type: 'sawtooth' },
           overdrive: { amount: 0 },
         },
@@ -2233,7 +2260,7 @@ describe('303-Specific Feature Tests', () => {
     });
 
     it('TB303 should support square waveform', () => {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name: 'TB303 Square',
         synthType: 'TB303',
@@ -2242,7 +2269,7 @@ describe('303-Specific Feature Tests', () => {
           filter: { cutoff: 1000, resonance: 50 },
           filterEnvelope: { envMod: 50, decay: 200 },
           accent: { amount: 50 },
-          slide: { time: 60 },
+          slide: { time: 60, mode: 'exponential' as const },
           oscillator: { type: 'square' },
           overdrive: { amount: 0 },
         },
@@ -2285,7 +2312,7 @@ describe('Memory and Performance Sanity', () => {
 
     for (let i = 0; i < iterations; i++) {
       for (const synthType of synthTypes) {
-        const config: InstrumentConfig = {
+        const config: any = {
           id: 999,
           name: `Memory Test ${i}`,
           synthType,
@@ -2310,7 +2337,7 @@ describe('Memory and Performance Sanity', () => {
     const count = 20;
 
     for (let i = 0; i < count; i++) {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: i,
         name: `Rapid Create ${i}`,
         synthType: 'Synth',
@@ -2645,7 +2672,8 @@ describe('Fallback Detection Tests', () => {
       const fallbacks = report.filter(r => r.status === 'fallback');
       const natives = report.filter(r => r.status === 'native');
       const errors = report.filter(r => r.status === 'error');
-      const unknowns = report.filter(r => r.status === 'unknown');
+      // unknowns not currently displayed but kept for future use
+      report.filter(r => r.status === 'unknown');
 
       if (fallbacks.length > 0) {
         console.log(`\n  [!] SYNTHS USING FALLBACK (${fallbacks.length}):`);
@@ -2683,7 +2711,7 @@ describe('Fallback Detection Tests', () => {
 describe('Unknown SynthType Fallback Detection', () => {
   it('should detect when unknown synthType falls back to Synth', () => {
     // This tests the default case in createInstrument
-    const config: InstrumentConfig = {
+    const config: any = {
       id: 999,
       name: 'Unknown Type Test',
       synthType: 'NonExistentSynth' as SynthType, // Force unknown type
@@ -2694,7 +2722,7 @@ describe('Unknown SynthType Fallback Detection', () => {
       const instrument = InstrumentFactory.createInstrument(config);
       createdInstruments.push(instrument);
 
-      const ctorName = (instrument as any).constructor?.name || 'Unknown';
+      const ctorName = (instrument as any).constructor ? ((instrument as any).constructor as { name?: string }).name || 'Unknown' : 'Unknown';
 
       if (ctorName === 'Synth' || ctorName === 'Object') {
         console.log(`  [Default Fallback] Unknown synthType fell back to ${ctorName}`);
@@ -2721,7 +2749,7 @@ describe('Unknown SynthType Fallback Detection', () => {
     ];
 
     for (const { typo, correct } of typos) {
-      const config: InstrumentConfig = {
+      const config: any = {
         id: 999,
         name: 'Typo Test',
         synthType: typo as SynthType,
@@ -2732,7 +2760,7 @@ describe('Unknown SynthType Fallback Detection', () => {
         const instrument = InstrumentFactory.createInstrument(config);
         createdInstruments.push(instrument);
 
-        const ctorName = (instrument as any).constructor?.name || 'Unknown';
+        const ctorName = (instrument as any).constructor ? ((instrument as any).constructor as { name?: string }).name || 'Unknown' : 'Unknown';
 
         // If it created a basic Synth, the typo caused a fallback
         if (ctorName === 'Synth' && correct !== 'Synth') {
@@ -2882,7 +2910,7 @@ describe('Synth Capabilities Audit', () => {
 
     // Report synths missing trigger methods
     const missing = Object.entries(capabilities).filter(
-      ([_, caps]) => !caps.hasTriggerAttack || !caps.hasTriggerRelease
+      ([, caps]) => !caps.hasTriggerAttack || !caps.hasTriggerRelease
     );
 
     if (missing.length > 0) {

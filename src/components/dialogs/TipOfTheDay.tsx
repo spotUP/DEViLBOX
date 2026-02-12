@@ -70,7 +70,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
   // Sync activeTab with initialTab when opened
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      requestAnimationFrame(() => setActiveTab(initialTab));
       // Mark version as seen when opened
       localStorage.setItem(SEEN_VERSION_KEY, BUILD_NUMBER);
     }
@@ -79,7 +79,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
   // Pick a random tip when opened if not already set
   useEffect(() => {
     if (isOpen) {
-      setCurrentTipIndex(Math.floor(Math.random() * DEVILBOX_TIPS.length));
+      requestAnimationFrame(() => setCurrentTipIndex(Math.floor(Math.random() * DEVILBOX_TIPS.length)));
     }
   }, [isOpen]);
 

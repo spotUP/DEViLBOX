@@ -30,6 +30,12 @@ export interface MVerbOptions {
  * Wraps Martin Eastwood's MVerb (GPL v3) via AudioWorklet+WASM.
  * Falls back to a simple Schroeder reverb if WASM fails to load.
  */
+/** Extract the underlying native AudioNode from a Tone.js wrapper */
+function getRawNode(node: Tone.Gain): AudioNode {
+  const n = node as unknown as Record<string, AudioNode | undefined>;
+  return n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
+}
+
 export class MVerbEffect extends Tone.ToneAudioNode {
   readonly name = 'MVerb';
 
@@ -151,7 +157,7 @@ export class MVerbEffect extends Tone.ToneAudioNode {
 
       try {
         await context.audioWorklet.addModule(`${baseUrl}mverb/MVerb.worklet.js`);
-      } catch (e) {
+      } catch {
         // May already be registered
       }
 
@@ -210,12 +216,12 @@ export class MVerbEffect extends Tone.ToneAudioNode {
         this.fallbackReverb!.process(inL, inR, outL, outR);
       };
 
-      const rawInput = (this.input as any)._nativeAudioNode || (this.input as any)._node || this.input;
-      const rawWet = (this.wetGain as any)._nativeAudioNode || (this.wetGain as any)._node || this.wetGain;
+      const rawInput = getRawNode(this.input);
+      const rawWet = getRawNode(this.wetGain);
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(getRawNode(this.output));
       this.usingFallback = true;
     } catch (err) {
       console.warn('[MVerb] Fallback init failed:', err);
@@ -231,17 +237,17 @@ export class MVerbEffect extends Tone.ToneAudioNode {
       const rawContext = Tone.getContext().rawContext as AudioContext;
 
       if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch (_) {}
+        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
         this.fallbackNode.onaudioprocess = null;
         this.usingFallback = false;
       }
 
-      const rawInput = (this.input as any)._nativeAudioNode || (this.input as any)._node || this.input;
-      const rawWet = (this.wetGain as any)._nativeAudioNode || (this.wetGain as any)._node || this.wetGain;
+      const rawInput = getRawNode(this.input);
+      const rawWet = getRawNode(this.wetGain);
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      rawWet.connect((this.output as any)._nativeAudioNode || (this.output as any)._node || this.output);
+      rawWet.connect(getRawNode(this.output));
 
       const keepalive = rawContext.createGain();
       keepalive.gain.value = 0;
@@ -262,12 +268,12 @@ export class MVerbEffect extends Tone.ToneAudioNode {
   dispose(): this {
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
-      try { this.workletNode.disconnect(); } catch (_) {}
+      try { this.workletNode.disconnect(); } catch { /* ignored */ }
       this.workletNode = null;
     }
     if (this.fallbackNode) {
       this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch (_) {}
+      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
       this.fallbackNode = null;
     }
     this.dryGain.dispose();

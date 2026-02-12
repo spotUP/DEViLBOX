@@ -3,7 +3,7 @@
  * Theme-aware, click to skip to next visualizer
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useThemeStore } from '@stores/useThemeStore';
 
 interface LogoAnimationProps {
@@ -55,7 +55,7 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
   }, []);
 
   // Pause all CSS animations in the SVG
-  const pauseAnimations = useCallback(() => {
+  const pauseAnimations = () => {
     if (!svgContainerRef.current) return;
 
     const svg = svgContainerRef.current.querySelector('svg');
@@ -66,18 +66,15 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
       });
       svg.style.animationPlayState = 'paused';
     }
-  }, []);
-
+  };
 
   // Set timer once on mount to pause animation before it ends
   useEffect(() => {
     animationCompleteRef.current = false;
 
-    // Set timer to pause animation before it ends (and hides the logo)
     timerRef.current = setTimeout(() => {
       pauseAnimations();
       animationCompleteRef.current = true;
-      // Notify parent that animation is complete (can skip to next visualizer)
       onCompleteRef.current?.();
     }, ANIMATION_STOP_MS);
 
@@ -86,30 +83,31 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
         clearTimeout(timerRef.current);
       }
     };
-  }, [pauseAnimations]); // Removed key and onComplete dependencies
+  }, []);
 
+  // Ref for isCyanTheme inside animation loop
+  const isCyanThemeRef = useRef(isCyanTheme);
+  useEffect(() => { isCyanThemeRef.current = isCyanTheme; }, [isCyanTheme]);
 
-  // Simple color animation (no audio-reactive effects)
-  const animate = useCallback(() => {
-    if (!svgContainerRef.current) {
-      animationRef.current = requestAnimationFrame(animate);
-      return;
-    }
-
-    const container = svgContainerRef.current;
-    const baseColor = isCyanTheme ? '#00ffff' : '#00d4aa';
-
-    // Just set the base color and zoom, no effects
-    container.style.color = baseColor;
-    container.style.transform = 'scale(1.5)';
-    container.style.filter = '';
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, [isCyanTheme]);
-
-  // Start/stop animation loop
+  // Start/stop animation loop - defined inside effect to avoid self-referencing
   useEffect(() => {
-    animationRef.current = requestAnimationFrame(animate);
+    const tick = () => {
+      if (!svgContainerRef.current) {
+        animationRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const container = svgContainerRef.current;
+      const baseColor = isCyanThemeRef.current ? '#00ffff' : '#00d4aa';
+
+      container.style.color = baseColor;
+      container.style.transform = 'scale(1.5)';
+      container.style.filter = '';
+
+      animationRef.current = requestAnimationFrame(tick);
+    };
+
+    animationRef.current = requestAnimationFrame(tick);
 
     return () => {
       if (animationRef.current) {
@@ -117,7 +115,7 @@ const LogoAnimationComponent: React.FC<LogoAnimationProps> = ({
         animationRef.current = null;
       }
     };
-  }, [animate]);
+  }, []);
 
   // Skip animation on click (go to next visualizer)
   const handleClick = (e: React.MouseEvent) => {

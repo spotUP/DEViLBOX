@@ -10,7 +10,7 @@
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { createFormatHandler } from './effects';
-import { type FormatHandler, type ModuleFormat } from './effects/types';
+import { type FormatHandler, type ModuleFormat, type TickResult, type ChannelState, type ActiveInstrumentMeta } from './effects/types';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { getEffectProcessor } from './EffectCommands';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -126,15 +126,17 @@ export class PatternScheduler {
     const wasm = engine.getWasmInstance();
 
     // Use WASM if available for speed
-    if (wasm && typeof wasm.computePatternTimings === 'function') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wasmAny = wasm as any;
+    if (wasm && typeof wasmAny.computePatternTimings === 'function') {
       try {
         const length = pattern.length;
         // Allocate input buffer: header(12) + rows(length * 20)
         const inputSize = 12 + (length * 20);
-        const inputPtr = wasm.__new(inputSize, 1);
-        
+        const inputPtr = wasmAny.__new(inputSize, 1);
+
         // Write header
-        const view = new DataView(wasm.memory.buffer);
+        const view = new DataView(wasmAny.memory.buffer);
         view.setInt32(inputPtr, length, true);
         view.setInt32(inputPtr + 4, initialSpeed, true);
         view.setFloat32(inputPtr + 8, initialBPM, true);
@@ -179,10 +181,10 @@ export class PatternScheduler {
         }
 
         // Allocate output buffer: length * 16 bytes
-        const outputPtr = wasm.__new(length * 16, 1);
-        
+        const outputPtr = wasmAny.__new(length * 16, 1);
+
         // EXECUTE IN WASM
-        wasm.computePatternTimings(inputPtr, outputPtr);
+        wasmAny.computePatternTimings(inputPtr, outputPtr);
 
         // Read results
         const results: Array<{ time: number; speed: number; bpm: number; delay: number }> = [];
@@ -292,7 +294,7 @@ export class PatternScheduler {
    */
   private applyTickEffects(
     channelIndex: number,
-    tickResult: any,
+    tickResult: TickResult,
     handler: FormatHandler
   ): void {
     const engine = getToneEngine();
@@ -302,7 +304,7 @@ export class PatternScheduler {
       engine.setChannelFrequency(channelIndex, tickResult.setFrequency);
     } else if (tickResult.setPeriod !== undefined && tickResult.setPeriod > 0) {
       // Periodic playback logic: convert period to frequency for ToneEngine
-      const periodMult = (handler as any).config?.periodMultiplier || 3546895;
+      const periodMult = (handler as unknown as { config?: { periodMultiplier?: number } }).config?.periodMultiplier || 3546895;
       const frequency = periodMult / tickResult.setPeriod;
       engine.setChannelFrequency(channelIndex, frequency);
     } else if (tickResult.setPeriod === 0) {
@@ -341,7 +343,7 @@ export class PatternScheduler {
       engine.setBPM(tickResult.setBPM);
     }
     if (tickResult.setSpeed !== undefined) {
-      (handler as any).speed = tickResult.setSpeed;
+      (handler as unknown as { speed: number }).speed = tickResult.setSpeed;
     }
 
     if (tickResult.funkRepeat !== undefined) {
@@ -408,7 +410,7 @@ export class PatternScheduler {
     const tickEvents: Array<{ time: number; callback: (time: number) => void }> = [];
 
     // Pre-compute row timings using CURRENT speed/BPM from persistent handler if available
-    const currentSpeed = (localHandler as any).speed ?? pattern.importMetadata?.modData?.initialSpeed ?? 6;
+    const currentSpeed = (localHandler as unknown as { speed?: number }).speed ?? pattern.importMetadata?.modData?.initialSpeed ?? 6;
     const currentBPM = Tone.getTransport().bpm.value;
     const rowTimings = this.computeRowTimings(pattern, currentSpeed, currentBPM);
 
@@ -459,13 +461,13 @@ export class PatternScheduler {
               // Hardware Quirk: ensure handler has access to sample metadata if available
               const instrument = instruments.find(i => i.id === instrumentId);
               if (instrument?.metadata?.modPlayback) {
-                (state as any).sampleDefaultVolume = instrument.metadata.modPlayback.defaultVolume;
-                (state as any).sampleDefaultFinetune = instrument.metadata.modPlayback.finetune;
+                (state as ChannelState & { sampleDefaultVolume?: number; sampleDefaultFinetune?: number }).sampleDefaultVolume = instrument.metadata.modPlayback.defaultVolume;
+                (state as ChannelState & { sampleDefaultFinetune?: number }).sampleDefaultFinetune = instrument.metadata.modPlayback.finetune;
               }
 
               // Pass active instrument metadata for Auto-Vibrato
               if (instrument) {
-                (state as any).activeInstrument = instrument.metadata?.preservedSample ? instrument.metadata : instrument;
+                state.activeInstrument = (instrument.metadata?.preservedSample ? instrument.metadata : instrument) as ActiveInstrumentMeta;
               }
 
               const effectResult = localHandler.processRowStart(
@@ -693,23 +695,25 @@ export class PatternScheduler {
     }
 
     // Create Tone.Part for row events - audio triggers at precise time, UI updates via Draw
-    const rowPart = new Tone.Part((time, event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rowPart = new Tone.Part(((time: number, event: { audioCallback: (time: number) => void; uiCallback: () => void }) => {
       // Trigger audio at exact Transport time
       event.audioCallback(time);
       // Schedule UI update separately to not block audio
       Tone.Draw.schedule(() => {
         event.uiCallback();
       }, time);
-    }, events.map(e => [e.time, { audioCallback: e.audioCallback, uiCallback: e.uiCallback }]));
+    }) as any, events.map(e => [e.time, { audioCallback: e.audioCallback, uiCallback: e.uiCallback }]));
 
     // Part doesn't loop
     rowPart.loop = false;
     rowPart.start(0);
 
     // Create Tone.Part for tick events (effect processing)
-    const tickPart = new Tone.Part((time, event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tickPart = new Tone.Part(((time: number, event: { callback: (time: number) => void }) => {
       event.callback(time);
-    }, tickEvents.map(e => [e.time, { callback: e.callback }]));
+    }) as any, tickEvents.map(e => [e.time, { callback: e.callback }]));
 
     tickPart.loop = false;
     tickPart.start(0);

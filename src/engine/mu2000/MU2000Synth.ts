@@ -283,7 +283,8 @@ export class MU2000Synth implements DevilboxSynth {
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): void {
+  triggerRelease(note: string | number, time?: number): void {
+    void time;
     if (!this.isInitialized) return;
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;

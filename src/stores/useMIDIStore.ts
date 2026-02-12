@@ -798,3 +798,27 @@ export const useMIDIStore = create<MIDIStore>()(
   )
 );
 
+// ============================================================================
+// Auto-sync MIDI knobs to current instrument on instrument selection change.
+// This ensures the MIDI controller always maps to whatever instrument the user
+// is looking at in the synth editor, not just on MIDI note-on events.
+// ============================================================================
+
+useInstrumentStore.subscribe((state, prevState) => {
+  if (state.currentInstrumentId !== prevState.currentInstrumentId) {
+    const instrument = state.instruments.find(i => i.id === state.currentInstrumentId);
+    if (!instrument) return;
+
+    const store = useMIDIStore.getState();
+    // Auto-switch bank
+    const autoBank = getKnobBankForSynth(instrument.synthType);
+    if (autoBank && store.knobBank !== autoBank) {
+      store.setKnobBank(autoBank);
+    }
+    // Sync NKS2 knob assignments + pages
+    if (store.nksActiveSynthType !== instrument.synthType) {
+      store.syncKnobsToSynth(instrument.synthType);
+    }
+  }
+});
+

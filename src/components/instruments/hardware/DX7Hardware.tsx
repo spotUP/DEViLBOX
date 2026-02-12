@@ -42,8 +42,8 @@ const DX7Slider: React.FC<{
           onChange={handleChange}
           className="absolute h-28 w-6 bg-transparent cursor-pointer z-10 opacity-0"
           style={{
-            writingMode: 'vertical-lr' as any,
-            direction: 'rtl' as any,
+            writingMode: 'vertical-lr' as React.CSSProperties['writingMode'],
+            direction: 'rtl' as React.CSSProperties['direction'],
           }}
           title={`${label}: ${Math.round(value * 100)}%`}
         />

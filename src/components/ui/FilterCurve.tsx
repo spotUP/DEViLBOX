@@ -3,9 +3,15 @@
  * Drag to adjust cutoff (X) and resonance (Y)
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
 type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch' | 'lowshelf' | 'highshelf' | 'peaking';
+
+// dB scale constants (module scope for stable references)
+const MIN_DB = -24;
+const MAX_DB = 24;
+const MIN_FREQ = 20;
+const MAX_FREQ = 20000;
 
 interface FilterCurveProps {
   cutoff: number; // 20-20000 Hz
@@ -49,33 +55,29 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  const padding = { top: 10, right: 10, bottom: 25, left: 35 };
+  const padding = useMemo(() => ({ top: 10, right: 10, bottom: 25, left: 35 }), []);
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
   // Logarithmic frequency scale (20Hz to 20kHz)
-  const minFreq = 20;
-  const maxFreq = 20000;
   const freqToX = (freq: number) => {
-    const logMin = Math.log10(minFreq);
-    const logMax = Math.log10(maxFreq);
-    const logFreq = Math.log10(Math.max(minFreq, Math.min(maxFreq, freq)));
+    const logMin = Math.log10(MIN_FREQ);
+    const logMax = Math.log10(MAX_FREQ);
+    const logFreq = Math.log10(Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq)));
     return padding.left + ((logFreq - logMin) / (logMax - logMin)) * graphWidth;
   };
-  const xToFreq = (x: number) => {
-    const logMin = Math.log10(minFreq);
-    const logMax = Math.log10(maxFreq);
+  const xToFreq = useCallback((x: number) => {
+    const logMin = Math.log10(MIN_FREQ);
+    const logMax = Math.log10(MAX_FREQ);
     const normalized = (x - padding.left) / graphWidth;
     return Math.pow(10, logMin + normalized * (logMax - logMin));
-  };
+  }, [padding.left, graphWidth]);
 
-  // dB scale (-24 to +24 dB)
-  const minDb = -24;
-  const maxDb = 24;
-  const dbToY = (db: number) => {
-    const normalized = (db - minDb) / (maxDb - minDb);
+  // dB scale
+  const dbToY = useCallback((db: number) => {
+    const normalized = (db - MIN_DB) / (MAX_DB - MIN_DB);
     return padding.top + (1 - normalized) * graphHeight;
-  };
+  }, [padding.top, graphHeight]);
 
   // Generate filter response curve
   const generateFilterPath = useCallback(() => {
@@ -122,14 +124,14 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
       }
 
       // Clamp to display range
-      db = Math.max(minDb, Math.min(maxDb, db));
+      db = Math.max(MIN_DB, Math.min(MAX_DB, db));
       const y = dbToY(db);
 
       points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
     }
 
     return points.join(' ');
-  }, [cutoff, resonance, type, graphWidth]);
+  }, [cutoff, resonance, type, graphWidth, xToFreq, padding.left, dbToY]);
 
   // Handle drag
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -152,7 +154,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
     const normalizedY = 1 - (y - padding.top) / graphHeight;
     const newResonance = Math.round(normalizedY * 30);
     onResonanceChange(Math.max(0, Math.min(30, newResonance)));
-  }, [isDragging, onCutoffChange, onResonanceChange, graphHeight]);
+  }, [isDragging, onCutoffChange, onResonanceChange, graphHeight, xToFreq, padding.top]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -182,7 +184,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   const filterPath = generateFilterPath();
 
   // Fill path
-  const fillPath = `${filterPath} L ${width - padding.right} ${dbToY(minDb)} L ${padding.left} ${dbToY(minDb)} Z`;
+  const fillPath = `${filterPath} L ${width - padding.right} ${dbToY(MIN_DB)} L ${padding.left} ${dbToY(MIN_DB)} Z`;
 
   return (
     <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700 w-full">

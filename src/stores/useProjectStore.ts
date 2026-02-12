@@ -21,7 +21,7 @@ interface ProjectStore {
 }
 
 export const useProjectStore = create<ProjectStore>()(
-  immer((set, _get) => ({
+  immer((set) => ({
     // Initial state
     metadata: {
       id: `project-${Date.now()}`,

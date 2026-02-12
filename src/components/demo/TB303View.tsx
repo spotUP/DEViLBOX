@@ -4,7 +4,7 @@
  * All playback handled by TrackerReplayer
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { TB303Sequencer, type TB303Step } from '@components/sequencer/TB303Sequencer';
 import { Knob } from '@components/controls/Knob';
 import { useTrackerStore, useInstrumentStore, useTransportStore } from '@stores';
@@ -97,8 +97,10 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Refs for latest values without triggering dependency updates
   const instrumentRef = useRef(instrument);
   const tb303ConfigRef = useRef(instrument?.tb303);
-  instrumentRef.current = instrument;
-  tb303ConfigRef.current = instrument?.tb303;
+  useEffect(() => {
+    instrumentRef.current = instrument;
+    tb303ConfigRef.current = instrument?.tb303;
+  }, [instrument]);
 
   // Debounced store update to prevent re-render spam during knob dragging
   const storeUpdateTimerRef = useRef<number | null>(null);

@@ -3,7 +3,7 @@
  * Tests for native XM binary parser
  */
 
-import { describe, it, expect, beforeEach as _beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { parseXM } from '../formats/XMParser';
 
 describe('XMParser', () => {
@@ -370,12 +370,14 @@ function createMinimalXM(options: {
   return buffer;
 }
 
-function createXMWithPattern(_options: { rows: any[] }): ArrayBuffer {
+function createXMWithPattern(options: { rows: unknown[] }): ArrayBuffer {
+  void options;
   // Simplified - would need full XM structure
   return createMinimalXM();
 }
 
-function createXMWithInstrument(_options: any): ArrayBuffer {
+function createXMWithInstrument(options: unknown): ArrayBuffer {
+  void options;
   // Simplified - would need full XM structure with instrument data
   return createMinimalXM();
 }

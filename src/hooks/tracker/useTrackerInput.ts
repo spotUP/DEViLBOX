@@ -1,4 +1,3 @@
-// @ts-nocheck - Undefined argument issue
 /**
  * useTrackerInput - FastTracker II Keyboard Input System
  * Implements authentic FT2 keyboard shortcuts
@@ -116,7 +115,6 @@ export const useTrackerInput = () => {
     insertMode,
     multiRecEnabled,
     multiEditEnabled,
-    multiRecChannels,
     recReleaseEnabled,
   } = useTrackerStore(useShallow((state) => ({
     cursor: state.cursor,
@@ -129,7 +127,6 @@ export const useTrackerInput = () => {
     insertMode: state.insertMode,
     multiRecEnabled: state.multiRecEnabled,
     multiEditEnabled: state.multiEditEnabled,
-    multiRecChannels: state.multiRecChannels,
     recReleaseEnabled: state.recReleaseEnabled,
   })));
 
@@ -152,8 +149,6 @@ export const useTrackerInput = () => {
   const pastePushForward = useTrackerStore((state) => state.pastePushForward);
   const setCurrentOctave = useTrackerStore((state) => state.setCurrentOctave);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
-  const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
-  const humanizeSelection = useTrackerStore((state) => state.humanizeSelection);
   const toggleRecordMode = useTrackerStore((state) => state.toggleRecordMode);
   const setEditStep = useTrackerStore((state) => state.setEditStep);
   const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
@@ -172,13 +167,11 @@ export const useTrackerInput = () => {
     currentRow: playbackRow,
     stop,
     play,
-    togglePlayPause: _togglePlayPause,
   } = useTransportStore(useShallow((state) => ({
     isPlaying: state.isPlaying,
     currentRow: state.currentRow,
     stop: state.stop,
     play: state.play,
-    togglePlayPause: state.togglePlayPause,
   })));
 
   const {
@@ -352,7 +345,7 @@ export const useTrackerInput = () => {
         moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
       }
     },
-    [cursor, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel]
+    [cursor, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel, currentInstrumentId]
   );
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
@@ -1246,10 +1239,12 @@ export const useTrackerInput = () => {
       handleInsertRow,
       handleDeleteRow,
       transposeSelection,
-      interpolateSelection,
-      humanizeSelection,
       setPtnJumpPos,
       getPtnJumpPos,
+      readMacroSlot,
+      writeMacroSlot,
+      setCurrentOctave,
+      toggleInsertMode,
     ]
   );
 

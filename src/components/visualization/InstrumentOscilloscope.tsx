@@ -43,7 +43,7 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
   // Handle responsive width with ResizeObserver
   useEffect(() => {
     if (width !== 'auto') {
-      setLogicalWidth(width);
+      requestAnimationFrame(() => setLogicalWidth(width));
       return;
     }
 
@@ -113,7 +113,22 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
 
     const waveform = analyser.getWaveform();
     const hasActivity = analyser.hasActivity();
-    if (!hasActivity) return false;
+
+    // Idle state: draw a subtle static waveform hint
+    if (!hasActivity) {
+      ctx.strokeStyle = `${color}30`; // Very transparent
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const cycles = 3;
+      for (let i = 0; i < logicalWidth; i++) {
+        const t = (i / logicalWidth) * cycles * Math.PI * 2;
+        const amp = 0.15 * Math.sin(Math.PI * i / logicalWidth); // Fade edges
+        const y = (0.5 + amp * Math.sin(t)) * height;
+        if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+      }
+      ctx.stroke();
+      return false;
+    }
 
     // Get or create gradient
     const gradientKey = `${color}-${height}`;

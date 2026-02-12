@@ -52,7 +52,6 @@ function getParamDisplayName(param: VSTBridgeParam): string {
 
 export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   instrument,
-  onChange: _onChange,
 }) => {
   const [params, setParams] = useState<VSTBridgeParam[]>([]);
   const [paramValues, setParamValues] = useState<Map<number, number>>(new Map());
@@ -105,7 +104,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
           setParamValues(values);
           setIsLoading(false);
         }
-      } catch (_e) {
+      } catch {
         if (!cancelled) setIsLoading(false);
       }
     };

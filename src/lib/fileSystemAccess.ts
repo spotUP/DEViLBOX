@@ -3,6 +3,41 @@
  * Provides access to the user's filesystem (Chrome/Edge only)
  */
 
+/**
+ * Extended Window interface for File System Access API
+ * These APIs are available in Chrome/Edge but not yet in the TypeScript lib types.
+ */
+interface FileSystemAccessWindow {
+  showDirectoryPicker(options?: { mode?: string; startIn?: string }): Promise<FileSystemDirectoryHandle>;
+  showOpenFilePicker(options?: {
+    multiple?: boolean;
+    types?: Array<{ description: string; accept: Record<string, string[]> }>;
+  }): Promise<FileSystemFileHandle[]>;
+  showSaveFilePicker(options?: {
+    suggestedName?: string;
+    types?: Array<{ description: string; accept: Record<string, string[]> }>;
+  }): Promise<FileSystemFileHandle>;
+}
+
+/** Extended FileSystemDirectoryHandle with entries/getFileHandle/getDirectoryHandle/removeEntry */
+interface ExtendedDirectoryHandle extends FileSystemDirectoryHandle {
+  entries(): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>;
+  removeEntry(name: string): Promise<void>;
+}
+
+/** Extended FileSystemFileHandle with createWritable */
+interface ExtendedFileHandle extends FileSystemFileHandle {
+  createWritable(): Promise<FileSystemWritableFileStream>;
+}
+
+/** Extended FileSystemHandle with permission methods */
+interface ExtendedHandle extends FileSystemHandle {
+  queryPermission(options: { mode: string }): Promise<string>;
+  requestPermission(options: { mode: string }): Promise<string>;
+}
+
 export interface FileEntry {
   name: string;
   path: string;
@@ -30,7 +65,7 @@ export async function requestDirectoryAccess(): Promise<FileSystemDirectoryHandl
   }
 
   try {
-    const handle = await (window as any).showDirectoryPicker({
+    const handle = await (window as unknown as FileSystemAccessWindow).showDirectoryPicker({
       mode: 'readwrite',
       startIn: 'documents',
     });
@@ -72,7 +107,7 @@ export async function listDirectory(
 
   const entries: FileEntry[] = [];
 
-  for await (const [name, entryHandle] of (handle as any).entries()) {
+  for await (const [name, entryHandle] of (handle as unknown as ExtendedDirectoryHandle).entries()) {
     const isDirectory = entryHandle.kind === 'directory';
     let size: number | undefined;
     let modifiedAt: Date | undefined;
@@ -137,7 +172,7 @@ export async function writeFile(
   fileHandle: FileSystemFileHandle,
   content: string | ArrayBuffer | Blob
 ): Promise<void> {
-  const writable = await (fileHandle as any).createWritable();
+  const writable = await (fileHandle as unknown as ExtendedFileHandle).createWritable();
   await writable.write(content);
   await writable.close();
 }
@@ -153,7 +188,7 @@ export async function createFile(
   const handle = dirHandle || currentDirectoryHandle;
   if (!handle) throw new Error('No directory handle available');
 
-  const fileHandle = await (handle as any).getFileHandle(name, { create: true });
+  const fileHandle = await (handle as unknown as ExtendedDirectoryHandle).getFileHandle(name, { create: true });
   await writeFile(fileHandle, content);
   return fileHandle;
 }
@@ -168,7 +203,7 @@ export async function deleteFile(
   const handle = dirHandle || currentDirectoryHandle;
   if (!handle) throw new Error('No directory handle available');
 
-  await (handle as any).removeEntry(name);
+  await (handle as unknown as ExtendedDirectoryHandle).removeEntry(name);
 }
 
 /**
@@ -181,7 +216,7 @@ export async function createDirectory(
   const handle = dirHandle || currentDirectoryHandle;
   if (!handle) throw new Error('No directory handle available');
 
-  return (handle as any).getDirectoryHandle(name, { create: true });
+  return (handle as unknown as ExtendedDirectoryHandle).getDirectoryHandle(name, { create: true });
 }
 
 /**
@@ -199,7 +234,7 @@ export async function pickFiles(options?: {
   }
 
   try {
-    const handles = await (window as any).showOpenFilePicker({
+    const handles = await (window as unknown as FileSystemAccessWindow).showOpenFilePicker({
       multiple: options?.multiple ?? false,
       types: options?.types ?? [
         {
@@ -240,7 +275,7 @@ export async function pickSaveLocation(
   }
 
   try {
-    const handle = await (window as any).showSaveFilePicker({
+    const handle = await (window as unknown as FileSystemAccessWindow).showSaveFilePicker({
       suggestedName,
       types: types ?? [
         {
@@ -270,12 +305,12 @@ export async function verifyPermission(
   const options = { mode };
 
   // Check if permission was already granted
-  if ((await (handle as any).queryPermission(options)) === 'granted') {
+  if ((await (handle as unknown as ExtendedHandle).queryPermission(options)) === 'granted') {
     return true;
   }
 
   // Request permission
-  if ((await (handle as any).requestPermission(options)) === 'granted') {
+  if ((await (handle as unknown as ExtendedHandle).requestPermission(options)) === 'granted') {
     return true;
   }
 

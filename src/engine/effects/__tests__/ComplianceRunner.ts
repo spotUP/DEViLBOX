@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createFormatHandler } from '../index';
-import { type ModuleFormat, type TickResult, type ChannelState, type EnvelopePoints } from '../types';
+import type { ModuleFormat, TickResult, ChannelState, EnvelopePoints } from '../types';
 import { mockConfig } from './harness';
 import { TrackerEnvelope } from '../../TrackerEnvelope';
 
@@ -57,7 +57,7 @@ export class ComplianceRunner {
         handler.init({ 
           ...mockConfig, 
           format: testCase.format,
-          linearSlides: (testCase as any).linearSlides ?? (testCase.format === 'XM' || testCase.format === 'IT')
+          linearSlides: (testCase as ComplianceTestCase & { linearSlides?: boolean }).linearSlides ?? (testCase.format === 'XM' || testCase.format === 'IT')
         });
       });
 
@@ -124,8 +124,8 @@ export class ComplianceRunner {
               steps.forEach((step, stepIdx) => {
                 const results: TickResult[] = [];
 
-                if ((step as any).initialState) {
-                  Object.assign(state, (step as any).initialState);
+                if (step.initialState) {
+                  Object.assign(state, step.initialState);
                 }
 
                 
@@ -222,10 +222,10 @@ export class ComplianceRunner {
       
 
                 // Hardware Quirk: ensure handler has access to sample metadata if available
-                const inst = (state as any).activeInstrument;
+                const inst = state.activeInstrument as Record<string, unknown> | undefined;
                 if (inst) {
-                  (state as any).sampleDefaultVolume = inst.defaultVolume ?? 64;
-                  (state as any).sampleDefaultFinetune = inst.finetune ?? 0;
+                  (state as ChannelState & { sampleDefaultVolume?: number }).sampleDefaultVolume = (inst.defaultVolume as number) ?? 64;
+                  (state as ChannelState & { sampleDefaultFinetune?: number }).sampleDefaultFinetune = (inst.finetune as number) ?? 0;
                 }
 
                 // Row Start (Tick 0)
@@ -348,7 +348,7 @@ export class ComplianceRunner {
 
                 
 
-                                                                            fadeoutStep: inst?.fadeout || testCase.fadeout || 0,
+                                                                            fadeoutStep: (inst?.fadeout as number) || testCase.fadeout || 0,
 
                 
 
@@ -372,15 +372,16 @@ export class ComplianceRunner {
 
                 
 
-                            const volEnvData = inst?.envelopes?.volumeEnvelope || testCase.volumeEnvelope;
+                            const envelopes = inst?.envelopes as Record<string, unknown> | undefined;
+                            const volEnvData = (envelopes?.volumeEnvelope as EnvelopePoints | undefined) || testCase.volumeEnvelope;
 
                 
 
-                            const panEnvData = inst?.envelopes?.panningEnvelope || testCase.panningEnvelope;
+                            const panEnvData = (envelopes?.panningEnvelope as EnvelopePoints | undefined) || testCase.panningEnvelope;
 
                 
 
-                            const pitchEnvData = inst?.envelopes?.pitchEnvelope || testCase.pitchEnvelope;
+                            const pitchEnvData = (envelopes?.pitchEnvelope as EnvelopePoints | undefined) || testCase.pitchEnvelope;
 
                 
 
@@ -513,9 +514,9 @@ export class ComplianceRunner {
                   if (voices.length > 0) {
                     const v = voices[voices.length - 1];
                     const volMult = (v.fadeout / 65536);
-                    state.envelopeVolume = (v.vol as any).currentValue * volMult;
-                    state.envelopePanning = (v.pan as any).currentValue;
-                    state.envelopePitch = (v.pitch as any).currentValue;
+                    state.envelopeVolume = v.vol.getCurrentValue() * volMult;
+                    state.envelopePanning = v.pan.getCurrentValue();
+                    state.envelopePitch = v.pitch.getCurrentValue();
                   }
 
                   

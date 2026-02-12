@@ -2215,6 +2215,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
 /**
  * Get the appropriate visual editor for an effect type
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getVisualEffectEditor(effectType: string): React.FC<VisualEffectEditorProps> {
   return EFFECT_EDITORS[effectType] || GenericEffectEditor;
 }
@@ -2231,6 +2232,7 @@ interface VisualEffectEditorWrapperProps {
 }
 
 /** Enclosure color mapping — background tint per effect type */
+// eslint-disable-next-line react-refresh/only-export-components
 export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accent: string; border: string }> = {
   Distortion:          { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
   Reverb:              { bg: '#0e0a20', bgEnd: '#080618', accent: '#6366f1', border: '#1a1430' },
@@ -2278,6 +2280,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   WAMPedalboard:       { bg: '#081a18', bgEnd: '#041210', accent: '#14b8a6', border: '#0a2a28' },
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_ENCLOSURE = { bg: '#181818', bgEnd: '#101010', accent: '#888', border: '#282828' };
 
 /** 3D pedal enclosure shadows */
@@ -2288,13 +2291,21 @@ const ENCLOSURE_SHADOW = [
   'inset 0 -1px 0 rgba(0,0,0,0.4)',
 ].join(', ');
 
+/** Resolves and renders the correct sub-editor for the given effect type */
+const EffectEditorDispatch: React.FC<VisualEffectEditorProps & { effectType: string }> = ({
+  effectType,
+  ...props
+}) => {
+  const Editor = EFFECT_EDITORS[effectType] || GenericEffectEditor;
+  return <Editor {...props} />;
+};
+
 export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps> = ({
   effect,
   onUpdateParameter,
   onUpdateWet,
   onClose,
 }) => {
-  const EditorComponent = getVisualEffectEditor(effect.type);
 
   // Icon mapping
   const iconMap: Record<string, React.ReactNode> = {
@@ -2404,7 +2415,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
 
       {/* Editor Content */}
       <div className="p-4">
-        <EditorComponent
+        <EffectEditorDispatch
+          effectType={effect.type}
           effect={effect}
           onUpdateParameter={onUpdateParameter}
           onUpdateWet={onUpdateWet}

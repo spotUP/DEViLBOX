@@ -389,7 +389,7 @@ export class OBXdSynth implements DevilboxSynth {
         keepalive.gain.value = 0;
         this._worklet.connect(keepalive);
         keepalive.connect(rawContext.destination);
-      } catch (_e) { /* keepalive failed */ }
+      } catch { /* keepalive failed */ }
 
     } catch (error) {
       console.error('Failed to initialize OBXdSynth:', error);
@@ -630,7 +630,8 @@ export class OBXdSynth implements DevilboxSynth {
   /**
    * Release a note
    */
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  triggerRelease(frequency?: number | string, time?: number): this {
+    void time;
     if (!this._worklet) return this;
 
     if (frequency !== undefined) {

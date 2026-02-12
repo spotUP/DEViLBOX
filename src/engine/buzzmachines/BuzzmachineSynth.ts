@@ -75,11 +75,11 @@ export class BuzzmachineSynth implements DevilboxSynth {
       const context = this.audioContext;
 
       // Initialize engine
-      await this.engine.init(context as any);
+      await this.engine.init(context);
 
       // Create worklet node for this machine
       this.workletNode = await this.engine.createMachineNode(
-        context as any,
+        context,
         this.machineType
       );
 

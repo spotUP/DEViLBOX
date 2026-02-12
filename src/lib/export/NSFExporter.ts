@@ -249,8 +249,9 @@ function createNSFHeader(
   loadAddress: number,
   initAddress: number,
   playAddress: number,
-  _dataLength: number
+  dataLength: number
 ): Uint8Array {
+  void dataLength;
   const header = new Uint8Array(NSF_HEADER_SIZE);
   const view = new DataView(header.buffer);
 

@@ -52,11 +52,11 @@ function generateKeys(startOctave: number, numOctaves: number): Key[] {
       const mappedOctave = oct - keyboardOctaveOffset;
       if (mappedOctave === 0) {
         // Lower octave keys
-        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName);
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find((pair) => pair[1] === noteName);
         if (entry) keyboardKey = entry[0];
       } else if (mappedOctave === 1) {
         // Upper octave keys
-        const entry = Object.entries(FT2_KEYBOARD_MAP).find(([_, v]) => v === noteName + '+');
+        const entry = Object.entries(FT2_KEYBOARD_MAP).find((pair) => pair[1] === noteName + '+');
         if (entry) keyboardKey = entry[0];
       } else if (mappedOctave === 2 && noteName === 'C') {
         // Top C

@@ -37,12 +37,7 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
   const width = (note.endRow - note.startRow) * horizontalZoom;
   const y = (scrollY + 60 - note.midiNote) * verticalZoom; // 60 notes visible range center
 
-  // Don't render if off-screen (use container-relative check)
-  if (x + width < -50 || x > 3000 || y < -50 || y > 2000) {
-    return null;
-  }
-
-  // Handle mouse down for selection and drag
+  // Handle mouse down for selection and drag (must be before conditional return)
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (isGhost) return;
@@ -64,6 +59,11 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
     },
     [note.id, width, isGhost, onSelect, onDragStart]
   );
+
+  // Don't render if off-screen (use container-relative check)
+  if (x + width < -50 || x > 3000 || y < -50 || y > 2000) {
+    return null;
+  }
 
   // Velocity as percentage for visual indicator
   const velocityPercent = (note.velocity / 127) * 100;

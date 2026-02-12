@@ -147,6 +147,7 @@ export const MIDILearnButton: React.FC<MIDILearnButtonProps> = ({
  * Hook to use MIDI CC value for a parameter
  * Returns the current value from MIDI CC input
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMIDILearnValue(
   instrumentId: number,
   parameterPath: string,

@@ -25,6 +25,7 @@ interface EffectParameter {
 }
 
 // Neural parameter schema (legacy support) - exported for reference
+// eslint-disable-next-line react-refresh/only-export-components
 export const NEURAL_PARAMETER_SCHEMA: Record<string, EffectParameter[]> = {};
 
 interface EffectParameterEditorProps {

@@ -4,8 +4,12 @@
  */
 
 import React, { useMemo, useState, useRef, useCallback } from 'react';
-import { useAutomationStore } from '@stores';
+import { useAutomationStore, useInstrumentStore, useTrackerStore } from '@stores';
+import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
+import { getSectionColor } from '@hooks/useChannelAutomationParams';
+import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import type { SynthType } from '@typedefs/instrument';
 
 interface AutomationLanesProps {
   patternId: string;
@@ -24,55 +28,27 @@ interface AutomationLanesProps {
   nextPatternLength?: number;
 }
 
-// Interpolate value between automation points
-const getInterpolatedValue = (
-  curve: AutomationCurve | null,
-  row: number
-): number | null => {
-  if (!curve || curve.points.length === 0) return null;
+/** Resolve parameter color from NKS section of the first channel that has automation */
+function useParameterColor(parameter: string): string {
+  const patterns = useTrackerStore((s) => s.patterns);
+  const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
+  const instruments = useInstrumentStore((s) => s.instruments);
 
-  const points = curve.points;
-  let before = null;
-  let after = null;
-
-  for (let i = 0; i < points.length; i++) {
-    if (points[i].row <= row) before = points[i];
-    if (points[i].row >= row) {
-      after = points[i];
-      break;
+  return useMemo(() => {
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return 'var(--color-synth-filter)';
+    // Check first channel's instrument for section info
+    for (const ch of pattern.channels) {
+      if (ch.instrumentId === null) continue;
+      const inst = instruments.find((i) => i.id === ch.instrumentId);
+      if (!inst) continue;
+      const nksParams = getNKSParametersForSynth(inst.synthType as SynthType);
+      const nksParam = nksParams.find((p) => p.id === parameter);
+      if (nksParam) return getSectionColor(nksParam.section);
     }
-  }
-
-  if (before && before.row === row) return before.value;
-  if (after && after.row === row) return after.value;
-  if (!before && after) return after.value;
-  if (before && !after) return before.value;
-
-  if (before && after) {
-    const t = (row - before.row) / (after.row - before.row);
-    return before.value + (after.value - before.value) * t;
-  }
-
-  return null;
-};
-
-// Get color based on parameter (uses CSS variables for theming)
-const getParameterColor = (parameter: string): string => {
-  const colors: Record<string, string> = {
-    cutoff: 'var(--color-synth-filter)',
-    resonance: 'var(--color-synth-filter)',
-    envMod: 'var(--color-synth-envelope)',
-    decay: 'var(--color-synth-envelope)',
-    accent: 'var(--color-synth-accent)',
-    overdrive: 'var(--color-synth-drive)',
-    distortion: 'var(--color-synth-drive)',
-    volume: 'var(--color-synth-volume)',
-    pan: 'var(--color-synth-pan)',
-    delay: 'var(--color-synth-effects)',
-    reverb: 'var(--color-synth-effects)',
-  };
-  return colors[parameter] || 'var(--color-synth-filter)';
-};
+    return 'var(--color-synth-filter)';
+  }, [parameter, patterns, currentPatternIndex, instruments]);
+}
 
 const LANE_WIDTH = 20;
 
@@ -152,7 +128,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return result;
   }, [nextPatternId, channelCount, parameter, allCurves]);
 
-  const color = getParameterColor(parameter);
+  const color = useParameterColor(parameter);
   const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
   const nextLen = nextPatternId ? (nextPatternLength || patternLength) : 0;
 
@@ -162,16 +138,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const nextHeight = nextLen * rowHeight;
   const totalVirtualHeight = prevHeight + currentHeight + nextHeight;
 
-  // Check if any channel has automation data (including adjacent patterns)
-  const hasAnyData = curves.some(c => c !== null) ||
-                     prevCurves.some(c => c !== null) ||
-                     nextCurves.some(c => c !== null);
-
-  if (!hasAnyData) {
-    return null; // Don't render anything if no automation data
-  }
-
-  // Mouse event handlers for editing
+  // Mouse event handlers for editing (must be before conditional return)
   const handleMouseDown = useCallback((
     e: React.MouseEvent,
     curve: AutomationCurve,
@@ -180,17 +147,17 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     yOffset: number
   ) => {
     if (e.button !== 0) return; // Only left click
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     // Calculate row and value from mouse position
     const mouseY = e.clientY - rect.top - yOffset;
     const row = Math.floor(mouseY / rowHeight);
-    
+
     if (row < 0 || row >= patternLength) return;
 
     const mouseX = e.clientX - rect.left - laneLeft;
@@ -210,10 +177,10 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 
     const laneLeft = dragState.channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
     const yOffset = prevLen * rowHeight;
-    
+
     const mouseY = e.clientY - rect.top - yOffset;
     const row = Math.floor(mouseY / rowHeight);
-    
+
     if (row < 0 || row >= patternLength) return;
 
     const mouseX = e.clientX - rect.left - laneLeft;
@@ -237,7 +204,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 
     const mouseY = e.clientY - rect.top - yOffset;
     const row = Math.floor(mouseY / rowHeight);
-    
+
     if (row < 0 || row >= patternLength) return;
 
     // Remove point at this row if it exists
@@ -246,6 +213,15 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       removePoint(curve.id, row);
     }
   }, [patternLength, rowHeight, removePoint]);
+
+  // Check if any channel has automation data (including adjacent patterns)
+  const hasAnyData = curves.some(c => c !== null) ||
+                     prevCurves.some(c => c !== null) ||
+                     nextCurves.some(c => c !== null);
+
+  if (!hasAnyData) {
+    return null; // Don't render anything if no automation data
+  }
 
   // Helper to render curves for a single pattern at a virtual y position
   const renderPatternCurves = (
@@ -269,7 +245,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
       const fillPoints: string[] = [`M ${LANE_WIDTH} ${pHeight}`];
 
       for (let row = 0; row < pLength; row++) {
-        const value = getInterpolatedValue(curve, row);
+        const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (value !== null) {
           const x = value * (LANE_WIDTH - 2) + 1;
           const y = row * rowHeight + rowHeight / 2;
@@ -279,7 +255,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 
       // Build fill path (going backwards)
       for (let row = pLength - 1; row >= 0; row--) {
-        const value = getInterpolatedValue(curve, row);
+        const value = interpolateAutomationValue(curve.points, row, curve.interpolation, curve.mode);
         if (value !== null) {
           const x = value * (LANE_WIDTH - 2) + 1;
           const y = row * rowHeight + rowHeight / 2;

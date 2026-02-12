@@ -86,6 +86,8 @@ export function patternToPianoRollNotes(
         instrument: cell.instrument,
         slide: (cell.flag1 === 2 || cell.flag2 === 2),
         accent: (cell.flag1 === 1 || cell.flag2 === 1),
+        hammer: (cell.flag1 === 4 || cell.flag2 === 4),
+        mute: (cell.flag1 === 3 || cell.flag2 === 3),
       });
     }
   });
@@ -307,6 +309,45 @@ export function usePianoRollData(channelIndex?: number) {
     [notes, pattern, currentPatternIndex, setCell]
   );
 
+  // Resize a note from the start (left edge drag) - keeps endRow, changes startRow
+  const resizeNoteStart = useCallback(
+    (noteId: string, newStartRow: number) => {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note || !pattern) return;
+
+      const clampedStart = Math.max(0, Math.min(newStartRow, note.endRow - 1));
+      if (clampedStart === note.startRow) return;
+
+      const beforeState = saveForUndo(pattern);
+
+      // Delete old note
+      const [chIndexStr] = noteId.split('-');
+      const chIndex = parseInt(chIndexStr, 10);
+      setCell(chIndex, note.startRow, { note: 0, volume: 0 });
+      if (note.endRow < (pattern?.length || 64)) {
+        const endCell = pattern?.channels[chIndex]?.rows[note.endRow];
+        if (endCell?.note === 97) {
+          setCell(chIndex, note.endRow, { note: 0 });
+        }
+      }
+
+      // Re-add at new start position, keeping same endRow
+      const xmNote = midiToXMNote(note.midiNote);
+      const volumeValue = Math.round((note.velocity / 127) * 64);
+      const volume = 0x10 + volumeValue;
+      setCell(note.channelIndex, clampedStart, { note: xmNote, volume });
+      if (note.endRow < (pattern?.length || 64)) {
+        setCell(note.channelIndex, note.endRow, { note: 97 });
+      }
+
+      const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
+      if (afterPattern) {
+        recordEdit(beforeState, afterPattern, currentPatternIndex, 'Resize note start');
+      }
+    },
+    [notes, pattern, currentPatternIndex, setCell]
+  );
+
   // Set note velocity (with undo — for single clicks, not drag)
   const setNoteVelocity = useCallback(
     (noteId: string, velocity: number) => {
@@ -494,6 +535,159 @@ export function usePianoRollData(channelIndex?: number) {
     [notes, pattern, currentPatternIndex, setCell]
   );
 
+  // Transpose notes by semitones (with undo)
+  const transposeNotes = useCallback(
+    (noteIds: string[], semitones: number) => {
+      if (!pattern || noteIds.length === 0) return;
+      const beforeState = saveForUndo(pattern);
+
+      noteIds.forEach(noteId => {
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+
+        const newMidi = Math.max(0, Math.min(127, note.midiNote + semitones));
+        if (newMidi === note.midiNote) return;
+
+        const [chIndexStr] = noteId.split('-');
+        const chIndex = parseInt(chIndexStr, 10);
+        const duration = note.endRow - note.startRow;
+
+        // Clear old note
+        setCell(chIndex, note.startRow, { note: 0, volume: 0 });
+        if (note.endRow < (pattern?.length || 64)) {
+          const livePattern = useTrackerStore.getState().patterns[currentPatternIndex];
+          const endCell = livePattern?.channels[chIndex]?.rows[note.endRow];
+          if (endCell?.note === 97) {
+            setCell(chIndex, note.endRow, { note: 0 });
+          }
+        }
+
+        // Write at new pitch
+        const xmNote = midiToXMNote(newMidi);
+        const volumeValue = Math.round((note.velocity / 127) * 64);
+        const volume = 0x10 + volumeValue;
+        setCell(note.channelIndex, note.startRow, { note: xmNote, volume });
+        if (note.startRow + duration < (pattern?.length || 64)) {
+          setCell(note.channelIndex, note.startRow + duration, { note: 97 });
+        }
+      });
+
+      const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
+      if (afterPattern) {
+        recordEdit(beforeState, afterPattern, currentPatternIndex, `Transpose ${semitones > 0 ? '+' : ''}${semitones}`);
+      }
+    },
+    [notes, pattern, currentPatternIndex, setCell]
+  );
+
+  // Adjust note lengths by delta rows (with undo)
+  const adjustNoteLengths = useCallback(
+    (noteIds: string[], deltaRows: number) => {
+      if (!pattern || noteIds.length === 0) return;
+      const beforeState = saveForUndo(pattern);
+
+      noteIds.forEach(noteId => {
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+
+        const newDuration = Math.max(1, (note.endRow - note.startRow) + deltaRows);
+        const newEndRow = note.startRow + newDuration;
+
+        const [chIndexStr] = noteId.split('-');
+        const chIndex = parseInt(chIndexStr, 10);
+
+        // Clear old note
+        setCell(chIndex, note.startRow, { note: 0, volume: 0 });
+        if (note.endRow < (pattern?.length || 64)) {
+          const livePattern = useTrackerStore.getState().patterns[currentPatternIndex];
+          const endCell = livePattern?.channels[chIndex]?.rows[note.endRow];
+          if (endCell?.note === 97) {
+            setCell(chIndex, note.endRow, { note: 0 });
+          }
+        }
+
+        // Rewrite with new duration
+        const xmNote = midiToXMNote(note.midiNote);
+        const volumeValue = Math.round((note.velocity / 127) * 64);
+        const volume = 0x10 + volumeValue;
+        setCell(note.channelIndex, note.startRow, { note: xmNote, volume });
+        if (newEndRow < (pattern?.length || 64)) {
+          setCell(note.channelIndex, newEndRow, { note: 97 });
+        }
+      });
+
+      const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
+      if (afterPattern) {
+        recordEdit(beforeState, afterPattern, currentPatternIndex, `Adjust length ${deltaRows > 0 ? '+' : ''}${deltaRows}`);
+      }
+    },
+    [notes, pattern, currentPatternIndex, setCell]
+  );
+
+  // Duplicate selected notes (offset after last selected, with undo)
+  const duplicateNotes = useCallback(
+    (noteIds: string[]) => {
+      if (!pattern || noteIds.length === 0) return;
+      const beforeState = saveForUndo(pattern);
+
+      const selectedNotes = noteIds.map(id => notes.find(n => n.id === id)).filter(Boolean) as PianoRollNote[];
+      if (selectedNotes.length === 0) return;
+
+      // Calculate offset: place duplicates after the last selected note
+      const minStart = Math.min(...selectedNotes.map(n => n.startRow));
+      const maxEnd = Math.max(...selectedNotes.map(n => n.endRow));
+      const blockWidth = maxEnd - minStart;
+
+      selectedNotes.forEach(note => {
+        const newStartRow = note.startRow + blockWidth;
+        if (newStartRow >= (pattern?.length || 64)) return;
+
+        const duration = note.endRow - note.startRow;
+        const xmNote = midiToXMNote(note.midiNote);
+        const volumeValue = Math.round((note.velocity / 127) * 64);
+        const volume = 0x10 + volumeValue;
+        setCell(note.channelIndex, newStartRow, { note: xmNote, volume });
+        if (newStartRow + duration < (pattern?.length || 64)) {
+          setCell(note.channelIndex, newStartRow + duration, { note: 97 });
+        }
+      });
+
+      const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
+      if (afterPattern) {
+        recordEdit(beforeState, afterPattern, currentPatternIndex, `Duplicate ${noteIds.length} notes`);
+      }
+    },
+    [notes, pattern, currentPatternIndex, setCell]
+  );
+
+  // Adjust velocity of notes by delta (with undo)
+  const adjustVelocities = useCallback(
+    (noteIds: string[], delta: number) => {
+      if (!pattern || noteIds.length === 0) return;
+      const beforeState = saveForUndo(pattern);
+
+      noteIds.forEach(noteId => {
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+
+        const newVelocity = Math.max(1, Math.min(127, note.velocity + delta));
+        const volumeValue = Math.round((newVelocity / 127) * 64);
+        const volume = 0x10 + volumeValue;
+
+        const [chIndexStr, startRowStr] = noteId.split('-');
+        const chIndex = parseInt(chIndexStr, 10);
+        const startRow = parseInt(startRowStr, 10);
+        setCell(chIndex, startRow, { volume });
+      });
+
+      const afterPattern = useTrackerStore.getState().patterns[currentPatternIndex];
+      if (afterPattern) {
+        recordEdit(beforeState, afterPattern, currentPatternIndex, `Adjust velocity ${delta > 0 ? '+' : ''}${delta}`);
+      }
+    },
+    [notes, pattern, currentPatternIndex, setCell]
+  );
+
   // Paste notes from clipboard
   const pasteNotes = useCallback(
     (clipboard: PianoRollClipboard, targetRow: number, targetNote: number, targetChannel?: number) => {
@@ -537,6 +731,7 @@ export function usePianoRollData(channelIndex?: number) {
     deleteNotes,
     moveNote,
     resizeNote,
+    resizeNoteStart,
     setNoteVelocity,
     setMultipleVelocities,
     beginVelocityDrag,
@@ -546,6 +741,10 @@ export function usePianoRollData(channelIndex?: number) {
     toggleSlide,
     toggleAccent,
     quantizeNotes,
+    transposeNotes,
+    adjustNoteLengths,
+    duplicateNotes,
+    adjustVelocities,
     pasteNotes,
   };
 }

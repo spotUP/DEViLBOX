@@ -162,11 +162,11 @@ export class BuzzmachineGenerator implements DevilboxSynth {
       const context = this.audioContext;
 
       // Initialize engine
-      await this.engine.init(context as any);
+      await this.engine.init(context);
 
       // Create worklet node for this machine
       this.workletNode = await this.engine.createMachineNode(
-        context as any,
+        context,
         this.machineType
       );
 
@@ -185,7 +185,7 @@ export class BuzzmachineGenerator implements DevilboxSynth {
         keepalive.gain.value = 0;
         this.workletNode.connect(keepalive);
         keepalive.connect(this.audioContext.destination);
-      } catch (_e) { /* keepalive failed */ }
+      } catch { /* keepalive failed */ }
 
       this.useWasmEngine = true;
       console.log(`[BuzzmachineGenerator] ${this.machineType} WASM engine active`);
@@ -754,7 +754,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
   /**
    * Load GuitarML model - not supported
    */
-  public async loadGuitarMLModel(_index: number): Promise<void> {
+  public async loadGuitarMLModel(index: number): Promise<void> {
+    void index;
     // GuitarML requires Open303 AudioWorklet, not WASM
     console.warn('[BuzzmachineGenerator] GuitarML not supported for Aggressor');
   }
@@ -762,14 +763,16 @@ export class BuzzmachineGenerator implements DevilboxSynth {
   /**
    * Enable/disable GuitarML - not supported
    */
-  public async setGuitarMLEnabled(_enabled: boolean): Promise<void> {
+  public async setGuitarMLEnabled(enabled: boolean): Promise<void> {
+    void enabled;
     // GuitarML requires Open303 AudioWorklet, not WASM
   }
 
   /**
    * Set GuitarML mix - not supported
    */
-  public setGuitarMLMix(_mix: number): void {
+  public setGuitarMLMix(mix: number): void {
+    void mix;
     // GuitarML requires Open303 AudioWorklet, not WASM
   }
 
@@ -777,7 +780,8 @@ export class BuzzmachineGenerator implements DevilboxSynth {
    * Set quality mode - not applicable
    * Aggressor WASM has fixed quality
    */
-  public setQuality(_quality: string): void {
+  public setQuality(quality: string): void {
+    void quality;
     // N/A - WASM runs at fixed quality
   }
 

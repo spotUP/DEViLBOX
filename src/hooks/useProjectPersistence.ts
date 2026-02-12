@@ -7,8 +7,10 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore } from '@stores';
+import { useArrangementStore } from '@stores/useArrangementStore';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
+import type { ArrangementSnapshot } from '@typedefs/arrangement';
 import { needsMigration, migrateProject } from '@/lib/migration';
 
 
@@ -32,8 +34,9 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
  *      Fixed volume mismatch between default instrument (was -6dB) and presets (was 1dB).
  * - 9: Added korgEnabled, lfo.enabled toggles. pulseWidth default 1→0 (50% duty = true square).
  *      Wave blend knob replaces SAW/SQR toggle.
+ * - 10: Added arrangement timeline view snapshot to saved project.
  */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 interface SavedProject {
   version: string;
@@ -47,6 +50,7 @@ interface SavedProject {
   automation?: AutomationCurve[];
   masterEffects?: EffectConfig[];
   grooveTemplateId?: string; // Groove/swing template ID
+  arrangement?: ArrangementSnapshot; // Arrangement timeline view data
 }
 
 /**
@@ -60,6 +64,7 @@ export function saveProjectToStorage(): boolean {
     const transportState = useTransportStore.getState();
     const automationState = useAutomationStore.getState();
     const audioState = useAudioStore.getState();
+    const arrangementState = useArrangementStore.getState();
 
     const savedProject: SavedProject = {
       version: '1.0.0',
@@ -83,6 +88,8 @@ export function saveProjectToStorage(): boolean {
       masterEffects: audioState.masterEffects,
       // Only save groove template if not the default
       ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
+      // Save arrangement if it has any tracks/clips
+      ...(arrangementState.tracks.length > 0 ? { arrangement: arrangementState.getSnapshot() } : {}),
     };
 
     // Don't save projects with MOD/XM/IT/S3M imported instruments
@@ -184,6 +191,12 @@ export function loadProjectFromStorage(): boolean {
     // Load groove template (always reset to straight if not specified)
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
 
+    // Load arrangement timeline data
+    if (project.arrangement) {
+      const arrangementStore = useArrangementStore.getState();
+      arrangementStore.loadSnapshot(project.arrangement);
+    }
+
     // Auto-bake any instruments that need it (async)
     instrumentStore.autoBakeInstruments();
 
@@ -267,6 +280,19 @@ export function useProjectPersistence() {
   useEffect(() => {
     const unsubscribe = useTransportStore.subscribe((state, prevState) => {
       if (state.bpm !== prevState.bpm || state.grooveTemplateId !== prevState.grooveTemplateId) {
+        markAsModified();
+      }
+    });
+
+    return unsubscribe;
+  }, [markAsModified]);
+
+  // Subscribe to arrangement store changes (clips, tracks, markers)
+  useEffect(() => {
+    const unsubscribe = useArrangementStore.subscribe((state, prevState) => {
+      if (state.clips !== prevState.clips ||
+          state.tracks !== prevState.tracks ||
+          state.markers !== prevState.markers) {
         markAsModified();
       }
     });

@@ -1,6 +1,6 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-// @ts-ignore
+// @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from './samjs';
 import type { SamConfig } from '@/types/instrument';
 
@@ -11,7 +11,7 @@ export class SAMSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _sourceNode: AudioBufferSourceNode | null = null;
   private _playerGain: GainNode;
-  private _sam: any;
+  private _sam: InstanceType<typeof SamJs>;
   private _config: SamConfig;
   private _buffer: AudioBuffer | null = null;
   private _isRendering: boolean = false;
@@ -54,7 +54,7 @@ export class SAMSynth implements DevilboxSynth {
 
   private _stopSource(): void {
     if (this._sourceNode) {
-      try { this._sourceNode.stop(); } catch (_e) { /* already stopped */ }
+      try { this._sourceNode.stop(); } catch { /* already stopped */ }
       this._sourceNode.disconnect();
       this._sourceNode = null;
     }

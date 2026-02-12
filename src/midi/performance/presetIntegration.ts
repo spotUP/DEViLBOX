@@ -445,7 +445,8 @@ export function nksPresetToUserPreset(
   synthType?: SynthType
 ): Omit<UserPreset, 'id' | 'createdAt' | 'updatedAt'> {
   const config = nksPresetToInstrumentConfig(nksPreset, 0, synthType);
-  const { id: _id, ...configWithoutId } = config;
+  const { id: configId, ...configWithoutId } = config;
+  void configId;
 
   return {
     name: nksPreset.metadata.name || 'NKS Preset',

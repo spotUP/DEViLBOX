@@ -5,7 +5,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAutomationStore } from '@stores';
-import type { AutomationParameter, AutomationShape, InterpolationType } from '@typedefs/automation';
+import type { AutomationCurve, AutomationParameter, AutomationShape, InterpolationType } from '@typedefs/automation';
 
 interface AutomationCurveEditorProps {
   patternId: string;
@@ -44,7 +44,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
     lastRow: null,
     lastValue: null,
   });
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<Record<string, unknown>[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
   const { getAutomation, setAutomation, addPoint, clearPoints } = useAutomationStore();
@@ -342,7 +342,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const prevState = history[historyIndex - 1];
-      setAutomation(patternId, channelIndex, parameter, prevState);
+      setAutomation(patternId, channelIndex, parameter, prevState as unknown as AutomationCurve);
       setHistoryIndex((prev) => prev - 1);
     }
   }, [historyIndex, history, patternId, channelIndex, parameter, setAutomation]);
@@ -351,7 +351,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const nextState = history[historyIndex + 1];
-      setAutomation(patternId, channelIndex, parameter, nextState);
+      setAutomation(patternId, channelIndex, parameter, nextState as unknown as AutomationCurve);
       setHistoryIndex((prev) => prev + 1);
     }
   }, [historyIndex, history, patternId, channelIndex, parameter, setAutomation]);

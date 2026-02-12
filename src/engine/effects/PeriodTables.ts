@@ -166,7 +166,8 @@ export function getPeriodExtended(noteIndex: number, finetune: number = 0): numb
   return Math.round(428 / Math.pow(2, semitones / 12));
 }
 
-export function periodToNoteIndex(period: number, _finetune: number = 0): number {
+export function periodToNoteIndex(period: number, finetune: number = 0): number {
+  void finetune;
   if (period <= 0) return -1;
   const halfClock = 3546895;
   const frequency = halfClock / period;

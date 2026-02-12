@@ -5,7 +5,7 @@
  * real-time waveform display with hardware-styled appearance.
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useThemeStore } from '@stores/useThemeStore';
 
@@ -40,121 +40,130 @@ export function MAMEOscilloscope({
     ? 'linear-gradient(180deg, #0a1515 0%, #050c0c 100%)'
     : 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)';
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-
-    // Resize canvas for crisp display
-    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      ctx.scale(dpr, dpr);
-    }
-
-    // Clear
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, w, h);
-
-    const pad = 4;
-    const innerW = w - pad * 2;
-    const innerH = h - pad * 2;
-
-    // Draw grid
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    for (let i = 1; i < 4; i++) {
-      const y = pad + (innerH * i) / 4;
-      ctx.beginPath();
-      ctx.moveTo(pad, y);
-      ctx.lineTo(w - pad, y);
-      ctx.stroke();
-    }
-    for (let i = 1; i < 8; i++) {
-      const x = pad + (innerW * i) / 8;
-      ctx.beginPath();
-      ctx.moveTo(x, pad);
-      ctx.lineTo(x, h - pad);
-      ctx.stroke();
-    }
-
-    // Draw center line
-    ctx.strokeStyle = centerLineColor;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad, h / 2);
-    ctx.lineTo(w - pad, h / 2);
-    ctx.stroke();
-
-    // Draw waveform
-    const data = oscDataRef.current;
-    if (data && data.length > 0) {
-      ctx.strokeStyle = waveColor;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-
-      const samples = data.length;
-      const step = innerW / samples;
-
-      for (let i = 0; i < samples; i++) {
-        const x = pad + i * step;
-        // Clamp and scale sample value
-        const sample = Math.max(-1, Math.min(1, data[i]));
-        const y = pad + innerH / 2 - sample * (innerH / 2 - 4);
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-
-      // Glow effect
-      ctx.strokeStyle = waveColor;
-      ctx.globalAlpha = 0.3;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    } else {
-      // Draw flat line when no data
-      ctx.strokeStyle = waveColor;
-      ctx.globalAlpha = 0.3;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(pad, h / 2);
-      ctx.lineTo(w - pad, h / 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    animFrameRef.current = requestAnimationFrame(draw);
-  }, [bgColor, gridColor, centerLineColor, waveColor]);
+  // Refs for values needed inside the animation loop
+  const bgColorRef = useRef(bgColor);
+  const gridColorRef = useRef(gridColor);
+  const centerLineColorRef = useRef(centerLineColor);
+  const waveColorRef = useRef(waveColor);
+  useEffect(() => { bgColorRef.current = bgColor; }, [bgColor]);
+  useEffect(() => { gridColorRef.current = gridColor; }, [gridColor]);
+  useEffect(() => { centerLineColorRef.current = centerLineColor; }, [centerLineColor]);
+  useEffect(() => { waveColorRef.current = waveColor; }, [waveColor]);
 
   useEffect(() => {
     const engine = getToneEngine();
     const synth = engine.getMAMEChipSynth(instrumentId);
 
     if (!synth) {
-      setIsActive(false);
+      requestAnimationFrame(() => setIsActive(false));
       return;
     }
 
-    setIsActive(true);
+    requestAnimationFrame(() => setIsActive(true));
 
     // Subscribe to oscilloscope data
     const unsubscribe = synth.onOscData((data: Float32Array) => {
       oscDataRef.current = data;
     });
 
-    // Start animation loop
-    animFrameRef.current = requestAnimationFrame(draw);
+    // Animation loop defined inside effect to avoid self-referencing
+    const tick = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        animFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        animFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.scale(dpr, dpr);
+      }
+
+      ctx.fillStyle = bgColorRef.current;
+      ctx.fillRect(0, 0, w, h);
+
+      const pad = 4;
+      const innerW = w - pad * 2;
+      const innerH = h - pad * 2;
+
+      ctx.strokeStyle = gridColorRef.current;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const y = pad + (innerH * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(w - pad, y);
+        ctx.stroke();
+      }
+      for (let i = 1; i < 8; i++) {
+        const x = pad + (innerW * i) / 8;
+        ctx.beginPath();
+        ctx.moveTo(x, pad);
+        ctx.lineTo(x, h - pad);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = centerLineColorRef.current;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, h / 2);
+      ctx.lineTo(w - pad, h / 2);
+      ctx.stroke();
+
+      const data = oscDataRef.current;
+      const wc = waveColorRef.current;
+      if (data && data.length > 0) {
+        ctx.strokeStyle = wc;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+
+        const samples = data.length;
+        const step = innerW / samples;
+
+        for (let i = 0; i < samples; i++) {
+          const x = pad + i * step;
+          const sample = Math.max(-1, Math.min(1, data[i]));
+          const y = pad + innerH / 2 - sample * (innerH / 2 - 4);
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = wc;
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.strokeStyle = wc;
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad, h / 2);
+        ctx.lineTo(w - pad, h / 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animFrameRef.current = requestAnimationFrame(tick);
 
     return () => {
       unsubscribe();
@@ -162,7 +171,7 @@ export function MAMEOscilloscope({
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [instrumentId, draw]);
+  }, [instrumentId]);
 
   if (!isActive) {
     return null;

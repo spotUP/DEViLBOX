@@ -79,21 +79,23 @@ export function useMIDIActions() {
             setCurrentRow(currentRow - 1);
           }
           break;
-        case 'nav.rowDown':
+        case 'nav.rowDown': {
           const pattern = patterns[currentPatternIndex];
           if (pattern && currentRow < pattern.length - 1) {
             setCurrentRow(currentRow + 1);
           }
           break;
+        }
         case 'nav.toStart':
           setCurrentRow(0);
           break;
-        case 'nav.toEnd':
+        case 'nav.toEnd': {
           const currentPattern = patterns[currentPatternIndex];
           if (currentPattern) {
             setCurrentRow(currentPattern.length - 1);
           }
           break;
+        }
 
         // Editing
         case 'edit.octaveUp':

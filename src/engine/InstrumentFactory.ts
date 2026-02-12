@@ -1,4 +1,3 @@
-// @ts-nocheck - Tone.js API type issues need resolution
 /**
  * InstrumentFactory - Creates and manages synth instances
  * Factory class to create all synth types from InstrumentConfig.
@@ -23,14 +22,10 @@ import {
   DEFAULT_FURNACE,
   DEFAULT_SPACE_LASER,
   DEFAULT_DUB_SIREN,
-  DEFAULT_DEXED,
-  DEFAULT_OBXD,
   DEFAULT_TB303,
   DEFAULT_PWM_SYNTH,
   DEFAULT_STRING_MACHINE,
   DEFAULT_CHIP_SYNTH,
-  DEFAULT_ENVELOPE,
-  DEFAULT_FILTER,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { WavetableSynth } from './WavetableSynth';
@@ -46,7 +41,6 @@ import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { SidechainCompressor } from './effects/SidechainCompressor';
-import type { InstrumentConfig, EffectConfig, SynthType } from '@/types/instrument';
 import { ArpeggioEngine } from './ArpeggioEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { FurnaceChipType } from './chips/FurnaceChipEngine';
@@ -58,7 +52,7 @@ import { SynareSynth } from './SynareSynth';
 import { SAMSynth } from './sam/SAMSynth';
 import { V2Synth } from './v2/V2Synth';
 import { V2SpeechSynth } from './v2/V2SpeechSynth';
-import { DB303Synth, DB303Synth as JC303Synth } from './db303/DB303Synth';
+import { DB303Synth } from './db303/DB303Synth';
 import { MAMESynth } from './MAMESynth';
 import { BuzzmachineGenerator } from './buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
@@ -524,7 +518,7 @@ export class InstrumentFactory {
             (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(config.furnace.furnaceIndex);
             // Encode and upload instrument from config (converts to FINS format)
             console.log(`[InstrumentFactory] Queuing upload for instrument ${config.name}, furnaceIndex=${config.furnace.furnaceIndex}`);
-            (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace, config.name).catch(err => {
+            (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace as unknown as Record<string, unknown>, config.name).catch(err => {
               console.error(`[InstrumentFactory] Failed to upload instrument data for ${config.name}:`, err);
             });
           }
@@ -542,7 +536,7 @@ export class InstrumentFactory {
         instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPNB_B);
         break;
 
-      case 'Sampler':
+      case 'Sampler': {
         // Check if this is a MOD/XM sample that needs period-based playback
         const hasMODMetadata = config.metadata?.modPlayback?.usePeriodPlayback;
         console.log(`[InstrumentFactory] Creating ${config.synthType} for instrument ${config.id}:`, {
@@ -559,6 +553,7 @@ export class InstrumentFactory {
           instrument = this.createSampler(config); // Use Sampler for regular samples
         }
         break;
+      }
 
       case 'Player':
         instrument = this.createPlayer(config);
@@ -816,7 +811,7 @@ export class InstrumentFactory {
     if (config.synthType.startsWith('Furnace') && instrument) {
       const offset = this.VOLUME_NORMALIZATION_OFFSETS[config.synthType] ?? 0;
       if (offset !== 0 && 'setVolumeOffset' in instrument) {
-        (instrument as any).setVolumeOffset(offset);
+        (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(offset);
       }
     }
 
@@ -827,21 +822,21 @@ export class InstrumentFactory {
    * Create effect chain from config (now async for neural effects)
    */
   public static async createEffectChain(
-    effects: EffectConfig[],
-    audioContext?: AudioContext
-  ): Promise<Tone.ToneAudioNode[]> {
+    effects: EffectConfig[]
+  ): Promise<(Tone.ToneAudioNode | DevilboxSynth)[]> {
     const enabled = effects.filter((fx) => fx.enabled);
-    return Promise.all(enabled.map((fx) => this.createEffect(fx, audioContext)));
+    return Promise.all(enabled.map((fx) => this.createEffect(fx)));
   }
 
   /**
    * Create single effect instance (now async for neural effects)
    */
   public static async createEffect(
-    config: EffectConfig,
-    audioContext?: AudioContext
-  ): Promise<Tone.ToneAudioNode> {
+    config: EffectConfig
+  ): Promise<Tone.ToneAudioNode | DevilboxSynth> {
     const wetValue = config.wet / 100;
+    // Helper: Tone.js expects specific numeric/string params; our EffectConfig stores them as number|string
+    const p = config.parameters as Record<string, number & string>;
 
     // Neural effects
     if (config.category === 'neural') {
@@ -858,28 +853,28 @@ export class InstrumentFactory {
 
       // Set all parameters from config
       Object.entries(config.parameters).forEach(([key, value]) => {
-        wrapper.setParameter(key, value);
+        wrapper.setParameter(key, value as number);
       });
 
       return wrapper;
     }
 
     // Tone.js effects
-    let node: Tone.ToneAudioNode;
+    let node: Tone.ToneAudioNode | DevilboxSynth;
     
     switch (config.type) {
       case 'Distortion':
         node = new Tone.Distortion({
-          distortion: config.parameters.drive || 0.4,
-          oversample: config.parameters.oversample || 'none',
+          distortion: p.drive || 0.4,
+          oversample: p.oversample || 'none',
           wet: wetValue,
         });
         break;
 
       case 'Reverb': {
         const reverb = new Tone.Reverb({
-          decay: config.parameters.decay || 1.5,
-          preDelay: config.parameters.preDelay || 0.01,
+          decay: p.decay || 1.5,
+          preDelay: p.preDelay || 0.01,
           wet: wetValue,
         });
         // Reverb needs to generate its impulse response before it can process audio
@@ -890,17 +885,17 @@ export class InstrumentFactory {
 
       case 'Delay':
         node = new Tone.FeedbackDelay({
-          delayTime: config.parameters.time || 0.25,
-          feedback: config.parameters.feedback || 0.5,
+          delayTime: p.time || 0.25,
+          feedback: p.feedback || 0.5,
           wet: wetValue,
         });
         break;
 
       case 'Chorus': {
         const chorus = new Tone.Chorus({
-          frequency: config.parameters.frequency || 1.5,
-          delayTime: config.parameters.delayTime || 3.5,
-          depth: config.parameters.depth || 0.7,
+          frequency: p.frequency || 1.5,
+          delayTime: p.delayTime || 3.5,
+          depth: p.depth || 0.7,
           wet: wetValue,
         });
         chorus.start(); // Start LFO
@@ -910,17 +905,17 @@ export class InstrumentFactory {
 
       case 'Phaser':
         node = new Tone.Phaser({
-          frequency: config.parameters.frequency || 0.5,
-          octaves: config.parameters.octaves || 3,
-          baseFrequency: config.parameters.baseFrequency || 350,
+          frequency: p.frequency || 0.5,
+          octaves: p.octaves || 3,
+          baseFrequency: p.baseFrequency || 350,
           wet: wetValue,
         });
         break;
 
       case 'Tremolo': {
         const tremolo = new Tone.Tremolo({
-          frequency: config.parameters.frequency || 10,
-          depth: config.parameters.depth || 0.5,
+          frequency: p.frequency || 10,
+          depth: p.depth || 0.5,
           wet: wetValue,
         });
         tremolo.start(); // Start LFO
@@ -930,8 +925,8 @@ export class InstrumentFactory {
 
       case 'Vibrato': {
         const vibrato = new Tone.Vibrato({
-          frequency: config.parameters.frequency || 5,
-          depth: config.parameters.depth || 0.1,
+          frequency: p.frequency || 5,
+          depth: p.depth || 0.1,
           wet: wetValue,
         });
         node = vibrato;
@@ -940,11 +935,11 @@ export class InstrumentFactory {
 
       case 'AutoFilter': {
         const autoFilter = new Tone.AutoFilter({
-          frequency: config.parameters.frequency || 1,
-          baseFrequency: config.parameters.baseFrequency || 200,
-          octaves: config.parameters.octaves || 2.6,
+          frequency: p.frequency || 1,
+          baseFrequency: p.baseFrequency || 200,
+          octaves: p.octaves || 2.6,
           filter: {
-            type: config.parameters.filterType || 'lowpass',
+            type: p.filterType || 'lowpass',
             rolloff: -12,
             Q: 1,
           },
@@ -957,8 +952,8 @@ export class InstrumentFactory {
 
       case 'AutoPanner': {
         const autoPanner = new Tone.AutoPanner({
-          frequency: config.parameters.frequency || 1,
-          depth: config.parameters.depth || 1,
+          frequency: p.frequency || 1,
+          depth: p.depth || 1,
           wet: wetValue,
         });
         autoPanner.start(); // Start LFO
@@ -968,183 +963,181 @@ export class InstrumentFactory {
 
       case 'AutoWah':
         node = new Tone.AutoWah({
-          baseFrequency: config.parameters.baseFrequency || 100,
-          octaves: config.parameters.octaves || 6,
-          sensitivity: config.parameters.sensitivity || 0,
-          Q: config.parameters.Q || 2,
-          gain: config.parameters.gain || 2,
-          follower: config.parameters.follower || 0.1,
+          baseFrequency: p.baseFrequency || 100,
+          octaves: p.octaves || 6,
+          sensitivity: p.sensitivity || 0,
+          Q: p.Q || 2,
+          gain: p.gain || 2,
+          follower: p.follower || 0.1,
           wet: wetValue,
         });
         break;
 
       case 'BitCrusher':
-        node = new Tone.BitCrusher({
-          bits: config.parameters.bits || 4,
-          wet: wetValue,
-        });
+        node = new Tone.BitCrusher(Number(p.bits) || 4);
+        (node as Tone.BitCrusher).wet.value = wetValue;
         break;
 
       case 'Chebyshev':
         node = new Tone.Chebyshev({
-          order: config.parameters.order || 50,
-          oversample: config.parameters.oversample || 'none',
+          order: p.order || 50,
+          oversample: p.oversample || 'none',
           wet: wetValue,
         });
         break;
 
       case 'FeedbackDelay':
         node = new Tone.FeedbackDelay({
-          delayTime: config.parameters.time || 0.25,
-          feedback: config.parameters.feedback || 0.5,
+          delayTime: p.time || 0.25,
+          feedback: p.feedback || 0.5,
           wet: wetValue,
         });
         break;
 
       case 'FrequencyShifter':
         node = new Tone.FrequencyShifter({
-          frequency: config.parameters.frequency || 0,
+          frequency: p.frequency || 0,
           wet: wetValue,
         });
         break;
 
       case 'PingPongDelay':
         node = new Tone.PingPongDelay({
-          delayTime: config.parameters.time || 0.25,
-          feedback: config.parameters.feedback || 0.5,
+          delayTime: p.time || 0.25,
+          feedback: p.feedback || 0.5,
           wet: wetValue,
         });
         break;
 
       case 'PitchShift':
         node = new Tone.PitchShift({
-          pitch: config.parameters.pitch || 0,
-          windowSize: config.parameters.windowSize || 0.1,
-          delayTime: config.parameters.delayTime || 0,
-          feedback: config.parameters.feedback || 0,
+          pitch: p.pitch || 0,
+          windowSize: p.windowSize || 0.1,
+          delayTime: p.delayTime || 0,
+          feedback: p.feedback || 0,
           wet: wetValue,
         });
         break;
 
       case 'Compressor':
         node = new Tone.Compressor({
-          threshold: config.parameters.threshold || -24,
-          ratio: config.parameters.ratio || 12,
-          attack: config.parameters.attack || 0.003,
-          release: config.parameters.release || 0.25,
+          threshold: p.threshold || -24,
+          ratio: p.ratio || 12,
+          attack: p.attack || 0.003,
+          release: p.release || 0.25,
         });
         break;
 
       case 'EQ3':
         node = new Tone.EQ3({
-          low: config.parameters.low || 0,
-          mid: config.parameters.mid || 0,
-          high: config.parameters.high || 0,
-          lowFrequency: config.parameters.lowFrequency || 400,
-          highFrequency: config.parameters.highFrequency || 2500,
+          low: p.low || 0,
+          mid: p.mid || 0,
+          high: p.high || 0,
+          lowFrequency: p.lowFrequency || 400,
+          highFrequency: p.highFrequency || 2500,
         });
         break;
 
       case 'Filter':
         node = new Tone.Filter({
-          type: config.parameters.type || 'lowpass',
-          frequency: config.parameters.frequency || 350,
-          rolloff: config.parameters.rolloff || -12,
-          Q: config.parameters.Q || 1,
-          gain: config.parameters.gain || 0,
+          type: p.type || 'lowpass',
+          frequency: p.frequency || 350,
+          rolloff: p.rolloff || -12,
+          Q: p.Q || 1,
+          gain: p.gain || 0,
         });
         break;
 
       case 'JCReverb':
         node = new Tone.JCReverb({
-          roomSize: config.parameters.roomSize || 0.5,
+          roomSize: p.roomSize || 0.5,
           wet: wetValue,
         });
         break;
 
       case 'StereoWidener':
         node = new Tone.StereoWidener({
-          width: config.parameters.width || 0.5,
+          width: p.width || 0.5,
         });
         break;
 
       case 'TapeSaturation':
         node = new TapeSaturation({
-          drive: (config.parameters.drive || 50) / 100,   // 0-100 -> 0-1
-          tone: config.parameters.tone || 12000,          // Hz
+          drive: (p.drive || 50) / 100,   // 0-100 -> 0-1
+          tone: p.tone || 12000,          // Hz
           wet: wetValue,
         });
         break;
 
       case 'SidechainCompressor':
         node = new SidechainCompressor({
-          threshold: config.parameters.threshold ?? -24,
-          ratio: config.parameters.ratio ?? 4,
-          attack: config.parameters.attack ?? 0.003,
-          release: config.parameters.release ?? 0.25,
-          knee: config.parameters.knee ?? 6,
-          sidechainGain: (config.parameters.sidechainGain ?? 100) / 100,
+          threshold: p.threshold ?? -24,
+          ratio: p.ratio ?? 4,
+          attack: p.attack ?? 0.003,
+          release: p.release ?? 0.25,
+          knee: p.knee ?? 6,
+          sidechainGain: (p.sidechainGain ?? 100) / 100,
           wet: wetValue,
         });
         break;
 
       case 'SpaceEcho':
         node = new SpaceEchoEffect({
-          mode: Number(config.parameters.mode) || 4,
-          rate: Number(config.parameters.rate) || 300,
-          intensity: Number(config.parameters.intensity) || 0.5,
-          echoVolume: Number(config.parameters.echoVolume) || 0.8,
-          reverbVolume: Number(config.parameters.reverbVolume) || 0.3,
-          bass: Number(config.parameters.bass) || 0,
-          treble: Number(config.parameters.treble) || 0,
+          mode: Number(p.mode) || 4,
+          rate: Number(p.rate) || 300,
+          intensity: Number(p.intensity) || 0.5,
+          echoVolume: Number(p.echoVolume) || 0.8,
+          reverbVolume: Number(p.reverbVolume) || 0.3,
+          bass: Number(p.bass) || 0,
+          treble: Number(p.treble) || 0,
           wet: wetValue,
         });
         break;
 
       case 'SpaceyDelayer':
         node = new SpaceyDelayerEffect({
-          firstTap: Number(config.parameters.firstTap) || 250,
-          tapSize: Number(config.parameters.tapSize) || 150,
-          feedback: Number(config.parameters.feedback) || 40,
-          multiTap: config.parameters.multiTap != null ? Number(config.parameters.multiTap) : 1,
-          tapeFilter: Number(config.parameters.tapeFilter) || 0,
+          firstTap: Number(p.firstTap) || 250,
+          tapSize: Number(p.tapSize) || 150,
+          feedback: Number(p.feedback) || 40,
+          multiTap: p.multiTap != null ? Number(p.multiTap) : 1,
+          tapeFilter: Number(p.tapeFilter) || 0,
           wet: wetValue,
         });
         break;
 
       case 'RETapeEcho':
         node = new RETapeEchoEffect({
-          mode: config.parameters.mode != null ? Number(config.parameters.mode) : 3,
-          repeatRate: Number(config.parameters.repeatRate) || 0.5,
-          intensity: Number(config.parameters.intensity) || 0.5,
-          echoVolume: Number(config.parameters.echoVolume) || 0.8,
-          wow: Number(config.parameters.wow) || 0,
-          flutter: Number(config.parameters.flutter) || 0,
-          dirt: Number(config.parameters.dirt) || 0,
-          inputBleed: config.parameters.inputBleed != null ? Number(config.parameters.inputBleed) : 0,
-          loopAmount: Number(config.parameters.loopAmount) || 0,
-          playheadFilter: config.parameters.playheadFilter != null ? Number(config.parameters.playheadFilter) : 1,
+          mode: p.mode != null ? Number(p.mode) : 3,
+          repeatRate: Number(p.repeatRate) || 0.5,
+          intensity: Number(p.intensity) || 0.5,
+          echoVolume: Number(p.echoVolume) || 0.8,
+          wow: Number(p.wow) || 0,
+          flutter: Number(p.flutter) || 0,
+          dirt: Number(p.dirt) || 0,
+          inputBleed: p.inputBleed != null ? Number(p.inputBleed) : 0,
+          loopAmount: Number(p.loopAmount) || 0,
+          playheadFilter: p.playheadFilter != null ? Number(p.playheadFilter) : 1,
           wet: wetValue,
         });
         break;
 
       case 'BiPhase':
         node = new BiPhaseEffect({
-          rateA: Number(config.parameters.rateA) || 0.5,
-          depthA: Number(config.parameters.depthA) || 0.6,
-          rateB: Number(config.parameters.rateB) || 4.0,
-          depthB: Number(config.parameters.depthB) || 0.4,
-          feedback: Number(config.parameters.feedback) || 0.3,
-          routing: Number(config.parameters.routing) === 1 ? 'series' : 'parallel',
+          rateA: Number(p.rateA) || 0.5,
+          depthA: Number(p.depthA) || 0.6,
+          rateB: Number(p.rateB) || 4.0,
+          depthB: Number(p.depthB) || 0.4,
+          feedback: Number(p.feedback) || 0.3,
+          routing: Number(p.routing) === 1 ? 'series' : 'parallel',
           wet: wetValue,
         });
         break;
 
       case 'DubFilter':
         node = new DubFilterEffect({
-          cutoff: Number(config.parameters.cutoff) || 20,
-          resonance: Number(config.parameters.resonance) || 1,
-          gain: Number(config.parameters.gain) || 1,
+          cutoff: Number(p.cutoff) || 20,
+          resonance: Number(p.resonance) || 1,
+          gain: Number(p.gain) || 1,
           wet: wetValue,
         });
         break;
@@ -1426,52 +1419,52 @@ export class InstrumentFactory {
       // WASM effects
       case 'MoogFilter':
         node = new MoogFilterEffect({
-          cutoff: Number(config.parameters.cutoff) || 1000,
-          resonance: (Number(config.parameters.resonance) || 10) / 100,  // 0-100 -> 0-1
-          drive: Number(config.parameters.drive) || 1.0,
-          model: Number(config.parameters.model) || MoogFilterModel.Hyperion,
-          filterMode: Number(config.parameters.filterMode) || MoogFilterMode.LP4,
+          cutoff: Number(p.cutoff) || 1000,
+          resonance: (Number(p.resonance) || 10) / 100,  // 0-100 -> 0-1
+          drive: Number(p.drive) || 1.0,
+          model: (Number(p.model) || MoogFilterModel.Hyperion) as MoogFilterModel,
+          filterMode: (Number(p.filterMode) || MoogFilterMode.LP4) as MoogFilterMode,
           wet: wetValue,
         });
         break;
 
       case 'MVerb':
         node = new MVerbEffect({
-          damping: Number(config.parameters.damping) ?? 0.5,
-          density: Number(config.parameters.density) ?? 0.5,
-          bandwidth: Number(config.parameters.bandwidth) ?? 0.5,
-          decay: Number(config.parameters.decay) ?? 0.7,
-          predelay: Number(config.parameters.predelay) ?? 0.0,
-          size: Number(config.parameters.size) ?? 0.8,
-          gain: Number(config.parameters.gain) ?? 1.0,
-          mix: Number(config.parameters.mix) ?? 0.4,
-          earlyMix: Number(config.parameters.earlyMix) ?? 0.5,
+          damping: Number(p.damping),
+          density: Number(p.density),
+          bandwidth: Number(p.bandwidth),
+          decay: Number(p.decay),
+          predelay: Number(p.predelay),
+          size: Number(p.size),
+          gain: Number(p.gain),
+          mix: Number(p.mix),
+          earlyMix: Number(p.earlyMix),
           wet: wetValue,
         });
         break;
 
       case 'Leslie':
         node = new LeslieEffect({
-          speed: Number(config.parameters.speed) ?? 0.0,
-          hornRate: Number(config.parameters.hornRate) ?? 6.8,
-          drumRate: Number(config.parameters.drumRate) ?? 5.9,
-          hornDepth: Number(config.parameters.hornDepth) ?? 0.7,
-          drumDepth: Number(config.parameters.drumDepth) ?? 0.5,
-          doppler: Number(config.parameters.doppler) ?? 0.5,
-          width: Number(config.parameters.width) ?? 0.8,
-          acceleration: Number(config.parameters.acceleration) ?? 0.5,
+          speed: Number(p.speed),
+          hornRate: Number(p.hornRate),
+          drumRate: Number(p.drumRate),
+          hornDepth: Number(p.hornDepth),
+          drumDepth: Number(p.drumDepth),
+          doppler: Number(p.doppler),
+          width: Number(p.width),
+          acceleration: Number(p.acceleration),
           wet: wetValue,
         });
         break;
 
       case 'SpringReverb':
         node = new SpringReverbEffect({
-          decay: Number(config.parameters.decay) ?? 0.6,
-          damping: Number(config.parameters.damping) ?? 0.4,
-          tension: Number(config.parameters.tension) ?? 0.5,
-          mix: Number(config.parameters.mix) ?? 0.35,
-          drip: Number(config.parameters.drip) ?? 0.5,
-          diffusion: Number(config.parameters.diffusion) ?? 0.7,
+          decay: Number(p.decay),
+          damping: Number(p.damping),
+          tension: Number(p.tension),
+          mix: Number(p.mix),
+          drip: Number(p.drip),
+          diffusion: Number(p.diffusion),
           wet: wetValue,
         });
         break;
@@ -1506,7 +1499,7 @@ export class InstrumentFactory {
     }
 
     // Attach type metadata for identification in the engine
-    (node as any)._fxType = config.type;
+    (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
 
     // Apply initial BPM-synced values if sync is enabled
     if (isEffectBpmSynced(config.parameters)) {
@@ -1538,7 +1531,7 @@ export class InstrumentFactory {
               if (entry.param === 'frequency' && node instanceof Tone.Chorus) node.frequency.value = value;
               break;
             case 'BiPhase':
-              if (entry.param === 'rateA' && node instanceof BiPhaseEffect) (node as any).rateA = value;
+              if (entry.param === 'rateA' && node instanceof BiPhaseEffect) (node as unknown as { rateA: number }).rateA = value;
               break;
           }
         }
@@ -1594,9 +1587,8 @@ export class InstrumentFactory {
   private static createSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: {
-        type: config.oscillator?.type || 'sawtooth',
-        detune: config.oscillator?.detune || 0,
-      },
+        type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
+      } as Partial<Tone.OmniOscillatorSynthOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1605,6 +1597,9 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('Synth', config.volume),
     });
+    if (config.oscillator?.detune) {
+      synth.set({ detune: config.oscillator.detune });
+    }
 
     // Setup pitch envelope if enabled
     const pitchEnv = config.pitchEnvelope;
@@ -1640,14 +1635,14 @@ export class InstrumentFactory {
       disconnect: () => synth.disconnect(),
       dispose: () => synth.dispose(),
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   private static createMonoSynth(config: InstrumentConfig): Tone.MonoSynth {
     // Build base config first
-    const monoConfig: Tone.MonoSynthOptions = {
+    const monoConfig: Record<string, unknown> = {
       oscillator: {
-        type: config.oscillator?.type || 'sawtooth',
+        type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
         detune: config.oscillator?.detune || 0,
       },
       envelope: {
@@ -1683,15 +1678,16 @@ export class InstrumentFactory {
       };
     }
 
-    return new Tone.MonoSynth(monoConfig);
+    return new Tone.MonoSynth(monoConfig as unknown as Tone.MonoSynthOptions);
   }
 
   private static createDuoSynth(config: InstrumentConfig): Tone.DuoSynth {
+    const oscType = (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType;
     return new Tone.DuoSynth({
       voice0: {
         oscillator: {
-          type: config.oscillator?.type || 'sawtooth',
-        },
+          type: oscType,
+        } as Partial<Tone.OmniOscillatorSynthOptions>,
         envelope: {
           attack: (config.envelope?.attack ?? 10) / 1000,
           decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1701,8 +1697,8 @@ export class InstrumentFactory {
       },
       voice1: {
         oscillator: {
-          type: config.oscillator?.type || 'sawtooth',
-        },
+          type: oscType,
+        } as Partial<Tone.OmniOscillatorSynthOptions>,
         envelope: {
           attack: (config.envelope?.attack ?? 10) / 1000,
           decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1720,7 +1716,7 @@ export class InstrumentFactory {
     return new Tone.PolySynth(Tone.FMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      },
+      } as Partial<Tone.OmniOscillatorSynthOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1736,7 +1732,7 @@ export class InstrumentFactory {
     return new Tone.PolySynth(Tone.AMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      },
+      } as Partial<Tone.OmniOscillatorSynthOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 10) / 1000,
         decay: (config.envelope?.decay ?? 200) / 1000,
@@ -1748,7 +1744,7 @@ export class InstrumentFactory {
   }
 
   private static createPluckSynth(config: InstrumentConfig): Tone.PolySynth {
-    return new Tone.PolySynth(Tone.PluckSynth, {
+    return new Tone.PolySynth(Tone.PluckSynth as any, {
       attackNoise: 1,
       dampening: 4000,
       resonance: 0.7,
@@ -1773,7 +1769,7 @@ export class InstrumentFactory {
       octaves: 10,
       oscillator: {
         type: config.oscillator?.type || 'sine',
-      },
+      } as Partial<Tone.OmniOscillatorSynthOptions>,
       envelope: {
         attack: (config.envelope?.attack ?? 1) / 1000,
         decay: (config.envelope?.decay ?? 400) / 1000,
@@ -1907,7 +1903,7 @@ export class InstrumentFactory {
         if (df.enabled) {
           synth.enableDevilFish(true, {
             overdrive: tb.overdrive?.amount,
-            muffler: df.muffler as any,
+            muffler: df.muffler as 'off' | 'dark' | 'mid' | 'bright',
           });
         }
         if (df.muffler) {
@@ -1935,20 +1931,11 @@ export class InstrumentFactory {
         if (df.softAttack !== undefined) {
           synth.setSoftAttack(df.softAttack);
         }
-        if (df.slideTime !== undefined) {
-          synth.setSlideTime(df.slideTime);
-        }
         if (df.sweepSpeed !== undefined) {
           synth.setSweepSpeed(df.sweepSpeed);
         }
-        if (df.accentAttack !== undefined) {
-          synth.setParam('accent_attack', df.accentAttack);
-        }
-        if (df.filterFM !== undefined) {
-          synth.setFilterFM(df.filterFM);
-        }
-        if (df.accentSweepEnabled !== undefined) {
-          synth.setAccentSweepEnabled(df.accentSweepEnabled);
+        if (df.filterFmDepth !== undefined) {
+          synth.setFilterFM(df.filterFmDepth);
         }
       }
 
@@ -1978,7 +1965,8 @@ export class InstrumentFactory {
     }
 
     // Priority 2: Check for sample URL from parameters (Legacy/Upload)
-    const sampleUrl = config.parameters?.sampleUrl || config.sample?.url;
+    const params = config.parameters as Record<string, string | number> | undefined;
+    const sampleUrl = params?.sampleUrl as string | undefined || config.sample?.url;
     const baseNote = config.sample?.baseNote || 'C4';
 
     // CRITICAL: Check if this is a MOD/XM instrument loaded from localStorage
@@ -2018,8 +2006,9 @@ export class InstrumentFactory {
 
   private static createPlayer(config: InstrumentConfig): Tone.Player {
     // Get sample URL from parameters (base64 data URL from user upload)
-    const sampleUrl = config.parameters?.sampleUrl;
-    const reverseMode = config.parameters?.reverseMode || 'forward';
+    const pp = config.parameters as Record<string, string | number> | undefined;
+    const sampleUrl = pp?.sampleUrl as string | undefined;
+    const reverseMode = pp?.reverseMode || 'forward';
 
     if (sampleUrl) {
       const player = new Tone.Player({
@@ -2038,7 +2027,7 @@ export class InstrumentFactory {
 
   private static createGranularSynth(config: InstrumentConfig): Tone.GrainPlayer {
     // Get sample URL and granular config
-    const sampleUrl = config.granular?.sampleUrl || config.parameters?.sampleUrl;
+    const sampleUrl = config.granular?.sampleUrl || (config.parameters as Record<string, string> | undefined)?.sampleUrl;
     const granularConfig = config.granular;
 
     if (sampleUrl) {
@@ -2080,7 +2069,7 @@ export class InstrumentFactory {
 
     // Create a PolySynth with sawtooth and add unison effect via chorus
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
         type: 'sawtooth',
       },
@@ -2152,27 +2141,29 @@ export class InstrumentFactory {
         filter.dispose();
         chorus.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const ssc = newConfig || DEFAULT_SUPERSAW;
+        const env = ssc.envelope as Record<string, number>;
+        const flt = ssc.filter as Record<string, number & string>;
         synth.set({
           envelope: {
-            attack: (ssc.envelope.attack || 10) / 1000,
-            decay: (ssc.envelope.decay || 100) / 1000,
-            sustain: (ssc.envelope.sustain || 80) / 100,
-            release: (ssc.envelope.release || 300) / 1000,
+            attack: (env.attack || 10) / 1000,
+            decay: (env.decay || 100) / 1000,
+            sustain: (env.sustain || 80) / 100,
+            release: (env.release || 300) / 1000,
           }
         });
         filter.set({
-          type: ssc.filter.type,
-          frequency: ssc.filter.cutoff,
-          Q: ssc.filter.resonance / 10,
+          type: flt.type,
+          frequency: flt.cutoff,
+          Q: flt.resonance / 10,
         });
         chorus.set({
-          depth: Math.min(1, ssc.detune / 50),
+          depth: Math.min(1, (ssc.detune as number) / 50),
         });
       },
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -2186,11 +2177,10 @@ export class InstrumentFactory {
     if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
     else if (psConfig.voiceType === 'AMSynth') VoiceClass = Tone.AMSynth;
 
-    const synth = new Tone.PolySynth(VoiceClass, {
-      maxPolyphony: psConfig.voiceCount,
+    const synth = new Tone.PolySynth(VoiceClass as any, {
       oscillator: {
         type: psConfig.oscillator?.type || 'sawtooth',
-      },
+      } as Partial<Tone.OmniOscillatorSynthOptions>,
       envelope: {
         attack: (psConfig.envelope?.attack || 50) / 1000,
         decay: (psConfig.envelope?.decay || 200) / 1000,
@@ -2199,6 +2189,7 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('PolySynth', config.volume),
     });
+    synth.maxPolyphony = psConfig.voiceCount;
 
     // Setup pitch envelope if enabled
     const pitchEnv = config.pitchEnvelope;
@@ -2234,7 +2225,7 @@ export class InstrumentFactory {
       disconnect: () => synth.disconnect(),
       dispose: () => synth.dispose(),
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -2249,9 +2240,9 @@ export class InstrumentFactory {
 
     // Create polyphonic sine synth for organ tone
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
-        type: 'sine',
+        type: 'custom',
         partials: [
           drawbars[0] / 8, // sub
           drawbars[1] / 8, // fundamental
@@ -2263,7 +2254,7 @@ export class InstrumentFactory {
           drawbars[7] / 8, // 8th
           drawbars[8] / 8, // 9th
         ]
-      },
+      } as any,
       envelope: {
         attack: 0.005, // Fast attack for organ click
         decay: 0.1,
@@ -2272,6 +2263,7 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('Organ', config.volume),
     });
+    synth.maxPolyphony = 32;
 
     // Add Leslie/rotary effect
     let rotary: Tone.Tremolo | null = null;
@@ -2306,29 +2298,30 @@ export class InstrumentFactory {
         rotary?.dispose();
         output.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const oc = newConfig || DEFAULT_ORGAN;
+        const db = oc.drawbars as number[];
         synth.set({
           oscillator: {
             partials: [
-              (oc.drawbars[0] || 0) / 8,
-              (oc.drawbars[1] || 0) / 8,
-              (oc.drawbars[2] || 0) / 8,
-              (oc.drawbars[3] || 0) / 8,
-              (oc.drawbars[4] || 0) / 8,
-              (oc.drawbars[5] || 0) / 8,
-              (oc.drawbars[6] || 0) / 8,
-              (oc.drawbars[7] || 0) / 8,
-              (oc.drawbars[8] || 0) / 8,
+              (db[0] || 0) / 8,
+              (db[1] || 0) / 8,
+              (db[2] || 0) / 8,
+              (db[3] || 0) / 8,
+              (db[4] || 0) / 8,
+              (db[5] || 0) / 8,
+              (db[6] || 0) / 8,
+              (db[7] || 0) / 8,
+              (db[8] || 0) / 8,
             ]
           }
         });
         if (rotary) {
-          rotary.frequency.rampTo(oc.rotary?.speed === 'fast' ? 6 : 1, 0.1);
+          rotary.frequency.rampTo((oc.rotary as Record<string, string>)?.speed === 'fast' ? 6 : 1, 0.1);
         }
       },
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -2444,11 +2437,11 @@ export class InstrumentFactory {
             saturation?.dispose();
             filter?.dispose();
           },
-          applyConfig: (newConfig: any) => {
+          applyConfig: (newConfig: Record<string, unknown>) => {
             const dmc = newConfig || DEFAULT_DRUM_MACHINE;
-            const kc = dmc.kick;
+            const kc = dmc.kick as Record<string, number> | undefined;
             if (!kc) return;
-            
+
             synth.set({
               pitchDecay: kc.envDuration / 1000,
               octaves: Math.log2(kc.envAmount) * 2,
@@ -2464,7 +2457,7 @@ export class InstrumentFactory {
             }
           },
           volume: synth.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'snare': {
@@ -2562,9 +2555,9 @@ export class InstrumentFactory {
             filter.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const sc = dmc.snare;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const sc = dmc.snare as Record<string, number & string> | undefined;
             if (!sc) return;
 
             body.set({
@@ -2586,7 +2579,7 @@ export class InstrumentFactory {
             });
           },
           volume: body.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'hihat': {
@@ -2595,8 +2588,7 @@ export class InstrumentFactory {
         const hhDefaults909 = { tone: 50, decay: 100, metallic: 50 }; // 909: crisper
         const hhConfig = { ...(is808 ? hhDefaults808 : hhDefaults909), ...dmConfig.hihat };
         // Hi-hat: metal synth approximation
-        return new Tone.MetalSynth({
-          frequency: is808 ? 180 + hhConfig.tone * 1.5 : 200 + hhConfig.tone * 2,
+        const metalSynth = new Tone.MetalSynth({
           envelope: {
             attack: 0.001,
             decay: hhConfig.decay / 1000,
@@ -2608,6 +2600,8 @@ export class InstrumentFactory {
           octaves: 1.5,
           volume: config.volume || -12,
         });
+        metalSynth.frequency.value = is808 ? 180 + hhConfig.tone * 1.5 : 200 + hhConfig.tone * 2;
+        return metalSynth;
       }
 
       case 'clap': {
@@ -2734,9 +2728,9 @@ export class InstrumentFactory {
             toneFilter.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
+          applyConfig: (newConfig: Record<string, unknown>) => {
             const dmc = newConfig || DEFAULT_DRUM_MACHINE;
-            const cc = dmc.clap;
+            const cc = dmc.clap as Record<string, any> | undefined;
             if (!cc) return;
 
             noise.set({
@@ -2747,7 +2741,7 @@ export class InstrumentFactory {
             filter1.frequency.rampTo(cc.filterFreqs[0], 0.1);
             filter2.frequency.rampTo(cc.filterFreqs[1], 0.1);
             toneFilter.frequency.rampTo(1000 + cc.tone * 24, 0.1);
-            
+
             burstNoises.forEach((burst, i) => {
               burst.set({
                 envelope: {
@@ -2757,7 +2751,7 @@ export class InstrumentFactory {
             });
           },
           volume: noise.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'tom': {
@@ -2839,9 +2833,9 @@ export class InstrumentFactory {
             noise.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const tc = dmc.tom;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const tc = dmc.tom as Record<string, number> | undefined;
             if (!tc) return;
 
             synth.set({
@@ -2859,7 +2853,7 @@ export class InstrumentFactory {
             });
           },
           volume: synth.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'rimshot': {
@@ -2964,9 +2958,9 @@ export class InstrumentFactory {
             saturation.dispose();
             highpass.dispose();
           },
-          applyConfig: (newConfig: any) => {
+          applyConfig: (newConfig: Record<string, unknown>) => {
             const dmc = newConfig || DEFAULT_DRUM_MACHINE;
-            const rc = dmc.rimshot;
+            const rc = dmc.rimshot as Record<string, any> | undefined;
             if (!rc) return;
 
             noise.set({
@@ -2983,7 +2977,7 @@ export class InstrumentFactory {
             saturation.distortion = (rc.saturation / 5) * 0.8;
           },
           volume: noise.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       // =========================================================================
@@ -3041,9 +3035,9 @@ export class InstrumentFactory {
             synth.dispose();
             filter.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const cc = dmc.conga;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const cc = dmc.conga as Record<string, number> | undefined;
             if (!cc) return;
 
             synth.set({
@@ -3053,7 +3047,7 @@ export class InstrumentFactory {
             });
           },
           volume: synth.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'cowbell': {
@@ -3135,7 +3129,7 @@ export class InstrumentFactory {
             longVCA.gain.exponentialRampToValueAtTime(0.125 * vel, t + 0.017);
             longVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.017 + cowbellConfig.decay / 1000);
           },
-          triggerRelease: (_note: string, _time?: number) => {
+          triggerRelease: () => {
             // Cowbell doesn't respond to release - it's a one-shot
           },
           releaseAll: () => {
@@ -3154,15 +3148,15 @@ export class InstrumentFactory {
             filter.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const cc = dmc.cowbell;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const cc = dmc.cowbell as Record<string, number> | undefined;
             if (!cc) return;
 
             filter.frequency.rampTo(cc.filterFreq, 0.1);
           },
           volume: output.gain,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'clave': {
@@ -3241,7 +3235,7 @@ export class InstrumentFactory {
             vca2.gain.setValueAtTime(0.5 * vel, t);
             vca2.gain.exponentialRampToValueAtTime(0.001, t + claveConfig.decay / 1000);
           },
-          triggerRelease: (_note: string, _time?: number) => { /* one-shot */ },
+          triggerRelease: () => { /* one-shot */ },
           releaseAll: () => { /* one-shot */ },
           connect: (dest: Tone.InputNode) => output.connect(dest),
           disconnect: () => output.disconnect(),
@@ -3256,15 +3250,15 @@ export class InstrumentFactory {
             distortion.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const cc = dmc.clave;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const cc = dmc.clave as Record<string, number> | undefined;
             if (!cc) return;
 
             filter.frequency.rampTo(cc.filterFreq, 0.1);
           },
           volume: output.gain,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'maracas': {
@@ -3315,9 +3309,9 @@ export class InstrumentFactory {
             noise.dispose();
             filter.dispose();
           },
-          applyConfig: (newConfig: any) => {
-            const dmc = newConfig || DEFAULT_DR_MACHINE;
-            const mc = dmc.maracas;
+          applyConfig: (newConfig: Record<string, unknown>) => {
+            const dmc = newConfig || DEFAULT_DRUM_MACHINE;
+            const mc = dmc.maracas as Record<string, number> | undefined;
             if (!mc) return;
 
             noise.set({
@@ -3328,7 +3322,7 @@ export class InstrumentFactory {
             filter.frequency.rampTo(mc.filterFreq, 0.1);
           },
           volume: noise.volume,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       case 'cymbal': {
@@ -3421,7 +3415,7 @@ export class InstrumentFactory {
             highVCA.gain.exponentialRampToValueAtTime(highEnvAmt * vel, t + 0.01);
             highVCA.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
           },
-          triggerRelease: (_note: string, _time?: number) => { /* one-shot */ },
+          triggerRelease: () => { /* one-shot */ },
           releaseAll: () => { /* one-shot */ },
           connect: (dest: Tone.InputNode) => output.connect(dest),
           disconnect: () => output.disconnect(),
@@ -3439,13 +3433,13 @@ export class InstrumentFactory {
             highVCA.dispose();
             output.dispose();
           },
-          applyConfig: (newConfig: any) => {
+          applyConfig: () => {
             // Cymbal parameters primarily affect triggerAttack, but we can store them
             // or update relevant static params here if needed.
             // For now, since most logic is in trigger, we just ensure it doesn't crash.
           },
           volume: output.gain,
-        } as any;
+        } as unknown as Tone.ToneAudioNode;
       }
 
       default:
@@ -3495,7 +3489,7 @@ export class InstrumentFactory {
 
       // Add bit crusher for 8-bit sound
       const bitCrusher = new Tone.BitCrusher({
-        bits: chipConfig.bitDepth,
+        bits: chipConfig.bitDepth as any,
         wet: 1,
       });
       noise.connect(bitCrusher);
@@ -3520,25 +3514,26 @@ export class InstrumentFactory {
           noise.dispose();
           bitCrusher.dispose();
         },
-        applyConfig: (newConfig: any) => {
+        applyConfig: (newConfig: Record<string, unknown>) => {
           const csc = newConfig || DEFAULT_CHIP_SYNTH;
+          const env = csc.envelope as Record<string, number>;
           noise.set({
             envelope: {
-              attack: csc.envelope.attack / 1000,
-              decay: csc.envelope.decay / 1000,
-              sustain: csc.envelope.sustain / 100,
-              release: csc.envelope.release / 1000,
+              attack: env.attack / 1000,
+              decay: env.decay / 1000,
+              sustain: env.sustain / 100,
+              release: env.release / 1000,
             }
           });
-          bitCrusher.bits = csc.bitDepth;
+          (bitCrusher as any).bits = csc.bitDepth;
         },
         volume: noise.volume,
-      } as any;
+      } as unknown as Tone.ToneAudioNode;
     }
 
     // Square/Triangle channels
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
         type: oscillatorType,
       },
@@ -3553,7 +3548,7 @@ export class InstrumentFactory {
 
     // Add bit crusher for 8-bit character
     const bitCrusher = new Tone.BitCrusher({
-      bits: chipConfig.bitDepth,
+      bits: chipConfig.bitDepth as any,
       wet: 1,
     });
     synth.connect(bitCrusher);
@@ -3565,16 +3560,16 @@ export class InstrumentFactory {
     if (arpeggioConfig?.enabled) {
       arpeggioEngine = new ArpeggioEngine({
         config: arpeggioConfig,
-        onNoteOn: (note: string, velocity: number, duration: number, scheduledTime: number) => {
-          // Release last arpeggio note before playing new one - use scheduled time for tight timing
+        onNoteOn: (note: string, velocity: number, duration: number) => {
+          // Release last arpeggio note before playing new one
           if (lastArpNote) {
-            synth.triggerRelease(lastArpNote, scheduledTime);
+            synth.triggerRelease(lastArpNote);
           }
-          synth.triggerAttackRelease(note, duration, scheduledTime, velocity);
+          synth.triggerAttackRelease(note, duration, undefined, velocity);
           lastArpNote = note;
         },
-        onNoteOff: (note: string, scheduledTime: number) => {
-          synth.triggerRelease(note, scheduledTime);
+        onNoteOff: (note: string) => {
+          synth.triggerRelease(note);
           if (lastArpNote === note) {
             lastArpNote = null;
           }
@@ -3629,17 +3624,18 @@ export class InstrumentFactory {
         synth.dispose();
         bitCrusher.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const csc = newConfig || DEFAULT_CHIP_SYNTH;
+        const env = csc.envelope as Record<string, number>;
         synth.set({
           envelope: {
-            attack: csc.envelope.attack / 1000,
-            decay: csc.envelope.decay / 1000,
-            sustain: csc.envelope.sustain / 100,
-            release: csc.envelope.release / 1000,
+            attack: env.attack / 1000,
+            decay: env.decay / 1000,
+            sustain: env.sustain / 100,
+            release: env.release / 1000,
           }
         });
-        bitCrusher.bits = csc.bitDepth;
+        (bitCrusher as any).bits = csc.bitDepth;
       },
       volume: synth.volume,
       // Expose methods for real-time arpeggio updates
@@ -3653,7 +3649,7 @@ export class InstrumentFactory {
       isArpeggioPlaying: () => arpeggioEngine?.getIsPlaying() ?? false,
     };
 
-    return chipSynthWrapper as any;
+    return chipSynthWrapper as unknown as Tone.ToneAudioNode;
   }
 
   private static createFurnace(config: InstrumentConfig): FurnaceSynth {
@@ -3887,7 +3883,7 @@ export class InstrumentFactory {
 
     // Use square wave (Tone.Synth doesn't support true pulse width control)
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
         type: 'square',
       },
@@ -3938,28 +3934,30 @@ export class InstrumentFactory {
         filter.dispose();
         chorus.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const pc = newConfig || DEFAULT_PWM_SYNTH;
+        const env = pc.envelope as Record<string, number>;
+        const flt = pc.filter as Record<string, number & string>;
         synth.set({
           envelope: {
-            attack: pc.envelope.attack / 1000,
-            decay: pc.envelope.decay / 1000,
-            sustain: pc.envelope.sustain / 100,
-            release: pc.envelope.release / 1000,
+            attack: env.attack / 1000,
+            decay: env.decay / 1000,
+            sustain: env.sustain / 100,
+            release: env.release / 1000,
           }
         });
         filter.set({
-          type: pc.filter.type,
-          frequency: pc.filter.cutoff,
-          Q: pc.filter.resonance / 10,
+          type: flt.type,
+          frequency: flt.cutoff,
+          Q: flt.resonance / 10,
         });
         chorus.set({
-          frequency: pc.pwmRate,
-          depth: pc.pwmDepth / 100,
+          frequency: pc.pwmRate as number,
+          depth: (pc.pwmDepth as number) / 100,
         });
       },
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -3970,7 +3968,7 @@ export class InstrumentFactory {
 
     // Create polyphonic sawtooth synth
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
         type: 'sawtooth',
       },
@@ -4021,22 +4019,23 @@ export class InstrumentFactory {
         chorus.dispose();
         filter.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const sc = newConfig || DEFAULT_STRING_MACHINE;
+        const ens = sc.ensemble as Record<string, number>;
         synth.set({
           envelope: {
-            attack: sc.attack / 1000,
-            release: sc.release / 1000,
+            attack: (sc.attack as number) / 1000,
+            release: (sc.release as number) / 1000,
           }
         });
         chorus.set({
-          frequency: sc.ensemble.rate,
-          depth: sc.ensemble.depth / 100,
+          frequency: ens.rate,
+          depth: ens.depth / 100,
         });
-        filter.frequency.rampTo(2000 + (sc.brightness * 80), 0.1);
+        filter.frequency.rampTo(2000 + ((sc.brightness as number) * 80), 0.1);
       },
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -4044,13 +4043,13 @@ export class InstrumentFactory {
    */
   private static createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const fmtConfig = config.formantSynth || DEFAULT_FORMANT_SYNTH;
-    const formants = VOWEL_FORMANTS[fmtConfig.vowel] || VOWEL_FORMANTS['a'];
+    const formants = VOWEL_FORMANTS[fmtConfig.vowel] || VOWEL_FORMANTS['A'];
 
     // Create source oscillator
     const synth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
-        type: fmtConfig.oscillator?.type || 'sawtooth',
+        type: (fmtConfig.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
       },
       envelope: {
         attack: (fmtConfig.envelope?.attack || 10) / 1000,
@@ -4108,24 +4107,25 @@ export class InstrumentFactory {
         f3.dispose();
         output.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const fc = newConfig || DEFAULT_FORMANT_SYNTH;
-        const formants = VOWEL_FORMANTS[fc.vowel];
-        
+        const env = fc.envelope as Record<string, number>;
+        const fmts = VOWEL_FORMANTS[fc.vowel as keyof typeof VOWEL_FORMANTS];
+
         synth.set({
           envelope: {
-            attack: fc.envelope.attack / 1000,
-            decay: fc.envelope.decay / 1000,
-            sustain: fc.envelope.sustain / 100,
-            release: fc.envelope.release / 1000,
+            attack: env.attack / 1000,
+            decay: env.decay / 1000,
+            sustain: env.sustain / 100,
+            release: env.release / 1000,
           }
         });
-        f1.frequency.rampTo(formants.f1, 0.1);
-        f2.frequency.rampTo(formants.f2, 0.1);
-        f3.frequency.rampTo(formants.f3, 0.1);
+        f1.frequency.rampTo(fmts.f1, 0.1);
+        f2.frequency.rampTo(fmts.f2, 0.1);
+        f3.frequency.rampTo(fmts.f3, 0.1);
       },
       volume: synth.volume,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
@@ -4149,9 +4149,9 @@ export class InstrumentFactory {
 
     // Main oscillator 1 (with unison)
     const osc1 = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
-        type: wbConfig.osc1.type,
+        type: wbConfig.osc1.type as Tone.ToneOscillatorType,
       },
       envelope: {
         attack: wbConfig.envelope.attack / 1000,
@@ -4164,9 +4164,9 @@ export class InstrumentFactory {
 
     // Main oscillator 2 (slightly detuned for Reese)
     const osc2 = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 32,
+
       oscillator: {
-        type: wbConfig.osc2.type,
+        type: wbConfig.osc2.type as Tone.ToneOscillatorType,
       },
       envelope: {
         attack: wbConfig.envelope.attack / 1000,
@@ -4185,7 +4185,7 @@ export class InstrumentFactory {
     let subOsc: Tone.PolySynth | null = null;
     if (wbConfig.sub.enabled) {
       subOsc = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 32,
+  
         oscillator: { type: 'sine' },
         envelope: {
           attack: wbConfig.envelope.attack / 1000,
@@ -4208,8 +4208,8 @@ export class InstrumentFactory {
         const panAmount = ((i / voiceCount) - 0.5) * (wbConfig.unison.stereoSpread / 50);
 
         const voice = new Tone.PolySynth(Tone.Synth, {
-          maxPolyphony: 32,
-          oscillator: { type: wbConfig.osc1.type },
+    
+          oscillator: { type: wbConfig.osc1.type as Tone.ToneOscillatorType },
           envelope: {
             attack: wbConfig.envelope.attack / 1000,
             decay: wbConfig.envelope.decay / 1000,
@@ -4232,7 +4232,7 @@ export class InstrumentFactory {
     let fmSynth: Tone.PolySynth | null = null;
     if (wbConfig.fm.enabled && wbConfig.fm.amount > 0) {
       fmSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 32,
+  
         modulationIndex: wbConfig.fm.amount / 10,
         harmonicity: wbConfig.fm.ratio,
         envelope: {
@@ -4519,15 +4519,21 @@ export class InstrumentFactory {
         if (formantMixer) formantMixer.dispose();
         output.dispose();
       },
-      applyConfig: (newConfig: any) => {
+      applyConfig: (newConfig: Record<string, unknown>) => {
         const wbc = newConfig || DEFAULT_WOBBLE_BASS;
+        const wbcEnv = (wbc.envelope || {}) as Record<string, number>;
+        const wbcOsc1 = (wbc.osc1 || {}) as Record<string, number>;
+        const wbcOsc2 = (wbc.osc2 || {}) as Record<string, number>;
+        const wbcSub = (wbc.sub || {}) as Record<string, number>;
+        const wbcFilter = (wbc.filter || {}) as Record<string, unknown>;
+        const wbcLFO = (wbc.wobbleLFO || {}) as Record<string, number>;
         
         // Update Envelopes
         const envParams = {
-          attack: wbc.envelope.attack / 1000,
-          decay: wbc.envelope.decay / 1000,
-          sustain: wbc.envelope.sustain / 100,
-          release: wbc.envelope.release / 1000,
+          attack: (wbcEnv.attack || 10) / 1000,
+          decay: (wbcEnv.decay || 200) / 1000,
+          sustain: (wbcEnv.sustain ?? 70) / 100,
+          release: (wbcEnv.release || 300) / 1000,
         };
         osc1.set({ envelope: envParams });
         osc2.set({ envelope: envParams });
@@ -4536,26 +4542,26 @@ export class InstrumentFactory {
         unisonVoices.forEach(v => v.set({ envelope: envParams }));
 
         // Update Osc Levels & Tuning
-        osc1.volume.rampTo(-6 + (wbc.osc1.level / 100) * 6 - 6, 0.1);
-        osc2.volume.rampTo(-6 + (wbc.osc2.level / 100) * 6 - 6, 0.1);
-        osc1.set({ detune: wbc.osc1.octave * 1200 + wbc.osc1.detune });
-        osc2.set({ detune: wbc.osc2.octave * 1200 + wbc.osc2.detune });
+        osc1.volume.rampTo(-6 + (wbcOsc1.level / 100) * 6 - 6, 0.1);
+        osc2.volume.rampTo(-6 + (wbcOsc2.level / 100) * 6 - 6, 0.1);
+        osc1.set({ detune: wbcOsc1.octave * 1200 + wbcOsc1.detune });
+        osc2.set({ detune: wbcOsc2.octave * 1200 + wbcOsc2.detune });
         
         if (subOsc) {
-          subOsc.volume.rampTo(-12 + (wbc.sub.level / 100) * 12 - 6, 0.1);
-          subOsc.set({ detune: wbc.sub.octave * 1200 });
+          subOsc.volume.rampTo(-12 + (wbcSub.level / 100) * 12 - 6, 0.1);
+          subOsc.set({ detune: wbcSub.octave * 1200 });
         }
 
         // Update Filter
         filter.set({
-          type: wbc.filter.type,
-          frequency: wbc.filter.cutoff,
-          Q: wbc.filter.resonance / 10,
+          type: wbcFilter.type as Tone.FilterOptions['type'],
+          frequency: Number(wbcFilter.cutoff) || 500,
+          Q: Number(wbcFilter.resonance) / 10,
         });
 
         // Update LFO
         if (wobbleLFO) {
-          wobbleLFO.frequency.rampTo(wbc.wobbleLFO.rate, 0.1);
+          wobbleLFO.frequency.rampTo(wbcLFO.rate || 1, 0.1);
         }
       },
       volume: osc1.volume,
@@ -4563,13 +4569,14 @@ export class InstrumentFactory {
       // Expose LFO for external control
       wobbleLFO,
       filter,
-    } as any;
+    } as unknown as Tone.ToneAudioNode;
   }
 
   /**
    * Reverse an AudioBuffer by copying samples in reverse order
    */
-  private static reverseAudioBuffer(buffer: AudioBuffer): AudioBuffer {
+  // @ts-ignore unused but kept for potential future use
+  private static _reverseAudioBuffer(buffer: AudioBuffer): AudioBuffer {
     const audioContext = Tone.getContext().rawContext;
     const reversed = audioContext.createBuffer(
       buffer.numberOfChannels,
@@ -4612,11 +4619,10 @@ export class InstrumentFactory {
     const startCents = pitchEnv.amount * 100; // Convert semitones to cents
     const sustainCents = (pitchEnv.sustain / 100) * startCents;
     const attackTime = pitchEnv.attack / 1000;
-    const decayTime = pitchEnv.decay / 1000;
     const releaseTime = pitchEnv.release / 1000;
 
     // Cast to access detune param
-    const s = synth as any;
+    const s = synth as { set?: (options: { detune: number }) => void };
     if (!s.set) return;
 
     // Start at initial offset
@@ -4655,17 +4661,17 @@ export class InstrumentFactory {
     const attackTime = pitchEnv.attack / 1000;
     const decayTime = pitchEnv.decay / 1000;
 
-    const s = synth as any;
+    const s = synth as { set?: (options: { detune: number }) => void };
     if (!s.set) return;
 
     // Start at initial pitch offset
     s.set({ detune: startCents });
 
-    // Schedule decay to sustain level
-    const totalADTime = (attackTime + decayTime) * 1000;
+    // Schedule decay to sustain level relative to the scheduled time
+    const delayMs = Math.max(0, (time - Tone.now() + attackTime + decayTime) * 1000);
     setTimeout(() => {
       if (s.set) s.set({ detune: sustainCents });
-    }, totalADTime);
+    }, delayMs);
   }
 
   private static createDubSiren(config: InstrumentConfig): Tone.ToneAudioNode {
@@ -4859,7 +4865,7 @@ export class InstrumentFactory {
         if (df.enabled) {
           synth.enableDevilFish(true, {
             overdrive: tb.overdrive?.amount,
-            muffler: df.muffler as any,
+            muffler: df.muffler as 'off' | 'dark' | 'mid' | 'bright',
           });
         }
         if (df.muffler) synth.setMuffler(df.muffler);
@@ -4887,7 +4893,7 @@ export class InstrumentFactory {
   // ─── MAME Hardware-Accurate Synths ────────────────────────────────
 
   /** Apply config.parameters to a MAME chip synth via setParam/loadPreset */
-  private static applyChipParameters(synth: any, config: InstrumentConfig): void {
+  private static applyChipParameters(synth: { setParam: (key: string, value: number) => void; loadPreset?: (index: number) => void }, config: InstrumentConfig): void {
     const params = config.parameters;
     if (!params) return;
     // If _program is set, load built-in WASM preset first (not all chips support it)
@@ -5058,13 +5064,14 @@ export class InstrumentFactory {
     time: number
   ): void {
     const releaseTime = pitchEnv.release / 1000;
-    const s = synth as any;
+    const s = synth as { set?: (options: { detune: number }) => void };
     if (!s.set) return;
 
-    // Ramp back to 0 over release time
+    // Ramp back to 0 over release time, scheduled relative to the note release time
+    const delayMs = Math.max(0, (time - Tone.now() + releaseTime) * 1000);
     setTimeout(() => {
       if (s.set) s.set({ detune: 0 });
-    }, releaseTime * 1000);
+    }, delayMs);
   }
 }
 

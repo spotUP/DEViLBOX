@@ -51,8 +51,9 @@ export function canExportGYM(writes: RegisterWrite[]): boolean {
  */
 export function exportToGYM(
   writes: RegisterWrite[],
-  _options: GYMExportOptions = {}
+  options: GYMExportOptions = {}
 ): Uint8Array {
+  void options;
   const commands: number[] = [];
 
   // Filter to only supported chips

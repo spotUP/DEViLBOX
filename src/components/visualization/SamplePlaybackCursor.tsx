@@ -62,7 +62,7 @@ export const SamplePlaybackCursor: React.FC<SamplePlaybackCursorProps> = ({
 
   // Update visibility
   useEffect(() => {
-    setIsVisible(position !== undefined && position >= 0);
+    requestAnimationFrame(() => setIsVisible(position !== undefined && position >= 0));
   }, [position]);
 
   // Animation frame callback

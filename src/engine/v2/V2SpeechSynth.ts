@@ -1,6 +1,6 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-// @ts-ignore - SamJs is a JavaScript library without types
+// @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '../sam/samjs';
 
 export interface V2SpeechConfig {
@@ -18,7 +18,7 @@ export class V2SpeechSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _sourceNode: AudioBufferSourceNode | null = null;
   private _playerGain: GainNode;
-  private _sam: any;
+  private _sam: InstanceType<typeof SamJs>;
   private _config: V2SpeechConfig;
   private _buffer: AudioBuffer | null = null;
   private _isRendering: boolean = false;
@@ -70,7 +70,7 @@ export class V2SpeechSynth implements DevilboxSynth {
 
   private _stopSource(): void {
     if (this._sourceNode) {
-      try { this._sourceNode.stop(); } catch (_e) { /* already stopped */ }
+      try { this._sourceNode.stop(); } catch { /* already stopped */ }
       this._sourceNode.disconnect();
       this._sourceNode = null;
     }

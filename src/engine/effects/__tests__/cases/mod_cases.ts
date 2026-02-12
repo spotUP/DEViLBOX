@@ -200,15 +200,15 @@ export const modCases: ComplianceTestCase[] = [
 
         finetune: 0
 
-      } as any
+      }
 
     },
 
             steps: [
 
-              { 
+              {
 
-                row: 0, 
+                row: 0,
 
                 note: 'C-1',
 
@@ -232,7 +232,7 @@ export const modCases: ComplianceTestCase[] = [
 
                     finetune: 7
 
-                  } as any
+                  }
 
                 },
 

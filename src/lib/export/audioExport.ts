@@ -1,4 +1,3 @@
-// @ts-nocheck - ToneAudioNode type issues
 /**
  * Audio Export - Render pattern/song to WAV file
  * Uses Tone.js Offline rendering for accurate timing
@@ -8,6 +7,11 @@ import * as Tone from 'tone';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
+/** Synth node that can play notes */
+interface PlayableSynth extends Tone.ToneAudioNode {
+  triggerAttackRelease(note: string, duration: number | string, time?: number, velocity?: number): this;
+}
+
 interface AudioExportOptions {
   sampleRate?: number;
   channels?: number;
@@ -15,11 +19,15 @@ interface AudioExportOptions {
 }
 
 /**
- * Convert tracker note format (C-4) to Tone.js format (C4)
+ * Convert XM note number to Tone.js note string
+ * XM: 1-96 = C-0 to B-7, 97 = note off
  */
-function convertNoteFormat(note: string): string {
-  if (note === '===' || note === '...') return note;
-  return note.replace('-', '');
+function xmNoteToToneNote(note: number): string {
+  if (note <= 0 || note > 96) return '';
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const semitone = (note - 1) % 12;
+  const octave = Math.floor((note - 1) / 12);
+  return `${noteNames[semitone]}${octave}`;
 }
 
 /**
@@ -169,19 +177,20 @@ export async function renderPatternToAudio(
         let duration = secondsPerRow;
         for (let nextRow = rowIndex + 1; nextRow < pattern.length; nextRow++) {
           const nextCell = channel.rows[nextRow];
-          if (nextCell.note && nextCell.note !== '...') {
+          if (nextCell.note !== 0) {
             duration = (nextRow - rowIndex) * secondsPerRow;
             break;
           }
         }
 
-        const toneNote = convertNoteFormat(cell.note);
-        const velocity = cell.volume !== null ? cell.volume / 64 : 0.8;
+        const toneNote = xmNoteToToneNote(cell.note);
+        if (!toneNote) return; // Skip if note conversion failed
+        const velocity = cell.volume !== 0 ? cell.volume / 64 : 0.8;
 
         transport.schedule((t) => {
           try {
             if ('triggerAttackRelease' in synth) {
-              synth.triggerAttackRelease(toneNote, duration, t, velocity);
+              (synth as PlayableSynth).triggerAttackRelease(toneNote, duration, t, velocity);
             }
           } catch (e) {
             console.warn(`Failed to trigger note ${toneNote}:`, e);

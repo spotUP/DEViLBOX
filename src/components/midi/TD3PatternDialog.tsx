@@ -198,7 +198,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
         success: true,
         message: 'Pattern exported to .seq file',
       });
-    } catch (error) {
+    } catch {
       setSendResult({
         success: false,
         message: 'Failed to export .seq file',
@@ -239,7 +239,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
         const data = JSON.parse(text);
         
         // Map notes if they are in the flat format
-        const mappedSteps = data.steps.map((s: any) => ({
+        const mappedSteps = data.steps.map((s: { note: number | null; octave: number; upperC?: boolean; accent?: boolean; slide?: boolean; tie?: boolean }) => ({
           note: s.note === null ? null : { value: s.note, octave: s.octave, upperC: s.upperC || false },
           flag1: s.accent ? 1 : undefined,
           flag2: s.slide ? 2 : undefined,
@@ -259,7 +259,7 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
           message: 'Loaded pattern from JSON file',
         });
       }
-    } catch (error) {
+    } catch {
       setSendResult({
         success: false,
         message: 'Failed to parse pattern file',

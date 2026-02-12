@@ -75,7 +75,7 @@ const restoreState = (state: TabState) => {
   const engine = getToneEngine();
   try {
     engine.stop();
-  } catch (e) {
+  } catch {
     // Ignore errors if engine not initialized
   }
 

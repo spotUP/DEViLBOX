@@ -43,6 +43,7 @@ const SAMPLE_SYNTH_TYPES = ['Sampler', 'Player', 'GranularSynth'];
 // SECTION HEADER COMPONENT
 // ============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 function SectionHeader({ color, title }: { color: string; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-4">
@@ -64,7 +65,7 @@ export function renderGenericTabContent(
   const isSampleBased = SAMPLE_SYNTH_TYPES.includes(instrument.synthType);
 
   // Update helpers
-  const updateOscillator = (key: string, value: any) => {
+  const updateOscillator = (key: string, value: string | number | boolean) => {
     const currentOsc = instrument.oscillator || { type: 'sawtooth', detune: 0, octave: 0 };
     onChange({
       oscillator: { ...currentOsc, [key]: value },
@@ -87,7 +88,7 @@ export function renderGenericTabContent(
     });
   };
 
-  const updateFilter = (key: string, value: any) => {
+  const updateFilter = (key: string, value: string | number) => {
     const currentFilter = instrument.filter || { type: 'lowpass' as const, frequency: 2000, Q: 1, rolloff: -24 as const };
     onChange({
       filter: { ...currentFilter, [key]: value },
@@ -118,7 +119,7 @@ export function renderGenericTabContent(
 
 function renderOscillatorTab(
   instrument: InstrumentConfig,
-  updateOscillator: (key: string, value: any) => void,
+  updateOscillator: (key: string, value: string | number | boolean) => void,
   isSampleBased: boolean
 ): React.ReactNode {
   if (!instrument.oscillator || isSampleBased) return null;
@@ -131,7 +132,7 @@ function renderOscillatorTab(
         {/* Waveform Selector */}
         <div className="mb-4">
           <WaveformSelector
-            value={instrument.oscillator.type as any}
+            value={instrument.oscillator.type as 'sine' | 'square' | 'sawtooth' | 'triangle' | 'pulse' | 'pwm'}
             onChange={(type) => updateOscillator('type', type)}
             size="lg"
             color="#4a9eff"
@@ -328,7 +329,7 @@ function renderEnvelopeTab(
 
 function renderFilterTab(
   instrument: InstrumentConfig,
-  updateFilter: (key: string, value: any) => void
+  updateFilter: (key: string, value: string | number) => void
 ): React.ReactNode {
   if (!instrument.filter) return null;
 
@@ -487,9 +488,9 @@ export function renderSpecialParameters(
   instrument: InstrumentConfig,
   onChange: (updates: Partial<InstrumentConfig>) => void
 ): React.ReactNode {
-  const params = instrument.parameters || {};
+  const params = (instrument.parameters || {}) as Record<string, number>;
 
-  const updateParam = (key: string, value: any) => {
+  const updateParam = (key: string, value: string | number | boolean) => {
     onChange({
       parameters: { ...params, [key]: value },
     });

@@ -11,12 +11,9 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
-import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, Plus, Library, ChevronDown, ChevronRight, FileUp } from 'lucide-react';
+import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, ChevronDown, ChevronRight, FileUp } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
-import {
-  getFurnaceWavetablesByCategory,
-  type FurnaceWavetablePreset
-} from '@constants/furnaceWavetablePresets';
+import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 
@@ -320,7 +317,7 @@ interface AlgorithmDiagramProps {
   opCount?: number;
 }
 
-const AlgorithmDiagram: React.FC<AlgorithmDiagramProps> = ({ algorithm, feedback, opCount: _opCount = 4 }) => {
+const AlgorithmDiagram: React.FC<AlgorithmDiagramProps> = ({ algorithm, feedback }) => {
   // Algorithm connections for 4-op FM (OPN/OPM style)
   // Based on Furnace's algorithm visualizations
   const algorithms = [
@@ -469,7 +466,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         }
       } else {
         // Parse audio file
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const audioCtx = new AudioCtx();
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);
@@ -540,14 +538,16 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
         {/* Live Oscilloscope */}
         <div className="flex-1 mx-4">
-          <InstrumentOscilloscope
-            instrumentId={instrumentId}
-            width="auto"
-            height={40}
-            color="#a78bfa"
-            backgroundColor="transparent"
-            className="w-full rounded border border-violet-500/20"
-          />
+          <VisualizerFrame variant="compact">
+            <InstrumentOscilloscope
+              instrumentId={instrumentId}
+              width="auto"
+              height={40}
+              color="#a78bfa"
+              backgroundColor="transparent"
+              className="w-full"
+            />
+          </VisualizerFrame>
         </div>
 
         {/* Global Controls */}
@@ -978,56 +978,6 @@ const ToggleButton: React.FC<{
     {label}
   </button>
 );
-
-// @ts-expect-error Reserved for future use
-const _MacroMiniView: React.FC<{
-  values: number[];
-  loop?: number;
-  release?: number;
-}> = ({ values, loop = -1, release = -1 }) => {
-  if (values.length === 0) return null;
-
-  const max = Math.max(...values.map(Math.abs), 1);
-  const points = values.map((v, i) => {
-    const x = (i / Math.max(values.length - 1, 1)) * 100;
-    const y = 50 - (v / max) * 40;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-      {/* Loop marker */}
-      {loop >= 0 && loop < values.length && (
-        <line
-          x1={(loop / values.length) * 100}
-          y1="0"
-          x2={(loop / values.length) * 100}
-          y2="100"
-          stroke="#3b82f6"
-          strokeWidth="2"
-        />
-      )}
-      {/* Release marker */}
-      {release >= 0 && release < values.length && (
-        <line
-          x1={(release / values.length) * 100}
-          y1="0"
-          x2={(release / values.length) * 100}
-          y2="100"
-          stroke="#ef4444"
-          strokeWidth="2"
-        />
-      )}
-      {/* Value line */}
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#a78bfa"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-};
 
 // ============================================================================
 // SUB-PANELS (PSG, Wavetable, PCM, GB, C64, SNES)
@@ -1586,45 +1536,6 @@ const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   );
 };
 
-// @ts-expect-error Reserved for future use
-const _WavetablePanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => (
-  <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <Waves size={16} className="text-cyan-400" />
-        <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
-          Wavetable Engine ({config.wavetables.length} waves)
-        </h3>
-      </div>
-      <WavetablePresetSelector
-        chipType={config.chipType}
-        onSelect={(preset) => {
-          const newWavetables = [...config.wavetables, { id: config.wavetables.length, data: preset.data }];
-          onChange({ wavetables: newWavetables });
-        }}
-      />
-    </div>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {config.wavetables.map((wave, i) => (
-        <WavetableVisualizer
-          key={i}
-          data={wave.data}
-          index={wave.id}
-          onRemove={() => {
-            const newWavetables = config.wavetables.filter((_, idx) => idx !== i);
-            onChange({ wavetables: newWavetables });
-          }}
-        />
-      ))}
-      {config.wavetables.length === 0 && (
-        <div className="col-span-4 h-16 border border-dashed border-dark-border rounded flex items-center justify-center">
-          <span className="text-[10px] text-text-muted font-mono italic">No custom waves. Click "Add Preset" to load wavetables.</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
 // PCM Panel - fixed to use actual config values
 const PCM_DEFAULTS = { sampleRate: 44100, loopStart: 0, loopEnd: 65535, loopPoint: 0, bitDepth: 8, loopEnabled: false };
 
@@ -1683,210 +1594,6 @@ const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
         </button>
       </div>
     </div>
-  );
-};
-
-// ============================================================================
-// WAVETABLE COMPONENTS
-// ============================================================================
-
-const WavetableVisualizer: React.FC<{ data: number[]; index: number; onRemove?: () => void }> = ({ data, index, onRemove }) => {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const width = 120;
-  const height = 48;
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const w = width;
-    const h = height;
-    ctx.clearRect(0, 0, w, h);
-
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#1e293b';
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.beginPath();
-    const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, '#22d3ee');
-    gradient.addColorStop(1, '#0891b2');
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = 1.5;
-
-    const maxVal = Math.max(...data.map(Math.abs), 1);
-    const isUnsigned = data.every(v => v >= 0);
-
-    for (let i = 0; i < data.length; i++) {
-      const x = (i / (data.length - 1)) * w;
-      let y;
-      if (isUnsigned) {
-        y = h - (data[i] / maxVal) * h * 0.8 - h * 0.1;
-      } else {
-        y = h / 2 - (data[i] / maxVal) * (h / 2) * 0.8;
-      }
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    ctx.lineTo(w, h);
-    ctx.lineTo(0, h);
-    ctx.fillStyle = 'rgba(34, 211, 238, 0.05)';
-    ctx.fill();
-  }, [data]);
-
-  return (
-    <div className="bg-dark-bgTertiary p-1 rounded border border-dark-border hover:border-cyan-500/50 transition-colors group relative">
-      {onRemove && (
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 hover:bg-red-500 rounded-full text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-          title="Remove wavetable"
-        >
-          ×
-        </button>
-      )}
-      <canvas ref={canvasRef} width={120} height={48} className="w-full h-12" />
-      <div className="flex justify-between items-center px-1 mt-1">
-        <span className="text-[8px] font-mono text-cyan-400 font-bold">W{index}</span>
-        <span className="text-[8px] font-mono text-text-muted">{data.length} pts</span>
-      </div>
-    </div>
-  );
-};
-
-const WavetablePresetSelector: React.FC<{
-  chipType: number;
-  onSelect: (preset: FurnaceWavetablePreset) => void;
-}> = ({ chipType, onSelect }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [selectedCategory, setSelectedCategory] = React.useState<'32x16' | '32x32' | '128x256'>('32x16');
-
-  const getRecommendedCategory = (): '32x16' | '32x32' | '128x256' => {
-    if ([5, 8, 19].includes(chipType)) return '32x16';
-    if ([6, 44].includes(chipType)) return '32x32';
-    if ([25].includes(chipType)) return '128x256';
-    return '32x16';
-  };
-
-  React.useEffect(() => {
-    setSelectedCategory(getRecommendedCategory());
-  }, [chipType]);
-
-  const presets = getFurnaceWavetablesByCategory(selectedCategory);
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2 py-1 bg-dark-bg border border-dark-border rounded hover:border-cyan-500/50 transition-colors text-xs text-text-muted hover:text-cyan-400"
-      >
-        <Library size={12} />
-        <span className="font-mono">Add Preset</span>
-        <Plus size={10} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 top-8 z-50 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-64 max-h-80 overflow-hidden">
-            <div className="p-2 border-b border-dark-border">
-              <div className="flex gap-1">
-                {(['32x16', '32x32', '128x256'] as const).map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`flex-1 text-[10px] font-mono py-1 rounded transition-colors ${
-                      selectedCategory === cat
-                        ? 'bg-cyan-600 text-white'
-                        : 'bg-dark-bg text-text-muted hover:text-cyan-400'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="overflow-y-auto max-h-56">
-              {presets.map(preset => (
-                <button
-                  key={preset.id}
-                  onClick={() => {
-                    onSelect(preset);
-                    setIsOpen(false);
-                  }}
-                  className="w-full px-3 py-2 text-left hover:bg-dark-bg transition-colors flex items-center gap-2 border-b border-dark-border/50 last:border-0"
-                >
-                  <MiniWaveform data={preset.data} max={preset.max} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] text-text-primary truncate">{preset.name}</div>
-                    <div className="text-[9px] text-text-muted font-mono">{preset.len} pts</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-const MiniWaveform: React.FC<{ data: number[]; max: number }> = ({ data, max }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const width = 32;
-  const height = 16;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const points = data.map((v, i) => {
-      const x = (i / (data.length - 1)) * width;
-      const y = height - (v / max) * (height - 2) - 1;
-      return { x, y };
-    });
-
-    ctx.clearRect(0, 0, width, height);
-    ctx.beginPath();
-    ctx.strokeStyle = '#22d3ee';
-    ctx.lineWidth = 1;
-    
-    points.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
-  }, [data, max]);
-
-  return (
-    <canvas 
-      ref={canvasRef} 
-      width={width} 
-      height={height} 
-      className="flex-shrink-0"
-      style={{ width, height }}
-    />
   );
 };
 
@@ -1967,16 +1674,6 @@ function isOperatorCarrier(algorithm: number, opIndex: number): boolean {
     7: [0, 1, 2, 3],  // Alg 7: All operators are carriers
   };
   return carrierMap[algorithm]?.includes(opIndex) ?? false;
-}
-
-// @ts-expect-error Reserved for future use
-function _getMacroTypeName(type: number): string {
-  const names: Record<number, string> = {
-    0: 'VOL', 1: 'ARP', 2: 'DUTY', 3: 'WAVE', 4: 'PITCH',
-    5: 'EX1', 6: 'EX2', 7: 'EX3', 8: 'ALG', 9: 'FB',
-    10: 'FMS', 11: 'AMS', 12: 'PAN.L', 13: 'PAN.R', 14: 'RESET',
-  };
-  return names[type] || `M${type}`;
 }
 
 const OPLL_PRESETS = [

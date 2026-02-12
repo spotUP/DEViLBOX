@@ -8,7 +8,7 @@
  * Falls back to VSTBridgePanel if synth not yet loaded.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { Loader } from 'lucide-react';
 import { useThemeStore } from '@stores';
@@ -16,6 +16,80 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import { VSTBridgePanel } from './VSTBridgePanel';
+
+// ============================================================================
+// Module-scope sub-components (extracted to satisfy react-hooks/static-components)
+// ============================================================================
+
+/** Toggle button helper */
+const Toggle = memo(({ id, label, params, accentColor, setParam }: {
+  id: number; label: string; params: number[]; accentColor: string;
+  setParam: (id: number, value: number) => void;
+}) => (
+  <button
+    onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
+    className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+      params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+    }`}
+    style={params[id] > 0.5 ? { backgroundColor: accentColor } : {}}
+  >
+    {label}
+  </button>
+));
+Toggle.displayName = 'Toggle';
+
+/** FX toggle */
+const FxToggle = memo(({ id, label, params, fxAccent, setParam }: {
+  id: number; label: string; params: number[]; fxAccent: string;
+  setParam: (id: number, value: number) => void;
+}) => (
+  <button
+    onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
+    className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+      params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+    }`}
+    style={params[id] > 0.5 ? { backgroundColor: fxAccent } : {}}
+  >
+    {label}
+  </button>
+));
+FxToggle.displayName = 'FxToggle';
+
+/** Type selector helper */
+const TypeSelect = memo(({ id, labels, params, accentColor, setParam }: {
+  id: number; labels: string[]; params: number[]; accentColor: string;
+  setParam: (id: number, value: number) => void;
+}) => (
+  <div className="flex flex-wrap gap-1">
+    {labels.map((label, i) => (
+      <button
+        key={label}
+        onClick={() => setParam(id, i)}
+        className={`px-1.5 py-1 text-[9px] font-bold rounded transition-all ${
+          Math.round(params[id]) === i ? 'text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+        }`}
+        style={Math.round(params[id]) === i ? { backgroundColor: accentColor } : {}}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+));
+TypeSelect.displayName = 'TypeSelect';
+
+/** Section header */
+const Section = memo(({ title, color, bg, panelBg, accentColor, children }: {
+  title: string; color?: string; bg?: string; panelBg: string; accentColor: string;
+  children: React.ReactNode;
+}) => (
+  <div className={`p-4 rounded-xl border ${bg || panelBg}`}>
+    <h3 className="font-bold uppercase tracking-tight text-sm mb-4" style={{ color: color || accentColor }}>
+      {title}
+    </h3>
+    {children}
+  </div>
+));
+Section.displayName = 'Section';
 
 // Parameter IDs matching Odin2WASM.cpp (119 params)
 const P = {
@@ -126,7 +200,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
         } else {
           if (!cancelled) setSynthReady(true);
         }
-      } catch (_e) {
+      } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };
@@ -165,60 +239,6 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
     ? 'bg-[#041210] border-teal-900/40'
     : 'bg-[#151020] border-purple-900/30';
 
-  // Toggle button helper
-  const Toggle = ({ id, label }: { id: number; label: string }) => (
-    <button
-      onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
-      className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-        params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
-      }`}
-      style={params[id] > 0.5 ? { backgroundColor: accentColor } : {}}
-    >
-      {label}
-    </button>
-  );
-
-  // FX toggle
-  const FxToggle = ({ id, label }: { id: number; label: string }) => (
-    <button
-      onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
-      className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-        params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
-      }`}
-      style={params[id] > 0.5 ? { backgroundColor: fxAccent } : {}}
-    >
-      {label}
-    </button>
-  );
-
-  // Type selector helper
-  const TypeSelect = ({ id, labels }: { id: number; labels: string[] }) => (
-    <div className="flex flex-wrap gap-1">
-      {labels.map((label, i) => (
-        <button
-          key={label}
-          onClick={() => setParam(id, i)}
-          className={`px-1.5 py-1 text-[9px] font-bold rounded transition-all ${
-            Math.round(params[id]) === i ? 'text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-          }`}
-          style={Math.round(params[id]) === i ? { backgroundColor: accentColor } : {}}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
-  // Section header
-  const Section = ({ title, color, bg, children }: { title: string; color?: string; bg?: string; children: React.ReactNode }) => (
-    <div className={`p-4 rounded-xl border ${bg || panelBg}`}>
-      <h3 className="font-bold uppercase tracking-tight text-sm mb-4" style={{ color: color || accentColor }}>
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-
   // Oscillator row data
   const oscData = [
     { idx: 0, typeId: P.OSC1_TYPE, volId: P.OSC1_VOL, octId: P.OSC1_OCT, semiId: P.OSC1_SEMI, fineId: P.OSC1_FINE, pwId: P.OSC1_PW, posId: P.OSC1_POS, fmId: P.OSC1_FM, driftId: P.OSC1_DRIFT, resetId: P.OSC1_RESET, syncId: -1 },
@@ -229,7 +249,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   return (
     <div className="flex flex-col gap-4 p-4 overflow-y-auto">
       {/* ═══ MASTER ═══ */}
-      <Section title="Master">
+      <Section title="Master" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-4 justify-center flex-wrap">
           <Knob label="Volume" value={params[P.MASTER_VOL]} min={0} max={1} defaultValue={0.7}
             onChange={(v) => setParam(P.MASTER_VOL, v)} size="md" color={knobColor} />
@@ -249,7 +269,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
       </Section>
 
       {/* ═══ OSCILLATORS ═══ */}
-      <Section title="Oscillators">
+      <Section title="Oscillators" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex flex-col gap-4">
           {oscData.map(osc => (
             <div key={osc.idx} className="flex flex-col gap-2">
@@ -257,7 +277,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 <span className="text-xs font-bold w-10 shrink-0" style={{ color: accentColor }}>
                   OSC {osc.idx + 1}
                 </span>
-                <TypeSelect id={osc.typeId} labels={OSC_TYPE_LABELS} />
+                <TypeSelect id={osc.typeId} labels={OSC_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
               </div>
               <div className="flex gap-2 flex-wrap justify-center">
                 <Knob label="Vol" value={params[osc.volId]} min={0} max={1} defaultValue={0.7}
@@ -279,8 +299,8 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                   onChange={(v) => setParam(osc.fmId, v)} size="sm" color={knobColor} />
                 <Knob label="Drift" value={params[osc.driftId]} min={0} max={1} defaultValue={0}
                   onChange={(v) => setParam(osc.driftId, v)} size="sm" color={knobColor} />
-                <Toggle id={osc.resetId} label="Reset" />
-                {osc.syncId >= 0 && <Toggle id={osc.syncId} label="Sync" />}
+                <Toggle id={osc.resetId} label="Reset" params={params} accentColor={accentColor} setParam={setParam} />
+                {osc.syncId >= 0 && <Toggle id={osc.syncId} label="Sync" params={params} accentColor={accentColor} setParam={setParam} />}
               </div>
             </div>
           ))}
@@ -288,12 +308,12 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
       </Section>
 
       {/* ═══ FILTERS ═══ */}
-      <Section title="Filters">
+      <Section title="Filters" panelBg={panelBg} accentColor={accentColor}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Filter 1 */}
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 1</span>
-            <TypeSelect id={P.FIL1_TYPE} labels={FILTER_TYPE_LABELS} />
+            <TypeSelect id={P.FIL1_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL1_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL1_FREQ, v)} size="sm" color={knobColor} logarithmic
@@ -312,16 +332,16 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 onChange={(v) => setParam(P.FIL1_KBD, v)} size="sm" color={knobColor} />
             </div>
             <div className="flex gap-1 justify-center">
-              <Toggle id={P.FIL1_OSC1} label="Osc1" />
-              <Toggle id={P.FIL1_OSC2} label="Osc2" />
-              <Toggle id={P.FIL1_OSC3} label="Osc3" />
+              <Toggle id={P.FIL1_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
+              <Toggle id={P.FIL1_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
+              <Toggle id={P.FIL1_OSC3} label="Osc3" params={params} accentColor={accentColor} setParam={setParam} />
             </div>
           </div>
 
           {/* Filter 2 */}
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 2</span>
-            <TypeSelect id={P.FIL2_TYPE} labels={FILTER_TYPE_LABELS} />
+            <TypeSelect id={P.FIL2_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL2_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL2_FREQ, v)} size="sm" color={knobColor} logarithmic
@@ -340,25 +360,25 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 onChange={(v) => setParam(P.FIL2_KBD, v)} size="sm" color={knobColor} />
             </div>
             <div className="flex gap-1 justify-center">
-              <Toggle id={P.FIL2_OSC1} label="Osc1" />
-              <Toggle id={P.FIL2_OSC2} label="Osc2" />
-              <Toggle id={P.FIL2_OSC3} label="Osc3" />
-              <Toggle id={P.FIL2_FIL1} label="Fil1" />
+              <Toggle id={P.FIL2_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
+              <Toggle id={P.FIL2_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
+              <Toggle id={P.FIL2_OSC3} label="Osc3" params={params} accentColor={accentColor} setParam={setParam} />
+              <Toggle id={P.FIL2_FIL1} label="Fil1" params={params} accentColor={accentColor} setParam={setParam} />
             </div>
           </div>
         </div>
       </Section>
 
       {/* ═══ ROUTING ═══ */}
-      <Section title="Routing">
+      <Section title="Routing" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-2 justify-center">
-          <Toggle id={P.FIL1_AMP} label="Fil1 → Amp" />
-          <Toggle id={P.FIL2_AMP} label="Fil2 → Amp" />
+          <Toggle id={P.FIL1_AMP} label="Fil1 → Amp" params={params} accentColor={accentColor} setParam={setParam} />
+          <Toggle id={P.FIL2_AMP} label="Fil2 → Amp" params={params} accentColor={accentColor} setParam={setParam} />
         </div>
       </Section>
 
       {/* ═══ ENVELOPES ═══ */}
-      <Section title="Envelopes">
+      <Section title="Envelopes" panelBg={panelBg} accentColor={accentColor}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'AMP EG', a: P.ENV1_A, d: P.ENV1_D, s: P.ENV1_S, r: P.ENV1_R, loop: P.ENV1_LOOP },
@@ -382,7 +402,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
                 <Knob label="R" value={params[env.r]} min={0.001} max={5} defaultValue={0.3}
                   onChange={(v) => setParam(env.r, v)} size="sm" color={knobColor}
                   formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
-                <Toggle id={env.loop} label="Loop" />
+                <Toggle id={env.loop} label="Loop" params={params} accentColor={accentColor} setParam={setParam} />
               </div>
             </div>
           ))}
@@ -390,7 +410,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
       </Section>
 
       {/* ═══ LFOs ═══ */}
-      <Section title="LFOs">
+      <Section title="LFOs" panelBg={panelBg} accentColor={accentColor}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'LFO1 → Filter', freq: P.LFO1_FREQ, depth: P.LFO1_DEPTH },
@@ -415,9 +435,9 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
       </Section>
 
       {/* ═══ DISTORTION ═══ */}
-      <Section title="Distortion" color={fxAccent} bg={fxBg}>
+      <Section title="Distortion" color={fxAccent} bg={fxBg} panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-3 items-center justify-center flex-wrap">
-          <FxToggle id={P.DIST_ON} label="ON" />
+          <FxToggle id={P.DIST_ON} label="ON" params={params} fxAccent={fxAccent} setParam={setParam} />
           <Knob label="Boost" value={params[P.DIST_BOOST]} min={0} max={1} defaultValue={0.5}
             onChange={(v) => setParam(P.DIST_BOOST, v)} size="sm" color={fxAccent} />
           <Knob label="Dry/Wet" value={params[P.DIST_DRYWET]} min={0} max={1} defaultValue={1}
@@ -426,12 +446,12 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
       </Section>
 
       {/* ═══ FX CHAIN ═══ */}
-      <Section title="Effects" color={fxAccent} bg={fxBg}>
+      <Section title="Effects" color={fxAccent} bg={fxBg} panelBg={panelBg} accentColor={accentColor}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Delay */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.DELAY_ON} label="DELAY" />
+              <FxToggle id={P.DELAY_ON} label="DELAY" params={params} fxAccent={fxAccent} setParam={setParam} />
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Time" value={params[P.DELAY_TIME]} min={0.01} max={2} defaultValue={0.3}
@@ -451,7 +471,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           {/* Chorus */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.CHORUS_ON} label="CHORUS" />
+              <FxToggle id={P.CHORUS_ON} label="CHORUS" params={params} fxAccent={fxAccent} setParam={setParam} />
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.CHORUS_RATE]} min={0.01} max={10} defaultValue={0.3}
@@ -468,7 +488,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           {/* Phaser */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.PHASER_ON} label="PHASER" />
+              <FxToggle id={P.PHASER_ON} label="PHASER" params={params} fxAccent={fxAccent} setParam={setParam} />
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.PHASER_RATE]} min={0.01} max={10} defaultValue={0.5}
@@ -485,7 +505,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           {/* Flanger */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.FLANGER_ON} label="FLANGER" />
+              <FxToggle id={P.FLANGER_ON} label="FLANGER" params={params} fxAccent={fxAccent} setParam={setParam} />
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Rate" value={params[P.FLANGER_RATE]} min={0.01} max={10} defaultValue={0.3}
@@ -502,7 +522,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           {/* Reverb */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.REVERB_ON} label="REVERB" />
+              <FxToggle id={P.REVERB_ON} label="REVERB" params={params} fxAccent={fxAccent} setParam={setParam} />
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Knob label="Hall" value={params[P.REVERB_HALL]} min={0.2} max={10} defaultValue={2}

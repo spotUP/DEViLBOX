@@ -30,6 +30,25 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const handleUpdateStep = useCallback((index: number, step: ArpeggioStep) => {
+    const newSteps = [...steps];
+    newSteps[index] = step;
+    onChange(newSteps);
+  }, [steps, onChange]);
+
+  const handleAddStep = () => {
+    if (steps.length >= maxSteps) return;
+    const lastStep = steps[steps.length - 1] || { noteOffset: 0 };
+    onChange([...steps, { noteOffset: lastStep.noteOffset }]);
+  };
+
+  const handleRemoveStep = (index: number) => {
+    if (steps.length <= 1) return;
+    const newSteps = steps.filter((_, i) => i !== index);
+    onChange(newSteps);
+    setSelectedIndex(Math.min(index, newSteps.length - 1));
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,26 +76,7 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [steps.length, selectedIndex]);
-
-  const handleUpdateStep = useCallback((index: number, step: ArpeggioStep) => {
-    const newSteps = [...steps];
-    newSteps[index] = step;
-    onChange(newSteps);
-  }, [steps, onChange]);
-
-  const handleAddStep = () => {
-    if (steps.length >= maxSteps) return;
-    const lastStep = steps[steps.length - 1] || { noteOffset: 0 };
-    onChange([...steps, { noteOffset: lastStep.noteOffset }]);
-  };
-
-  const handleRemoveStep = (index: number) => {
-    if (steps.length <= 1) return;
-    const newSteps = steps.filter((_, i) => i !== index);
-    onChange(newSteps);
-    setSelectedIndex(Math.min(index, newSteps.length - 1));
-  };
+  }, [steps.length, selectedIndex, handleRemoveStep]);
 
   const handleClearStep = (index: number) => {
     handleUpdateStep(index, { noteOffset: 0 });

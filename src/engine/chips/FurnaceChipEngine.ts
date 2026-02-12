@@ -122,7 +122,7 @@ export class FurnaceChipEngine {
 
   public static getInstance(): FurnaceChipEngine {
     // Check globalThis first to handle Vite HMR module boundaries
-    const globalInstance = (globalThis as any)[GLOBAL_KEY] as FurnaceChipEngine | undefined;
+    const globalInstance = (globalThis as unknown as Record<string, unknown>)[GLOBAL_KEY] as FurnaceChipEngine | undefined;
     if (globalInstance) {
       // Sync with static reference
       if (FurnaceChipEngine.instance !== globalInstance) {
@@ -136,7 +136,7 @@ export class FurnaceChipEngine {
     if (!FurnaceChipEngine.instance) {
       FurnaceChipEngine.instance = new FurnaceChipEngine();
       // Store in globalThis for cross-module access
-      (globalThis as any)[GLOBAL_KEY] = FurnaceChipEngine.instance;
+      (globalThis as unknown as Record<string, unknown>)[GLOBAL_KEY] = FurnaceChipEngine.instance;
     }
     return FurnaceChipEngine.instance;
   }
@@ -170,8 +170,8 @@ export class FurnaceChipEngine {
   private async doInit(audioContext: unknown): Promise<void> {
     try {
       // Get rawContext from Tone.js context (standardized-audio-context)
-      const toneCtx = audioContext as any;
-      const rawContext = toneCtx.rawContext || toneCtx._context || audioContext;
+      const toneCtx = audioContext as unknown as Record<string, unknown>;
+      const rawContext = (toneCtx.rawContext || toneCtx._context || audioContext) as AudioContext;
       // Also get native context for compatibility checks
       const nativeCtx = getNativeContext(audioContext);
 
@@ -190,7 +190,7 @@ export class FurnaceChipEngine {
         } catch {
           // Ignore resume errors
         }
-        if (rawContext.state !== 'running') {
+        if ((rawContext.state as string) !== 'running') {
           console.log('[FurnaceChipEngine] Waiting up to 5s for AudioContext to start...');
           const started = await Promise.race([
             new Promise<boolean>((resolve) => {
@@ -226,9 +226,10 @@ export class FurnaceChipEngine {
       try {
         await ctxForWorklet.audioWorklet.addModule(workletUrl);
         console.log('[FurnaceChipEngine] Worklet module loaded on', ctxForWorklet.constructor.name);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Check if it's "already registered" vs actual error
-        if (err?.message?.includes('already') || err?.name === 'InvalidStateError') {
+        const errObj = err instanceof Error ? err : null;
+        if (errObj?.message?.includes('already') || errObj?.name === 'InvalidStateError') {
           console.log('[FurnaceChipEngine] Worklet already registered on', ctxForWorklet.constructor.name);
         } else {
           console.error('[FurnaceChipEngine] Worklet load failed:', workletUrl, err);
@@ -405,7 +406,7 @@ export class FurnaceChipEngine {
         'port:', this.workletNode?.port ? 'exists' : 'null',
         'loaded:', this.isLoaded,
         'ctx state:', this.rawContext?.state,
-        'globalInstance:', (globalThis as any)[GLOBAL_KEY] === this ? 'MATCH' : 'MISMATCH!');
+        'globalInstance:', (globalThis as unknown as Record<string, unknown>)[GLOBAL_KEY] === this ? 'MATCH' : 'MISMATCH!');
     }
 
     if (!this.workletNode) {

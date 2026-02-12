@@ -6,9 +6,10 @@
 import React, { useCallback, memo } from 'react';
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, X, ExternalLink, Undo2 } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
-import type { TB303Config } from '@typedefs/instrument';
+import { PopOutWindow, focusPopout } from '@components/ui/PopOutWindow';
+import type { TB303Config, EffectConfig } from '@typedefs/instrument';
 
 export const TB303KnobPanel: React.FC = memo(() => {
   // ALL HOOKS MUST BE AT THE TOP
@@ -19,10 +20,12 @@ export const TB303KnobPanel: React.FC = memo(() => {
     }))
   );
   
-  const { tb303Collapsed, toggleTB303Collapsed } = useUIStore(
-    useShallow((state) => ({ 
-      tb303Collapsed: state.tb303Collapsed, 
-      toggleTB303Collapsed: state.toggleTB303Collapsed 
+  const { tb303Collapsed, toggleTB303Collapsed, tb303PoppedOut, setTB303PoppedOut } = useUIStore(
+    useShallow((state) => ({
+      tb303Collapsed: state.tb303Collapsed,
+      toggleTB303Collapsed: state.toggleTB303Collapsed,
+      tb303PoppedOut: state.tb303PoppedOut,
+      setTB303PoppedOut: state.setTB303PoppedOut,
     }))
   );
 
@@ -41,12 +44,12 @@ export const TB303KnobPanel: React.FC = memo(() => {
     const latest = useInstrumentStore.getState().instruments.find(i => i.id === targetInstrument.id);
     if (!latest?.tb303) return;
     updateInstrument(targetInstrument.id, {
-      tb303: { ...latest.tb303, ...updates } as any
+      tb303: { ...latest.tb303, ...updates }
     });
   }, [targetInstrument, updateInstrument]);
 
   // Handle full preset load (synth config + effects chain)
-  const handlePresetLoad = useCallback(async (preset: any) => {
+  const handlePresetLoad = useCallback(async (preset: { tb303?: Partial<TB303Config>; effects?: Array<Record<string, unknown>> }) => {
     if (!targetInstrument) return;
 
     // Apply TB-303 synth config
@@ -56,10 +59,10 @@ export const TB303KnobPanel: React.FC = memo(() => {
 
     // Apply effects chain (or clear if preset has none)
     if (preset.effects !== undefined) {
-      const effects = preset.effects.map((fx: any, i: number) => ({
+      const effects = preset.effects.map((fx: Record<string, unknown>, i: number) => ({
         ...fx,
-        id: fx.id || `tb303-fx-${Date.now()}-${i}`,
-      }));
+        id: (fx.id as string) || `tb303-fx-${Date.now()}-${i}`,
+      })) as EffectConfig[];
       updateInstrument(targetInstrument.id, { effects });
 
       // Rebuild audio chain immediately
@@ -71,17 +74,87 @@ export const TB303KnobPanel: React.FC = memo(() => {
 
   // NOW conditional returns are safe
   if (!targetInstrument || !targetInstrument.tb303) {
+    // Still render popout window if it was open (instrument might get re-assigned)
+    if (tb303PoppedOut) {
+      return (
+        <PopOutWindow
+          isOpen={true}
+          onClose={() => setTB303PoppedOut(false)}
+          title="DEViLBOX — TB-303"
+          width={1200}
+          height={560}
+          fitContent
+        >
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+            No TB-303 instrument found
+          </div>
+        </PopOutWindow>
+      );
+    }
     return null;
+  }
+
+  // Popped out — render into separate window, show placeholder strip inline
+  if (tb303PoppedOut) {
+    return (
+      <>
+        <PopOutWindow
+          isOpen={true}
+          onClose={() => setTB303PoppedOut(false)}
+          title="DEViLBOX — TB-303"
+          width={1200}
+          height={560}
+          fitContent
+        >
+          <div style={{ background: '#1a1a1a' }}>
+            <JC303StyledKnobPanel
+              key={targetInstrument.id}
+              config={targetInstrument.tb303}
+              onChange={handleConfigChange}
+              onPresetLoad={handlePresetLoad}
+              instrumentId={targetInstrument.id}
+            />
+          </div>
+        </PopOutWindow>
+
+        {/* Placeholder strip in main window */}
+        <div
+          className="tb303-knob-panel"
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '40px',
+            background: '#1a1a1a',
+            borderTop: '1px solid #333',
+          }}
+        >
+          <div className="absolute top-0 left-0 p-2 text-xs font-mono text-accent-primary flex items-center gap-2">
+            <span className="font-bold">TB-303</span>
+            <span className="text-gray-500">Popped Out</span>
+          </div>
+          <div className="absolute top-0 right-0 z-50">
+            <button
+              className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
+              onClick={() => setTB303PoppedOut(false)}
+              title="Restore panel inline"
+            >
+              <Undo2 size={14} />
+              Restore
+            </button>
+          </div>
+        </div>
+      </>
+    );
   }
 
   // Collapsed view
   if (tb303Collapsed) {
     return (
-      <div 
+      <div
         className="tb303-knob-panel"
-        style={{ 
-          position: 'relative', 
-          width: '100%', 
+        style={{
+          position: 'relative',
+          width: '100%',
           height: '40px',
           background: '#1a1a1a',
           borderTop: '1px solid #333'
@@ -105,47 +178,60 @@ export const TB303KnobPanel: React.FC = memo(() => {
     );
   }
 
+  // Shared action buttons for the 303 panel header
+  const panelActions = (
+    <>
+      <button
+        className="p-1.5 text-gray-500 hover:text-cyan-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+        onClick={() => {
+          if (tb303PoppedOut) {
+            focusPopout('DEViLBOX — TB-303');
+          } else {
+            setTB303PoppedOut(true);
+          }
+        }}
+        title="Pop out to separate window"
+      >
+        <ExternalLink size={14} />
+      </button>
+      <button
+        className="p-1.5 text-gray-500 hover:text-white bg-black/40 hover:bg-black/70 rounded transition-colors"
+        onClick={toggleTB303Collapsed}
+        title="Collapse synth panel"
+      >
+        <ChevronUp size={14} />
+      </button>
+      <button
+        className="p-1.5 text-gray-500 hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+        onClick={() => useUIStore.getState().setTB303Collapsed(true)}
+        title="Close synth panel"
+      >
+        <X size={14} />
+      </button>
+    </>
+  );
+
   // Main expanded panel
   return (
-    <div 
+    <div
       className="tb303-knob-panel"
-      style={{ 
-        position: 'relative', 
-        width: '100%', 
+      style={{
+        position: 'relative',
+        width: '100%',
         maxHeight: '400px', // Hard limit to prevent blocking
         background: '#1a1a1a',
         borderTop: '1px solid #333',
         overflow: 'auto'
       }}
     >
-      {/* Control Buttons */}
-      <div className="sticky top-0 right-0 z-50 flex justify-end gap-1 bg-black/80 p-1">
-        <button
-          className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80"
-          onClick={toggleTB303Collapsed}
-          title="Collapse synth panel"
-        >
-          <ChevronUp size={16} />
-        </button>
-        <button
-          className="p-2 text-gray-400 hover:text-red-400 bg-black/50 hover:bg-black/80 rounded-bl-lg"
-          onClick={() => useUIStore.getState().setTB303Collapsed(true)}
-          title="Close synth panel"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Panel Content */}
-      <div>
-        <JC303StyledKnobPanel
-          key={targetInstrument.id}
-          config={targetInstrument.tb303}
-          onChange={handleConfigChange}
-          onPresetLoad={handlePresetLoad}
-          instrumentId={targetInstrument.id}
-        />
-      </div>
+      <JC303StyledKnobPanel
+        key={targetInstrument.id}
+        config={targetInstrument.tb303}
+        onChange={handleConfigChange}
+        onPresetLoad={handlePresetLoad}
+        instrumentId={targetInstrument.id}
+        headerActions={panelActions}
+      />
     </div>
   );
 });

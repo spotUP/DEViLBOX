@@ -197,6 +197,7 @@ export const AutomationColumnToggle: React.FC<AutomationColumnToggleProps> = ({
 /**
  * Hook for handling automation column input
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAutomationColumnInput = (
   cell: TrackerCell,
   cursor: CursorPosition,

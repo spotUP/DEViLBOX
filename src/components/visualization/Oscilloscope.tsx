@@ -1,4 +1,3 @@
-// @ts-nocheck - Argument count mismatch
 /**
  * Oscilloscope - Canvas-based waveform and spectrum visualizer
  */
@@ -22,21 +21,21 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const { analyserNode, fftNode } = useAudioStore();
-  const [actualWidth, setActualWidth] = useState(typeof width === 'number' ? width : 800);
+  const [measuredWidth, setMeasuredWidth] = useState(800);
 
-  // Handle responsive width
+  // Derived actual width: use prop when numeric, measured when 'auto'
+  const actualWidth = width !== 'auto' ? width : measuredWidth;
+
+  // Handle responsive width measurement via ResizeObserver
   useEffect(() => {
-    if (width !== 'auto') {
-      setActualWidth(width);
-      return;
-    }
+    if (width !== 'auto') return;
 
     const container = containerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
       const rect = container.getBoundingClientRect();
-      setActualWidth(Math.floor(rect.width));
+      setMeasuredWidth(Math.floor(rect.width));
     };
 
     updateWidth();

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import type { DubSirenConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
@@ -20,10 +20,6 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<DubSirenTab>('main');
   
-  // Use ref to prevent stale closures in callbacks
-  const configRef = useRef(config);
-  configRef.current = config;
-
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
@@ -39,11 +35,11 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
 
   // Helper to update nested configs
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {
-    onChange({ oscillator: { ...configRef.current.oscillator, ...updates } });
+    onChange({ oscillator: { ...config.oscillator, ...updates } });
   };
 
   const updateLFO = (updates: Partial<typeof config.lfo>) => {
-    onChange({ lfo: { ...configRef.current.lfo, ...updates } });
+    onChange({ lfo: { ...config.lfo, ...updates } });
   };
 
   const updateDelay = (updates: Partial<typeof config.delay>) => {
@@ -51,15 +47,15 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
     if (updates.time !== undefined) {
       updates.time = Math.max(0, Math.min(1, updates.time));
     }
-    onChange({ delay: { ...configRef.current.delay, ...updates } });
+    onChange({ delay: { ...config.delay, ...updates } });
   };
 
   const updateReverb = (updates: Partial<typeof config.reverb>) => {
-    onChange({ reverb: { ...configRef.current.reverb, ...updates } });
+    onChange({ reverb: { ...config.reverb, ...updates } });
   };
 
   const updateFilter = (updates: Partial<typeof config.filter>) => {
-    onChange({ filter: { ...configRef.current.filter, ...updates } });
+    onChange({ filter: { ...config.filter, ...updates } });
   };
 
   const handleThrow = (active: boolean) => {
@@ -81,7 +77,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         {['sine', 'square', 'sawtooth', 'triangle'].map((type) => (
           <button
             key={type}
-            onClick={() => onSelect(type as any)}
+            onClick={() => onSelect(type as 'sine' | 'square' | 'sawtooth' | 'triangle')}
             className={`
               w-10 h-10 rounded border transition-all flex items-center justify-center
               ${currentType === type
@@ -271,7 +267,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             {['lowpass', 'highpass', 'bandpass', 'notch'].map((type) => (
               <button
                 key={type}
-                onClick={() => updateFilter({ type: type as any })}
+                onClick={() => updateFilter({ type: type as 'lowpass' | 'highpass' | 'bandpass' | 'notch' })}
                 className={`
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type

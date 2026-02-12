@@ -46,8 +46,10 @@ export const ModelBrowser: React.FC<ModelBrowserProps> = ({
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setSearchQuery('');
-      setSelectedCategory('all');
+      requestAnimationFrame(() => {
+        setSearchQuery('');
+        setSelectedCategory('all');
+      });
     }
   }, [isOpen]);
 

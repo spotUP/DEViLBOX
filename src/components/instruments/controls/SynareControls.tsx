@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { SynareConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Drum, Activity, Waves, MoveDown, Speaker, Wind } from 'lucide-react';
@@ -22,7 +22,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
   
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Theme-aware styling
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
@@ -257,7 +257,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             <span className="text-[10px] font-bold text-gray-500 uppercase">Target</span>
             <select
               value={config.lfo.target}
-              onChange={(e) => onChange({ lfo: { ...config.lfo, target: e.target.value as any } })}
+              onChange={(e) => onChange({ lfo: { ...config.lfo, target: e.target.value as 'pitch' | 'filter' | 'both' } })}
               className="bg-[#151515] border border-gray-700 text-xs text-text-primary rounded px-1 py-0.5"
             >
               <option value="pitch">Pitch</option>
@@ -312,7 +312,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
         {['main', 'mod'].map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab as any)}
+            onClick={() => setActiveTab(tab as SynareTab)}
             className={`
               flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
               ${activeTab === tab 

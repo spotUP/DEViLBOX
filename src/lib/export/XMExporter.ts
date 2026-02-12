@@ -5,7 +5,7 @@
 
 import type { Pattern, TrackerCell, ImportMetadata, EnvelopePoints } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
-import { adsrToEnvelopePoints as _adsrToEnvelopePoints } from '../import/EnvelopeConverter';
+// EnvelopeConverter import removed - not currently used but available for future envelope export
 
 export interface XMExportOptions {
   channelLimit?: number; // Default 32 (XM max)
@@ -84,8 +84,8 @@ export async function exportAsXM(
   }
 
   // Convert patterns
-  const xmPatterns: XMPatternData[] = patterns.map((pattern, idx) =>
-    convertPatternToXM(pattern, effectiveChannels, idx, warnings)
+  const xmPatterns: XMPatternData[] = patterns.map((pattern) =>
+    convertPatternToXM(pattern, effectiveChannels)
   );
 
   // Build XM file
@@ -165,9 +165,7 @@ interface XMNoteData {
  */
 function convertPatternToXM(
   pattern: Pattern,
-  channelCount: number,
-  _patternIndex: number,
-  warnings: string[]
+  channelCount: number
 ): XMPatternData {
   const rows: XMNoteData[][] = [];
 
@@ -183,7 +181,7 @@ function convertPatternToXM(
         continue;
       }
 
-      const xmNote = convertCellToXMNote(cell, warnings);
+      const xmNote = convertCellToXMNote(cell);
       rowNotes.push(xmNote);
     }
 
@@ -196,7 +194,7 @@ function convertPatternToXM(
 /**
  * Convert TrackerCell to XM note
  */
-function convertCellToXMNote(cell: TrackerCell, _warnings: string[]): XMNoteData {
+function convertCellToXMNote(cell: TrackerCell): XMNoteData {
   // Convert note - handle both numeric (XM) and string (legacy) formats
   let note = 0;
   const noteValue = cell.note;
@@ -436,7 +434,18 @@ function buildXMFile(config: {
 /**
  * Write XM header
  */
-function writeXMHeader(config: any): Uint8Array {
+function writeXMHeader(config: {
+  moduleName: string;
+  trackerName: string;
+  patterns: XMPatternData[];
+  instruments: XMInstrumentData[];
+  channelCount: number;
+  defaultSpeed: number;
+  defaultBPM: number;
+  songLength: number;
+  restartPosition: number;
+  linearFrequency: boolean;
+}): Uint8Array {
   const buffer = new Uint8Array(336); // 80 + 256 pattern order table
   const view = new DataView(buffer.buffer);
   let offset = 0;

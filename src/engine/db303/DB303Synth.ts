@@ -77,7 +77,7 @@ const DB303Param = {
 
 /** Signal chain trace logging — enable via `window.DB303_TRACE = true` in browser console */
 function db303TraceEnabled(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).DB303_TRACE;
+  return typeof window !== 'undefined' && !!(window as unknown as Record<string, boolean>).DB303_TRACE;
 }
 
 export class DB303Synth implements DevilboxSynth {
@@ -95,7 +95,7 @@ export class DB303Synth implements DevilboxSynth {
   private overdriveAmount: number = 0;
 
   // Compatibility properties
-  public config: any = {};
+  public config: Record<string, unknown> = {};
   public audioContext: AudioContext;
   private _disposed: boolean = false;
   private _initPromise: Promise<void>;
@@ -149,7 +149,7 @@ export class DB303Synth implements DevilboxSynth {
       // Load worklet module for THIS context
       try {
         await context.audioWorklet.addModule(`${baseUrl}db303/DB303.worklet.js`);
-      } catch (e) {
+      } catch {
         // Module might already be added to this context
       }
 
@@ -244,7 +244,7 @@ export class DB303Synth implements DevilboxSynth {
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(ctx.destination);
-    } catch (_e) { /* keepalive failed */ }
+    } catch { /* keepalive failed */ }
   }
 
   // Store current slideTime for hammer restoration
@@ -816,7 +816,8 @@ export class DB303Synth implements DevilboxSynth {
   }
 
   setDelayTime(value: number): void {
-    const clamped = Math.max(0, Math.min(1, value));
+    // WASM expects raw 0-16 (16th note subdivisions), NOT 0-1 normalized
+    const clamped = Math.max(0, Math.min(16, value));
     this.setParameterByName(DB303Param.DELAY_TIME, clamped);
   }
 
@@ -867,12 +868,12 @@ export class DB303Synth implements DevilboxSynth {
       // Rewire: worklet → overdriveGain → overdrive → output
       try {
         this.workletNode.disconnect(this.output);
-      } catch (_e) { /* not connected */ }
+      } catch { /* not connected */ }
       try {
         this.workletNode.connect(this.overdriveGain);
         this.overdriveGain.connect(this.overdrive);
         this.overdrive.connect(this.output);
-      } catch (_e) { /* already connected */ }
+      } catch { /* already connected */ }
     } else {
       // Bypass: worklet → output (direct)
       if (this.overdrive && this.overdriveGain) {
@@ -880,24 +881,22 @@ export class DB303Synth implements DevilboxSynth {
           this.workletNode.disconnect(this.overdriveGain);
           this.overdriveGain.disconnect(this.overdrive);
           this.overdrive.disconnect(this.output);
-        } catch (_e) { /* not connected */ }
+        } catch { /* not connected */ }
         this.overdriveGain.gain.linearRampToValueAtTime(1, now + RAMP);
       }
       try {
         this.workletNode.connect(this.output);
-      } catch (_e) { /* already connected */ }
+      } catch { /* already connected */ }
     }
   }
 
-  setVegDecay(_ms: number): void {
-    // VEG (Volume Envelope Generator) decay - convert to ms (16-3000ms)
-    // NOTE: This WASM doesn't have ampDecay/VegDecay - amplitude uses filter envelope
-  }
+  // VEG (Volume Envelope Generator) decay
+  // NOTE: This WASM doesn't have ampDecay/VegDecay - amplitude uses filter envelope
+  setVegDecay(_ms: number): void { void _ms; }
 
-  setVegSustain(_percent: number): void {
-    // VEG sustain - convert percent to dB (0-100% = -60 to 0dB)
-    // NOTE: This WASM doesn't have ampSustain/VegSustain - amplitude uses filter envelope
-  }
+  // VEG sustain
+  // NOTE: This WASM doesn't have ampSustain/VegSustain - amplitude uses filter envelope
+  setVegSustain(_percent: number): void { void _percent; }
 
   setFilterFM(percent: number): void {
     this.setFilterFmDepth(percent / 100);
@@ -928,20 +927,16 @@ export class DB303Synth implements DevilboxSynth {
     }
   }
 
-  setSweepSpeed(_mode: string): void {
+  setSweepSpeed(_mode: string): void { void _mode;
     // Sweep speed is not a native TB-303/DB303 parameter
     // It's a UI abstraction for envelope attack/decay times
     // The actual parameters (normalAttack, accentAttack, decay) are set separately
     // This method is a no-op to maintain compatibility with the interface
   }
 
-  setHighResonanceEnabled(_enabled: boolean): void {
-    // NOOP
-  }
+  setHighResonanceEnabled(_enabled: boolean): void { void _enabled; }
 
-  setAccentSweepEnabled(_enabled: boolean): void {
-    // Always enabled in db303
-  }
+  setAccentSweepEnabled(_enabled: boolean): void { void _enabled; }
 
   // Enable/disable methods for effects — WASM-only
   setChorusEnabled(enabled: boolean): void {
@@ -967,12 +962,12 @@ export class DB303Synth implements DevilboxSynth {
     }
   }
 
-  async loadGuitarMLModel(_index: number): Promise<void> {}
-  async setGuitarMLEnabled(_enabled: boolean): Promise<void> {}
-  setGuitarMLMix(_mix: number): void {}
-  setQuality(_quality: string): void {}
-  enableDevilFish(_enabled: boolean): void {}
-  setHighResonance(_enabled: boolean): void {}
+  async loadGuitarMLModel(_index: number): Promise<void> { void _index; }
+  async setGuitarMLEnabled(_enabled: boolean): Promise<void> { void _enabled; }
+  setGuitarMLMix(_mix: number): void { void _mix; }
+  setQuality(_quality: string): void { void _quality; }
+  enableDevilFish(_enabled: boolean): void { void _enabled; }
+  setHighResonance(_enabled: boolean): void { void _enabled; }
 
   /**
    * Apply a full TB303Config directly. All values are 0-1 normalized.
@@ -981,7 +976,7 @@ export class DB303Synth implements DevilboxSynth {
    */
   applyConfig(tb: TB303Config): void {
     if (db303TraceEnabled()) {
-      const keys = Object.keys(tb).filter(k => (tb as any)[k] !== undefined);
+      const keys = Object.keys(tb).filter(k => (tb as Record<string, unknown>)[k] !== undefined);
       console.log('[DB303:applyConfig]', keys);
     }
     // --- Core parameters ---
@@ -990,15 +985,26 @@ export class DB303Synth implements DevilboxSynth {
     // Default is 1.0 — lower values attenuate but user should still have control.
     if (tb.volume !== undefined) this.setVolume(tb.volume);
 
-    // Filter (all 0-1)
+    // Filter — check extendedCutoff (Wide toggle) for Hz mode
     if (tb.filter) {
-      this.setCutoff(tb.filter.cutoff);
+      if (tb.devilFish?.extendedCutoff) {
+        // Wide mode: 0-1 knob → 10-5000 Hz (logarithmic, matching reference)
+        const hz = 10 * Math.pow(500, tb.filter.cutoff);
+        this.setCutoffHz(hz);
+      } else {
+        this.setCutoff(tb.filter.cutoff);
+      }
       this.setResonance(tb.filter.resonance);
     }
 
-    // Filter envelope (all 0-1)
+    // Filter envelope — check extendedEnvMod (Wide toggle) for percent mode
     if (tb.filterEnvelope) {
-      this.setEnvMod(tb.filterEnvelope.envMod);
+      if (tb.devilFish?.extendedEnvMod) {
+        // Wide mode: 0-1 knob → 0-300% (linear, matching reference)
+        this.setEnvModPercent(tb.filterEnvelope.envMod * 300);
+      } else {
+        this.setEnvMod(tb.filterEnvelope.envMod);
+      }
       this.setDecay(tb.filterEnvelope.decay);
     }
 
@@ -1068,21 +1074,19 @@ export class DB303Synth implements DevilboxSynth {
       if (df.ensembleAmount !== undefined) this.setEnsembleAmount(df.ensembleAmount);
     }
 
-    // --- Devil Fish envelope mods (only when DF toggle is ON) ---
-    if (df?.enabled) {
-      // normalDecay: DO NOT set here. setDecay() already syncs normalDecay
-      // to match the core decay value.
+    // --- Devil Fish envelope mods (always active — reference has no DF toggle) ---
+    // The WASM always has DF enabled (line above calls enableDevilFish(true)).
+    // These params are always sent; no gating on df.enabled.
+    if (df) {
+      // normalDecay: setDecay() above syncs normalDecay to match the core decay.
+      // If the user has set a different normalDecay via the DEVILFISH tab, override here.
+      if (df.normalDecay !== undefined) this.setNormalDecay(df.normalDecay);
       if (df.accentDecay !== undefined) this.setAccentDecay(df.accentDecay);
       if (df.softAttack !== undefined) this.setSoftAttack(df.softAttack);
       if (df.accentSoftAttack !== undefined) this.setAccentSoftAttack(df.accentSoftAttack);
       if (df.muffler !== undefined) this.setMuffler(df.muffler);
       if (df.sweepSpeed !== undefined) this.setSweepSpeed(df.sweepSpeed);
       if (df.highResonance !== undefined) this.setHighResonanceEnabled(df.highResonance);
-    } else if (df) {
-      // Reset only the DF envelope mods to neutral when disabled
-      this.setAccentDecay(0.1);
-      this.setSoftAttack(0);
-      this.setAccentSoftAttack(0.5);
     }
 
     // --- Korg filter parameters (independent of Devil Fish mode) ---

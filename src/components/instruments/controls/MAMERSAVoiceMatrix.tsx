@@ -78,7 +78,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
         </div>
         <div className="grid grid-cols-3 gap-2">
           {['ic5', 'ic6', 'ic7'].map((id) => {
-            const isLoaded = !!(roms as any)[id];
+            const isLoaded = !!roms[id as keyof typeof roms];
             return (
               <label key={id} className={`
                 flex flex-col items-center justify-center p-2 rounded border border-dashed transition-all cursor-pointer
@@ -86,7 +86,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
               `}>
                 <span className={`text-[9px] font-bold ${isLoaded ? 'text-sky-400' : 'text-text-muted'}`}>{id.toUpperCase()}</span>
                 <span className="text-[8px] text-text-muted">{isLoaded ? 'READY' : 'UPLOAD'}</span>
-                <input type="file" className="hidden" onChange={(e) => handleRSARomUpload(e, id as any)} />
+                <input type="file" className="hidden" onChange={(e) => handleRSARomUpload(e, id as 'ic5' | 'ic6' | 'ic7')} />
               </label>
             );
           })}

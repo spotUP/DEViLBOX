@@ -4,7 +4,7 @@
  * for inclusion in the main factory preset list.
  */
 
-import type { InstrumentPreset } from '@typedefs/instrument';
+import type { InstrumentPreset, SynthType } from '@typedefs/instrument';
 import { BUZZMACHINE_PRESETS } from './buzzmachinePresets';
 import { BuzzmachineType } from '../engine/buzzmachines/BuzzmachineEngine';
 
@@ -37,7 +37,7 @@ for (const type of GENERATOR_TYPES) {
       BUZZMACHINE_FACTORY_PRESETS.push({
         name: displayName,
         type: 'synth',
-        synthType: `Buzz${getShortName(type)}` as any, // Construct dynamic synth type or use 'Buzzmachine'
+        synthType: `Buzz${getShortName(type)}` as SynthType, // Construct dynamic synth type
         // Ideally we use 'Buzzmachine' synthType but set the specific config
         // But InstrumentFactory supports specific types like 'BuzzKick'
         // Let's use the specific type names handled by InstrumentFactory
@@ -62,14 +62,11 @@ function getShortName(type: string): string {
     case BuzzmachineType.FSM_KICKXP: return 'KickXP';
     case BuzzmachineType.JESKOLA_TRILOK: return 'Trilok';
     case BuzzmachineType.JESKOLA_NOISE: return 'Noise';
-    case BuzzmachineType.OOMEK_AGGRESSOR: return 'Aggressor'; // Not directly supported in factory?
     // InstrumentFactory handles specific strings. Let's check InstrumentFactory.ts
     // It handles: BuzzDTMF, BuzzFreqBomb, BuzzKick, BuzzKickXP, BuzzNoise, BuzzTrilok,
     // Buzz4FM2F, BuzzDynamite6, BuzzM3, Buzz3o3, Buzz3o3DF, BuzzM4.
     // OomekAggressor maps to Buzz3o3.
     // OomekAggressorDF maps to Buzz3o3DF.
-    
-    // Mapping fix:
     case BuzzmachineType.OOMEK_AGGRESSOR: return '3o3'; // -> Buzz3o3
     case BuzzmachineType.OOMEK_AGGRESSOR_DF: return '3o3DF'; // -> Buzz3o3DF
     case BuzzmachineType.MADBRAIN_4FM2F: return '4FM2F';

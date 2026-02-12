@@ -51,6 +51,12 @@ export interface MoogFilterOptions {
  * Falls back to a pure-JS Krajeski implementation if WASM fails to load.
  * Extends Tone.ToneAudioNode for direct integration with existing effect chains.
  */
+/** Extract the underlying native GainNode from a Tone.js Gain wrapper */
+function getRawGainNode(node: Tone.Gain): GainNode {
+  const n = node as unknown as Record<string, GainNode | undefined>;
+  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as GainNode);
+}
+
 export class MoogFilterEffect extends Tone.ToneAudioNode {
   readonly name = 'MoogFilter';
 
@@ -207,7 +213,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       // Register worklet processor
       try {
         await context.audioWorklet.addModule(`${baseUrl}moogfilters/MoogFilters.worklet.js`);
-      } catch (e) {
+      } catch {
         // May already be registered
       }
 
@@ -277,9 +283,9 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       };
 
       // Connect fallback as wet path using raw GainNodes from Tone.Gain wrappers
-      const rawInput = (this.input as any)._gainNode as GainNode;
-      const rawWet = (this.wetGain as any)._gainNode as GainNode;
-      const rawOut = (this.output as any)._gainNode as GainNode;
+      const rawInput = getRawGainNode(this.input);
+      const rawWet = getRawGainNode(this.wetGain);
+      const rawOut = getRawGainNode(this.output);
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
@@ -301,15 +307,15 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
 
       // Disconnect fallback
       if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch (_) {}
+        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
         this.fallbackNode.onaudioprocess = null;
         this.usingFallback = false;
       }
 
       // Connect WASM worklet as wet path using raw GainNodes
-      const rawInput = (this.input as any)._gainNode as GainNode;
-      const rawWet = (this.wetGain as any)._gainNode as GainNode;
-      const rawOut = (this.output as any)._gainNode as GainNode;
+      const rawInput = getRawGainNode(this.input);
+      const rawWet = getRawGainNode(this.wetGain);
+      const rawOut = getRawGainNode(this.output);
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
@@ -342,14 +348,14 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     // Clean up WASM worklet
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
-      try { this.workletNode.disconnect(); } catch (_) {}
+      try { this.workletNode.disconnect(); } catch { /* ignored */ }
       this.workletNode = null;
     }
 
     // Clean up fallback
     if (this.fallbackNode) {
       this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch (_) {}
+      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
       this.fallbackNode = null;
     }
 

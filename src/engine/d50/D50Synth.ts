@@ -286,7 +286,8 @@ export class D50Synth implements DevilboxSynth {
   /**
    * Convert MIDI note to D-50 pitch (for future envelope implementation)
    */
-  private _midiNoteToPitch(midiNote: number, _detune: number = 0): number {
+  private _midiNoteToPitch(midiNote: number, detune: number = 0): number {
+    void detune;
     // D-50 uses MIDI-like note numbers internally
     // with additional fine tuning resolution
     return midiNote;
@@ -373,7 +374,8 @@ export class D50Synth implements DevilboxSynth {
   /**
    * Trigger a note off
    */
-  triggerRelease(note: string | number, _time?: number): void {
+  triggerRelease(note: string | number, time?: number): void {
+    void time;
     if (!this.isInitialized) return;
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;

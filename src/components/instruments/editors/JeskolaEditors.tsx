@@ -14,7 +14,7 @@
  * - OomekAggressor
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import {
@@ -56,8 +56,10 @@ const useBuzzmachineParam = (
   onChange: (updates: Partial<InstrumentConfig>) => void
 ) => {
   const configRef = useRef(config);
-  configRef.current = config;
-  
+  useEffect(() => {
+    configRef.current = config;
+  });
+
   return useCallback(
     (paramIndex: number, value: number) => {
       const currentParams = configRef.current.buzzmachine?.parameters || {};
@@ -1618,7 +1620,8 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         const text = await file.text();
         wavetableData = text.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
       } else {
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const audioCtx = new AudioCtxClass();
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);
@@ -1798,6 +1801,7 @@ const BUZZMACHINE_EDITORS: Record<string, EditorComponent> = {
  * @param machineType The buzzmachine type string
  * @returns The editor component or null if no dedicated editor exists
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getJeskolaEditor(machineType: string): EditorComponent | null {
   return BUZZMACHINE_EDITORS[machineType] || null;
 }

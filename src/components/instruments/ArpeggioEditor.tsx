@@ -55,6 +55,7 @@ const PLAYBACK_MODES: { value: ArpeggioMode; label: string; icon: React.ReactNod
 ];
 
 // Division values for note-based speed - exported for reference
+// eslint-disable-next-line react-refresh/only-export-components
 export const DIVISIONS = [1, 2, 4, 8, 16, 32, 64];
 
 // Helper: Convert legacy pattern to steps
