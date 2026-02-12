@@ -284,7 +284,7 @@
         <label>Filter topology (0-5)</label>
         <select id="filterSelect" disabled>
           <option value="0">0 - Classic</option>
-          <option value="1">1 - Smooth</option>
+          <option value="1" selected>1 - Enhanced (default)</option>
           <option value="2">2 - Aggressive</option>
           <option value="3">3 - Resonant</option>
           <option value="4">4 - Vintage</option>
@@ -306,42 +306,82 @@
       <div class="control-group">
         <div class="name">Filter Drive</div>
         <label>Input saturation (0-1)</label>
-        <input type="range" id="filterInputDrive" min="0" max="1" step="0.01" value="0" disabled>
-        <div class="value-display" id="filterInputDriveVal">0</div>
+        <input type="range" id="filterInputDrive" min="0" max="1" step="0.01" value="0.169" disabled>
+        <div class="value-display" id="filterInputDriveVal">0.17</div>
       </div>
       <div class="control-group">
         <div class="name">Passband Comp</div>
-        <label>Resonance compensation (0-1)</label>
-        <input type="range" id="passbandCompensation" min="0" max="1" step="0.01" value="0" disabled>
-        <div class="value-display" id="passbandCompensationVal">0%</div>
+        <label>Knob value (0-1) [INVERTED to WASM]</label>
+        <input type="range" id="passbandCompensation" min="0" max="1" step="0.01" value="0.09" disabled>
+        <div class="value-display" id="passbandCompensationVal">9%</div>
       </div>
       <div class="control-group">
         <div class="name">Res Tracking</div>
-        <label>Resonance tracking (0-1)</label>
-        <input type="range" id="resTracking" min="0" max="1" step="0.01" value="0" disabled>
-        <div class="value-display" id="resTrackingVal">0%</div>
+        <label>Knob value (0-1) [INVERTED to WASM]</label>
+        <input type="range" id="resTracking" min="0" max="1" step="0.01" value="0.743" disabled>
+        <div class="value-display" id="resTrackingVal">74%</div>
       </div>
     </div>
     
-    <h3>Korg-Style Filter <span style="color:#ff0066;font-size:11px">(Set Filter Select = 5 to hear these)</span></h3>
+    <h3>Filter Nonlinearity <span style="color:#ff0066;font-size:11px">(Active on ALL filter modes - Korg mirror params sent automatically)</span></h3>
     <div class="controls-grid">
       <div class="control-group">
         <div class="name">Diode Character</div>
-        <label>Warmth / Distortion (0-1)</label>
-        <input type="range" id="diodeCharacter" min="0" max="1" step="0.01" value="0.5" disabled>
-        <div class="value-display" id="diodeCharacterVal">50%</div>
+        <label>Warmth / Distortion (0-1) [+korgWarmth]</label>
+        <input type="range" id="diodeCharacter" min="0" max="1" step="0.01" value="1" disabled>
+        <div class="value-display" id="diodeCharacterVal">100%</div>
       </div>
       <div class="control-group">
         <div class="name">Duffing Amount</div>
-        <label>Nonlinearity (-1 to 1)</label>
-        <input type="range" id="duffingAmount" min="-1" max="1" step="0.01" value="0" disabled>
-        <div class="value-display" id="duffingAmountVal">0</div>
+        <label>Nonlinearity (-1 to 1) [+korgStiffness]</label>
+        <input type="range" id="duffingAmount" min="-1" max="1" step="0.01" value="0.03" disabled>
+        <div class="value-display" id="duffingAmountVal">0.03</div>
       </div>
       <div class="control-group">
         <div class="name">Filter FM</div>
-        <label>Filter FM depth (0-1)</label>
+        <label>Filter FM depth (0-1) [+korgFilterFm]</label>
         <input type="range" id="filterFmDepth" min="0" max="1" step="0.01" value="0" disabled>
         <div class="value-display" id="filterFmDepthVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Stage NL Amount</div>
+        <label>Per-stage nonlinearity (0-1)</label>
+        <input type="range" id="stageNLAmount" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="stageNLAmountVal">0%</div>
+      </div>
+    </div>
+
+    <h3>Korg Ladder Filter <span style="color:#ff0066;font-size:11px">(Set Filter Select = 5 for these)</span></h3>
+    <div class="controls-grid">
+      <div class="control-group">
+        <div class="name">Korg Bite</div>
+        <label>Filter edge/bite (0-1)</label>
+        <input type="range" id="korgBite" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="korgBiteVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Korg Clip</div>
+        <label>Soft clipping (0-1)</label>
+        <input type="range" id="korgClip" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="korgClipVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Korg XMod</div>
+        <label>Cross modulation (0-1)</label>
+        <input type="range" id="korgCrossmod" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="korgCrossmodVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Korg Q.Sag</div>
+        <label>Resonance sag (0-1)</label>
+        <input type="range" id="korgQSag" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="korgQSagVal">0%</div>
+      </div>
+      <div class="control-group">
+        <div class="name">Korg Sharp</div>
+        <label>Filter sharpness (0-1)</label>
+        <input type="range" id="korgSharpness" min="0" max="1" step="0.01" value="0" disabled>
+        <div class="value-display" id="korgSharpnessVal">0%</div>
       </div>
     </div>
 
@@ -356,14 +396,14 @@
       <div class="control-group">
         <div class="name">Normal Decay</div>
         <label>Non-accented notes only</label>
-        <input type="range" id="normalDecay" min="0" max="1" step="0.01" value="0.3" disabled>
-        <div class="value-display" id="normalDecayVal">0.30</div>
+        <input type="range" id="normalDecay" min="0" max="1" step="0.01" value="0.164" disabled>
+        <div class="value-display" id="normalDecayVal">0.16</div>
       </div>
       <div class="control-group">
         <div class="name">Accent Decay</div>
         <label>ACCENTED notes only</label>
-        <input type="range" id="accentDecay" min="0" max="1" step="0.01" value="0.3" disabled>
-        <div class="value-display" id="accentDecayVal">0.30</div>
+        <input type="range" id="accentDecay" min="0" max="1" step="0.01" value="0.006" disabled>
+        <div class="value-display" id="accentDecayVal">0.01</div>
       </div>
       <div class="control-group">
         <div class="name">Soft Attack</div>
@@ -374,8 +414,8 @@
       <div class="control-group">
         <div class="name">Accent Soft Attack</div>
         <label>ACCENTED notes only</label>
-        <input type="range" id="accentSoftAttack" min="0" max="1" step="0.01" value="0" disabled>
-        <div class="value-display" id="accentSoftAttackVal">0</div>
+        <input type="range" id="accentSoftAttack" min="0" max="1" step="0.01" value="0.1" disabled>
+        <div class="value-display" id="accentSoftAttackVal">0.10</div>
       </div>
     </div>
   </div>
@@ -513,13 +553,23 @@
       lpBpMix: { setter: 'setLpBpMix', format: v => v < 0.1 ? 'LP' : v > 0.9 ? 'BP' : `${(v*100).toFixed(0)}%` },
       filterTracking: { setter: 'setFilterTracking', format: v => `${(v*100).toFixed(0)}%` },
       filterInputDrive: { setter: 'setFilterInputDrive', format: v => v.toFixed(2) },
-      passbandCompensation: { setter: 'setPassbandCompensation', format: v => `${(v*100).toFixed(0)}%` },
-      resTracking: { setter: 'setResTracking', format: v => `${(v*100).toFixed(0)}%` },
-      
-      // DevilFish - Korg
-      diodeCharacter: { setter: 'setDiodeCharacter', format: v => `${(v*100).toFixed(0)}%` },
-      duffingAmount: { setter: 'setDuffingAmount', format: v => v.toFixed(2) },
-      filterFmDepth: { setter: 'setFilterFmDepth', format: v => `${(v*100).toFixed(0)}%` },
+      // passbandCompensation and resTracking have INVERTED knob values
+      // Knob 0.09 → WASM gets 1 - 0.09 = 0.91
+      passbandCompensation: { setter: 'setPassbandCompensation', format: v => `${(v*100).toFixed(0)}% (→WASM ${((1-v)*100).toFixed(0)}%)`, invert: true },
+      resTracking: { setter: 'setResTracking', format: v => `${(v*100).toFixed(0)}% (→WASM ${((1-v)*100).toFixed(0)}%)`, invert: true },
+
+      // DevilFish - Nonlinearity (mirrored to Korg params automatically)
+      diodeCharacter: { setter: 'setDiodeCharacter', format: v => `${(v*100).toFixed(0)}%`, mirror: 'korgWarmth' },
+      duffingAmount: { setter: 'setDuffingAmount', format: v => v.toFixed(2), mirror: 'korgStiffness', mirrorTransform: v => Math.abs(v) < 0.16 ? 0 : ((v > 0 ? 1 : -1) * (Math.abs(v) - 0.16)) / 0.84 },
+      filterFmDepth: { setter: 'setFilterFmDepth', format: v => `${(v*100).toFixed(0)}%`, mirror: 'korgFilterFm' },
+      stageNLAmount: { setter: 'setStageNLAmount', format: v => `${(v*100).toFixed(0)}%` },
+
+      // Korg ladder filter params (filterSelect=5)
+      korgBite: { setter: 'setKorgBite', format: v => `${(v*100).toFixed(0)}%` },
+      korgClip: { setter: 'setKorgClip', format: v => `${(v*100).toFixed(0)}%` },
+      korgCrossmod: { setter: 'setKorgCrossmod', format: v => `${(v*100).toFixed(0)}%` },
+      korgQSag: { setter: 'setKorgQSag', format: v => `${(v*100).toFixed(0)}%` },
+      korgSharpness: { setter: 'setKorgSharpness', format: v => `${(v*100).toFixed(0)}%` },
       
       // DevilFish - Envelope
       slideTime: { setter: 'setSlideTime', format: v => v.toFixed(2) },
@@ -552,23 +602,48 @@
       chorusMode: { setter: 'setChorusMode' },
     };
 
+    // Helper to send a param with optional inversion and Korg mirroring
+    function sendParam(id, knobValue) {
+      const config = params[id];
+      if (!config || !db303Synth) return;
+
+      // Inversion: reference app inverts passbandCompensation and resTracking
+      let wasmValue = config.invert ? (1 - knobValue) : knobValue;
+
+      if (typeof db303Synth[config.setter] === 'function') {
+        db303Synth[config.setter](wasmValue);
+      }
+
+      // Korg parameter mirroring (reference sends to BOTH standard + Korg)
+      if (config.mirror) {
+        const mirrorSetterName = 'set' + config.mirror.charAt(0).toUpperCase() + config.mirror.slice(1);
+        let mirrorValue = config.mirrorTransform ? config.mirrorTransform(knobValue) : wasmValue;
+        if (typeof db303Synth[mirrorSetterName] === 'function') {
+          db303Synth[mirrorSetterName](mirrorValue);
+        }
+      }
+
+      // resTracking also sends korgIbiasScale
+      if (id === 'resTracking') {
+        db303Synth.setKorgIbiasScale(0.1 + knobValue * 3.9);
+      }
+    }
+
     function setupSliders() {
       Object.entries(params).forEach(([id, config]) => {
         const slider = document.getElementById(id);
         const display = document.getElementById(id + 'Val');
         if (!slider) return;
-        
+
         slider.disabled = false;
         slider.addEventListener('input', (e) => {
           const value = parseFloat(e.target.value);
           if (display) display.textContent = config.format(value);
-          
-          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-            db303Synth[config.setter](value);
-            log(`${id}: ${config.format(value)}`, 'info');
-          }
+
+          sendParam(id, value);
+          log(`${id}: ${config.format(value)}`, 'info');
         });
-        
+
         // Set initial display
         if (display) display.textContent = config.format(parseFloat(slider.value));
       });
@@ -695,9 +770,22 @@
           setDiodeCharacter: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'diodeCharacter', value: v }),
           setDuffingAmount: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'duffingAmount', value: v }),
           setFilterFmDepth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterFmDepth', value: v }),
+          setStageNLAmount: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'stageNLAmount', value: v }),
+          // Korg mirror params (separate WASM functions)
+          setKorgWarmth: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgWarmth', value: v }),
+          setKorgStiffness: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgStiffness', value: v }),
+          setKorgFilterFm: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgFilterFm', value: v }),
+          setKorgIbiasScale: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgIbiasScale', value: v }),
+          // Korg ladder filter knobs
+          setKorgBite: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgBite', value: v }),
+          setKorgClip: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgClip', value: v }),
+          setKorgCrossmod: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgCrossmod', value: v }),
+          setKorgQSag: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgQSag', value: v }),
+          setKorgSharpness: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'korgSharpness', value: v }),
           setLpBpMix: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lpBpMix', value: v }),
           setFilterTracking: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterTracking', value: v }),
           setFilterSelect: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'filterSelect', value: v }),
+          setOversamplingOrder: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'oversamplingOrder', value: v }),
           setLfoWaveform: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoWaveform', value: v }),
           setLfoRate: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoRate', value: v }),
           setLfoContour: (v) => workletNode.port.postMessage({ type: 'setParameter', paramId: 'lfoContour', value: v }),
@@ -722,7 +810,37 @@
         await audioContext.resume();
         
         log('✓ DB303Synth ready!', 'success');
-        
+
+        // Apply default-preset.xml values (matching db303.pages.dev)
+        log('Applying db303 app startup defaults (ne object)...', 'info');
+        db303Synth.setOversamplingOrder(2);      // 4x oversampling — MUST be first
+        db303Synth.setFilterSelect(1);           // Enhanced filter — MUST be second
+        // Send all defaults using sendParam for proper inversion/mirroring
+        // Values match the `ne` object in db303-index-unmin.js (app startup defaults)
+        const initDefaults = {
+          cutoff: 0.5, resonance: 0.5, envMod: 0.5, decay: 0.4, accent: 0.5,
+          waveform: 0, pulseWidth: 1, subOscGain: 0, subOscBlend: 1,
+          normalDecay: 0.5, accentDecay: 0.1, softAttack: 0, accentSoftAttack: 0.5,
+          passbandCompensation: 0.9, resTracking: 0.7,
+          filterInputDrive: 0, diodeCharacter: 0, duffingAmount: 0,
+          filterFmDepth: 0, lpBpMix: 0, filterTracking: 0, slideTime: 0.17,
+        };
+        // Direct WASM calls for params with special handling
+        for (const [param, val] of Object.entries(initDefaults)) {
+          const cfg = params[param];
+          if (!cfg) continue;
+          let wasmVal = cfg.invert ? (1 - val) : val;
+          db303Synth[cfg.setter](wasmVal);
+          // Korg mirroring
+          if (cfg.mirror) {
+            const mirrorSetter = 'set' + cfg.mirror.charAt(0).toUpperCase() + cfg.mirror.slice(1);
+            let mv = cfg.mirrorTransform ? cfg.mirrorTransform(val) : wasmVal;
+            if (db303Synth[mirrorSetter]) db303Synth[mirrorSetter](mv);
+          }
+          if (param === 'resTracking') db303Synth.setKorgIbiasScale(0.1 + val * 3.9);
+        }
+        log('✓ Default preset applied (diodeCharacter=1, filterInputDrive=0.17, oversampling=4x)', 'success');
+
         // Enable UI
         document.getElementById('playBtn').disabled = false;
         document.getElementById('stopBtn').disabled = false;
@@ -808,8 +926,10 @@
       const paramGroups = {
         // LFO params need LFO rate to be audible
         lfo: ['lfoRate', 'lfoContour', 'lfoPitchDepth', 'lfoPwmDepth', 'lfoFilterDepth'],
-        // Korg filter params need filterSelect=5
-        korg: ['diodeCharacter', 'duffingAmount', 'filterFmDepth'],
+        // Korg filter params need filterSelect=5 (the new knobs)
+        korg: ['korgBite', 'korgClip', 'korgCrossmod', 'korgQSag', 'korgSharpness'],
+        // Nonlinearity params work on all filter modes
+        nonlinearity: ['diodeCharacter', 'duffingAmount', 'filterFmDepth', 'stageNLAmount'],
         // Chorus needs mix > 0
         chorus: ['chorusMix'],
         // Phaser needs mix > 0
@@ -822,6 +942,8 @@
         accent: ['accent', 'accentDecay', 'accentSoftAttack'],
         // Normal (non-accent) envelope params
         normalEnv: ['normalDecay', 'softAttack'],
+        // Key tracking params - need notes across octaves
+        tracking: ['filterTracking', 'resTracking'],
         // Trigger-time params: effect only heard on note attack, need multiple notes
         triggerTime: ['softAttack', 'accentSoftAttack', 'normalDecay', 'accentDecay', 'decay', 'accent', 'envMod'],
       };
@@ -899,14 +1021,15 @@
           log('  (Setting up Korg filter mode for this test)', 'info');
           db303Synth.setFilterSelect(5);
           document.getElementById('filterSelect').value = 5;
-          // Korg params need filter in active range with high resonance
-          db303Synth.setCutoff(0.4);      // Mid-range cutoff
-          db303Synth.setResonance(0.85);  // High resonance to hear character
-          db303Synth.setEnvMod(0.5);      // Some envelope sweep
-          // For Filter FM, we need depth set
-          if (id === 'filterFmDepth') {
-            db303Synth.setFilterFmDepth(0.5);
-          }
+          db303Synth.setCutoff(0.4);
+          db303Synth.setResonance(0.85);
+          db303Synth.setEnvMod(0.5);
+        }
+        if (paramGroups.nonlinearity.includes(id)) {
+          log('  (Testing nonlinearity param - active on all filter modes)', 'info');
+          db303Synth.setCutoff(0.4);
+          db303Synth.setResonance(0.85);
+          db303Synth.setEnvMod(0.5);
         }
         // Chorus tests: need mix > 0
         if (paramGroups.chorus.includes(id) || id === 'chorusMix' || id === 'chorusMode') {
@@ -964,9 +1087,7 @@
             const v = min + (max - min) * (i / steps);
             slider.value = v;
             if (display) display.textContent = config.format(v);
-            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-              db303Synth[config.setter](v);
-            }
+            sendParam(id, v);
             // Wait a tiny bit for param to take effect
             await new Promise(r => setTimeout(r, 20));
             // Play note with appropriate articulation
@@ -989,9 +1110,7 @@
             if (display) display.textContent = config.format(v);
             
             // CRITICAL: Set param while NOTE IS OFF to avoid glitches
-            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-              db303Synth[config.setter](v);
-            }
+            sendParam(id, v);
             log(`    Step ${i+1}/${steps+1}: ${config.format(v)} - settling...`, 'info');
             
             // Wait for param to stabilize in DSP
@@ -1031,9 +1150,7 @@
           const newValue = min + (max - min) * 0.8;
           slider.value = newValue;
           if (display) display.textContent = config.format(newValue);
-          if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-            db303Synth[config.setter](newValue);
-          }
+          sendParam(id, newValue);
           log(`  Changed ${id} to ${config.format(newValue)}, playing octaves again...`, 'info');
           
           for (let octave = 0; octave < octaveNotes.length; octave++) {
@@ -1057,9 +1174,7 @@
             const v = min + (max - min) * (i / steps);
             slider.value = v;
             if (display) display.textContent = config.format(v);
-            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-              db303Synth[config.setter](v);
-            }
+            sendParam(id, v);
             await new Promise(r => setTimeout(r, delay));
           }
           
@@ -1069,9 +1184,7 @@
             const v = min + (max - min) * (i / steps);
             slider.value = v;
             if (display) display.textContent = config.format(v);
-            if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-              db303Synth[config.setter](v);
-            }
+            sendParam(id, v);
             await new Promise(r => setTimeout(r, delay));
           }
           
@@ -1083,10 +1196,8 @@
         // Restore original value
         slider.value = originalValue;
         if (display) display.textContent = config.format(originalValue);
-        if (db303Synth && typeof db303Synth[config.setter] === 'function') {
-          db303Synth[config.setter](originalValue);
-        }
-        
+        sendParam(id, originalValue);
+
         // Reset parent params after testing to avoid affecting next tests
         if (paramGroups.lfo.includes(id)) {
           db303Synth.setLfoRate(0);
@@ -1094,8 +1205,8 @@
           db303Synth.setLfoFilterDepth(0);
         }
         if (paramGroups.korg.includes(id)) {
-          db303Synth.setFilterSelect(0);
-          document.getElementById('filterSelect').value = 0;
+          db303Synth.setFilterSelect(1);
+          document.getElementById('filterSelect').value = 1;
         }
         if (paramGroups.chorus.includes(id)) {
           db303Synth.setChorusMix(0);
