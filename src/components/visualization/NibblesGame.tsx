@@ -947,12 +947,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
             // Worm segments (val 1-15)
             let segmentColor = PALETTE[val] || '#fff';
 
-            // Apply frequency-based colors to worm segments
-            if (val >= 1 && val <= 15) {
-              const isPlayer2 = val === 7; // P2 head is 7, P1 head is 6
-              const segmentIndex = getSegmentIndex(x, y, isPlayer2);
-              segmentColor = getFrequencyColor(segmentIndex, val);
-            }
+            // Frequency-based colors disabled - use default PALETTE colors
+            // if (val >= 1 && val <= 15) {
+            //   const isPlayer2 = val === 7; // P2 head is 7, P1 head is 6
+            //   const segmentIndex = getSegmentIndex(x, y, isPlayer2);
+            //   segmentColor = getFrequencyColor(segmentIndex, val);
+            // }
 
             if (grid) {
               ctx.fillStyle = '#000';
