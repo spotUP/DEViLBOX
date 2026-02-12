@@ -14,9 +14,11 @@ import {
   Plus,
   Maximize2,
   Eye,
+  Play,
+  Square,
 } from 'lucide-react';
 import { useArrangementStore } from '@stores/useArrangementStore';
-import { useUIStore } from '@stores';
+import { useUIStore, useTransportStore } from '@stores';
 import type { ArrangementToolMode } from '@/types/arrangement';
 
 const SNAP_OPTIONS = [
@@ -35,6 +37,8 @@ export const ArrangementToolbar: React.FC = () => {
     view, setPixelsPerRow, setSnapDivision, setFollowPlayback,
     zoomToFit, addTrack,
   } = useArrangementStore();
+
+  const { isPlaying, togglePlayPause, stop } = useTransportStore();
 
   const handleZoomIn = () => setPixelsPerRow(Math.min(32, view.pixelsPerRow * 1.5));
   const handleZoomOut = () => setPixelsPerRow(Math.max(0.5, view.pixelsPerRow / 1.5));
@@ -69,6 +73,30 @@ export const ArrangementToolbar: React.FC = () => {
         <option value="tracker">Tracker</option>
         <option value="arrangement">Arrangement</option>
       </select>
+
+      <div className="w-px h-5 bg-dark-border" />
+
+      {/* Transport Controls */}
+      <div className="flex items-center gap-1">
+        <button
+          className={`p-1.5 rounded text-xs transition-colors ${
+            isPlaying
+              ? 'bg-green-600 text-white'
+              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary'
+          }`}
+          onClick={togglePlayPause}
+          title="Play/Pause (Space)"
+        >
+          <Play size={14} fill={isPlaying ? 'currentColor' : 'none'} />
+        </button>
+        <button
+          className="p-1.5 rounded bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary"
+          onClick={stop}
+          title="Stop (Space when playing)"
+        >
+          <Square size={14} />
+        </button>
+      </div>
 
       <div className="w-px h-5 bg-dark-border" />
 
