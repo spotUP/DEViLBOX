@@ -49,6 +49,11 @@ const SCORE_MULTIPLIER_DISPLAY_MS = 500;
 // Grid rendering
 const GRID_CELL_PADDING = 2;
 
+// Particle effects
+const PARTICLE_COUNT = 8;
+const PARTICLE_LIFE_DECAY = 0.02;
+const PARTICLE_GRAVITY = 0.1;
+
 // Colors matching FT2 bmpCustomPalette
 const PALETTE = [
   '#000000', // 0: Background
@@ -87,6 +92,16 @@ const TILE_COLORS = [
 ];
 
 type Coord = { x: number; y: number };
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  color: string;
+  size: number;
+}
 
 export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -137,6 +152,9 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
   // Beat-synced food spawning
   const lastBeatSpawnRef = useRef(0);
   const beatFoodQueueRef = useRef(0);
+
+  // Particle effects
+  const particlesRef = useRef<Particle[]>([]);
 
   // Refs for core game logic (to keep the loop stable)
   const levelRef = useRef(0);
@@ -343,6 +361,29 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
 
     if (!surround) spawnFood();
   }, [numPlayers, surround, spawnFood]);
+
+  // Update and render particles
+  const updateAndRenderParticles = useCallback((ctx: CanvasRenderingContext2D, cellSize: number, offsetX: number, offsetY: number) => {
+    particlesRef.current = particlesRef.current.filter(p => {
+      // Update position
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= PARTICLE_LIFE_DECAY;
+      p.vy += PARTICLE_GRAVITY;
+
+      // Render
+      if (p.life > 0) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        const px = offsetX + p.x * cellSize;
+        const py = offsetY + p.y * cellSize;
+        ctx.fillRect(px - p.size / 2, py - p.size / 2, p.size, p.size);
+        ctx.globalAlpha = 1;
+      }
+
+      return p.life > 0;
+    });
+  }, []);
 
   // Handle Game Over
   // Render music-reactive background tiles
@@ -577,6 +618,23 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       }
 
       lastEatTimeRef.current = now;
+
+      // Spawn particles (we'll calculate cellSize in render, store positions in grid coords)
+      const centerX = nextP1.x;
+      const centerY = nextP1.y;
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const angle = (Math.PI * 2 * i) / PARTICLE_COUNT;
+        const speed = 2 + Math.random() * 3;
+        particlesRef.current.push({
+          x: centerX,
+          y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          color: PALETTE[12], // Yellow
+          size: 3 + Math.random() * 3,
+        });
+      }
     }
 
     if (nextP2) {
@@ -600,6 +658,23 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
         }
 
         lastEatTimeRef.current = now;
+
+        // Spawn particles
+        const centerX = nextP2.x;
+        const centerY = nextP2.y;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const angle = (Math.PI * 2 * i) / PARTICLE_COUNT;
+          const speed = 2 + Math.random() * 3;
+          particlesRef.current.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            color: PALETTE[12], // Yellow
+            size: 3 + Math.random() * 3,
+          });
+        }
       }
     }
 
@@ -823,6 +898,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
           }
         }
       }
+
+      // Update and render particles
+      updateAndRenderParticles(ctx, cellSize, offsetX, offsetY);
+
       renderFrameId = requestAnimationFrame(render);
     };
     renderFrameId = requestAnimationFrame(render);
@@ -830,7 +909,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 100, onExit }
       isRunning = false;
       if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
     };
-  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles]);
+  }, [grid, surround, gridGlowIntensity, wormPulseScale, uiState.showMenu, uiState.showHighScores, renderBackgroundTiles, updateAndRenderParticles]);
 
   // Initial Level Load (only once on mount)
   useEffect(() => {
