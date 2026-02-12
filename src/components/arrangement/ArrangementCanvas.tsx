@@ -182,6 +182,7 @@ export const ArrangementCanvas: React.FC = () => {
       clipRendererRef.current.render(
         ctx, vp, state.clips, state.tracks, visibleEntries, patterns,
         state.selectedClipIds, rs.ghostClips.length > 0 ? rs.ghostClips : null,
+        state.playbackRow, transport.isPlaying,
       );
 
       // 4. Automation curves

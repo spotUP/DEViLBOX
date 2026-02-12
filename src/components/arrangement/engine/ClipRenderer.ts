@@ -58,6 +58,8 @@ export class ClipRenderer {
     patterns: Pattern[],
     selectedClipIds: Set<string>,
     ghostClips: ArrangementClip[] | null,
+    playbackRow?: number,
+    isPlaying?: boolean,
   ): void {
     const trackMap = new Map(tracks.map(t => [t.id, t]));
     const entryMap = new Map(entries.map(e => [e.trackId, e]));
@@ -79,7 +81,8 @@ export class ClipRenderer {
       if (clipEnd < range.startRow || clip.startRow > range.endRow) continue;
 
       const selected = selectedClipIds.has(clip.id);
-      this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, selected, false);
+      const isActive = isPlaying && playbackRow !== undefined && playbackRow >= clip.startRow && playbackRow < clipEnd;
+      this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, selected, false, isActive, playbackRow);
     }
 
     // Draw ghost clips (drag preview)
@@ -92,7 +95,7 @@ export class ClipRenderer {
 
         const pattern = patternMap.get(clip.patternId);
         const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
-        this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, false, true);
+        this.drawClip(ctx, vp, clip, track, entry, pattern, clipLen, false, true, false);
       }
     }
   }
@@ -107,6 +110,8 @@ export class ClipRenderer {
     clipLen: number,
     selected: boolean,
     ghost: boolean,
+    isActive: boolean = false,
+    playbackRow?: number,
   ): void {
     const x = vp.rowToPixelX(clip.startRow) + CLIP_PADDING;
     const y = vp.trackYToScreenY(entry.y) + CLIP_PADDING;
@@ -206,6 +211,36 @@ export class ClipRenderer {
       // Label text
       ctx.fillStyle = clip.muted ? '#ffffff55' : '#ffffffee';
       ctx.fillText(label, x + 4, y + HEADER_BAR_HEIGHT + 2, maxLabelWidth);
+    }
+
+    // Active clip playback feedback (progress bar + glow)
+    if (isActive && playbackRow !== undefined && !ghost) {
+      const progress = (playbackRow - clip.startRow) / clipLen;
+      const progressX = x + (w * progress);
+
+      // Subtle fill up to playback position
+      ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},0.2)`;
+      ctx.fillRect(x, y, progressX - x, h);
+
+      // Glowing vertical line at playback position
+      const glowGrad = ctx.createLinearGradient(progressX - 4, y, progressX + 4, y);
+      glowGrad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+      glowGrad.addColorStop(0.5, `rgba(${Math.min(255, rgb.r + 60)},${Math.min(255, rgb.g + 60)},${Math.min(255, rgb.b + 60)},0.8)`);
+      glowGrad.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(progressX - 4, y, 8, h);
+
+      // Bright center line
+      ctx.strokeStyle = `rgba(255,255,255,0.9)`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(progressX, y);
+      ctx.lineTo(progressX, y + h);
+      ctx.stroke();
+
+      // Enhanced top bar for active clips
+      ctx.fillStyle = `rgba(255,255,255,0.15)`;
+      ctx.fillRect(x, y, w, HEADER_BAR_HEIGHT);
     }
 
     // Muted overlay
