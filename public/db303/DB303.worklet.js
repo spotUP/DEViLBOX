@@ -7,7 +7,7 @@
  */
 
 // Performance: Disable note event logging (causes severe slowdown if true)
-const DEBUG_NOTE_EVENTS = true;
+const DEBUG_NOTE_EVENTS = false;
 
 class DB303Processor extends AudioWorkletProcessor {
   constructor() {
@@ -22,10 +22,19 @@ class DB303Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.currentNote = -1; // Track currently held note for slide logic
+    this.slideNotes = new Set(); // Track orphaned notes from slide sequences
     this.pendingMessages = []; // Queue messages received before WASM init completes
     this.initializing = false;
     this.eventQueue = []; // Queue for sample-accurate events
-    
+    this.lastPeakL = 0; // Track peak from actual process() output
+    this.processPath = 'unknown'; // Which process branch is used
+
+    // Shadow state: track values sent to WASM setters (since getParameter may not exist)
+    this.paramState = {
+      cutoff: 0.5, resonance: 0.5, envMod: 0.5, decay: 0.3,
+      accent: 0.5, volume: 0.8, waveform: 0, tuning: 0.5
+    };
+
     // Parameter smoothing for glitch-sensitive params (delay time, etc.)
     // Rate is per audio block (~128 samples = 2.9ms at 44.1kHz)
     // Higher rate = faster response, lower rate = smoother
@@ -103,6 +112,7 @@ class DB303Processor extends AudioWorkletProcessor {
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] ALL NOTES OFF');
           this.synth.allNotesOff();
           this.currentNote = -1;
+          this.slideNotes.clear();
           this.eventQueue = [];
         }
         break;
@@ -225,6 +235,11 @@ class DB303Processor extends AudioWorkletProcessor {
               }
             }
             
+            // Track value in shadow state for diagnostics
+            if (data.paramId in this.paramState) {
+              this.paramState[data.paramId] = numericValue;
+            }
+
             // Use smoothing for glitch-sensitive parameters
             if (this.smoothedParams[data.paramId]) {
               this.smoothedParams[data.paramId].target = numericValue;
@@ -285,25 +300,33 @@ class DB303Processor extends AudioWorkletProcessor {
       case 'getDiagnostics':
         if (this.synth) {
           try {
-            var peak = 0;
-            if (this.outputBufferL) {
-              for (var di = 0; di < this.bufferSize; di++) {
-                var abs = Math.abs(this.outputBufferL[di] || 0);
-                if (abs > peak) peak = abs;
-              }
+            // Use lastPeakL captured during actual process() calls
+            const peak = this.lastPeakL;
+            this.lastPeakL = 0; // Reset for next measurement window
+
+            // Use shadow state (paramState) since WASM may not have getParameter()
+            const ps = this.paramState;
+
+            // Enumerate methods including prototype (Emscripten classes use prototype)
+            const methods = [];
+            for (const k in this.synth) {
+              if (typeof this.synth[k] === 'function') methods.push(k);
             }
+
             this.port.postMessage({
               type: 'diagnostics',
-              cutoff: this.synth.getParameter(2),
-              resonance: this.synth.getParameter(3),
-              envMod: this.synth.getParameter(4),
-              decay: this.synth.getParameter(5),
-              accent: this.synth.getParameter(6),
-              waveform: this.synth.getParameter(0),
-              volume: this.synth.getParameter(7),
+              cutoff: ps.cutoff,
+              resonance: ps.resonance,
+              envMod: ps.envMod,
+              decay: ps.decay,
+              accent: ps.accent,
+              waveform: ps.waveform,
+              volume: ps.volume,
               peakAmplitude: peak,
               currentNote: this.currentNote,
-              initialized: this.initialized
+              initialized: this.initialized,
+              processPath: this.processPath,
+              wasmMethods: methods.join(',')
             });
           } catch (e) {
             this.port.postMessage({ type: 'diagnostics', error: e.message });
@@ -324,22 +347,26 @@ class DB303Processor extends AudioWorkletProcessor {
     switch (data.type) {
       case 'noteOn':
         if (!data.slide && this.currentNote >= 0) {
-          if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: allNotesOff() then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
-          // Use allNotesOff instead of noteOff(currentNote) to clear orphan notes
-          // left in the WASM noteList by slides. During slides, noteOn is called
-          // without noteOff, so previous notes accumulate. If we only noteOff the
-          // currentNote, slide-source notes remain orphaned and degrade audio output.
-          this.synth.allNotesOff();
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] TRIGGER: noteOff(' + this.currentNote + ') then noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
+          // Use noteOff (NOT allNotesOff) to allow proper envelope release.
+          // allNotesOff hard-kills all state, destroying filter character.
+          // The reference site uses simple noteOn/noteOff pairs.
+          // Clean up any slide-orphaned notes first, then release current.
+          for (const orphan of this.slideNotes) {
+            if (orphan !== this.currentNote) {
+              this.synth.noteOff(orphan);
+            }
+          }
+          this.slideNotes.clear();
+          this.synth.noteOff(this.currentNote);
         } else if (data.slide && this.currentNote >= 0) {
-          // FIX: Skip noteOn entirely for same-pitch slides
-          // When sliding to the same pitch, just sustain the note without any WASM call.
-          // This prevents artifacts from calling noteOn for an already-playing note.
           if (data.note === this.currentNote) {
             if (DEBUG_NOTE_EVENTS) console.log('[DB303] SAME-PITCH SLIDE: sustaining note ' + this.currentNote + ' (no WASM call) at ' + currentTime.toFixed(3));
-            // Gate stays high, pitch stays same, no action needed
             return;
           }
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] SLIDE: noteOn(' + data.note + ') over held note ' + this.currentNote + ' vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
+          // Track slide-source notes so we can clean them up later
+          this.slideNotes.add(this.currentNote);
         } else {
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] FIRST NOTE: noteOn(' + data.note + ') vel=' + data.velocity + ' at ' + currentTime.toFixed(3));
         }
@@ -351,14 +378,21 @@ class DB303Processor extends AudioWorkletProcessor {
           if (DEBUG_NOTE_EVENTS) console.log('[DB303] RELEASE: noteOff(' + data.note + ') at ' + currentTime.toFixed(3));
           this.synth.noteOff(data.note);
           this.currentNote = -1;
+          this.slideNotes.clear();
         }
         break;
       case 'gateOff':
-        // Use allNotesOff to clear the entire noteList - during slides, multiple notes
-        // accumulate in the WASM noteList, so we need to clear them all
+        // Release current note with proper noteOff (allows envelope release)
+        // then clean up any slide-orphaned notes
         if (this.currentNote >= 0) {
-          if (DEBUG_NOTE_EVENTS) console.log('[DB303] GATE OFF: allNotesOff() at ' + currentTime.toFixed(3));
-          this.synth.allNotesOff();
+          if (DEBUG_NOTE_EVENTS) console.log('[DB303] GATE OFF: noteOff(' + this.currentNote + ') at ' + currentTime.toFixed(3));
+          this.synth.noteOff(this.currentNote);
+          for (const orphan of this.slideNotes) {
+            if (orphan !== this.currentNote) {
+              this.synth.noteOff(orphan);
+            }
+          }
+          this.slideNotes.clear();
           this.currentNote = -1;
         }
         break;
@@ -651,21 +685,29 @@ class DB303Processor extends AudioWorkletProcessor {
       // Render audio sub-block
       if (samplesToProcess > 0) {
         if (typeof this.synth.process === 'function' && typeof this.synth.getOutputBufferPtr === 'function') {
+          this.processPath = 'getOutputBufferPtr';
           this.synth.process(samplesToProcess);
           const outputPtr = this.synth.getOutputBufferPtr();
           const ptrIndex = outputPtr >> 2;
-          
+
           for (let i = 0; i < samplesToProcess; i++) {
-            outputL[processedSamples + i] = heapF32[ptrIndex + i * 2];
+            const sL = heapF32[ptrIndex + i * 2];
+            outputL[processedSamples + i] = sL;
             outputR[processedSamples + i] = heapF32[ptrIndex + i * 2 + 1];
+            const absL = sL < 0 ? -sL : sL;
+            if (absL > this.lastPeakL) this.lastPeakL = absL;
           }
         } else {
+          this.processPath = 'outputPtr';
           this.updateBufferViews();
           if (this.outputBufferL && this.outputBufferR) {
             this.synth.process(this.outputPtrL, this.outputPtrR, samplesToProcess);
             for (let i = 0; i < samplesToProcess; i++) {
-              outputL[processedSamples + i] = this.outputBufferL[i];
+              const sL = this.outputBufferL[i];
+              outputL[processedSamples + i] = sL;
               outputR[processedSamples + i] = this.outputBufferR[i];
+              const absL = sL < 0 ? -sL : sL;
+              if (absL > this.lastPeakL) this.lastPeakL = absL;
             }
           }
         }

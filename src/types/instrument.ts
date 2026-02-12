@@ -278,7 +278,8 @@ export interface DevilFishConfig {
   // Audio quality
   oversamplingOrder?: 0 | 1 | 2 | 3 | 4; // 0=none, 1=2x, 2=4x, 3=8x, 4=16x oversampling
 
-  // Korg/Advanced Filter (exposed when filterSelect = 5 for Korg Ladder)
+  // Korg/Advanced Filter
+  korgEnabled?: boolean;  // Enable/disable Korg filter parameters
   korgBite?: number;      // 0-1 - filter bite/edge character
   korgClip?: number;      // 0-1 - soft clipping amount
   korgCrossmod?: number;  // 0-1 - cross modulation depth
@@ -353,6 +354,7 @@ export interface TB303Config {
 
   // LFO (Low Frequency Oscillator) - for modulation
   lfo?: {
+    enabled?: boolean;         // Enable/disable LFO
     waveform: number;         // 0=triangle, 1=saw up, 2=saw down, 3=square, 4=random(S&H), 5=noise
     rate: number;              // 0-100 (LFO speed/frequency)
     contour: number;           // 0-100 (envelope contour amount)
@@ -2873,10 +2875,12 @@ export const DEFAULT_FILTER: FilterConfig = {
 
 export const DEFAULT_TB303: TB303Config = {
   engineType: 'db303',  // Use db303 engine by default for better sound
-  volume: 0.8,          // 80% volume (safe default)
+  volume: 1.0,          // Reference never calls setVolume — WASM default is 1.0.
+                        // Lower values starve internal nonlinearities, making sound tame.
   oscillator: {
     type: 'sawtooth',   // db303 default: waveform=0 (sawtooth)
-    pulseWidth: 1,      // db303 default: pulseWidth=1 (100% = full square when waveform=1)
+    pulseWidth: 0,      // 0 = 50% duty cycle (true square). Reference default is 1 (99% thin pulse)
+                        // but we use 0 so SAW/SQR toggle produces a proper square wave.
     subOscGain: 0,      // db303 default: subOscGain=0
     subOscBlend: 1,     // db303 default: subOscBlend=1 (100% blend)
   },
@@ -2898,25 +2902,28 @@ export const DEFAULT_TB303: TB303Config = {
   overdrive: {
     amount: 0,
   },
-  // Devil Fish parameters - matching db303 defaults exactly (all normalized 0-1)
+  // Devil Fish parameters — always enabled (matching reference db303.pages.dev).
+  // The WASM has no "DF off" mode — it always uses these params internally.
+  // Default values are neutral/clean (no drive, no nonlinearity) = clean 303 sound.
   devilFish: {
     enabled: true,
-    normalDecay: 0.5,            // db303 default: normalDecay=0.5
-    accentDecay: 0.1,            // db303 default: accentDecay=0.1 - SHORTER than normal!
-    softAttack: 0,               // db303 default: softAttack=0
-    accentSoftAttack: 0.5,       // db303 default: accentSoftAttack=0.5
-    passbandCompensation: 0.9,   // db303 default: passbandCompensation=0.9 (90%)
-    resTracking: 0.7,            // db303 default: resTracking=0.7 (70%)
-    filterInputDrive: 0,         // db303 default: filterInputDrive=0
-    filterSelect: 1,             // db303 default: filterSelect=1 (not 0!)
-    diodeCharacter: 0,           // db303 default: diodeCharacter=0
-    duffingAmount: 0,            // db303 default: duffingAmount=0
-    filterFmDepth: 0,            // db303 default: filterFmDepth=0
-    lpBpMix: 0,                  // db303 default: lpBpMix=0
-    filterTracking: 0,           // db303 default: filterTracking=0
-    stageNLAmount: 0,            // db303 default: stageNLAmount=0
-    ensembleAmount: 0,           // db303 default: ensembleAmount=0
-    oversamplingOrder: 2,        // db303 default: oversamplingOrder=2 (4x)
+    normalDecay: 0.5,            // db303 app default: normalDecay=0.5
+    accentDecay: 0.1,            // db303 app default: accentDecay=0.1
+    softAttack: 0,               // db303 app default: softAttack=0
+    accentSoftAttack: 0.5,       // db303 app default: accentSoftAttack=0.5
+    passbandCompensation: 0.9,   // db303 app default: 0.9 (→WASM 0.1, minimal compensation)
+    resTracking: 0.7,            // db303 app default: resTracking=0.7
+    filterInputDrive: 0,         // db303 app default: filterInputDrive=0 (clean)
+    filterSelect: 1,             // db303 app default: filterSelect=1
+    diodeCharacter: 0,           // db303 app default: diodeCharacter=0 (clean, no nonlinearity)
+    duffingAmount: 0,            // db303 app default: duffingAmount=0
+    filterFmDepth: 0,            // db303 app default: filterFmDepth=0
+    lpBpMix: 0,                  // db303 app default: lpBpMix=0
+    filterTracking: 0,           // db303 app default: filterTracking=0
+    stageNLAmount: 0,            // db303 app default: stageNLAmount=0
+    ensembleAmount: 0,           // db303 app default: ensembleAmount=0
+    korgEnabled: false,          // Korg filter params off by default
+    oversamplingOrder: 2,        // db303 app default: oversamplingOrder=2 (4x)
     // Required defaults for other Devil Fish parameters
     accentSweepEnabled: true,
     sweepSpeed: 'normal',
@@ -2926,6 +2933,7 @@ export const DEFAULT_TB303: TB303Config = {
     vegSustain: 0,
   },
   lfo: {
+    enabled: false,     // LFO off by default (not standard 303)
     waveform: 0,        // db303 default: lfoWaveform=0 (triangle)
     rate: 0,            // db303 default: lfoRate=0
     contour: 0,         // db303 default: lfoContour=0
@@ -2957,35 +2965,39 @@ export const DEFAULT_TB303: TB303Config = {
 };
 
 /**
- * Default Devil Fish settings matching db303 defaults
- * All values are normalized 0-1 (matching db303.pages.dev)
+ * Default Devil Fish settings matching db303.pages.dev app startup defaults (ne object)
+ * All values are normalized 0-1 knob positions (matching db303.pages.dev)
+ * NOTE: default-preset.xml is a specific sound preset, NOT the app defaults.
  */
 export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
   enabled: true,         // db303 always has Devil Fish enabled
 
-  // Envelope defaults (matching db303 exactly)
-  normalDecay: 0.5,      // db303 default: normalDecay=0.5
-  accentDecay: 0.1,      // db303 default: accentDecay=0.1 - SHORTER than normal!
+  // Envelope defaults (matching db303 app defaults)
+  normalDecay: 0.5,      // db303 app default: normalDecay=0.5
+  accentDecay: 0.1,      // db303 app default: accentDecay=0.1
   accentAttack: 3.0,     // 3ms attack
   vegDecay: 0.5,         // db303 default: vegDecay=0.5
   vegSustain: 0,         // db303 default: vegSustain=0
-  softAttack: 0,         // db303 default: softAttack=0
-  accentSoftAttack: 0.5, // db303 default: accentSoftAttack=0.5
+  softAttack: 0,         // db303 app default: softAttack=0
+  accentSoftAttack: 0.5, // db303 app default: accentSoftAttack=0.5
 
-  // Filter defaults (matching db303 exactly)
-  filterTracking: 0,     // db303 default: filterTracking=0
-  filterFmDepth: 0,      // db303 default: filterFmDepth=0
-  passbandCompensation: 0.9, // db303 default: passbandCompensation=0.9
-  resTracking: 0.7,      // db303 default: resTracking=0.7
-  duffingAmount: 0,      // db303 default: duffingAmount=0
-  lpBpMix: 0,            // db303 default: lpBpMix=0 (100% lowpass)
-  stageNLAmount: 0,      // db303 default: stageNLAmount=0
-  filterSelect: 1,       // db303 default: filterSelect=1 (NOT 0 or 255!)
-  diodeCharacter: 0,     // db303 default: diodeCharacter=0
-  filterInputDrive: 0,   // db303 default: filterInputDrive=0
+  // Filter defaults (matching db303 app defaults)
+  filterTracking: 0,     // db303 app default: filterTracking=0
+  filterFmDepth: 0,      // db303 app default: filterFmDepth=0
+  passbandCompensation: 0.9, // db303 app default: 0.9 (→WASM 0.1, minimal compensation)
+  resTracking: 0.7,      // db303 app default: resTracking=0.7
+  duffingAmount: 0,      // db303 app default: duffingAmount=0
+  lpBpMix: 0,            // db303 app default: lpBpMix=0 (100% lowpass)
+  stageNLAmount: 0,      // db303 app default: stageNLAmount=0
+  filterSelect: 1,       // db303 app default: filterSelect=1
+  diodeCharacter: 0,     // db303 app default: diodeCharacter=0 (clean, no nonlinearity)
+  filterInputDrive: 0,   // db303 app default: filterInputDrive=0 (clean)
 
   // Effects defaults (matching db303 exactly)
   ensembleAmount: 0,     // db303 default: ensembleAmount=0
+
+  // Korg filter defaults (disabled by default)
+  korgEnabled: false,
 
   // Audio quality defaults
   oversamplingOrder: 2,  // db303 default: oversamplingOrder=2 (4x)

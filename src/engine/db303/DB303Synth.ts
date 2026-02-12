@@ -433,12 +433,26 @@ export class DB303Synth implements DevilboxSynth {
       case 'softAttack':    this.setSoftAttack(value); break;
       case 'accentSoftAttack': this.setAccentSoftAttack(value); break;
       case 'filterTracking': this.setFilterTracking(value); break;
-      case 'filterFmDepth': this.setFilterFmDepth(value); break;
+      case 'filterFmDepth':
+        this.setFilterFmDepth(value);
+        this.setKorgFilterFm(value);
+        break;
       case 'filterInputDrive': this.setFilterInputDrive(value); break;
-      case 'passbandCompensation': this.setPassbandCompensation(value); break;
-      case 'resTracking':   this.setResTracking(value); break;
-      case 'diodeCharacter': this.setDiodeCharacter(value); break;
-      case 'duffingAmount': this.setDuffingAmount(value); break;
+      case 'passbandCompensation': this.setPassbandCompensation(1 - value); break;
+      case 'resTracking':
+        this.setResTracking(1 - value);
+        this.setKorgIbiasScale(0.1 + value * 3.9);
+        break;
+      case 'diodeCharacter':
+        this.setDiodeCharacter(value);
+        this.setKorgWarmth(value);
+        break;
+      case 'duffingAmount': {
+        this.setDuffingAmount(value);
+        const stiff = Math.abs(value) < 0.16 ? 0 : ((value > 0 ? 1 : -1) * (Math.abs(value) - 0.16)) / 0.84;
+        this.setKorgStiffness(stiff);
+        break;
+      }
       case 'lpBpMix':       this.setLpBpMix(value); break;
       case 'korgBite':      this.setKorgBite(value); break;
       case 'korgClip':      this.setKorgClip(value); break;
@@ -502,6 +516,9 @@ export class DB303Synth implements DevilboxSynth {
     // Send normalized 0-1 value directly - WASM handles ms conversion
     const clamped = Math.max(0, Math.min(1, value));
     this.setParameterByName(DB303Param.DECAY, clamped);
+    // CRITICAL: The WASM uses normalDecay (not decay) for the actual filter envelope.
+    // Without this, the DF normalDecay default (0.5) always overrides the user's decay.
+    this.setParameterByName('normalDecay', clamped);
   }
 
   setAccent(value: number): void {
@@ -546,7 +563,7 @@ export class DB303Synth implements DevilboxSynth {
   // ============================================================================
 
   setLfoWaveform(waveform: number): void {
-    // 0 = sine, 1 = triangle, 2 = square - pass through as is
+    // 0=triangle, 1=saw up, 2=saw down, 3=square, 4=random(S&H), 5=noise
     this.setParameterByName(DB303Param.LFO_WAVEFORM, waveform);
   }
 
@@ -671,6 +688,22 @@ export class DB303Synth implements DevilboxSynth {
   }
 
   // Korg filter advanced parameters (for authentic 303 filter behavior)
+  // These mirror the main filter params but target separate WASM functions
+  setKorgWarmth(value: number): void {
+    // Mirrors diodeCharacter - adds transistor warmth/nonlinearity
+    this.setParameterByName(DB303Param.KORG_WARMTH, value);
+  }
+
+  setKorgStiffness(value: number): void {
+    // Mirrors duffingAmount (after deadzone transform) - adds filter stiffness
+    this.setParameterByName(DB303Param.KORG_STIFFNESS, value);
+  }
+
+  setKorgFilterFm(value: number): void {
+    // Mirrors filterFmDepth - filter frequency modulation
+    this.setParameterByName(DB303Param.KORG_FILTER_FM, value);
+  }
+
   setKorgIbiasScale(value: number): void {
     // Controls resonance tracking bias current scaling
     // db303 web app: 0.1 + resTrackingKnob * 3.9 (range 0.1-4.0)
@@ -953,6 +986,8 @@ export class DB303Synth implements DevilboxSynth {
     }
     // --- Core parameters ---
     if (tb.tuning !== undefined) this.setTuning(tb.tuning);
+    // Volume: reference never sets volume (WASM default is natural level).
+    // Default is 1.0 — lower values attenuate but user should still have control.
     if (tb.volume !== undefined) this.setVolume(tb.volume);
 
     // Filter (all 0-1)
@@ -994,47 +1029,81 @@ export class DB303Synth implements DevilboxSynth {
       if (tb.oscillator.pitchToPw !== undefined) this.setPitchToPw(tb.oscillator.pitchToPw);
     }
 
-    // --- Devil Fish modifications ---
+    // --- MOJO: Filter character params (always active, independent of Devil Fish toggle) ---
+    // The reference site always has these active. enableDevilFish() is a no-op in WASM —
+    // there's no real toggle. The WASM always uses whatever params are set.
     const df = tb.devilFish;
-    if (df?.enabled) {
+    if (df) {
       this.enableDevilFish(true);
-      if (df.normalDecay !== undefined) this.setNormalDecay(df.normalDecay);
-      if (df.accentDecay !== undefined) this.setAccentDecay(df.accentDecay);
-      if (df.softAttack !== undefined) this.setSoftAttack(df.softAttack);
-      if (df.accentSoftAttack !== undefined) this.setAccentSoftAttack(df.accentSoftAttack);
+      // CRITICAL: Reference sets oversamplingOrder FIRST (line 2355 of db303-index-unmin.js),
+      // then filterSelect (line 2358), before any other params. Changing oversampling rate
+      // may reinitialize internal DSP state, so all filter params must come AFTER.
+      if (df.oversamplingOrder !== undefined) this.setOversamplingOrder(df.oversamplingOrder);
+      if (df.filterSelect !== undefined) this.setFilterSelect(df.filterSelect);
+
+      // MOJO params — filter character shaping, always sent
       if (df.filterTracking !== undefined) this.setFilterTracking(df.filterTracking);
-      if (df.filterFmDepth !== undefined) this.setFilterFmDepth(df.filterFmDepth);
+      if (df.filterFmDepth !== undefined) {
+        this.setFilterFmDepth(df.filterFmDepth);
+        this.setKorgFilterFm(df.filterFmDepth);
+      }
       if (df.filterInputDrive !== undefined) this.setFilterInputDrive(df.filterInputDrive);
-      // passbandCompensation: db303 web app inverts knob value before sending to engine
       if (df.passbandCompensation !== undefined) this.setPassbandCompensation(1 - df.passbandCompensation);
-      // resTracking: knob position → engine needs inverted + korgIbiasScale formula
       if (df.resTracking !== undefined) {
         this.setResTracking(1 - df.resTracking);
         this.setKorgIbiasScale(0.1 + df.resTracking * 3.9);
       }
-      if (df.duffingAmount !== undefined) this.setDuffingAmount(df.duffingAmount);
+      if (df.duffingAmount !== undefined) {
+        this.setDuffingAmount(df.duffingAmount);
+        const da = df.duffingAmount;
+        const stiffness = Math.abs(da) < 0.16 ? 0 : ((da > 0 ? 1 : -1) * (Math.abs(da) - 0.16)) / 0.84;
+        this.setKorgStiffness(stiffness);
+      }
       if (df.lpBpMix !== undefined) this.setLpBpMix(df.lpBpMix);
-      if (df.filterSelect !== undefined) this.setFilterSelect(df.filterSelect);
-      if (df.diodeCharacter !== undefined) this.setDiodeCharacter(df.diodeCharacter);
+      if (df.diodeCharacter !== undefined) {
+        this.setDiodeCharacter(df.diodeCharacter);
+        this.setKorgWarmth(df.diodeCharacter);
+      }
       if (df.stageNLAmount !== undefined) this.setStageNLAmount(df.stageNLAmount);
       if (df.ensembleAmount !== undefined) this.setEnsembleAmount(df.ensembleAmount);
-      if (df.oversamplingOrder !== undefined) this.setOversamplingOrder(df.oversamplingOrder);
-      // Korg filter parameters
+    }
+
+    // --- Devil Fish envelope mods (only when DF toggle is ON) ---
+    if (df?.enabled) {
+      // normalDecay: DO NOT set here. setDecay() already syncs normalDecay
+      // to match the core decay value.
+      if (df.accentDecay !== undefined) this.setAccentDecay(df.accentDecay);
+      if (df.softAttack !== undefined) this.setSoftAttack(df.softAttack);
+      if (df.accentSoftAttack !== undefined) this.setAccentSoftAttack(df.accentSoftAttack);
+      if (df.muffler !== undefined) this.setMuffler(df.muffler);
+      if (df.sweepSpeed !== undefined) this.setSweepSpeed(df.sweepSpeed);
+      if (df.highResonance !== undefined) this.setHighResonanceEnabled(df.highResonance);
+    } else if (df) {
+      // Reset only the DF envelope mods to neutral when disabled
+      this.setAccentDecay(0.1);
+      this.setSoftAttack(0);
+      this.setAccentSoftAttack(0.5);
+    }
+
+    // --- Korg filter parameters (independent of Devil Fish mode) ---
+    if (df?.korgEnabled) {
       if (df.korgBite !== undefined) this.setKorgBite(df.korgBite);
       if (df.korgClip !== undefined) this.setKorgClip(df.korgClip);
       if (df.korgCrossmod !== undefined) this.setKorgCrossmod(df.korgCrossmod);
       if (df.korgQSag !== undefined) this.setKorgQSag(df.korgQSag);
       if (df.korgSharpness !== undefined) this.setKorgSharpness(df.korgSharpness);
-      if (df.muffler !== undefined) this.setMuffler(df.muffler);
-      if (df.sweepSpeed !== undefined) this.setSweepSpeed(df.sweepSpeed);
-      if (df.highResonance !== undefined) this.setHighResonanceEnabled(df.highResonance);
     } else if (df) {
-      this.enableDevilFish(false);
+      // Reset Korg filter params to neutral when disabled
+      this.setKorgBite(0);
+      this.setKorgClip(0);
+      this.setKorgCrossmod(0);
+      this.setKorgQSag(0);
+      this.setKorgSharpness(0.5);
     }
 
     // --- LFO ---
     const lfo = tb.lfo;
-    if (lfo) {
+    if (lfo?.enabled) {
       if (lfo.waveform !== undefined) this.setLfoWaveform(lfo.waveform);
       if (lfo.rate !== undefined) this.setLfoRate(lfo.rate);
       if (lfo.contour !== undefined) this.setLfoContour(lfo.contour);
@@ -1042,6 +1111,13 @@ export class DB303Synth implements DevilboxSynth {
       if (lfo.pwmDepth !== undefined) this.setLfoPwmDepth(lfo.pwmDepth);
       if (lfo.filterDepth !== undefined) this.setLfoFilterDepth(lfo.filterDepth);
       if (lfo.stiffDepth !== undefined) this.setLfoStiffDepth(lfo.stiffDepth);
+    } else {
+      // Reset LFO depths to zero when disabled
+      this.setLfoRate(0);
+      this.setLfoPitchDepth(0);
+      this.setLfoPwmDepth(0);
+      this.setLfoFilterDepth(0);
+      this.setLfoStiffDepth(0);
     }
 
     // --- Built-in effects (all WASM-internal) ---
