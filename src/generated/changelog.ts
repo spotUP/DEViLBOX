@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T18:31:46.030Z
+ * Generated: 2026-02-12T19:09:53.331Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '426';
-export const BUILD_HASH = 'd21bb32';
+export const BUILD_NUMBER = '428';
+export const BUILD_HASH = '46195bf';
 export const BUILD_DATE = '2026-02-12';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-12',
     changes: [
+      {
+        type: 'feature',
+        "description": "Arrangement view, piano roll canvas engine, DB303 param wiring fixes"
+      },
+      {
+        type: 'feature',
+        "description": "ROM auto-load status + upload dialog for MAME synths"
+      },
       {
         type: 'fix',
         "description": "Route TrackerReplayer through master effects chain"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Bridge native DevilboxSynths into Tone.js effect chains"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up SurgeControls component"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up VitalControls component"
       }
     ]
   }
