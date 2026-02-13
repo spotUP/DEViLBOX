@@ -975,6 +975,24 @@ export class DB303Synth implements DevilboxSynth {
    * Called by both InstrumentFactory (init) and useInstrumentStore (runtime updates).
    */
   applyConfig(tb: TB303Config): void {
+    // Always log critical params so we can verify correct values reach WASM
+    const df = tb.devilFish;
+    console.log('[DB303:applyConfig] CRITICAL PARAMS (app state → WASM):', {
+      filterSelect: df?.filterSelect,
+      accentDecay: df?.accentDecay,
+      normalDecay: df?.normalDecay,
+      accentSoftAttack: df?.accentSoftAttack,
+      filterInputDrive: df?.filterInputDrive,
+      diodeCharacter: df?.diodeCharacter,
+      duffingAmount: df?.duffingAmount,
+      'passbandComp (app→WASM)': `${df?.passbandCompensation} → ${df?.passbandCompensation !== undefined ? 1 - df.passbandCompensation : '?'}`,
+      'resTracking (app→WASM)': `${df?.resTracking} → ${df?.resTracking !== undefined ? 1 - df.resTracking : '?'}`,
+      cutoff: tb.filter?.cutoff,
+      resonance: tb.filter?.resonance,
+      envMod: tb.filterEnvelope?.envMod,
+      decay: tb.filterEnvelope?.decay,
+      accent: tb.accent?.amount,
+    });
     if (db303TraceEnabled()) {
       const keys = Object.keys(tb).filter(k => (tb as unknown as Record<string, unknown>)[k] !== undefined);
       console.log('[DB303:applyConfig]', keys);
@@ -1038,7 +1056,6 @@ export class DB303Synth implements DevilboxSynth {
     // --- MOJO: Filter character params (always active, independent of Devil Fish toggle) ---
     // The reference site always has these active. enableDevilFish() is a no-op in WASM —
     // there's no real toggle. The WASM always uses whatever params are set.
-    const df = tb.devilFish;
     if (df) {
       this.enableDevilFish(true);
       // CRITICAL: Reference sets oversamplingOrder FIRST (line 2355 of db303-index-unmin.js),

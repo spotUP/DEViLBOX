@@ -12,20 +12,22 @@
 
 import type { InstrumentPreset } from '@typedefs/instrument';
 
-/** Shared Devil Fish defaults matching the `ne` object from db303-index-unmin.js */
+/** Shared Devil Fish defaults matching db303-local/default-preset.xml
+ *  (the reference app loads this XML on init via loadDefaults → fetch("presets/default-preset.xml"))
+ */
 const DF_DEFAULTS = {
   enabled: true,
   oversamplingOrder: 2 as const,  // 4x oversampling — MUST be set (type: 0|1|2|3|4)
-  filterSelect: 1,                // Enhanced diode ladder
-  normalDecay: 0.5,
-  accentDecay: 0.1,
-  softAttack: 0,
-  accentSoftAttack: 0.5,
-  passbandCompensation: 0.9,      // 0.9 knob → WASM 0.1 = minimal compensation = more resonance peak
-  resTracking: 0.7,
-  filterInputDrive: 0,
-  diodeCharacter: 0,
-  duffingAmount: 0,
+  filterSelect: 0,                // 0=DiodeLadder (only valid: 0 or 5=Korg). Reference init uses 0.
+  normalDecay: 0.164,             // default-preset.xml: 0.164
+  accentDecay: 0.006,             // default-preset.xml: 0.006 — CRITICAL for acid screams
+  softAttack: 0,                  // default-preset.xml: 0
+  accentSoftAttack: 0.1,          // default-preset.xml: 0.1
+  passbandCompensation: 0.09,     // default-preset.xml: 0.09. App inverts → WASM 0.91
+  resTracking: 0.257,             // default-preset.xml: 0.743 (inverted on read: 1-0.743=0.257). App inverts → WASM 0.743
+  filterInputDrive: 0.169,        // default-preset.xml: 0.169 (subtle warmth)
+  diodeCharacter: 1,              // default-preset.xml: 1 (nonlinear character)
+  duffingAmount: 0.03,            // default-preset.xml: 0.03 (subtle saturation)
   filterFmDepth: 0,
   lpBpMix: 0,
   filterTracking: 0,
@@ -41,7 +43,7 @@ const DF_DEFAULTS = {
 
 export const TB303_PRESETS: InstrumentPreset['config'][] = [
   // === DEFAULT PRESET ===
-  // Matches db303.pages.dev startup defaults (ne object, NOT default-preset.xml)
+  // Matches db303-local/default-preset.xml (reference loads XML on init)
   {
     type: 'synth' as const,
     name: 'DB303 Default',
@@ -49,16 +51,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     tb303: {
       engineType: 'db303',
       volume: 1.0,
-      oscillator: { type: 'sawtooth', pulseWidth: 1, subOscGain: 0, subOscBlend: 1 },
+      oscillator: { type: 'sawtooth', pulseWidth: 0, subOscGain: 0, subOscBlend: 1 },
       filter: { cutoff: 0.5, resonance: 0.5 },
-      filterEnvelope: { envMod: 0.5, decay: 0.4 },
+      filterEnvelope: { envMod: 0.5, decay: 0.5 },
       accent: { amount: 0.5 },
       slide: { time: 0.17, mode: 'exponential' },
       devilFish: { ...DF_DEFAULTS },
       lfo: { waveform: 0, rate: 0, contour: 0, pitchDepth: 0, pwmDepth: 0, filterDepth: 0 },
       chorus: { enabled: false, mode: 0, mix: 0.5 },
       phaser: { enabled: false, rate: 0.5, depth: 0.7, feedback: 0, mix: 0 },
-      delay: { enabled: false, time: 0.5, feedback: 0, tone: 0.5, mix: 0, stereo: 0.75 },
+      delay: { enabled: false, time: 3, feedback: 0.3, tone: 0.5, mix: 0, stereo: 0.5 },
     },
     effects: [],
     volume: 0,
@@ -97,7 +99,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.15,   // Slight drive into filter for grit
-        normalDecay: 0.4,
+        normalDecay: 0.2,         // Snappier than default for squelch
       },
     },
     effects: [],
@@ -149,18 +151,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     tb303: {
       volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.7, resonance: 0.92 },
+      filter: { cutoff: 0.35, resonance: 0.92 },       // Low cutoff → envelope sweeps UP = scream
       filterEnvelope: { envMod: 0.95, decay: 0.4 },
       accent: { amount: 1.0 },
       slide: { time: 0.1, mode: 'exponential' },
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.4,    // Drive into filter = saturation before resonance
-        diodeCharacter: 0.25,     // Slight diode nonlinearity for extra grit
         duffingAmount: 0.3,       // Nonlinear stiffness adds harmonics
-        normalDecay: 0.35,        // Snappier decay
-        accentDecay: 0.15,
-        passbandCompensation: 0.95, // → WASM 0.05 = almost no compensation = maximum resonance peak
+        normalDecay: 0.15,        // Very snappy normal decay
+        accentDecay: 0.003,       // ULTRA fast accent decay = acid scream
       },
     },
     effects: [],
@@ -176,14 +176,14 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     tb303: {
       volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.65, resonance: 0.8 },
+      filter: { cutoff: 0.5, resonance: 0.8 },
       filterEnvelope: { envMod: 0.75, decay: 0.45 },
       accent: { amount: 0.95 },
       slide: { time: 0.08, mode: 'exponential' },
       devilFish: {
         ...DF_DEFAULTS,
-        normalDecay: 0.2,
-        accentDecay: 0.1,
+        normalDecay: 0.12,
+        accentDecay: 0.015,       // Fast accent decay for chaotic sweeps
         softAttack: 0.05,
         filterTracking: 0.6,
         filterFmDepth: 0.5,       // Filter FM for chaotic modulation
@@ -204,18 +204,16 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     tb303: {
       volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.6, resonance: 0.88 },
+      filter: { cutoff: 0.4, resonance: 0.88 },
       filterEnvelope: { envMod: 0.9, decay: 0.35 },
       accent: { amount: 0.95 },
       slide: { time: 0.12, mode: 'exponential' },
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.5,    // Heavy drive
-        diodeCharacter: 0.15,
         duffingAmount: 0.2,
-        normalDecay: 0.3,
-        accentDecay: 0.12,
-        passbandCompensation: 0.95, // Max resonance peak
+        normalDecay: 0.15,
+        accentDecay: 0.005,       // Very fast accent decay for acid burn
       },
     },
     effects: [],
@@ -485,7 +483,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
     tb303: {
       volume: 1.0,
       oscillator: { type: 'sawtooth' },
-      filter: { cutoff: 0.7, resonance: 0.85 },
+      filter: { cutoff: 0.45, resonance: 0.85 },
       filterEnvelope: { envMod: 0.9, decay: 0.45 },
       accent: { amount: 0.95 },
       slide: { time: 0.08, mode: 'exponential' },
@@ -494,9 +492,8 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         filterInputDrive: 0.6,    // Heavy drive
         diodeCharacter: 0.5,      // Strong diode character
         duffingAmount: 0.6,       // Aggressive nonlinearity
-        normalDecay: 0.25,
-        accentDecay: 0.1,
-        passbandCompensation: 0.95,
+        normalDecay: 0.12,
+        accentDecay: 0.008,       // Fast accent decay for industrial aggression
       },
     },
     effects: [
