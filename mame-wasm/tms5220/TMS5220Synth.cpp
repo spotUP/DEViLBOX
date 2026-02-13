@@ -733,17 +733,21 @@ private:
         const uint8_t* frame = frame_buffer_data_ + (frame_buffer_pos_ * 12);
         frame_buffer_pos_++;
 
-        new_frame_energy_idx_ = frame[0];
+        // Clamp indices to valid table ranges (buffer bytes are uint8_t 0-255,
+        // but tables are smaller: energy[16], pitch[32], ktable[][32])
+        new_frame_energy_idx_ = std::min((int)frame[0], 15);
 
         if (new_frame_energy_idx_ == 0 || new_frame_energy_idx_ == 15)
             return;
 
-        new_frame_pitch_idx_ = frame[1];
+        new_frame_pitch_idx_ = std::min((int)frame[1], 31);
         uv_zpar_ = (new_frame_pitch_idx_ == 0);
 
         // Always read all K indices from buffer (no repeat frames)
-        for (int i = 0; i < NUM_K; i++)
-            new_frame_k_idx_[i] = frame[2 + i];
+        for (int i = 0; i < NUM_K; i++) {
+            int maxVal = (1 << KBITS[i]) - 1;
+            new_frame_k_idx_[i] = std::min((int)frame[2 + i], maxVal);
+        }
     }
 
     /** Lattice filter (from MAME tms5110.cpp:660)

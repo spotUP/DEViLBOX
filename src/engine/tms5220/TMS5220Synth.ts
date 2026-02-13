@@ -88,6 +88,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _romSentToWasm = false;
   private _speakingChain: (() => void) | null = null;
   private _phonemeSpeechActive = false;
+  private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
@@ -291,6 +292,10 @@ export class TMS5220Synth extends MAMEBaseSynth {
   stopSpeaking(): void {
     this._speakingChain = null;
     this._phonemeSpeechActive = false;
+    if (this._phonemeSpeechTimer !== null) {
+      clearTimeout(this._phonemeSpeechTimer);
+      this._phonemeSpeechTimer = null;
+    }
     if (this.workletNode && !this._disposed) {
       this.workletNode.port.postMessage({ type: 'stopSpeaking' });
     }
@@ -391,17 +396,21 @@ export class TMS5220Synth extends MAMEBaseSynth {
     const data = new Uint8Array(totalFrames * 12);
     let offset = 0;
 
+    // K index max values per coefficient (from KBITS: 5,5,4,4,4,4,4,3,3,3)
+    const kMax = [31, 31, 15, 15, 15, 15, 15, 7, 7, 7];
+
     for (const frame of frames) {
       const count = Math.max(1, Math.round(frame.durationMs / 25));
-      const energyIdx = Math.max(frame.energy, 1); // Avoid 0 (silence) for active frames
-      const pitchIdx = frame.unvoiced ? 0 : frame.pitch;
+      // Clamp to valid table ranges: energy [1,14] (0=silence, 15=stop), pitch [0,31]
+      const energyIdx = Math.min(Math.max(frame.energy, 1), 14);
+      const pitchIdx = frame.unvoiced ? 0 : Math.min(Math.max(frame.pitch, 0), 31);
       const k = frame.k;
 
       for (let i = 0; i < count; i++) {
         data[offset] = energyIdx;
         data[offset + 1] = pitchIdx;
         for (let ki = 0; ki < 10; ki++) {
-          data[offset + 2 + ki] = k[ki] ?? 0;
+          data[offset + 2 + ki] = Math.min(Math.max(k[ki] ?? 0, 0), kMax[ki]);
         }
         offset += 12;
       }
@@ -436,10 +445,11 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
     this._phonemeSpeechActive = true;
 
-    // Estimate total duration for callback
+    // Estimate total duration for callback (cancellable via stopSpeaking)
     if (onDone) {
       const totalMs = numFrames * 25 + 100; // 25ms per frame + buffer
-      setTimeout(() => {
+      this._phonemeSpeechTimer = setTimeout(() => {
+        this._phonemeSpeechTimer = null;
         this._phonemeSpeechActive = false;
         onDone();
       }, totalMs);
