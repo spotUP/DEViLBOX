@@ -46,6 +46,7 @@ import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { extractSamples, canExtractSamples } from '@lib/import/SampleExtractor';
 import { encodeWav } from '@lib/import/WavEncoder';
 import { getToneEngine } from '@engine/ToneEngine';
+import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
@@ -472,6 +473,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       // Stop playback before loading to prevent STALE INSTRUMENT warnings
       stop();
+
+      // Ensure audio context is running before loading instruments
+      // This prevents InvalidStateError when worklets try to initialize
+      try {
+        const context = Tone.getContext();
+        if (context.state !== 'running') {
+          await context.resume();
+          console.log('[Import] Audio context resumed, state:', context.state);
+        }
+      } catch (err) {
+        console.warn('[Import] Failed to resume audio context:', err);
+      }
 
       // Load instruments first, then patterns
       loadInstruments(instruments);
