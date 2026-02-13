@@ -188,8 +188,8 @@ export class MVerbEffect extends Tone.ToneAudioNode {
                 /(wasmMemory=wasmExports\["\w+"\])/,
                 '$1;Module["wasmMemory"]=wasmMemory'
               );
-            // Inject shims for AudioWorklet scope (no `self`, `window`, or `document`)
-            code = 'var self = globalThis; var URL = globalThis.URL;\n' + code;
+            // Inject shim for AudioWorklet scope (has globalThis but no `self`)
+            code = 'var self = globalThis;\n' + code;
             this.jsCode = code;
           }
         } catch (fetchErr) {
