@@ -199,15 +199,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
   const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
-  const { 
+  const {
     setBPM,
     setSpeed,
-    smoothScrolling, 
-    setSmoothScrolling, 
+    smoothScrolling,
+    setSmoothScrolling,
     grooveTemplateId,
     swing,
     jitter,
-    useMpcScale
+    useMpcScale,
+    stop
   } = useTransportStore(useShallow((state) => ({
     setBPM: state.setBPM,
     setSpeed: state.setSpeed,
@@ -217,6 +218,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     swing: state.swing,
     jitter: state.jitter,
     useMpcScale: state.useMpcScale,
+    stop: state.stop,
   })));
   const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
     masterMuted: state.masterMuted,
@@ -458,13 +460,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       }
 
       // Convert instruments using native converter
-      // Preserve original instrument IDs from MOD/XM (already 1-indexed)
+      // Track next available ID to avoid duplicates when multi-sample instruments expand
       const instruments: InstrumentConfig[] = [];
+      let nextId = 1;
       for (let i = 0; i < parsedInstruments.length; i++) {
-        // Use the original instrument ID from the parsed data (already correct: 1-31 for MOD, 1-128 for XM)
-        const converted = convertToInstrument(parsedInstruments[i], parsedInstruments[i].id, format);
+        // Use nextId to ensure globally unique IDs (handles multi-sample Furnace instruments)
+        const converted = convertToInstrument(parsedInstruments[i], nextId, format);
         instruments.push(...converted);
+        nextId += converted.length; // Advance ID by number of instruments created
       }
+
+      // Stop playback before loading to prevent STALE INSTRUMENT warnings
+      stop();
 
       // Load instruments first, then patterns
       loadInstruments(instruments);
