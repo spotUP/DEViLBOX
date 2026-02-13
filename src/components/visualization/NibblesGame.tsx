@@ -106,11 +106,11 @@ interface Particle {
   size: number;
 }
 
-export const NibblesGame: React.FC<NibblesGameProps> = ({ height, onExit }) => {
+export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [actualWidth, setActualWidth] = useState(800);
-  const [actualHeight, setActualHeight] = useState(600);
+  const [actualWidth, setActualWidth] = useState(200);
+  const [actualHeight, setActualHeight] = useState(height);
   
   // UI Sync State (for rendering only)
   const [uiState, setUiSync] = useState({
