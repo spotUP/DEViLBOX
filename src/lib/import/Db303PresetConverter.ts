@@ -89,8 +89,8 @@ export function parseDb303Preset(xmlString: string): Partial<TB303Config> {
       accentDecay: getFloat('devilfish accentDecay', 0.5),
       softAttack: getFloat('devilfish softAttack', 0),
       accentSoftAttack: getFloat('devilfish accentSoftAttack', 0.5),
-      passbandCompensation: getFloat('devilfish passbandCompensation', 0.9),
-      resTracking: 1 - getFloat('devilfish resTracking', 0.3), // XML stores inverted value (db303 format); app default knob=0.7
+      passbandCompensation: getFloat('devilfish passbandCompensation', 0.09),
+      resTracking: 1 - getFloat('devilfish resTracking', 0.743), // XML stores inverted value; 1-0.743=0.257 app value
       filterInputDrive: getFloat('devilfish filterInputDrive', 0),
       filterSelect,
       diodeCharacter: getFloat('devilfish diodeCharacter', 0),
@@ -206,10 +206,10 @@ export function convertToDb303Preset(config: TB303Config): string {
     lines.push(`    <accentDecay>${(df.accentDecay ?? 0.5).toFixed(3)}</accentDecay>`);
     lines.push(`    <softAttack>${(df.softAttack ?? 0).toFixed(3)}</softAttack>`);
     lines.push(`    <accentSoftAttack>${(df.accentSoftAttack ?? 0.5).toFixed(3)}</accentSoftAttack>`);
-    lines.push(`    <passbandCompensation>${(df.passbandCompensation ?? 0.9).toFixed(3)}</passbandCompensation>`);
-    lines.push(`    <resTracking>${(1 - (df.resTracking ?? 0.7)).toFixed(3)}</resTracking>`);
+    lines.push(`    <passbandCompensation>${(df.passbandCompensation ?? 0.09).toFixed(3)}</passbandCompensation>`);
+    lines.push(`    <resTracking>${(1 - (df.resTracking ?? 0.257)).toFixed(3)}</resTracking>`);
     lines.push(`    <filterInputDrive>${(df.filterInputDrive ?? 0).toFixed(3)}</filterInputDrive>`);
-    lines.push(`    <filterSelect>${df.filterSelect ?? 1}</filterSelect>`);
+    lines.push(`    <filterSelect>${df.filterSelect ?? 0}</filterSelect>`);
     lines.push(`    <diodeCharacter>${(df.diodeCharacter ?? 0).toFixed(3)}</diodeCharacter>`);
     lines.push(`    <duffingAmount>${(df.duffingAmount ?? 0).toFixed(3)}</duffingAmount>`);
     lines.push(`    <filterFmDepth>${(df.filterFmDepth ?? 0).toFixed(3)}</filterFmDepth>`);

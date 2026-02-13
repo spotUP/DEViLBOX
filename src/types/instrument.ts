@@ -2901,7 +2901,7 @@ export const DEFAULT_TB303: TB303Config = {
   },
   filterEnvelope: {
     envMod: 0.5,        // db303 default: envMod=0.5 (normalized 0-1)
-    decay: 0.4,         // db303 default: decay=0.4 (normalized 0-1)
+    decay: 0.5,         // default-preset.xml: 0.5 (normalized 0-1)
   },
   accent: {
     amount: 0.5,        // db303 default: accent=0.5 (normalized 0-1)
@@ -2915,19 +2915,20 @@ export const DEFAULT_TB303: TB303Config = {
   },
   // Devil Fish parameters — always enabled (matching reference db303.pages.dev).
   // The WASM has no "DF off" mode — it always uses these params internally.
-  // Default values are neutral/clean (no drive, no nonlinearity) = clean 303 sound.
+  // Source of truth: db303-local/default-preset.xml (loaded by reference app on init).
+  // Conversion: JC303.cpp::setParameter() converts 0-1 → real values inside WASM.
   devilFish: {
     enabled: true,
-    normalDecay: 0.5,            // db303 app default: normalDecay=0.5
-    accentDecay: 0.1,            // db303 app default: accentDecay=0.1
-    softAttack: 0,               // db303 app default: softAttack=0
-    accentSoftAttack: 0.5,       // db303 app default: accentSoftAttack=0.5
-    passbandCompensation: 0.9,   // db303 app default: 0.9 (→WASM 0.1, minimal compensation)
-    resTracking: 0.7,            // db303 app default: resTracking=0.7
-    filterInputDrive: 0,         // db303 app default: filterInputDrive=0 (clean)
-    filterSelect: 1,             // db303 app default: filterSelect=1
-    diodeCharacter: 0,           // db303 app default: diodeCharacter=0 (clean, no nonlinearity)
-    duffingAmount: 0,            // db303 app default: duffingAmount=0
+    normalDecay: 0.164,          // default-preset.xml: 0.164
+    accentDecay: 0.006,          // default-preset.xml: 0.006 — CRITICAL for acid screams
+    softAttack: 0,               // default-preset.xml: 0
+    accentSoftAttack: 0.1,       // default-preset.xml: 0.1 (punch on accented notes)
+    passbandCompensation: 0.09,  // default-preset.xml: 0.09. App inverts → WASM gets 1-0.09=0.91
+    resTracking: 0.257,           // default-preset.xml: 0.743 (inverted on read: 1-0.743=0.257). App inverts → WASM gets 0.743
+    filterInputDrive: 0.169,     // default-preset.xml: 0.169 (subtle warmth/drive)
+    filterSelect: 0,             // 0=DiodeLadder (only valid: 0 or 5=Korg). Reference init uses 0.
+    diodeCharacter: 1,           // default-preset.xml: 1 (nonlinear character)
+    duffingAmount: 0.03,         // default-preset.xml: 0.03 (subtle saturation)
     filterFmDepth: 0,            // db303 app default: filterFmDepth=0
     lpBpMix: 0,                  // db303 app default: lpBpMix=0
     filterTracking: 0,           // db303 app default: filterTracking=0
@@ -2967,59 +2968,10 @@ export const DEFAULT_TB303: TB303Config = {
   },
   delay: {
     enabled: false,     // db303 default: delayMix=0 (disabled)
-    time: 3,            // db303 WASM expects raw 0-16 (16th note subdivisions)
-    feedback: 0,        // db303 default: delayFeedback=0
-    tone: 0.5,          // db303 default: delayTone=0.5
+    time: 3,            // default-preset.xml: 3 (WASM raw 0-16, 16th note subdivisions)
+    feedback: 0.3,      // default-preset.xml: 0.3
+    tone: 0.5,          // default-preset.xml: 0.5
     mix: 0,
-    stereo: 0.75,       // db303 default: delaySpread=0.75
+    stereo: 0.5,        // default-preset.xml: 0.5 (spread)
   },
-};
-
-/**
- * Default Devil Fish settings matching db303.pages.dev app startup defaults (ne object)
- * All values are normalized 0-1 knob positions (matching db303.pages.dev)
- * NOTE: default-preset.xml is a specific sound preset, NOT the app defaults.
- */
-export const DEFAULT_DEVIL_FISH: DevilFishConfig = {
-  enabled: true,         // db303 always has Devil Fish enabled
-
-  // Envelope defaults (matching db303 app defaults)
-  normalDecay: 0.5,      // db303 app default: normalDecay=0.5
-  accentDecay: 0.1,      // db303 app default: accentDecay=0.1
-  accentAttack: 3.0,     // 3ms attack
-  vegDecay: 0.5,         // db303 default: vegDecay=0.5
-  vegSustain: 0,         // db303 default: vegSustain=0
-  softAttack: 0,         // db303 app default: softAttack=0
-  accentSoftAttack: 0.5, // db303 app default: accentSoftAttack=0.5
-
-  // Filter defaults (matching db303 app defaults)
-  filterTracking: 0,     // db303 app default: filterTracking=0
-  filterFmDepth: 0,      // db303 app default: filterFmDepth=0
-  passbandCompensation: 0.9, // db303 app default: 0.9 (→WASM 0.1, minimal compensation)
-  resTracking: 0.7,      // db303 app default: resTracking=0.7
-  duffingAmount: 0,      // db303 app default: duffingAmount=0
-  lpBpMix: 0,            // db303 app default: lpBpMix=0 (100% lowpass)
-  stageNLAmount: 0,      // db303 app default: stageNLAmount=0
-  filterSelect: 1,       // db303 app default: filterSelect=1
-  diodeCharacter: 0,     // db303 app default: diodeCharacter=0 (clean, no nonlinearity)
-  filterInputDrive: 0,   // db303 app default: filterInputDrive=0 (clean)
-
-  // Effects defaults (matching db303 exactly)
-  ensembleAmount: 0,     // db303 default: ensembleAmount=0
-
-  // Korg filter defaults (disabled by default)
-  korgEnabled: false,
-
-  // Audio quality defaults
-  oversamplingOrder: 2,  // db303 default: oversamplingOrder=2 (4x)
-
-  // Accent defaults
-  sweepSpeed: 'normal',  // Standard accent behavior
-  accentSweepEnabled: true,
-
-  // Resonance mode
-  highResonance: false,  // Normal resonance range
-
-  // Output
-  muffler: 'off',        // No muffler
 };

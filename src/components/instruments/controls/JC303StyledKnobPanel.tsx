@@ -372,16 +372,16 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     onChange({ tuning });
   };
 
-  const updateLfo = (key: string, value: number | boolean) => {
+  const updateLfo = (updates: Record<string, number | boolean>) => {
     const currentLfo = configRef.current.lfo || {
       waveform: 0, rate: 0, contour: 0, pitchDepth: 0, pwmDepth: 0, filterDepth: 0, stiffDepth: 0
     };
-    onChange({ lfo: { ...currentLfo, [key]: value } as TB303Config['lfo'] });
+    onChange({ lfo: { ...currentLfo, ...updates } as TB303Config['lfo'] });
   };
 
-  const updateChorus = (key: string, value: number | boolean) => {
+  const updateChorus = (updates: Record<string, number | boolean>) => {
     const currentChorus = configRef.current.chorus || { enabled: false, mode: 1, mix: 0.3 };
-    onChange({ chorus: { ...currentChorus, [key]: value } as TB303Config['chorus'] });
+    onChange({ chorus: { ...currentChorus, ...updates } as TB303Config['chorus'] });
   };
 
   const updateDelay = (key: string, value: number | boolean) => {
@@ -529,19 +529,19 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <span className="text-[9px] font-bold text-purple-400/60 tracking-wider">WAVE</span>
                 <div className="flex gap-1.5 items-center">
                   {[0, 1, 2, 3, 4, 5].map(w => (
-                    <button key={w} onClick={() => { updateLfo('enabled', true); updateLfo('waveform', w); }} className={clsx("w-10 h-8 text-[10px] font-bold rounded-md border-2 transition-all", config.lfo?.waveform === w ? "bg-purple-500 text-white border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]" : "bg-black/50 text-purple-400/50 border-purple-900/40 hover:border-purple-500/50 hover:text-purple-400")}>
+                    <button key={w} onClick={() => updateLfo({ enabled: true, waveform: w })} className={clsx("w-10 h-8 text-[10px] font-bold rounded-md border-2 transition-all", config.lfo?.waveform === w ? "bg-purple-500 text-white border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]" : "bg-black/50 text-purple-400/50 border-purple-900/40 hover:border-purple-500/50 hover:text-purple-400")}>
                       {['TRI', 'SAW', 'SAW▼', 'SQR', 'S&H', 'NSE'][w]}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="w-px h-14 bg-gray-800 flex-shrink-0" />
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.rate ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => { updateLfo('enabled', true); updateLfo('rate', v); }} label="Rate" size="md" color="#a855f7" formatValue={v => { const r = LFO_RATE_MIN * Math.pow(LFO_RATE_MAX/LFO_RATE_MIN, v); return r >= 10 ? r.toFixed(1) + 'Hz' : r.toFixed(2) + 'Hz'; }} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.contour ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => { updateLfo('enabled', true); updateLfo('contour', v); }} label="Contour" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.pwmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => { updateLfo('enabled', true); updateLfo('pwmDepth', v); }} label="PWM Mod" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.pitchDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => { updateLfo('enabled', true); updateLfo('pitchDepth', v); }} label="Pitch" size="md" color="#a855f7" formatValue={v => '+' + Math.round(v * 12) + ' semi'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.filterDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => { updateLfo('enabled', true); updateLfo('filterDepth', v); }} label="Filter" size="md" color="#a855f7" formatValue={v => '+' + (v * 2).toFixed(1) + ' oct'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.stiffDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => { updateLfo('enabled', true); updateLfo('stiffDepth', v); }} label="Tension" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.rate ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, rate: v })} label="Rate" size="md" color="#a855f7" formatValue={v => { const r = LFO_RATE_MIN * Math.pow(LFO_RATE_MAX/LFO_RATE_MIN, v); return r >= 10 ? r.toFixed(1) + 'Hz' : r.toFixed(2) + 'Hz'; }} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.contour ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateLfo({ enabled: true, contour: v })} label="Contour" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.pwmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pwmDepth: v })} label="PWM Mod" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.pitchDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pitchDepth: v })} label="Pitch" size="md" color="#a855f7" formatValue={v => '+' + Math.round(v * 12) + ' semi'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.filterDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, filterDepth: v })} label="Filter" size="md" color="#a855f7" formatValue={v => '+' + (v * 2).toFixed(1) + ' oct'} /></div>
+              <div style={{ width: '65px' }}><Knob value={config.lfo?.stiffDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, stiffDepth: v })} label="Tension" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
             </div>
           )}
 
@@ -571,7 +571,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                     {[0, 1, 2, 3, 4].map(m => {
                       const activeMode = (config.chorus?.enabled && (config.chorus?.mode ?? 0) > 0) ? (config.chorus?.mode ?? 0) : 0;
                       return (
-                        <button key={m} onClick={() => { updateChorus('mode', m); updateChorus('enabled', m > 0); }}
+                        <button key={m} onClick={() => updateChorus({ mode: m, enabled: m > 0 })}
                           className={clsx("px-2.5 py-1 text-[10px] font-bold rounded border transition-all",
                             activeMode === m ? "bg-green-500 text-white border-green-400" : "bg-black/50 text-green-400/50 border-green-900/40 hover:border-green-500/50"
                           )}>
@@ -584,7 +584,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] text-gray-400 flex-shrink-0 w-8">Mix</span>
                   <input type="range" min={0} max={1} step={0.01} value={config.chorus?.mix ?? 0.5}
-                    onChange={(e) => updateChorus('mix', parseFloat(e.target.value))}
+                    onChange={(e) => updateChorus({ mix: parseFloat(e.target.value) })}
                     className="flex-1 h-1.5 accent-green-500 cursor-pointer" style={{ minWidth: '80px' }} />
                   <span className="text-[10px] text-gray-300 w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
                 </div>
@@ -635,7 +635,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
         {/* Waveform Scope + Filter Response */}
         {instrumentId !== undefined && (
-          <div className="absolute" style={{ top: '10px', left: '480px', right: '20px', height: '80px' }}>
+          <div className="absolute pointer-events-none" style={{ top: '10px', left: '480px', right: '20px', height: '80px' }}>
             <div className="viz-frame w-full h-full">
               <div className="viz-frame__content">
                 <DB303Scope config={config} instrumentId={instrumentId} />
