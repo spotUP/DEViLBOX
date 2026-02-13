@@ -2057,7 +2057,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
       chipType: inst.type,
       synthType,
       macros: inst.macros.map(m => ({
-        type: m.code,
+        code: m.code,
+        type: m.code,  // Downstream code uses 'type' as slot identifier
         data: [...m.data],
         loop: m.loop,
         release: m.release,

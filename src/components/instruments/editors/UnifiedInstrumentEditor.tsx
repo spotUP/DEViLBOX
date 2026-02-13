@@ -559,15 +559,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }, [instrument.parameters, instrument.id, handleChange]);
 
   // Handle MAME chip synth text parameter changes (e.g. speech text)
+  // Uses onChange directly instead of handleChange to avoid triggering auto-preview
   const handleChipTextChange = useCallback((key: string, value: string) => {
     const currentParams = instrument.parameters || {};
     const newParams = { ...currentParams, [key]: value };
-    handleChange({ parameters: newParams });
+    onChange({ parameters: newParams });
     try {
       const engine = getToneEngine();
       engine.updateMAMEChipTextParam(instrument.id, key, value);
     } catch { /* ignored */ }
-  }, [instrument.parameters, instrument.id, handleChange]);
+  }, [instrument.parameters, instrument.id, onChange]);
 
   // Handle MAME chip synth preset load
   const handleChipPresetLoad = useCallback((program: number) => {

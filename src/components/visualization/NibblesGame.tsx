@@ -271,11 +271,15 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
     inputBuffer1.current = [];
     inputBuffer2.current = [];
 
-    if (!surround) spawnFood();
-  }, [numPlayers, surround, spawnFood]);
+    // Always spawn initial food (needed for gameplay)
+    spawnFood();
+  }, [numPlayers, spawnFood]);
 
   // Reset game state (including music-reactive state)
   const resetGame = useCallback(() => {
+    // Stop the game first
+    isPlayingRef.current = false;
+
     // Reset core game state
     levelRef.current = 0;
     score1Ref.current = 0;
@@ -1027,7 +1031,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
         className="cursor-pointer w-full h-full"
         onClick={(e) => {
           e.stopPropagation();
-          if (!uiState.isPlaying) setIsPlaying(true);
+          if (!uiState.isPlaying) {
+            resetGame();
+            setIsPlaying(true);
+          }
         }}
       />
 
@@ -1036,8 +1043,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
           <div className="flex flex-col items-center gap-2 scale-75 md:scale-100">
             <h3 className="text-white font-bold text-sm tracking-widest uppercase">NIBBLES</h3>
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsPlaying(true); }}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                resetGame();
+                setIsPlaying(true);
+              }}
               className="bg-accent-primary hover:bg-accent-secondary text-white px-6 py-1 rounded-full text-xs font-bold uppercase transition-all shadow-glow-sm"
             >
               Start Game

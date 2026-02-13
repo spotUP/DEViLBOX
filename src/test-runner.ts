@@ -39,60 +39,96 @@ declare const window: Window & TestRunnerWindow;
 // ============================================
 
 // =============================================
-// FOCUSED TESTING: Fixed chips + MAME synths
+// ALL FURNACE INSTRUMENTS - FULL DEBUG CONFIG
 // =============================================
 const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
-  // === Recently Fixed Chips (were silent) ===
-  'FurnacePCSPKR': { synthType: 'FurnacePCSPKR', volume: -12, furnace: DEFAULT_FURNACE },
-  'FurnaceRF5C68': { synthType: 'FurnaceRF5C68', volume: -12, furnace: DEFAULT_FURNACE },
-  'FurnaceMSM6258': { synthType: 'FurnaceMSM6258', volume: -12, furnace: DEFAULT_FURNACE },
+  // === Furnace FM Chips ===
+  'FurnaceOPN': { synthType: 'FurnaceOPN', volume: -12, furnace: DEFAULT_FURNACE },       // YM2612 - Genesis
+  'FurnaceOPM': { synthType: 'FurnaceOPM', volume: -12, furnace: DEFAULT_FURNACE },       // YM2151 - Arcade
+  'FurnaceOPL': { synthType: 'FurnaceOPL', volume: -12, furnace: DEFAULT_FURNACE },       // YMF262 - SoundBlaster
+  'FurnaceOPLL': { synthType: 'FurnaceOPLL', volume: -12, furnace: DEFAULT_FURNACE },     // YM2413 - MSX
+  'FurnaceESFM': { synthType: 'FurnaceESFM', volume: -12, furnace: DEFAULT_FURNACE },     // Enhanced OPL3
+  'FurnaceOPZ': { synthType: 'FurnaceOPZ', volume: -12, furnace: DEFAULT_FURNACE },       // YM2414 - TX81Z
+  'FurnaceOPNA': { synthType: 'FurnaceOPNA', volume: -12, furnace: DEFAULT_FURNACE },     // YM2608 - PC-98
+  'FurnaceOPNB': { synthType: 'FurnaceOPNB', volume: -12, furnace: DEFAULT_FURNACE },     // YM2610 - Neo Geo
+  'FurnaceOPL4': { synthType: 'FurnaceOPL4', volume: -12, furnace: DEFAULT_FURNACE },     // YMF278B
+  'FurnaceY8950': { synthType: 'FurnaceY8950', volume: -12, furnace: DEFAULT_FURNACE },   // MSX-AUDIO
+  'FurnaceVRC7': { synthType: 'FurnaceVRC7', volume: -12, furnace: DEFAULT_FURNACE },     // Konami VRC7
+  'FurnaceOPN2203': { synthType: 'FurnaceOPN2203', volume: -12, furnace: DEFAULT_FURNACE }, // YM2203
+  'FurnaceOPNBB': { synthType: 'FurnaceOPNBB', volume: -12, furnace: DEFAULT_FURNACE },   // YM2610B
 
-  // ========================================================================
-  // === ROM-BASED SYNTHS (Require external ROM files to produce sound) ===
-  // ========================================================================
-  // Place ROM files in /public/roms/{chipname}/ - See /public/roms/README.md
+  // === Furnace Console PSG Chips ===
+  'FurnaceNES': { synthType: 'FurnaceNES', volume: -12, furnace: DEFAULT_FURNACE },       // 2A03 - NES
+  'FurnaceGB': { synthType: 'FurnaceGB', volume: -12, furnace: DEFAULT_FURNACE },         // Game Boy DMG
+  'FurnaceSNES': { synthType: 'FurnaceSNES', volume: -12, furnace: DEFAULT_FURNACE },     // SPC700 - SNES
+  'FurnacePCE': { synthType: 'FurnacePCE', volume: -12, furnace: DEFAULT_FURNACE },       // HuC6280 - PC Engine
+  'FurnacePSG': { synthType: 'FurnacePSG', volume: -12, furnace: DEFAULT_FURNACE },       // SN76489 - SMS
+  'FurnaceVB': { synthType: 'FurnaceVB', volume: -12, furnace: DEFAULT_FURNACE },         // Virtual Boy VSU
+  'FurnaceLynx': { synthType: 'FurnaceLynx', volume: -12, furnace: DEFAULT_FURNACE },     // Atari Lynx Mikey
+  'FurnaceSWAN': { synthType: 'FurnaceSWAN', volume: -12, furnace: DEFAULT_FURNACE },     // WonderSwan
+  'FurnaceGBA': { synthType: 'FurnaceGBA', volume: -12, furnace: DEFAULT_FURNACE },       // GBA DMA
+  'FurnaceNDS': { synthType: 'FurnaceNDS', volume: -12, furnace: DEFAULT_FURNACE },       // Nintendo DS
+  'FurnacePOKEMINI': { synthType: 'FurnacePOKEMINI', volume: -12, furnace: DEFAULT_FURNACE }, // Pokemon Mini
 
-  // === TR707 - ROM loader implemented ✓ ===
-  'MAMETR707': { synthType: 'MAMETR707', volume: -12 },  // ✓ Has ROM loader (128KB/256KB)
+  // === Furnace NES Expansion Audio ===
+  'FurnaceVRC6': { synthType: 'FurnaceVRC6', volume: -12, furnace: DEFAULT_FURNACE },     // Konami VRC6
+  'FurnaceN163': { synthType: 'FurnaceN163', volume: -12, furnace: DEFAULT_FURNACE },     // Namco 163
+  'FurnaceFDS': { synthType: 'FurnaceFDS', volume: -12, furnace: DEFAULT_FURNACE },       // Famicom Disk System
+  'FurnaceMMC5': { synthType: 'FurnaceMMC5', volume: -12, furnace: DEFAULT_FURNACE },     // MMC5
 
-  // === MAME PCM Chips - ROM loaders implemented ✓ ===
-  'MAMEC352': { synthType: 'MAMEC352', volume: -12 },       // ✓ Namco PCM (2-8MB) - Arcade games
-  'MAMEICS2115': { synthType: 'MAMEICS2115', volume: -12 }, // ✓ ICS Wavetable (up to 16MB) - Gravis UltraSound
-  'MAMEK054539': { synthType: 'MAMEK054539', volume: -12 }, // ✓ Konami PCM (up to 16MB) - Arcade games
-  'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 }, // ✓ Ricoh PCM (2-8MB) - Sega Saturn/Arcade
-  'MAMEES5503': { synthType: 'MAMEES5503', volume: -12 },   // ✓ Ensoniq DOC (85KB Mirage wavetables + 8 built-in)
+  // === Furnace Computer Chips ===
+  'FurnaceC64': { synthType: 'FurnaceC64', volume: -12, furnace: DEFAULT_FURNACE },       // SID 6581
+  'FurnaceSID6581': { synthType: 'FurnaceSID6581', volume: -12, furnace: DEFAULT_FURNACE }, // MOS 6581
+  'FurnaceSID8580': { synthType: 'FurnaceSID8580', volume: -12, furnace: DEFAULT_FURNACE }, // MOS 8580
+  'FurnaceAY': { synthType: 'FurnaceAY', volume: -12, furnace: DEFAULT_FURNACE },         // AY-3-8910
+  'FurnaceAY8930': { synthType: 'FurnaceAY8930', volume: -12, furnace: DEFAULT_FURNACE }, // Enhanced AY
+  'FurnaceVIC': { synthType: 'FurnaceVIC', volume: -12, furnace: DEFAULT_FURNACE },       // VIC-20
+  'FurnaceSAA': { synthType: 'FurnaceSAA', volume: -12, furnace: DEFAULT_FURNACE },       // Philips SAA1099
+  'FurnaceTED': { synthType: 'FurnaceTED', volume: -12, furnace: DEFAULT_FURNACE },       // Plus/4 TED
+  'FurnaceVERA': { synthType: 'FurnaceVERA', volume: -12, furnace: DEFAULT_FURNACE },     // Commander X16
+  'FurnacePET': { synthType: 'FurnacePET', volume: -12, furnace: DEFAULT_FURNACE },       // Commodore PET
 
-  // === MAME Speech Chips with Internal ROM (3 chips - work without external files) ===
-  'MAMESP0250': { synthType: 'MAMESP0250', volume: -12 },   // ✓ Internal allophone ROM
-  'MAMETMS5220': { synthType: 'MAMETMS5220', volume: -12 }, // ✓ Internal chirp ROM
-  'MAMEVotrax': { synthType: 'MAMEVotrax', volume: -12 },   // ✓ Internal phoneme ROM
+  // === Furnace Wavetable Chips ===
+  'FurnaceSCC': { synthType: 'FurnaceSCC', volume: -12, furnace: DEFAULT_FURNACE },       // Konami SCC
+  'FurnaceX1_010': { synthType: 'FurnaceX1_010', volume: -12, furnace: DEFAULT_FURNACE }, // Seta X1-010
+  'FurnaceNAMCO': { synthType: 'FurnaceNAMCO', volume: -12, furnace: DEFAULT_FURNACE },   // Namco WSG (Pac-Man)
+  'FurnaceBUBBLE': { synthType: 'FurnaceBUBBLE', volume: -12, furnace: DEFAULT_FURNACE }, // Konami Bubble System
 
-  // === Non-MAME ROM-Based Synths - Auto-loading implemented ✓ ===
-  'D50': { synthType: 'D50', volume: -12 },              // ✓ Roland D-50 (auto-loads IC30/IC29/firmware)
-  'VFX': { synthType: 'VFX', volume: -12 },              // ✓ Ensoniq VFX (auto-loads sample banks)
-  // 'RdPiano': { synthType: 'RdPiano', volume: -12 },      // Rhodes/Wurlitzer (needs sample ROMs)
-  // 'MU2000': { synthType: 'MU2000', volume: -12 },        // Yamaha MU2000 (needs sample ROMs)
+  // === Furnace Sample/PCM Chips ===
+  'FurnaceSEGAPCM': { synthType: 'FurnaceSEGAPCM', volume: -12, furnace: DEFAULT_FURNACE },   // Sega PCM
+  'FurnaceQSOUND': { synthType: 'FurnaceQSOUND', volume: -12, furnace: DEFAULT_FURNACE },     // Capcom QSound
+  'FurnaceES5506': { synthType: 'FurnaceES5506', volume: -12, furnace: DEFAULT_FURNACE },     // Ensoniq ES5506
+  'FurnaceRF5C68': { synthType: 'FurnaceRF5C68', volume: -12, furnace: DEFAULT_FURNACE },     // Sega CD PCM
+  'FurnaceC140': { synthType: 'FurnaceC140', volume: -12, furnace: DEFAULT_FURNACE },         // Namco C140
+  'FurnaceK007232': { synthType: 'FurnaceK007232', volume: -12, furnace: DEFAULT_FURNACE },   // Konami K007232
+  'FurnaceK053260': { synthType: 'FurnaceK053260', volume: -12, furnace: DEFAULT_FURNACE },   // Konami K053260
+  'FurnaceGA20': { synthType: 'FurnaceGA20', volume: -12, furnace: DEFAULT_FURNACE },         // Irem GA20
+  'FurnaceOKI': { synthType: 'FurnaceOKI', volume: -12, furnace: DEFAULT_FURNACE },           // OKI MSM6295
+  'FurnaceYMZ280B': { synthType: 'FurnaceYMZ280B', volume: -12, furnace: DEFAULT_FURNACE },   // Yamaha YMZ280B
+  'FurnaceMSM6258': { synthType: 'FurnaceMSM6258', volume: -12, furnace: DEFAULT_FURNACE },   // OKI MSM6258
+  'FurnaceMSM5232': { synthType: 'FurnaceMSM5232', volume: -12, furnace: DEFAULT_FURNACE },   // OKI MSM5232
+  'FurnaceMULTIPCM': { synthType: 'FurnaceMULTIPCM', volume: -12, furnace: DEFAULT_FURNACE }, // Sega MultiPCM
+  'FurnacePCMDAC': { synthType: 'FurnacePCMDAC', volume: -12, furnace: DEFAULT_FURNACE },     // Generic PCM DAC
 
-  // ========================================================================
-  // === MAME Synths - Pure Synthesis (No ROM needed) ===
-  // ========================================================================
-  'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },
-  'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
-  'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
-  'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 },
-  'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },      // Wavetable with RAM upload
-  'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
-  'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
-  'MAMEMEA8000': { synthType: 'MAMEMEA8000', volume: -12 },
-  'MAMESN76477': { synthType: 'MAMESN76477', volume: -12 },
-  'MAMESNKWave': { synthType: 'MAMESNKWave', volume: -12 },
-  'MAMETMS36XX': { synthType: 'MAMETMS36XX', volume: -12 },
-  'MAMEUPD931': { synthType: 'MAMEUPD931', volume: -12 },
-  'MAMEUPD933': { synthType: 'MAMEUPD933', volume: -12 },
-  'MAMEYMF271': { synthType: 'MAMEYMF271', volume: -12 },
-  'MAMEYMOPQ': { synthType: 'MAMEYMOPQ', volume: -12 },
-  'MAMEVASynth': { synthType: 'MAMEVASynth', volume: -12 },
-  'SCSP': { synthType: 'SCSP', volume: -12 },              // Wavetable with RAM upload
+  // === Furnace Other/Misc Chips ===
+  'FurnaceTIA': { synthType: 'FurnaceTIA', volume: -12, furnace: DEFAULT_FURNACE },           // Atari 2600
+  'FurnaceAMIGA': { synthType: 'FurnaceAMIGA', volume: -12, furnace: DEFAULT_FURNACE },       // Amiga Paula
+  'FurnacePCSPKR': { synthType: 'FurnacePCSPKR', volume: -12, furnace: DEFAULT_FURNACE },     // PC Speaker
+  'FurnaceZXBEEPER': { synthType: 'FurnaceZXBEEPER', volume: -12, furnace: DEFAULT_FURNACE }, // ZX Spectrum
+  'FurnacePOKEY': { synthType: 'FurnacePOKEY', volume: -12, furnace: DEFAULT_FURNACE },       // Atari POKEY
+  'FurnaceSM8521': { synthType: 'FurnaceSM8521', volume: -12, furnace: DEFAULT_FURNACE },     // Game.com
+  'FurnaceT6W28': { synthType: 'FurnaceT6W28', volume: -12, furnace: DEFAULT_FURNACE },       // NEC T6W28
+  'FurnacePONG': { synthType: 'FurnacePONG', volume: -12, furnace: DEFAULT_FURNACE },         // AY-3-8500 Pong
+  'FurnacePV1000': { synthType: 'FurnacePV1000', volume: -12, furnace: DEFAULT_FURNACE },     // Casio PV-1000
+  'FurnaceDAVE': { synthType: 'FurnaceDAVE', volume: -12, furnace: DEFAULT_FURNACE },         // Enterprise DAVE
+  'FurnaceSU': { synthType: 'FurnaceSU', volume: -12, furnace: DEFAULT_FURNACE },             // Sound Unit
+  'FurnacePOWERNOISE': { synthType: 'FurnacePOWERNOISE', volume: -12, furnace: DEFAULT_FURNACE }, // Power Noise
+  'FurnaceSCVTONE': { synthType: 'FurnaceSCVTONE', volume: -12, furnace: DEFAULT_FURNACE },   // Epoch SCV
+  'FurnaceUPD1771': { synthType: 'FurnaceUPD1771', volume: -12, furnace: DEFAULT_FURNACE },   // NEC uPD1771
+  'FurnaceSUPERVISION': { synthType: 'FurnaceSUPERVISION', volume: -12, furnace: DEFAULT_FURNACE }, // Watara Supervision
+
+  // === Generic Furnace (default platform) ===
+  'Furnace': { synthType: 'Furnace', volume: -12, furnace: DEFAULT_FURNACE },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
