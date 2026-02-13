@@ -143,7 +143,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
   const [beatIntensity, setBeatIntensity] = useState(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const previousVolumeRef = useRef(0);
-  const audioBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const audioBufferRef = useRef<Uint8Array | null>(null);
 
   // Visual effects
   const [gridGlowIntensity, setGridGlowIntensity] = useState(0);
@@ -216,9 +216,8 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       const x = Math.floor(Math.random() * WIDTH);
       const y = Math.floor(Math.random() * HEIGHT);
       const cell = gridRef.current[y]?.[x];
-      const cellBelow = y < HEIGHT - 1 ? gridRef.current[y + 1]?.[x] : 0;
-      const suitable = cell === 0 && (y === HEIGHT - 1 || cellBelow === 0);
-      if (suitable) {
+      // Food can spawn on any empty cell
+      if (cell === 0) {
         currentNumberRef.current++;
         gridRef.current[y][x] = 16 + currentNumberRef.current;
         return;
@@ -254,8 +253,11 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
     p1DirRef.current = mapDir(lvlData.p1Dir);
     p2DirRef.current = mapDir(lvlData.p2Dir);
 
-    p1Ref.current = Array(256).fill(null).map(() => ({ x: x1, y: y1 }));
-    p2Ref.current = Array(256).fill(null).map(() => ({ x: x2, y: y2 }));
+    // Initialize worm arrays with only head position set, rest null
+    p1Ref.current = Array(256).fill(null);
+    p1Ref.current[0] = { x: x1, y: y1 };
+    p2Ref.current = Array(256).fill(null);
+    p2Ref.current[0] = { x: x2, y: y2 };
 
     p1LenRef.current = 5;
     p2LenRef.current = 5;
@@ -347,7 +349,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
 
     // Reuse buffer to avoid allocation on every frame
     if (!audioBufferRef.current || audioBufferRef.current.length !== analyser.frequencyBinCount) {
-      audioBufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      audioBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
     }
     analyser.getByteFrequencyData(audioBufferRef.current);
     setAudioData(audioBufferRef.current);
