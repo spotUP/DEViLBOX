@@ -72,6 +72,8 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
 
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
+    // Wet path output connected immediately (fallback/wasm connects input → processor → wetGain)
+    this.wetGain.connect(this.output);
 
     this.initFallback();
     this.initWasm();
@@ -184,12 +186,11 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
       const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect(getRawNode(this.output));
       this.usingFallback = true;
     } catch (err) {
       console.warn('[SpringReverb] Fallback init failed:', err);
+      // Direct passthrough as last resort
       this.input.connect(this.wetGain);
-      this.wetGain.connect(this.output);
     }
   }
 
@@ -197,16 +198,17 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
     if (!this.workletNode) return;
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
+      // Connect WASM first, then disconnect fallback (avoids silent gap)
+      const rawInput = getRawNode(this.input);
+      const rawWet = getRawNode(this.wetGain);
+      rawInput.connect(this.workletNode);
+      this.workletNode.connect(rawWet);
+      // Now safe to disconnect fallback
       if (this.fallbackNode && this.usingFallback) {
         try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
         this.fallbackNode.onaudioprocess = null;
         this.usingFallback = false;
       }
-      const rawInput = getRawNode(this.input);
-      const rawWet = getRawNode(this.wetGain);
-      rawInput.connect(this.workletNode);
-      this.workletNode.connect(rawWet);
-      rawWet.connect(getRawNode(this.output));
       const keepalive = rawContext.createGain();
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
@@ -219,6 +221,11 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
   private sendParam(paramId: number, value: number) {
     if (this.workletNode && this.isWasmReady) {
       this.workletNode.port.postMessage({ type: 'parameter', paramId, value });
+    }
+    // Update fallback reverb parameters too
+    if (this.usingFallback && this.fallbackReverb) {
+      if (paramId === PARAM_DECAY) this.fallbackReverb.setFeedback(value);
+      if (paramId === PARAM_DAMPING) this.fallbackReverb.setDamping(value);
     }
   }
 
@@ -251,6 +258,7 @@ function clamp01(v: number): number {
  */
 class SpringFallback {
   private combs: { buffer: Float32Array; index: number; feedback: number; lp: number }[];
+  private dampingCoeff = 0.4;
 
   constructor(sampleRate: number) {
     const sr = sampleRate / 44100;
@@ -262,14 +270,24 @@ class SpringFallback {
     ];
   }
 
+  setFeedback(v: number) {
+    const fb = 0.5 + clamp01(v) * 0.45; // map 0-1 → 0.5-0.95
+    for (const c of this.combs) c.feedback = fb;
+  }
+
+  setDamping(v: number) {
+    this.dampingCoeff = 0.1 + clamp01(v) * 0.8; // map 0-1 → 0.1-0.9
+  }
+
   process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array) {
     const n = inL.length;
+    const damp = this.dampingCoeff;
     for (let i = 0; i < n; i++) {
       const mono = (inL[i] + inR[i]) * 0.5;
       let sum = 0;
       for (const c of this.combs) {
         const out = c.buffer[c.index];
-        c.lp = out + 0.4 * (c.lp - out);
+        c.lp = out + damp * (c.lp - out);
         c.buffer[c.index] = mono + c.lp * c.feedback;
         c.index = (c.index + 1) % c.buffer.length;
         sum += out;

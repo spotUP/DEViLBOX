@@ -67,7 +67,9 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Wet path connects once worklet is ready
+    // Wet path output connected immediately so audio isn't silent while WASM loads
+    this.wetGain.connect(this.output);
+
     this.initialize();
   }
 
@@ -110,11 +112,9 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
         jsCode: jsCode,
       });
 
-      // Connect wet path using Tone.connect for safe native↔Tone bridging
-      // input → workletNode → wetGain → output
+      // Connect wet path: input → workletNode → wetGain (already connected to output)
       Tone.connect(this.input, this.workletNode);
       Tone.connect(this.workletNode, this.wetGain);
-      this.wetGain.connect(this.output);
 
     } catch (err) {
       console.error('[SpaceyDelayer] Init failed:', err);

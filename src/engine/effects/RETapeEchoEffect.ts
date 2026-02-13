@@ -81,6 +81,10 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
+    // Wet path output must be connected immediately so audio isn't silent
+    // while WASM loads (initialize() connects input → worklet → wetGain async)
+    this.wetGain.connect(this.output);
+
     this.initialize();
   }
 
@@ -124,10 +128,9 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
         jsCode: jsCode,
       });
 
-      // Connect wet path using Tone.connect for safe bridging
+      // Connect wet path: input → workletNode → wetGain (already connected to output)
       Tone.connect(this.input, this.workletNode);
       Tone.connect(this.workletNode, this.wetGain);
-      this.wetGain.connect(this.output);
 
     } catch (err) {
       console.error('[RETapeEcho] Init failed:', err);

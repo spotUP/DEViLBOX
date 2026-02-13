@@ -213,16 +213,18 @@ export class LeslieEffect extends Tone.ToneAudioNode {
     if (!this.workletNode) return;
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
-      if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-        this.fallbackNode.onaudioprocess = null;
-        this.usingFallback = false;
-      }
+      // Connect WASM first, then disconnect fallback (avoids silent gap)
       const rawInput = getRawNode(this.input);
       const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
       rawWet.connect(getRawNode(this.output));
+      // Now safe to disconnect fallback
+      if (this.fallbackNode && this.usingFallback) {
+        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
+        this.fallbackNode.onaudioprocess = null;
+        this.usingFallback = false;
+      }
       const keepalive = rawContext.createGain();
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
