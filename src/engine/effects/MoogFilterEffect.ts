@@ -246,8 +246,8 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
                 /(wasmMemory=wasmExports\["\w+"\])/,
                 '$1;Module["wasmMemory"]=wasmMemory'
               );
-            // Inject URL shim for AudioWorklet new Function() scope
-            code = 'var URL = globalThis.URL || self.URL;\n' + code;
+            // Inject shims for AudioWorklet scope (no `self`, `window`, or `document`)
+            code = 'var self = globalThis; var URL = globalThis.URL;\n' + code;
             this.jsCode = code;
           }
         } catch (fetchErr) {

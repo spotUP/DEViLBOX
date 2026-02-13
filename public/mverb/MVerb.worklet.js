@@ -1,10 +1,78 @@
 /**
  * MVerb.worklet.js - MVerb Plate Reverb AudioWorklet Effect Processor
  * Loads and runs the MVerb WASM module as an audio effect (input -> output).
+ *
+ * IMPORTANT: Shares a single WASM module across all processor instances to avoid
+ * AudioWorklet memory exhaustion (each Emscripten module allocates ~16MB).
+ *
  * WASM binary and JS code are received via postMessage.
  */
 
 let processorRegistered = false;
+
+// Shared WASM module (single instance for all processors)
+let sharedModule = null;
+let sharedModulePromise = null;
+
+async function getOrCreateModule(wasmBinary, jsCode) {
+  // Return cached module if already initialized
+  if (sharedModule) return sharedModule;
+
+  // If initialization is in progress, wait for it
+  if (sharedModulePromise) return sharedModulePromise;
+
+  sharedModulePromise = (async () => {
+    // Evaluate the JS code to get the module factory
+    let createModule;
+    try {
+      const wrappedCode = `${jsCode}; return typeof createMVerbModule !== 'undefined' ? createMVerbModule : (typeof Module !== 'undefined' ? Module : null);`;
+      createModule = new Function(wrappedCode)();
+    } catch (evalErr) {
+      console.error('Failed to evaluate MVerb JS:', evalErr);
+      sharedModulePromise = null;
+      throw new Error('Could not evaluate MVerb module factory');
+    }
+
+    if (!createModule) {
+      sharedModulePromise = null;
+      throw new Error('Could not load MVerb module factory');
+    }
+
+    // Intercept WebAssembly.instantiate to capture WASM memory
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const instance = result.instance || result;
+      if (instance.exports) {
+        for (const value of Object.values(instance.exports)) {
+          if (value instanceof WebAssembly.Memory) {
+            capturedMemory = value;
+            break;
+          }
+        }
+      }
+      return result;
+    };
+
+    let Module;
+    try {
+      Module = await createModule({ wasmBinary });
+    } finally {
+      WebAssembly.instantiate = origInstantiate;
+    }
+
+    // Store captured memory on Module for later use
+    if (capturedMemory && !Module.wasmMemory) {
+      Module.wasmMemory = capturedMemory;
+    }
+
+    sharedModule = Module;
+    return Module;
+  })();
+
+  return sharedModulePromise;
+}
 
 class MVerbProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -15,11 +83,13 @@ class MVerbProcessor extends AudioWorkletProcessor {
     this.pendingMessages = [];
     this.Module = null;
 
+    // WASM buffer pointers
     this.inputPtrL = 0;
     this.inputPtrR = 0;
     this.outputPtrL = 0;
     this.outputPtrR = 0;
 
+    // Typed array views into WASM memory
     this.inputBufferL = null;
     this.inputBufferR = null;
     this.outputBufferL = null;
@@ -67,11 +137,13 @@ class MVerbProcessor extends AudioWorkletProcessor {
     this.inputBufferR = null;
     this.outputBufferL = null;
     this.outputBufferR = null;
+    // Call .delete() on Embind object to invoke C++ destructor
     if (this.effect) {
       try { this.effect.delete(); } catch(_) {}
     }
     this.effect = null;
     this.isInitialized = false;
+    // Note: Do NOT null out this.Module — it's shared across instances
   }
 
   async initialize(data) {
@@ -82,52 +154,22 @@ class MVerbProcessor extends AudioWorkletProcessor {
         throw new Error('Missing wasmBinary or jsCode in init message');
       }
 
-      let createModule;
-      try {
-        const wrappedCode = `${jsCode}; return typeof createMVerbModule !== 'undefined' ? createMVerbModule : (typeof Module !== 'undefined' ? Module : null);`;
-        createModule = new Function(wrappedCode)();
-      } catch (evalErr) {
-        console.error('Failed to evaluate MVerb JS:', evalErr);
-        throw new Error('Could not evaluate MVerb module factory');
-      }
+      // Get or create the shared WASM module (single instance for all processors)
+      const Module = await getOrCreateModule(wasmBinary, jsCode);
 
-      if (!createModule) {
-        throw new Error('Could not load MVerb module factory');
-      }
-
-      let capturedMemory = null;
-      const origInstantiate = WebAssembly.instantiate;
-      WebAssembly.instantiate = async function(...args) {
-        const result = await origInstantiate.apply(this, args);
-        const instance = result.instance || result;
-        if (instance.exports) {
-          for (const value of Object.values(instance.exports)) {
-            if (value instanceof WebAssembly.Memory) {
-              capturedMemory = value;
-              break;
-            }
-          }
-        }
-        return result;
-      };
-
-      let Module;
-      try {
-        Module = await createModule({ wasmBinary });
-      } finally {
-        WebAssembly.instantiate = origInstantiate;
-      }
-
+      // Create a NEW effect instance from the shared module
       this.effect = new Module.MVerbEffect();
       this.effect.initialize(sampleRate);
 
-      const bufferSize = 128 * 4;
+      // Allocate input AND output buffers in WASM memory (4 buffers for stereo effect)
+      const bufferSize = 128 * 4; // 128 samples * 4 bytes per float
       this.inputPtrL = Module._malloc(bufferSize);
       this.inputPtrR = Module._malloc(bufferSize);
       this.outputPtrL = Module._malloc(bufferSize);
       this.outputPtrR = Module._malloc(bufferSize);
 
-      const wasmMem = Module.wasmMemory || capturedMemory;
+      // Get WASM memory buffer
+      const wasmMem = Module.wasmMemory;
       const heapBuffer = Module.HEAPF32
         ? Module.HEAPF32.buffer
         : (wasmMem ? wasmMem.buffer : null);
@@ -138,6 +180,7 @@ class MVerbProcessor extends AudioWorkletProcessor {
 
       this._wasmMemory = wasmMem;
 
+      // Create typed array views into WASM memory
       this.inputBufferL = new Float32Array(heapBuffer, this.inputPtrL, 128);
       this.inputBufferR = new Float32Array(heapBuffer, this.inputPtrR, 128);
       this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, 128);
@@ -146,11 +189,13 @@ class MVerbProcessor extends AudioWorkletProcessor {
       this.Module = Module;
       this.isInitialized = true;
 
+      // Process any pending messages
       for (const msg of this.pendingMessages) {
         this.handleMessage({ data: msg });
       }
       this.pendingMessages = [];
 
+      // Notify main thread
       this.port.postMessage({ type: 'ready' });
 
     } catch (error) {
@@ -168,6 +213,7 @@ class MVerbProcessor extends AudioWorkletProcessor {
     const outputL = output[0];
     const outputR = output[1] || output[0];
 
+    // If no input connected or no effect ready, passthrough silence
     if (!input || !input[0] || !input[0].length) {
       if (outputL) outputL.fill(0);
       if (outputR) outputR.fill(0);
@@ -175,16 +221,18 @@ class MVerbProcessor extends AudioWorkletProcessor {
     }
 
     const inputL = input[0];
-    const inputR = input[1] || input[0];
+    const inputR = input[1] || input[0]; // Mono->stereo if needed
     const numSamples = inputL.length;
 
     if (!this.effect || !this.isInitialized) {
+      // Passthrough when WASM not ready
       outputL.set(inputL);
       outputR.set(inputR);
       return true;
     }
 
     try {
+      // Recreate views if WASM memory was resized
       const currentBuffer = this._wasmMemory
         ? this._wasmMemory.buffer
         : (this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null);
@@ -196,19 +244,23 @@ class MVerbProcessor extends AudioWorkletProcessor {
         this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
       }
 
+      // Copy input audio into WASM memory
       this.inputBufferL.set(inputL.subarray(0, numSamples));
       this.inputBufferR.set(inputR.subarray(0, numSamples));
 
+      // Process through WASM effect (input -> output)
       this.effect.process(
         this.inputPtrL, this.inputPtrR,
         this.outputPtrL, this.outputPtrR,
         numSamples
       );
 
+      // Copy WASM output to Web Audio output
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       outputR.set(this.outputBufferR.subarray(0, numSamples));
 
     } catch (error) {
+      // Passthrough on error
       outputL.set(inputL);
       outputR.set(inputR);
     }
@@ -217,6 +269,7 @@ class MVerbProcessor extends AudioWorkletProcessor {
   }
 }
 
+// Register processor only once
 if (!processorRegistered) {
   registerProcessor('mverb-processor', MVerbProcessor);
   processorRegistered = true;
