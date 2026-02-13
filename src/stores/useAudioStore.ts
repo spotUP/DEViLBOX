@@ -202,13 +202,16 @@ export const useAudioStore = create<AudioStore>()(
           }
           Object.assign(effect, updates);
 
+          // Clone before passing to ToneEngine — Immer revokes draft proxies after set()
+          const effectCopy = JSON.parse(JSON.stringify(effect)) as EffectConfig;
+
           // Notify ToneEngine to update effect
           const engine = get().toneEngineInstance;
           if (engine) {
-            engine.updateMasterEffectParams(effectId, effect);
+            engine.updateMasterEffectParams(effectId, effectCopy);
 
             // If bpmSync is ON after update, apply synced timing
-            if (effect.parameters.bpmSync === 1) {
+            if (effectCopy.parameters.bpmSync === 1) {
               const bpm = engine.getBPM();
               engine.updateBpmSyncedEffects(bpm);
             }

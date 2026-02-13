@@ -305,14 +305,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
 
-      // Disconnect fallback
-      if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-        this.fallbackNode.onaudioprocess = null;
-        this.usingFallback = false;
-      }
-
-      // Connect WASM worklet as wet path using raw GainNodes
+      // Connect WASM worklet FIRST, then disconnect fallback (avoids silent gap)
       const rawInput = getRawGainNode(this.input);
       const rawWet = getRawGainNode(this.wetGain);
       const rawOut = getRawGainNode(this.output);
@@ -320,6 +313,13 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
       rawWet.connect(rawOut);
+
+      // Now safe to disconnect fallback
+      if (this.fallbackNode && this.usingFallback) {
+        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
+        this.fallbackNode.onaudioprocess = null;
+        this.usingFallback = false;
+      }
 
       // Keepalive connection
       const keepalive = rawContext.createGain();

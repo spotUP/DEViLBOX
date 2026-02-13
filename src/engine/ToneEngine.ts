@@ -31,6 +31,8 @@ import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { WAMEffectNode } from './wam/WAMEffectNode';
+import { SidechainCompressor } from './effects/SidechainCompressor';
+import { TapeSaturation } from './effects/TapeSaturation';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -4386,15 +4388,34 @@ export class ToneEngine {
       return;
     }
 
-    // Create effect nodes (async for neural effects)
-    const effectNodes = (await Promise.all(
-      enabledEffects.map((config) => InstrumentFactory.createEffect(config))
-    )) as Tone.ToneAudioNode[];
+    // Ensure AudioContext is running before creating worklet-based effects (BitCrusher, etc.)
+    if (Tone.getContext().state === 'suspended') {
+      try { await Tone.start(); } catch { /* user gesture required */ }
+    }
+
+    // Create effect nodes individually — skip any that fail (e.g. worklet on suspended context)
+    const successNodes: Tone.ToneAudioNode[] = [];
+    const successConfigs: EffectConfig[] = [];
+    for (const config of enabledEffects) {
+      try {
+        const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
+        successNodes.push(node);
+        successConfigs.push(config);
+      } catch (error) {
+        console.warn(`[ToneEngine] Failed to create effect ${config.type}, skipping:`, error);
+      }
+    }
+
+    if (successNodes.length === 0) {
+      // All effects failed — direct connection to master channel
+      this.masterEffectsInput.connect(this.masterChannel);
+      return;
+    }
 
     // Store nodes and configs
-    effectNodes.forEach((node, index) => {
+    successNodes.forEach((node, index) => {
       this.masterEffectsNodes.push(node);
-      this.masterEffectConfigs.set(enabledEffects[index].id, { node, config: enabledEffects[index] });
+      this.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
     });
 
     // Connect chain: masterEffectsInput → effects[0] → effects[n] → masterChannel
@@ -4407,6 +4428,13 @@ export class ToneEngine {
 
     this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
 
+  }
+
+  /**
+   * Get the audio node for a master effect by ID (used by WAM GUI rendering)
+   */
+  public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {
+    return this.masterEffectConfigs.get(effectId)?.node ?? null;
   }
 
   /**
@@ -4587,6 +4615,9 @@ export class ToneEngine {
         if (node instanceof Tone.Filter) {
           if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
           if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
+          if ('type' in changed) node.type = changed.type as Tone.Filter['type'];
+          if ('rolloff' in changed) node.rolloff = changed.rolloff as Tone.FilterRollOff;
+          if ('gain' in changed) node.gain.rampTo(changed.gain as number, R);
         }
         break;
 
@@ -4671,7 +4702,7 @@ export class ToneEngine {
       case 'MoogFilter':
         if (node instanceof MoogFilterEffect) {
           if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
-          if ('resonance' in changed) node.setResonance(Number(changed.resonance));
+          if ('resonance' in changed) node.setResonance(Number(changed.resonance) / 100); // UI 0-100 → WASM 0-1
           if ('drive' in changed) node.setDrive(Number(changed.drive));
           if ('model' in changed) node.setModel(Number(changed.model) as MoogFilterModel);
           if ('filterMode' in changed) node.setFilterMode(Number(changed.filterMode) as MoogFilterMode);
@@ -4714,6 +4745,61 @@ export class ToneEngine {
           if ('mix' in changed) node.setSpringMix(Number(changed.mix));
           if ('drip' in changed) node.setDrip(Number(changed.drip));
           if ('diffusion' in changed) node.setDiffusion(Number(changed.diffusion));
+        }
+        break;
+
+      case 'Reverb':
+        if (node instanceof Tone.Reverb) {
+          if ('decay' in changed) node.decay = changed.decay as number;
+          if ('preDelay' in changed) node.preDelay = changed.preDelay as number;
+        }
+        break;
+
+      case 'JCReverb':
+        if (node instanceof Tone.JCReverb) {
+          if ('roomSize' in changed) node.roomSize.rampTo(changed.roomSize as number, R);
+        }
+        break;
+
+      case 'SidechainCompressor':
+        if (node instanceof SidechainCompressor) {
+          if ('threshold' in changed) node.threshold = changed.threshold as number;
+          if ('ratio' in changed) node.ratio = changed.ratio as number;
+          if ('attack' in changed) node.attack = changed.attack as number;
+          if ('release' in changed) node.release = changed.release as number;
+          if ('knee' in changed) node.knee = changed.knee as number;
+          if ('sidechainGain' in changed) node.sidechainGain = changed.sidechainGain as number;
+        }
+        break;
+
+      case 'TapeSaturation':
+        if (node instanceof TapeSaturation) {
+          if ('drive' in changed) node.drive = (changed.drive as number) / 100; // UI 0-100 → internal 0-1
+          if ('tone' in changed) node.tone = changed.tone as number;
+        }
+        break;
+
+      case 'AutoWah':
+        if (node instanceof Tone.AutoWah) {
+          if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
+          if ('octaves' in changed) node.octaves = changed.octaves as number;
+          if ('sensitivity' in changed) node.sensitivity = changed.sensitivity as number;
+          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
+          if ('gain' in changed) node.gain.rampTo(changed.gain as number, R);
+          if ('follower' in changed) node.follower = changed.follower as number;
+        }
+        break;
+
+      case 'Chebyshev':
+        if (node instanceof Tone.Chebyshev) {
+          if ('order' in changed) node.order = changed.order as number;
+          if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
+        }
+        break;
+
+      case 'FrequencyShifter':
+        if (node instanceof Tone.FrequencyShifter) {
+          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
         }
         break;
 

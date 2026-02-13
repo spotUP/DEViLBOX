@@ -136,7 +136,7 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'EQ3':
       return { low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 };
     case 'Filter':
-      return { type: 'lowpass', frequency: 350, rolloff: -12, Q: 1, gain: 0 };
+      return { type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 };
     case 'JCReverb':
       return { roomSize: 0.5 };
     case 'StereoWidener':
@@ -154,7 +154,7 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'BiPhase':
       return { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 };
     case 'DubFilter':
-      return { cutoff: 20, resonance: 1, gain: 1 };
+      return { cutoff: 20, resonance: 30, gain: 1 };
     case 'MoogFilter':
       return { cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 };
     case 'MVerb':
@@ -973,10 +973,20 @@ export class InstrumentFactory {
         });
         break;
 
-      case 'BitCrusher':
-        node = new Tone.BitCrusher(Number(p.bits) || 4);
-        (node as Tone.BitCrusher).wet.value = wetValue;
+      case 'BitCrusher': {
+        const crusher = new Tone.BitCrusher(Number(p.bits) || 4);
+        crusher.wet.value = wetValue;
+        // BitCrusher uses an AudioWorklet that loads async — wait for it
+        const crusherWorklet = (crusher as unknown as { _bitCrusherWorklet: { _worklet?: AudioWorkletNode } })._bitCrusherWorklet;
+        if (crusherWorklet) {
+          for (let attempt = 0; attempt < 50; attempt++) {
+            if (crusherWorklet._worklet) break;
+            await new Promise(r => setTimeout(r, 20));
+          }
+        }
+        node = crusher;
         break;
+      }
 
       case 'Chebyshev':
         node = new Tone.Chebyshev({
@@ -1041,19 +1051,30 @@ export class InstrumentFactory {
       case 'Filter':
         node = new Tone.Filter({
           type: p.type || 'lowpass',
-          frequency: p.frequency || 350,
+          frequency: p.frequency || 5000,
           rolloff: p.rolloff || -12,
           Q: p.Q || 1,
           gain: p.gain || 0,
         });
         break;
 
-      case 'JCReverb':
-        node = new Tone.JCReverb({
+      case 'JCReverb': {
+        const jcr = new Tone.JCReverb({
           roomSize: p.roomSize || 0.5,
           wet: wetValue,
         });
+        // JCReverb uses 4 FeedbackCombFilter AudioWorklets that load async.
+        // Wait for them to connect before returning, otherwise wet path is silent.
+        const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
+        if (combFilters?.length) {
+          for (let attempt = 0; attempt < 50; attempt++) {
+            if (combFilters.every(f => f._worklet)) break;
+            await new Promise(r => setTimeout(r, 20));
+          }
+        }
+        node = jcr;
         break;
+      }
 
       case 'StereoWidener':
         node = new Tone.StereoWidener({
@@ -1136,7 +1157,7 @@ export class InstrumentFactory {
       case 'DubFilter':
         node = new DubFilterEffect({
           cutoff: Number(p.cutoff) || 20,
-          resonance: Number(p.resonance) || 1,
+          resonance: Number(p.resonance) || 30,
           gain: Number(p.gain) || 1,
           wet: wetValue,
         });
