@@ -169,6 +169,8 @@ export class LeslieEffect extends Tone.ToneAudioNode {
               .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
               .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
               .replace(/(wasmMemory=wasmExports\["\w+"\])/, '$1;Module["wasmMemory"]=wasmMemory');
+            // Inject shims for AudioWorklet scope (no `self`, `window`, or `document`)
+            code = 'var self = globalThis; var URL = globalThis.URL;\n' + code;
             this.jsCode = code;
           }
         } catch (fetchErr) {
