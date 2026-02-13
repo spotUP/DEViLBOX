@@ -1090,9 +1090,14 @@ export class FurnaceDispatchEngine {
         await context.audioWorklet.addModule(`${baseUrl}furnace-dispatch/FurnaceDispatch.worklet.js${cacheBuster}`);
         console.log('[FurnaceDispatch] ensureModuleLoaded: worklet module added');
       } catch (e: unknown) {
-        // Only swallow "already registered" errors; re-throw real failures
+        // Swallow expected errors:
+        // - "already registered" / "duplicate" - module already loaded
+        // - "InvalidStateError" - context suspended (will retry when context resumes)
         const msg = (e instanceof Error ? e.message : String(e));
-        if (!msg.includes('already') && !msg.includes('duplicate')) {
+        const name = (e instanceof Error ? e.name : '');
+        if (msg.includes('already') || msg.includes('duplicate') || name === 'InvalidStateError') {
+          console.log('[FurnaceDispatch] ensureModuleLoaded: worklet already loaded or context suspended');
+        } else {
           throw new Error(`Failed to load FurnaceDispatch worklet: ${msg}`);
         }
       }
