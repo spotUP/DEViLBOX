@@ -52,14 +52,10 @@ add_subdirectory(dexed)
 add_subdirectory(obxd)
 
 # ============================================================================
-# Open303 (TB-303 Synthesizer) - MIT
+# NOTE: DB303/Open303 source removed from juce-wasm. The running DB303 WASM
+# is the site-rip at public/db303/ (identical to db303-local/db303.wasm).
+# Source of truth: Reference Code/jc303-main/ (JC303.cpp has the conversion layer).
 # ============================================================================
-add_subdirectory(open303)
-
-# ============================================================================
-# DB303 (TB-303 Synthesizer with db303 tweaks) - MIT + GPLv3
-# ============================================================================
-add_subdirectory(db303)
 
 # ============================================================================
 # RdPiano (Roland SA-synthesis Digital Piano) - GPL-3.0
@@ -105,7 +101,7 @@ add_subdirectory(monique)
 # Combined build target
 # ============================================================================
 add_custom_target(all_synths
-    DEPENDS DexedWASM OBXdWASM Open303WASM DB303WASM RdPianoWASM MoogFiltersWASM
+    DEPENDS DexedWASM OBXdWASM RdPianoWASM MoogFiltersWASM
             MVerbWASM LeslieWASM SpringReverbWASM TonewheelWASM MelodicaWASM
             MoniqueWASMBuild
     COMMENT "Building all JUCE WASM synths and effects"
