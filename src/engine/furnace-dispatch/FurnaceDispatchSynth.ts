@@ -103,7 +103,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.output = getDevilboxAudioContext().createGain();
     this.platformType = platformType;
     this.engine = FurnaceDispatchEngine.getInstance();
-    this._readyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
+    this._isReadyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
     this.initialize();
   }
 
@@ -111,11 +111,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * Returns a promise that resolves when the synth is fully initialized and ready to play.
    */
   get ready(): Promise<void> {
-    return this._readyPromise;
+    return this._isReadyPromise;
   }
 
   public async ensureInitialized(): Promise<void> {
-    return this._readyPromise;
+    return this._isReadyPromise;
   }
 
   /**
@@ -202,7 +202,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Set up default instrument for this platform
       this.setupDefaultInstrument();
 
-      this._ready = true;
+      this._isReady = true;
       this._resolveReady();
 
       // Wire oscilloscope data to the store
@@ -595,7 +595,10 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) {
+      console.warn(`[FurnaceDispatchSynth] triggerAttack blocked: ready=${this._isReady} disposed=${this._disposed} platform=${this.platformType}`);
+      return;
+    }
 
     const midiNote = typeof note === 'string'
       ? noteToMidi(note)
@@ -657,7 +660,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
   triggerRelease(note?: string | number, time?: number): void {
     void time;
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) return;
 
     if (note !== undefined) {
       // Release a specific note
@@ -696,22 +699,22 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * Send a raw dispatch command.
    */
   sendCommand(cmd: number, chan: number, val1: number = 0, val2: number = 0): void {
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) return;
     this.engine.dispatch(cmd, chan, val1, val2, this.platformType);
   }
 
   applyEffect(effect: number, param: number, chan?: number): void {
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) return;
     this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
   applyExtendedEffect(x: number, y: number, chan?: number): void {
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) return;
     this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.platformType);
   }
 
   applyPlatformEffect(effect: number, param: number, chan?: number): void {
-    if (!this._ready || this._disposed) return;
+    if (!this._isReady || this._disposed) return;
     this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
