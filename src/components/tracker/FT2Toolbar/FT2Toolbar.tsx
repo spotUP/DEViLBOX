@@ -379,11 +379,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       if (moduleInfo.nativeData?.instruments) {
         const parsedInstruments = moduleInfo.nativeData.instruments;
         const format = moduleInfo.nativeData.format;
-        // Use original instrument ID from parsed data (1-31 for MOD, 1-128 for XM)
-        // NOT array index, which would renumber after filtering empty samples
-        instruments = parsedInstruments.flatMap((parsed) =>
-          convertToInstrument(parsed, parsed.id, format)
-        );
+        // Track next available ID to avoid duplicates when multi-sample instruments expand
+        let nextId = 1;
+        instruments = [];
+        for (const parsed of parsedInstruments) {
+          const converted = convertToInstrument(parsed, nextId, format);
+          instruments.push(...converted);
+          nextId += converted.length; // Advance ID by number of instruments created
+        }
       } else {
         instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, undefined);
       }
