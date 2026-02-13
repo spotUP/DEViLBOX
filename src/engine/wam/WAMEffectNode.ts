@@ -169,12 +169,37 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
    * Create native GUI element from the WAM plugin
    */
   async createGui(): Promise<HTMLElement | null> {
-    if (!this._wamInstance || typeof this._wamInstance.createGui !== 'function') return null;
-    try {
-      return await this._wamInstance.createGui();
-    } catch {
-      return null;
+    if (!this._wamInstance) return null;
+
+    // 1. Try the standard WAM 2.0 createGui()
+    if (typeof this._wamInstance.createGui === 'function') {
+      try {
+        const gui = await this._wamInstance.createGui();
+        if (gui) return gui;
+      } catch {
+        // Fall through to fallback
+      }
     }
+
+    // 2. Fallback: try to load gui.js relative to the module URL
+    if (this._moduleUrl) {
+      const baseUrl = this._moduleUrl.replace(/\/[^/]*$/, '/');
+      const guiCandidates = ['gui.js', 'Gui/index.js', 'gui/index.js'];
+      for (const guiFile of guiCandidates) {
+        const guiUrl = baseUrl + guiFile;
+        try {
+          const guiModule = await import(/* @vite-ignore */ guiUrl);
+          if (typeof guiModule.createElement === 'function') {
+            const gui = await guiModule.createElement(this._wamInstance);
+            if (gui) return gui as HTMLElement;
+          }
+        } catch {
+          // This candidate doesn't exist, try next
+        }
+      }
+    }
+
+    return null;
   }
 
   /**

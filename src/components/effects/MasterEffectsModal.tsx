@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink } from 'lucide-react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import {
@@ -30,6 +30,7 @@ import { EffectParameterEditor } from './EffectParameterEditor';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 // User preset storage key
 const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
@@ -50,7 +51,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
-  const [editingEffect, setEditingEffect] = useState<EffectConfig | null>(null);
+  const [editingEffectId, setEditingEffectId] = useState<string | null>(null);
+  const [previewEffectId, setPreviewEffectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const {
@@ -61,6 +63,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     reorderMasterEffects,
     setMasterEffects,
   } = useAudioStore();
+
+  // Derive editingEffect from store (never stale)
+  const editingEffect = useMemo(
+    () => masterEffects.find(e => e.id === editingEffectId) ?? null,
+    [masterEffects, editingEffectId]
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -135,45 +143,67 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   // Count neural effects for performance warning
   const neuralEffectCount = masterEffects.filter(fx => fx.category === 'neural').length;
 
-  // Handle adding effect (supports both Tone.js and Neural)
-  const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
-    // User Decision #2: Warn before adding 4th neural effect
-    if (availableEffect.category === 'neural' && neuralEffectCount >= 3) {
-      const proceed = confirm(
-        '⚠️ Performance Warning\n\n' +
-        'You are adding a 4th neural effect to the master chain. Multiple neural effects can cause high CPU usage and audio glitches.\n\n' +
-        'Consider using Tone.js effects or reducing the neural effect count.\n\n' +
-        'Continue anyway?'
-      );
-      if (!proceed) return;
+  // Preview an effect — temporarily adds to audio chain so user hears it
+  const handlePreviewEffect = useCallback((availableEffect: AvailableEffect) => {
+    // Remove previous preview if any
+    if (previewEffectId) {
+      removeMasterEffect(previewEffectId);
     }
 
-    // Build new effect config
-    const newEffect: EffectConfig = {
-      id: `master-fx-${Date.now()}`,
-      category: availableEffect.category,
-      type: (availableEffect.type as EffectType) || 'Distortion', // Default to Distortion for neural
-      enabled: true,
-      wet: 100,
-      parameters: {},
-      neuralModelIndex: availableEffect.neuralModelIndex,
-      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-    };
+    // Warn before adding 4th neural effect
+    if (availableEffect.category === 'neural' && neuralEffectCount >= 3) {
+      const proceed = confirm(
+        'Performance Warning\n\n' +
+        'Adding a 4th neural effect. Multiple neural effects can cause high CPU usage and audio glitches.\n\n' +
+        'Continue anyway?'
+      );
+      if (!proceed) { setPreviewEffectId(null); setEditingEffectId(null); return; }
+    }
 
-    // Get default parameters from neural model schema
+    const type = (availableEffect.type as EffectType) || 'Distortion';
+    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
+
     if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
       const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
       if (model?.parameters) {
         Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) {
-            newEffect.parameters[key] = param.default;
-          }
+          if (param) params[key] = param.default;
         });
       }
     }
 
-    addMasterEffectConfig(newEffect);
-  }, [neuralEffectCount, addMasterEffectConfig]);
+    addMasterEffectConfig({
+      category: availableEffect.category,
+      type,
+      enabled: true,
+      wet: 100,
+      parameters: params,
+      neuralModelIndex: availableEffect.neuralModelIndex,
+      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
+    });
+
+    // Store generates its own ID — read it back
+    const added = useAudioStore.getState().masterEffects;
+    const newId = added[added.length - 1]?.id ?? null;
+    setPreviewEffectId(newId);
+    setEditingEffectId(newId);
+  }, [previewEffectId, neuralEffectCount, addMasterEffectConfig, removeMasterEffect]);
+
+  // Confirm: keep the preview effect in the chain permanently
+  const handleConfirmAdd = useCallback(() => {
+    if (!previewEffectId) return;
+    setPreviewEffectId(null);
+    // editingEffectId already points to the effect — it just stays in the chain
+  }, [previewEffectId]);
+
+  // Cancel/remove the preview effect
+  const handleCancelPreview = useCallback(() => {
+    if (previewEffectId) {
+      removeMasterEffect(previewEffectId);
+    }
+    setPreviewEffectId(null);
+    setEditingEffectId(null);
+  }, [previewEffectId, removeMasterEffect]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -236,7 +266,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
       onClick={handleBackdropClick}
     >
-      <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-[1200px] flex flex-col overflow-hidden animate-scale-in">
+      <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-[1400px] flex flex-col overflow-hidden animate-scale-in">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bgSecondary">
           <div className="flex items-center gap-4">
@@ -418,19 +448,19 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content — 3-column layout: Chain | Editor | Browser */}
         <div className="flex-1 overflow-hidden flex">
-          {/* Left: Effects List */}
-          <div className="w-1/2 border-r border-dark-border flex flex-col">
+          {/* Left: Effect Chain (1/4) */}
+          <div className="w-1/4 border-r border-dark-border flex flex-col">
             <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
-              <h3 className="text-sm font-bold text-text-primary mb-3">Effect Chain</h3>
-              <p className="text-xs text-text-muted">Drag effects to reorder. Click to edit parameters.</p>
+              <h3 className="text-sm font-bold text-text-primary mb-1">Effect Chain</h3>
+              <p className="text-xs text-text-muted">Drag to reorder. Click to edit.</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
+            <div className="flex-1 overflow-y-auto scrollbar-modern p-3">
               {masterEffects.length === 0 ? (
-                <div className="p-8 text-center text-text-muted text-sm border border-dashed border-dark-border rounded-lg">
-                  No master effects. Add effects from the panel on the right.
+                <div className="p-6 text-center text-text-muted text-xs border border-dashed border-dark-border rounded-lg">
+                  No effects yet. Add from the browser panel.
                 </div>
               ) : (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -439,8 +469,11 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       <SortableEffectItem
                         key={effect.id}
                         effect={effect}
-                        isSelected={editingEffect?.id === effect.id}
-                        onSelect={() => setEditingEffect(effect)}
+                        isSelected={editingEffectId === effect.id}
+                        onSelect={() => {
+                          if (previewEffectId) { removeMasterEffect(previewEffectId); setPreviewEffectId(null); }
+                          setEditingEffectId(effect.id);
+                        }}
                         onToggle={() => handleToggle(effect.id)}
                         onRemove={() => removeMasterEffect(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
@@ -452,100 +485,124 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
             </div>
           </div>
 
-          {/* Right: Add Effects / Edit Parameters */}
-          <div className="w-1/2 flex flex-col">
+          {/* Center: Effect Editor (1/2) */}
+          <div className="w-1/2 border-r border-dark-border flex flex-col">
             {editingEffect ? (
               <>
                 <div className="p-4 border-b border-dark-border bg-dark-bgSecondary flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-text-primary">{editingEffect.type} Parameters</h3>
-                    <p className="text-xs text-text-muted">Adjust effect settings</p>
+                    <h3 className="text-sm font-bold text-text-primary">{editingEffect.neuralModelName || editingEffect.type} Parameters</h3>
+                    <p className="text-xs text-text-muted">
+                      {previewEffectId === editingEffectId ? 'Preview — tweak knobs to hear changes' : 'Adjust effect settings'}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => setEditingEffect(null)}
-                    className="text-xs text-text-muted hover:text-accent-primary transition-colors"
-                  >
-                    Back to Add
-                  </button>
+                  {previewEffectId === editingEffectId && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCancelPreview}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-dark-border
+                                 text-text-muted hover:text-text-primary hover:border-dark-borderLight transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleConfirmAdd}
+                        className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg
+                                 bg-accent-primary text-white hover:bg-accent-primaryHover transition-colors"
+                      >
+                        <Plus size={12} />
+                        Add to Chain
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
                   <EffectParameterEditor
                     effect={editingEffect}
                     onUpdateParameter={(key, value) => {
-                      const updates = { parameters: { ...editingEffect.parameters, [key]: value } };
-                      updateMasterEffect(editingEffect.id, updates);
-                      setEditingEffect({ ...editingEffect, ...updates });
+                      if (!editingEffectId) return;
+                      const current = useAudioStore.getState().masterEffects.find(e => e.id === editingEffectId);
+                      if (!current) return;
+                      updateMasterEffect(editingEffectId, {
+                        parameters: { ...current.parameters, [key]: value }
+                      });
                     }}
                     onUpdateWet={(wet) => {
-                      updateMasterEffect(editingEffect.id, { wet });
-                      setEditingEffect({ ...editingEffect, wet });
+                      if (editingEffectId) updateMasterEffect(editingEffectId, { wet });
                     }}
                   />
                 </div>
               </>
             ) : (
-              <>
-                <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary">Add Effect</h3>
-                    <p className="text-xs text-text-muted">Select an effect to add to the chain</p>
-                  </div>
-                  <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                    <input
-                      type="text"
-                      placeholder="Search effects..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2 text-sm bg-dark-bg border border-dark-border rounded-lg text-text-primary
-                               placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
+              <div className="flex-1 flex items-center justify-center text-text-muted">
+                <div className="text-center space-y-2">
+                  <Sliders size={32} className="mx-auto opacity-30" />
+                  <p className="text-sm">Select an effect from the chain<br/>or click one in the browser to preview</p>
                 </div>
-                <div className="flex-1 overflow-y-auto scrollbar-modern p-4">
-                  <div className="space-y-4">
-                    {Object.keys(filteredEffectsByGroup).length === 0 ? (
-                      <div className="p-8 text-center text-text-muted text-sm">
-                        No effects matching "{searchQuery}"
-                      </div>
-                    ) : null}
-                    {Object.entries(filteredEffectsByGroup).map(([group, groupEffects]) => (
-                      <div key={group}>
-                        <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-2">{group}</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          {groupEffects.map((effect) => (
-                            <button
-                              key={effect.label}
-                              onClick={() => handleAddEffect(effect)}
-                              className="px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
-                                       hover:bg-accent-primary hover:text-white hover:border-accent-primary
-                                       transition-colors text-left flex items-center justify-between gap-2"
-                            >
-                              <span className="truncate">{effect.label}</span>
-                              {/* User Decision #4: Visual badges */}
-                              {effect.category === 'neural' && (
-                                <Cpu size={12} className="flex-shrink-0 opacity-60" />
-                              )}
-                              {effect.category === 'wam' && (
-                                <Globe size={12} className="flex-shrink-0 opacity-60" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
+              </div>
             )}
+          </div>
+
+          {/* Right: Effect Browser (1/4) */}
+          <div className="w-1/4 flex flex-col">
+            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-3">
+              <div>
+                <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>
+                <p className="text-xs text-text-muted">Click to preview</p>
+              </div>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search effects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-sm bg-dark-bg border border-dark-border rounded-lg text-text-primary
+                           placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-modern p-3">
+              <div className="space-y-3">
+                {Object.keys(filteredEffectsByGroup).length === 0 ? (
+                  <div className="p-6 text-center text-text-muted text-xs">
+                    No effects matching "{searchQuery}"
+                  </div>
+                ) : null}
+                {Object.entries(filteredEffectsByGroup).map(([group, groupEffects]) => (
+                  <div key={group}>
+                    <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-1.5">{group}</h4>
+                    <div className="space-y-1">
+                      {groupEffects.map((effect) => (
+                        <button
+                          key={effect.label}
+                          onClick={() => handlePreviewEffect(effect)}
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
+                                   hover:bg-accent-primary hover:text-white hover:border-accent-primary
+                                   transition-colors text-left flex items-center justify-between gap-2"
+                        >
+                          <span className="truncate">{effect.label}</span>
+                          {effect.category === 'neural' && (
+                            <Cpu size={12} className="flex-shrink-0 opacity-60" />
+                          )}
+                          {effect.category === 'wam' && (
+                            <Globe size={12} className="flex-shrink-0 opacity-60" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
