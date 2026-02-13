@@ -353,11 +353,12 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       buffer = new Uint8Array(analyser.frequencyBinCount);
       audioBufferRef.current = buffer;
     }
-    analyser.getByteFrequencyData(buffer);
+    // Use any cast to work around ArrayBufferLike vs ArrayBuffer type incompatibility
+    analyser.getByteFrequencyData(buffer as any);
     setAudioData(buffer);
 
     // Beat detection: measure sudden volume increase
-    const volume = audioBufferRef.current.reduce((a, b) => a + b, 0) / audioBufferRef.current.length;
+    const volume = buffer.reduce((a, b) => a + b, 0) / buffer.length;
     const volumeDelta = volume - previousVolumeRef.current;
 
     if (volumeDelta > BEAT_DETECTION_THRESHOLD) {
