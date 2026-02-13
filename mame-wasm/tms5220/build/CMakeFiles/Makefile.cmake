@@ -12,36 +12,22 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/4.1.1/CMakeCXXCompiler.cmake"
   "CMakeFiles/4.1.1/CMakeSystem.cmake"
   "/opt/homebrew/Cellar/emscripten/4.0.16/libexec/cmake/Modules/Platform/Emscripten.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeCCompiler.cmake.in"
   "/opt/homebrew/share/cmake/Modules/CMakeCInformation.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeCXXCompiler.cmake.in"
   "/opt/homebrew/share/cmake/Modules/CMakeCXXInformation.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeDetermineCCompiler.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeDetermineCompiler.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeDetermineSystem.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeFindBinUtils.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeSystem.cmake.in"
   "/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake"
   "/opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeTestCCompiler.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeTestCXXCompiler.cmake"
-  "/opt/homebrew/share/cmake/Modules/CMakeUnixFindMake.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/Clang-C.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/Clang-CXX.cmake"
-  "/opt/homebrew/share/cmake/Modules/Compiler/Clang-FindBinUtils.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake"
   "/opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake"
   "/opt/homebrew/share/cmake/Modules/Internal/CMakeCLinkerInformation.cmake"
   "/opt/homebrew/share/cmake/Modules/Internal/CMakeCXXLinkerInformation.cmake"
   "/opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake"
-  "/opt/homebrew/share/cmake/Modules/Internal/CMakeInspectCLinker.cmake"
-  "/opt/homebrew/share/cmake/Modules/Internal/CMakeInspectCXXLinker.cmake"
   )
 
 # The corresponding makefile is:
@@ -52,11 +38,6 @@ set(CMAKE_MAKEFILE_OUTPUTS
 
 # Byproducts of CMake generate step:
 set(CMAKE_MAKEFILE_PRODUCTS
-  "CMakeFiles/4.1.1/CMakeSystem.cmake"
-  "CMakeFiles/4.1.1/CMakeCCompiler.cmake"
-  "CMakeFiles/4.1.1/CMakeCXXCompiler.cmake"
-  "CMakeFiles/4.1.1/CMakeCCompiler.cmake"
-  "CMakeFiles/4.1.1/CMakeCXXCompiler.cmake"
   "CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 

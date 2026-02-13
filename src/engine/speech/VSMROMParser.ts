@@ -16,7 +16,7 @@
 export interface LPCFrame {
   energy: number;    // Energy index 0-15 (0=silent, 15=stop)
   repeat: boolean;   // Repeat previous frame's K coefficients
-  pitch: number;     // Pitch index 0-63 (0=unvoiced)
+  pitch: number;     // Pitch index 0-31 (0=unvoiced, TMC0281 5-bit)
   k: number[];       // K1-K10 indices (only present for non-repeat, non-silent frames)
   unvoiced: boolean; // true if pitch=0 (noise excitation)
 }
@@ -39,15 +39,15 @@ class BitReader {
     this.bitPos = startBit;
   }
 
-  /** Read N bits from the bitstream (MSB first, matching TMS5220 serial protocol) */
+  /** Read N bits from the bitstream (LSB first within each byte, matching MAME speechrom.cpp) */
   readBits(count: number): number {
     let value = 0;
     for (let i = 0; i < count; i++) {
       const byteIndex = Math.floor(this.bitPos / 8);
       const bitIndex = this.bitPos % 8;
       if (byteIndex < this.data.length) {
-        // TMS5220 reads bits MSB first within each byte
-        const bit = (this.data[byteIndex] >> (7 - bitIndex)) & 1;
+        // MAME speechrom.cpp reads bits LSB first: (byte >> bitOffset) & 1
+        const bit = (this.data[byteIndex] >> bitIndex) & 1;
         value = (value << 1) | bit;
       }
       this.bitPos++;
@@ -92,7 +92,7 @@ function parseLPCFrame(reader: BitReader): LPCFrame | null {
   }
 
   const repeat = reader.readBits(1) === 1;
-  const pitch = reader.readBits(6);
+  const pitch = reader.readBits(5); // TMC0281 uses 5-bit pitch (0-31), not 6-bit TMS5220
   const unvoiced = pitch === 0;
 
   if (repeat) {
@@ -276,10 +276,12 @@ export function buildWordTableFromMCU(_mcuRom: Uint8Array, vsmRom: Uint8Array): 
 
   // Scan the beginning of the VSM ROM for the address table.
   // Read 16-bit LE values and convert to combined byte offsets.
-  // The table ends when we encounter a value that points outside the ROM
-  // or when parsed LPC frames at the target address are too short.
+  // Each entry is a 14-bit byte address + 2-bit chip select.
+  // Allow gaps (some entries may point to invalid data) — only stop after
+  // several consecutive invalid entries.
   const maxTableBytes = Math.min(1024, totalBytes);
   const addresses: Array<{ byteOffset: number; tableOffset: number }> = [];
+  let consecutiveInvalid = 0;
 
   for (let off = 0; off < maxTableBytes; off += 2) {
     const raw = vsmRom[off] | (vsmRom[off + 1] << 8);
@@ -287,24 +289,55 @@ export function buildWordTableFromMCU(_mcuRom: Uint8Array, vsmRom: Uint8Array): 
     const addr = raw & 0x3FFF;
     const combinedByte = chip * 16384 + addr;
 
-    // Must point within the ROM and past the table area itself
-    if (combinedByte >= totalBytes) break;
+    if (combinedByte >= totalBytes) {
+      consecutiveInvalid++;
+      if (consecutiveInvalid > 5) break;
+      continue;
+    }
 
     // Validate: try to parse LPC frames at this byte address
     const frames = parseLPCFramesFromPosition(vsmRom, combinedByte * 8);
-    if (frames.length >= 3) {
+    // A valid word needs 3+ frames and should end with a stop frame
+    const hasStop = frames.length > 0 && frames[frames.length - 1].energy === 15;
+    if (frames.length >= 3 || (frames.length >= 1 && hasStop)) {
       addresses.push({ byteOffset: combinedByte, tableOffset: off });
-    } else if (addresses.length > 10) {
-      // Once we've found many valid entries, a failed parse likely means table end
-      break;
+      consecutiveInvalid = 0;
+    } else {
+      consecutiveInvalid++;
+      if (addresses.length > 20 && consecutiveInvalid > 5) {
+        // After finding many valid entries, 5+ consecutive failures = table end
+        break;
+      }
     }
   }
 
-  // Name words from the vocabulary list
-  for (let i = 0; i < addresses.length; i++) {
-    const name = i < SPEAK_AND_SPELL_VOCABULARY.length
-      ? SPEAK_AND_SPELL_VOCABULARY[i]
-      : `Word ${i}`;
+  // Detect header/metadata entries at the start of the address table.
+  // The Speak & Spell ROM has 1-2 header entries that point to locations
+  // far beyond where the actual A-Z speech data starts. Real speech data
+  // begins shortly after the address table itself (near byte 100-200),
+  // while header entries may point to bytes 10000+.
+  let skipCount = 0;
+  if (addresses.length > 5) {
+    const refAddresses = addresses.slice(2, Math.min(6, addresses.length));
+    const minRef = Math.min(...refAddresses.map(a => a.byteOffset));
+    for (let i = 0; i < Math.min(2, addresses.length); i++) {
+      if (addresses[i].byteOffset > minRef * 5) {
+        skipCount++;
+      } else {
+        break;
+      }
+    }
+    if (skipCount > 0) {
+      console.log(`[VSMROMParser] Skipping ${skipCount} header entries (offsets: ${addresses.slice(0, skipCount).map(a => a.byteOffset).join(', ')} vs speech start ~${minRef})`);
+    }
+  }
+
+  // Name words from the vocabulary list, skipping header entries
+  for (let i = skipCount; i < addresses.length; i++) {
+    const vocabIdx = i - skipCount;
+    const name = vocabIdx < SPEAK_AND_SPELL_VOCABULARY.length
+      ? SPEAK_AND_SPELL_VOCABULARY[vocabIdx]
+      : `Word ${vocabIdx}`;
     const startBit = addresses[i].byteOffset * 8;
     const frames = parseLPCFramesFromPosition(vsmRom, startBit);
     words.push({ name, startBit, frames });
