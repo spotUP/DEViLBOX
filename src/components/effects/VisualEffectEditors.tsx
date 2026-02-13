@@ -7,7 +7,7 @@
  * - Consistent layout and styling
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { EffectConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { BpmSyncControl } from './BpmSyncControl';
@@ -1188,6 +1188,150 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
 };
 
 // ============================================================================
+// WAM 2.0 EFFECT EDITOR (Native GUI embed)
+// ============================================================================
+
+import { getToneEngine } from '@engine/ToneEngine';
+import { WAMEffectNode } from '@engine/wam/WAMEffectNode';
+
+const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateWet,
+}) => {
+  const guiContainerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasGui, setHasGui] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let currentGui: HTMLElement | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const mountGui = async () => {
+      if (!guiContainerRef.current) return;
+      guiContainerRef.current.innerHTML = '';
+      setHasGui(false);
+      setIsLoading(true);
+
+      try {
+        const engine = getToneEngine();
+
+        // The WAM node may not exist yet — rebuildMasterEffects is async.
+        // Poll until the node is available (up to ~5s).
+        let node: ReturnType<typeof engine.getMasterEffectNode> = null;
+        for (let attempt = 0; attempt < 25; attempt++) {
+          node = engine.getMasterEffectNode(effect.id);
+          if (node && node instanceof WAMEffectNode) break;
+          node = null;
+          await new Promise(r => setTimeout(r, 200));
+          if (!isMounted) return;
+        }
+
+        if (!node || !(node instanceof WAMEffectNode)) {
+          if (isMounted) setIsLoading(false);
+          return;
+        }
+
+        await node.ensureInitialized();
+        if (!isMounted) return;
+
+        const gui = await node.createGui();
+        if (!gui || !isMounted || !guiContainerRef.current) {
+          if (isMounted) setIsLoading(false);
+          return;
+        }
+
+        currentGui = gui;
+        setHasGui(true);
+        guiContainerRef.current.appendChild(gui);
+
+        // Auto-scale plugin GUI to fill container
+        const scaleToFit = () => {
+          const container = guiContainerRef.current;
+          if (!container || !gui) return;
+          gui.style.transform = '';
+          gui.style.position = '';
+          gui.style.left = '';
+          gui.style.top = '';
+          const w = gui.offsetWidth || gui.scrollWidth || gui.clientWidth;
+          const h = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
+          if (!w || !h) return;
+          const cw = container.clientWidth;
+          const ch = container.clientHeight;
+          if (!cw || !ch) return;
+          const scale = Math.min(cw / w, ch / h);
+          const scaledW = w * scale;
+          const scaledH = h * scale;
+          gui.style.position = 'absolute';
+          gui.style.transformOrigin = 'top left';
+          gui.style.transform = `scale(${scale})`;
+          gui.style.left = `${(cw - scaledW) / 2}px`;
+          gui.style.top = `${(ch - scaledH) / 2}px`;
+        };
+
+        resizeObserver = new ResizeObserver(scaleToFit);
+        resizeObserver.observe(guiContainerRef.current);
+        requestAnimationFrame(scaleToFit);
+        setTimeout(scaleToFit, 300);
+        setTimeout(scaleToFit, 800);
+        setTimeout(scaleToFit, 1500);
+      } catch (err) {
+        console.warn('[WAMEffectEditor] Failed to load GUI:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    mountGui();
+
+    return () => {
+      isMounted = false;
+      resizeObserver?.disconnect();
+      if (currentGui?.parentElement) {
+        currentGui.parentElement.removeChild(currentGui);
+      }
+    };
+  }, [effect.id]);
+
+  return (
+    <div className="space-y-4">
+      {/* Native WAM GUI */}
+      <div
+        ref={guiContainerRef}
+        className="bg-black rounded-lg border border-white/[0.06] overflow-hidden relative"
+        style={{ minHeight: hasGui ? 300 : 0, display: hasGui || isLoading ? 'block' : 'none' }}
+      />
+      {isLoading && (
+        <div className="flex items-center justify-center py-8 text-text-muted text-xs">
+          Loading plugin interface...
+        </div>
+      )}
+      {!hasGui && !isLoading && (
+        <div className="text-center text-text-muted text-xs py-4">
+          Plugin did not provide a native GUI.
+        </div>
+      )}
+      {/* Mix knob */}
+      <section className="rounded-xl p-4 border border-white/[0.04] bg-black/30 backdrop-blur-sm">
+        <SectionHeader color="#6b7280" title="Mix" />
+        <div className="flex justify-center">
+          <Knob
+            value={effect.wet}
+            min={0}
+            max={100}
+            onChange={onUpdateWet}
+            label="Mix"
+            size="lg"
+            color="#6b7280"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ============================================================================
 // SPACEY DELAYER (WASM Multitap Delay)
 // ============================================================================
 
@@ -2198,18 +2342,18 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   MVerb: MVerbEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
-  // WAM 2.0 effects — use generic editor (WAM provides its own native GUI)
-  WAMBigMuff: GenericEffectEditor,
-  WAMTS9: GenericEffectEditor,
-  WAMDistoMachine: GenericEffectEditor,
-  WAMQuadraFuzz: GenericEffectEditor,
-  WAMVoxAmp: GenericEffectEditor,
-  WAMStonePhaser: GenericEffectEditor,
-  WAMPingPongDelay: GenericEffectEditor,
-  WAMFaustDelay: GenericEffectEditor,
-  WAMPitchShifter: GenericEffectEditor,
-  WAMGraphicEQ: GenericEffectEditor,
-  WAMPedalboard: GenericEffectEditor,
+  // WAM 2.0 effects — embed native plugin GUI
+  WAMBigMuff: WAMEffectEditor,
+  WAMTS9: WAMEffectEditor,
+  WAMDistoMachine: WAMEffectEditor,
+  WAMQuadraFuzz: WAMEffectEditor,
+  WAMVoxAmp: WAMEffectEditor,
+  WAMStonePhaser: WAMEffectEditor,
+  WAMPingPongDelay: WAMEffectEditor,
+  WAMFaustDelay: WAMEffectEditor,
+  WAMPitchShifter: WAMEffectEditor,
+  WAMGraphicEQ: WAMEffectEditor,
+  WAMPedalboard: WAMEffectEditor,
 };
 
 /**
@@ -2350,6 +2494,21 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
 
   const enc = ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE;
   const icon = iconMap[effect.type] || <Music size={18} className="text-white" />;
+  const isWAM = effect.type.startsWith('WAM');
+
+  // WAM effects render only their native GUI — skip the pedal enclosure wrapper
+  if (isWAM) {
+    return (
+      <div className="overflow-y-auto scrollbar-modern">
+        <EffectEditorDispatch
+          effectType={effect.type}
+          effect={effect}
+          onUpdateParameter={onUpdateParameter}
+          onUpdateWet={onUpdateWet}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -2414,7 +2573,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
       </div>
 
       {/* Editor Content */}
-      <div className="p-4">
+      <div className="p-4 overflow-y-auto scrollbar-modern">
         <EffectEditorDispatch
           effectType={effect.type}
           effect={effect}
