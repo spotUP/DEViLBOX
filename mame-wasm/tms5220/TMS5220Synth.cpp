@@ -4,7 +4,7 @@
  * Faithful port of MAME's tms5110.cpp emulation by Frank Palazzolo,
  * Jarek Burczynski, Aaron Giles, Jonathan Gevaryahu, Couriersud.
  *
- * Two operating modes:
+ * Three operating modes:
  *
  * 1. ROM SPEECH MODE (MAME-accurate):
  *    Loads VSM ROM data into WASM memory, speaks words by byte address.
@@ -12,10 +12,14 @@
  *    parameter interpolation with inhibit logic, chirp/noise excitation,
  *    10-pole lattice filter, and clip_analog output.
  *
- * 2. MIDI MODE (interactive):
+ * 2. FRAME BUFFER MODE (MAME-accurate, phoneme TTS):
+ *    Pre-packed LPC frame indices fed from TypeScript (SAM phoneme pipeline).
+ *    Uses the same MAME state machine as ROM mode but reads frames from a
+ *    flat buffer instead of ROM bits.
+ *
+ * 3. MIDI MODE (interactive):
  *    4-voice polyphonic LPC synth with phoneme presets for real-time playing.
- *    Uses simplified interpolation. Also supports setLPCFrame for TS-driven
- *    phoneme text-to-speech.
+ *    Uses simplified interpolation.
  *
  * License: BSD-3-Clause (matching MAME)
  */

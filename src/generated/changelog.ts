@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-13T09:28:52.993Z
+ * Generated: 2026-02-13T09:38:44.384Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '483';
-export const BUILD_HASH = 'f50e3b8';
+export const BUILD_NUMBER = '490';
+export const BUILD_HASH = 'ff4c4c5';
 export const BUILD_DATE = '2026-02-13';
 
 // Full semantic version with build number
@@ -33,6 +33,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-13',
     changes: [
+      {
+        type: 'fix',
+        "description": "Clamp TMS5220 table indices and clean up FurnaceDispatch naming"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: update project docs, migration, nibbles fixes, and misc improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing parameter handlers and fix async init races"
+      },
+      {
+        type: 'fix',
+        "description": "Redesign master effects modal and fix stale closure bug"
+      },
+      {
+        type: 'fix',
+        "description": "Correct TB-303 defaults and presets from verified reference sources"
+      },
+      {
+        type: 'feature',
+        "description": "Improve TMS5220 speech synth with phoneme mapping and ROM parsing"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove stale DB303/open303 source copies and outdated docs"
+      },
       {
         type: 'fix',
         "description": "Suppress InvalidStateError in global handler"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add author email to package.json for Linux .deb builds"
-      },
-      {
-        type: 'feature',
-        "description": "Add playback visual feedback to clips"
-      },
-      {
-        type: 'fix',
-        "description": "Widen zoom level display to prevent text squishing"
-      },
-      {
-        type: 'feature',
-        "description": "Add transport controls (Play/Stop) to toolbar"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused addPattern and deletePattern variables"
-      },
-      {
-        type: 'fix',
-        "description": "Replace require() with async import() in ToneEngine"
-      },
-      {
-        type: 'fix',
-        "description": "Song length should use patternOrder.length not patterns.length"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
       }
     ]
   }
