@@ -15,6 +15,11 @@ const moduleCache = new Map<string, Promise<{ wasmBinary: ArrayBuffer; jsCode: s
 // Track which worklet modules have been added per AudioContext
 const workletLoadedMap = new WeakMap<AudioContext, Set<string>>();
 
+// Cache-bust worklet module URLs to ensure latest code is loaded.
+// Worklet files in /public/mame/ aren't processed by Vite's asset pipeline,
+// so browsers may aggressively cache them. Fresh timestamp per page load.
+const WORKLET_CACHE_BUST = `?t=${Date.now()}`;
+
 /**
  * Preprocess Emscripten-generated JS for AudioWorklet compatibility.
  *
@@ -65,7 +70,7 @@ export async function ensureMAMEModuleLoaded(
   // Load the shared init helper first (sets globalThis.initMAMEWasmModule)
   if (!loaded.has('__mame_init_helper__')) {
     try {
-      await context.audioWorklet.addModule(`${baseUrl}mame/mame-worklet-init.js`);
+      await context.audioWorklet.addModule(`${baseUrl}mame/mame-worklet-init.js${WORKLET_CACHE_BUST}`);
     } catch {
       // Module might already be added
     }
@@ -75,7 +80,7 @@ export async function ensureMAMEModuleLoaded(
   // Then load the chip-specific worklet processor
   if (!loaded.has(chipName)) {
     try {
-      await context.audioWorklet.addModule(`${baseUrl}mame/${workletFile}`);
+      await context.audioWorklet.addModule(`${baseUrl}mame/${workletFile}${WORKLET_CACHE_BUST}`);
     } catch {
       // Module might already be added
     }
