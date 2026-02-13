@@ -478,9 +478,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       // This prevents InvalidStateError when worklets try to initialize
       try {
         const context = Tone.getContext();
-        if (context.state !== 'running') {
+        const rawContext = (context as any).rawContext || (context as any)._context;
+        if (rawContext && rawContext.state !== 'running') {
           await context.resume();
-          console.log('[Import] Audio context resumed, state:', context.state);
+          // Wait for context to actually transition to running state
+          let attempts = 0;
+          while (rawContext.state !== 'running' && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            attempts++;
+          }
+          console.log('[Import] Audio context resumed, state:', rawContext.state, 'after', attempts * 50, 'ms');
         }
       } catch (err) {
         console.warn('[Import] Failed to resume audio context:', err);
