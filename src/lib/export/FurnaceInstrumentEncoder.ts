@@ -203,7 +203,9 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   if (config.macros && config.macros.length > 0) {
     stdOffset = writer.getPosition();
 
-    // Index macros by code (0-14)
+    // Index macros by code (0-14). The 'code' field is the macro slot number.
+    // Fallback to 'type' for backward compatibility (old saved projects may have
+    // code=undefined with slot number accidentally stored in type).
     const macrosByCode: (FurnaceMacro | null)[] = new Array(15).fill(null);
     for (const macro of config.macros) {
       const code = macro.code ?? macro.type;

@@ -35,8 +35,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setLinearInterpolation,
     audioLatency,
     setAudioLatency,
-    autoLatency,
-    setAutoLatency,
     midiPolyphonic,
     setMidiPolyphonic
   } = useSettingsStore();
@@ -250,20 +248,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <option value="balanced">Balanced (50ms)</option>
                   <option value="playback">Stable (150ms)</option>
                 </select>
-              </div>
-
-              {/* Auto Latency Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Dynamic Latency:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">Instant (10ms) when stopped, stable when playing</span>
-                </div>
-                <Toggle
-                  label=""
-                  value={autoLatency}
-                  onChange={setAutoLatency}
-                  size="sm"
-                />
               </div>
             </div>
           </section>

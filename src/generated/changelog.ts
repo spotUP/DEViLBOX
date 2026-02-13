@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-12T23:23:02.718Z
+ * Generated: 2026-02-13T09:28:52.993Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '462';
-export const BUILD_HASH = 'fe3dab5';
-export const BUILD_DATE = '2026-02-12';
+export const BUILD_NUMBER = '483';
+export const BUILD_HASH = 'f50e3b8';
+export const BUILD_DATE = '2026-02-13';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,90 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-13',
     changes: [
+      {
+        type: 'fix',
+        "description": "Suppress InvalidStateError in global handler"
+      },
+      {
+        type: 'fix',
+        "description": "Fix duplicate IDs in FT2Toolbar import path"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure audio context is running before loading instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent duplicate instrument IDs and stale instrument warnings"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve Web Audio API type compatibility issue"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript buffer type error"
+      },
+      {
+        type: 'fix',
+        "description": "Fix critical game logic bugs preventing game start"
+      },
+      {
+        type: 'fix',
+        "description": "Handle InvalidStateError when loading worklet on suspended context"
+      },
+      {
+        type: 'fix',
+        "description": "Match visualizer sizing (200x120 default)"
+      },
+      {
+        type: 'fix',
+        "description": "Set larger initial canvas size (800x600)"
+      },
+      {
+        type: 'fix',
+        "description": "Increase default height from 100px to 400px"
+      },
+      {
+        type: 'fix',
+        "description": "Disable frequency-based worm colors for visibility"
+      },
+      {
+        type: 'fix',
+        "description": "Disable background tile animation"
+      },
+      {
+        type: 'fix',
+        "description": "Properly setup native AnalyserNode from Tone.js"
+      },
+      {
+        type: 'feature',
+        "description": "Complete music-reactive implementation"
+      },
+      {
+        type: 'improvement',
+        "description": "Document background tile rendering optimizations"
+      },
+      {
+        type: 'feature',
+        "description": "Add music reactivity toggle in settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add frequency-based worm segment colors"
+      },
+      {
+        type: 'feature',
+        "description": "Add particle trail effects"
+      },
+      {
+        type: 'feature',
+        "description": "Add music-reactive speed modulation"
+      },
+      {
+        type: 'feature',
+        "description": "Add beat-synced score multiplier"
+      },
       {
         type: 'feature',
         "description": "Add beat-synced food spawning"
@@ -154,96 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in import/export and stores"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in hooks and utilities"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in UI components"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in synth implementations"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 363 TypeScript errors in InstrumentFactory and ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Arrangement view, piano roll canvas engine, DB303 param wiring fixes"
-      },
-      {
-        type: 'feature',
-        "description": "ROM auto-load status + upload dialog for MAME synths"
-      },
-      {
-        type: 'fix',
-        "description": "Route TrackerReplayer through master effects chain"
-      },
-      {
-        type: 'fix',
-        "description": "Misc engine, store, and UI improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Tabbed MOJO/DevilFish/Korg/LFO/FX UI, always-active filter params"
-      },
-      {
-        type: 'feature',
-        "description": "Add Speak & Spell ROM data and fix TTS voice activation"
-      },
-      {
-        type: 'improvement',
-        "description": "Reorganize NKS into performance module"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove old song data files and unused hardware images"
-      }
-    ]
-  },
-  {
-    version: '2026-02-11',
-    date: '2026-02-11',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Eliminate crackles from parameter changes"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up MIDI double-trigger diagnostics after confirming fix"
-      },
-      {
-        type: 'feature',
-        "description": "Diag: add comprehensive MIDI double-trigger diagnostics"
-      },
-      {
-        type: 'fix',
-        "description": "Filter non-automatable params from knob pages, clean up TS errors, add speech engine"
-      },
-      {
-        type: 'fix',
-        "description": "Use stored type instead of minified constructor name for stale instrument check"
-      },
-      {
-        type: 'fix',
-        "description": "Break circular import between VotraxSynth and votraxPhonemeMap"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent stale preview instrument causing double-trigger on MIDI playback"
-      },
-      {
-        type: 'feature',
-        "description": "Split WAM plugins into effects and synths, add effect search, fix bugs"
       }
     ]
   }

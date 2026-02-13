@@ -15,6 +15,8 @@ import {
   type OscDataCallback
 } from './FurnaceDispatchEngine';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { encodeFurnaceInstrument } from '@lib/export/FurnaceInstrumentEncoder';
+import type { FurnaceConfig } from '@typedefs/instrument';
 
 /** Channel names for each platform */
 const PLATFORM_CHANNELS: Record<number, string[]> = {
@@ -85,7 +87,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
   private engine: FurnaceDispatchEngine;
   private _disposed = false;
-  private _ready = false;
+  /** Exposed as public for test runner init-state detection (matches _isReady pattern) */
+  public _isReady = false;
   private _readyPromise: Promise<void>;
   private _resolveReady!: () => void;
   private currentChannel = 0;
@@ -236,6 +239,31 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         this.setupDefaultGBInstrument();
         break;
 
+      // === C64 SID needs waveform in instrument ===
+      case P.C64_6581:
+      case P.C64_8580:
+        this.setupDefaultC64Instrument();
+        break;
+
+      // === AY needs mixer register (reg 7) set to enable tone output ===
+      // Without STD_NOISE_MODE, psgMode=0 → reg 7 = 0xFF → all outputs disabled
+      case P.AY:
+      case P.AY8930:
+        for (let ch = 0; ch < numCh; ch++) {
+          // STD_NOISE_MODE with value 0 → psgMode=(0+1)&3=1 (tone on, noise off)
+          disp(DivCmd.STD_NOISE_MODE, ch, 0, 0);
+        }
+        break;
+
+      // === SAA1099 needs psgMode set for tone enable ===
+      // Register 0x14 (tone enable) uses bit 0 of psgMode per channel
+      case P.SAA1099:
+        for (let ch = 0; ch < numCh; ch++) {
+          // STD_NOISE_MODE with value 1 → psgMode=(1&1)|((1&16)>>3)=1 (tone on)
+          disp(DivCmd.STD_NOISE_MODE, ch, 1, 0);
+        }
+        break;
+
       // === Wavetable chips ===
       case P.PCE:
         this.setupDefaultWavetable(32, 31);
@@ -351,6 +379,51 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       view.setInt32(8 + i * 4, val, true);
     }
     this.engine.setWavetable(0, waveData, pt);
+  }
+
+  /**
+   * Set up a default C64 SID instrument with pulse waveform.
+   * C64 SID requires waveform bits set in the instrument — without them,
+   * the voice control register has no waveform and produces silence.
+   */
+  private setupDefaultC64Instrument(): void {
+    const pt = this.platformType;
+    const numCh = this.engine.getChannelCount(pt) || 3;
+
+    // Build a minimal C64 instrument: pulse wave, fast ADSR, 50% duty
+    const config: FurnaceConfig = {
+      chipType: 3, // DIV_INS_C64
+      algorithm: 0, feedback: 0, fms: 0, ams: 0, fms2: 0, ams2: 0,
+      ops: 0, opllPreset: 0, fixedDrums: false,
+      operators: [],
+      macros: [
+        // Volume macro: full volume (15)
+        { code: 0, type: 0, data: [15], loop: -1, release: -1, mode: 0 },
+      ],
+      opMacros: [],
+      wavetables: [],
+      c64: {
+        triOn: false,
+        sawOn: false,
+        pulseOn: true,   // Pulse waveform — required for sound!
+        noiseOn: false,
+        a: 0,  // Instant attack
+        d: 0,  // No decay
+        s: 15, // Max sustain
+        r: 1,  // Short release
+        duty: 2048, // 50% duty cycle
+        ringMod: false,
+        oscSync: false,
+      },
+    };
+
+    const binaryData = encodeFurnaceInstrument(config, 'Default C64');
+    this.engine.uploadFurnaceInstrument(0, binaryData, pt);
+
+    for (let ch = 0; ch < numCh; ch++) {
+      this.engine.setInstrument(ch, 0, pt);
+      this.engine.setVolume(ch, 15, pt);
+    }
   }
 
   /**

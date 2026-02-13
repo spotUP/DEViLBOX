@@ -190,6 +190,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               value={textValue}
               onChange={(e) => onTextChange?.(paramKey, e.target.value)}
               onKeyDown={(e) => {
+                e.stopPropagation();
                 if (e.key === 'Enter' && isSpeechText) {
                   onSpeak!(textValue);
                 }

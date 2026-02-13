@@ -35,8 +35,16 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
  * - 9: Added korgEnabled, lfo.enabled toggles. pulseWidth default 1→0 (50% duty = true square).
  *      Wave blend knob replaces SAW/SQR toggle.
  * - 10: Added arrangement timeline view snapshot to saved project.
+ * - 11: Fixed TB-303 DevilFish defaults to match reference default-preset.xml
+ *       (accentDecay 0.1→0.006, normalDecay 0.5→0.164, accentSoftAttack 0.5→0.1,
+ *        filterInputDrive 0→0.169, diodeCharacter 0→1, duffingAmount 0→0.03).
+ *       Old defaults killed acid screams — accentDecay was 17x too slow.
+ * - 12: Fixed passbandCompensation (0.9→0.09) and resTracking (0.7→0.257) — both were
+ *       inverted params where app value ≠ XML value. WASM was getting 0.1 instead of 0.91
+ *       for passbandCompensation and 0.3 instead of 0.743 for resTracking.
+ *       Fixed filterSelect migration (was hardcoding invalid value 1, now 0).
  */
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 12;
 
 interface SavedProject {
   version: string;
