@@ -9,6 +9,8 @@ export interface V2SpeechConfig {
   pitch: number;
   formantShift: number;
   singMode: boolean;
+  vowelSequence?: string[];
+  vowelLoopSingle?: boolean;
 }
 
 export class V2SpeechSynth implements DevilboxSynth {
@@ -27,6 +29,11 @@ export class V2SpeechSynth implements DevilboxSynth {
   private _readyPromise: Promise<void>;
   private _readyResolve!: () => void;
   private _renderTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
 
   constructor(config?: Partial<V2SpeechConfig>) {
     this.audioContext = getDevilboxAudioContext();
@@ -133,7 +140,17 @@ export class V2SpeechSynth implements DevilboxSynth {
       (config.formantShift !== undefined && config.formantShift !== this._config.formantShift) ||
       (config.singMode !== undefined && config.singMode !== this._config.singMode);
 
+    // Track vowel sequence changes
+    const seqChanged = config.vowelSequence !== undefined &&
+      JSON.stringify(config.vowelSequence) !== JSON.stringify(this._config.vowelSequence);
+
     this._config = { ...this._config, ...config };
+
+    if (config.vowelLoopSingle !== undefined) this._vowelLoopSingle = config.vowelLoopSingle;
+    if (seqChanged) {
+      this._vowelSequence = config.vowelSequence ?? [];
+      this._vowelIndex = 0;
+    }
 
     if (config.singMode !== undefined && this._sourceNode) {
       this._sourceNode.loop = config.singMode;
@@ -161,7 +178,64 @@ export class V2SpeechSynth implements DevilboxSynth {
     }
   }
 
+  /** Render a single vowel phoneme and return the buffer */
+  private _renderVowel(code: string): AudioBuffer | null {
+    const samPitch = Math.round((this._config.pitch / 127) * 255);
+    const samSpeed = Math.round((this._config.speed / 127) * 255);
+    const formantOffset = ((this._config.formantShift - 64) / 64) * 50;
+    const mouth = Math.max(0, Math.min(255, 128 + formantOffset));
+    const throat = Math.max(0, Math.min(255, 128 - formantOffset));
+
+    const sam = new SamJs({
+      pitch: samPitch,
+      speed: samSpeed,
+      mouth: Math.round(mouth),
+      throat: Math.round(throat),
+      singmode: true,
+      phonetic: true,
+    });
+    const buf32 = sam.buf32(code, true);
+    if (!buf32) return null;
+    const audioBuf = this.audioContext.createBuffer(1, buf32.length, 22050);
+    audioBuf.getChannelData(0).set(buf32);
+    return audioBuf;
+  }
+
   public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
+    if (this._config.singMode && this._vowelSequence.length > 0) {
+      // Vowel sequence mode: render next vowel and play it
+      const vowelCode = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+      this._vowelIndex++;
+
+      const vowelBuf = this._renderVowel(vowelCode);
+      if (!vowelBuf) return;
+
+      this._buffer = vowelBuf;
+
+      const midi = typeof note === 'string' ? noteToMidi(note) : note;
+      const ratio = Math.pow(2, (midi - 48) / 12);
+
+      this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+      this._playerGain.gain.value = velocity;
+
+      this._stopSource();
+      const source = this.audioContext.createBufferSource();
+      source.buffer = vowelBuf;
+      source.loop = this._vowelLoopSingle;
+      source.connect(this._playerGain);
+      source.onended = () => {
+        if (this._sourceNode === source) {
+          this._isPlaying = false;
+          this._sourceNode = null;
+        }
+      };
+      this._sourceNode = source;
+      source.playbackRate.value = ratio;
+      source.start(time, 0);
+      this._isPlaying = true;
+      return;
+    }
+
     if (!this._buffer) {
       console.warn('[V2Speech] triggerAttack called before buffer ready');
       return;
@@ -169,14 +243,16 @@ export class V2SpeechSynth implements DevilboxSynth {
 
     if (this._config.singMode) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      const ratio = Math.pow(2, (midi - 60) / 12);
+      const ratio = Math.pow(2, (midi - 48) / 12);
 
       // Cancel any release fade and restore gain
       this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
       this._playerGain.gain.value = velocity;
 
       if (this._isPlaying && this._sourceNode) {
-        this._sourceNode.playbackRate.value = ratio;
+        // Glide pitch smoothly (~60ms portamento for natural singing)
+        this._sourceNode.playbackRate.cancelScheduledValues(this.audioContext.currentTime);
+        this._sourceNode.playbackRate.setTargetAtTime(ratio, this.audioContext.currentTime, 0.06);
       } else {
         this._startSource(time);
         if (this._sourceNode) {

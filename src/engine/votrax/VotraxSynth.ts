@@ -2,7 +2,7 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
-import { type VotraxFrame, phonemesToVotraxFrames } from '@engine/speech/votraxPhonemeMap';
+import { type VotraxFrame, phonemesToVotraxFrames, samToVotrax } from '@engine/speech/votraxPhonemeMap';
 
 /**
  * Votrax Parameter IDs (matching C++ enum)
@@ -60,6 +60,16 @@ export class VotraxSynth extends MAMEBaseSynth {
 
   private _speechSequencer: SpeechSequencer<VotraxFrame> | null = null;
 
+  // Speech mode state
+  private _mode: 0 | 1 = 1;
+  private _singMode = true;
+  private _speechText = 'HELLO WORLD';
+
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
+
   constructor() {
     super();
     this.initSynth();
@@ -72,16 +82,35 @@ export class VotraxSynth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
+    if (this._mode === 1) {
+      if (this._singMode && this._vowelSequence.length > 0) {
+        this._speakSingleVowel(note, velocity);
+      } else if (this._singMode) {
+        if (this._speechSequencer) {
+          const freq = 440 * Math.pow(2, (note - 69) / 12);
+          this.writeFrequency(freq);
+        } else {
+          this._startSpeechAtNote(this._speechText, note, velocity);
+        }
+      } else {
+        this._startSpeechAtNote(this._speechText, 60, velocity);
+      }
+    } else {
+      this.workletNode.port.postMessage({
+        type: 'noteOn',
+        note,
+        velocity: Math.floor(velocity * 127),
+      });
+    }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    if (this._mode === 1) {
+      // Speech mode: let speech finish naturally
+    } else {
+      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    }
   }
 
   protected writeFrequency(freq: number): void {
@@ -170,10 +199,15 @@ export class VotraxSynth extends MAMEBaseSynth {
   /** Speak English text using SAM's reciter and Votrax allophone mapping */
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
-      console.warn(`[Votrax] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
       this._pendingCalls.push({ method: 'speakText', args: [text] });
       return;
     }
+    this._startSpeechAtNote(text, 60, 0.8);
+  }
+
+  /** Start speech at a specific MIDI note (avoids triggerAttack recursion) */
+  private _startSpeechAtNote(text: string, note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
 
@@ -184,15 +218,17 @@ export class VotraxSynth extends MAMEBaseSynth {
     const frames = phonemesToVotraxFrames(tokens);
     if (frames.length === 0) return;
 
-    console.log(`[Votrax] speakText: "${text}" → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
-
     const speechFrames: SpeechFrame<VotraxFrame>[] = frames.map(f => ({
       data: f,
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice via the full triggerAttack path
-    this.triggerAttack(60, undefined, 0.8);
+    // Start voice directly (not via triggerAttack to avoid recursion)
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
 
     this._speechSequencer = new SpeechSequencer<VotraxFrame>(
       (frame) => this.writePhone(frame.phone),
@@ -285,6 +321,53 @@ export class VotraxSynth extends MAMEBaseSynth {
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
     }
+
+    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
+    if (param === 'sing_mode') this._singMode = value >= 1;
+    if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
+  }
+
+  setTextParam(key: string, value: string): void {
+    if (key === 'speechText') this._speechText = value;
+    if (key === 'vowelSequence') {
+      this._vowelSequence = value ? value.split(',').filter(Boolean) : [];
+      this._vowelIndex = 0;
+    }
+  }
+
+  /** Play a single vowel from the sequence at the given MIDI note */
+  private _speakSingleVowel(note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
+
+    const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+    this._vowelIndex++;
+
+    const frames = samToVotrax(code);
+    if (!frames || frames.length === 0) return;
+
+    this.stopSpeaking();
+
+    const speechFrames: SpeechFrame<VotraxFrame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
+
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
+
+    this._speechSequencer = new SpeechSequencer<VotraxFrame>(
+      (f) => this.writePhone(f.phone),
+      () => {
+        if (!this._vowelLoopSingle) {
+          this._speechSequencer = null;
+          this.triggerRelease();
+        }
+      }
+    );
+    this._speechSequencer.speak(speechFrames, this._vowelLoopSingle);
   }
 
   private sendMessage(type: string, value: number): void {

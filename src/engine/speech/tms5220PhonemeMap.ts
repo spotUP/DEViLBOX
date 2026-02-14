@@ -18,7 +18,7 @@
 export interface TMS5220Frame {
   k: number[];       // K1-K10 indices [10 values]
   energy: number;    // Energy index 0-15
-  pitch: number;     // Pitch index 0-63 (0=unvoiced)
+  pitch: number;     // Pitch index 0-31 (0=unvoiced, TMC0281 5-bit)
   unvoiced: boolean; // true = noise excitation
   durationMs: number;
 }
@@ -38,7 +38,7 @@ export function samToTMS5220(samCode: string): TMS5220Frame | null {
   const map: Record<string, TMS5220Frame> = {
     // === Vowels (voiced) ===
     //                            K1  K2  K3  K4  K5  K6  K7  K8  K9  K10
-    'IY': { k: [12, 28, 11,  6, 10,  7,  9,  3,  5,  3], energy: 12, pitch: 32, unvoiced: false, durationMs: 150 },
+    'IY': { k: [12, 28, 11,  6, 10,  7,  9,  3,  5,  3], energy: 12, pitch: 31, unvoiced: false, durationMs: 150 },
     'IH': { k: [15, 25, 10,  7,  9,  7,  8,  3,  4,  3], energy: 12, pitch: 30, unvoiced: false, durationMs: 120 },
     'EH': { k: [20, 22, 10,  7,  8,  7,  8,  4,  4,  3], energy: 12, pitch: 30, unvoiced: false, durationMs: 140 },
     'AE': { k: [24, 19, 10,  8,  8,  7,  8,  4,  4,  4], energy: 12, pitch: 30, unvoiced: false, durationMs: 150 },

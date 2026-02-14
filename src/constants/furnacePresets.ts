@@ -466,65 +466,387 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
   },
 
   // ============================================
-  // COMMODORE 64 (SID)
+  // COMMODORE 64 — SID 6581 (warm, gritty analog)
   // ============================================
   {
-    name: 'SID Lead',
+    name: '6581 Pulse Lead',
     type: 'synth',
-    synthType: 'FurnaceC64',
+    synthType: 'FurnaceSID6581',
     volume: -8,
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 3,
-      algorithm: 4,
-      feedback: 4,
-      operators: [
-        op({ mult: 1, tl: 15, ar: 25, dr: 8, sl: 5, rr: 8 }),
-        op({ mult: 2, tl: 35, ar: 31, dr: 10, sl: 6, rr: 10, dt: 1 }),
-        disabledOp(),
-        disabledOp(),
-      ],
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 12, r: 4,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1200, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
       macros: [], opMacros: [], wavetables: []
     }
   },
   {
-    name: 'SID Bass',
+    name: '6581 Saw Lead',
     type: 'synth',
-    synthType: 'FurnaceC64',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Saw Bass',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
     volume: -6,
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 3,
-      algorithm: 4,
-      feedback: 5,
-      operators: [
-        op({ mult: 1, tl: 10, ar: 31, dr: 6, sl: 3, rr: 6 }),
-        op({ mult: 3, tl: 40, ar: 31, dr: 12, sl: 8, rr: 8, dt: 2 }),
-        disabledOp(),
-        disabledOp(),
-      ],
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 14, r: 2,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 512, filterResonance: 6,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
       macros: [], opMacros: [], wavetables: []
     }
   },
   {
-    name: 'SID Pad',
+    name: '6581 Pulse Bass',
     type: 'synth',
-    synthType: 'FurnaceC64',
+    synthType: 'FurnaceSID6581',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 15, r: 3,
+        duty: 1024,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 400, filterResonance: 8,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Arp Pulse',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 4, s: 0, r: 2,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Noise Snare',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: false, noiseOn: true,
+        a: 0, d: 4, s: 0, r: 0,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 800, filterResonance: 2,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Kick',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -4,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: true, sawOn: false, pulseOn: false, noiseOn: false,
+        a: 0, d: 6, s: 0, r: 0,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 300, filterResonance: 0,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Ring Mod',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
     volume: -10,
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 3,
-      algorithm: 2,
-      feedback: 3,
-      operators: [
-        op({ mult: 1, tl: 18, ar: 18, dr: 4, sl: 2, rr: 10 }),
-        op({ mult: 2, tl: 30, ar: 20, dr: 6, sl: 4, rr: 12, dt: -1 }),
-        disabledOp(),
-        disabledOp(),
-      ],
+      chipType: 45,
+      c64: {
+        triOn: true, sawOn: false, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 8, r: 6,
+        duty: 0,
+        ringMod: true, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Filter Sweep',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 2, d: 10, s: 6, r: 8,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 900, filterResonance: 12,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '6581 Pad',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 45,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: true, noiseOn: false,
+        a: 8, d: 6, s: 10, r: 10,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 700, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+
+  // ============================================
+  // COMMODORE 64 — SID 8580 (cleaner, crisper)
+  // ============================================
+  {
+    name: '8580 Pulse Lead',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 12, r: 4,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1400, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Saw Lead',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Saw Bass',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 14, r: 2,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 600, filterResonance: 6,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Pulse Bass',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 15, r: 3,
+        duty: 1024,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 500, filterResonance: 8,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Arp Saw',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 3, s: 0, r: 2,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Hi-Hat',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: false, noiseOn: true,
+        a: 0, d: 2, s: 0, r: 0,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1200, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: true, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Sync Lead',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: true,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1000, filterResonance: 6,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+      macros: [], opMacros: [], wavetables: []
+    }
+  },
+  {
+    name: '8580 Pad',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: 46,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: true, noiseOn: false,
+        a: 8, d: 6, s: 10, r: 10,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 800, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
       macros: [], opMacros: [], wavetables: []
     }
   },

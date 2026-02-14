@@ -2,7 +2,7 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
-import { type SP0250Frame, phonemesToSP0250Frames } from '@engine/speech/sp0250PhonemeMap';
+import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
 
 /**
  * SP0250 Parameter IDs (matching C++ enum)
@@ -67,6 +67,16 @@ export class SP0250Synth extends MAMEBaseSynth {
 
   private _speechSequencer: SpeechSequencer<SP0250Frame> | null = null;
 
+  // Speech mode state
+  private _mode: 0 | 1 = 1;       // 0=Tone, 1=Speech
+  private _singMode = true;
+  private _speechText = 'HELLO WORLD';
+
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
+
   constructor() {
     super();
     this.initSynth();
@@ -79,16 +89,39 @@ export class SP0250Synth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
+    if (this._mode === 1) {
+      if (this._singMode && this._vowelSequence.length > 0) {
+        // Vowel sequence mode: cycle through vowels per note
+        this._speakSingleVowel(note, velocity);
+      } else if (this._singMode) {
+        if (this._speechSequencer) {
+          // Already speaking — just change pitch (glide via frequency)
+          const freq = 440 * Math.pow(2, (note - 69) / 12);
+          this.writeFrequency(freq);
+        } else {
+          // Start speech at this note's pitch
+          this._startSpeechAtNote(this._speechText, note, velocity);
+        }
+      } else {
+        // Non-sing: retrigger speech on each note
+        this._startSpeechAtNote(this._speechText, 60, velocity);
+      }
+    } else {
+      this.workletNode.port.postMessage({
+        type: 'noteOn',
+        note,
+        velocity: Math.floor(velocity * 127),
+      });
+    }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    if (this._mode === 1) {
+      // Speech mode: let speech finish naturally
+    } else {
+      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    }
   }
 
   protected writeFrequency(freq: number): void {
@@ -167,10 +200,15 @@ export class SP0250Synth extends MAMEBaseSynth {
   /** Speak English text using SAM's reciter and SP0250 vowel mapping */
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
-      console.warn(`[SP0250] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
       this._pendingCalls.push({ method: 'speakText', args: [text] });
       return;
     }
+    this._startSpeechAtNote(text, 60, 0.8);
+  }
+
+  /** Start speech at a specific MIDI note (avoids triggerAttack recursion) */
+  private _startSpeechAtNote(text: string, note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
 
@@ -181,30 +219,29 @@ export class SP0250Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    console.log(`[SP0250] speakText: "${text}" → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
-
     const speechFrames: SpeechFrame<SP0250Frame>[] = frames.map(f => ({
       data: f,
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice via the full triggerAttack path
-    this.triggerAttack(60, undefined, 0.8);
+    // Start voice directly (not via triggerAttack to avoid recursion)
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
 
     this._speechSequencer = new SpeechSequencer<SP0250Frame>(
       (frame) => {
-        console.log(`[SP0250] Frame: vowel=${frame.preset}, voiced=${frame.voiced}, brightness=${frame.brightness?.toFixed(2)}`);
         this.setVowel(frame.preset);
         this.setVoiced(frame.voiced);
         this.setBrightness(frame.brightness);
       },
       () => {
-        console.log('[SP0250] Speech complete');
         this._speechSequencer = null;
         this.triggerRelease();
       }
     );
-    console.log(`[SP0250] Starting speech sequencer with ${speechFrames.length} frames`);
     this._speechSequencer.speak(speechFrames);
   }
 
@@ -288,6 +325,57 @@ export class SP0250Synth extends MAMEBaseSynth {
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
     }
+
+    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
+    if (param === 'sing_mode') this._singMode = value >= 1;
+    if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
+  }
+
+  setTextParam(key: string, value: string): void {
+    if (key === 'speechText') this._speechText = value;
+    if (key === 'vowelSequence') {
+      this._vowelSequence = value ? value.split(',').filter(Boolean) : [];
+      this._vowelIndex = 0;
+    }
+  }
+
+  /** Play a single vowel from the sequence at the given MIDI note */
+  private _speakSingleVowel(note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
+
+    const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+    this._vowelIndex++;
+
+    const frame = samToSP0250(code);
+    if (!frame) return;
+
+    this.stopSpeaking();
+
+    const speechFrames: SpeechFrame<SP0250Frame>[] = [{
+      data: frame,
+      durationMs: frame.durationMs,
+    }];
+
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
+
+    this._speechSequencer = new SpeechSequencer<SP0250Frame>(
+      (f) => {
+        this.setVowel(f.preset);
+        this.setVoiced(f.voiced);
+        this.setBrightness(f.brightness);
+      },
+      () => {
+        if (!this._vowelLoopSingle) {
+          this._speechSequencer = null;
+          this.triggerRelease();
+        }
+      }
+    );
+    this._speechSequencer.speak(speechFrames, this._vowelLoopSingle);
   }
 }
 

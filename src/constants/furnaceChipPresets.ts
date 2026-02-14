@@ -295,23 +295,288 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     effects: [],
     furnace: { chipType: FurnaceChipType.ZXBEEPER_QT }
   },
+  // === COMMODORE 64 — SID (generic C64) ===
   {
-    name: 'SID Pulse PWM',
+    name: 'C64 Pulse Lead',
     type: 'synth',
     synthType: 'FurnaceC64',
     volume: -8,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.SID }
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 12, r: 4,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1200, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
   },
   {
-    name: 'SID Ring Mod',
+    name: 'C64 Saw Lead',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: 'C64 Bass',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 14, r: 2,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 512, filterResonance: 6,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: 'C64 Arp',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 4, s: 0, r: 2,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: 'C64 Noise Drum',
+    type: 'synth',
+    synthType: 'FurnaceC64',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: false, noiseOn: true,
+        a: 0, d: 4, s: 0, r: 0,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 800, filterResonance: 2,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: 'C64 Pad',
     type: 'synth',
     synthType: 'FurnaceC64',
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.SID }
+    furnace: {
+      chipType: FurnaceChipType.SID,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: true, noiseOn: false,
+        a: 8, d: 6, s: 10, r: 10,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 700, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  // === COMMODORE 64 — SID 6581 (warm, gritty) ===
+  {
+    name: '6581 Saw+Pulse',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_6581,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: true, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 1536,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 900, filterResonance: 6,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '6581 Triangle Sub',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_6581,
+      c64: {
+        triOn: true, sawOn: false, pulseOn: false, noiseOn: false,
+        a: 0, d: 10, s: 15, r: 4,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '6581 Dirty Reso',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_6581,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 10, s: 8, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 600, filterResonance: 14,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '6581 PWM Throb',
+    type: 'synth',
+    synthType: 'FurnaceSID6581',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_6581,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 4, d: 6, s: 12, r: 8,
+        duty: 512,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 700, filterResonance: 8,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  // === COMMODORE 64 — SID 8580 (cleaner, crisper) ===
+  {
+    name: '8580 Clean Pulse',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_8580,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+        a: 0, d: 6, s: 12, r: 4,
+        duty: 2048,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1400, filterResonance: 4,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '8580 Bandpass',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -8,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_8580,
+      c64: {
+        triOn: false, sawOn: true, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 10, r: 6,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 800, filterResonance: 10,
+        filterLP: false, filterBP: true, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '8580 Ring Mod',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -10,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_8580,
+      c64: {
+        triOn: true, sawOn: false, pulseOn: false, noiseOn: false,
+        a: 0, d: 8, s: 8, r: 6,
+        duty: 0,
+        ringMod: true, oscSync: false,
+        toFilter: false, initFilter: false,
+        filterCutoff: 1024, filterResonance: 0,
+        filterLP: false, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
+  },
+  {
+    name: '8580 Noise Perc',
+    type: 'synth',
+    synthType: 'FurnaceSID8580',
+    volume: -6,
+    pan: 0,
+    effects: [],
+    furnace: {
+      chipType: FurnaceChipType.SID_8580,
+      c64: {
+        triOn: false, sawOn: false, pulseOn: false, noiseOn: true,
+        a: 0, d: 3, s: 0, r: 0,
+        duty: 0,
+        ringMod: false, oscSync: false,
+        toFilter: true, initFilter: true,
+        filterCutoff: 1000, filterResonance: 2,
+        filterLP: true, filterBP: false, filterHP: false, filterCh3Off: false,
+      },
+    }
   },
 
   // === GAME BOY ADVANCE / DS ===

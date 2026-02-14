@@ -8,6 +8,18 @@
  * WASM binary and JS code are received via postMessage.
  */
 
+// Polyfill URL for AudioWorklet scope — Emscripten's findWasmBinary() calls
+// new URL('file.wasm', base) even when wasmBinary is provided directly.
+if (typeof URL === 'undefined') {
+  globalThis.URL = class URL {
+    constructor(path, base) {
+      this.href = base ? (base + '/' + path) : path;
+      this.pathname = path;
+    }
+    toString() { return this.href; }
+  };
+}
+
 let processorRegistered = false;
 
 // Shared WASM module (single instance for all processors)

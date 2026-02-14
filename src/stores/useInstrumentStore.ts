@@ -407,7 +407,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
 
           // Auto-initialize furnace config when synthType changes to a Furnace type
-          if (synthTypeChanging && updates.synthType?.startsWith('Furnace')) {
+          // BUT skip this when loading a preset — the preset already provides
+          // the correct furnace config with its unique c64/gb/etc. chip data.
+          // Without this guard, preset configs (waveform, ADSR, filter, duty)
+          // get overwritten with generic defaults, making all presets sound identical.
+          if (synthTypeChanging && !isPresetLoad && updates.synthType?.startsWith('Furnace')) {
             const furnaceConfig = getDefaultFurnaceConfig(updates.synthType);
             if (furnaceConfig) {
               // Always update/reset furnace config when changing Furnace synth type

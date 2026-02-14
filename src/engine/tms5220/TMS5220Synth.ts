@@ -1,8 +1,9 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
-import { type TMS5220Frame, phonemesToTMS5220Frames } from '@engine/speech/tms5220PhonemeMap';
+import { type TMS5220Frame, phonemesToTMS5220Frames, samToTMS5220 } from '@engine/speech/tms5220PhonemeMap';
 import { type VSMWord, buildWordTableFromMCU, scanVSMForWords } from '@engine/speech/VSMROMParser';
+import { extractPhonemeLibrary, buildFramesFromROMLibrary } from '@engine/speech/ROMPhonemeExtractor';
 import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { normalizeUrl } from '@/utils/urlUtils';
 
@@ -27,6 +28,7 @@ const TMS5220Param = {
   K8_INDEX: 14,
   K9_INDEX: 15,
   K10_INDEX: 16,
+  SPEECH_PITCH_OFFSET: 17,
 } as const;
 
 /**
@@ -86,9 +88,24 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _romWords: VSMWord[] = [];
   private _romLoaded = false;
   private _romSentToWasm = false;
+  private _romPhonemes: Map<string, TMS5220Frame[]> | null = null;
   private _speakingChain: (() => void) | null = null;
   private _phonemeSpeechActive = false;
   private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Speech parameter state (applied as offsets to TTS frames)
+  private _speechPitchIndex = 32;   // default center (chipParameters default)
+  private _speechEnergyIndex = 10;  // default (chipParameters default)
+
+  // Mode: 0 = Tone (MIDI), 1 = Speech (TTS on noteOn)
+  private _mode: 0 | 1 = 1;
+  private _singMode = true;  // When true, MIDI note shifts speech pitch (like SAM/V2Speech)
+  private _speechText = 'HELLO WORLD';
+
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
 
   constructor() {
     super();
@@ -112,6 +129,11 @@ export class TMS5220Synth extends MAMEBaseSynth {
         // Fall back to heuristic scanning
         this._romWords = scanVSMForWords(this._romData);
         console.log(`[TMS5220] Heuristic scan: ${this._romWords.length} words found`);
+      }
+
+      // Extract authentic phonemes from A-Z letter recordings
+      if (this._romWords.length >= 26) {
+        this._romPhonemes = extractPhonemeLibrary(this._romWords.slice(0, 26));
       }
 
       this._romLoaded = true;
@@ -170,10 +192,19 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   /** Play a word from the ROM by index (MAME-accurate: WASM reads ROM directly) */
   speakWord(index: number): void {
+    this.stopSpeaking();
+    this._playROMWordDirect(index);
+  }
+
+  /**
+   * Send a ROM word to WASM without calling stopSpeaking().
+   * Used by chain methods (speakTextHybrid, spellText) to avoid
+   * nulling _speakingChain between words.
+   */
+  private _playROMWordDirect(index: number): void {
     if (!this._romLoaded || index < 0 || index >= this._romWords.length) return;
     if (!this._romSentToWasm || !this.workletNode || this._disposed) return;
 
-    this.stopSpeaking();
     const word = this._romWords[index];
     const byteAddr = Math.floor(word.startBit / 8);
 
@@ -190,16 +221,46 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
+
+    if (this._mode === 1) {
+      // Speech mode
+      if (this._singMode && this._vowelSequence.length > 0) {
+        // Vowel sequence mode: cycle through vowels per note
+        const pitchOffset = Math.round((note - 60) * 0.5);
+        this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
+        this._speakSingleVowel();
+      } else if (this._singMode) {
+        // Sing mode: MIDI note controls pitch via WASM offset (slides smoothly)
+        const pitchOffset = Math.round((note - 60) * 0.5);
+        this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
+
+        // Only start speech if not already speaking — don't retrigger
+        if (!this.isSpeaking) {
+          this.speakText(this._speechText);
+        }
+      } else {
+        // Non-sing: each note retriggers speech from the start (one-shot)
+        this.stopSpeaking();
+        this.speakText(this._speechText);
+      }
+    } else {
+      // Tone mode: standard MIDI noteOn
+      this.workletNode.port.postMessage({
+        type: 'noteOn',
+        note,
+        velocity: Math.floor(velocity * 127),
+      });
+    }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+
+    if (this._mode === 1) {
+      // Speech mode: let speech finish naturally (like SAM)
+    } else {
+      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    }
   }
 
   protected writeFrequency(freq: number): void {
@@ -324,7 +385,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       const wordIdx = this._romWords.findIndex(w => w.name === letters[idx]);
       idx++;
       if (wordIdx >= 0) {
-        this.speakWord(wordIdx);
+        this._playROMWordDirect(wordIdx);
         // Wait for word duration (~25ms * frames) then play next
         const word = this._romWords[wordIdx];
         const durationMs = word.frames.length * 25 + 100;
@@ -338,7 +399,12 @@ export class TMS5220Synth extends MAMEBaseSynth {
   }
 
   /**
-   * Hybrid TTS: ROM recordings for known vocabulary, SAM phonemes for unknown words.
+   * Hybrid TTS: ROM recordings for single-letter words (A-Z verified),
+   * SAM phoneme synthesis for everything else.
+   *
+   * Only the first 26 ROM entries (letters A-Z) have verified name→audio mapping.
+   * Vocabulary words after index 25 may have incorrect name mappings depending on
+   * the ROM version, so we route those through the phoneme pipeline instead.
    */
   speakTextHybrid(text: string): void {
     this.stopSpeaking();
@@ -355,18 +421,25 @@ export class TMS5220Synth extends MAMEBaseSynth {
       }
 
       const word = words[wordIndex++];
-      const romIdx = this._romWords.findIndex(w => w.name.toLowerCase() === word.toLowerCase());
+
+      // Only match single letters against ROM (first 26 entries are verified A-Z)
+      let romIdx = -1;
+      if (word.length === 1 && /^[A-Za-z]$/.test(word)) {
+        romIdx = this._romWords.findIndex(
+          (w, i) => i < 26 && w.name.toLowerCase() === word.toLowerCase()
+        );
+      }
 
       console.log(`[TMS5220] hybrid: word="${word}" → romIdx=${romIdx}`);
 
       if (romIdx >= 0) {
-        // ROM word: play via WASM speech engine
-        this.speakWord(romIdx);
+        // Single letter: play via ROM (verified A-Z mapping)
+        this._playROMWordDirect(romIdx);
         const romWord = this._romWords[romIdx];
         const durationMs = romWord.frames.length * 25 + 200;
         setTimeout(playNext, durationMs);
       } else {
-        // Unknown word: SAM phoneme synthesis
+        // All other words: SAM phoneme synthesis
         this._speakPhonemeWord(word, () => {
           setTimeout(playNext, 200);
         });
@@ -423,6 +496,33 @@ export class TMS5220Synth extends MAMEBaseSynth {
     return { data, numFrames: totalFrames };
   }
 
+  /** Apply pitch/energy knob offsets to TTS frames before sending to WASM */
+  private _applySpeechParamsToFrames(frames: TMS5220Frame[]): TMS5220Frame[] {
+    const pitchOffset = this._speechPitchIndex - 32;  // 32 = center/default
+    const energyScale = this._speechEnergyIndex / 10; // 10 = default
+
+    // Skip if no modification needed
+    if (pitchOffset === 0 && Math.abs(energyScale - 1) < 0.01) return frames;
+
+    return frames.map(f => {
+      let newPitch = f.pitch;
+      let newEnergy = f.energy;
+
+      // Apply pitch offset to voiced frames (pitch > 0)
+      if (pitchOffset !== 0 && f.pitch > 0) {
+        newPitch = Math.max(1, Math.min(31, f.pitch + pitchOffset));
+      }
+
+      // Apply energy scaling
+      if (Math.abs(energyScale - 1) >= 0.01 && f.energy > 0 && f.energy < 15) {
+        newEnergy = Math.max(1, Math.min(14, Math.round(f.energy * energyScale)));
+      }
+
+      if (newPitch === f.pitch && newEnergy === f.energy) return f;
+      return { ...f, pitch: newPitch, energy: newEnergy };
+    });
+  }
+
   /** Send a frame buffer to WASM and start speaking */
   private _sendFrameBufferAndSpeak(frames: TMS5220Frame[], onDone?: () => void): void {
     if (!this.workletNode || this._disposed) {
@@ -430,7 +530,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
       return;
     }
 
-    const { data, numFrames } = this._packFrameBuffer(frames);
+    // Apply pitch/energy knob offsets before packing
+    const modifiedFrames = this._applySpeechParamsToFrames(frames);
+    const { data, numFrames } = this._packFrameBuffer(modifiedFrames);
 
     // Transfer frame buffer to worklet
     const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
@@ -439,8 +541,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       [buffer]
     );
 
-    // Set volume and start speaking through MAME engine
-    this.workletNode.port.postMessage({ type: 'setVolume', value: 1.0 });
+    // Start speaking through MAME engine (volume already set via setParameter knob)
     this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
 
     this._phonemeSpeechActive = true;
@@ -456,6 +557,14 @@ export class TMS5220Synth extends MAMEBaseSynth {
     }
   }
 
+  /** Build TMS5220 frames for phoneme tokens, using ROM data when available */
+  private _buildPhonemeFrames(tokens: Array<{ code: string; stress: number }>): TMS5220Frame[] {
+    if (this._romPhonemes && this._romPhonemes.size > 0) {
+      return buildFramesFromROMLibrary(tokens, this._romPhonemes, samToTMS5220);
+    }
+    return phonemesToTMS5220Frames(tokens);
+  }
+
   /** Speak full text via SAM phonemes through MAME engine frame buffer */
   private _speakPhonemeText(text: string): void {
     this.stopSpeaking();
@@ -464,7 +573,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (!phonemeStr) return;
 
     const tokens = parsePhonemeString(phonemeStr);
-    const frames = phonemesToTMS5220Frames(tokens);
+    const frames = this._buildPhonemeFrames(tokens);
     if (frames.length === 0) return;
 
     this._sendFrameBufferAndSpeak(frames, () => {
@@ -478,7 +587,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (!phonemeStr) { onDone(); return; }
 
     const tokens = parsePhonemeString(phonemeStr);
-    const frames = phonemesToTMS5220Frames(tokens);
+    const frames = this._buildPhonemeFrames(tokens);
     if (frames.length === 0) { onDone(); return; }
 
     // Stop any current WASM speech first
@@ -534,6 +643,46 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
     }
+
+    // Track speech-relevant params locally for TTS frame modification
+    if (param === 'pitch_index') this._speechPitchIndex = value;
+    if (param === 'energy_index') this._speechEnergyIndex = value;
+    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
+    if (param === 'sing_mode') this._singMode = value >= 1;
+    if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
+  }
+
+  /** Store speech text for use in Speech mode noteOn */
+  setTextParam(key: string, value: string): void {
+    if (key === 'speechText') {
+      this._speechText = value;
+    }
+    if (key === 'vowelSequence') {
+      this._vowelSequence = value ? value.split(',').filter(Boolean) : [];
+      this._vowelIndex = 0;
+    }
+  }
+
+  /** Speak a single vowel from the sequence through the frame buffer */
+  private _speakSingleVowel(): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
+
+    const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+    this._vowelIndex++;
+
+    const frame = samToTMS5220(code);
+    if (!frame) return;
+
+    this.stopSpeaking();
+
+    // For looping, repeat the frame multiple times to create a sustained sound
+    const frames = this._vowelLoopSingle
+      ? Array(40).fill(frame) // ~1 second of frames, will be retriggered on next note
+      : [frame];
+
+    this._sendFrameBufferAndSpeak(frames, () => {
+      this._phonemeSpeechActive = false;
+    });
   }
 
   protected override processPendingCall(call: { method: string; args: unknown[] }): void {

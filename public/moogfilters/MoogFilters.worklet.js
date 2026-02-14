@@ -8,6 +8,19 @@
  * WASM binary and JS code are received via postMessage.
  */
 
+// Polyfill URL for AudioWorklet scope — Emscripten's findWasmBinary() calls
+// new URL('file.wasm', base) even when wasmBinary is provided directly.
+// We just need it to not crash; the URL is never actually fetched.
+if (typeof URL === 'undefined') {
+  globalThis.URL = class URL {
+    constructor(path, base) {
+      this.href = base ? (base + '/' + path) : path;
+      this.pathname = path;
+    }
+    toString() { return this.href; }
+  };
+}
+
 let processorRegistered = false;
 
 // Shared WASM module (single instance for all processors)
@@ -258,6 +271,20 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
       // Copy WASM output to Web Audio output
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       outputR.set(this.outputBufferR.subarray(0, numSamples));
+
+      // DIAGNOSTIC: Log input/output peak levels every 500 frames (~5sec)
+      if (!this._diagCounter) this._diagCounter = 0;
+      this._diagCounter++;
+      if (this._diagCounter % 500 === 0) {
+        let maxIn = 0, maxOut = 0;
+        for (let i = 0; i < numSamples; i++) {
+          maxIn = Math.max(maxIn, Math.abs(inputL[i]));
+          maxOut = Math.max(maxOut, Math.abs(outputL[i]));
+        }
+        console.warn('[MoogWorklet] frame', this._diagCounter,
+          'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6),
+          'init:', this.isInitialized, 'hasEffect:', !!this.effect);
+      }
 
     } catch (error) {
       // Passthrough on error

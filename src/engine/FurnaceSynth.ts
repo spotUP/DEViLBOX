@@ -76,6 +76,43 @@ export class FurnaceSynth implements DevilboxSynth {
   }
 
   /**
+   * Dynamically set the chip channel index (for multi-channel tracker playback).
+   */
+  public setChannelIndex(ch: number): void {
+    this.channelIndex = ch;
+  }
+
+  /**
+   * Get the maximum number of channels for a given chip type.
+   */
+  public static getMaxChannels(chipType: number): number {
+    switch (chipType) {
+      case FurnaceChipType.OPN2: return 6;   // YM2612: 6 FM channels
+      case FurnaceChipType.OPM:  return 8;   // YM2151: 8 FM channels
+      case FurnaceChipType.OPZ:  return 8;   // YM2414: 8 FM channels
+      case FurnaceChipType.OPL3: return 18;  // YMF262: 18 channels (9 per part)
+      case FurnaceChipType.OPLL: return 9;   // YM2413: 9 channels
+      case FurnaceChipType.OPNA: return 6;   // YM2608: 6 FM channels
+      case FurnaceChipType.OPNB: return 4;   // YM2610: 4 FM channels
+      case FurnaceChipType.OPN:  return 3;   // YM2203: 3 FM channels
+      case FurnaceChipType.OPNB_B: return 6; // YM2610B: 6 FM channels
+      case FurnaceChipType.ESFM: return 18;  // Enhanced OPL3
+      case FurnaceChipType.Y8950: return 9;  // MSX-AUDIO: 9 channels
+      case FurnaceChipType.OPL4: return 18;  // YMF278B: 18 FM channels
+      case FurnaceChipType.PSG:  return 4;   // SN76489: 3 tone + 1 noise
+      case FurnaceChipType.AY:   return 3;   // AY-3-8910: 3 channels
+      case FurnaceChipType.NES:  return 5;   // 2A03: 5 channels
+      case FurnaceChipType.GB:   return 4;   // Game Boy: 4 channels
+      case FurnaceChipType.SID:
+      case FurnaceChipType.SID_6581:
+      case FurnaceChipType.SID_8580: return 3; // SID: 3 voices
+      case FurnaceChipType.PCE:  return 6;   // PC Engine: 6 channels
+      case FurnaceChipType.SNES: return 8;   // SPC700: 8 channels
+      default: return 6; // Safe default
+    }
+  }
+
+  /**
    * Set volume normalization offset in dB.
    * Applied to the native output GainNode in the audio path.
    */
@@ -2204,8 +2241,6 @@ export class FurnaceSynth implements DevilboxSynth {
           this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0x40 + opOff), 127);
         }
 
-        // Deactivate chip to stop rendering entirely
-        this.chipEngine.deactivate(FurnaceChipType.OPN2);
         break;
       }
       case FurnaceChipType.OPM: { // 1
@@ -2222,8 +2257,6 @@ export class FurnaceSynth implements DevilboxSynth {
           this.chipEngine.write(FurnaceChipType.OPM, 0x60 + opOff, 127);
         }
 
-        // Deactivate chip to stop rendering entirely
-        this.chipEngine.deactivate(FurnaceChipType.OPM);
         break;
       }
       case FurnaceChipType.OPL3: { // 2
@@ -2283,8 +2316,6 @@ export class FurnaceSynth implements DevilboxSynth {
         console.log(`[FurnaceSynth] OPZ KEY OFF: chan=${chan}, reg=0x${(0x20 + (chan & 7)).toString(16)}, val=0x${keyOffVal.toString(16)}`);
         this.chipEngine.write(FurnaceChipType.OPZ, 0x20 + (chan & 7), keyOffVal);
 
-        // Deactivate chip to stop rendering entirely
-        this.chipEngine.deactivate(FurnaceChipType.OPZ);
         break;
       }
       case FurnaceChipType.Y8950: // 23

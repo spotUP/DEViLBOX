@@ -258,78 +258,79 @@ export class InstrumentFactory {
     'JC303': 15,           // Same engine as TB303
     'Buzz3o3': 5,          // Kept (WASM-dependent)
     'Furnace': 0,          // Generic Furnace - WASM dispatcher, no chip-specific output
-    // Furnace FM chips - recalibrated 2026-02-05 after WASM gain fixes
-    'FurnaceOPN': 7,       // Measured: -17.0dB → need +7dB
-    'FurnaceOPM': 2,       // Measured: -12.1dB → need +2dB
-    'FurnaceOPL': 10,      // Measured: -19.5dB → need +10dB
-    'FurnaceOPLL': 2,      // Measured: -12.1dB → need +2dB
-    'FurnaceESFM': 0,      // Measured: -18.2dB (test isolation, varies) → conservative 0
-    'FurnaceOPZ': 0,       // Measured: -19.2dB (test isolation, varies) → conservative 0
-    'FurnaceOPNA': 5,      // Measured: -14.6dB → need +5dB
-    'FurnaceOPNB': 5,      // Measured: -15.4dB → need +5dB
-    'FurnaceOPL4': 6,      // Measured: -16.3dB → need +6dB
-    'FurnaceY8950': 6,     // Measured: -16.4dB → need +6dB
-    'FurnaceVRC7': 2,      // Measured: -11.3dB → need +1-2dB
-    'FurnaceOPN2203': 0,   // Measured: -9.5dB → already near target
-    'FurnaceOPNBB': 2,     // Measured: -11.5dB → need +2dB
-    // Furnace Dispatch chips - calibrated 2026-02-05 via browser test runner
-    'FurnaceNES': 7,       // Measured: -17.3dB → need +7dB
-    'FurnaceGB': 4,        // Measured: -13.6dB → need +4dB
-    'FurnaceSNES': -10,    // Measured: 0.0dB (clipping) → need -10dB
-    'FurnacePCE': 3,       // Measured: -12.9dB → need +3dB
-    'FurnacePSG': 3,       // Measured: -13.1dB → need +3dB
-    'FurnaceVB': 16,       // Measured: -25.7dB → need +16dB
-    'FurnaceLynx': 3,      // Measured: -13.2dB → need +3dB
-    'FurnaceSWAN': 4,      // Measured: -13.9dB → need +4dB
-    'FurnaceVRC6': 3,      // Measured: -13.0dB → need +3dB
-    'FurnaceN163': 7,      // Measured: -17.1dB → need +7dB
-    'FurnaceFDS': 3,       // Measured: -13.4dB → need +3dB
-    'FurnaceMMC5': 37,     // Measured: -46.8dB → need +37dB
-    'FurnaceGBA': -10,     // Measured: 0.0dB (clipping) → need -10dB
-    'FurnaceNDS': 3,       // Measured: -13.1dB → need +3dB
-    'FurnacePOKEMINI': -10, // Measured: -0.0dB (clipping) → need -10dB
-    'FurnaceC64': 6,       // Measured: -16.1dB → need +6dB
-    'FurnaceSID6581': 6,   // Measured: -16.0dB → need +6dB
-    'FurnaceSID8580': 6,   // Measured: -15.9dB → need +6dB
-    'FurnaceAY': 3,        // Measured: -13.3dB → need +3dB
-    'FurnaceAY8930': 3,    // Measured: -13.2dB → need +3dB
-    'FurnaceVIC': 3,       // Measured: -12.8dB → need +3dB
-    'FurnaceSAA': 6,       // Measured: -16.2dB → need +6dB
-    'FurnaceTED': -4,      // Measured: -5.9dB → need -4dB
-    'FurnaceVERA': 17,     // Measured: -26.5dB → need +17dB
-    'FurnaceSCC': 9,       // Measured: -18.5dB → need +9dB
-    'FurnaceTIA': -7,      // Measured: -3.2dB → need -7dB
-    'FurnaceAMIGA': 3,     // Measured: -13.0dB → need +3dB
-    'FurnacePET': -10,     // Measured: -0.0dB (clipping) → need -10dB
-    'FurnacePCSPKR': -10,  // Measured 2026-02-07: -0.0dB → need -10dB
-    'FurnaceZXBEEPER': -4, // Measured: -6.1dB → need -4dB
-    'FurnacePOKEY': 7,     // Measured: -17.3dB → need +7dB
-    'FurnacePONG': -10,    // Measured: -0.0dB (clipping) → need -10dB
-    'FurnacePV1000': 3,    // Measured: -12.6dB → need +3dB
-    'FurnaceDAVE': 3,      // Measured: -13.0dB → need +3dB
-    'FurnaceSU': 8,        // Measured: -18.3dB → need +8dB
-    'FurnacePOWERNOISE': -4, // Measured: -6.0dB → need -4dB
-    'FurnaceSEGAPCM': -5,  // Measured: -4.8dB → need -5dB
-    'FurnaceQSOUND': 5,    // Measured: -15.2dB → need +5dB
-    'FurnaceES5506': 38,   // Measured: -47.7dB → need +38dB
-    'FurnaceRF5C68': 0,    // Silent - needs further investigation (2026-02-07)
-    'FurnaceC140': 8,      // Measured: -18.0dB → need +8dB
-    'FurnaceK007232': -4,  // Measured: -6.1dB → need -4dB
-    'FurnaceK053260': 3,   // Measured: -12.5dB → need +3dB
-    'FurnaceGA20': 3,      // Measured: -12.6dB → need +3dB
-    'FurnaceOKI': 44,      // Measured: -54.3dB → need +44dB
-    'FurnaceYMZ280B': 14,  // Measured: -23.8dB → need +14dB
-    'FurnaceX1_010': 15,   // Measured: -24.6dB → need +15dB
-    'FurnaceMSM6258': -10, // Measured 2026-02-07: -0.1dB → need -10dB
-    'FurnaceMSM5232': 10,  // Measured: -19.7dB → need +10dB
-    'FurnaceMULTIPCM': 14, // Measured: -24.1dB → need +14dB
-    'FurnaceNAMCO': 3,     // Measured: -13.0dB → need +3dB
-    'FurnacePCMDAC': -5,   // Measured: -4.9dB → need -5dB
-    'FurnaceBUBBLE': 3,    // Measured: -13.2dB → need +3dB
-    'FurnaceSM8521': 3,    // Measured: -12.8dB → need +3dB
-    'FurnaceT6W28': 3,     // Measured: -13.0dB → need +3dB
-    'FurnaceSUPERVISION': 3, // Measured: -13.1dB → need +3dB
-    'FurnaceUPD1771': 3,   // Measured: -12.7dB → need +3dB
+    // Furnace FM chips - recalibrated 2026-02-13 via browser test runner
+    'FurnaceOPN': 7,       // Measured: -10.0dB → on target
+    'FurnaceOPM': 2,       // Measured: -10.1dB → on target
+    'FurnaceOPL': 10,      // Measured: -9.5dB → on target
+    'FurnaceOPLL': 12,     // Measured: variable (-10 to -34dB), using conservative +12
+    'FurnaceESFM': 19,     // Measured: -28.6dB → need +19dB
+    'FurnaceOPZ': -14,     // Measured: +3.8dB → need -14dB
+    'FurnaceOPNA': 6,      // Measured: -15.7dB → need +6dB
+    'FurnaceOPNB': 7,      // Measured: -17.4dB → need +7dB
+    'FurnaceOPL4': 9,      // Measured: -18.6dB → need +9dB
+    'FurnaceY8950': 9,     // Measured: -18.7dB → need +9dB
+    'FurnaceVRC7': 8,      // Measured: variable (-9 to -26dB), using conservative +8
+    'FurnaceOPN2203': -3,  // Measured: -7.5dB → need -3dB
+    'FurnaceOPNBB': 2,     // Measured: -9.5dB → on target
+    // Furnace Dispatch chips - recalibrated 2026-02-13 via browser test runner
+    'FurnaceNES': 7,       // Measured: -9.8dB → on target
+    'FurnaceGB': 4,        // Measured: -9.6dB → on target
+    'FurnaceSNES': -10,    // Measured: -10.0dB → on target
+    'FurnacePCE': 5,       // Measured: variable (-7 to -20dB), using moderate +5
+    'FurnacePSG': 3,       // Measured: -9.1dB → on target
+    'FurnaceVB': 16,       // Measured: -9.7dB → on target
+    'FurnaceLynx': 3,      // Measured: -9.7dB → on target
+    'FurnaceSWAN': 4,      // Measured: -9.9dB → on target
+    'FurnaceVRC6': 3,      // Measured: -9.6dB → on target
+    'FurnaceN163': 7,      // Measured: -10.5dB → on target
+    'FurnaceFDS': 3,       // Measured: -8.2dB → on target
+    'FurnaceMMC5': 37,     // Measured: -9.8dB → on target
+    'FurnaceGBA': -10,     // Measured: -10.0dB → on target
+    'FurnaceNDS': 3,       // Measured: -8.6dB → on target
+    'FurnacePOKEMINI': -10, // Measured: -10.0dB → on target
+    'FurnaceC64': 6,       // Measured: -11.1dB → on target
+    'FurnaceSID6581': 6,   // Measured: -11.1dB → on target
+    'FurnaceSID8580': 6,   // Measured: -11.1dB → on target
+    'FurnaceAY': 3,        // Measured: -9.0dB → on target
+    'FurnaceAY8930': 25,   // Measured: -32.4dB → need +22dB
+    'FurnaceVIC': -1,      // Measured: -6.4dB → need -4dB (was +3, overcorrected)
+    'FurnaceSAA': 6,       // Measured: -9.5dB → on target
+    'FurnaceTED': -4,      // Measured: -10.0dB → on target
+    'FurnaceVERA': 14,     // Measured: -13.4dB → need +3dB
+    'FurnaceSCC': 9,       // Measured: -9.7dB → on target
+    'FurnaceTIA': -7,      // Measured: -10.4dB → on target
+    'FurnaceAMIGA': 15,    // Measured: -21.6dB → need +12dB
+    'FurnacePET': -10,     // Measured: -10.0dB → on target
+    'FurnacePCSPKR': -10,  // Measured: -10.0dB → on target
+    'FurnaceZXBEEPER': -4, // Measured: -10.2dB → on target
+    'FurnacePOKEY': 7,     // Measured: -9.7dB → on target
+    'FurnacePONG': -10,    // Measured: -10.0dB → on target
+    'FurnacePV1000': 3,    // Measured: -9.6dB → on target
+    'FurnaceDAVE': 15,     // Measured: -21.6dB → need +12dB
+    'FurnaceSU': 27,       // Measured: -29.4dB → need +19dB
+    'FurnacePOWERNOISE': -4, // Measured: -10.4dB → on target
+    'FurnaceSEGAPCM': -5,  // Measured: -10.4dB → on target
+    'FurnaceQSOUND': 18,   // Measured: -22.9dB → need +13dB
+    'FurnaceES5506': 80,   // Measured: -52.3dB → need +42dB
+    'FurnaceRF5C68': 0,    // Silent - sample format mismatch (needs signed magnitude)
+    'FurnaceC140': 33,     // Measured: -34.7dB → need +25dB
+    'FurnaceK007232': -4,  // Measured: -9.9dB → on target
+    'FurnaceK053260': 17,  // Measured: -24.0dB → need +14dB
+    'FurnaceGA20': 3,      // Silent - sample format mismatch (needs unsigned 8-bit)
+    'FurnaceOKI': 44,      // Silent - needs VOX ADPCM encoding
+    'FurnaceYMZ280B': 39,  // Measured: -34.7dB → need +25dB
+    'FurnaceX1_010': 15,   // Measured: -9.6dB → on target
+    'FurnaceMSM6258': -10, // Measured: -10.1dB → on target
+    'FurnaceMSM5232': 10,  // Measured: -9.8dB → on target
+    'FurnaceMULTIPCM': 56, // Measured: -51.7dB → need +42dB
+    'FurnaceNAMCO': -5,    // Measured: variable (-7 to +5dB), using conservative -5
+    'FurnacePCMDAC': 8,    // Measured: -23.0dB → need +13dB
+    'FurnaceBUBBLE': 3,    // Measured: -9.5dB → on target
+    'FurnaceSM8521': 9,    // Measured: -16.2dB → need +6dB
+    'FurnaceT6W28': 3,     // Measured: -8.3dB → on target
+    'FurnaceSUPERVISION': -1, // Measured: -6.2dB → need -4dB (was +3, overcorrected)
+    'FurnaceUPD1771': 9,   // Measured: -15.7dB → need +6dB
+    'FurnaceSCVTONE': 3,   // Measured: -8.1dB → on target
     'BuzzKick': 3,         // Calibrated with output gain: measured -13.1dB, target -10
     'BuzzKickXP': 5,       // Calibrated with output gain: measured -21.7dB, target -10
     'BuzzNoise': 7,        // Calibrated with output gain: measured -22.3dB, target -10
@@ -514,10 +515,11 @@ export class InstrumentFactory {
         if (dispatchPlatform !== undefined) {
           instrument = new FurnaceDispatchSynth(dispatchPlatform);
           // Set the Furnace instrument index and upload encoded instrument
-          if (config.furnace?.furnaceIndex !== undefined) {
-            (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(config.furnace.furnaceIndex);
+          const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
+          (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(furnaceIndex);
+          if (config.furnace) {
             // Encode and upload instrument from config (converts to FINS format)
-            console.log(`[InstrumentFactory] Queuing upload for instrument ${config.name}, furnaceIndex=${config.furnace.furnaceIndex}`);
+            console.log(`[InstrumentFactory] Queuing upload for instrument ${config.name}, furnaceIndex=${furnaceIndex}`);
             (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace as unknown as Record<string, unknown>, config.name).catch(err => {
               console.error(`[InstrumentFactory] Failed to upload instrument data for ${config.name}:`, err);
             });

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-13T09:38:44.384Z
+ * Generated: 2026-02-14T11:05:39.546Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '490';
-export const BUILD_HASH = 'ff4c4c5';
-export const BUILD_DATE = '2026-02-13';
+export const BUILD_NUMBER = '493';
+export const BUILD_HASH = 'adf1c54';
+export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-13',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove URL shim that shadowed global URL constructor"
+      },
+      {
+        type: 'fix',
+        "description": "Fix WASM OOM and self-not-defined in AudioWorklet scope"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(tms5220): update C++ docs and rebuild WASM binary with index clamping"
+      },
       {
         type: 'fix',
         "description": "Clamp TMS5220 table indices and clean up FurnaceDispatch naming"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Make play buttons restart playback instead of toggling"
-      },
-      {
-        type: 'fix',
-        "description": "Add 60fps to remaining visualizers"
-      },
-      {
-        type: 'fix',
-        "description": "Increase frame rate from 30fps to 60fps"
-      },
-      {
-        type: 'fix',
-        "description": "Add author email to package.json for Linux .deb builds"
       }
     ]
   }

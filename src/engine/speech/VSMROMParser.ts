@@ -312,24 +312,61 @@ export function buildWordTableFromMCU(_mcuRom: Uint8Array, vsmRom: Uint8Array): 
   }
 
   // Detect header/metadata entries at the start of the address table.
-  // The Speak & Spell ROM has 1-2 header entries that point to locations
-  // far beyond where the actual A-Z speech data starts. Real speech data
-  // begins shortly after the address table itself (near byte 100-200),
-  // while header entries may point to bytes 10000+.
+  // The ROM typically has: far-off pointers (module headers), then system
+  // prompts (e.g. "say it", "try again"), then the actual A-Z letters +
+  // vocabulary words. We detect these in two phases:
+  //
+  // Phase 1: Skip entries with non-monotonic addresses (far-off pointers).
+  // Phase 2: Among the remaining entries, find the largest byte-address gap
+  //          in the first ~15 entries. The Speak & Spell stores system prompts
+  //          contiguously near the ROM start, then letters A-Z in a separate
+  //          region — creating a large gap between the two groups.
   let skipCount = 0;
-  if (addresses.length > 5) {
-    const refAddresses = addresses.slice(2, Math.min(6, addresses.length));
-    const minRef = Math.min(...refAddresses.map(a => a.byteOffset));
-    for (let i = 0; i < Math.min(2, addresses.length); i++) {
-      if (addresses[i].byteOffset > minRef * 5) {
-        skipCount++;
-      } else {
+  if (addresses.length > 15) {
+    // Phase 1: find where addresses become monotonically increasing
+    const RUN_LENGTH = 10;
+    for (let start = 0; start <= Math.min(10, addresses.length - RUN_LENGTH); start++) {
+      let increasing = true;
+      for (let j = start; j < start + RUN_LENGTH - 1; j++) {
+        if (addresses[j + 1].byteOffset <= addresses[j].byteOffset) {
+          increasing = false;
+          break;
+        }
+      }
+      if (increasing) {
+        skipCount = start;
         break;
       }
     }
-    if (skipCount > 0) {
-      console.log(`[VSMROMParser] Skipping ${skipCount} header entries (offsets: ${addresses.slice(0, skipCount).map(a => a.byteOffset).join(', ')} vs speech start ~${minRef})`);
+
+    // Phase 2: detect system prompts before the actual letter recordings.
+    // Look for the largest byte-address gap among the first entries —
+    // this separates system prompts (near ROM start) from letter data.
+    const searchEnd = Math.min(skipCount + 15, addresses.length - 1);
+    let maxGap = 0;
+    let maxGapIdx = skipCount;
+    const gaps: number[] = [];
+
+    for (let i = skipCount; i < searchEnd; i++) {
+      const gap = addresses[i + 1].byteOffset - addresses[i].byteOffset;
+      gaps.push(gap);
+      if (gap > maxGap) {
+        maxGap = gap;
+        maxGapIdx = i + 1;
+      }
     }
+
+    if (gaps.length > 3) {
+      const sorted = [...gaps].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      if (maxGap > median * 3 && maxGapIdx > skipCount) {
+        skipCount = maxGapIdx;
+      }
+    }
+  }
+
+  if (skipCount > 0) {
+    console.log(`[VSMROMParser] Skipping ${skipCount} header/prompt entries → letter "A" at entry [${skipCount}] byte ${addresses[skipCount]?.byteOffset}`);
   }
 
   // Name words from the vocabulary list, skipping header entries

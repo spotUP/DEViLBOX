@@ -81,9 +81,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        // Also check if click is in any submenu (which are portals)
-        // This is complex because we have multiple portals.
-        // For simplicity, we'll let the portal ContextMenu handle its own outside clicks.
+        // Check if click is inside a portal-rendered submenu (same component class)
+        // Submenus are rendered via createPortal at document.body level
+        const target = e.target as Element;
+        if (target.closest?.('[data-context-menu]')) return;
         onClose();
       }
     };
@@ -137,6 +138,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   return createPortal(
     <div
       ref={menuRef}
+      data-context-menu
       className={`
         fixed z-[100] min-w-[180px] py-1
         bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl

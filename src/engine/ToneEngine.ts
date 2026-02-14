@@ -105,6 +105,7 @@ export class ToneEngine {
   // Master effects chain
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
   private masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }> = new Map();
+  private masterEffectsRebuildVersion = 0;
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
   private channelOutputs: Map<number, {
@@ -403,7 +404,7 @@ export class ToneEngine {
           const { instance } = await WebAssembly.instantiate(dspBinary, imports);
           this.wasmInstance = instance.exports;
           if ((this.wasmInstance as any).init) (this.wasmInstance as any).init();
-          console.log('[ToneEngine] Unified DevilboxDSP WASM instance ready');
+          console.warn('[ToneEngine] Unified DevilboxDSP WASM instance ready');
         } catch (e) {
           console.error('[ToneEngine] Failed to init Main Thread WASM:', e);
         }
@@ -453,7 +454,7 @@ export class ToneEngine {
       const furnaceEngine = FurnaceChipEngine.getInstance();
       // Pass Tone.js context - the engine will extract the native AudioContext
       await furnaceEngine.init(Tone.getContext());
-      console.log('[ToneEngine] Furnace WASM chip engine initialized');
+      console.warn('[ToneEngine] Furnace WASM chip engine initialized');
     } catch (error) {
       console.warn('[ToneEngine] Furnace WASM init failed:', error);
     }
@@ -1155,7 +1156,11 @@ export class ToneEngine {
 
         // If we have a stored edited buffer, use that instead of URL
         // Note: audioBuffer can be ArrayBuffer, Uint8Array, or base64 string (from persistence)
-        if (storedBuffer) {
+        // Guard: after JSON deserialization, ArrayBuffer becomes {} — reject non-buffer objects
+        const isValidBuffer = storedBuffer instanceof ArrayBuffer ||
+          (storedBuffer as unknown) instanceof Uint8Array ||
+          typeof storedBuffer === 'string';
+        if (storedBuffer && isValidBuffer) {
           // Convert base64 string to ArrayBuffer if needed
           let bufferToUse: ArrayBuffer | Uint8Array | null = storedBuffer;
           if (typeof storedBuffer === 'string') {
@@ -1292,6 +1297,7 @@ export class ToneEngine {
           instrument = new Tone.Sampler({
             volume: config.volume || -12,
           });
+          this.instrumentSynthTypes.set(key, 'EmptySampler');
         }
         break;
       }
@@ -1972,12 +1978,17 @@ export class ToneEngine {
 
           player.start(safeTime);
         } else {
-          // Regular Sampler
+          // Regular Sampler (or empty Sampler with no buffers)
+          if (actualType === 'EmptySampler') return; // No sample data, skip silently
           const sampler = instrument as Tone.Sampler;
           if (!sampler.loaded) {
             return;
           }
-          sampler.triggerAttack(note, safeTime, velocity);
+          try {
+            sampler.triggerAttack(note, safeTime, velocity);
+          } catch {
+            // Sampler may throw "No available buffers" if async loading hasn't completed
+          }
         }
       } else if (config.synthType === 'Player' || config.synthType === 'GranularSynth') {
         // Player/GranularSynth need a buffer loaded
@@ -2045,6 +2056,11 @@ export class ToneEngine {
       } else if (instrument instanceof WAMSynth) {
         instrument.triggerAttack(note, safeTime, velocity);
       } else {
+        // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
+        if (instrument instanceof FurnaceSynth && channelIndex !== undefined) {
+          const maxCh = FurnaceSynth.getMaxChannels(instrument.getChipType());
+          instrument.setChannelIndex(channelIndex % maxCh);
+        }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = Tone.Frequency(note).toFrequency();
         const finalVelocity = this.applySlideAndAccent(
@@ -2496,6 +2512,11 @@ export class ToneEngine {
             const gain = (voiceNode.output as GainNode).gain;
             if (gain.value === 0) { gain.cancelScheduledValues(0); gain.value = 1; }
           }
+          // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
+          if (voiceNode instanceof FurnaceSynth && channelIndex !== undefined) {
+            const maxCh = FurnaceSynth.getMaxChannels(voiceNode.getChipType());
+            voiceNode.setChannelIndex(channelIndex % maxCh);
+          }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
             const finalVelocity = accent ? Math.min(1, velocity * ToneEngine.ACCENT_BOOST) : velocity;
@@ -2921,6 +2942,22 @@ export class ToneEngine {
     keysToRemove.forEach((key) => {
       this.disposeInstrumentByKey(key);
     });
+  }
+
+  /**
+   * Dispose ALL instruments in the engine (for clean module import).
+   * Removes all audio nodes, effect chains, analysers, and type mappings.
+   */
+  public disposeAllInstruments(): void {
+    const allKeys = Array.from(this.instruments.keys());
+    allKeys.forEach((key) => {
+      this.disposeInstrumentByKey(key);
+    });
+    this.instrumentSynthTypes.clear();
+    this.instrumentLoadingPromises.clear();
+    this.decodedAudioBuffers.clear();
+    this.activeVoices.clear();
+    this.channelLastNote.clear();
   }
 
   /**
@@ -4363,6 +4400,10 @@ export class ToneEngine {
    * Called when effects are added, removed, or reordered
    */
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
+    // Version guard: if another rebuild starts while we're async, abort this one
+    const myVersion = ++this.masterEffectsRebuildVersion;
+    console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
+
     // Deep clone effects to avoid Immer proxy revocation issues during async operations
     const effectsCopy = JSON.parse(JSON.stringify(effects)) as EffectConfig[];
 
@@ -4393,17 +4434,39 @@ export class ToneEngine {
       try { await Tone.start(); } catch { /* user gesture required */ }
     }
 
+    // Check if a newer rebuild superseded us
+    if (myVersion !== this.masterEffectsRebuildVersion) {
+      console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + this.masterEffectsRebuildVersion + ')');
+      return;
+    }
+
     // Create effect nodes individually — skip any that fail (e.g. worklet on suspended context)
     const successNodes: Tone.ToneAudioNode[] = [];
     const successConfigs: EffectConfig[] = [];
     for (const config of enabledEffects) {
       try {
         const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
+        // Check again after each async operation
+        if (myVersion !== this.masterEffectsRebuildVersion) {
+          console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted mid-create');
+          // Dispose the node we just created since we're aborting
+          try { node.disconnect(); node.dispose(); } catch { /* */ }
+          // Dispose any previously created nodes in this batch
+          successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+          return;
+        }
         successNodes.push(node);
         successConfigs.push(config);
       } catch (error) {
         console.warn(`[ToneEngine] Failed to create effect ${config.type}, skipping:`, error);
       }
+    }
+
+    // Final version check before connecting
+    if (myVersion !== this.masterEffectsRebuildVersion) {
+      console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted before connect');
+      successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+      return;
     }
 
     if (successNodes.length === 0) {
@@ -4427,6 +4490,9 @@ export class ToneEngine {
     }
 
     this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
+    console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
+      this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
+
 
   }
 
@@ -4444,7 +4510,7 @@ export class ToneEngine {
   public updateMasterEffectParams(effectId: string, config: EffectConfig): void {
     const effectData = this.masterEffectConfigs.get(effectId);
     if (!effectData) {
-      console.warn('[ToneEngine] Effect not found for update:', effectId);
+      console.warn('[ToneEngine] Effect not found for update:', effectId, 'available:', [...this.masterEffectConfigs.keys()]);
       return;
     }
 
@@ -4456,6 +4522,9 @@ export class ToneEngine {
         const wetValue = config.wet / 100;
         if ('wet' in node && node.wet instanceof Tone.Signal) {
           node.wet.rampTo(wetValue, 0.02);
+        } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
+          // Custom WASM effects (MoogFilter, MVerb, Leslie, SpringReverb) use a plain setter
+          (node as Record<string, unknown>).wet = wetValue;
         }
       }
 
@@ -4495,6 +4564,8 @@ export class ToneEngine {
         const wetValue = config.wet / 100;
         if ('wet' in node && node.wet instanceof Tone.Signal) {
           node.wet.rampTo(wetValue, 0.02);
+        } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
+          (node as Record<string, unknown>).wet = wetValue;
         }
       }
 

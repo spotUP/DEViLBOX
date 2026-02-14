@@ -455,7 +455,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           ) : (
             <div className="grid grid-cols-1 gap-2">
               {/* Back button when in subdirectory */}
-              {currentPath !== '' && (hasElectronFS() || hasServerFS) && (
+              {currentPath !== '' && (
                 <div
                   onClick={() => {
                     if (hasElectronFS() && currentPath) {
@@ -463,9 +463,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
                       setCurrentPath(parentPath);
                       setElectronDirectory(parentPath);
-                    } else if (hasServerFS && currentPath) {
-                      // Navigate to parent directory on server
-                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || 'songs';
+                    } else if (currentPath) {
+                      // Navigate to parent directory (server or manifest)
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '';
                       setCurrentPath(parentPath);
                     }
                     setSelectedFile(null);
@@ -492,6 +492,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                         setSelectedFile(null);
                       } else if (hasServerFS) {
                         // Navigate into directory on server
+                        setCurrentPath(file.path);
+                        setSelectedFile(null);
+                      } else {
+                        // Navigate into directory via manifest (GitHub Pages)
                         setCurrentPath(file.path);
                         setSelectedFile(null);
                       }
