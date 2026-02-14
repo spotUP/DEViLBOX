@@ -210,7 +210,8 @@ export const useMIDIStore = create<MIDIStore>()(
           if (success) {
             // Guard: only register the note/CC handler ONCE
             if (midiNoteHandlerRegistered) {
-              console.warn('[useMIDIStore] MIDI handler already registered — skipping duplicate registration');
+              // Debug: Intentional guard for React StrictMode double-invocation
+              // console.log('[useMIDIStore] MIDI handler already registered — skipping duplicate registration');
             }
 
             if (!midiNoteHandlerRegistered) {

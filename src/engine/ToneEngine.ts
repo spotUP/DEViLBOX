@@ -903,9 +903,14 @@ export class ToneEngine {
       // Use instrumentSynthTypes map (not constructor.name which gets minified by bundlers)
       const storedType = this.instrumentSynthTypes.get(key);
       if (config.synthType && storedType && storedType !== config.synthType && storedType !== 'Player') {
-        console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} stored as ${storedType} but config wants ${config.synthType} — dispose was missed!`);
+        console.warn(`[ToneEngine] STALE INSTRUMENT: key=${key} stored as ${storedType} but config wants ${config.synthType} — disposing and recreating`);
+        // Dispose the stale instrument immediately and create a new one
+        this.disposeInstrumentByKey(key);
+        // Continue to create new instrument below
+      } else {
+        // Type matches, return cached instrument
+        return cached ?? null;
       }
-      return cached ?? null;
     }
 
     // PERFORMANCE FIX: Check for shared/legacy instrument before creating new one
@@ -4446,7 +4451,8 @@ export class ToneEngine {
 
     // Version guard: if another rebuild starts while we're async, abort this one
     const myVersion = ++this.masterEffectsRebuildVersion;
-    console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
+    // Debug log only (verbose in StrictMode due to double-invocation)
+    // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
 
     // Deep clone effects to avoid Immer proxy revocation issues during async operations
     const effectsCopy = structuredClone(effects) as EffectConfig[];
@@ -4480,7 +4486,7 @@ export class ToneEngine {
 
     // Check if a newer rebuild superseded us
     if (myVersion !== this.masterEffectsRebuildVersion) {
-      console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + this.masterEffectsRebuildVersion + ')');
+      // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + this.masterEffectsRebuildVersion + ')');
       return;
     }
 
@@ -4492,7 +4498,7 @@ export class ToneEngine {
         const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
         // Check again after each async operation
         if (myVersion !== this.masterEffectsRebuildVersion) {
-          console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted mid-create');
+          // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted mid-create');
           // Dispose the node we just created since we're aborting
           try { node.disconnect(); node.dispose(); } catch { /* */ }
           // Dispose any previously created nodes in this batch
@@ -4508,7 +4514,7 @@ export class ToneEngine {
 
     // Final version check before connecting
     if (myVersion !== this.masterEffectsRebuildVersion) {
-      console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted before connect');
+      // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted before connect');
       successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
       return;
     }
@@ -4534,8 +4540,9 @@ export class ToneEngine {
     }
 
     this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
-    console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
-      this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
+    // Debug: Success
+    // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
+    //   this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
 
 
   }

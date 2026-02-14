@@ -14,6 +14,7 @@ export interface PatternGestureConfig {
   onTap?: (x: number, y: number) => void;
   onLongPress?: (x: number, y: number) => void;
   onPinchZoom?: (scale: number) => void;
+  onScroll?: (deltaY: number) => void; // Continuous scroll during touch drag
   swipeThreshold?: number;
   longPressDelay?: number;
   enabled?: boolean;
@@ -31,6 +32,7 @@ interface TouchState {
   startY: number;
   currentX: number;
   currentY: number;
+  lastY: number; // For continuous scroll tracking
   startTime: number;
   touches: number;
   initialDistance: number;
@@ -64,6 +66,7 @@ export function useMobilePatternGestures({
   onTap,
   onLongPress,
   onPinchZoom,
+  onScroll,
   swipeThreshold = DEFAULT_SWIPE_THRESHOLD,
   longPressDelay = DEFAULT_LONG_PRESS_DELAY,
   enabled = true,
@@ -91,6 +94,7 @@ export function useMobilePatternGestures({
         startY: touch.clientY,
         currentX: touch.clientX,
         currentY: touch.clientY,
+        lastY: touch.clientY,
         startTime: Date.now(),
         touches: numTouches,
         initialDistance: numTouches === 2 ? getTouchDistance(e.touches[0], e.touches[1]) : 0,
@@ -149,8 +153,21 @@ export function useMobilePatternGestures({
         // Prevent default to avoid page zoom
         e.preventDefault();
       }
+
+      // Handle continuous scroll for single-touch vertical movement
+      if (numTouches === 1 && onScroll) {
+        const deltaY = touchState.current.lastY - touch.clientY;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+
+        // Only trigger scroll if this is primarily vertical movement
+        if (absY > absX && Math.abs(deltaY) > 1) {
+          onScroll(deltaY);
+          touchState.current.lastY = touch.clientY;
+        }
+      }
     },
-    [enabled, onPinchZoom, clearLongPressTimer]
+    [enabled, onPinchZoom, onScroll, clearLongPressTimer]
   );
 
   // Handle touch end

@@ -378,6 +378,374 @@ Register in `FACTORY_PRESETS` map. The `PresetDropdown` component automatically 
 
 ---
 
+## Modular Synth SDK
+
+DEViLBOX's modular synthesis system allows plugin developers to create custom modules that can be patched together in a visual editor. Unlike traditional synths, modular synths are built from discrete processing units (VCO, VCF, VCA, ADSR, etc.) connected via virtual patch cables.
+
+### Architecture
+
+```
+ModuleDescriptor  (metadata + port defs + factory)
+       |
+ModuleRegistry    (discovery)
+       |
+ModularSynth      (runtime engine — implements DevilboxSynth)
+  ├── ModularVoice[]      (per-voice module graphs)
+  ├── sharedModules       (LFO, Noise — one instance)
+  └── connectionManager   (hot-swap connections)
+```
+
+**Audio routing:** Each voice's Output module → voice GainNode → ModularSynth.output → synthBus → masterBus
+
+**Signal types:**
+- `audio` — AudioNode→AudioNode (oscillators, filters, amplifiers)
+- `cv` — AudioNode→AudioParam via GainNode scaler (control voltage, 0-1)
+- `gate` — ConstantSource 0/1 (note on/off)
+- `trigger` — One-shot pulse (for clocking/sequencing)
+
+**Polyphony:** Per-voice graph cloning. VCO/VCF/VCA/ADSR cloned per voice (1-8 voices). LFO/Noise shared across voices.
+
+### Creating a Module
+
+#### 1. Define `ModuleDescriptor`
+
+```typescript
+import type { ModuleDescriptor, ModuleInstance, ModulePort } from '@/types/modular';
+import { ModuleRegistry } from '@/engine/modular/ModuleRegistry';
+
+const MyModuleDescriptor: ModuleDescriptor = {
+  id: 'MyModule',
+  name: 'My Module',
+  category: 'filter', // 'source' | 'filter' | 'amplifier' | 'modulator' | 'envelope' | 'utility' | 'io'
+  voiceMode: 'per-voice', // or 'shared' for global modules (LFO, Noise)
+  color: '#4f46e5', // Optional UI accent color
+
+  ports: [
+    {
+      id: 'input',
+      name: 'In',
+      direction: 'input',
+      signal: 'audio',
+    },
+    {
+      id: 'cutoff',
+      name: 'Cutoff',
+      direction: 'input',
+      signal: 'cv',
+    },
+    {
+      id: 'output',
+      name: 'Out',
+      direction: 'output',
+      signal: 'audio',
+    },
+  ],
+
+  parameters: [
+    {
+      id: 'frequency',
+      name: 'Frequency',
+      min: 20,
+      max: 20000,
+      default: 1000,
+      unit: 'Hz',
+      curve: 'exponential', // or 'linear'
+    },
+    {
+      id: 'resonance',
+      name: 'Resonance',
+      min: 0,
+      max: 10,
+      default: 1,
+    },
+  ],
+
+  create: (ctx: AudioContext) => {
+    // Return ModuleInstance with ports and parameter control
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1000;
+    filter.Q.value = 1;
+
+    const ports: Map<string, ModulePort> = new Map();
+
+    // Audio input port
+    ports.set('input', {
+      id: 'input',
+      name: 'In',
+      direction: 'input',
+      signal: 'audio',
+      node: filter, // Connect here
+    });
+
+    // CV input port (for modulation)
+    const cutoffScale = ctx.createGain();
+    cutoffScale.gain.value = 10000; // Scale CV (0-1) to Hz range
+    cutoffScale.connect(filter.frequency);
+
+    ports.set('cutoff', {
+      id: 'cutoff',
+      name: 'Cutoff',
+      direction: 'input',
+      signal: 'cv',
+      param: cutoffScale.gain, // CV targets AudioParam
+      scaleNode: cutoffScale,
+    });
+
+    // Audio output port
+    ports.set('output', {
+      id: 'output',
+      name: 'Out',
+      direction: 'output',
+      signal: 'audio',
+      node: filter, // Connect from here
+    });
+
+    return {
+      ports,
+
+      setParameter: (paramId: string, value: number) => {
+        if (paramId === 'frequency') {
+          filter.frequency.value = value;
+        } else if (paramId === 'resonance') {
+          filter.Q.value = value;
+        }
+      },
+
+      getParameter: (paramId: string) => {
+        if (paramId === 'frequency') return filter.frequency.value;
+        if (paramId === 'resonance') return filter.Q.value;
+        return 0;
+      },
+
+      dispose: () => {
+        cutoffScale.disconnect();
+        filter.disconnect();
+      },
+    };
+  },
+};
+
+// Register the module
+ModuleRegistry.register(MyModuleDescriptor);
+```
+
+#### 2. Port Types and Routing
+
+**Audio Ports** (signal: 'audio'):
+```typescript
+// Output
+ports.set('output', {
+  id: 'output',
+  name: 'Out',
+  direction: 'output',
+  signal: 'audio',
+  node: oscillator, // Source node
+});
+
+// Input
+ports.set('input', {
+  id: 'input',
+  name: 'In',
+  direction: 'input',
+  signal: 'audio',
+  node: filter, // Destination node
+});
+
+// Connection: sourcePort.node.connect(targetPort.node)
+```
+
+**CV Ports** (signal: 'cv'):
+```typescript
+// Output
+ports.set('output', {
+  id: 'output',
+  name: 'Out',
+  direction: 'output',
+  signal: 'cv',
+  node: lfo, // ConstantSource or OscillatorNode
+});
+
+// Input
+const scaleGain = ctx.createGain();
+scaleGain.gain.value = 100; // Scale factor
+scaleGain.connect(filter.frequency); // Target AudioParam
+
+ports.set('cutoff', {
+  id: 'cutoff',
+  name: 'Cutoff CV',
+  direction: 'input',
+  signal: 'cv',
+  param: scaleGain.gain,
+  scaleNode: scaleGain,
+});
+
+// Connection: sourcePort.node.connect(targetPort.scaleNode)
+```
+
+**Gate Ports** (signal: 'gate'):
+```typescript
+// ADSR envelope triggers on gate signal (0 = off, 1 = on)
+gateOn: (time: number, velocity: number) => {
+  envelope.offset.cancelScheduledValues(time);
+  envelope.offset.setValueAtTime(0, time);
+  envelope.offset.linearRampToValueAtTime(1, time + attack);
+  envelope.offset.linearRampToValueAtTime(sustain, time + attack + decay);
+}
+
+gateOff: (time: number) => {
+  envelope.offset.cancelScheduledValues(time);
+  envelope.offset.setValueAtTime(envelope.offset.value, time);
+  envelope.offset.linearRampToValueAtTime(0, time + release);
+}
+```
+
+#### 3. Voice Modes
+
+**Per-voice modules** (voiceMode: 'per-voice'):
+- Cloned for each voice (VCO, VCF, VCA, ADSR)
+- Receive note-specific pitch/gate signals
+- Examples: oscillators, filters, amplifiers, envelopes
+
+**Shared modules** (voiceMode: 'shared'):
+- Single instance across all voices (LFO, Noise, Delay)
+- Used for global modulation or effects
+- Examples: LFOs, noise generators, global effects
+
+#### 4. Module Categories
+
+- `source` — Oscillators, noise generators (VCO, Noise)
+- `filter` — Filters (VCF, EQ)
+- `amplifier` — VCAs, mixers
+- `modulator` — LFOs, S&H
+- `envelope` — ADSR, AR
+- `utility` — Mixers, multiples, logic
+- `io` — MIDI-In, Output
+
+#### 5. Registration
+
+**Built-in modules** are auto-registered from `src/engine/modular/modules/index.ts`:
+```typescript
+import './VCOModule';
+import './VCFModule';
+import './VCAModule';
+// ... etc
+```
+
+**Plugin modules** should register in their init file:
+```typescript
+import { ModuleRegistry } from '@/engine/modular/ModuleRegistry';
+import { MyModuleDescriptor } from './MyModule';
+
+ModuleRegistry.register(MyModuleDescriptor);
+```
+
+### Example: Simple VCA Module
+
+```typescript
+import type { ModuleDescriptor } from '@/types/modular';
+import { ModuleRegistry } from '@/engine/modular/ModuleRegistry';
+
+const VCADescriptor: ModuleDescriptor = {
+  id: 'VCA',
+  name: 'VCA',
+  category: 'amplifier',
+  voiceMode: 'per-voice',
+  color: '#f59e0b',
+
+  ports: [
+    { id: 'input', name: 'In', direction: 'input', signal: 'audio' },
+    { id: 'cv', name: 'CV', direction: 'input', signal: 'cv' },
+    { id: 'output', name: 'Out', direction: 'output', signal: 'audio' },
+  ],
+
+  parameters: [
+    { id: 'gain', name: 'Gain', min: 0, max: 2, default: 1 },
+    { id: 'bias', name: 'Bias', min: 0, max: 1, default: 0 },
+  ],
+
+  create: (ctx) => {
+    const inputGain = ctx.createGain();
+    const cvGain = ctx.createGain();
+    const outputGain = ctx.createGain();
+
+    inputGain.connect(outputGain);
+    cvGain.connect(outputGain.gain);
+
+    const ports = new Map();
+    ports.set('input', { id: 'input', name: 'In', direction: 'input', signal: 'audio', node: inputGain });
+    ports.set('cv', { id: 'cv', name: 'CV', direction: 'input', signal: 'cv', param: cvGain.gain, scaleNode: cvGain });
+    ports.set('output', { id: 'output', name: 'Out', direction: 'output', signal: 'audio', node: outputGain });
+
+    return {
+      ports,
+      setParameter: (id, val) => {
+        if (id === 'gain') outputGain.gain.value = val;
+      },
+      getParameter: (id) => id === 'gain' ? outputGain.gain.value : 0,
+      dispose: () => {
+        inputGain.disconnect();
+        cvGain.disconnect();
+        outputGain.disconnect();
+      },
+    };
+  },
+};
+
+ModuleRegistry.register(VCADescriptor);
+```
+
+### Visual Editors
+
+The modular synth includes three visual patch editors:
+
+1. **Rack View** — Vertical list of horizontal module strips with drag reordering
+2. **Canvas View** — Free-form 2D canvas with pan/zoom
+3. **Matrix View** — Table-based connection editor (tracker-style)
+
+All editors share the same patch data (`ModularPatchConfig`) and render identical audio graphs.
+
+### Key Types
+
+```typescript
+// From src/types/modular.ts
+export type SignalType = 'audio' | 'cv' | 'gate' | 'trigger';
+export type VoiceMode = 'per-voice' | 'shared';
+export type ModuleCategory = 'source' | 'filter' | 'amplifier' | 'modulator' | 'envelope' | 'utility' | 'io';
+
+export interface ModuleDescriptor {
+  id: string;
+  name: string;
+  category: ModuleCategory;
+  voiceMode: VoiceMode;
+  color?: string;
+  ports: ModulePortDef[];
+  parameters: ModuleParamDef[];
+  create: (ctx: AudioContext) => ModuleInstance;
+}
+
+export interface ModuleInstance {
+  ports: Map<string, ModulePort>;
+  setParameter: (paramId: string, value: number) => void;
+  getParameter: (paramId: string) => number;
+  gateOn?: (time: number, velocity: number) => void;
+  gateOff?: (time: number) => void;
+  dispose: () => void;
+}
+
+export interface ModulePort {
+  id: string;
+  name: string;
+  direction: 'input' | 'output';
+  signal: SignalType;
+  node?: AudioNode;        // For audio signals
+  param?: AudioParam;      // For CV signals
+  scaleNode?: GainNode;    // For CV scaling
+}
+```
+
+---
+
 ## Integration Checklist
 
 When adding a new synth:

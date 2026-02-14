@@ -349,7 +349,7 @@ export class FurnaceChipEngine {
           this.workletNode!.connect(gain);
           gain.connect(ctxForWorklet.destination);
           this.outputGain = gain;
-          console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → destination (native audio path)');
+          // Debug: console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → destination (native audio path)');
         } catch (destErr) {
           console.warn('[FurnaceChipEngine] Native connection failed:', destErr);
           // Fallback: try nativeCtx

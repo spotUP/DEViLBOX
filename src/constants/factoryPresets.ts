@@ -21,6 +21,7 @@ import { FURNACE_CHIP_PRESETS } from './furnaceChipPresets';
 import { SAMPLE_PACK_PRESETS, WAVETABLE_PACK_PRESETS } from './samplePresets';
 import { BUZZMACHINE_FACTORY_PRESETS } from './buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from './makkPresets';
+import { HARMONIC_PRESETS } from './harmonicPresets';
 
 // BASS PRESETS (18)
 
@@ -2818,6 +2819,7 @@ export const PRESET_CATEGORIES = {
   Wavetables: WAVETABLE_PACK_PRESETS,
   Buzz: BUZZMACHINE_FACTORY_PRESETS,
   Makk: MAKK_FACTORY_PRESETS,
+  Harmonic: HARMONIC_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;

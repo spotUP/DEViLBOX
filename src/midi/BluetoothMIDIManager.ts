@@ -31,6 +31,22 @@ export const isIOSDevice = (): boolean => {
 };
 
 /**
+ * Detect if the device is Android
+ */
+export const isAndroidDevice = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || navigator.vendor;
+  return /android/i.test(userAgent);
+};
+
+/**
+ * Detect if the device is mobile (iOS or Android)
+ */
+export const isMobileDevice = (): boolean => {
+  return isIOSDevice() || isAndroidDevice();
+};
+
+/**
  * Detect if Web MIDI API is supported
  */
 export const isWebMIDISupported = (): boolean => {
@@ -42,13 +58,29 @@ export const isWebMIDISupported = (): boolean => {
  */
 export const getBluetoothMIDIInfo = (): BluetoothMIDIInfo => {
   const isIOS = isIOSDevice();
+  const isAndroid = isAndroidDevice();
   const isSupported = isWebMIDISupported();
 
   if (!isSupported) {
+    if (isAndroid) {
+      return {
+        isIOS: false,
+        isSupported: false,
+        instructions: `Web MIDI is not supported on Android Chrome yet.
+
+To use MIDI on Android:
+1. Try Chrome Canary or Chrome Dev (enable chrome://flags/#enable-web-midi)
+2. Or use a desktop browser (Chrome, Edge, Opera)
+3. USB MIDI controllers work better than Bluetooth on Android
+
+Alternatively, use an iOS device with Safari for full MIDI support.`,
+        requiresPairing: false,
+      };
+    }
     return {
       isIOS,
       isSupported: false,
-      instructions: 'Web MIDI is not supported on this browser. Try Safari on iOS or Chrome on Android.',
+      instructions: 'Web MIDI is not supported on this browser. Try Safari on iOS or Chrome/Edge on desktop.',
       requiresPairing: false,
     };
   }
@@ -57,24 +89,51 @@ export const getBluetoothMIDIInfo = (): BluetoothMIDIInfo => {
     return {
       isIOS: true,
       isSupported: true,
-      instructions: `To connect Bluetooth MIDI devices on iOS:
+      instructions: `To connect MIDI devices on iOS:
 
+USB MIDI (via Camera Connection Kit):
+1. Connect USB MIDI controller to Lightning/USB-C adapter
+2. DEViLBOX should detect it automatically
+3. Check MIDI settings to verify connection
+
+Bluetooth MIDI:
 1. Open Settings → Bluetooth
 2. Turn on your MIDI device
 3. Pair it with your ${/iPad/i.test(navigator.userAgent) ? 'iPad' : 'iPhone'}
-4. Return to DEViLBOX and refresh the page
-5. Your MIDI device should appear in the MIDI settings
+4. Return to DEViLBOX (no refresh needed)
+5. Device should appear in MIDI settings
 
-Note: iOS requires Bluetooth MIDI devices to be paired through Settings first.`,
+Note: iOS Safari has the best MIDI support. Chrome on iOS does NOT support Web MIDI.`,
       requiresPairing: true,
     };
   }
 
-  // Android or desktop
+  if (isAndroid) {
+    return {
+      isIOS: false,
+      isSupported: true,
+      instructions: `To connect MIDI devices on Android:
+
+USB MIDI (via USB-C or OTG adapter):
+1. Connect USB MIDI controller via adapter
+2. Grant USB permission when prompted
+3. Check MIDI settings to verify connection
+
+Bluetooth MIDI:
+1. Pair MIDI device via Android Bluetooth settings
+2. Open DEViLBOX
+3. Device should appear in MIDI settings
+
+Note: Android MIDI support varies by device and browser. Chrome 43+ required. USB works more reliably than Bluetooth.`,
+      requiresPairing: false,
+    };
+  }
+
+  // Desktop
   return {
     isIOS: false,
     isSupported: true,
-    instructions: 'Connect your USB MIDI device or Bluetooth MIDI device (if supported by your browser).',
+    instructions: 'Connect your USB MIDI device. It should be detected automatically. Bluetooth MIDI may require pairing first.',
     requiresPairing: false,
   };
 };

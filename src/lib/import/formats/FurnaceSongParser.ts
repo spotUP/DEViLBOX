@@ -2467,7 +2467,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
         if (pattern && pattern.rows[row]) {
           const cell = pattern.rows[row];
           // Track raw note data before conversion
-          if (cell.note >= 0 && cell.note <= 12) {
+          if (cell.note >= 1 && cell.note <= 12) {
             totalRawNotes++;
           }
           if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
@@ -2478,7 +2478,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
             totalConvertedNotes++;
           }
           // Detect dropped notes (raw had a note, converted has 0)
-          if (cell.note >= 0 && cell.note <= 12 && converted.note === 0) {
+          if (cell.note >= 1 && cell.note <= 12 && converted.note === 0) {
             totalDroppedNotes++;
             if (droppedExamples.length < 5) {
               const noteNames = ['?', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C'];
@@ -2646,7 +2646,7 @@ function convertFurnaceCell(cell: FurnacePatternCell): ConvertedPatternCell {
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
     note = 97; // XM note off
-  } else if (cell.note >= 0 && cell.note <= 12) {
+  } else if (cell.note >= 1 && cell.note <= 12) {
     // Furnace new format: note 12 = C, 1 = C#, 2 = D, ..., 11 = B
     // XM format: semitone 0 = C, 1 = C#, ..., 11 = B
     // Furnace stores C with octave one less than the actual octave

@@ -394,7 +394,8 @@ export class DB303Synth implements DevilboxSynth {
       } else {
         this._pendingParams.push({ paramId: paramName, value });
       }
-      console.log(`[DB303] setParameter QUEUED (workletNode null): paramName=${paramName}, value=${value}, queue=${this._pendingParams.length}`);
+      // Debug: Parameters queued until worklet ready (intentional behavior)
+      // console.log(`[DB303] setParameter QUEUED (workletNode null): paramName=${paramName}, value=${value}, queue=${this._pendingParams.length}`);
       return;
     }
     if (db303TraceEnabled()) console.log(`[DB303:WASM] ${paramName} = ${value}`);
