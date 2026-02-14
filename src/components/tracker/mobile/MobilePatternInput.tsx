@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { useTrackerStore } from '@stores';
-import { Piano, Hash, Delete, ChevronLeft, ChevronRight, Copy, Scissors } from 'lucide-react';
+import { Piano, Hash, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface MobilePatternInputProps {
@@ -32,6 +32,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
 }) => {
   const { cursor, currentOctave, setCurrentOctave } = useTrackerStore();
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Determine input mode based on cursor column
   const inputMode = useMemo(() => {
@@ -83,6 +84,12 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
     onDelete();
   }, [onDelete]);
 
+  // Collapse/expand handler
+  const toggleCollapse = useCallback(() => {
+    haptics.selection();
+    setIsCollapsed(!isCollapsed);
+  }, [isCollapsed]);
+
   // Long-press context menu handlers
   const handleLongPressStart = useCallback(() => {
     haptics.heavy();
@@ -117,18 +124,34 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
           )}
         </div>
 
-        {/* Context menu toggle */}
-        <button
-          onClick={handleLongPressStart}
-          className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
-          aria-label="Show context menu"
-        >
-          <Copy size={14} className="text-text-muted" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Context menu toggle */}
+          <button
+            onClick={handleLongPressStart}
+            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
+            aria-label="Show context menu"
+          >
+            <Copy size={14} className="text-text-muted" />
+          </button>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={toggleCollapse}
+            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
+            aria-label={isCollapsed ? "Expand input" : "Collapse input"}
+          >
+            {isCollapsed ? (
+              <ChevronUp size={14} className="text-text-muted" />
+            ) : (
+              <ChevronDown size={14} className="text-text-muted" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Input area */}
-      <div className="p-2 bg-dark-bgSecondary">
+      {!isCollapsed && (
+        <div className="p-2 bg-dark-bgSecondary">
         {inputMode === 'piano' ? (
           <PianoKeyboard
             currentOctave={currentOctave}
@@ -145,6 +168,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
           />
         )}
       </div>
+      )}
 
       {/* Context menu overlay */}
       {showContextMenu && (
