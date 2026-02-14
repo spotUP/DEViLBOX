@@ -93,6 +93,7 @@ import { WAM_EFFECT_URLS, WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { SynthRegistry } from './registry/SynthRegistry';
+import { EffectRegistry } from './registry/EffectRegistry';
 
 /**
  * Returns the complete set of default parameters for a given effect type.
@@ -100,6 +101,11 @@ import { SynthRegistry } from './registry/SynthRegistry';
  * Used by addEffect() to populate parameters so the store always has all params.
  */
 export function getDefaultEffectParameters(type: string): Record<string, number | string> {
+  // Try registry first
+  const desc = EffectRegistry.get(type);
+  if (desc) return desc.getDefaultParameters();
+
+  // Fallback to switch for unregistered effects
   switch (type) {
     case 'Distortion':
       return { drive: 0.4, oversample: 'none' };
@@ -851,6 +857,14 @@ export class InstrumentFactory {
     const wetValue = config.wet / 100;
     // Helper: Tone.js expects specific numeric/string params; our EffectConfig stores them as number|string
     const p = config.parameters as Record<string, number & string>;
+
+    // Try EffectRegistry first
+    const effectDesc = await EffectRegistry.ensure(config.type);
+    if (effectDesc) {
+      const registryNode = await effectDesc.create(config);
+      (registryNode as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
+      return registryNode;
+    }
 
     // Neural effects
     if (config.category === 'neural') {
