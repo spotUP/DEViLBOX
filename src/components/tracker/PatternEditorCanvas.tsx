@@ -165,23 +165,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
-    if (!pattern || !isMobile || !containerRef.current) return;
+    if (!pattern || !isMobile || !containerRef.current || !canvasRef.current) return;
 
     // Get container bounds
     const rect = containerRef.current.getBoundingClientRect();
-    const relativeX = tapX - rect.left + scrollLeft;
+    const relativeX = tapX - rect.left; // No horizontal scroll on mobile
     const relativeY = tapY - rect.top + containerRef.current.scrollTop;
 
-    // Calculate row (accounting for header)
-    const headerHeight = 32; // Approximate header height
-    const rowIndex = Math.floor((relativeY - headerHeight) / ROW_HEIGHT);
+    // On mobile, there's no channel header, so no offset needed
+    const rowIndex = Math.floor(relativeY / ROW_HEIGHT);
 
-    // Calculate channel and column
-    // Channel width varies but roughly: LINE_NUMBER_WIDTH + (channels * ~200px)
+    // Calculate channel width - must match render() layout
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const firstCell = pattern.channels[0]?.rows[0];
+    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
+    const hasProb = firstCell?.probability !== undefined;
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4; // Automation column
+    const channelWidth = noteWidth + paramWidth + 20 + 20; // +20 for automation lane visual space
+
     let channelIndex = 0;
-
-    // Simple channel detection (this is approximate - exact calculation would need channel widths)
-    const channelWidth = 200; // Approximate width per channel
     if (relativeX > LINE_NUMBER_WIDTH) {
       channelIndex = Math.floor((relativeX - LINE_NUMBER_WIDTH) / channelWidth);
       channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
@@ -191,11 +196,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const validRow = Math.max(0, Math.min(rowIndex, pattern.length - 1));
 
     // Move cursor to tapped position
-    console.log(`[PatternCanvas] Tap detected: row=${validRow}, channel=${channelIndex}`);
+    console.log(`[PatternCanvas] Tap detected: x=${relativeX}, y=${relativeY}, row=${validRow}, channel=${channelIndex}, channelWidth=${channelWidth}`);
     const store = useTrackerStore.getState();
     store.moveCursorToRow(validRow);
     store.moveCursorToChannel(channelIndex);
-  }, [pattern, isMobile, scrollLeft, cursor.columnType]);
+  }, [pattern, isMobile]);
 
   const patternGestures = useMobilePatternGestures({
     onSwipeLeft,
@@ -1420,7 +1425,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       {/* Canvas Pattern Grid */}
       <div
         ref={containerRef}
-        className="flex-1 relative bg-dark-bg"
+        className="flex-1 relative bg-dark-bg overflow-x-hidden"
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
