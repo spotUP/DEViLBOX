@@ -11,7 +11,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { Play, Square, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useTransportStore, useTrackerStore } from '@stores';
+import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
@@ -39,6 +39,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const { isPlaying, togglePlayPause } = useTransportStore();
   const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste } = useTrackerStore();
+  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore();
   const pattern = patterns[currentPatternIndex];
   const { isPortrait, isLandscape } = useOrientation();
 
@@ -145,19 +146,19 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
       {/* Fixed header with pattern info and transport */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-top">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className="text-xs text-text-muted font-mono">PAT</span>
           <span className="text-sm font-bold text-accent-primary font-mono">
             {(currentPatternIndex + 1).toString().padStart(2, '0')}
           </span>
-          <span className="text-xs text-text-secondary truncate max-w-[100px]">
+          <span className="text-xs text-text-secondary truncate max-w-[60px]">
             {pattern?.name || 'Untitled'}
           </span>
 
           {/* Portrait mode: Channel selector */}
           {isPortrait && (
             <div
-              className="flex items-center gap-1 ml-2 pl-2 border-l border-dark-border touch-none"
+              className="flex items-center gap-1 ml-1 pl-1 border-l border-dark-border touch-none"
               {...channelHeaderGestures}
             >
               <button
@@ -168,7 +169,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
               >
                 <ChevronLeft size={14} />
               </button>
-              <span className="text-xs font-mono text-accent-primary min-w-[32px] text-center">
+              <span className="text-xs font-mono text-accent-primary min-w-[28px] text-center">
                 CH {(mobileChannel + 1).toString().padStart(2, '0')}
               </span>
               <button
@@ -181,10 +182,26 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
               </button>
             </div>
           )}
+
+          {/* Instrument selector */}
+          <div className="ml-1 pl-1 border-l border-dark-border flex-1 min-w-0">
+            <select
+              value={currentInstrumentId ?? 1}
+              onChange={(e) => setCurrentInstrument(parseInt(e.target.value, 10))}
+              className="w-full text-xs bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary font-mono truncate"
+              style={{ maxWidth: '140px' }}
+            >
+              {instruments.map((inst) => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name.substring(0, 20)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Transport controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={togglePlayPause}
             className={`

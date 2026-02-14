@@ -155,6 +155,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Track theme for cache invalidation
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
+  const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
+  const currentTheme = getCurrentTheme();
   const lastThemeRef = useRef(currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
@@ -203,9 +205,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     bg: '#0a0a0b',
     rowNormal: '#0d0d0e',
     rowHighlight: '#111113', // More subtle highlight (was #151518)
-    centerLine: isCyanTheme ? 'rgba(0, 255, 255, 0.25)' : 'rgba(239, 68, 68, 0.25)',
-    cursor: isCyanTheme ? '#00ffff' : '#ef4444',
-    cursorBg: isCyanTheme ? 'rgba(0, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+    centerLine: currentTheme.colors.accentGlow, // Use theme accent with transparency
+    cursor: currentTheme.colors.accent, // Use theme accent color
+    cursorBg: currentTheme.colors.accentGlow, // Use theme accent glow (transparent)
     text: '#e0e0e0',
     textMuted: '#505050',
     textNote: '#909090',  // Grey by default, flashes white on current row
@@ -976,11 +978,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const isPlayingCaret = transportState.isPlaying;
       let caretBg: string;
       if (isRecording) {
-        caretBg = '#ef4444'; // Red for record mode
+        caretBg = currentTheme.colors.accent; // Theme accent for record mode
       } else if (isPlayingCaret) {
-        caretBg = '#22c55e'; // Green for playback
+        caretBg = currentTheme.colors.accentSecondary; // Secondary accent for playback
       } else {
-        caretBg = isCyanTheme ? '#00ffff' : '#3b82f6'; // Cyan or Blue for idle
+        caretBg = currentTheme.colors.accent; // Theme accent for idle
       }
 
       // Caret dimensions: same height as the row highlight bar
