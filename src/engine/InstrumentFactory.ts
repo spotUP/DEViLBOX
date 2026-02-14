@@ -92,6 +92,7 @@ import { WAMEffectNode } from './wam/WAMEffectNode';
 import { WAM_EFFECT_URLS, WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
+import { SynthRegistry } from './registry/SynthRegistry';
 
 /**
  * Returns the complete set of default parameters for a given effect type.
@@ -407,6 +408,17 @@ export class InstrumentFactory {
    * Returns a Tone.ToneAudioNode for Tone.js synths, or a DevilboxSynth for native synths (e.g. WAM).
    */
   public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode | DevilboxSynth {
+    // Try SynthRegistry first (new registry architecture)
+    const registryDesc = SynthRegistry.get(config.synthType);
+    if (registryDesc) {
+      const instrument = registryDesc.create(config);
+      // Apply volume offset for Furnace WASM synths via setVolumeOffset
+      if (config.synthType.startsWith('Furnace') && registryDesc.volumeOffsetDb && 'setVolumeOffset' in instrument) {
+        (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(registryDesc.volumeOffsetDb);
+      }
+      return instrument;
+    }
+
     let instrument: Tone.ToneAudioNode | DevilboxSynth;
 
     switch (config.synthType) {

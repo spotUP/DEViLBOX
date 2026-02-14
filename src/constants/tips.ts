@@ -81,7 +81,7 @@ export const DEVILBOX_TIPS: Tip[] = [
   },
   {
     title: "The 'Note Off' Sentinel",
-    content: "Use the '`' (backtick) or '=' key to insert a 'Note Off' command. This is essential for controlling the release of polyphonic synths.",
+    content: "Press CapsLock to insert a 'Note Off' command (===). This is essential for controlling the release of polyphonic synths and creating gated sequences.",
     category: 'tracker'
   },
   {
@@ -120,8 +120,8 @@ export const DEVILBOX_TIPS: Tip[] = [
     category: 'workflow'
   },
   {
-    title: "Sample Transposition",
-    content: "When using the Sampler, the 'Transpose' knob in the Envelope tab allows for clean pitch shifting without changing the sample's speed.",
+    title: "Sample Rate Reduction",
+    content: "The Bitcrusher effect can reduce sample rate and bit depth independently. Try 8-bit depth with full sample rate for clean lo-fi.",
     category: 'synthesis'
   },
   {
@@ -195,8 +195,8 @@ export const DEVILBOX_TIPS: Tip[] = [
     category: 'workflow'
   },
   {
-    title: "Low Pass Gates",
-    content: "The 'Synare' instrument features a specialized Low Pass Gate. Modulate the 'Strike' parameter for organic, plucky sounds.",
+    title: "Synare Resonant Filter",
+    content: "The Synare features a resonant 24dB lowpass filter with dedicated envelope control. Use high resonance and fast filter decay for classic disco tom sounds.",
     category: 'synthesis'
   },
   {
@@ -223,5 +223,376 @@ export const DEVILBOX_TIPS: Tip[] = [
     title: "Dub Techno Bass",
     content: "For warm dub techno bass on the 303: Cutoff 40%, Reso 30%, Env Mod 50%, Decay 70%. Deep and warm, not screaming.",
     category: 'synthesis'
+  },
+
+  // ===== TRACKER SHORTCUTS (15 new tips) =====
+  {
+    title: "Function Key Octaves",
+    content: "Press F1-F7 to instantly jump to octaves 1-7. No more clicking! F4 is middle C territory.",
+    category: 'tracker'
+  },
+  {
+    title: "Pattern Jump Markers",
+    content: "Press Shift+F9/F10/F11/F12 to set jump markers at current row. Then press F9-F12 (without Shift) to instantly jump back to those positions!",
+    category: 'workflow'
+  },
+  {
+    title: "16-Row Leaps",
+    content: "PageUp and PageDown jump 16 rows at a time. Perfect for navigating 64-row patterns in 4 jumps!",
+    category: 'tracker'
+  },
+  {
+    title: "Home & End Keys",
+    content: "Home jumps to row 0, End jumps to the last row. Quick pattern boundaries navigation.",
+    category: 'tracker'
+  },
+  {
+    title: "Tab Channel Hopping",
+    content: "Tab moves to the next channel, Shift+Tab moves to the previous one. Navigate horizontally without the mouse!",
+    category: 'tracker'
+  },
+  {
+    title: "Edit Step Cycling",
+    content: "Press the grave key (`) to cycle edit step forward (1→2→4→8→16). Shift+` cycles backward. Instant skip patterns!",
+    category: 'tracker'
+  },
+  {
+    title: "Insert & Delete Rows",
+    content: "Insert key adds a new row at cursor position and pushes everything down. Delete key removes the current row. Essential for live pattern editing!",
+    category: 'tracker'
+  },
+  {
+    title: "Multi-Channel Chords",
+    content: "Place your cursor on a note and press Ctrl+H. DEViLBOX will expand it into a major chord across the next 2 channels!",
+    category: 'tracker'
+  },
+  {
+    title: "Volume Interpolation",
+    content: "Select a range in the Volume column (Shift+Arrow), then press 'I'. DEViLBOX creates a smooth volume fade between start and end!",
+    category: 'tracker'
+  },
+  {
+    title: "Selection Mastery",
+    content: "Shift+Arrow extends selection in any direction. Combine with Ctrl+C to copy complex patterns!",
+    category: 'tracker'
+  },
+  {
+    title: "Mix Paste Magic",
+    content: "Ctrl+Shift+V does a 'mix paste' - only fills EMPTY cells, preserving existing notes. Perfect for layering!",
+    category: 'tracker'
+  },
+  {
+    title: "Flood Fill Patterns",
+    content: "Ctrl+Shift+F does 'flood paste' - repeats your clipboard until pattern end. Instant drum fills!",
+    category: 'tracker'
+  },
+  {
+    title: "Insert Paste",
+    content: "Ctrl+Shift+I does 'push-forward paste' - inserts clipboard and shifts everything down. Non-destructive pattern injection!",
+    category: 'workflow'
+  },
+  {
+    title: "Effect Entry Speed",
+    content: "In effect columns, just type hex values directly (0-9, A-F). No need to click! Type '1', '0', '3' for effect 103 (portamento).",
+    category: 'tracker'
+  },
+  {
+    title: "Note Preview Toggle",
+    content: "Disable note preview in Settings to avoid triggering sounds while navigating the pattern. Re-enable for jamming!",
+    category: 'workflow'
+  },
+
+  // ===== EFFECT CHAIN & ROUTING (8 new tips) =====
+  {
+    title: "Effect Order Matters",
+    content: "Always place Compression BEFORE Reverb. Compressing a reverb tail sounds muddy. Reverb after compression sounds professional!",
+    category: 'synthesis'
+  },
+  {
+    title: "Parallel Compression",
+    content: "Add a second channel with the same instrument, compress it heavily, then mix it under the dry signal for 'New York' parallel compression.",
+    category: 'synthesis'
+  },
+  {
+    title: "Master vs Channel FX",
+    content: "Channel effects process individual instruments. Master effects process the final mix. Use Master FX for glue compression and final polish!",
+    category: 'workflow'
+  },
+  {
+    title: "Send & Return",
+    content: "The 'Delay Throws' feature is a send effect - it momentarily sends MORE signal to the reverb/delay without changing dry level.",
+    category: 'workflow'
+  },
+  {
+    title: "EQ Before Distortion",
+    content: "If using both EQ and Distortion, place EQ first to shape the frequency content BEFORE it hits the saturation stage.",
+    category: 'synthesis'
+  },
+  {
+    title: "Reverb Tail Length",
+    content: "In the Space Echo or MVerb, longer decay times create ambient washes. Shorter decays (< 1s) keep it tight for techno/house.",
+    category: 'synthesis'
+  },
+  {
+    title: "Filter Feedback Loop",
+    content: "On the 303, high Resonance feeds the filter output back into itself. At 100% it self-oscillates into a sine wave!",
+    category: 'synthesis'
+  },
+  {
+    title: "Effect Automation",
+    content: "You can automate effect parameters in the pattern! Use effect column to send CC messages to effects. Check the help for CC mappings.",
+    category: 'tracker'
+  },
+
+  // ===== MIDI MAPPING (10 new tips) =====
+  {
+    title: "CC Learn Mode",
+    content: "Click any knob, then move a controller. DEViLBOX auto-learns the MIDI CC and maps it. Instant hardware integration!",
+    category: 'midi'
+  },
+  {
+    title: "NRPN Support",
+    content: "DEViLBOX supports NRPN (Non-Registered Parameter Numbers) for controlling deep synth parameters via MIDI.",
+    category: 'midi'
+  },
+  {
+    title: "Velocity Curves",
+    content: "In MIDI Settings, you can set velocity curves (linear, logarithmic, exponential) to match your keyboard's feel.",
+    category: 'midi'
+  },
+  {
+    title: "Aftertouch Mapping",
+    content: "Map keyboard aftertouch to filter cutoff or vibrato depth for expressive playing. Check the MIDI mapping panel!",
+    category: 'midi'
+  },
+  {
+    title: "Program Change Presets",
+    content: "Send MIDI Program Change messages to switch between instrument presets without touching the mouse!",
+    category: 'midi'
+  },
+  {
+    title: "MIDI Panic",
+    content: "If MIDI notes get stuck, double-tap Esc to kill all active MIDI voices instantly.",
+    category: 'midi'
+  },
+  {
+    title: "Akai Pad Bank Magic",
+    content: "The Akai MPK Mini's 4 pad banks are pre-mapped! Bank A = Drums, Bank B = Synths, Bank C = Effects, Bank D = Mixer.",
+    category: 'midi'
+  },
+  {
+    title: "MIDI Clock Master",
+    content: "DEViLBOX can SEND MIDI clock to sync external hardware. Enable 'MIDI Clock Out' in Settings > MIDI.",
+    category: 'midi'
+  },
+  {
+    title: "Note Repeat",
+    content: "Hold a note on your MIDI keyboard and enable Note Repeat in the transport. Instant gated sequences!",
+    category: 'midi'
+  },
+  {
+    title: "Split Keyboard Zones",
+    content: "You can map different instruments to different MIDI note ranges (splits). Check the MIDI Mapping panel for zone setup.",
+    category: 'midi'
+  },
+
+  // ===== SYNTH TECHNIQUES (12 new tips) =====
+  {
+    title: "303 Slide Timing",
+    content: "For authentic 303 slides, notes must OVERLAP by at least 1 tick. Use edit step 0 and place the next note 1 row early!",
+    category: 'synthesis'
+  },
+  {
+    title: "Devil Fish FM Mode",
+    content: "In Devil Fish mode, Osc 2 can FM modulate Osc 1. Crank the FM amount for metallic, inharmonic textures!",
+    category: 'synthesis'
+  },
+  {
+    title: "Furnace Wavetables",
+    content: "Furnace chips support wavetable synthesis! Load custom wavetables in the Wavetable tab for evolving timbres.",
+    category: 'synthesis'
+  },
+  {
+    title: "MAME Chip Authenticity",
+    content: "MAME chips use cycle-accurate emulation. They sound EXACTLY like the original arcade hardware, glitches and all!",
+    category: 'performance'
+  },
+  {
+    title: "Speech Phoneme Chains",
+    content: "On SAM, TMS5220, or Votrax, you can chain phonemes to create words. Try 'HH EH LL OW' for 'Hello'!",
+    category: 'synthesis'
+  },
+  {
+    title: "Dub Siren Automation",
+    content: "Automate the Dub Siren's frequency knob in the pattern with effect column for rising/falling siren sweeps!",
+    category: 'synthesis'
+  },
+  {
+    title: "Synare Tom Layers",
+    content: "Layer 2 Synare instruments: one with high pitch + fast decay (attack), one with low pitch + long decay (body). Instant 808!",
+    category: 'synthesis'
+  },
+  {
+    title: "Filter Self-Oscillation",
+    content: "On synths with resonant filters, push resonance to 100% and cutoff to zero. The filter becomes a sine oscillator!",
+    category: 'synthesis'
+  },
+  {
+    title: "PWM Modulation",
+    content: "On synths with pulse waves, modulate the pulse width with an LFO for that classic analog chorus effect.",
+    category: 'synthesis'
+  },
+  {
+    title: "Noise Gate Drums",
+    content: "Use the Synare's noise generator + filter envelope for snares and hi-hats. High noise mix, fast filter decay!",
+    category: 'synthesis'
+  },
+  {
+    title: "Formant Synthesis",
+    content: "On speech synths, formants define vowel sounds. Automate formant frequencies to create 'talking' basslines!",
+    category: 'synthesis'
+  },
+  {
+    title: "Ring Modulation",
+    content: "Some synths have ring mod (Osc1 × Osc2). Detune Osc2 slightly for metallic bell tones. Detune heavily for chaos!",
+    category: 'synthesis'
+  },
+
+  // ===== HIDDEN FEATURES (6 new tips) =====
+  {
+    title: "Nibbles Easter Egg",
+    content: "There's a hidden Nibbles game in DEViLBOX! Find it in the About dialog. Classic FastTracker 2 nostalgia!",
+    category: 'workflow'
+  },
+  {
+    title: "Sine Scroller Demo",
+    content: "Check out the sine scroller in the About section - a classic demoscene effect rendered in real-time!",
+    category: 'workflow'
+  },
+  {
+    title: "Export Format Options",
+    content: "DEViLBOX can export to WAV (24-bit), XM, MOD, and MIDI. Use XM/MOD for sharing with other trackers!",
+    category: 'workflow'
+  },
+  {
+    title: "Import XM/MOD Files",
+    content: "Drag & drop .XM or .MOD files into DEViLBOX to import classic tracker modules. Instant retro library!",
+    category: 'workflow'
+  },
+  {
+    title: "Sample Extraction",
+    content: "When importing XM/MOD files, samples are automatically extracted and converted to instruments. Instant sample library!",
+    category: 'workflow'
+  },
+  {
+    title: "Furnace Song Import",
+    content: "Import .FUR (Furnace) files directly! Chip instruments, patterns, and even wavetables come through intact.",
+    category: 'workflow'
+  },
+
+  // ===== PRO WORKFLOW (10 new tips) =====
+  {
+    title: "Pattern Cloning",
+    content: "In the Pattern List, right-click a pattern and choose 'Clone'. Creates an independent copy you can edit separately!",
+    category: 'workflow'
+  },
+  {
+    title: "Block Transpose",
+    content: "Select a block, open Advanced Edit (Ctrl+E), and transpose +12 semitones for instant octave jumps!",
+    category: 'tracker'
+  },
+  {
+    title: "Find & Replace",
+    content: "Open Find/Replace dialog to search for specific notes or effect values across patterns. Batch editing power!",
+    category: 'workflow'
+  },
+  {
+    title: "Humanize Timing",
+    content: "Select notes and use the Humanize dialog to add subtle timing and velocity variations. Instant groove!",
+    category: 'workflow'
+  },
+  {
+    title: "Channel Muting",
+    content: "Click the channel number to mute/solo channels. Perfect for isolating problematic tracks during mixdown.",
+    category: 'workflow'
+  },
+  {
+    title: "Pattern Matrix",
+    content: "Use the Pattern Matrix view to see your entire song structure at a glance. Rearrange patterns with drag & drop!",
+    category: 'workflow'
+  },
+  {
+    title: "Arrangement Mode",
+    content: "Switch to Arrangement view for DAW-style clip editing. Non-destructive pattern sequencing!",
+    category: 'workflow'
+  },
+  {
+    title: "Undo History Panel",
+    content: "Open the Undo History panel to see all edit operations. Jump back to any previous state!",
+    category: 'workflow'
+  },
+  {
+    title: "Pattern Minimap",
+    content: "The minimap on the right shows an overview of your pattern. Click to jump to any row instantly!",
+    category: 'workflow'
+  },
+  {
+    title: "VU Meters",
+    content: "Watch the channel VU meters to spot clipping before it happens. Red = too hot, back off the volume!",
+    category: 'workflow'
+  },
+
+  // ===== PERFORMANCE TIPS (5 new tips) =====
+  {
+    title: "Audio Latency Explained",
+    content: "Interactive (10ms) = live playing, Balanced (50ms) = normal work, Stable (150ms) = no glitches during playback. Pick what fits!",
+    category: 'performance'
+  },
+  {
+    title: "Amiga Limits Mode",
+    content: "Enable Amiga Limits in Settings to clamp periods to 113-856, just like the real Amiga. Authentic ProTracker sound!",
+    category: 'performance'
+  },
+  {
+    title: "Sample Interpolation",
+    content: "Linear interpolation = clean/smooth. None = crunchy/aliased. Disable for authentic Amiga/DOS tracker grunge!",
+    category: 'performance'
+  },
+  {
+    title: "WASM vs JavaScript",
+    content: "WASM synths (Furnace, Buzzmachines) are 10-100x faster than JS synths. Use them for complex arrangements!",
+    category: 'performance'
+  },
+  {
+    title: "CPU Optimization",
+    content: "Disable unused effects and mute channels you're not using. Each active effect consumes CPU. Keep it lean!",
+    category: 'performance'
+  },
+
+  // ===== MOBILE TIPS (5 new tips) =====
+  {
+    title: "Mobile Swipe Navigation",
+    content: "On mobile, swipe left/right in the pattern to move the cursor. Swipe on channel header to change channels (portrait mode)!",
+    category: 'workflow'
+  },
+  {
+    title: "Long-Press Context Menu",
+    content: "Long-press on mobile to open context menus for copy/paste operations. Quick actions at your fingertips!",
+    category: 'workflow'
+  },
+  {
+    title: "Pinch to Zoom",
+    content: "Pinch-zoom on the pattern editor (mobile) to change row height. Make patterns easier to read!",
+    category: 'workflow'
+  },
+  {
+    title: "Collapsible Piano",
+    content: "On mobile pattern view, collapse the bottom piano keyboard when you need more screen space for editing.",
+    category: 'workflow'
+  },
+  {
+    title: "Haptic Feedback",
+    content: "DEViLBOX uses haptic feedback on mobile for button presses and note entry. Feel every interaction!",
+    category: 'workflow'
   }
 ];

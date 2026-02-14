@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChannelSpectrumsProps {
   height?: number;
@@ -14,7 +15,12 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const [width, setWidth] = useState(300);
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore(
+    useShallow((state) => ({
+      patterns: state.patterns,
+      currentPatternIndex: state.currentPatternIndex,
+    }))
+  );
   const pattern = patterns[currentPatternIndex];
   const channelCount = pattern?.channels.length || 4;
 
@@ -51,6 +57,10 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
     const cellWidth = width / channelsPerRow;
     const cellHeight = height / rows;
 
+    // Enable analysers when visualization is active
+    const engine = getToneEngine();
+    engine.enableAnalysers();
+
     const animate = () => {
       if (!mounted) return;
       
@@ -63,6 +73,7 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
       if (fft) {
         const values = fft;
         const barsPerChannel = 16;
+        const time = Date.now() / 1000; // Hoist out of loops
 
         for (let ch = 0; ch < channelCount; ch++) {
           const row = Math.floor(ch / channelsPerRow);
@@ -94,7 +105,6 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
             const barHeight = Math.max(0, Math.min(1, normalized)) * maxBarHeight;
 
             // Dramatic time-based and channel-based modulation
-            const time = Date.now() / 1000;
             const channelPhase = ch * 1.7;
             const channelAmp = 0.4 + (ch % 3) * 0.3; // Different amplitude per channel
             const channelMod = pattern?.channels[ch]?.muted ? 0 : (Math.sin(time * 1.5 + channelPhase + i * 0.4) * 0.3 + channelAmp);
@@ -121,6 +131,8 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      // Disable analysers to save CPU when visualization unmounts
+      engine.disableAnalysers();
     };
   }, [width, height, channelCount, pattern]);
 

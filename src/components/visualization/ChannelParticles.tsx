@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 
 interface Particle {
   x: number;
@@ -25,7 +26,12 @@ export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100
   const animationRef = useRef<number | undefined>(undefined);
   const particlesRef = useRef<Particle[][]>([]);
   const [width, setWidth] = useState(300);
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore(
+    useShallow((state) => ({
+      patterns: state.patterns,
+      currentPatternIndex: state.currentPatternIndex,
+    }))
+  );
   const pattern = patterns[currentPatternIndex];
   const channelCount = pattern?.channels.length || 4;
 

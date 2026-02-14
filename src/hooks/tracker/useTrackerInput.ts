@@ -162,6 +162,7 @@ export const useTrackerInput = () => {
   const deleteRow = useTrackerStore((state) => state.deleteRow);
   const setPtnJumpPos = useTrackerStore((state) => state.setPtnJumpPos);
   const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
+  const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
 
   const {
     isPlaying,
@@ -604,8 +605,8 @@ export const useTrackerInput = () => {
       // Arrow keys
       if (key === 'ArrowUp') {
         e.preventDefault();
-        if (e.altKey) {
-          // Alt+Arrow: Mark block
+        if (e.altKey || e.shiftKey) {
+          // Alt+Arrow or Shift+Arrow: Mark/extend selection
           if (!selection) startSelection();
           moveCursor('up');
           endSelection();
@@ -617,7 +618,7 @@ export const useTrackerInput = () => {
 
       if (key === 'ArrowDown') {
         e.preventDefault();
-        if (e.altKey) {
+        if (e.altKey || e.shiftKey) {
           if (!selection) startSelection();
           moveCursor('down');
           endSelection();
@@ -629,7 +630,7 @@ export const useTrackerInput = () => {
 
       if (key === 'ArrowLeft') {
         e.preventDefault();
-        if (e.altKey) {
+        if (e.altKey || e.shiftKey) {
           if (!selection) startSelection();
           moveCursor('left');
           endSelection();
@@ -641,7 +642,7 @@ export const useTrackerInput = () => {
 
       if (key === 'ArrowRight') {
         e.preventDefault();
-        if (e.altKey) {
+        if (e.altKey || e.shiftKey) {
           if (!selection) startSelection();
           moveCursor('right');
           endSelection();
@@ -800,6 +801,63 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'i') {
         e.preventDefault();
         pastePushForward();
+        return;
+      }
+
+      // I key (no modifiers): Interpolate values in selection
+      if (keyLower === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        if (selection && cursor.columnType === 'volume') {
+          // Get start and end values from selection
+          const startRow = Math.min(selection.startRow, selection.endRow);
+          const endRow = Math.max(selection.startRow, selection.endRow);
+          const channel = cursor.channelIndex;
+
+          const startCell = pattern.channels[channel].rows[startRow];
+          const endCell = pattern.channels[channel].rows[endRow];
+          const startValue = startCell.volume || 0;
+          const endValue = endCell.volume || 64;
+
+          interpolateSelection('volume', startValue, endValue, 'linear');
+          useUIStore.getState().setStatusMessage(`INTERPOLATE: ${startValue} → ${endValue}`);
+        } else if (cursor.columnType === 'volume') {
+          useUIStore.getState().setStatusMessage('SELECT VOLUME RANGE FIRST');
+        } else {
+          useUIStore.getState().setStatusMessage('INTERPOLATE: VOLUME COLUMN ONLY');
+        }
+        return;
+      }
+
+      // Ctrl+H: Chord tool (expand note into chord)
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'h' && !e.altKey) {
+        e.preventDefault();
+        // TODO: Implement chord expansion dialog
+        // For now, expand current note into a major chord (root, 3rd, 5th)
+        if (cursor.columnType === 'note') {
+          const currentCell = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex];
+          if (currentCell.note && currentCell.note > 0 && currentCell.note < 97) {
+            const rootNote = currentCell.note;
+            const third = rootNote + 4; // Major third
+            const fifth = rootNote + 7; // Perfect fifth
+
+            // Place notes in consecutive channels if available
+            if (cursor.channelIndex + 2 < pattern.channels.length) {
+              setCell(cursor.channelIndex + 1, cursor.rowIndex, {
+                note: third,
+                instrument: currentCell.instrument
+              });
+              setCell(cursor.channelIndex + 2, cursor.rowIndex, {
+                note: fifth,
+                instrument: currentCell.instrument
+              });
+              useUIStore.getState().setStatusMessage('CHORD: MAJOR');
+            } else {
+              useUIStore.getState().setStatusMessage('CHORD: NOT ENOUGH CHANNELS');
+            }
+          } else {
+            useUIStore.getState().setStatusMessage('CHORD: NO NOTE');
+          }
+        }
         return;
       }
 

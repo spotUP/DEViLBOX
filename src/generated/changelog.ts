@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T11:05:39.546Z
+ * Generated: 2026-02-14T14:53:37.561Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '493';
-export const BUILD_HASH = 'adf1c54';
+export const BUILD_NUMBER = '509';
+export const BUILD_HASH = 'b8d5af7';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -31,6 +31,76 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-14',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Make piano roll/input panel collapsible"
+      },
+      {
+        type: 'feature',
+        "description": "Add instrument selector and fix cursor bar styling"
+      },
+      {
+        type: 'fix',
+        "description": "Enable native scrolling and add clipboard actions"
+      },
+      {
+        type: 'feature',
+        "description": "Add swipe gestures for cursor movement and channel switching"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused touch variable in handleKeyTouch"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve remaining TypeScript errors"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript compilation errors in mobile UX code"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: sync remaining changes from previous development"
+      },
+      {
+        type: 'improvement',
+        "description": "Update project memory with mobile UX implementation"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive mobile UX documentation"
+      },
+      {
+        type: 'feature',
+        "description": "Add mobile MIDI support section to settings"
+      },
+      {
+        type: 'feature',
+        "description": "Optimize drum pads and pedalboard for mobile layouts"
+      },
+      {
+        type: 'feature',
+        "description": "Optimize all instrument editors for touch devices"
+      },
+      {
+        type: 'fix',
+        "description": "Solve knob scroll conflict with touch-action CSS"
+      },
+      {
+        type: 'feature',
+        "description": "Add mobile pattern editor with context-aware input"
+      },
+      {
+        type: 'feature',
+        "description": "Add mobile UX infrastructure"
+      }
+    ]
+  },
+  {
+    version: '2026-02-13',
     date: '2026-02-13',
     changes: [
       {
@@ -168,76 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add music-reactive background tiles"
-      },
-      {
-        type: 'feature',
-        "description": "Add audio analysis infrastructure"
-      }
-    ]
-  },
-  {
-    version: '2026-02-12',
-    date: '2026-02-12',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Replace browser prompt with custom React component"
-      },
-      {
-        type: 'fix',
-        "description": "Change alignItems to stretch for full-height glass overlay"
-      },
-      {
-        type: 'fix',
-        "description": "Fix collision detection to check from current position"
-      },
-      {
-        type: 'fix',
-        "description": "Ensure visualizer container has full height"
-      },
-      {
-        type: 'fix',
-        "description": "Scale playfield to fit visible canvas area"
-      },
-      {
-        type: 'fix',
-        "description": "Fill entire visualizer height and track container size"
-      },
-      {
-        type: 'fix',
-        "description": "Make viz-frame fill parent container height"
-      },
-      {
-        type: 'fix',
-        "description": "Make game fill entire visualizer area"
-      },
-      {
-        type: 'fix',
-        "description": "Remove glass and vignette overlays from compact visualizers"
-      },
-      {
-        type: 'fix',
-        "description": "Draw border inside canvas and double cell size"
-      },
-      {
-        type: 'fix',
-        "description": "Remove visualizer margin and make food more visible"
-      },
-      {
-        type: 'fix',
-        "description": "Fix game logic bugs preventing startup and gameplay"
-      },
-      {
-        type: 'fix',
-        "description": "Revert buttons to toggle, keep hotkeys as restart"
-      },
-      {
-        type: 'fix',
-        "description": "Make play hotkeys restart playback like buttons"
-      },
-      {
-        type: 'fix',
-        "description": "Make play buttons restart playback instead of toggling"
       }
     ]
   }

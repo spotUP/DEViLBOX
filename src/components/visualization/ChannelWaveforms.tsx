@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChannelWaveformsProps {
   height?: number;
@@ -14,7 +15,12 @@ export const ChannelWaveforms: React.FC<ChannelWaveformsProps> = ({ height = 100
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const [width, setWidth] = useState(300);
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore(
+    useShallow((state) => ({
+      patterns: state.patterns,
+      currentPatternIndex: state.currentPatternIndex,
+    }))
+  );
   const pattern = patterns[currentPatternIndex];
   const channelCount = pattern?.channels.length || 4;
 
@@ -50,6 +56,10 @@ export const ChannelWaveforms: React.FC<ChannelWaveformsProps> = ({ height = 100
     const rows = Math.ceil(channelCount / channelsPerRow);
     const cellWidth = width / channelsPerRow;
     const cellHeight = height / rows;
+
+    // Enable analysers when visualization is active
+    const engine = getToneEngine();
+    engine.enableAnalysers();
 
     const animate = () => {
       if (!mounted) return;
@@ -125,6 +135,8 @@ export const ChannelWaveforms: React.FC<ChannelWaveformsProps> = ({ height = 100
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      // Disable analysers to save CPU when visualization unmounts
+      engine.disableAnalysers();
     };
   }, [width, height, channelCount, pattern]);
 
