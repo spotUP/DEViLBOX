@@ -34,7 +34,7 @@ export const JackPort: React.FC<JackPortProps> = ({
   direction,
   signal,
   isHovered = false,
-  isConnected = false,
+  isConnected: _isConnected = false, // Reserved for future visual indication
   isWiringSource = false,
   onPortClick,
   onPortHover,
@@ -76,10 +76,10 @@ export const JackPort: React.FC<JackPortProps> = ({
           w-3 h-3 rounded-full cursor-pointer border-2 transition-all
           ${isWiringSource ? 'ring-2 ring-white ring-offset-1' : ''}
           ${isHovered ? 'scale-125' : ''}
-          ${isConnected ? 'border-white' : 'border-surface-tertiary'}
         `}
         style={{
           backgroundColor: color,
+          borderColor: color,
           boxShadow: isWiringSource ? `0 0 8px ${color}` : 'none',
         }}
         onClick={handleClick}
@@ -88,7 +88,7 @@ export const JackPort: React.FC<JackPortProps> = ({
       />
 
       {/* Port label */}
-      <span className="text-xs text-text-tertiary">{name}</span>
+      <span className="text-xs" style={{ color }}>{name}</span>
     </div>
   );
 };
