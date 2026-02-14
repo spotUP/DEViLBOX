@@ -33,7 +33,7 @@ export interface LeslieOptions {
 /** Extract the underlying native AudioNode from a Tone.js wrapper */
 function getRawNode(node: Tone.Gain): AudioNode {
   const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
+  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
 }
 
 export class LeslieEffect extends Tone.ToneAudioNode {
@@ -82,6 +82,7 @@ export class LeslieEffect extends Tone.ToneAudioNode {
 
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
+    this.wetGain.connect(this.output);
 
     this.initFallback();
     this.initWasm();
@@ -202,12 +203,18 @@ export class LeslieEffect extends Tone.ToneAudioNode {
       const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect(getRawNode(this.output));
+      // wetGain → output already connected via Tone.js in constructor
+
+      // Keepalive: ensure ScriptProcessorNode is processed
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.fallbackNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+
       this.usingFallback = true;
     } catch (err) {
       console.warn('[Leslie] Fallback init failed:', err);
       this.input.connect(this.wetGain);
-      this.wetGain.connect(this.output);
     }
   }
 
@@ -220,7 +227,7 @@ export class LeslieEffect extends Tone.ToneAudioNode {
       const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      rawWet.connect(getRawNode(this.output));
+      // wetGain → output already connected via Tone.js in constructor
       // Now safe to disconnect fallback
       if (this.fallbackNode && this.usingFallback) {
         try { this.fallbackNode.disconnect(); } catch { /* ignored */ }

@@ -44,7 +44,7 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
  *       for passbandCompensation and 0.3 instead of 0.743 for resTracking.
  *       Fixed filterSelect migration (was hardcoding invalid value 1, now 0).
  */
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 interface SavedProject {
   version: string;
@@ -90,6 +90,21 @@ export function saveProjectToStorage(): boolean {
           cleanedInst.sample = { ...inst.sample, url: '' };
           return cleanedInst;
         }
+        // Strip non-serializable audioBuffer from samples before saving.
+        // ArrayBuffer becomes {} after JSON.stringify, breaking restore.
+        // The base64 data URL (sample.url) is the serializable equivalent.
+        if (inst.sample?.audioBuffer) {
+          const cleanedInst = { ...inst };
+          cleanedInst.sample = { ...inst.sample, audioBuffer: undefined };
+          // Also strip audioBuffer from preservedSample in metadata
+          if (cleanedInst.metadata?.preservedSample?.audioBuffer) {
+            cleanedInst.metadata = {
+              ...cleanedInst.metadata,
+              preservedSample: { ...cleanedInst.metadata.preservedSample, audioBuffer: undefined as unknown as ArrayBuffer },
+            };
+          }
+          return cleanedInst;
+        }
         return inst;
       }),
       automation: automationState.curves,
@@ -100,22 +115,17 @@ export function saveProjectToStorage(): boolean {
       ...(arrangementState.tracks.length > 0 ? { arrangement: arrangementState.getSnapshot() } : {}),
     };
 
-    // Don't save projects with MOD/XM/IT/S3M imported instruments
-    // Sample data (AudioBuffers, blob URLs) can't be serialized to JSON
-    // Better to not save at all than to save broken/silent data
-    const hasImportedModules = savedProject.instruments.some(
-      (inst) => inst.metadata?.importedFrom === 'MOD' || 
-                inst.metadata?.importedFrom === 'XM' ||
-                inst.metadata?.importedFrom === 'IT' ||
-                inst.metadata?.importedFrom === 'S3M'
-    );
-
-    if (hasImportedModules) {
-      console.log('[Persistence] Skipping save: project contains imported module data that cannot persist');
+    // Sample audioBuffers have been stripped above — base64 data URLs are the
+    // serializable equivalent and survive JSON round-trips. On restore, ToneEngine
+    // falls through to URL-based loading when audioBuffer is missing.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
+    } catch (storageError) {
+      // QuotaExceededError: project too large for localStorage (usually 5-10 MB limit)
+      // This can happen with many large sample-based instruments
+      console.warn('[Persistence] localStorage quota exceeded, project not saved:', storageError);
       return false;
     }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedProject));
     projectState.markAsSaved();
     return true;
   } catch (error) {

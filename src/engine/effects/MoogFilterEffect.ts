@@ -105,9 +105,16 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     this.dryGain = new Tone.Gain(1 - this._options.wet);
     this.wetGain = new Tone.Gain(this._options.wet);
 
-    // Dry path (always connected)
+    // Dry path: input → dryGain → output (Tone.js connections)
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
+
+    // Wet path output: wetGain → output (Tone.js connection)
+    // The processor (fallback/worklet) inserts between input and wetGain via raw Web Audio.
+    // This Tone.js connection ensures the wet path is part of the graph that Tone.js knows about.
+    this.wetGain.connect(this.output);
+
+    console.warn('[MoogFilter] Created, wet:', this._options.wet, 'cutoff:', this._options.cutoff);
 
     // Start WASM loading, use JS fallback immediately
     this.initFallback();
@@ -173,6 +180,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       // Listen for ready signal
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
+          console.warn('[MoogFilter] WASM ready! Swapping from fallback...');
           this.isWasmReady = true;
           // Send all current parameters
           this.sendParam(PARAM_MODEL, this._options.model);
@@ -274,28 +282,51 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       this.fallbackFilter.setCutoff(this._options.cutoff);
       this.fallbackFilter.setResonance(this._options.resonance);
 
+      let fallbackFrameCount = 0;
       this.fallbackNode.onaudioprocess = (e) => {
         const inL = e.inputBuffer.getChannelData(0);
         const inR = e.inputBuffer.getChannelData(1);
         const outL = e.outputBuffer.getChannelData(0);
         const outR = e.outputBuffer.getChannelData(1);
         this.fallbackFilter!.process(inL, inR, outL, outR);
+
+        // DIAGNOSTIC: Log fallback audio levels — frequent initially, then sparse
+        fallbackFrameCount++;
+        const shouldLog = fallbackFrameCount <= 200
+          ? (fallbackFrameCount % 50 === 1)   // Every ~0.3sec for first ~1.2sec
+          : (fallbackFrameCount % 2000 === 1); // Every ~12sec after
+        if (shouldLog) {
+          let maxIn = 0, maxOut = 0;
+          for (let i = 0; i < inL.length; i++) {
+            maxIn = Math.max(maxIn, Math.abs(inL[i]));
+            maxOut = Math.max(maxOut, Math.abs(outL[i]));
+          }
+          console.warn('[MoogFilter] Fallback frame:', fallbackFrameCount,
+            'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6));
+        }
       };
 
-      // Connect fallback as wet path using raw GainNodes from Tone.Gain wrappers
+      // Connect fallback: input._gainNode → fallbackNode → wetGain._gainNode
+      // (wetGain → output is already connected via Tone.js in the constructor)
       const rawInput = getRawGainNode(this.input);
       const rawWet = getRawGainNode(this.wetGain);
-      const rawOut = getRawGainNode(this.output);
 
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
-      rawWet.connect(rawOut);
+
+      // Keepalive: ensure the ScriptProcessorNode is always processed by the audio engine.
+      // Connect it (with zero gain) to the destination so Chrome doesn't skip processing.
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.fallbackNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+
       this.usingFallback = true;
+      console.warn('[MoogFilter] Fallback connected with keepalive');
     } catch (err) {
       console.warn('[MoogFilter] Fallback init failed:', err);
-      // Last resort: direct passthrough
+      // Last resort: direct passthrough (input → wetGain → output already connected)
       this.input.connect(this.wetGain);
-      this.wetGain.connect(this.output);
     }
   }
 
@@ -306,13 +337,13 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       const rawContext = Tone.getContext().rawContext as AudioContext;
 
       // Connect WASM worklet FIRST, then disconnect fallback (avoids silent gap)
+      // Route: input._gainNode → workletNode → wetGain._gainNode
+      // (wetGain → output is already connected via Tone.js in the constructor)
       const rawInput = getRawGainNode(this.input);
       const rawWet = getRawGainNode(this.wetGain);
-      const rawOut = getRawGainNode(this.output);
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      rawWet.connect(rawOut);
 
       // Now safe to disconnect fallback
       if (this.fallbackNode && this.usingFallback) {
@@ -321,11 +352,13 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
         this.usingFallback = false;
       }
 
-      // Keepalive connection
+      // Keepalive: ensure the AudioWorkletNode is always processed
       const keepalive = rawContext.createGain();
       keepalive.gain.value = 0;
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
+
+      console.warn('[MoogFilter] WASM swap complete with keepalive');
 
     } catch (err) {
       console.warn('[MoogFilter] WASM swap failed, staying on fallback:', err);

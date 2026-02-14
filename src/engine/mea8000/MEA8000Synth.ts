@@ -2,7 +2,7 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
-import { type MEA8000Frame, phonemesToMEA8000Frames } from '@engine/speech/mea8000PhonemeMap';
+import { type MEA8000Frame, phonemesToMEA8000Frames, samToMEA8000 } from '@engine/speech/mea8000PhonemeMap';
 
 /**
  * MEA8000 Parameter IDs (matching C++ enum)
@@ -81,6 +81,16 @@ export class MEA8000Synth extends MAMEBaseSynth {
 
   private _speechSequencer: SpeechSequencer<MEA8000Frame> | null = null;
 
+  // Speech mode state
+  private _mode: 0 | 1 = 1;
+  private _singMode = true;
+  private _speechText = 'HELLO WORLD';
+
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
+
   constructor() {
     super();
     this.initSynth();
@@ -93,16 +103,35 @@ export class MEA8000Synth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
+    if (this._mode === 1) {
+      if (this._singMode && this._vowelSequence.length > 0) {
+        this._speakSingleVowel(note, velocity);
+      } else if (this._singMode) {
+        if (this._speechSequencer) {
+          const freq = 440 * Math.pow(2, (note - 69) / 12);
+          this.writeFrequency(freq);
+        } else {
+          this._startSpeechAtNote(this._speechText, note, velocity);
+        }
+      } else {
+        this._startSpeechAtNote(this._speechText, 60, velocity);
+      }
+    } else {
+      this.workletNode.port.postMessage({
+        type: 'noteOn',
+        note,
+        velocity: Math.floor(velocity * 127),
+      });
+    }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    if (this._mode === 1) {
+      // Speech mode: let speech finish naturally
+    } else {
+      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    }
   }
 
   protected writeFrequency(freq: number): void {
@@ -177,10 +206,15 @@ export class MEA8000Synth extends MAMEBaseSynth {
   /** Speak English text using SAM's reciter and MEA8000 formant mapping */
   speakText(text: string): void {
     if (!this._isReady || !this.workletNode) {
-      console.warn(`[MEA8000] speakText: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing "${text}"`);
       this._pendingCalls.push({ method: 'speakText', args: [text] });
       return;
     }
+    this._startSpeechAtNote(text, 60, 0.8);
+  }
+
+  /** Start speech at a specific MIDI note (avoids triggerAttack recursion) */
+  private _startSpeechAtNote(text: string, note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
 
@@ -191,15 +225,17 @@ export class MEA8000Synth extends MAMEBaseSynth {
     const frames = phonemesToMEA8000Frames(tokens);
     if (frames.length === 0) return;
 
-    console.log(`[MEA8000] speakText: "${text}" → ${frames.length} frames, outputGain=${this.output.gain.value.toFixed(3)}`);
-
     const speechFrames: SpeechFrame<MEA8000Frame>[] = frames.map(f => ({
       data: f,
       durationMs: f.durationMs,
     }));
 
-    // Activate a voice via the full triggerAttack path
-    this.triggerAttack(60, undefined, 0.8);
+    // Start voice directly (not via triggerAttack to avoid recursion)
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
 
     this._speechSequencer = new SpeechSequencer<MEA8000Frame>(
       (frame) => {
@@ -298,6 +334,57 @@ export class MEA8000Synth extends MAMEBaseSynth {
     if (paramId !== undefined) {
       this.setParameterById(paramId, value);
     }
+
+    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
+    if (param === 'sing_mode') this._singMode = value >= 1;
+    if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
+  }
+
+  setTextParam(key: string, value: string): void {
+    if (key === 'speechText') this._speechText = value;
+    if (key === 'vowelSequence') {
+      this._vowelSequence = value ? value.split(',').filter(Boolean) : [];
+      this._vowelIndex = 0;
+    }
+  }
+
+  /** Play a single vowel from the sequence at the given MIDI note */
+  private _speakSingleVowel(note: number, velocity: number): void {
+    if (!this._isReady || !this.workletNode || this._disposed) return;
+
+    const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+    this._vowelIndex++;
+
+    const frame = samToMEA8000(code);
+    if (!frame) return;
+
+    this.stopSpeaking();
+
+    const speechFrames: SpeechFrame<MEA8000Frame>[] = [{
+      data: frame,
+      durationMs: frame.durationMs,
+    }];
+
+    this.workletNode.port.postMessage({
+      type: 'noteOn',
+      note,
+      velocity: Math.floor(velocity * 127),
+    });
+
+    this._speechSequencer = new SpeechSequencer<MEA8000Frame>(
+      (f) => {
+        this.setFormants(f.f1, f.f2, f.f3);
+        this.setNoiseMode(f.noise);
+        this.setBandwidth(f.bw);
+      },
+      () => {
+        if (!this._vowelLoopSingle) {
+          this._speechSequencer = null;
+          this.triggerRelease();
+        }
+      }
+    );
+    this._speechSequencer.speak(speechFrames, this._vowelLoopSingle);
   }
 
   private sendMessage(type: string, value: number): void {

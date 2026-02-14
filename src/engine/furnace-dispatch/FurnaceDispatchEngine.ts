@@ -1243,9 +1243,11 @@ export class FurnaceDispatchEngine {
 
   /**
    * Set the instrument on a channel.
+   * @param force - If true, forces insChanged even if index hasn't changed.
+   *   Required after uploading new instrument data to the same slot.
    */
-  setInstrument(chan: number, insIndex: number, platformType?: number): void {
-    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, 0, platformType);
+  setInstrument(chan: number, insIndex: number, platformType?: number, force: boolean = false): void {
+    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, force ? 1 : 0, platformType);
   }
 
   /**

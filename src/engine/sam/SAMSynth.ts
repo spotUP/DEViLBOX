@@ -21,6 +21,11 @@ export class SAMSynth implements DevilboxSynth {
   private _readyResolve!: () => void;
   private _renderTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Vowel sequence state
+  private _vowelSequence: string[] = [];
+  private _vowelLoopSingle = true;
+  private _vowelIndex = 0;
+
   constructor(config: SamConfig) {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
@@ -119,7 +124,17 @@ export class SAMSynth implements DevilboxSynth {
       (config.singmode !== undefined && config.singmode !== this._config.singmode) ||
       (config.phonetic !== undefined && config.phonetic !== this._config.phonetic);
 
+    // Track vowel sequence changes
+    const seqChanged = config.vowelSequence !== undefined &&
+      JSON.stringify(config.vowelSequence) !== JSON.stringify(this._config.vowelSequence);
+
     this._config = { ...this._config, ...config };
+
+    if (config.vowelLoopSingle !== undefined) this._vowelLoopSingle = config.vowelLoopSingle;
+    if (seqChanged) {
+      this._vowelSequence = config.vowelSequence ?? [];
+      this._vowelIndex = 0;
+    }
 
     if (config.singmode !== undefined && this._sourceNode) {
       this._sourceNode.loop = config.singmode;
@@ -141,7 +156,58 @@ export class SAMSynth implements DevilboxSynth {
     }
   }
 
+  /** Render a single vowel phoneme and return the buffer */
+  private _renderVowel(code: string): AudioBuffer | null {
+    const sam = new SamJs({
+      pitch: this._config.pitch,
+      speed: this._config.speed,
+      mouth: this._config.mouth,
+      throat: this._config.throat,
+      singmode: true,
+      phonetic: true,
+    });
+    const buf32 = sam.buf32(code, true);
+    if (!buf32) return null;
+    const audioBuf = this.audioContext.createBuffer(1, buf32.length, 22050);
+    audioBuf.getChannelData(0).set(buf32);
+    return audioBuf;
+  }
+
   public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
+    if (this._config.singmode && this._vowelSequence.length > 0) {
+      // Vowel sequence mode: render next vowel and play it
+      const vowelCode = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
+      this._vowelIndex++;
+
+      const vowelBuf = this._renderVowel(vowelCode);
+      if (!vowelBuf) return;
+
+      this._buffer = vowelBuf;
+
+      const midi = typeof note === 'string' ? noteToMidi(note) : note;
+      const ratio = Math.pow(2, (midi - 48) / 12);
+
+      this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+      this._playerGain.gain.value = velocity;
+
+      this._stopSource();
+      const source = this.audioContext.createBufferSource();
+      source.buffer = vowelBuf;
+      source.loop = this._vowelLoopSingle;
+      source.connect(this._playerGain);
+      source.onended = () => {
+        if (this._sourceNode === source) {
+          this._isPlaying = false;
+          this._sourceNode = null;
+        }
+      };
+      this._sourceNode = source;
+      source.playbackRate.value = ratio;
+      source.start(time, 0);
+      this._isPlaying = true;
+      return;
+    }
+
     if (!this._buffer) {
       console.warn('[SAM] triggerAttack called before buffer ready');
       return;
@@ -149,18 +215,22 @@ export class SAMSynth implements DevilboxSynth {
 
     if (this._config.singmode) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      const ratio = Math.pow(2, (midi - 60) / 12);
+      const ratio = Math.pow(2, (midi - 48) / 12);
+
+      // Cancel any release fade and restore gain
+      this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+      this._playerGain.gain.value = velocity;
 
       if (this._isPlaying && this._sourceNode) {
-        // Just update pitch — keep playing
-        this._sourceNode.playbackRate.value = ratio;
+        // Glide pitch smoothly (~60ms portamento for natural singing)
+        this._sourceNode.playbackRate.cancelScheduledValues(this.audioContext.currentTime);
+        this._sourceNode.playbackRate.setTargetAtTime(ratio, this.audioContext.currentTime, 0.06);
       } else {
         this._startSource(time);
         if (this._sourceNode) {
           this._sourceNode.playbackRate.value = ratio;
         }
       }
-      this._playerGain.gain.value = velocity;
     } else {
       // Normal mode: restart on each trigger
       this._startSource(time);
@@ -173,8 +243,16 @@ export class SAMSynth implements DevilboxSynth {
     // One-shot playback: ignore duration, let buffer play to completion
   }
 
-  public triggerRelease() {
-    // One-shot playback usually doesn't need release
+  public triggerRelease(time?: number) {
+    if (this._config.singmode && this._isPlaying) {
+      // Sing mode: fade out quickly and stop
+      const t = time ?? this.audioContext.currentTime;
+      this._playerGain.gain.cancelScheduledValues(t);
+      this._playerGain.gain.setValueAtTime(this._playerGain.gain.value, t);
+      this._playerGain.gain.linearRampToValueAtTime(0, t + 0.05);
+      setTimeout(() => this._stopSource(), 80);
+    }
+    // Non-sing mode: one-shot plays to completion
   }
 
   public dispose(): void {

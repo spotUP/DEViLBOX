@@ -173,6 +173,39 @@ const DIV_ELEMENT_COMMENTS = 0x09;
 const DIV_ELEMENT_GROOVE = 0x0a;
 
 /**
+ * Chip file ID → FurnaceChipType engine value
+ * Maps Furnace file system IDs to the FurnaceChipEngine enum values
+ * Used to set the correct chipType when converting instruments
+ */
+const CHIP_ID_TO_ENGINE_CHIP: Record<number, number> = {
+  0x02: 0,    // Genesis (compound) → OPN2
+  0x03: 3,    // SN76489/SMS → PSG
+  0x04: 5,    // Game Boy → GB
+  0x05: 6,    // PC Engine → PCE
+  0x06: 4,    // NES → NES
+  0x07: 10,   // C64 (8580) → SID
+  0x47: 10,   // C64 (6581) → SID
+  0xf0: 10,   // SID2 → SID
+  0x80: 12,   // AY-3-8910 → AY
+  0x81: 0,    // Amiga → OPN2 (placeholder, sample-based)
+  0x82: 1,    // YM2151 → OPM
+  0x83: 0,    // YM2612 → OPN2
+  0x84: 15,   // TIA → TIA
+  0x87: 24,   // SNES → SNES
+  0x88: 9,    // VRC6 → VRC6
+  0x89: 11,   // OPLL → OPLL
+  0x8a: 16,   // FDS → FDS
+  0x8d: 47,   // YM2203 → OPN
+  0x8e: 13,   // YM2608 → OPNA
+  0x8f: 2,    // OPL → OPL3
+  0x90: 2,    // OPL2 → OPL3
+  0x91: 2,    // OPL3 → OPL3
+  0x97: 18,   // SAA1099 → SAA
+  0x98: 22,   // OPZ → OPZ
+  0xa0: 0,    // YM2612 ext → OPN2
+};
+
+/**
  * Chip file ID → default instrument type (DIV_INS_*)
  * From Furnace sysDef.cpp channel definitions
  */
@@ -363,6 +396,7 @@ export interface FurnaceC64Data {
   toFilter: boolean; initFilter: boolean; dutyIsAbs: boolean;
   lp: boolean; bp: boolean; hp: boolean; ch3off: boolean;
   filterIsAbs: boolean; noTest: boolean; ringMod: boolean; oscSync: boolean;
+  resetDuty: boolean;
   a: number; d: number; s: number; r: number;
   duty: number; cut: number; res: number;
 }
@@ -1401,6 +1435,14 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const adsr2 = reader.readUint8();
           const duty = reader.readUint16() & 0xFFF;
           const cutRes = reader.readUint16();
+          let res = cutRes >> 12;
+          let resetDuty = false;
+          // v199+: extra byte with high res bits and resetDuty flag
+          if (reader.getOffset() < featEnd) {
+            const extraByte = reader.readUint8();
+            res |= (extraByte & 0x0F) << 4; // high 4 bits of resonance
+            resetDuty = !!(extraByte & 0x10); // v222+: resetDuty flag
+          }
           inst.c64 = {
             triOn: !!(c64f1 & 1), sawOn: !!(c64f1 & 2), pulseOn: !!(c64f1 & 4),
             noiseOn: !!(c64f1 & 8), toFilter: !!(c64f1 & 16),
@@ -1410,7 +1452,7 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
             noTest: !!(c64f2 & 32), ringMod: !!(c64f2 & 64), oscSync: !!(c64f2 & 128),
             a: (adsr1 >> 4) & 0x0F, d: adsr1 & 0x0F,
             s: (adsr2 >> 4) & 0x0F, r: adsr2 & 0x0F,
-            duty, cut: cutRes & 0xFFF, res: cutRes >> 12,
+            duty, cut: cutRes & 0xFFF, res, resetDuty,
           };
           break;
         }
@@ -2017,6 +2059,95 @@ interface ConvertedPatternCell {
 }
 
 /**
+ * Build a per-channel array of the default instrument type (DIV_INS_*) for each channel.
+ * For compound chips like Genesis (0x02), maps sub-channels to their correct type:
+ *   channels 0-5 → DIV_INS_FM (1), channel 6 → DIV_INS_AMIGA (4), channels 7-9 → DIV_INS_STD (0)
+ */
+function buildChannelChipMap(module: FurnaceModule): number[] {
+  // Genesis compound chip: FM (6ch) + DAC (1ch) + PSG (3ch + noise)
+  const COMPOUND_CHANNEL_TYPES: Record<number, number[]> = {
+    0x02: [1, 1, 1, 1, 1, 1,  4,  0, 0, 0, 0],  // Genesis: FM×6, DAC, PSG×4
+  };
+
+  const channelInsType: number[] = [];
+  let chanOffset = 0;
+
+  for (let i = 0; i < module.systemLen; i++) {
+    const chipId = module.systems[i];
+    const chanCount = module.systemChans[i] ?? 0;
+
+    const compound = COMPOUND_CHANNEL_TYPES[chipId];
+    if (compound) {
+      // Compound chip: use per-sub-channel types
+      for (let ch = 0; ch < chanCount; ch++) {
+        channelInsType[chanOffset + ch] = compound[ch] ?? 0;
+      }
+    } else {
+      // Simple chip: all channels use the same default instrument type
+      const defaultType = CHIP_DEFAULT_INS_TYPE[chipId] ?? 0;
+      for (let ch = 0; ch < chanCount; ch++) {
+        channelInsType[chanOffset + ch] = defaultType;
+      }
+    }
+    chanOffset += chanCount;
+  }
+
+  return channelInsType;
+}
+
+/**
+ * Build a per-channel array of the chip ID for each channel.
+ * Used to determine chip-specific variants (e.g., SID 6581 vs 8580).
+ */
+function buildChannelChipIdMap(module: FurnaceModule): number[] {
+  const channelChipId: number[] = [];
+  let chanOffset = 0;
+
+  for (let i = 0; i < module.systemLen; i++) {
+    const chipId = module.systems[i];
+    const chanCount = module.systemChans[i] ?? 0;
+    for (let ch = 0; ch < chanCount; ch++) {
+      channelChipId[chanOffset + ch] = chipId;
+    }
+    chanOffset += chanCount;
+  }
+
+  return channelChipId;
+}
+
+/**
+ * Scan pattern data to find which channels each instrument is used on.
+ * Returns a map from instrument index (0-based) to the set of channel indices.
+ */
+function scanInstrumentChannels(module: FurnaceModule): Map<number, Set<number>> {
+  const result = new Map<number, Set<number>>();
+  const subsong = module.subsongs[0];
+  if (!subsong) return result;
+
+  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
+    for (let ch = 0; ch < module.chans; ch++) {
+      const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
+      const key = `0_${ch}_${patIdx}`;
+      const pattern = module.patterns.get(key);
+      if (!pattern) continue;
+
+      for (const row of pattern.rows) {
+        if (row.instrument >= 0) {
+          let channels = result.get(row.instrument);
+          if (!channels) {
+            channels = new Set<number>();
+            result.set(row.instrument, channels);
+          }
+          channels.add(ch);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Convert Furnace module to DEViLBOX format
  */
 export function convertFurnaceToDevilbox(module: FurnaceModule): {
@@ -2024,18 +2155,93 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   patterns: ConvertedPatternCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
+  // --- Build channel-to-chip mapping for STD instrument remapping ---
+  // For compound chips like Genesis (FM + PSG), we need to know which
+  // channels are FM vs PSG to correctly remap DIV_INS_STD instruments.
+  const channelChipInsType = buildChannelChipMap(module);
+  const channelChipId = buildChannelChipIdMap(module);
+
+  // Scan pattern data to find which channels each instrument appears on
+  const instrumentChannels = scanInstrumentChannels(module);
+
   // Convert instruments with full Furnace data preservation
   const instruments: ParsedInstrument[] = module.instruments.map((inst, idx) => {
     const samples: ParsedSample[] = [];
-    
+
     // Map Furnace instrument type to SynthType
-    const synthType = mapFurnaceInstrumentType(inst.type);
+    let synthType = mapFurnaceInstrumentType(inst.type);
+
+    // DIV_INS_STD (type 0) is generic and adapts to the module's chip context.
+    // Use the pattern data to determine which channels this instrument plays on,
+    // then map to the appropriate synth type based on the channel's chip.
+    if (inst.type === 0 && synthType === 'ChipSynth') {
+      const channels = instrumentChannels.get(idx);
+      if (channels && channels.size > 0) {
+        // Find the most common chip instrument type across all channels this instrument is used on
+        const typeCounts = new Map<number, number>();
+        for (const ch of channels) {
+          const insType = channelChipInsType[ch];
+          if (insType !== undefined && insType !== 0) {
+            typeCounts.set(insType, (typeCounts.get(insType) || 0) + 1);
+          }
+        }
+        // Pick the most-used type
+        let bestType = 0;
+        let bestCount = 0;
+        for (const [t, c] of typeCounts) {
+          if (c > bestCount) { bestType = t; bestCount = c; }
+        }
+        if (bestType > 0) {
+          const remapped = FURNACE_TYPE_MAP[bestType];
+          if (remapped) {
+            console.log(`[FurnaceSongParser] Remapping STD inst ${idx} "${inst.name}": ChipSynth -> ${remapped} (channels=${[...channels].join(',')}, chipInsType=${bestType})`);
+            synthType = remapped;
+          }
+        }
+      } else if (module.systems.length > 0) {
+        // No pattern usage found — fall back to primary chip's default
+        const primaryChip = module.systems[0];
+        const defaultInsType = CHIP_DEFAULT_INS_TYPE[primaryChip];
+        if (defaultInsType !== undefined && defaultInsType !== 0) {
+          const remapped = FURNACE_TYPE_MAP[defaultInsType];
+          if (remapped) {
+            console.log(`[FurnaceSongParser] Remapping STD inst ${idx} "${inst.name}": ChipSynth -> ${remapped} (fallback, chip=0x${primaryChip.toString(16)})`);
+            synthType = remapped;
+          }
+        }
+      }
+    }
+
+    // Refine C64 SID variant based on chip ID (6581 vs 8580)
+    // DIV_INS_C64 (type 3), DIV_INS_SID2 (63), DIV_INS_SID3 (66) all map to FurnaceC64
+    // but we can distinguish the hardware variant from the chip ID
+    if (synthType === 'FurnaceC64') {
+      const channels = instrumentChannels.get(idx);
+      let chipId = module.systems.length > 0 ? module.systems[0] : 0; // Default to primary chip
+
+      // If we know which channels this instrument is used on, get the chip ID from those channels
+      if (channels && channels.size > 0) {
+        const firstCh = channels.values().next().value;
+        if (firstCh !== undefined && channelChipId[firstCh] !== undefined) {
+          chipId = channelChipId[firstCh];
+        }
+      }
+
+      if (chipId === 0x47 || chipId === 0xf0) {
+        // 0x47 = C64 6581, 0xf0 = SID2 (typically 6581-based)
+        synthType = 'FurnaceSID6581';
+        console.log(`[FurnaceSongParser] C64 inst ${idx} "${inst.name}": refined to FurnaceSID6581 (chip=0x${chipId.toString(16)})`);
+      } else if (chipId === 0x07) {
+        // 0x07 = C64 8580
+        synthType = 'FurnaceSID8580';
+        console.log(`[FurnaceSongParser] C64 inst ${idx} "${inst.name}": refined to FurnaceSID8580 (chip=0x${chipId.toString(16)})`);
+      }
+    }
+
     const isSampleBased = synthType === 'Sampler' || synthType === 'Player';
 
     // Debug: Log instrument type mapping
-    if (idx < 3) {
-      console.log(`[FurnaceSongParser] Inst ${idx} "${inst.name}": type=${inst.type} -> synthType="${synthType}" samples=${inst.samples.length} wavetables=${inst.wavetables.length}`);
-    }
+    console.log(`[FurnaceSongParser] Inst ${idx} "${inst.name}": type=${inst.type} -> synthType="${synthType}" hasFM=${!!inst.fm} samples=${inst.samples.length} wavetables=${inst.wavetables.length}`);
 
     // Convert samples referenced by this instrument
     if (inst.samples && inst.samples.length > 0) {
@@ -2053,8 +2259,11 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     }
 
     // Build FurnaceInstrumentData for chip-accurate playback
+    // Use the module's primary chip to determine chipType (not the instrument type)
+    const primaryChipId = module.systems.length > 0 ? module.systems[0] : 0;
+    const engineChipType = CHIP_ID_TO_ENGINE_CHIP[primaryChipId] ?? inst.type;
     const furnaceData: FurnaceInstrumentData = {
-      chipType: inst.type,
+      chipType: engineChipType,
       synthType,
       macros: inst.macros.map(m => ({
         code: m.code,
@@ -2154,6 +2363,13 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   // Furnace has per-channel order tables: orders[channel][orderPos] = patternIndex
   // Each channel can play a different pattern at each song position.
   // We must look up each channel's pattern from its own order table.
+  let totalRawNotes = 0;     // Notes in Furnace data (before conversion)
+  let totalConvertedNotes = 0; // Notes that survived conversion
+  let totalDroppedNotes = 0;   // Notes lost to octave clamping
+  let totalMissedLookups = 0;  // Pattern key lookups that failed
+  let totalEffects = 0;
+  const droppedExamples: string[] = [];
+
   for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
     const patternRows: ConvertedPatternCell[][] = [];
 
@@ -2168,9 +2384,34 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
 
         if (pattern && pattern.rows[row]) {
           const cell = pattern.rows[row];
+          // Track raw note data before conversion
+          if (cell.note >= 0 && cell.note <= 12) {
+            totalRawNotes++;
+          }
+          if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
+            totalEffects++;
+          }
           const converted = convertFurnaceCell(cell);
+          if (converted.note > 0 && converted.note < 97) {
+            totalConvertedNotes++;
+          }
+          // Detect dropped notes (raw had a note, converted has 0)
+          if (cell.note >= 0 && cell.note <= 12 && converted.note === 0) {
+            totalDroppedNotes++;
+            if (droppedExamples.length < 5) {
+              const noteNames = ['?', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C'];
+              droppedExamples.push(`${noteNames[cell.note] || '?'}${cell.octave} (ord=${orderPos} ch=${ch} row=${row})`);
+            }
+          }
           rowCells.push(converted);
         } else {
+          if (row === 0 && orderPos === 0) {
+            // Log first row lookup failures
+            totalMissedLookups++;
+            if (totalMissedLookups <= 5) {
+              console.log(`[FurnaceParser] Pattern lookup MISS: key="${key}" patternExists=${module.patterns.has(key)}`);
+            }
+          }
           rowCells.push({
             note: 0,
             instrument: 0,
@@ -2194,6 +2435,12 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     pat.some(row => row.some(cell => cell.note > 0 || cell.instrument > 0 || cell.effectType > 0))
   );
   console.log(`[FurnaceParser] Converted ${patterns.length} patterns (by order position), ${nonEmptyPatterns.length} have data`);
+  console.log(`[FurnaceParser] Note stats: ${totalRawNotes} raw notes → ${totalConvertedNotes} survived, ${totalDroppedNotes} dropped (octave too low), ${totalEffects} effect cells`);
+  if (droppedExamples.length > 0) {
+    console.log(`[FurnaceParser] Dropped note examples:`, droppedExamples);
+  }
+  // Log all pattern keys for debugging
+  console.log(`[FurnaceParser] Pattern map keys:`, [...module.patterns.keys()].slice(0, 30));
 
   return {
     instruments,

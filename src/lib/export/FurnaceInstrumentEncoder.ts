@@ -106,9 +106,26 @@ function boolToU8(val: boolean | number | undefined): number {
 }
 
 /**
+ * Map our internal chipType IDs to Furnace DivInstrumentType values.
+ * The WASM decoder expects DivInstrumentType in the binary header byte [3].
+ * Our internal chipType values (from getDefaultFurnaceConfig) don't always
+ * match DivInstrumentType — e.g. SID_6581=45, SID_8580=46 but DIV_INS_C64=3.
+ */
+function resolveInsType(config: FurnaceConfig): number {
+  // If config has chip-specific data, use the corresponding DivInstrumentType
+  if (config.c64) return DIV_INS_C64;       // 3
+  if (config.gb) return DIV_INS_GB;          // 2
+  if (config.n163) return DIV_INS_N163;      // 17
+  if (config.fds) return DIV_INS_FDS;        // 15
+  if (config.snes) return DIV_INS_SNES;      // 29
+  if (config.esfm) return DIV_INS_ESFM;      // 55
+  // Fall back to chipType as-is (works for FM types where values coincide)
+  return config.chipType;
+}
+
+/**
  * Encode a complete Furnace instrument to binary format
  *
- * chipType in FurnaceConfig is already DivInstrumentType — no remapping needed.
  * Reference: furnace-wasm/common/FurnaceDispatchWrapper.cpp:3631
  */
 export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'Instrument'): Uint8Array {
@@ -121,8 +138,9 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   // Version
   writer.writeUint8(1);
 
-  // Instrument type — chipType IS the DivInstrumentType already
-  writer.writeUint8(config.chipType);
+  // Instrument type — resolve to DivInstrumentType for WASM decoder
+  const insType = resolveInsType(config);
+  writer.writeUint8(insType);
 
   // Reserve space for header offsets (will patch later)
   const totalSizePos = writer.getPosition();
@@ -240,7 +258,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   // Reference: FurnaceDispatchWrapper.cpp:3732-3809
   let chipOffset = 0;
 
-  if (config.chipType === DIV_INS_GB && config.gb) {
+  if (insType === DIV_INS_GB && config.gb) {
     chipOffset = writer.getPosition();
     const gb = config.gb;
     writer.writeUint8(gb.envVol || 0);
@@ -260,7 +278,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     }
   }
 
-  if (config.chipType === DIV_INS_C64 && config.c64) {
+  if (insType === DIV_INS_C64 && config.c64) {
     chipOffset = writer.getPosition();
     const c64 = config.c64;
     // Byte 0: waveform flags
@@ -287,6 +305,8 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     if (filterIsAbs) filterFlags |= 8;
     const noTest = c64.noTest ?? false;
     if (noTest) filterFlags |= 16;
+    const resetDuty = c64.resetDuty ?? false;
+    if (resetDuty) filterFlags |= 32;
     writer.writeUint8(filterFlags);
     writer.writeUint8(c64.filterResonance ?? c64.filterRes ?? 0);
     writer.writeUint16(c64.filterCutoff ?? 0);
@@ -299,7 +319,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     writer.writeUint8(filterTypeFlags);
   }
 
-  if (config.chipType === DIV_INS_N163 && config.n163) {
+  if (insType === DIV_INS_N163 && config.n163) {
     chipOffset = writer.getPosition();
     const n163 = config.n163;
     writer.writeUint32(n163.wave || 0);
@@ -309,7 +329,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     writer.writeUint8(n163.perChPos ? 1 : 0);
   }
 
-  if (config.chipType === DIV_INS_FDS && config.fds) {
+  if (insType === DIV_INS_FDS && config.fds) {
     chipOffset = writer.getPosition();
     const fds = config.fds;
     writer.writeUint32(fds.modSpeed || 0);
@@ -322,7 +342,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     }
   }
 
-  if (config.chipType === DIV_INS_SNES && config.snes) {
+  if (insType === DIV_INS_SNES && config.snes) {
     chipOffset = writer.getPosition();
     const snes = config.snes;
     writer.writeUint8(snes.useEnv ? 1 : 0);

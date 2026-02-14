@@ -1603,6 +1603,7 @@ export interface FurnaceC64Config {
   dutyIsAbs?: boolean;   // Duty is absolute
   filterIsAbs?: boolean; // Filter cutoff is absolute
   noTest?: boolean;      // Disable test bit
+  resetDuty?: boolean;   // Reset duty cycle on note-on
 }
 
 // Amiga (DIV_INS_AMIGA)
@@ -2586,6 +2587,8 @@ export interface SamConfig {
   throat: number;   // 0-255 (default 128)
   singmode: boolean;
   phonetic: boolean;
+  vowelSequence?: string[];     // e.g. ['IY', 'AH', 'OO'] — per-note vowel cycling
+  vowelLoopSingle?: boolean;    // true = sustain/loop vowel while note held
 }
 
 export const DEFAULT_SAM: SamConfig = {
@@ -2594,8 +2597,10 @@ export const DEFAULT_SAM: SamConfig = {
   speed: 72,
   mouth: 128,
   throat: 128,
-  singmode: false,
+  singmode: true,
   phonetic: false,
+  vowelSequence: [],
+  vowelLoopSingle: true,
 };
 
 /**
@@ -2680,6 +2685,8 @@ export interface V2SpeechConfig {
   pitch: number;
   formantShift: number;
   singMode: boolean; // Enables MIDI note-to-pitch tracking
+  vowelSequence?: string[];     // e.g. ['IY', 'AH', 'OO'] — per-note vowel cycling
+  vowelLoopSingle?: boolean;    // true = sustain/loop vowel while note held
 }
 
 export const DEFAULT_V2_SPEECH: V2SpeechConfig = {
@@ -2688,6 +2695,8 @@ export const DEFAULT_V2_SPEECH: V2SpeechConfig = {
   pitch: 64,
   formantShift: 64,
   singMode: true,
+  vowelSequence: [],
+  vowelLoopSingle: true,
 };
 
 export const DEFAULT_V2: V2Config = {

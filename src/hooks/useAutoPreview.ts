@@ -20,11 +20,12 @@ const SKIP_PREVIEW_TYPES: Set<SynthType> = new Set([
   'ChiptuneModule' as SynthType,
   'Player',
   // MAME speech synths - preview note just produces a tone, not useful
-  'MAMETMS5220' as SynthType,
   'MAMESP0250' as SynthType,
   'MAMEMEA8000' as SynthType,
   'MAMEVotrax' as SynthType,
   'MAMEUPD931' as SynthType,
+  // MAME TMS5220 - knob preview plays MIDI tones, not speech
+  'MAMETMS5220' as SynthType,
   // ROM-based drum machines
   'MAMETR707' as SynthType,
 ]);

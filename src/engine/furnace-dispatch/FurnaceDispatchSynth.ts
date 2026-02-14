@@ -61,6 +61,13 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   [FurnaceDispatchPlatform.GB]: 15,
   [FurnaceDispatchPlatform.SMS]: 15,
   [FurnaceDispatchPlatform.NES]: 15,
+  [FurnaceDispatchPlatform.C64_6581]: 15,
+  [FurnaceDispatchPlatform.C64_8580]: 15,
+  [FurnaceDispatchPlatform.AY]: 15,
+  [FurnaceDispatchPlatform.AY8930]: 15,
+  [FurnaceDispatchPlatform.SAA1099]: 15,
+  [FurnaceDispatchPlatform.SCC]: 15,
+  [FurnaceDispatchPlatform.SCC_PLUS]: 15,
   [FurnaceDispatchPlatform.PCE]: 31,       // 5-bit volume
   [FurnaceDispatchPlatform.VIC20]: 15,
   [FurnaceDispatchPlatform.TIA]: 15,
@@ -89,7 +96,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private _disposed = false;
   /** Exposed as public for test runner init-state detection (matches _isReady pattern) */
   public _isReady = false;
-  private _readyPromise: Promise<void>;
+  private _isReadyPromise!: Promise<void>;
   private _resolveReady!: () => void;
   private currentChannel = 0;
   private platformType: number;
@@ -133,7 +140,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   public async uploadInstrumentFromConfig(config: Record<string, unknown>, name: string): Promise<void> {
     await this.ensureInitialized();
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
-    
+
     // Encode from config using our encoder
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
     // the 0xF0 0xB1 format with proper offsets. Our encoder handles this conversion.
@@ -141,6 +148,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const binaryData = updateFurnaceInstrument(config as unknown as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
     this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
+
+    // Force insChanged on all channels so the new instrument data (waveform,
+    // ADSR, filter, etc.) gets applied on the next note-on. Without this,
+    // the Furnace dispatch sees the same instrument index and skips copying
+    // the updated params to channel state — making all presets sound identical.
+    const numCh = this.engine.getChannelCount(this.platformType) || 3;
+    for (let ch = 0; ch < numCh; ch++) {
+      this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
+    }
   }
 
   /**
@@ -303,18 +319,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
 
-      // === Sample-based chips ===
+      // === Sample-based chips (signed 8-bit PCM) ===
       case P.AMIGA:
       case P.SEGAPCM:
       case P.SEGAPCM_COMPAT:
-      case P.RF5C68:
       case P.K007232:
       case P.K053260:
-      case P.GA20:
       case P.GBA_DMA:
       case P.GBA_MINMOD:
       case P.NDS:
-      case P.MSM6295:
       case P.YMZ280B:
       case P.QSOUND:
       case P.MULTIPCM:
@@ -322,7 +335,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         this.engine.renderSamples(pt);
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
+      // === RF5C68 and GA20: standard signed 8-bit (WASM renderSamples converts) ===
+      case P.RF5C68:
+      case P.GA20:
+        this.loadTestSample8bit();
+        this.engine.renderSamples(pt);
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        break;
+      // === VOX ADPCM chips ===
       case P.MSM6258:
+      case P.MSM6295:
         this.loadTestSampleVOX();
         this.engine.renderSamples(pt);
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
@@ -621,8 +643,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     }
 
     const pt = this.platformType;
-    // Set the instrument for this channel BEFORE playing the note
-    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt);
+    // Set the instrument for this channel BEFORE playing the note.
+    // Use force=true so insChanged is always set — the instrument data
+    // in slot 0 may have been replaced by a preset load, and without
+    // forcing, the dispatch skips copying params when the index matches.
+    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true);
 
     // Set volume based on velocity
     const maxVol = getMaxVolume(pt);

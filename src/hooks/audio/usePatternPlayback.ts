@@ -7,7 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAutomationStore, useAudioStore } from '@stores';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -39,10 +39,16 @@ export const usePatternPlayback = () => {
     engineRef.current.setBPM(bpm);
   }, [bpm]);
 
-  // Sync master effects
+  // Sync master effects — only rebuild when the list structure changes
+  // (add/remove/enable/disable/reorder), NOT on parameter or wet changes.
+  // Parameter updates are handled by updateMasterEffectParams in the store.
+  const masterEffectsKey = useMemo(
+    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}`).join('|'),
+    [masterEffects]
+  );
   useEffect(() => {
     engineRef.current.rebuildMasterEffects(masterEffects);
-  }, [masterEffects]);
+  }, [masterEffectsKey]);
 
   // Sync channel settings when pattern changes
   useEffect(() => {

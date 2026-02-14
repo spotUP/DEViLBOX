@@ -14,6 +14,7 @@ export class SpeechSequencer<T> {
   private _currentIndex = 0;
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _speaking = false;
+  private _loop = false;
   private _onFrame: ((data: T) => void) | null = null;
   private _onDone: (() => void) | null = null;
 
@@ -23,10 +24,11 @@ export class SpeechSequencer<T> {
   }
 
   /** Queue and start speaking a sequence of frames */
-  speak(frames: SpeechFrame<T>[]): void {
+  speak(frames: SpeechFrame<T>[], loop = false): void {
     this.stop();
     this._queue = frames;
     this._currentIndex = 0;
+    this._loop = loop;
     this._speaking = true;
     this._playNext();
   }
@@ -49,9 +51,13 @@ export class SpeechSequencer<T> {
 
   private _playNext(): void {
     if (this._currentIndex >= this._queue.length) {
-      this._speaking = false;
-      this._onDone?.();
-      return;
+      if (this._loop && this._queue.length > 0) {
+        this._currentIndex = 0;
+      } else {
+        this._speaking = false;
+        this._onDone?.();
+        return;
+      }
     }
 
     const frame = this._queue[this._currentIndex];

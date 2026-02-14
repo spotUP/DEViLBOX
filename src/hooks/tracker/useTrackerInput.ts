@@ -9,6 +9,7 @@ import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores'
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { stringNoteToXM } from '@/lib/xmConversions';
 
 // Track currently held notes to prevent retriggering and enable proper release
@@ -864,6 +865,8 @@ export const useTrackerInput = () => {
 
         // FT2 behavior: If playing, stop. If not playing, toggle edit mode.
         if (isPlaying) {
+          // Stop the replayer IMMEDIATELY (don't wait for React effect cycle)
+          getTrackerReplayer().stop();
           stop();
           // Kill all active notes to prevent stuck/jammed synths
           getToneEngine().releaseAll();

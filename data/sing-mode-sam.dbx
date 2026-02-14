@@ -1,0 +1,638 @@
+{
+  "format": "devilbox-song",
+  "version": "1.0.0",
+  "metadata": {
+    "id": "demo-sing-sam",
+    "name": "Star Spangled Banner - SAM",
+    "author": "DEViLBOX",
+    "description": "The Star Spangled Banner sung by SAM (Software Automatic Mouth) in sing mode",
+    "createdAt": "2026-02-14T00:00:00.000Z",
+    "modifiedAt": "2026-02-14T00:00:00.000Z",
+    "version": "1.0.0"
+  },
+  "bpm": 120,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "SAM Singing Voice",
+      "type": "synth",
+      "synthType": "Sam",
+      "volume": -6,
+      "pan": 0,
+      "monophonic": true,
+      "effects": [],
+      "sam": {
+        "text": "OH SAY CAN YOU SEE BY THE DAWNS EARLY LIGHT WHAT SO PROUDLY WE HAILED AT THE TWILIGHTS LAST GLEAMING",
+        "speed": 72,
+        "pitch": 64,
+        "mouth": 128,
+        "throat": 128,
+        "singmode": true,
+        "phonetic": false,
+        "vowelSequence": ["OH","AE","AE","UW","IY","AH","AH","AO","RR","IY","AH","AA","OH","AO","IY","IY","AE","AE","AH","IH","AH","AE","IY","IH"],
+        "vowelLoopSingle": true
+      }
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern-1",
+      "name": "Star Spangled Banner",
+      "length": 64,
+      "channels": [
+        {
+          "id": "ch-1",
+          "name": "SAM Sing",
+          "rows": [
+            {
+              "note": 55,
+              "instrument": 1,
+              "volume": 64,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 52,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 48,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 52,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 55,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 60,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 59,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 57,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 55,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 52,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 55,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 57,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 57,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 57,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 60,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 64,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 64,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 62,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 60,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 59,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 57,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 59,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 60,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 60,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            },
+            {
+              "note": 0,
+              "instrument": 0,
+              "volume": 0,
+              "effTyp": 0,
+              "eff": 0,
+              "effTyp2": 0,
+              "eff2": 0
+            }
+          ],
+          "muted": false,
+          "solo": false,
+          "collapsed": false,
+          "volume": 100,
+          "pan": 0,
+          "instrumentId": 1,
+          "color": null
+        }
+      ]
+    }
+  ],
+  "sequence": [
+    "pattern-1"
+  ]
+}

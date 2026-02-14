@@ -426,10 +426,16 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
 
-    // Stop all channels
-    for (const ch of this.channels) {
-      this.stopChannel(ch);
+    // Stop all channels (release synth notes + stop sample players)
+    for (let i = 0; i < this.channels.length; i++) {
+      this.stopChannel(this.channels[i], i);
     }
+
+    // Safety net: release ALL active notes in the engine to prevent any hanging voices
+    try {
+      const engine = getToneEngine();
+      engine.releaseAll();
+    } catch { /* ignored */ }
 
     // Reset position
     this.songPos = 0;
@@ -866,8 +872,7 @@ export class TrackerReplayer {
         );
       }
       this.releaseMacros(ch);
-      this.stopChannel(ch);
-      ch.lastPlayedNoteName = null; // Clear for next note sequence
+      this.stopChannel(ch, chIndex);
     }
 
     // Handle volume column (XM)
@@ -1673,7 +1678,7 @@ export class TrackerReplayer {
         ch.instrument,
         accent,      // accent: applies to current note
         slideActive, // slide: from PREVIOUS row's slide flag - controls pitch glide!
-        undefined,   // channelIndex (let engine allocate)
+        channelIndex,   // channelIndex: pass tracker channel to chip engine
         ch.period,   // period for MOD playback
         undefined,   // sampleOffset
         0,           // nnaAction
@@ -1772,7 +1777,7 @@ export class TrackerReplayer {
     }
   }
 
-  private stopChannel(ch: ChannelState): void {
+  private stopChannel(ch: ChannelState, channelIndex?: number): void {
     // Stop all pooled players (no disposal - they're reused)
     for (const player of ch.playerPool) {
       try {
@@ -1780,6 +1785,14 @@ export class TrackerReplayer {
       } catch { /* ignored */ }
     }
     ch.player = null;
+
+    // Release any active synth notes on this channel
+    if (ch.instrument && ch.instrument.synthType && ch.instrument.synthType !== 'Sampler' && ch.lastPlayedNoteName) {
+      try {
+        const engine = getToneEngine();
+        engine.triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, 0, ch.instrument, channelIndex);
+      } catch { /* ignored */ }
+    }
     ch.lastPlayedNoteName = null; // Clear for next note sequence
   }
 
@@ -1976,9 +1989,9 @@ export class TrackerReplayer {
     }
     this.playing = false;
 
-    // Stop all channels
-    for (const ch of this.channels) {
-      this.stopChannel(ch);
+    // Stop all channels (release synth notes + stop sample players)
+    for (let i = 0; i < this.channels.length; i++) {
+      this.stopChannel(this.channels[i], i);
     }
 
     // Clear state queue

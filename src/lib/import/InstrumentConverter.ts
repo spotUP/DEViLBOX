@@ -179,6 +179,105 @@ function convertFurnaceInstrument(
     })),
   };
 
+  // Copy chip-specific data from parser output to FurnaceConfig
+  // The parser stores these in chipConfig keyed by chip name
+  if (furnaceData.chipConfig) {
+    const cc = furnaceData.chipConfig;
+
+    // Game Boy (DIV_INS_GB)
+    if (cc.gb) {
+      const gb = cc.gb as { envVol: number; envDir: number; envLen: number; soundLen: number;
+        softEnv?: boolean; alwaysInit?: boolean; hwSeqLen?: number;
+        hwSeq?: Array<{ cmd: number; data: number }> };
+      furnaceConfig.gb = {
+        envVol: gb.envVol,
+        envDir: gb.envDir,
+        envLen: gb.envLen,
+        soundLen: gb.soundLen,
+        softEnv: gb.softEnv,
+        alwaysInit: gb.alwaysInit,
+        hwSeqLen: gb.hwSeqLen,
+        hwSeq: gb.hwSeq,
+      };
+    }
+
+    // C64 SID (DIV_INS_C64)
+    if (cc.c64) {
+      const c64 = cc.c64 as { triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
+        toFilter: boolean; initFilter: boolean; dutyIsAbs: boolean;
+        lp: boolean; bp: boolean; hp: boolean; ch3off: boolean;
+        filterIsAbs: boolean; noTest: boolean; ringMod: boolean; oscSync: boolean;
+        resetDuty: boolean; a: number; d: number; s: number; r: number;
+        duty: number; cut: number; res: number };
+      furnaceConfig.c64 = {
+        triOn: c64.triOn,
+        sawOn: c64.sawOn,
+        pulseOn: c64.pulseOn,
+        noiseOn: c64.noiseOn,
+        a: c64.a,
+        d: c64.d,
+        s: c64.s,
+        r: c64.r,
+        duty: c64.duty,
+        ringMod: c64.ringMod,
+        oscSync: c64.oscSync,
+        toFilter: c64.toFilter,
+        initFilter: c64.initFilter,
+        filterResonance: c64.res,
+        filterCutoff: c64.cut,
+        filterLP: c64.lp,
+        filterBP: c64.bp,
+        filterHP: c64.hp,
+        filterCh3Off: c64.ch3off,
+        dutyIsAbs: c64.dutyIsAbs,
+        filterIsAbs: c64.filterIsAbs,
+        noTest: c64.noTest,
+        resetDuty: c64.resetDuty,
+      };
+    }
+
+    // SNES (DIV_INS_SNES)
+    if (cc.snes) {
+      const snes = cc.snes as { a: number; d: number; s: number; r: number;
+        useEnv: boolean; sus: number; gainMode: number; gain: number; d2: number };
+      furnaceConfig.snes = {
+        useEnv: snes.useEnv,
+        gainMode: snes.gainMode,
+        gain: snes.gain,
+        a: snes.a,
+        d: snes.d,
+        s: snes.s,
+        r: snes.r,
+        d2: snes.d2,
+        sus: snes.sus,
+      };
+    }
+
+    // Namco 163 (DIV_INS_N163)
+    if (cc.n163) {
+      const n163 = cc.n163 as { wave: number; wavePos: number; waveLen: number; waveMode: number };
+      furnaceConfig.n163 = {
+        wave: n163.wave,
+        wavePos: n163.wavePos,
+        waveLen: n163.waveLen,
+        waveMode: n163.waveMode,
+        perChPos: false,
+      };
+    }
+
+    // FDS (DIV_INS_FDS)
+    if (cc.fds) {
+      const fds = cc.fds as { modSpeed: number; modDepth: number;
+        initModTableWithFirstWave: boolean; modTable: number[] };
+      furnaceConfig.fds = {
+        modSpeed: fds.modSpeed,
+        modDepth: fds.modDepth,
+        modTable: [...fds.modTable],
+        initModTableWithFirstWave: fds.initModTableWithFirstWave,
+      };
+    }
+  }
+
   // Create the instrument config
   const instrument: InstrumentConfig = {
     id: instrumentId,
@@ -201,7 +300,8 @@ function convertFurnaceInstrument(
     parameters: {},
   };
 
-  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
+  const chipKeys = furnaceData.chipConfig ? Object.keys(furnaceData.chipConfig).join(',') : 'none';
+  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, chipData=${chipKeys}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
 
   return instrument;
 }
@@ -310,7 +410,9 @@ function convertSampleToInstrument(
  */
 function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuffer; blobUrl: string } {
   const sampleRate = sample.sampleRate || 8363; // Default to Amiga C-2 rate
-  const length = sample.length;
+  // Guard against zero-length samples (empty Furnace sample slots):
+  // decodeAudioData() rejects WAV files with 0 data bytes, so use at least 1 sample of silence
+  const length = Math.max(1, sample.length);
 
   // CRITICAL FIX: Don't use OfflineAudioContext - browsers clamp sample rate to 44100 Hz minimum
   // Instead, create WAV file directly with correct sample rate header

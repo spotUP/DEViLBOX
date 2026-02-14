@@ -180,6 +180,7 @@ enum TMS5220ParamId {
     PARAM_K8_INDEX = 14,
     PARAM_K9_INDEX = 15,
     PARAM_K10_INDEX = 16,
+    PARAM_SPEECH_PITCH_OFFSET = 17,  // Signed offset for frame-buffer speech pitch (sing mode)
 };
 
 // ============================================================================
@@ -272,6 +273,14 @@ public:
         pitchBendFactor_ = 1.0f;
         speechPhaseAcc_ = 0.0;
         lastSpeechSample_ = 0;
+
+        // Reset parameter overrides (no overrides by default)
+        for (int i = 0; i < NUM_K; i++) {
+            param_k_idx_[i] = -1;  // -1 = use preset value
+        }
+        param_energy_idx_ = -1;
+        param_pitch_idx_ = -1;
+        param_noise_override_ = -1;
 
         for (int i = 0; i < NUM_VOICES; i++) voices_[i].reset();
         resetSpeechState();
@@ -438,6 +447,20 @@ public:
         v.noise_mode = preset.unvoiced;
         setKFromIndices(v, preset.k_indices);
 
+        // Apply parameter overrides from knobs (stored by setParameter)
+        for (int k = 0; k < NUM_K; k++) {
+            if (param_k_idx_[k] >= 0) {
+                int maxVal = (1 << KBITS[k]) - 1;
+                v.target_k[k] = ktable[k][std::clamp(param_k_idx_[k], 0, maxVal)];
+            }
+        }
+        if (param_energy_idx_ >= 0) {
+            v.target_energy = energy_table[std::clamp(param_energy_idx_, 0, 15)];
+        }
+        if (param_noise_override_ >= 0) {
+            v.noise_mode = (param_noise_override_ > 0);
+        }
+
         v.current_energy = 0;
         v.current_pitch = v.target_pitch;
         memcpy(v.current_k, v.target_k, sizeof(v.current_k));
@@ -499,45 +522,67 @@ public:
         switch (paramId) {
             case PARAM_VOLUME: volume_ = std::clamp(value, 0.0f, 1.0f); break;
             case PARAM_CHIRP_TYPE: /* chirp type not used for speech mode */ break;
-            case PARAM_K1_INDEX:
+            case PARAM_K1_INDEX: {
+                int idx = std::clamp((int)value, 0, 31);
+                param_k_idx_[0] = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_k[0] = ktable[0][std::clamp((int)value, 0, 31)];
+                        voices_[i].target_k[0] = ktable[0][idx];
                 break;
-            case PARAM_K2_INDEX:
+            }
+            case PARAM_K2_INDEX: {
+                int idx = std::clamp((int)value, 0, 31);
+                param_k_idx_[1] = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_k[1] = ktable[1][std::clamp((int)value, 0, 31)];
+                        voices_[i].target_k[1] = ktable[1][idx];
                 break;
-            case PARAM_K3_INDEX:
+            }
+            case PARAM_K3_INDEX: {
+                int idx = std::clamp((int)value, 0, 15);
+                param_k_idx_[2] = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_k[2] = ktable[2][std::clamp((int)value, 0, 15)];
+                        voices_[i].target_k[2] = ktable[2][idx];
                 break;
-            case PARAM_ENERGY_INDEX:
+            }
+            case PARAM_ENERGY_INDEX: {
+                int idx = std::clamp((int)value, 0, 15);
+                param_energy_idx_ = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_energy = energy_table[std::clamp((int)value, 0, 15)];
+                        voices_[i].target_energy = energy_table[idx];
                 break;
-            case PARAM_PITCH_INDEX:
+            }
+            case PARAM_PITCH_INDEX: {
+                int idx = std::clamp((int)value, 0, 31);
+                param_pitch_idx_ = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_pitch = pitch_table[std::clamp((int)value, 0, 31)];
+                        voices_[i].target_pitch = pitch_table[idx];
                 break;
-            case PARAM_NOISE_MODE:
+            }
+            case PARAM_NOISE_MODE: {
+                param_noise_override_ = (value > 0.5f) ? 1 : 0;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active) voices_[i].noise_mode = (value > 0.5f);
                 break;
+            }
             case PARAM_STEREO_WIDTH: stereoWidth_ = std::clamp(value, 0.0f, 1.0f); break;
             case PARAM_BRIGHTNESS: brightness_ = std::clamp(value, 0.0f, 2.0f); break;
+            case PARAM_SPEECH_PITCH_OFFSET:
+                speech_pitch_offset_target_ = (int)value;  // signed: -31 to +31
+                break;
             case PARAM_K4_INDEX: case PARAM_K5_INDEX: case PARAM_K6_INDEX:
             case PARAM_K7_INDEX: case PARAM_K8_INDEX: case PARAM_K9_INDEX:
             case PARAM_K10_INDEX: {
                 int kIdx = paramId - PARAM_K4_INDEX + 3; // K4=3, K5=4, ..., K10=9
                 int maxVal = (1 << KBITS[kIdx]) - 1;
+                int idx = std::clamp((int)value, 0, maxVal);
+                param_k_idx_[kIdx] = idx;
                 for (int i = 0; i < NUM_VOICES; i++)
                     if (voices_[i].active)
-                        voices_[i].target_k[kIdx] = ktable[kIdx][std::clamp((int)value, 0, maxVal)];
+                        voices_[i].target_k[kIdx] = ktable[kIdx][idx];
                 break;
             }
         }
@@ -563,6 +608,12 @@ public:
 
     void programChange(int program) {
         currentPreset_ = std::clamp(program, 0, 7);
+        // Clear parameter overrides — preset takes full control
+        for (int i = 0; i < NUM_K; i++) param_k_idx_[i] = -1;
+        param_energy_idx_ = -1;
+        param_pitch_idx_ = -1;
+        param_noise_override_ = -1;
+
         const PhonemePreset& preset = phoneme_presets[currentPreset_];
         for (int i = 0; i < NUM_VOICES; i++) {
             if (voices_[i].active) {
@@ -745,6 +796,19 @@ private:
             return;
 
         new_frame_pitch_idx_ = std::min((int)frame[1], 31);
+        // Sing mode: slide pitch smoothly toward target offset (~30% per frame = ~75ms glide)
+        if (speech_pitch_offset_target_ != (int)speech_pitch_offset_current_) {
+            float diff = (float)speech_pitch_offset_target_ - speech_pitch_offset_current_;
+            speech_pitch_offset_current_ += diff * 0.3f;
+            // Snap when close enough
+            if (std::abs(diff) < 0.5f)
+                speech_pitch_offset_current_ = (float)speech_pitch_offset_target_;
+        }
+        int pitchOff = (int)std::round(speech_pitch_offset_current_);
+        if (pitchOff != 0 && new_frame_pitch_idx_ > 0) {
+            new_frame_pitch_idx_ = std::clamp(
+                new_frame_pitch_idx_ + pitchOff, 1, 31);
+        }
         uv_zpar_ = (new_frame_pitch_idx_ == 0);
 
         // Always read all K indices from buffer (no repeat frames)
@@ -1138,6 +1202,16 @@ private:
     float brightness_ = 1.0f;
     int currentPreset_ = 0;
     float pitchBendFactor_ = 1.0f;
+
+    // Parameter overrides from knobs (-1 = use preset default)
+    int param_k_idx_[NUM_K] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+    int param_energy_idx_ = -1;
+    int param_pitch_idx_ = -1;
+    int param_noise_override_ = -1;  // -1=preset, 0=voiced, 1=noise
+
+    // Sing mode: runtime pitch offset applied during frame-buffer speech
+    int speech_pitch_offset_target_ = 0;    // Target offset (set by MIDI note)
+    float speech_pitch_offset_current_ = 0; // Smoothed offset (slides toward target)
 };
 
 // ============================================================================

@@ -26,7 +26,7 @@ export interface SpringReverbOptions {
 /** Extract the underlying native AudioNode from a Tone.js wrapper */
 function getRawNode(node: Tone.Gain): AudioNode {
   const n = node as unknown as Record<string, AudioNode | undefined>;
-  return n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
+  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
 }
 
 export class SpringReverbEffect extends Tone.ToneAudioNode {
@@ -188,6 +188,14 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
       const rawWet = getRawNode(this.wetGain);
       rawInput.connect(this.fallbackNode);
       this.fallbackNode.connect(rawWet);
+      // wetGain → output already connected via Tone.js in constructor
+
+      // Keepalive: ensure ScriptProcessorNode is processed
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.fallbackNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+
       this.usingFallback = true;
     } catch (err) {
       console.warn('[SpringReverb] Fallback init failed:', err);

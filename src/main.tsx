@@ -25,6 +25,13 @@ useSettingsStore.subscribe(
 
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
+  // Suppress Tone.js PolySynth disposal errors - these happen when scheduled events
+  // (like note releases) fire after the synth has been disposed. Not critical.
+  if (event.error?.message?.includes('already disposed')) {
+    event.preventDefault();
+    return;
+  }
+
   console.error('[Global] Uncaught error:', event.error);
   // In production, send to error reporting service
 });

@@ -17,6 +17,7 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { ChevronDown, ChevronUp, FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -198,7 +199,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
   const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
-  const { curves } = useAutomationStore();
+  const { curves, reset: resetAutomation } = useAutomationStore();
   const addTab = useTabsStore((state) => state.addTab);
 
   const engine = getToneEngine();
@@ -312,6 +313,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     // Always clean up before import to prevent stale state from previous imports
     if (isPlaying) stop();
     engine.releaseAll();
+
+    // Reset all stores to prevent stale data from previous imports
+    resetAutomation();
+    resetTransport();
+    resetInstruments();
+
+    // Dispose ALL existing engine instruments (not just matching IDs)
+    engine.disposeAllInstruments();
+
     setIsLoading(true);
     try {
       let result;
@@ -530,9 +540,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   const handlePlaySong = async () => {
     // Toggle: if already playing song, stop. Otherwise start song.
-    if (isPlaying && !isLooping) stop();
+    if (isPlaying && !isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
     else {
-      if (isPlaying) stop();
+      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
       setIsLooping(false);
       await engine.init();
       play();
@@ -541,9 +551,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
   const handlePlayPattern = async () => {
     // Toggle: if already playing pattern, stop. Otherwise start pattern.
-    if (isPlaying && isLooping) stop();
+    if (isPlaying && isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
     else {
-      if (isPlaying) stop();
+      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
       setIsLooping(true);
       await engine.init();
       play();
