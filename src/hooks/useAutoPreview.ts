@@ -37,50 +37,10 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerPreview = useCallback(() => {
-    // Skip for non-tonal types
-    if (SKIP_PREVIEW_TYPES.has(instrument.synthType)) return;
-
-    const engine = getToneEngine();
-
-    // Skip preview if transport is playing - the actual playing notes will demonstrate the changes
-    if (engine.isPlaying()) return;
-
-    // Clear existing debounce timer
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-
-    // Debounce: only trigger preview after user stops adjusting for PREVIEW_DEBOUNCE_MS
-    debounceTimerRef.current = setTimeout(() => {
-      // Reset the release timer
-      if (releaseTimerRef.current !== null) {
-        clearTimeout(releaseTimerRef.current);
-        releaseTimerRef.current = null;
-      }
-
-      // Attack on first call (or if previous note already released)
-      if (!isPlayingRef.current) {
-        isPlayingRef.current = true;
-        engine.triggerPolyNoteAttack(instrumentId, PREVIEW_NOTE, PREVIEW_VELOCITY, instrument);
-      }
-
-      // Schedule release after idle period
-      releaseTimerRef.current = setTimeout(() => {
-        if (isPlayingRef.current) {
-          isPlayingRef.current = false;
-          // Use fresh config from store — parameters may have changed since attack
-          const freshConfig = useInstrumentStore.getState().getInstrument(instrumentId);
-          if (freshConfig) {
-            engine.triggerPolyNoteRelease(instrumentId, PREVIEW_NOTE, freshConfig);
-          }
-        }
-        releaseTimerRef.current = null;
-      }, RELEASE_DELAY_MS);
-
-      debounceTimerRef.current = null;
-    }, PREVIEW_DEBOUNCE_MS);
-  }, [instrumentId, instrument]);
+    // Auto-preview disabled - user will trigger notes manually
+    // Parameters still update live on manually triggered notes and during transport playback
+    return;
+  }, []);
 
   // Cleanup on unmount: release any active preview note immediately
   useEffect(() => {
