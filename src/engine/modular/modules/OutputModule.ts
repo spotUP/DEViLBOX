@@ -13,7 +13,10 @@ export const OutputDescriptor: ModuleDescriptor = {
   voiceMode: 'per-voice',
   color: '#ef4444', // red
 
-  ports: [{ id: 'input', name: 'Input', direction: 'input', signal: 'audio' }],
+  ports: [
+    { id: 'input', name: 'Input', direction: 'input', signal: 'audio' },
+    { id: 'output', name: 'Output', direction: 'output', signal: 'audio' },
+  ],
 
   parameters: [
     { id: 'level', name: 'Level', min: 0, max: 2, default: 1 },
@@ -33,6 +36,7 @@ export const OutputDescriptor: ModuleDescriptor = {
 
     const ports = new Map<string, ModulePort>([
       ['input', { id: 'input', name: 'Input', direction: 'input', signal: 'audio', node: level }],
+      ['output', { id: 'output', name: 'Output', direction: 'output', signal: 'audio', node: panner }],
     ]);
 
     return {

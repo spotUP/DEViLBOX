@@ -1,12 +1,13 @@
 /**
- * PatchCable - SVG bezier cable rendering
+ * PatchCable - SVG cable rendering
  *
- * Renders a smooth bezier curve between two ports.
- * Uses cubic bezier formula from openDAW reference.
+ * Renders smart orthogonal routes between ports with rounded corners.
+ * Routes avoid UI elements by using horizontal/vertical segments.
  */
 
 import React from 'react';
 import type { SignalType } from '../../../../../types/modular';
+import { calculateCablePath } from '../utils/cableRouting';
 
 interface PatchCableProps {
   x1: number;
@@ -17,6 +18,8 @@ interface PatchCableProps {
   signal?: SignalType;
   isSelected?: boolean;
   onClick?: () => void;
+  useOrthogonal?: boolean; // Use orthogonal routing (default: true)
+  laneOffset?: number; // Horizontal lane offset for cable spreading
 }
 
 const SIGNAL_COLORS: Record<SignalType, string> = {
@@ -35,17 +38,11 @@ export const PatchCable: React.FC<PatchCableProps> = ({
   signal = 'audio',
   isSelected = false,
   onClick,
+  useOrthogonal = true,
+  laneOffset = 0,
 }) => {
-  // Cubic bezier control points (openDAW formula)
-  const dx = x2 - x1;
-  const controlPointOffset = Math.min(Math.abs(dx) * 0.5, 100);
-
-  const c1x = x1 + controlPointOffset;
-  const c1y = y1;
-  const c2x = x2 - controlPointOffset;
-  const c2y = y2;
-
-  const pathData = `M ${x1},${y1} C ${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+  // Calculate cable path (orthogonal or bezier) with lane offset for spreading
+  const pathData = calculateCablePath(x1, y1, x2, y2, useOrthogonal, 8, laneOffset);
 
   const strokeColor = color || SIGNAL_COLORS[signal];
 
@@ -64,7 +61,7 @@ export const PatchCable: React.FC<PatchCableProps> = ({
       <path
         d={pathData}
         stroke={strokeColor}
-        strokeWidth={isSelected ? '3' : '2'}
+        strokeWidth={isSelected ? '4' : '3'}
         fill="none"
         className="transition-all pointer-events-none"
         style={{

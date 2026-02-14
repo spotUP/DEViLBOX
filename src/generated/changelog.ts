@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T17:35:24.276Z
+ * Generated: 2026-02-14T19:23:52.485Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '533';
-export const BUILD_HASH = '89ae711';
+export const BUILD_NUMBER = '543';
+export const BUILD_HASH = '28debe0';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,46 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Prevent preset modal footer from causing horizontal scroll"
+      },
+      {
+        type: 'fix',
+        "description": "Improve preset modal footer visibility and usability"
+      },
+      {
+        type: 'fix',
+        "description": "Increase hamburger menu z-index to be always frontmost"
+      },
+      {
+        type: 'fix',
+        "description": "Mark isConnected param as intentionally unused"
+      },
+      {
+        type: 'fix',
+        "description": "Enable tap and swipe gestures in pattern editor"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused variables in cable routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix piano keyboard - white keys now visible"
+      },
+      {
+        type: 'fix',
+        "description": "Accept nullable ref in usePortPositions hook"
+      },
+      {
+        type: 'feature',
+        "description": "Expand mobile hamburger menu with FT2Toolbar features"
+      },
+      {
+        type: 'fix',
+        "description": "Add Safari-specific MIDI troubleshooting and debug logging"
+      },
       {
         type: 'improvement',
         "description": "Optimize instrument loading and fix unused variable"
@@ -192,52 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add mobile UX infrastructure"
-      }
-    ]
-  },
-  {
-    version: '2026-02-13',
-    date: '2026-02-13',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Remove URL shim that shadowed global URL constructor"
-      },
-      {
-        type: 'fix',
-        "description": "Fix WASM OOM and self-not-defined in AudioWorklet scope"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(tms5220): update C++ docs and rebuild WASM binary with index clamping"
-      },
-      {
-        type: 'fix',
-        "description": "Clamp TMS5220 table indices and clean up FurnaceDispatch naming"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: update project docs, migration, nibbles fixes, and misc improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing parameter handlers and fix async init races"
-      },
-      {
-        type: 'fix',
-        "description": "Redesign master effects modal and fix stale closure bug"
-      },
-      {
-        type: 'fix',
-        "description": "Correct TB-303 defaults and presets from verified reference sources"
-      },
-      {
-        type: 'feature',
-        "description": "Improve TMS5220 speech synth with phoneme mapping and ROM parsing"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove stale DB303/open303 source copies and outdated docs"
       }
     ]
   }

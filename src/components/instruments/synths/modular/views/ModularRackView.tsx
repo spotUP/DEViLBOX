@@ -26,6 +26,7 @@ import { RackStrip } from '../widgets/RackStrip';
 import { PatchCable } from '../widgets/PatchCable';
 import { usePortPositions } from '../hooks/usePortPositions';
 import { useModularState } from '../hooks/useModularState';
+import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 
 interface ModularRackViewProps {
   config: ModularPatchConfig;
@@ -33,7 +34,16 @@ interface ModularRackViewProps {
 }
 
 export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChange }) => {
-  const { positions, registerPort, recalculateAll } = usePortPositions();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const configRef = React.useRef(config);
+
+  // Keep ref in sync with props
+  React.useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  const { positions, registerPort, recalculateAll } = usePortPositions(containerRef);
   const {
     selectedModuleId,
     wiringSource,
@@ -68,7 +78,7 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
         rackSlot: idx,
       }));
 
-      onChange({ ...config, modules: reordered });
+      onChange({ ...configRef.current, modules: reordered });
       recalculateAll();
     }
   };
@@ -99,8 +109,8 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
         };
 
         onChange({
-          ...config,
-          connections: [...config.connections, newConnection],
+          ...configRef.current,
+          connections: [...configRef.current.connections, newConnection],
         });
 
         endWiring();
@@ -110,30 +120,31 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
   );
 
   // Handle module parameter change
+  // Uses configRef to avoid stale state issues with rapid knob changes
   const handleParameterChange = useCallback(
     (moduleId: string, paramId: string, value: number) => {
-      const updatedModules = config.modules.map((m) =>
+      const updatedModules = configRef.current.modules.map((m) =>
         m.id === moduleId
           ? { ...m, parameters: { ...m.parameters, [paramId]: value } }
           : m
       );
 
-      onChange({ ...config, modules: updatedModules });
+      onChange({ ...configRef.current, modules: updatedModules });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Handle module delete
   const handleModuleDelete = useCallback(
     (moduleId: string) => {
-      const updatedModules = config.modules.filter((m) => m.id !== moduleId);
-      const updatedConnections = config.connections.filter(
+      const updatedModules = configRef.current.modules.filter((m) => m.id !== moduleId);
+      const updatedConnections = configRef.current.connections.filter(
         (c) => c.source.moduleId !== moduleId && c.target.moduleId !== moduleId
       );
 
-      onChange({ ...config, modules: updatedModules, connections: updatedConnections });
+      onChange({ ...configRef.current, modules: updatedModules, connections: updatedConnections });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Handle connection delete
@@ -146,11 +157,24 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
 
   const handleConnectionDelete = useCallback(() => {
     if (selectedConnectionId) {
-      const updatedConnections = config.connections.filter((c) => c.id !== selectedConnectionId);
-      onChange({ ...config, connections: updatedConnections });
+      const updatedConnections = configRef.current.connections.filter((c) => c.id !== selectedConnectionId);
+      onChange({ ...configRef.current, connections: updatedConnections });
       selectConnection(null);
     }
-  }, [selectedConnectionId, config, onChange, selectConnection]);
+  }, [selectedConnectionId, onChange, selectConnection]);
+
+  // Recalculate positions on scroll
+  React.useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      recalculateAll();
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [recalculateAll]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -172,10 +196,14 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
 
   // Mouse move for wiring preview
   React.useEffect(() => {
-    if (!wiringSource) return;
+    if (!wiringSource || !containerRef.current) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      updateWiringPreview(e.clientX, e.clientY);
+      // Convert mouse position to container-relative coordinates
+      const containerRect = containerRef.current!.getBoundingClientRect();
+      const relativeX = e.clientX - containerRect.left;
+      const relativeY = e.clientY - containerRect.top;
+      updateWiringPreview(relativeX, relativeY);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -191,8 +219,98 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
   const isWiringSource = (portRef: PortRef) =>
     wiringSource ? getPortId(wiringSource) === getPortId(portRef) : false;
 
+  // Calculate lane offsets for cable spreading
+  const calculateLaneOffsets = useCallback((): Map<string, number> => {
+    const laneMap = new Map<string, number>();
+
+    // Helper to check if two Y ranges overlap
+    const rangesOverlap = (y1Min: number, y1Max: number, y2Min: number, y2Max: number) => {
+      return y1Min <= y2Max && y2Min <= y1Max;
+    };
+
+    // Build cable info with Y ranges
+    interface CableInfo {
+      conn: ModularConnection;
+      yMin: number;
+      yMax: number;
+      side: 'left' | 'right';
+    }
+
+    const cableInfos: CableInfo[] = [];
+
+    configRef.current.connections.forEach((conn) => {
+      const sourcePos = positions.get(getPortId(conn.source));
+      const targetPos = positions.get(getPortId(conn.target));
+
+      if (!sourcePos || !targetPos) return;
+
+      const yMin = Math.min(sourcePos.y, targetPos.y);
+      const yMax = Math.max(sourcePos.y, targetPos.y);
+
+      // Determine which side the vertical segment is on (left or right)
+      const side = sourcePos.x > targetPos.x ? 'right' : 'left';
+
+      cableInfos.push({ conn, yMin, yMax, side });
+    });
+
+    // Group cables that overlap vertically on the same side
+    const bundles: CableInfo[][] = [];
+
+    cableInfos.forEach((cable) => {
+      // Find all bundles that this cable overlaps with
+      const overlappingBundles: number[] = [];
+
+      bundles.forEach((bundle, index) => {
+        // Check if cable overlaps with any cable in the bundle and is on the same side
+        const overlaps = bundle.some(
+          (other) =>
+            other.side === cable.side &&
+            rangesOverlap(cable.yMin, cable.yMax, other.yMin, other.yMax)
+        );
+
+        if (overlaps && bundle[0].side === cable.side) {
+          overlappingBundles.push(index);
+        }
+      });
+
+      if (overlappingBundles.length === 0) {
+        // Create new bundle
+        bundles.push([cable]);
+      } else if (overlappingBundles.length === 1) {
+        // Add to existing bundle
+        bundles[overlappingBundles[0]].push(cable);
+      } else {
+        // Merge multiple bundles that this cable connects
+        const mergedBundle: CableInfo[] = [cable];
+
+        // Collect all cables from overlapping bundles (in reverse to safely remove)
+        for (let i = overlappingBundles.length - 1; i >= 0; i--) {
+          const bundleIndex = overlappingBundles[i];
+          mergedBundle.push(...bundles[bundleIndex]);
+          bundles.splice(bundleIndex, 1);
+        }
+
+        bundles.push(mergedBundle);
+      }
+    });
+
+    // Assign lane offsets within each bundle
+    bundles.forEach((bundle) => {
+      const numCables = bundle.length;
+      bundle.forEach((cable, index) => {
+        // Center the cable bundle by offsetting from -(n-1)/2 to +(n-1)/2
+        const laneOffset = index - (numCables - 1) / 2;
+        laneMap.set(cable.conn.id, laneOffset);
+      });
+    });
+
+    return laneMap;
+  }, [positions]); // Removed config.connections dependency - uses configRef.current instead
+
+  const laneOffsets = calculateLaneOffsets();
+
   return (
-    <div className="relative flex flex-col h-full bg-surface-primary overflow-hidden">
+    <div ref={containerRef} className="relative flex flex-col h-full bg-surface-primary overflow-hidden">
       {/* SVG overlay for cables */}
       <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
         {/* Existing connections */}
@@ -202,6 +320,16 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
 
           if (!sourcePos || !targetPos) return null;
 
+          const laneOffset = laneOffsets.get(conn.id) || 0;
+
+          // Determine signal type from source port
+          const sourceModule = configRef.current.modules.find((m) => m.id === conn.source.moduleId);
+          const sourceDescriptor = sourceModule
+            ? ModuleRegistry.get(sourceModule.descriptorId)
+            : null;
+          const sourcePort = sourceDescriptor?.ports.find((p) => p.id === conn.source.portId);
+          const signalType = sourcePort?.signal || 'audio';
+
           return (
             <PatchCable
               key={conn.id}
@@ -210,8 +338,10 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
               x2={targetPos.x}
               y2={targetPos.y}
               color={conn.color}
+              signal={signalType}
               isSelected={conn.id === selectedConnectionId}
               onClick={() => handleConnectionClick(conn.id)}
+              laneOffset={laneOffset}
             />
           );
         })}
@@ -228,10 +358,10 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
       </svg>
 
       {/* Module rack */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={config.modules.map((m) => m.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-12 px-20 max-w-5xl mx-auto">
               {config.modules.map((module) => (
                 <RackStrip
                   key={module.id}

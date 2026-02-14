@@ -13,19 +13,22 @@ export class ModularVoice {
   isActive = false;
   private ctx: AudioContext;
   private modules = new Map<string, ModuleInstance>();
+  private sharedModules: Map<string, any>; // Reference to shared modules
   private voiceOutput: GainNode;
   private _currentNote: number | null = null; // Tracked for future use (e.g., pitch bend)
 
   constructor(
     ctx: AudioContext,
     moduleConfigs: ModularModuleInstance[],
-    masterOutput: GainNode
+    masterOutput: GainNode,
+    sharedModules: Map<string, any> = new Map()
   ) {
     this.ctx = ctx;
     this.voiceOutput = ctx.createGain();
     this.voiceOutput.connect(masterOutput);
+    this.sharedModules = sharedModules;
 
-    // Create module instances
+    // Create per-voice module instances
     moduleConfigs.forEach((config) => {
       this.createModule(config);
     });
@@ -52,6 +55,14 @@ export class ModularVoice {
       });
 
       this.modules.set(config.id, instance);
+
+      // Auto-connect Output module to voice output
+      if (descriptor.id === 'Output') {
+        const outputPort = instance.ports.get('output');
+        if (outputPort?.node) {
+          outputPort.node.connect(this.voiceOutput);
+        }
+      }
     }
   }
 
@@ -64,11 +75,9 @@ export class ModularVoice {
 
     const frequency = noteToFrequency(note);
 
-    // Set frequency on all VCO modules
-    this.modules.forEach((module, id) => {
-      const descriptor = ModuleRegistry.get(
-        Array.from(this.modules.entries()).find(([key]) => key === id)?.[1].descriptorId || ''
-      );
+    // Trigger modules (gates, frequencies, etc.)
+    this.modules.forEach((module) => {
+      const descriptor = ModuleRegistry.get(module.descriptorId);
 
       // Gate on for envelope modules
       if (module.gateOn) {
@@ -129,10 +138,17 @@ export class ModularVoice {
   }
 
   /**
-   * Get module instance by ID
+   * Get module instance by ID (checks both per-voice and shared modules)
    */
   getModule(moduleId: string): ModuleInstance | undefined {
-    return this.modules.get(moduleId);
+    // Check per-voice modules first
+    const perVoiceModule = this.modules.get(moduleId);
+    if (perVoiceModule) {
+      return perVoiceModule;
+    }
+
+    // Check shared modules
+    return this.sharedModules.get(moduleId);
   }
 
   /**

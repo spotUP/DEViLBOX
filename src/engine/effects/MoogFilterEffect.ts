@@ -180,7 +180,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       // Listen for ready signal
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
-          console.warn('[MoogFilter] WASM ready! Swapping from fallback...');
+          // WASM ready, swap from fallback (silent - not an error)
           this.isWasmReady = true;
           // Send all current parameters
           this.sendParam(PARAM_MODEL, this._options.model);
@@ -358,7 +358,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       this.workletNode.connect(keepalive);
       keepalive.connect(rawContext.destination);
 
-      console.warn('[MoogFilter] WASM swap complete with keepalive');
+      // WASM swap complete (silent - not an error)
 
     } catch (err) {
       console.warn('[MoogFilter] WASM swap failed, staying on fallback:', err);

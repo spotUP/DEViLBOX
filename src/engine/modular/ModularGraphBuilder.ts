@@ -39,9 +39,7 @@ export class ModularGraphBuilder {
     const targetModule = voice.getModule(connection.target.moduleId);
 
     if (!sourceModule || !targetModule) {
-      console.warn(
-        `[GraphBuilder] Missing modules for connection: ${connection.source.moduleId} → ${connection.target.moduleId}`
-      );
+      // Silently skip - modules may not be created yet during initialization
       return;
     }
 
