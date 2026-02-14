@@ -18,7 +18,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters; const wet = c.wet / 100;
-      return new Tone.Distortion({ distortion: Number(p.drive) || 0.4, oversample: (p.oversample as OscillatorType) || 'none', wet });
+      return new Tone.Distortion({ distortion: Number(p.drive) || 0.4, oversample: (p.oversample as OverSampleType) || 'none', wet });
     },
     getDefaultParameters: () => ({ drive: 0.4, oversample: 'none' }),
   },
@@ -56,7 +56,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.Chebyshev({ order: Number(p.order) || 50, oversample: (p.oversample as OscillatorType) || 'none', wet: c.wet / 100 });
+      return new Tone.Chebyshev({ order: Number(p.order) || 50, oversample: (p.oversample as OverSampleType) || 'none', wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ order: 50, oversample: 'none' }),
   },
@@ -69,7 +69,7 @@ const tonejs: EffectDescriptor[] = [
       const p = c.parameters;
       return new Tone.Filter({
         type: (p.type as BiquadFilterType) || 'lowpass', frequency: Number(p.frequency) || 5000,
-        rolloff: Number(p.rolloff) || -12, Q: Number(p.Q) || 1, gain: Number(p.gain) || 0,
+        rolloff: (Number(p.rolloff) || -12) as -12 | -24 | -48 | -96, Q: Number(p.Q) || 1, gain: Number(p.gain) || 0,
       });
     },
     getDefaultParameters: () => ({ type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 }),
