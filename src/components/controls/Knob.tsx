@@ -5,6 +5,7 @@
 
 import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
 import { useThemeStore } from '@stores';
+import { haptics } from '@/utils/haptics';
 
 interface KnobProps {
   // Core (both versions)
@@ -67,8 +68,14 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showNumericInput, setShowNumericInput] = useState(false);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const dragStartY = useRef(0);
+  const dragStartX = useRef(0);
   const dragStartValue = useRef(0);
+  const lastTapTime = useRef(0);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingValueRef = useRef<number | null>(null);
   const gradientId = useId();
@@ -172,21 +179,99 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     return `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endPoint.x} ${endPoint.y}`;
   };
 
+  // Clear long-press timer
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  // Handle double-tap for numeric input (mobile)
+  const handleTap = useCallback((e: React.TouchEvent) => {
+    if (disabled) return;
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapTime.current;
+
+    if (timeSinceLastTap < 300) {
+      // Double-tap detected
+      clearLongPressTimer();
+      haptics.medium();
+      setShowNumericInput(true);
+      lastTapTime.current = 0; // Reset to prevent triple-tap
+    } else {
+      lastTapTime.current = now;
+    }
+  }, [disabled, clearLongPressTimer]);
+
+  // Handle long-press for preset menu (mobile)
+  const handleLongPressStart = useCallback((e: React.TouchEvent) => {
+    if (disabled) return;
+    const touch = e.touches[0];
+    const rect = knobRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMenuPosition({ x: rect.left + rect.width / 2, y: rect.top });
+    }
+
+    longPressTimer.current = setTimeout(() => {
+      haptics.heavy();
+      setShowPresetMenu(true);
+    }, 500);
+  }, [disabled]);
+
+  // Handle preset menu selection
+  const handlePresetSelect = useCallback((preset: number) => {
+    haptics.success();
+    onChange(preset);
+    setShowPresetMenu(false);
+  }, [onChange]);
+
+  // Handle numeric input submission
+  const handleNumericSubmit = useCallback((value: number) => {
+    const clampedValue = Math.max(min, Math.min(max, value));
+    haptics.success();
+    onChange(clampedValue);
+    setShowNumericInput(false);
+  }, [min, max, onChange]);
+
   // Handle mouse/touch down — registers global listeners only for this drag session
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (disabled) return;
     e.preventDefault();
+
+    const isTouchEvent = 'touches' in e;
+    const clientY = isTouchEvent ? e.touches[0].clientY : e.clientY;
+    const clientX = isTouchEvent ? e.touches[0].clientX : e.clientX;
+
+    // For touch events, detect double-tap and long-press
+    if (isTouchEvent) {
+      handleTap(e);
+      handleLongPressStart(e);
+    }
+
     setIsDragging(true);
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartY.current = clientY;
+    dragStartX.current = clientX;
     dragStartValue.current = getNormalized();
     document.body.style.cursor = 'ns-resize';
 
     const handleMouseMove = (ev: MouseEvent | TouchEvent) => {
+      // Clear long-press timer on movement
+      clearLongPressTimer();
+
       const moveY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
+      const moveX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+
+      // Support bidirectional drag (horizontal + vertical)
       const deltaY = dragStartY.current - moveY;
+      const deltaX = moveX - dragStartX.current;
+
+      // Use the larger delta for better control
+      const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+      const delta = isHorizontal ? deltaX : deltaY;
+
       const sensitivity = 150;
-      const deltaNorm = deltaY / sensitivity;
+      const deltaNorm = delta / sensitivity;
       const newNorm = Math.max(0, Math.min(1, dragStartValue.current + deltaNorm));
 
       let newValue: number;
@@ -216,6 +301,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     };
 
     const handleMouseUp = () => {
+      clearLongPressTimer();
       setIsDragging(false);
       document.body.style.cursor = '';
       window.removeEventListener('mousemove', handleMouseMove);
@@ -232,7 +318,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('touchmove', handleMouseMove, { passive: false });
     window.addEventListener('touchend', handleMouseUp);
-  }, [getNormalized, disabled]);
+  }, [getNormalized, disabled, handleTap, handleLongPressStart, clearLongPressTimer]);
 
   // Handle double-click to reset
   const handleDoubleClick = useCallback(() => {
@@ -312,14 +398,15 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     onChange(newValue);
   }, [value, min, max, logarithmic, step, onChange]);
 
-  // Cleanup any pending RAF on unmount
+  // Cleanup any pending RAF and timers on unmount
   useEffect(() => {
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
+      clearLongPressTimer();
     };
-  }, []);
+  }, [clearLongPressTimer]);
 
   // Indicator line position
   const indicatorEnd = polarToCartesian(rotation);
@@ -329,13 +416,15 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   };
 
   return (
-    <div 
-      className="knob-container" 
-      style={{ 
+    <>
+    <div
+      className="knob-container"
+      style={{
         width: knobSize + 20,
         opacity: disabled ? 0.4 : 1,
         pointerEvents: disabled ? 'none' : 'auto',
-      }} 
+        touchAction: 'none', // CRITICAL: Prevents scroll on mobile
+      }}
       title={title}
     >
       {/* Label */}
@@ -355,6 +444,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         style={{
           width: knobSize,
           height: knobSize,
+          touchAction: 'none', // CRITICAL: Prevents scroll on mobile
         }}
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
@@ -461,6 +551,88 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
       </div>
     </div>
+
+    {/* Mobile numeric input modal */}
+    {showNumericInput && (
+      <div
+        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+        onClick={() => setShowNumericInput(false)}
+      >
+        <div
+          className="bg-dark-bgSecondary rounded-lg p-6 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-sm font-mono text-text-secondary mb-3">
+            {label || 'Value'}
+          </div>
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            defaultValue={value}
+            autoFocus
+            className="w-full px-4 py-3 text-lg font-mono bg-dark-bg border-2 border-accent-primary rounded-lg text-text-primary focus:outline-none"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleNumericSubmit(parseFloat(e.currentTarget.value));
+              } else if (e.key === 'Escape') {
+                setShowNumericInput(false);
+              }
+            }}
+          />
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => handleNumericSubmit(parseFloat((document.querySelector('input[type="number"]') as HTMLInputElement)?.value || String(value)))}
+              className="flex-1 py-2 bg-accent-primary text-text-inverse rounded-lg font-mono text-sm"
+            >
+              OK
+            </button>
+            <button
+              onClick={() => setShowNumericInput(false)}
+              className="flex-1 py-2 bg-dark-bgTertiary text-text-secondary rounded-lg font-mono text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Mobile preset menu */}
+    {showPresetMenu && (
+      <div
+        className="fixed inset-0 z-50 bg-black/50"
+        onClick={() => setShowPresetMenu(false)}
+      >
+        <div
+          className="absolute bg-dark-bgSecondary rounded-lg shadow-xl p-2 min-w-[120px]"
+          style={{
+            left: `${menuPosition.x}px`,
+            top: `${menuPosition.y}px`,
+            transform: 'translate(-50%, -100%) translateY(-8px)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-xs font-mono text-text-muted text-center mb-2 px-2 py-1">
+            {label || 'Preset'}
+          </div>
+          {[0, 0.25, 0.5, 0.75, 1].map((preset) => {
+            const presetValue = min + preset * (max - min);
+            return (
+              <button
+                key={preset}
+                onClick={() => handlePresetSelect(presetValue)}
+                className="w-full px-3 py-2 text-sm font-mono text-text-secondary hover:bg-accent-primary hover:text-text-inverse rounded transition-colors"
+              >
+                {(preset * 100).toFixed(0)}% ({formatValueDisplay(presetValue)}{unit})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    </>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison for optimal memoization
