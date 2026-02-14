@@ -38,7 +38,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [activeTab, setActiveTab] = useState<MobileTab>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const { isPlaying, togglePlayPause } = useTransportStore();
-  const { patterns, currentPatternIndex, cursor, setCell, moveCursor } = useTrackerStore();
+  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste } = useTrackerStore();
   const pattern = patterns[currentPatternIndex];
   const { isPortrait, isLandscape } = useOrientation();
 
@@ -115,21 +115,30 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
     enabled: isPortrait,
   });
 
+  // Clipboard handlers for mobile input context menu
+  const handleCopy = useCallback(() => {
+    haptics.success();
+    copySelection();
+  }, [copySelection]);
+
+  const handleCut = useCallback(() => {
+    haptics.success();
+    cutSelection();
+  }, [cutSelection]);
+
+  const handlePaste = useCallback(() => {
+    haptics.success();
+    paste();
+  }, [paste]);
+
   // Gesture handlers for pattern editor (cursor movement)
+  // Note: Only horizontal swipes - vertical swipes reserved for scrolling
   const handlePatternSwipeLeft = useCallback(() => {
     moveCursor('left');
   }, [moveCursor]);
 
   const handlePatternSwipeRight = useCallback(() => {
     moveCursor('right');
-  }, [moveCursor]);
-
-  const handlePatternSwipeUp = useCallback(() => {
-    moveCursor('up');
-  }, [moveCursor]);
-
-  const handlePatternSwipeDown = useCallback(() => {
-    moveCursor('down');
   }, [moveCursor]);
 
   return (
@@ -202,8 +211,6 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
                 startChannel={startChannel}
                 onSwipeLeft={handlePatternSwipeLeft}
                 onSwipeRight={handlePatternSwipeRight}
-                onSwipeUp={handlePatternSwipeUp}
-                onSwipeDown={handlePatternSwipeDown}
               />
             </div>
           </div>
@@ -251,6 +258,9 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           onNoteInput={handleNoteInput}
           onHexInput={handleHexInput}
           onDelete={handleDelete}
+          onCopy={handleCopy}
+          onCut={handleCut}
+          onPaste={handlePaste}
         />
       )}
 

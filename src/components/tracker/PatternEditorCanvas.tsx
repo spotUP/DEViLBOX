@@ -70,8 +70,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   startChannel: _startChannel = 0, // TODO: Implement mobile channel offset
   onSwipeLeft,
   onSwipeRight,
-  onSwipeUp,
-  onSwipeDown,
+  onSwipeUp: _onSwipeUp, // Reserved for future use - currently allows native scroll
+  onSwipeDown: _onSwipeDown, // Reserved for future use - currently allows native scroll
 }) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,11 +94,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const rafRef = useRef<number | null>(null);
 
   // Mobile gesture handlers
+  // Note: Only horizontal swipes - vertical swipes allow native scrolling
   const patternGestures = useMobilePatternGestures({
     onSwipeLeft,
     onSwipeRight,
-    onSwipeUp,
-    onSwipeDown,
+    // onSwipeUp and onSwipeDown intentionally omitted to allow scrolling
     enabled: isMobile,
   });
 
