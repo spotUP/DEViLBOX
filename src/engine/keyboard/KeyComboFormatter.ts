@@ -1,4 +1,4 @@
-import type { NormalizedKeyEvent } from './types';
+import { NormalizedKeyEvent } from './types';
 
 /**
  * KeyComboFormatter - Converts keyboard events to standardized combo strings
@@ -6,44 +6,33 @@ import type { NormalizedKeyEvent } from './types';
  * Formats normalized keyboard events into strings like:
  * - "Ctrl+C"
  * - "Alt+F5"
- * - "Ctrl+Shift+Delete"
+ * - "Ctrl+Alt+Delete"
  *
- * Used to match key events against keyboard scheme mappings.
+ * Supports Mac-style "Cmd" vs "Ctrl" via preferCmd parameter.
  */
 export class KeyComboFormatter {
-  private static readonly KEY_NAMES: Record<string, string> = {
-    ' ': 'Space',
-    'ArrowUp': 'ArrowUp',
-    'ArrowDown': 'ArrowDown',
-    'ArrowLeft': 'ArrowLeft',
-    'ArrowRight': 'ArrowRight',
-    'Enter': 'Enter',
-    'Escape': 'Escape',
-    'Tab': 'Tab',
-    'Backspace': 'Backspace',
-    'Delete': 'Delete',
-    'Insert': 'Insert',
-    'Home': 'Home',
-    'End': 'End',
-    'PageUp': 'PageUp',
-    'PageDown': 'PageDown',
-  };
-
   /**
    * Format a normalized keyboard event into a combo string
    * @param event - Normalized keyboard event
-   * @returns Formatted combo string (e.g., "Ctrl+Shift+C")
+   * @param preferCmd - Use "Cmd" instead of "Ctrl" on Mac (when event.meta is true)
+   * @returns Formatted combo string (e.g., "Ctrl+Alt+C")
    */
-  static format(event: NormalizedKeyEvent): string {
+  static format(event: NormalizedKeyEvent, preferCmd = false): string {
     const parts: string[] = [];
 
-    // Add modifiers in consistent order
-    if (event.ctrl) parts.push('Ctrl');
-    if (event.shift) parts.push('Shift');
-    if (event.alt) parts.push('Alt');
+    // Add modifiers in consistent order: Ctrl → Alt → Shift
+    if (event.ctrl) {
+      parts.push(preferCmd && event.meta ? 'Cmd' : 'Ctrl');
+    }
+    if (event.alt) {
+      parts.push('Alt');
+    }
+    if (event.shift) {
+      parts.push('Shift');
+    }
 
-    // Normalize and add key
-    const key = this.KEY_NAMES[event.key] || event.key.toUpperCase();
+    // Add main key (uppercase for letters, preserve special keys)
+    const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
     parts.push(key);
 
     return parts.join('+');

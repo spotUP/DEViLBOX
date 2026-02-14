@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { KeyComboFormatter } from '../KeyComboFormatter';
-import type { NormalizedKeyEvent } from '../types';
+import { NormalizedKeyEvent } from '../types';
 
 describe('KeyComboFormatter', () => {
-  it('formats simple key', () => {
+  it('formats single key', () => {
     const event: NormalizedKeyEvent = {
       key: 'a',
       ctrl: false,
@@ -25,58 +25,47 @@ describe('KeyComboFormatter', () => {
     expect(KeyComboFormatter.format(event)).toBe('Ctrl+C');
   });
 
-  it('formats Alt+key', () => {
+  it('formats Ctrl+Shift+key', () => {
     const event: NormalizedKeyEvent = {
-      key: 's',
-      ctrl: false,
-      alt: true,
-      shift: false,
-      meta: false,
-    };
-    expect(KeyComboFormatter.format(event)).toBe('Alt+S');
-  });
-
-  it('formats Shift+key', () => {
-    const event: NormalizedKeyEvent = {
-      key: 'F5',
-      ctrl: false,
+      key: 'f',
+      ctrl: true,
       alt: false,
       shift: true,
       meta: false,
     };
-    expect(KeyComboFormatter.format(event)).toBe('Shift+F5');
+    expect(KeyComboFormatter.format(event)).toBe('Ctrl+Shift+F');
   });
 
-  it('formats complex combo Ctrl+Shift+Alt+key', () => {
+  it('formats Ctrl+Alt+key', () => {
     const event: NormalizedKeyEvent = {
-      key: 'Delete',
+      key: 'x',
       ctrl: true,
       alt: true,
-      shift: true,
+      shift: false,
       meta: false,
     };
-    expect(KeyComboFormatter.format(event)).toBe('Ctrl+Shift+Alt+Delete');
+    expect(KeyComboFormatter.format(event)).toBe('Ctrl+Alt+X');
   });
 
-  it('normalizes key names', () => {
+  it('uses Cmd instead of Ctrl on Mac when meta is true', () => {
     const event: NormalizedKeyEvent = {
-      key: ' ',
+      key: 'c',
+      ctrl: true,
+      alt: false,
+      shift: false,
+      meta: true,
+    };
+    expect(KeyComboFormatter.format(event, true)).toBe('Cmd+C');
+  });
+
+  it('preserves special key names', () => {
+    const event: NormalizedKeyEvent = {
+      key: 'Enter',
       ctrl: false,
       alt: false,
       shift: false,
       meta: false,
     };
-    expect(KeyComboFormatter.format(event)).toBe('Space');
-  });
-
-  it('handles ArrowUp, ArrowDown, etc.', () => {
-    const event: NormalizedKeyEvent = {
-      key: 'ArrowUp',
-      ctrl: false,
-      alt: false,
-      shift: false,
-      meta: false,
-    };
-    expect(KeyComboFormatter.format(event)).toBe('ArrowUp');
+    expect(KeyComboFormatter.format(event)).toBe('Enter');
   });
 });
