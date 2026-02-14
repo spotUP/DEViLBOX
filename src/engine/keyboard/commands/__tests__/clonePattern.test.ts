@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clonePattern } from '../clonePattern';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useUIStore } from '@stores/useUIStore';
 
 // Mock stores
 vi.mock('@stores/useTrackerStore');
+vi.mock('@stores/useUIStore');
 
 describe('clonePattern command', () => {
   beforeEach(() => {
@@ -20,11 +22,16 @@ describe('clonePattern command', () => {
     };
 
     const mockAddPattern = vi.fn();
+    const mockSetStatusMessage = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({
       patterns: [mockPattern],
       currentPatternIndex: 0,
       addPattern: mockAddPattern,
+    }));
+
+    (useUIStore.getState as any) = vi.fn(() => ({
+      setStatusMessage: mockSetStatusMessage,
     }));
 
     clonePattern();
@@ -34,8 +41,11 @@ describe('clonePattern command', () => {
     // Verify it's a deep clone (not the same reference)
     const clonedPattern = mockAddPattern.mock.calls[0][0];
     expect(clonedPattern).not.toBe(mockPattern);
-    expect(clonedPattern.name).toBe('Pattern 1 (copy)');
+    expect(clonedPattern.name).toBe('Pattern 1 (Copy)');
     expect(clonedPattern.length).toBe(64);
+
+    // Verify status message
+    expect(mockSetStatusMessage).toHaveBeenCalledWith('PATTERN CLONED: Pattern 1 (Copy)');
   });
 
   it('increments copy number for multiple clones', () => {
@@ -47,11 +57,12 @@ describe('clonePattern command', () => {
 
     const existingPatterns = [
       mockPattern,
-      { ...mockPattern, name: 'Pattern 1 (copy)' },
-      { ...mockPattern, name: 'Pattern 1 (copy 2)' },
+      { ...mockPattern, name: 'Pattern 1 (Copy)' },
+      { ...mockPattern, name: 'Pattern 1 (Copy 2)' },
     ];
 
     const mockAddPattern = vi.fn();
+    const mockSetStatusMessage = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({
       patterns: existingPatterns,
@@ -59,10 +70,14 @@ describe('clonePattern command', () => {
       addPattern: mockAddPattern,
     }));
 
+    (useUIStore.getState as any) = vi.fn(() => ({
+      setStatusMessage: mockSetStatusMessage,
+    }));
+
     clonePattern();
 
     const clonedPattern = mockAddPattern.mock.calls[0][0];
-    expect(clonedPattern.name).toBe('Pattern 1 (copy 3)');
+    expect(clonedPattern.name).toBe('Pattern 1 (Copy 3)');
   });
 
   it('returns true when successful', () => {
@@ -76,6 +91,10 @@ describe('clonePattern command', () => {
       patterns: [mockPattern],
       currentPatternIndex: 0,
       addPattern: vi.fn(),
+    }));
+
+    (useUIStore.getState as any) = vi.fn(() => ({
+      setStatusMessage: vi.fn(),
     }));
 
     const result = clonePattern();
