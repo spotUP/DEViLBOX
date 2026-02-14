@@ -18,6 +18,12 @@ export type OrientationLockType =
   | 'landscape-primary'
   | 'landscape-secondary';
 
+// Extend ScreenOrientation with lock/unlock methods (not in all TypeScript lib versions)
+interface ScreenOrientationWithLock extends ScreenOrientation {
+  lock(orientation: OrientationLockType): Promise<void>;
+  unlock(): void;
+}
+
 export interface OrientationState {
   orientation: Orientation;
   isPortrait: boolean;
@@ -131,7 +137,7 @@ export function useLockOrientation(
     }
 
     try {
-      await window.screen.orientation.lock(type);
+      await (window.screen.orientation as ScreenOrientationWithLock).lock(type);
     } catch (error) {
       console.error('Failed to lock orientation:', error);
       // Note: Most browsers require fullscreen for orientation lock
@@ -145,7 +151,7 @@ export function useLockOrientation(
     if (!isSupported) return;
 
     try {
-      window.screen.orientation.unlock();
+      (window.screen.orientation as ScreenOrientationWithLock).unlock();
     } catch (error) {
       console.error('Failed to unlock orientation:', error);
     }
