@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T19:39:20.523Z
+ * Generated: 2026-02-14T19:44:01.239Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '545';
-export const BUILD_HASH = 'ff9d734';
+export const BUILD_NUMBER = '547';
+export const BUILD_HASH = '9e5b29c';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Correct GitHub Pages URLs in manifest.json"
+      },
+      {
+        type: 'fix',
+        "description": "Disable horizontal scroll and fix tap/swipe gestures"
+      },
       {
         type: 'feature',
         "description": "Add PWA install-to-home-screen option"
@@ -224,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Optimize drum pads and pedalboard for mobile layouts"
-      },
-      {
-        type: 'feature',
-        "description": "Optimize all instrument editors for touch devices"
-      },
-      {
-        type: 'fix',
-        "description": "Solve knob scroll conflict with touch-action CSS"
       }
     ]
   }
