@@ -1,31 +1,30 @@
-import { useTransportStore } from '@stores/useTransportStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { getToneEngine } from '@engine/ToneEngine';
 
 /**
  * Play from Cursor - Start playback from current pattern position
  *
  * Classic tracker command (Alt+F5 in FastTracker 2).
  * Starts playback from the current row instead of pattern beginning.
+ * Stops existing playback before restarting from cursor.
  *
- * @returns true if playback started, false if already playing
+ * @returns true (always starts playback from cursor)
  */
 export function playFromCursor(): boolean {
-  const { isPlaying, play, setCurrentRow, setCurrentPattern } = useTransportStore.getState();
+  const { cursor } = useTrackerStore.getState();
+  const { isPlaying, stop, play } = useTransportStore.getState();
 
-  // Don't interrupt existing playback
+  // Stop if currently playing
   if (isPlaying) {
-    return false;
+    stop();
   }
 
-  // Get current position from tracker
-  const { currentRow, currentPatternIndex } = useTrackerStore.getState();
+  // Set playback start position to cursor row
+  useTransportStore.setState({ startRow: cursor.rowIndex });
 
-  // Set playback position to cursor location
-  setCurrentPattern(currentPatternIndex);
-  setCurrentRow(currentRow);
-
-  // Start playback
-  play();
+  // Start playback (async)
+  getToneEngine().init().then(() => play());
 
   return true;
 }

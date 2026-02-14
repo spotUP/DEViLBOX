@@ -1,78 +1,58 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { playFromCursor } from '../playFromCursor';
-import { useTransportStore } from '@stores/useTransportStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { getToneEngine } from '@engine/ToneEngine';
 
-// Mock stores
-vi.mock('@stores/useTransportStore');
+// Mock stores and engine
 vi.mock('@stores/useTrackerStore');
+vi.mock('@stores/useTransportStore');
+vi.mock('@engine/ToneEngine', () => ({
+  getToneEngine: vi.fn(() => ({
+    init: vi.fn(() => Promise.resolve()),
+  })),
+}));
 
-describe('playFromCursor command', () => {
+describe('playFromCursor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('starts playback from current row', () => {
+  it('sets start row and plays from cursor position', () => {
+    const mockCursor = { rowIndex: 16, channelIndex: 0, columnType: 'note' };
+    const mockStop = vi.fn();
     const mockPlay = vi.fn();
-    const mockSetCurrentRow = vi.fn();
-    const mockSetCurrentPattern = vi.fn();
+    const mockSetState = vi.fn();
 
-    vi.mocked(useTransportStore.getState).mockReturnValue({
-      play: mockPlay,
+    (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
+    (useTransportStore.getState as any) = vi.fn(() => ({
       isPlaying: false,
-      setCurrentRow: mockSetCurrentRow,
-      setCurrentPattern: mockSetCurrentPattern,
-    } as any);
-
-    vi.mocked(useTrackerStore.getState).mockReturnValue({
-      currentRow: 16,
-      currentPatternIndex: 2,
-    } as any);
-
-    playFromCursor();
-
-    expect(mockSetCurrentPattern).toHaveBeenCalledWith(2);
-    expect(mockSetCurrentRow).toHaveBeenCalledWith(16);
-    expect(mockPlay).toHaveBeenCalled();
-  });
-
-  it('does nothing if already playing', () => {
-    const mockPlay = vi.fn();
-
-    vi.mocked(useTransportStore.getState).mockReturnValue({
+      stop: mockStop,
       play: mockPlay,
-      isPlaying: true,
-    } as any);
-
-    playFromCursor();
-
-    expect(mockPlay).not.toHaveBeenCalled();
-  });
-
-  it('returns true when successful', () => {
-    vi.mocked(useTransportStore.getState).mockReturnValue({
-      play: vi.fn(),
-      isPlaying: false,
-      setCurrentRow: vi.fn(),
-      setCurrentPattern: vi.fn(),
-    } as any);
-
-    vi.mocked(useTrackerStore.getState).mockReturnValue({
-      currentRow: 0,
-      currentPatternIndex: 0,
-    } as any);
+    }));
+    (useTransportStore.setState as any) = mockSetState;
 
     const result = playFromCursor();
+
     expect(result).toBe(true);
+    expect(mockSetState).toHaveBeenCalledWith({ startRow: 16 });
   });
 
-  it('returns false when already playing', () => {
-    vi.mocked(useTransportStore.getState).mockReturnValue({
-      play: vi.fn(),
-      isPlaying: true,
-    } as any);
+  it('stops playback before restarting from cursor', () => {
+    const mockCursor = { rowIndex: 32, channelIndex: 0, columnType: 'note' };
+    const mockStop = vi.fn();
+    const mockPlay = vi.fn();
 
-    const result = playFromCursor();
-    expect(result).toBe(false);
+    (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
+    (useTransportStore.getState as any) = vi.fn(() => ({
+      isPlaying: true,
+      stop: mockStop,
+      play: mockPlay,
+    }));
+    (useTransportStore.setState as any) = vi.fn();
+
+    playFromCursor();
+
+    expect(mockStop).toHaveBeenCalled();
   });
 });
