@@ -16,6 +16,8 @@ enableMapSet();
 import './engine/registry/builtin'
 // SDK synths (MAME, Buzz, VSTBridge, WAM, etc.) — lazy loader registration
 import './engine/registry/sdk'
+// Effect descriptors — eager (Tone.js, WASM) + lazy loaders (Buzz, WAM, Neural)
+import './engine/registry/effects'
 
 // Dev tools: synth tester (adds testAllSynths() etc. to window)
 import './utils/synthTester'
