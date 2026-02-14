@@ -9,6 +9,7 @@ import type { DevilboxSynth } from '../../types/synth';
 import type { ModularPatchConfig, ModularModuleInstance, ModularConnection } from '../../types/modular';
 import { ModularVoice } from './ModularVoice';
 import { ModularConnectionManager } from './ModularConnectionManager';
+import { ModuleRegistry } from './ModuleRegistry';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
 import { registerBuiltInModules } from './modules';
 
@@ -20,6 +21,7 @@ export class ModularSynth implements DevilboxSynth {
   private activeVoices = new Map<number, ModularVoice>(); // noteNumber → voice
   private config: ModularPatchConfig;
   private connectionManager: ModularConnectionManager;
+  private sharedModules = new Map<string, any>(); // Shared module instances
 
   constructor(config: ModularPatchConfig) {
     this.ctx = getDevilboxAudioContext();
@@ -41,8 +43,23 @@ export class ModularSynth implements DevilboxSynth {
     const polyphony = this.config.polyphony || 1;
     this.voices = [];
 
+    // Create shared modules once (Noise, LFO, etc.)
+    this.sharedModules.clear();
+    this.config.modules.forEach((config) => {
+      const descriptor = ModuleRegistry.get(config.descriptorId);
+      if (descriptor && descriptor.voiceMode === 'shared') {
+        const instance = descriptor.create(this.ctx);
+        // Apply stored parameters
+        Object.entries(config.parameters).forEach(([paramId, value]) => {
+          instance.setParam(paramId, value);
+        });
+        this.sharedModules.set(config.id, instance);
+      }
+    });
+
+    // Create voices
     for (let i = 0; i < polyphony; i++) {
-      const voice = new ModularVoice(this.ctx, this.config.modules, this.output);
+      const voice = new ModularVoice(this.ctx, this.config.modules, this.output, this.sharedModules);
       this.voices.push(voice);
     }
 

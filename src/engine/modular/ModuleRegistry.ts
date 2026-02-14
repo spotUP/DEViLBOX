@@ -16,11 +16,12 @@ class ModuleRegistryClass {
   private modules = new Map<string, ModuleDescriptor>();
 
   /**
-   * Register a module descriptor
+   * Register a module descriptor (idempotent - won't re-register if already exists)
    */
   register(descriptor: ModuleDescriptor): void {
     if (this.modules.has(descriptor.id)) {
-      console.warn(`[ModuleRegistry] Module "${descriptor.id}" already registered, overwriting`);
+      // Already registered, skip silently (idempotent)
+      return;
     }
     this.modules.set(descriptor.id, descriptor);
   }

@@ -30,7 +30,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   const [isPanning, setIsPanning] = useState(false);
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
 
-  const { positions, registerPort, recalculateAll } = usePortPositions();
+  const { positions, registerPort, recalculateAll } = usePortPositions(containerRef);
   const {
     selectedModuleId,
     wiringSource,

@@ -43,7 +43,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   const { isMobile } = useResponsive();
 
   return (
-    <div className="h-screen flex flex-col bg-dark-bg text-text-primary overflow-y-hidden">
+    <div className="h-screen w-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">
       {/* Top Navigation Bar - Hidden on mobile */}
       <div className={isMobile ? 'hidden' : 'block'}>
         <NavBar />
@@ -69,7 +69,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex min-h-0 overflow-y-hidden">
+      <main className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {children}
       </main>
     </div>

@@ -37,6 +37,79 @@ data loss must NEVER happen again.
 
 ---
 
+## CRITICAL: Knob/Control Handling Pattern
+
+**!!! ALWAYS USE THIS PATTERN FOR CONTROLS !!!**
+
+### The Problem: Stale State in Callbacks
+
+When React components handle rapid user input (knobs, sliders, etc.), callbacks can capture **stale state** from previous renders. This causes:
+- Knobs interfering with each other (moving one knob resets others)
+- Sluggish/laggy controls
+- Lost parameter changes
+- Frustrating user experience
+
+### The Solution: Use Refs for Current State
+
+**ALWAYS** use a `ref` to track the current config state, just like TB-303Controls does:
+
+```typescript
+export const MyControls: React.FC<Props> = ({ config, onChange }) => {
+  const configRef = useRef(config);
+
+  // Keep ref in sync with props
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  // Update helper - uses configRef.current, NOT config
+  const updateParameter = useCallback((key: string, value: number) => {
+    onChange({
+      ...configRef.current,  // ← Use ref, NOT config prop!
+      [key]: value
+    });
+  }, [onChange]); // ← Remove config from dependencies
+
+  return (
+    <Knob
+      value={config.someParam}
+      onChange={(v) => updateParameter('someParam', v)}
+    />
+  );
+};
+```
+
+### Reference Implementation
+
+**TB303Controls** (`src/components/instruments/controls/JC303StyledKnobPanel.tsx`) is the **reference implementation**. When creating new synth controls:
+
+1. **Copy the pattern** from TB303Controls
+2. Use `configRef.current` in ALL callbacks that modify state
+3. Remove `config` from `useCallback` dependencies (keep only `onChange`)
+
+### Files Fixed Using This Pattern
+
+- ✅ `src/components/instruments/controls/JC303StyledKnobPanel.tsx` (reference)
+- ✅ `src/components/instruments/synths/modular/views/ModularRackView.tsx` (fixed 2026-02-14)
+
+### What NOT to Do
+
+❌ **WRONG** - Uses stale `config` prop:
+```typescript
+const handleChange = useCallback((key, value) => {
+  onChange({ ...config, [key]: value });  // BUG: stale config!
+}, [config, onChange]);
+```
+
+✅ **CORRECT** - Uses current `configRef`:
+```typescript
+const handleChange = useCallback((key, value) => {
+  onChange({ ...configRef.current, [key]: value });
+}, [onChange]);
+```
+
+---
+
 ## Furnace Synth Implementation
 
 *** IMPORTANT ***

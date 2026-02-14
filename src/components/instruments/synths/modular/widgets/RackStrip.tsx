@@ -128,7 +128,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
 
       {/* Body (collapsible) */}
       {!isCollapsed && (
-        <div className="flex items-center gap-4 p-3">
+        <div className="flex items-center gap-4 px-3 py-3">
           {/* Input ports */}
           <div className="flex flex-col gap-2">
             {inputPorts.map((port) => {
@@ -152,7 +152,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
           </div>
 
           {/* Parameters (knobs) */}
-          <div className="flex-1 flex gap-4 justify-center">
+          <div className="flex-1 flex gap-3 justify-center">
             {descriptor.parameters.map((param) => (
               <div key={param.id} className="flex flex-col items-center gap-1">
                 <Knob
