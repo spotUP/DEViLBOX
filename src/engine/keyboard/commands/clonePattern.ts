@@ -1,11 +1,12 @@
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useUIStore } from '@stores/useUIStore';
 import { Pattern } from '@/types/tracker';
 
 /**
  * Clone Pattern - Create a deep copy of the current pattern
  *
  * Creates a duplicate of the current pattern and adds it to the pattern list.
- * The cloned pattern gets a "(copy)" suffix, with incrementing numbers for multiple clones.
+ * The cloned pattern gets a "(Copy)" suffix, with incrementing numbers for multiple clones.
  * Used for creating pattern variations while preserving the original.
  *
  * @returns true (always succeeds)
@@ -28,6 +29,9 @@ export function clonePattern(): boolean {
   // Add the cloned pattern
   addPattern(clonedPattern);
 
+  // Show status message
+  useUIStore.getState().setStatusMessage(`PATTERN CLONED: ${clonedPattern.name}`);
+
   return true;
 }
 
@@ -35,19 +39,19 @@ export function clonePattern(): boolean {
  * Generate a unique name for the cloned pattern
  * @param baseName - Original pattern name
  * @param patterns - All existing patterns
- * @returns Unique name with (copy N) suffix
+ * @returns Unique name with (Copy N) suffix
  */
 function generateCloneName(baseName: string, patterns: Pattern[]): string {
-  const baseWithCopy = `${baseName} (copy)`;
+  const baseWithCopy = `${baseName} (Copy)`;
 
-  // Check if base name + (copy) exists
+  // Check if base name + (Copy) exists
   if (!patterns.some(p => p.name === baseWithCopy)) {
     return baseWithCopy;
   }
 
   // Find the highest copy number
   let maxCopyNum = 1;
-  const copyRegex = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(copy (\\d+)\\)$`);
+  const copyRegex = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(Copy(?: (\\d+))?\\)$`);
 
   patterns.forEach(pattern => {
     const match = pattern.name.match(copyRegex);
@@ -59,5 +63,5 @@ function generateCloneName(baseName: string, patterns: Pattern[]): string {
     }
   });
 
-  return `${baseName} (copy ${maxCopyNum + 1})`;
+  return `${baseName} (Copy ${maxCopyNum + 1})`;
 }
