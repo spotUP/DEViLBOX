@@ -109,12 +109,20 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     ctx.lineTo(logicalWidth, height / 2);
     ctx.stroke();
 
-    if (!analyser) return false;
+    if (!analyser) {
+      // Draw "no analyser" warning (should never happen - getInstrumentAnalyser always creates one)
+      ctx.fillStyle = `${color}80`;
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`No analyser for instrument ${instrumentId}`, logicalWidth / 2, height / 2 - 5);
+      return false;
+    }
 
     const waveform = analyser.getWaveform();
     const hasActivity = analyser.hasActivity();
+    const peak = analyser.getPeak();
 
-    // Idle state: draw a subtle static waveform hint
+    // Idle state: draw a subtle static waveform hint with debug info
     if (!hasActivity) {
       ctx.strokeStyle = `${color}30`; // Very transparent
       ctx.lineWidth = 1;
@@ -127,6 +135,12 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
         if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
       }
       ctx.stroke();
+
+      // Debug: show peak level
+      ctx.fillStyle = `${color}60`;
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Peak: ${peak.toFixed(4)}`, 4, height - 4);
       return false;
     }
 

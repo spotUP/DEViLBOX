@@ -405,7 +405,7 @@ export interface FurnaceSNESData {
   useEnv: boolean; sus: number; gainMode: number; gain: number; d2: number;
 }
 export interface FurnaceN163Data {
-  wave: number; wavePos: number; waveLen: number; waveMode: number;
+  wave: number; wavePos: number; waveLen: number; waveMode: number; perChanPos?: boolean;
 }
 export interface FurnaceFDSData {
   modSpeed: number; modDepth: number; initModTableWithFirstWave: boolean;
@@ -1462,11 +1462,18 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const snByte2 = reader.readUint8();
           const snByte3 = reader.readUint8();
           const gain = reader.readUint8();
+          let sus = (snByte3 & 0x08) ? 1 : 0;
+          let d2 = 0;
+          // v131+: extra byte with sus (bits 5-6) and d2 (bits 0-4)
+          if (reader.getOffset() < featEnd) {
+            const snByte4 = reader.readUint8();
+            sus = (snByte4 >> 5) & 0x03;
+            d2 = snByte4 & 0x1F;
+          }
           inst.snes = {
             a: snByte1 & 0x0F, d: (snByte1 >> 4) & 0x07,
             s: (snByte2 >> 5) & 0x07, r: snByte2 & 0x1F,
-            useEnv: !!(snByte3 & 0x10), sus: (snByte3 & 0x08) ? 1 : 0,
-            gainMode: snByte3 & 0x07, gain, d2: 0,
+            useEnv: !!(snByte3 & 0x10), sus, gainMode: snByte3 & 0x07, gain, d2,
           };
           break;
         }
@@ -1476,7 +1483,18 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const n163wavePos = reader.readUint8();
           const n163waveLen = reader.readUint8();
           const n163waveMode = reader.readUint8();
-          inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode };
+          let perChanPos = false;
+          // v164+: perChanPos flag and optional per-channel wave pos/len arrays
+          if (reader.getOffset() < featEnd) {
+            perChanPos = reader.readUint8() !== 0;
+            if (perChanPos) {
+              // Per-channel wave positions (8 channels)
+              for (let i = 0; i < 8; i++) reader.readUint8();
+              // Per-channel wave lengths (8 channels)
+              for (let i = 0; i < 8; i++) reader.readUint8();
+            }
+          }
+          inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode, perChanPos };
           break;
         }
         case 'FD': {
@@ -1489,6 +1507,70 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           inst.fds = { modSpeed, modDepth, initModTableWithFirstWave: initMod, modTable };
           break;
         }
+        case 'O1':
+        case 'O2':
+        case 'O3':
+        case 'O4':
+          // Operator macros (O1-O4) — Reference: instrument.cpp:2798-2805
+          // These are per-operator macro data (AM, AR, DR, MULT, RR, SL, TL, DT2, RS, DT, D2R, SSG)
+          // Stored in rawBinaryData for WASM upload, not parsed for TypeScript
+          console.log(`[FurnaceParser] Found ${featCode} (operator macros), preserving in rawBinaryData`);
+          break;
+        case 'LD':
+          // OPL drums — Reference: instrument.cpp:2806-2807
+          // fixedDrums, kickFreq, snareHatFreq, tomTopFreq
+          console.log('[FurnaceParser] Found LD (OPL drums), preserving in rawBinaryData');
+          break;
+        case 'WS':
+          // WaveSynth — Reference: instrument.cpp:2814-2815
+          // wavesynth chip-specific data
+          console.log('[FurnaceParser] Found WS (WaveSynth), preserving in rawBinaryData');
+          break;
+        case 'MP':
+          // MultiPCM — Reference: instrument.cpp:2824-2825
+          // multipcm chip-specific data
+          console.log('[FurnaceParser] Found MP (MultiPCM), preserving in rawBinaryData');
+          break;
+        case 'SU':
+          // Sound Unit — Reference: instrument.cpp:2826-2827
+          // soundunit chip-specific data
+          console.log('[FurnaceParser] Found SU (Sound Unit), preserving in rawBinaryData');
+          break;
+        case 'ES':
+          // ES5506 — Reference: instrument.cpp:2828-2829
+          // es5506 filter and envelope data
+          console.log('[FurnaceParser] Found ES (ES5506), preserving in rawBinaryData');
+          break;
+        case 'X1':
+          // X1-010 — Reference: instrument.cpp:2830-2831
+          // x1_010 chip-specific data
+          console.log('[FurnaceParser] Found X1 (X1-010), preserving in rawBinaryData');
+          break;
+        case 'NE':
+          // NES DPCM — Reference: instrument.cpp:2832-2833
+          // nes dpcm-specific data
+          console.log('[FurnaceParser] Found NE (NES DPCM), preserving in rawBinaryData');
+          break;
+        case 'EF':
+          // ESFM — Reference: instrument.cpp:2834-2835
+          // esfm chip-specific data
+          console.log('[FurnaceParser] Found EF (ESFM), preserving in rawBinaryData');
+          break;
+        case 'PN':
+          // PowerNoise — Reference: instrument.cpp:2836-2837
+          // powernoise chip-specific data
+          console.log('[FurnaceParser] Found PN (PowerNoise), preserving in rawBinaryData');
+          break;
+        case 'S2':
+          // SID2 — Reference: instrument.cpp:2838-2839
+          // sid2 chip-specific data
+          console.log('[FurnaceParser] Found S2 (SID2), preserving in rawBinaryData');
+          break;
+        case 'S3':
+          // SID3 — Reference: instrument.cpp:2840-2841
+          // sid3 chip-specific data (enhanced C64 SID)
+          console.log('[FurnaceParser] Found S3 (SID3), preserving in rawBinaryData');
+          break;
         default:
           // Unknown feature, skip (reader.seek(featEnd) handles it)
           break;

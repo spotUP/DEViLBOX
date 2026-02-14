@@ -1504,6 +1504,16 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-rose-500',
   },
+  // Modular Synthesis
+  ModularSynth: {
+    type: 'ModularSynth',
+    name: 'Modular Synth',
+    shortName: 'Modular',
+    description: 'Patch editor with modules (VCO, VCF, VCA, ADSR, LFO) and cable routing',
+    bestFor: ['Sound design', 'Experimental', 'Custom patches', 'Flexible routing'],
+    icon: 'Cable',
+    color: 'text-indigo-500',
+  },
 };
 
 // Organized categories

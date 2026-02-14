@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T15:33:34.553Z
+ * Generated: 2026-02-14T16:08:49.156Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '510';
-export const BUILD_HASH = 'ceae8a4';
+export const BUILD_NUMBER = '526';
+export const BUILD_HASH = '76790ad';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,70 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Re-enable silent auto-preview for waveform visualization"
+      },
+      {
+        type: 'fix',
+        "description": "Wire up HarmonicSynth parameter updates"
+      },
+      {
+        type: 'fix',
+        "description": "Disable auto-preview - user triggers notes manually"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent auto-preview during playback and debounce when editing"
+      },
+      {
+        type: 'fix',
+        "description": "Update instrument name when changing synth type"
+      },
+      {
+        type: 'fix',
+        "description": "Use SynthRegistry.knows() for lazy-loaded synths"
+      },
+      {
+        type: 'fix',
+        "description": "Add SynthRegistry check for HarmonicSynth and other registry synths"
+      },
+      {
+        type: 'feature',
+        "description": "Add HarmonicSynth to pads category"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive Plugin SDK documentation"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update changelog and instrument editor"
+      },
+      {
+        type: 'feature',
+        "description": "Register HarmonicSynth in SDK"
+      },
+      {
+        type: 'feature',
+        "description": "Add effect registry descriptors for all effect types"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate EffectRegistry system"
+      },
+      {
+        type: 'feature',
+        "description": "Add HarmonicSynth - additive/spectral synthesis engine"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive performance optimization summary"
+      },
+      {
+        type: 'improvement',
+        "description": "Integrate requestIdleCallback for idle-time auto-save"
+      },
       {
         type: 'improvement',
         "description": "Comprehensive performance optimization across rendering, audio, and state management"
@@ -174,70 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix critical game logic bugs preventing game start"
-      },
-      {
-        type: 'fix',
-        "description": "Handle InvalidStateError when loading worklet on suspended context"
-      },
-      {
-        type: 'fix',
-        "description": "Match visualizer sizing (200x120 default)"
-      },
-      {
-        type: 'fix',
-        "description": "Set larger initial canvas size (800x600)"
-      },
-      {
-        type: 'fix',
-        "description": "Increase default height from 100px to 400px"
-      },
-      {
-        type: 'fix',
-        "description": "Disable frequency-based worm colors for visibility"
-      },
-      {
-        type: 'fix',
-        "description": "Disable background tile animation"
-      },
-      {
-        type: 'fix',
-        "description": "Properly setup native AnalyserNode from Tone.js"
-      },
-      {
-        type: 'feature',
-        "description": "Complete music-reactive implementation"
-      },
-      {
-        type: 'improvement',
-        "description": "Document background tile rendering optimizations"
-      },
-      {
-        type: 'feature',
-        "description": "Add music reactivity toggle in settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add frequency-based worm segment colors"
-      },
-      {
-        type: 'feature',
-        "description": "Add particle trail effects"
-      },
-      {
-        type: 'feature',
-        "description": "Add music-reactive speed modulation"
-      },
-      {
-        type: 'feature',
-        "description": "Add beat-synced score multiplier"
-      },
-      {
-        type: 'feature',
-        "description": "Add beat-synced food spawning"
-      },
-      {
-        type: 'feature',
-        "description": "Add beat-synced grid glow and worm pulse"
       }
     ]
   }

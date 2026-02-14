@@ -5,7 +5,7 @@
 
 import { useRef, useCallback, useEffect } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
-import { useInstrumentStore } from '@stores';
+import { useInstrumentStore, useTransportStore } from '@stores';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 
 const PREVIEW_NOTE = 'C4';
@@ -40,10 +40,10 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
     // Skip for non-tonal types
     if (SKIP_PREVIEW_TYPES.has(instrument.synthType)) return;
 
-    const engine = getToneEngine();
-
     // Skip preview if transport is playing - the actual playing notes will demonstrate the changes
-    if (engine.isPlaying()) return;
+    if (useTransportStore.getState().isPlaying) return;
+
+    const engine = getToneEngine();
 
     // Clear existing debounce timer
     if (debounceTimerRef.current !== null) {
