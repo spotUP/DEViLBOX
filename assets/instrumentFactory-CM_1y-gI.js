@@ -1,0 +1,1 @@
+import{H as t}from"./index-Cjc_9M5O.js";import"./vendor-utils-Cm-70yv0.js";import"./vendor-react-LeNVipsj.js";import"./vendor-tone-CADp_hfL.js";import"./vendor-ui-Cpb_sTe-.js";function e(){return{id:Date.now(),name:"TB-303",type:"synth",synthType:"TB303",tb303:{...t},effects:[],volume:-6,pan:0}}export{e as createDefaultTB303Instrument};
