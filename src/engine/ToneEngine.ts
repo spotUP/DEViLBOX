@@ -491,7 +491,16 @@ export class ToneEngine {
     // Bump generation to invalidate any in-flight preload
     const generation = ++this.preloadGeneration;
 
-    // First, dispose any existing instruments to start fresh
+    // First, ensure lazy-loaded synths are registered
+    const lazyLoadPromises = configs
+      .map(config => SynthRegistry.ensure(config.synthType))
+      .filter(Boolean);
+    if (lazyLoadPromises.length > 0) {
+      await Promise.all(lazyLoadPromises);
+      if (generation !== this.preloadGeneration) return; // Superseded
+    }
+
+    // Then, dispose any existing instruments to start fresh
     configs.forEach((config) => {
       // BUG FIX: Use proper key format (was checking config.id but Map keys are strings like "3--1")
       const key = this.getInstrumentKey(config.id, -1);

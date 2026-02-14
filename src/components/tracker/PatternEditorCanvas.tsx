@@ -179,7 +179,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Calculate channel and column
     // Channel width varies but roughly: LINE_NUMBER_WIDTH + (channels * ~200px)
     let channelIndex = 0;
-    let columnType = cursor.columnType; // Keep current column type by default
 
     // Simple channel detection (this is approximate - exact calculation would need channel widths)
     const channelWidth = 200; // Approximate width per channel
