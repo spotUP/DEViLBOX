@@ -1,33 +1,124 @@
 /**
  * Leslie.worklet.js - Leslie Rotary Speaker AudioWorklet Effect Processor
+ *
+ * IMPORTANT: Shares a single WASM module across all processor instances to avoid
+ * AudioWorklet memory exhaustion (each Emscripten module allocates ~16MB).
+ *
  * WASM binary and JS code are received via postMessage.
  */
 
+// Polyfill URL for AudioWorklet scope — Emscripten's findWasmBinary() calls
+// new URL('file.wasm', base) even when wasmBinary is provided directly.
+if (typeof URL === 'undefined') {
+  globalThis.URL = class URL {
+    constructor(path, base) {
+      this.href = base ? (base + '/' + path) : path;
+      this.pathname = path;
+    }
+    toString() { return this.href; }
+  };
+}
+
 let processorRegistered = false;
+
+// Shared WASM module (single instance for all processors)
+let sharedModule = null;
+let sharedModulePromise = null;
+
+async function getOrCreateModule(wasmBinary, jsCode) {
+  // Return cached module if already initialized
+  if (sharedModule) return sharedModule;
+
+  // If initialization is in progress, wait for it
+  if (sharedModulePromise) return sharedModulePromise;
+
+  sharedModulePromise = (async () => {
+    // Evaluate the JS code to get the module factory
+    let createModule;
+    try {
+      const wrappedCode = `${jsCode}; return typeof createLeslieModule !== 'undefined' ? createLeslieModule : (typeof Module !== 'undefined' ? Module : null);`;
+      createModule = new Function(wrappedCode)();
+    } catch (evalErr) {
+      console.error('Failed to evaluate Leslie JS:', evalErr);
+      sharedModulePromise = null;
+      throw new Error('Could not evaluate Leslie module factory');
+    }
+
+    if (!createModule) {
+      sharedModulePromise = null;
+      throw new Error('Could not load Leslie module factory');
+    }
+
+    // Intercept WebAssembly.instantiate to capture WASM memory
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const instance = result.instance || result;
+      if (instance.exports) {
+        for (const value of Object.values(instance.exports)) {
+          if (value instanceof WebAssembly.Memory) {
+            capturedMemory = value;
+            break;
+          }
+        }
+      }
+      return result;
+    };
+
+    let Module;
+    try {
+      Module = await createModule({ wasmBinary });
+    } finally {
+      WebAssembly.instantiate = origInstantiate;
+    }
+
+    // Store captured memory on Module for later use
+    if (capturedMemory && !Module.wasmMemory) {
+      Module.wasmMemory = capturedMemory;
+    }
+
+    sharedModule = Module;
+    return Module;
+  })();
+
+  return sharedModulePromise;
+}
 
 class LeslieProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+
     this.effect = null;
     this.isInitialized = false;
     this.pendingMessages = [];
     this.Module = null;
+
+    // WASM buffer pointers
     this.inputPtrL = 0;
     this.inputPtrR = 0;
     this.outputPtrL = 0;
     this.outputPtrR = 0;
+
+    // Typed array views into WASM memory
     this.inputBufferL = null;
     this.inputBufferR = null;
     this.outputBufferL = null;
     this.outputBufferR = null;
+
     this._wasmMemory = null;
+
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
   async handleMessage(event) {
     const { type, ...data } = event.data;
+
     switch (type) {
-      case 'init': await this.initialize(data); break;
+      case 'init':
+        await this.initialize(data);
+        break;
+
       case 'parameter':
         if (this.effect && this.isInitialized) {
           this.effect.setParameter(data.paramId, data.value);
@@ -35,7 +126,10 @@ class LeslieProcessor extends AudioWorkletProcessor {
           this.pendingMessages.push(event.data);
         }
         break;
-      case 'dispose': this.cleanup(); break;
+
+      case 'dispose':
+        this.cleanup();
+        break;
     }
   }
 
@@ -46,60 +140,58 @@ class LeslieProcessor extends AudioWorkletProcessor {
       if (this.outputPtrL) this.Module._free(this.outputPtrL);
       if (this.outputPtrR) this.Module._free(this.outputPtrR);
     }
-    this.inputPtrL = 0; this.inputPtrR = 0;
-    this.outputPtrL = 0; this.outputPtrR = 0;
-    this.inputBufferL = null; this.inputBufferR = null;
-    this.outputBufferL = null; this.outputBufferR = null;
-    if (this.effect) { try { this.effect.delete(); } catch(_) {} }
+    this.inputPtrL = 0;
+    this.inputPtrR = 0;
+    this.outputPtrL = 0;
+    this.outputPtrR = 0;
+    this.inputBufferL = null;
+    this.inputBufferR = null;
+    this.outputBufferL = null;
+    this.outputBufferR = null;
+    // Call .delete() on Embind object to invoke C++ destructor
+    if (this.effect) {
+      try { this.effect.delete(); } catch(_) {}
+    }
     this.effect = null;
     this.isInitialized = false;
+    // Note: Do NOT null out this.Module — it's shared across instances
   }
 
   async initialize(data) {
     try {
       const { wasmBinary, jsCode } = data;
-      if (!wasmBinary || !jsCode) throw new Error('Missing wasmBinary or jsCode');
 
-      let createModule;
-      try {
-        const wrappedCode = `${jsCode}; return typeof createLeslieModule !== 'undefined' ? createLeslieModule : (typeof Module !== 'undefined' ? Module : null);`;
-        createModule = new Function(wrappedCode)();
-      } catch (evalErr) {
-        throw new Error('Could not evaluate Leslie module factory');
+      if (!wasmBinary || !jsCode) {
+        throw new Error('Missing wasmBinary or jsCode in init message');
       }
-      if (!createModule) throw new Error('Could not load Leslie module factory');
 
-      let capturedMemory = null;
-      const origInstantiate = WebAssembly.instantiate;
-      WebAssembly.instantiate = async function(...args) {
-        const result = await origInstantiate.apply(this, args);
-        const instance = result.instance || result;
-        if (instance.exports) {
-          for (const value of Object.values(instance.exports)) {
-            if (value instanceof WebAssembly.Memory) { capturedMemory = value; break; }
-          }
-        }
-        return result;
-      };
+      // Get or create the shared WASM module (single instance for all processors)
+      const Module = await getOrCreateModule(wasmBinary, jsCode);
 
-      let Module;
-      try { Module = await createModule({ wasmBinary }); }
-      finally { WebAssembly.instantiate = origInstantiate; }
-
+      // Create a NEW effect instance from the shared module
       this.effect = new Module.LeslieEffect();
       this.effect.initialize(sampleRate);
 
-      const bufferSize = 128 * 4;
+      // Allocate input AND output buffers in WASM memory (4 buffers for stereo effect)
+      const bufferSize = 128 * 4; // 128 samples * 4 bytes per float
       this.inputPtrL = Module._malloc(bufferSize);
       this.inputPtrR = Module._malloc(bufferSize);
       this.outputPtrL = Module._malloc(bufferSize);
       this.outputPtrR = Module._malloc(bufferSize);
 
-      const wasmMem = Module.wasmMemory || capturedMemory;
-      const heapBuffer = Module.HEAPF32 ? Module.HEAPF32.buffer : (wasmMem ? wasmMem.buffer : null);
-      if (!heapBuffer) throw new Error('Cannot access WASM memory buffer');
+      // Get WASM memory buffer
+      const wasmMem = Module.wasmMemory;
+      const heapBuffer = Module.HEAPF32
+        ? Module.HEAPF32.buffer
+        : (wasmMem ? wasmMem.buffer : null);
+
+      if (!heapBuffer) {
+        throw new Error('Cannot access WASM memory buffer');
+      }
+
       this._wasmMemory = wasmMem;
 
+      // Create typed array views into WASM memory
       this.inputBufferL = new Float32Array(heapBuffer, this.inputPtrL, 128);
       this.inputBufferR = new Float32Array(heapBuffer, this.inputPtrR, 128);
       this.outputBufferL = new Float32Array(heapBuffer, this.outputPtrL, 128);
@@ -108,13 +200,21 @@ class LeslieProcessor extends AudioWorkletProcessor {
       this.Module = Module;
       this.isInitialized = true;
 
-      for (const msg of this.pendingMessages) this.handleMessage({ data: msg });
+      // Process any pending messages
+      for (const msg of this.pendingMessages) {
+        this.handleMessage({ data: msg });
+      }
       this.pendingMessages = [];
+
+      // Notify main thread
       this.port.postMessage({ type: 'ready' });
 
     } catch (error) {
       console.error('Leslie initialization error:', error);
-      this.port.postMessage({ type: 'error', error: error.message });
+      this.port.postMessage({
+        type: 'error',
+        error: error.message
+      });
     }
   }
 
@@ -124,6 +224,7 @@ class LeslieProcessor extends AudioWorkletProcessor {
     const outputL = output[0];
     const outputR = output[1] || output[0];
 
+    // If no input connected or no effect ready, passthrough silence
     if (!input || !input[0] || !input[0].length) {
       if (outputL) outputL.fill(0);
       if (outputR) outputR.fill(0);
@@ -131,19 +232,22 @@ class LeslieProcessor extends AudioWorkletProcessor {
     }
 
     const inputL = input[0];
-    const inputR = input[1] || input[0];
+    const inputR = input[1] || input[0]; // Mono->stereo if needed
     const numSamples = inputL.length;
 
     if (!this.effect || !this.isInitialized) {
+      // Passthrough when WASM not ready
       outputL.set(inputL);
       outputR.set(inputR);
       return true;
     }
 
     try {
+      // Recreate views if WASM memory was resized
       const currentBuffer = this._wasmMemory
         ? this._wasmMemory.buffer
         : (this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null);
+
       if (currentBuffer && this.inputBufferL.buffer !== currentBuffer) {
         this.inputBufferL = new Float32Array(currentBuffer, this.inputPtrL, 128);
         this.inputBufferR = new Float32Array(currentBuffer, this.inputPtrR, 128);
@@ -151,12 +255,23 @@ class LeslieProcessor extends AudioWorkletProcessor {
         this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
       }
 
+      // Copy input audio into WASM memory
       this.inputBufferL.set(inputL.subarray(0, numSamples));
       this.inputBufferR.set(inputR.subarray(0, numSamples));
-      this.effect.process(this.inputPtrL, this.inputPtrR, this.outputPtrL, this.outputPtrR, numSamples);
+
+      // Process through WASM effect (input -> output)
+      this.effect.process(
+        this.inputPtrL, this.inputPtrR,
+        this.outputPtrL, this.outputPtrR,
+        numSamples
+      );
+
+      // Copy WASM output to Web Audio output
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       outputR.set(this.outputBufferR.subarray(0, numSamples));
+
     } catch (error) {
+      // Passthrough on error
       outputL.set(inputL);
       outputR.set(inputR);
     }
@@ -165,6 +280,7 @@ class LeslieProcessor extends AudioWorkletProcessor {
   }
 }
 
+// Register processor only once
 if (!processorRegistered) {
   registerProcessor('leslie-processor', LeslieProcessor);
   processorRegistered = true;

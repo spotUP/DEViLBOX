@@ -2,13 +2,90 @@
  * MoogFilters.worklet.js - Moog Ladder Filter AudioWorklet Effect Processor
  * Loads and runs the MoogFilters WASM module as an audio EFFECT (input -> output).
  *
- * Unlike synth worklets (output only), this processes input audio through
- * the WASM filter and writes to output.
+ * IMPORTANT: Shares a single WASM module across all processor instances to avoid
+ * AudioWorklet memory exhaustion (each Emscripten module allocates ~16MB).
  *
  * WASM binary and JS code are received via postMessage.
  */
 
+// Polyfill URL for AudioWorklet scope — Emscripten's findWasmBinary() calls
+// new URL('file.wasm', base) even when wasmBinary is provided directly.
+// We just need it to not crash; the URL is never actually fetched.
+if (typeof URL === 'undefined') {
+  globalThis.URL = class URL {
+    constructor(path, base) {
+      this.href = base ? (base + '/' + path) : path;
+      this.pathname = path;
+    }
+    toString() { return this.href; }
+  };
+}
+
 let processorRegistered = false;
+
+// Shared WASM module (single instance for all processors)
+let sharedModule = null;
+let sharedModulePromise = null;
+
+async function getOrCreateModule(wasmBinary, jsCode) {
+  // Return cached module if already initialized
+  if (sharedModule) return sharedModule;
+
+  // If initialization is in progress, wait for it
+  if (sharedModulePromise) return sharedModulePromise;
+
+  sharedModulePromise = (async () => {
+    // Evaluate the JS code to get the module factory
+    let createModule;
+    try {
+      const wrappedCode = `${jsCode}; return typeof createMoogFiltersModule !== 'undefined' ? createMoogFiltersModule : (typeof Module !== 'undefined' ? Module : null);`;
+      createModule = new Function(wrappedCode)();
+    } catch (evalErr) {
+      console.error('Failed to evaluate MoogFilters JS:', evalErr);
+      sharedModulePromise = null;
+      throw new Error('Could not evaluate MoogFilters module factory');
+    }
+
+    if (!createModule) {
+      sharedModulePromise = null;
+      throw new Error('Could not load MoogFilters module factory');
+    }
+
+    // Intercept WebAssembly.instantiate to capture WASM memory
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const instance = result.instance || result;
+      if (instance.exports) {
+        for (const value of Object.values(instance.exports)) {
+          if (value instanceof WebAssembly.Memory) {
+            capturedMemory = value;
+            break;
+          }
+        }
+      }
+      return result;
+    };
+
+    let Module;
+    try {
+      Module = await createModule({ wasmBinary });
+    } finally {
+      WebAssembly.instantiate = origInstantiate;
+    }
+
+    // Store captured memory on Module for later use
+    if (capturedMemory && !Module.wasmMemory) {
+      Module.wasmMemory = capturedMemory;
+    }
+
+    sharedModule = Module;
+    return Module;
+  })();
+
+  return sharedModulePromise;
+}
 
 class MoogFiltersProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -79,6 +156,7 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
     }
     this.effect = null;
     this.isInitialized = false;
+    // Note: Do NOT null out this.Module — it's shared across instances
   }
 
   async initialize(data) {
@@ -89,46 +167,10 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
         throw new Error('Missing wasmBinary or jsCode in init message');
       }
 
-      // Evaluate the JS code to get the module factory
-      let createModule;
-      try {
-        const wrappedCode = `${jsCode}; return typeof createMoogFiltersModule !== 'undefined' ? createMoogFiltersModule : (typeof Module !== 'undefined' ? Module : null);`;
-        createModule = new Function(wrappedCode)();
-      } catch (evalErr) {
-        console.error('Failed to evaluate MoogFilters JS:', evalErr);
-        throw new Error('Could not evaluate MoogFilters module factory');
-      }
+      // Get or create the shared WASM module (single instance for all processors)
+      const Module = await getOrCreateModule(wasmBinary, jsCode);
 
-      if (!createModule) {
-        throw new Error('Could not load MoogFilters module factory');
-      }
-
-      // Intercept WebAssembly.instantiate to capture WASM memory
-      let capturedMemory = null;
-      const origInstantiate = WebAssembly.instantiate;
-      WebAssembly.instantiate = async function(...args) {
-        const result = await origInstantiate.apply(this, args);
-        const instance = result.instance || result;
-        if (instance.exports) {
-          for (const value of Object.values(instance.exports)) {
-            if (value instanceof WebAssembly.Memory) {
-              capturedMemory = value;
-              break;
-            }
-          }
-        }
-        return result;
-      };
-
-      // Initialize the WASM module
-      let Module;
-      try {
-        Module = await createModule({ wasmBinary });
-      } finally {
-        WebAssembly.instantiate = origInstantiate;
-      }
-
-      // Create effect instance
+      // Create a NEW effect instance from the shared module
       this.effect = new Module.MoogFiltersEffect();
       this.effect.initialize(sampleRate);
 
@@ -140,7 +182,7 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
       this.outputPtrR = Module._malloc(bufferSize);
 
       // Get WASM memory buffer
-      const wasmMem = Module.wasmMemory || capturedMemory;
+      const wasmMem = Module.wasmMemory;
       const heapBuffer = Module.HEAPF32
         ? Module.HEAPF32.buffer
         : (wasmMem ? wasmMem.buffer : null);
@@ -229,6 +271,20 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
       // Copy WASM output to Web Audio output
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       outputR.set(this.outputBufferR.subarray(0, numSamples));
+
+      // DIAGNOSTIC: Log input/output peak levels every 500 frames (~5sec)
+      if (!this._diagCounter) this._diagCounter = 0;
+      this._diagCounter++;
+      if (this._diagCounter % 500 === 0) {
+        let maxIn = 0, maxOut = 0;
+        for (let i = 0; i < numSamples; i++) {
+          maxIn = Math.max(maxIn, Math.abs(inputL[i]));
+          maxOut = Math.max(maxOut, Math.abs(outputL[i]));
+        }
+        console.warn('[MoogWorklet] frame', this._diagCounter,
+          'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6),
+          'init:', this.isInitialized, 'hasEffect:', !!this.effect);
+      }
 
     } catch (error) {
       // Passthrough on error
