@@ -13,7 +13,7 @@ import { getToneEngine } from '@engine/ToneEngine';
  */
 export function playFromCursor(): boolean {
   const { cursor } = useTrackerStore.getState();
-  const { isPlaying, stop, play } = useTransportStore.getState();
+  const { isPlaying, stop, play, setCurrentRow } = useTransportStore.getState();
 
   // Stop if currently playing
   if (isPlaying) {
@@ -21,10 +21,15 @@ export function playFromCursor(): boolean {
   }
 
   // Set playback start position to cursor row
-  useTransportStore.setState({ startRow: cursor.rowIndex });
+  setCurrentRow(cursor.rowIndex);
 
   // Start playback (async)
-  getToneEngine().init().then(() => play());
+  getToneEngine()
+    .init()
+    .then(() => play())
+    .catch((error) => {
+      console.error('[playFromCursor] Failed to initialize audio engine:', error);
+    });
 
   return true;
 }

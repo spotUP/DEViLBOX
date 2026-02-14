@@ -22,34 +22,35 @@ describe('playFromCursor', () => {
     const mockCursor = { rowIndex: 16, channelIndex: 0, columnType: 'note' };
     const mockStop = vi.fn();
     const mockPlay = vi.fn();
-    const mockSetState = vi.fn();
+    const mockSetCurrentRow = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
     (useTransportStore.getState as any) = vi.fn(() => ({
       isPlaying: false,
       stop: mockStop,
       play: mockPlay,
+      setCurrentRow: mockSetCurrentRow,
     }));
-    (useTransportStore.setState as any) = mockSetState;
 
     const result = playFromCursor();
 
     expect(result).toBe(true);
-    expect(mockSetState).toHaveBeenCalledWith({ startRow: 16 });
+    expect(mockSetCurrentRow).toHaveBeenCalledWith(16);
   });
 
   it('stops playback before restarting from cursor', () => {
     const mockCursor = { rowIndex: 32, channelIndex: 0, columnType: 'note' };
     const mockStop = vi.fn();
     const mockPlay = vi.fn();
+    const mockSetCurrentRow = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
     (useTransportStore.getState as any) = vi.fn(() => ({
       isPlaying: true,
       stop: mockStop,
       play: mockPlay,
+      setCurrentRow: mockSetCurrentRow,
     }));
-    (useTransportStore.setState as any) = vi.fn();
 
     playFromCursor();
 
