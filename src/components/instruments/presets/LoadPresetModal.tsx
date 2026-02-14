@@ -582,11 +582,12 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 bg-ft2-header border-t-2 border-ft2-border">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 pb-6 sm:pb-3 bg-ft2-header border-t-2 border-ft2-border safe-area-bottom">
           <div className="flex items-center gap-4">
             <div className="text-ft2-textDim text-xs font-mono">
               {presetCount} PRESET{presetCount !== 1 ? 'S' : ''} • {browseMode === 'factory' ? activeCategory.toUpperCase() : (userFilterCategory === 'All' ? 'ALL USER' : userFilterCategory.toUpperCase())}
-              {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text">• DOUBLE-CLICK TO APPLY</span>}
+              {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text hidden sm:inline">• DOUBLE-CLICK TO APPLY</span>}
+              {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text sm:hidden">• SELECTED</span>}
             </div>
 
             {/* Jam Indicator */}
@@ -598,10 +599,10 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-ft2-bg border border-ft2-border text-ft2-text hover:border-ft2-highlight rounded transition-colors font-bold text-xs uppercase"
+              className="flex-1 sm:flex-none px-4 py-3 sm:py-2 bg-ft2-bg border border-ft2-border text-ft2-text hover:border-ft2-highlight rounded transition-colors font-bold text-xs uppercase"
             >
               Cancel
             </button>
@@ -615,7 +616,7 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
                 }
               }}
               disabled={!selectedPreset}
-              className="flex items-center gap-2 px-6 py-2 bg-ft2-cursor text-ft2-bg font-black hover:bg-ft2-highlight rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed uppercase text-xs"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 sm:py-2 bg-ft2-cursor text-ft2-bg font-black hover:bg-ft2-highlight rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed uppercase text-xs"
             >
               <Check size={16} />
               Load Preset
