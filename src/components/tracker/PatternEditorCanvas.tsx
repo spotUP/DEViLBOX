@@ -163,12 +163,51 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [pattern, isMobile, cursor.rowIndex]);
 
+  // Handle tap on pattern canvas - move cursor to tapped cell
+  const handlePatternTap = useCallback((tapX: number, tapY: number) => {
+    if (!pattern || !isMobile || !containerRef.current) return;
+
+    // Get container bounds
+    const rect = containerRef.current.getBoundingClientRect();
+    const relativeX = tapX - rect.left + scrollLeft;
+    const relativeY = tapY - rect.top + containerRef.current.scrollTop;
+
+    // Calculate row (accounting for header)
+    const headerHeight = 32; // Approximate header height
+    const rowIndex = Math.floor((relativeY - headerHeight) / ROW_HEIGHT);
+
+    // Calculate channel and column
+    // Channel width varies but roughly: LINE_NUMBER_WIDTH + (channels * ~200px)
+    let channelIndex = 0;
+    let columnType = cursor.columnType; // Keep current column type by default
+
+    // Simple channel detection (this is approximate - exact calculation would need channel widths)
+    const channelWidth = 200; // Approximate width per channel
+    if (relativeX > LINE_NUMBER_WIDTH) {
+      channelIndex = Math.floor((relativeX - LINE_NUMBER_WIDTH) / channelWidth);
+      channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
+    }
+
+    // Clamp row to valid range
+    const validRow = Math.max(0, Math.min(rowIndex, pattern.length - 1));
+
+    // Move cursor to tapped position
+    console.log(`[PatternCanvas] Tap detected: row=${validRow}, channel=${channelIndex}`);
+    useTrackerStore.getState().setCursor({
+      rowIndex: validRow,
+      channelIndex,
+      columnType,
+    });
+  }, [pattern, isMobile, scrollLeft, cursor.columnType]);
+
   const patternGestures = useMobilePatternGestures({
     onSwipeLeft,
     onSwipeRight,
     onSwipeUp: handleSwipeUp,
     onSwipeDown: handleSwipeDown,
+    onTap: handlePatternTap,
     onScroll: handleScroll,
+    swipeThreshold: 30, // Lower threshold for better mobile responsiveness
     enabled: isMobile,
   });
 

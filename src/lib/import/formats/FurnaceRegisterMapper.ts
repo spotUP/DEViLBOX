@@ -486,8 +486,11 @@ export class FurnaceRegisterMapper {
     // Reference: snes.cpp reset() lines 873-877
     // Sample directory is at 0x200, so DIR register = 0x02
     engine.write(chip, 0x5D, 0x02);  // DIR - Sample directory base (0x200 >> 8)
-    engine.write(chip, 0x0C, 127);   // MVOLL - Master volume left
-    engine.write(chip, 0x1C, 127);   // MVOLR - Master volume right
+    
+    // MODIFIED: Set master volume to 0 initially to prevent init beep
+    engine.write(chip, 0x0C, 0);     // MVOLL - Master volume left = 0 (silent)
+    engine.write(chip, 0x1C, 0);     // MVOLR - Master volume right = 0 (silent)
+    
     engine.write(chip, 0x6C, 0);     // FLG - DSP out of reset, echo off
     engine.write(chip, 0x4C, 0);     // KON - Key on (clear)
     engine.write(chip, 0x5C, 0);     // KOFF - Key off (clear)
@@ -757,12 +760,13 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.SCC;
     // Reference: scc.cpp line 303-307
-    // Set all channel volumes to max
+    
+    // MODIFIED: Set all channel volumes to 0 initially to prevent init beep
     for (let i = 0; i < 5; i++) {
-      engine.write(chip, 0x8A + i, 0x0F);  // Volume registers
+      engine.write(chip, 0x8A + i, 0x00);  // Volume = 0 (silent)
     }
-    // Enable all channels
-    engine.write(chip, 0x8F, 0x1F);  // Channel enable
+    // Disable all channels initially (will be enabled in writeKeyOn)
+    engine.write(chip, 0x8F, 0x00);  // Channel enable = 0 (all off)
   }
 
   /**
@@ -828,12 +832,14 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.SWAN;
     // Reference: swan.cpp lines 324-330
-    // Set all channel volumes to max
+    
+    // MODIFIED: Set all channel volumes to 0 initially to prevent init beep
     for (let i = 0; i < 4; i++) {
-      engine.write(chip, 0x08 + i, 0xFF);  // Channel volumes (L+R)
+      engine.write(chip, 0x08 + i, 0x00);  // Channel volumes = 0 (silent)
     }
     engine.write(chip, 0x0F, 0x00);   // Sound DMA control off
-    engine.write(chip, 0x11, 0x0F);   // Speaker enable, headphone output
+    engine.write(chip, 0x10, 0x00);   // Channel control = all off initially
+    engine.write(chip, 0x11, 0x00);   // Output control = silent initially
   }
 
   /**
@@ -1016,12 +1022,13 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.SEGAPCM;
     // Reference: segapcm.cpp lines 193-198
-    // Initialize all 16 channels
+    
+    // MODIFIED: Initialize all 16 channels with volume 0 to prevent init beep
     for (let i = 0; i < 16; i++) {
       const base = i << 3;
-      engine.write(chip, 0x86 + base, 3);      // Loop off, enable
-      engine.write(chip, 0x02 + base, 0x7F);   // Volume left
-      engine.write(chip, 0x03 + base, 0x7F);   // Volume right
+      engine.write(chip, 0x86 + base, 0);      // Disabled initially
+      engine.write(chip, 0x02 + base, 0x00);   // Volume left = 0 (silent)
+      engine.write(chip, 0x03 + base, 0x00);   // Volume right = 0 (silent)
     }
   }
 
@@ -1106,7 +1113,9 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.VIC;
     // Reference: vic20.cpp line 173
-    engine.write(chip, 14, 15);  // Volume = max
+    
+    // MODIFIED: Set volume to 0 initially to prevent init beep
+    engine.write(chip, 14, 0);  // Volume = 0 (silent)
   }
 
   /**
