@@ -39,7 +39,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const { isPlaying, togglePlayPause } = useTransportStore();
   const { patterns, currentPatternIndex, cursor, setCell, moveCursor } = useTrackerStore();
   const pattern = patterns[currentPatternIndex];
-  const { orientation, isPortrait, isLandscape } = useOrientation();
+  const { isPortrait, isLandscape } = useOrientation();
 
   // Calculate visible channels based on orientation
   const visibleChannels = isLandscape ? 4 : 1;

@@ -182,10 +182,10 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   // Handle touch with pressure sensitivity (iOS 3D Touch / Force Touch)
   const handleKeyTouch = useCallback((semitone: number, e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // @ts-ignore - force property exists on Touch in iOS Safari
-    const force = touch.force || 1.0; // Default to 1.0 on Android
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _velocity = Math.min(127, Math.floor(force * 127)); // TODO: Pass velocity to onNoteInput
+    // TODO: Implement velocity sensitivity from touch.force (iOS 3D Touch)
+    // const force = touch.force || 1.0;
+    // const velocity = Math.min(127, Math.floor(force * 127));
+    // Pass velocity to onNoteInput when implemented
 
     // For now, just trigger the note (velocity handling can be added to onNoteInput later)
     onNotePress(semitone);
