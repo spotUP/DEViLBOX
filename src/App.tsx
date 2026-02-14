@@ -50,6 +50,7 @@ const InstrumentEditorPopout = lazy(() => import('./components/instruments/Instr
 const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
 const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
+const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 
 function App() {
   // Check for application updates
@@ -91,6 +92,7 @@ function App() {
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
   const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
   const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
@@ -737,6 +739,7 @@ function App() {
         onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
         onShowPatterns={() => setShowPatterns(!showPatterns)}
         onShowInstruments={() => setShowInstrumentModal(true)}
+        onLoad={() => setShowFileBrowser(true)}
         onShowDrumpads={() => setShowDrumpads(true)}
       >
         <div className="flex-1 flex flex-col items-center justify-center px-4">
@@ -832,6 +835,7 @@ function App() {
         onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
         onShowPatterns={() => setShowPatterns(!showPatterns)}
         onShowInstruments={() => setShowInstrumentModal(true)}
+        onLoad={() => setShowFileBrowser(true)}
         onShowDrumpads={() => setShowDrumpads(true)}
       >
         <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
@@ -889,6 +893,35 @@ function App() {
         {showInstrumentFX && <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />}
         {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
         {showDrumpads && <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />}
+        {showFileBrowser && (
+          <FileBrowser
+            isOpen={showFileBrowser}
+            onClose={() => setShowFileBrowser(false)}
+            mode="load"
+            onLoad={async (data: any, filename: string) => {
+              setShowFileBrowser(false);
+              // Load the project data
+              const { loadPatterns, setCurrentPattern } = useTrackerStore.getState();
+              const { addInstrument } = useInstrumentStore.getState();
+
+              try {
+                if (data.patterns) {
+                  loadPatterns(data.patterns);
+                  if (data.patterns.length > 0) {
+                    setCurrentPattern(0);
+                  }
+                }
+                if (data.instruments && Array.isArray(data.instruments)) {
+                  data.instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
+                }
+                notify.success(`Loaded: ${filename}`);
+              } catch (error) {
+                console.error('Failed to load project:', error);
+                notify.error('Failed to load project');
+              }
+            }}
+          />
+        )}
         {showSamplePackModal && <SamplePackBrowser onClose={() => setShowSamplePackModal(false)} />}
         {showTips && (
           <TipOfTheDay 

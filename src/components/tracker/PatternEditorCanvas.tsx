@@ -136,6 +136,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     instruments: state.instruments
   })));
 
+  // Calculate if all channels fit in viewport (for disabling horizontal scroll)
+  const allChannelsFit = useMemo(() => {
+    if (!pattern) return true;
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const firstCell = pattern.channels[0]?.rows[0];
+    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
+    const hasProb = firstCell?.probability !== undefined;
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4;
+    const channelWidth = noteWidth + paramWidth + 20 + 20;
+    const totalWidth = pattern.channels.length * channelWidth;
+    return LINE_NUMBER_WIDTH + totalWidth <= dimensions.width;
+  }, [pattern, dimensions.width]);
+
   // Mobile gesture handlers
   // Vertical swipes move the cursor up/down
   const handleSwipeUp = useCallback(() => {
@@ -1178,6 +1194,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     lineNumberCacheRef.current = {};
   }, [dimensions]);
 
+  // Reset horizontal scroll when all channels fit in viewport
+  useEffect(() => {
+    if (allChannelsFit && scrollLeft > 0) {
+      setScrollLeft(0);
+    }
+  }, [allChannelsFit, scrollLeft]);
+
   // Handle mouse wheel for scrolling
   useEffect(() => {
     const container = containerRef.current;
@@ -1200,8 +1223,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const newRow = Math.min(pattern.length + 32, currentRow + delta); // Allow scrolling 32 rows into next pattern
         useTrackerStore.getState().moveCursorToRow(newRow);
       } else {
-        // Horizontal scroll - scroll channels
-        setScrollLeft(prev => Math.max(0, prev + e.deltaX));
+        // Horizontal scroll - scroll channels (only if they don't all fit)
+        const state = useTrackerStore.getState();
+        const noteWidth = CHAR_WIDTH * 3 + 4;
+        const firstCell = state.patterns[state.currentPatternIndex]?.channels[0]?.rows[0];
+        const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
+        const hasProb = firstCell?.probability !== undefined;
+        const paramWidth = CHAR_WIDTH * 10 + 16
+          + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+          + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+          + CHAR_WIDTH * 2 + 4;
+        const chanWidth = noteWidth + paramWidth + 20 + 20;
+        const totalWidth = (state.patterns[state.currentPatternIndex]?.channels.length || 0) * chanWidth;
+        const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalWidth - container.clientWidth);
+
+        if (maxScroll > 0) {
+          setScrollLeft(prev => Math.max(0, Math.min(maxScroll, prev + e.deltaX)));
+        }
       }
     };
 
@@ -1318,7 +1356,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
-              className="overflow-x-auto scrollbar-hidden flex-1"
+              className={`${allChannelsFit ? 'overflow-x-hidden' : 'overflow-x-auto'} scrollbar-hidden flex-1`}
               data-vu-scroll
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
