@@ -114,7 +114,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     // This Tone.js connection ensures the wet path is part of the graph that Tone.js knows about.
     this.wetGain.connect(this.output);
 
-    console.warn('[MoogFilter] Created, wet:', this._options.wet, 'cutoff:', this._options.cutoff);
+    // Debug: console.log('[MoogFilter] Created, wet:', this._options.wet, 'cutoff:', this._options.cutoff);
 
     // Start WASM loading, use JS fallback immediately
     this.initFallback();
@@ -290,20 +290,20 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
         const outR = e.outputBuffer.getChannelData(1);
         this.fallbackFilter!.process(inL, inR, outL, outR);
 
-        // DIAGNOSTIC: Log fallback audio levels — frequent initially, then sparse
+        // DIAGNOSTIC: Log fallback audio levels — disabled to reduce console noise
         fallbackFrameCount++;
-        const shouldLog = fallbackFrameCount <= 200
-          ? (fallbackFrameCount % 50 === 1)   // Every ~0.3sec for first ~1.2sec
-          : (fallbackFrameCount % 2000 === 1); // Every ~12sec after
-        if (shouldLog) {
-          let maxIn = 0, maxOut = 0;
-          for (let i = 0; i < inL.length; i++) {
-            maxIn = Math.max(maxIn, Math.abs(inL[i]));
-            maxOut = Math.max(maxOut, Math.abs(outL[i]));
-          }
-          console.warn('[MoogFilter] Fallback frame:', fallbackFrameCount,
-            'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6));
-        }
+        // const shouldLog = fallbackFrameCount <= 200
+        //   ? (fallbackFrameCount % 50 === 1)   // Every ~0.3sec for first ~1.2sec
+        //   : (fallbackFrameCount % 2000 === 1); // Every ~12sec after
+        // if (shouldLog) {
+        //   let maxIn = 0, maxOut = 0;
+        //   for (let i = 0; i < inL.length; i++) {
+        //     maxIn = Math.max(maxIn, Math.abs(inL[i]));
+        //     maxOut = Math.max(maxOut, Math.abs(outL[i]));
+        //   }
+        //   console.log('[MoogFilter] Fallback frame:', fallbackFrameCount,
+        //     'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6));
+        // }
       };
 
       // Connect fallback: input._gainNode → fallbackNode → wetGain._gainNode
@@ -322,7 +322,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       keepalive.connect(rawContext.destination);
 
       this.usingFallback = true;
-      console.warn('[MoogFilter] Fallback connected with keepalive');
+      // Debug: console.log('[MoogFilter] Fallback connected with keepalive');
     } catch (err) {
       console.warn('[MoogFilter] Fallback init failed:', err);
       // Last resort: direct passthrough (input → wetGain → output already connected)

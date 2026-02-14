@@ -21,9 +21,8 @@ export class ModularConnectionManager {
    */
   updateConnections(voices: ModularVoice[], connections: ModularConnection[]): void {
     if (!this.graphBuilder && voices.length > 0) {
-      // Lazy initialize graph builder with first voice's context
-      const ctx = voices[0].getOutput().context as AudioContext;
-      this.graphBuilder = new ModularGraphBuilder(ctx);
+      // Lazy initialize graph builder
+      this.graphBuilder = new ModularGraphBuilder();
     }
 
     if (!this.graphBuilder) return;

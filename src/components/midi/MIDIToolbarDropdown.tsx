@@ -7,7 +7,8 @@ import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
 import { PerformancePanel } from './PerformancePanel';
-import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2 } from 'lucide-react';
+import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone } from 'lucide-react';
+import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
 
 
 const MIDIToolbarDropdownComponent: React.FC = () => {
@@ -64,6 +65,9 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [lastActivityTimestamp]);
+
+  // Get mobile MIDI info
+  const midiInfo = getBluetoothMIDIInfo();
 
   // Determine status color
   const getStatusColor = () => {
@@ -124,14 +128,22 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
           </div>
 
           {isSupported === false ? (
-            <div className="px-4 py-6 text-center">
-              <AlertCircle size={24} className="mx-auto mb-2 text-text-muted" />
-              <p className="text-sm text-text-secondary">
+            <div className="px-4 py-6">
+              <div className="flex items-center gap-2 mb-3 justify-center">
+                {midiInfo.isIOS || midiInfo.instructions?.includes('Android') ? (
+                  <Smartphone size={24} className="text-text-muted" />
+                ) : (
+                  <AlertCircle size={24} className="text-text-muted" />
+                )}
+              </div>
+              <p className="text-sm text-text-secondary text-center mb-3">
                 Web MIDI API is not supported in this browser.
               </p>
-              <p className="text-xs text-text-muted mt-1">
-                Try Chrome, Edge, or Opera.
-              </p>
+              {midiInfo.instructions && (
+                <div className="text-xs text-text-muted text-left bg-dark-bgSecondary rounded p-3 max-h-64 overflow-y-auto whitespace-pre-line">
+                  {midiInfo.instructions}
+                </div>
+              )}
             </div>
           ) : isSupported === null ? (
             <div className="px-4 py-6 text-center">
@@ -156,6 +168,21 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
                   selectedId={selectedOutputId}
                   onSelect={selectOutput}
                 />
+                {/* Mobile Help - Show instructions if on mobile and no devices connected */}
+                {(midiInfo.isIOS || midiInfo.instructions?.includes('Android')) &&
+                 inputDevices.length === 0 && outputDevices.length === 0 && (
+                  <div className="mt-2 p-3 bg-dark-bgSecondary rounded border border-dark-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Smartphone size={14} className="text-accent-primary" />
+                      <span className="text-xs font-medium text-text-primary">
+                        Mobile MIDI Setup
+                      </span>
+                    </div>
+                    <div className="text-xs text-text-muted whitespace-pre-line max-h-48 overflow-y-auto">
+                      {midiInfo.instructions}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Quick Actions */}

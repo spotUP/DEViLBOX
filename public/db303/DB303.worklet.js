@@ -533,8 +533,8 @@ class DB303Processor extends AudioWorkletProcessor {
             methods.push(key);
           }
         }
-        console.log('[DB303 Worklet] Available methods:', methods.join(', '));
-        
+        // Debug: console.log('[DB303 Worklet] Available methods:', methods.join(', '));
+
         // Ensure filter is enabled
         if (typeof this.synth.setFilterSelect === 'function') {
           this.synth.setFilterSelect(0);

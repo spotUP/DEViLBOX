@@ -8,7 +8,6 @@
 import type { DevilboxSynth } from '../../types/synth';
 import type { ModularPatchConfig, ModularModuleInstance, ModularConnection } from '../../types/modular';
 import { ModularVoice } from './ModularVoice';
-import { ModularGraphBuilder } from './ModularGraphBuilder';
 import { ModularConnectionManager } from './ModularConnectionManager';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
 

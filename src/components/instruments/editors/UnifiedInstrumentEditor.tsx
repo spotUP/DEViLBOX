@@ -40,6 +40,7 @@ import { OBXdControls } from '../controls/OBXdControls';
 import { WAMControls } from '../controls/WAMControls';
 import { VSTBridgePanel } from '../controls/VSTBridgePanel';
 import { HarmonicSynthControls } from '../controls/HarmonicSynthControls';
+import { ModularSynthControls } from '../synths/modular/ModularSynthControls';
 import { TonewheelOrganControls } from '../controls/TonewheelOrganControls';
 import { MelodicaControls } from '../controls/MelodicaControls';
 import { VitalControls } from '../controls/VitalControls';
@@ -64,7 +65,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -141,6 +142,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
+  if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'WAM') return 'wam';
   if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
   if (synthType === 'Melodica') return 'melodica';
@@ -1744,6 +1746,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             onChange={(updates) => handleChange({ harmonicSynth: { ...harmonicConfig, ...updates } })}
           />
         </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MODULAR SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'modular') {
+    return (
+      <div className="synth-editor-container flex flex-col h-full">
+        <ModularSynthControls
+          config={instrument}
+          onChange={handleChange}
+        />
       </div>
     );
   }

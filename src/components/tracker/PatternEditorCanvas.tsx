@@ -93,17 +93,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
 
-  // Mobile gesture handlers
-  // Note: Only horizontal swipes - vertical swipes allow native scrolling
-  const patternGestures = useMobilePatternGestures({
-    onSwipeLeft,
-    onSwipeRight,
-    // onSwipeUp and onSwipeDown intentionally omitted to allow scrolling
-    enabled: isMobile,
-  });
-
-
-  // Get pattern and actions
+  // Get pattern and actions (moved BEFORE callbacks that use them)
   const {
     pattern,
     patterns,
@@ -145,6 +135,42 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const { instruments } = useInstrumentStore(useShallow((state) => ({
     instruments: state.instruments
   })));
+
+  // Mobile gesture handlers
+  // Vertical swipes move the cursor up/down
+  const handleSwipeUp = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const newRow = Math.max(0, cursor.rowIndex - 4); // Move up 4 rows
+    useTrackerStore.getState().moveCursorToRow(newRow);
+  }, [pattern, isMobile, cursor.rowIndex]);
+
+  const handleSwipeDown = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const newRow = Math.min(pattern.length - 1, cursor.rowIndex + 4); // Move down 4 rows
+    useTrackerStore.getState().moveCursorToRow(newRow);
+  }, [pattern, isMobile, cursor.rowIndex]);
+
+  // Continuous scroll handler for drag scrolling
+  const handleScroll = useCallback((deltaY: number) => {
+    if (!pattern || !isMobile) return;
+
+    // Convert pixels to rows (ROW_HEIGHT = 24px)
+    const rowDelta = Math.round(deltaY / ROW_HEIGHT);
+
+    if (Math.abs(rowDelta) > 0) {
+      const newRow = Math.max(0, Math.min(pattern.length + 31, cursor.rowIndex + rowDelta));
+      useTrackerStore.getState().moveCursorToRow(newRow);
+    }
+  }, [pattern, isMobile, cursor.rowIndex]);
+
+  const patternGestures = useMobilePatternGestures({
+    onSwipeLeft,
+    onSwipeRight,
+    onSwipeUp: handleSwipeUp,
+    onSwipeDown: handleSwipeDown,
+    onScroll: handleScroll,
+    enabled: isMobile,
+  });
 
   // Audio-synced display state ref (BassoonTracker pattern)
   // This stores the last state retrieved from TrackerReplayer.getStateAtTime()

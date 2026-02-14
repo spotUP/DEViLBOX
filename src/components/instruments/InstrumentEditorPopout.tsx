@@ -5,7 +5,7 @@
  * modal overlay. Reads directly from stores (same JS context as main window).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
@@ -24,6 +24,12 @@ export const InstrumentEditorPopout: React.FC = () => {
   const setCurrentInstrument = useInstrumentStore((state) => state.setCurrentInstrument);
 
   const currentInstrument = instruments.find((inst) => inst.id === currentInstrumentId) || null;
+
+  // Debug: verify store is shared (log on mount)
+  useEffect(() => {
+    console.log('[InstrumentEditorPopout] Mounted with currentInstrumentId:', currentInstrumentId);
+    console.log('[InstrumentEditorPopout] Store instruments count:', instruments.length);
+  }, []);
 
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
   const [showKeyboard, setShowKeyboard] = useState(true);
@@ -158,9 +164,10 @@ export const InstrumentEditorPopout: React.FC = () => {
         {activeTab === 'sound' && (
           <UnifiedInstrumentEditor
             instrument={currentInstrument}
-            onChange={(updates: Partial<InstrumentConfig>) =>
-              updateInstrument(currentInstrument.id, updates)
-            }
+            onChange={(updates: Partial<InstrumentConfig>) => {
+              console.log('[InstrumentEditorPopout] onChange called with updates:', updates);
+              updateInstrument(currentInstrument.id, updates);
+            }}
           />
         )}
 

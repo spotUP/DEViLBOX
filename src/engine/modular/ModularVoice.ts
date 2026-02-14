@@ -143,6 +143,13 @@ export class ModularVoice {
   }
 
   /**
+   * Get current note (for pitch bend, vibrato, etc.)
+   */
+  getCurrentNote(): number | null {
+    return this._currentNote;
+  }
+
+  /**
    * Cleanup all modules
    */
   dispose(): void {

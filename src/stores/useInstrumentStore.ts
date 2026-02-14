@@ -350,6 +350,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      console.log('[useInstrumentStore] updateInstrument called:', { id, updates, windowContext: window === window.parent ? 'main' : 'popup' });
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Check what's changing

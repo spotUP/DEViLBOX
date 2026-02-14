@@ -9,7 +9,7 @@ import type { PortRef } from '../../../../../types/modular';
 
 export interface ModularUIState {
   selectedModuleId: string | null;
-  hoveredPortId: string | null;
+  hoveredPortId: PortRef | null;
   wiringSource: PortRef | null;
   wiringPreview: { x: number; y: number } | null;
   selectedConnectionId: string | null;
@@ -17,7 +17,7 @@ export interface ModularUIState {
 
 export const useModularState = () => {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-  const [hoveredPortId, setHoveredPortId] = useState<string | null>(null);
+  const [hoveredPortId, setHoveredPortId] = useState<PortRef | null>(null);
   const [wiringSource, setWiringSource] = useState<PortRef | null>(null);
   const [wiringPreview, setWiringPreview] = useState<{ x: number; y: number } | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
@@ -44,8 +44,8 @@ export const useModularState = () => {
     setSelectedConnectionId(connectionId);
   }, []);
 
-  const hoverPort = useCallback((portId: string | null) => {
-    setHoveredPortId(portId);
+  const hoverPort = useCallback((portRef: PortRef | null) => {
+    setHoveredPortId(portRef);
   }, []);
 
   return {

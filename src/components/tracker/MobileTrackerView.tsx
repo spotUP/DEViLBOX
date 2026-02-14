@@ -37,6 +37,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<MobileTab>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
+  const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
   const { isPlaying, togglePlayPause } = useTransportStore();
   const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste } = useTrackerStore();
   const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore();
@@ -218,7 +219,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       </div>
 
       {/* Main content area - Pattern/Instruments/Controls tabs */}
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? 'calc(180px + env(safe-area-inset-bottom, 0))' : 'calc(56px + env(safe-area-inset-bottom, 0))' }}>
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0))` : 'calc(56px + env(safe-area-inset-bottom, 0))' }}>
         {activeTab === 'pattern' && (
           <div className="h-full flex flex-col">
             {/* Pattern editor canvas - scrollable */}
@@ -278,6 +279,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           onCopy={handleCopy}
           onCut={handleCut}
           onPaste={handlePaste}
+          onCollapseChange={setIsInputCollapsed}
         />
       )}
 

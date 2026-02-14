@@ -16,6 +16,7 @@ interface MobilePatternInputProps {
   onCopy?: () => void;
   onCut?: () => void;
   onPaste?: () => void;
+  onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
 // Note names for the piano keyboard
@@ -29,6 +30,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   onCopy,
   onCut,
   onPaste,
+  onCollapseChange,
 }) => {
   const { cursor, currentOctave, setCurrentOctave } = useTrackerStore();
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -87,8 +89,10 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   // Collapse/expand handler
   const toggleCollapse = useCallback(() => {
     haptics.selection();
-    setIsCollapsed(!isCollapsed);
-  }, [isCollapsed]);
+    const newCollapsed = !isCollapsed;
+    setIsCollapsed(newCollapsed);
+    onCollapseChange?.(newCollapsed);
+  }, [isCollapsed, onCollapseChange]);
 
   // Long-press context menu handlers
   const handleLongPressStart = useCallback(() => {

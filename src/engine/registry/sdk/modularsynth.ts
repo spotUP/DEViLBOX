@@ -9,6 +9,7 @@ import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
 import { ModularSynth } from '../../modular/ModularSynth';
 import { MODULAR_INIT_PATCH } from '../../../constants/modularPresets';
+import '../../modular/modules'; // Register built-in modules
 
 const descriptor: SynthDescriptor = {
   id: 'ModularSynth',
