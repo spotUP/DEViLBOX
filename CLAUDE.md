@@ -41,11 +41,14 @@ data loss must NEVER happen again.
 
 *** IMPORTANT ***
 
-When debugging or implementing Furnace chip synths (GB, NES, OPN2, OPM, etc.):
+When debugging or implementing Furnace chip synths, instruments, or imports:
 
-1. **NEVER guess** - Always reference the actual Furnace source code
-2. **Get proof/evidence** - Read the relevant platform file (e.g., `gb.cpp`, `nes.cpp`)
-3. **Implement 1:1** - Match the Furnace source exactly, including:
+1. **ALWAYS reference the Furnace tracker sources** at `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/`
+   - Platform implementations: `src/engine/platform/` (e.g., `gb.cpp`, `nes.cpp`, `rf5c68.cpp`)
+   - WASM wrapper: `/Users/spot/Code/DEViLBOX/furnace-wasm/common/FurnaceDispatchWrapper.cpp`
+2. **NEVER guess** - Always reference the actual Furnace source code
+3. **Get proof/evidence** - Read the relevant platform file
+4. **Implement 1:1** - Match the Furnace source exactly, including:
    - Register write sequences
    - Timing/order of writes
    - Envelope formats
