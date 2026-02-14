@@ -107,6 +107,8 @@ export type SynthType =
   | 'FurnaceZXBEEPER' // ZX Spectrum beeper
   | 'FurnaceSCVTONE'  // Epoch Super Cassette Vision
   | 'FurnacePCMDAC'   // Generic PCM DAC
+  // Additive/Spectral
+  | 'HarmonicSynth'
   // Bass synths
   | 'WobbleBass'
   // Buzzmachines (Jeskola Buzz effects as synths)
@@ -418,6 +420,37 @@ export interface WavetableConfig {
   };
   filterEnvelope: EnvelopeConfig;
 }
+
+export interface HarmonicSynthConfig {
+  harmonics: number[];        // 32 values, each 0-1 (amplitude per harmonic)
+  spectralTilt: number;       // -100 to 100 (shapes harmonic rolloff)
+  evenOddBalance: number;     // -100 to 100 (odd-heavy ↔ even-heavy)
+  filter: {
+    type: 'lowpass' | 'highpass' | 'bandpass';
+    cutoff: number;           // 20-20000 Hz
+    resonance: number;        // 0-30
+  };
+  envelope: { attack: number; decay: number; sustain: number; release: number; };
+  lfo: {
+    rate: number;             // 0.1-20 Hz
+    depth: number;            // 0-100
+    target: 'pitch' | 'filter' | 'spectral';
+  };
+  maxVoices: number;          // 4-8
+}
+
+/** Sawtooth harmonic series: 1/n */
+const SAW_HARMONICS = Array.from({ length: 32 }, (_, i) => 1 / (i + 1));
+
+export const DEFAULT_HARMONIC_SYNTH: HarmonicSynthConfig = {
+  harmonics: SAW_HARMONICS,
+  spectralTilt: 0,
+  evenOddBalance: 0,
+  filter: { type: 'lowpass', cutoff: 8000, resonance: 1 },
+  envelope: { attack: 10, decay: 300, sustain: 70, release: 200 },
+  lfo: { rate: 2, depth: 0, target: 'pitch' },
+  maxVoices: 6,
+};
 
 export const DEFAULT_WAVETABLE: WavetableConfig = {
   wavetableId: 'basic-saw',
@@ -2812,6 +2845,7 @@ export interface InstrumentConfig {
   pitchEnvelope?: PitchEnvelopeConfig;  // Pitch modulation envelope (for synth basses, kicks, FX)
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
+  harmonicSynth?: HarmonicSynthConfig;
   granular?: GranularConfig;
   // New synth configs
   superSaw?: SuperSawConfig;
