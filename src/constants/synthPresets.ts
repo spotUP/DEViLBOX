@@ -17,7 +17,6 @@ import type {
   DubSirenConfig,
   SpaceLaserConfig,
 } from '@typedefs/instrument';
-import { HARMONIC_PRESETS } from './harmonicPresets';
 
 export interface SynthPreset {
   id: string;
@@ -2830,8 +2829,6 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return DUB_SIREN_PRESETS;
     case 'SpaceLaser':
       return SPACE_LASER_PRESETS;
-    case 'HarmonicSynth':
-      return HARMONIC_PRESETS;
     default:
       return [];
   }
@@ -2850,5 +2847,4 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   PolySynth: POLYSYNTH_PRESETS,
   DubSiren: DUB_SIREN_PRESETS,
   SpaceLaser: SPACE_LASER_PRESETS,
-  HarmonicSynth: HARMONIC_PRESETS,
 };
