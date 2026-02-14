@@ -1509,8 +1509,8 @@ export class ToneEngine {
       }
 
       default: {
-        // Check VSTBridge registry for dynamically registered synths
-        if (SYNTH_REGISTRY.has(config.synthType || '')) {
+        // Check VSTBridge registry and new SynthRegistry for dynamically registered synths
+        if (SYNTH_REGISTRY.has(config.synthType || '') || SynthRegistry.has(config.synthType || '')) {
           instrument = InstrumentFactory.createInstrument(config);
           break;
         }
