@@ -12,6 +12,7 @@ import { Plus, Power, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import type { NeuralModelInfo } from '@typedefs/pedalboard';
 import type { NeuralPedalboard, PedalboardEffect } from '@typedefs/pedalboard';
 import { useThemeStore } from '@stores';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface PedalboardManagerProps {
   pedalboard: NeuralPedalboard;
@@ -197,7 +198,8 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
   }, [pedalboard, safeOnChange, onEnabledChange]);
 
   return (
-    <div className="space-y-4" style={{ backgroundColor: bgColor }}>
+    <ScrollLockContainer>
+      <div className="space-y-4" style={{ backgroundColor: bgColor }}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b" style={{ borderColor }}>
         <div className="flex items-center gap-3">
@@ -253,7 +255,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
 
       {/* Input/Output Gain */}
       <div className="px-4 py-3 rounded-lg border" style={{ backgroundColor: panelBg, borderColor }}>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="flex items-center gap-4">
             <label htmlFor="input-gain" className="text-sm font-medium text-gray-400 min-w-[80px]">
               Input Gain
@@ -408,6 +410,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
             : undefined
         }
       />
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };

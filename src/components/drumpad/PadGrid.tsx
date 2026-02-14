@@ -7,6 +7,7 @@ import { PadButton } from './PadButton';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
+import { useOrientation } from '@hooks/useOrientation';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
@@ -22,6 +23,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   // Track focused pad for keyboard navigation
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
+
+  const { isPortrait } = useOrientation();
+  const gridCols = isPortrait ? 2 : 4; // 2x8 grid on portrait, 4x4 on landscape
 
   const { programs, currentProgramId } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
@@ -171,10 +175,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
         </div>
       </div>
 
-      {/* 4x4 Pad Grid */}
+      {/* Responsive Pad Grid (4x4 landscape, 2x8 portrait) */}
       <div
         ref={gridRef}
-        className="grid grid-cols-4 gap-2"
+        className={`grid gap-2 ${gridCols === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}
         role="grid"
         aria-label="Drum pad grid"
       >
