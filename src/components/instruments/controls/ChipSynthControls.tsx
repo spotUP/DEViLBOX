@@ -11,6 +11,8 @@ import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import type { SynthType } from '@typedefs/instrument';
 import JSZip from 'jszip';
+import { VowelEditor } from './VowelEditor';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface ChipSynthControlsProps {
   synthType: SynthType;
@@ -41,6 +43,9 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   // Use ref to prevent stale closures in callbacks
   const parametersRef = useRef(parameters);
   useEffect(() => { parametersRef.current = parameters; }, [parameters]);
+
+  // Phoneme toggle state for text params (must be top-level, not inside renderParam)
+  const [phonemeMode, setPhonemeMode] = useState<Record<string, boolean>>({});
 
   // Group parameters by their group field (must be before conditional return)
   const grouped = useMemo(() => {
@@ -153,9 +158,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     if (param.type === 'text') {
       const textValue = String(parameters[paramKey] ?? param.defaultText ?? '');
       const isSpeechText = paramKey === 'speechText' && onSpeak;
-
-      // Track phoneme mode per-parameter
-      const [showPhonemes, setShowPhonemes] = React.useState(false);
+      const showPhonemes = phonemeMode[paramKey] ?? false;
 
       // Convert text to phonemes or vice versa
       const handlePhonemeToggle = () => {
@@ -164,12 +167,11 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
         if (!showPhonemes) {
           // Convert text to phonemes
           try {
-            // Import speech reciter
             import('@engine/speech/Reciter').then(({ textToPhonemes }) => {
               const phonemes = textToPhonemes(textValue);
               if (phonemes) {
                 onTextChange?.(paramKey, phonemes);
-                setShowPhonemes(true);
+                setPhonemeMode(prev => ({ ...prev, [paramKey]: true }));
               }
             });
           } catch (err) {
@@ -177,7 +179,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
           }
         } else {
           // Toggle back - user can manually edit back to text
-          setShowPhonemes(false);
+          setPhonemeMode(prev => ({ ...prev, [paramKey]: false }));
         }
       };
 
@@ -252,6 +254,23 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               </>
             )}
           </div>
+        </div>
+      );
+    }
+
+    if (param.type === 'vowelEditor') {
+      const seqStr = String(parameters['vowelSequence'] ?? '');
+      const seq = seqStr ? seqStr.split(',').filter(Boolean) : [];
+      const loopVal = Number(parameters['vowelLoopSingle'] ?? 1);
+      return (
+        <div key={paramKey} style={{ flex: '1 1 100%' }}>
+          <VowelEditor
+            vowelSequence={seq}
+            loopSingle={loopVal >= 1}
+            onChange={(newSeq) => onTextChange?.('vowelSequence', newSeq.join(','))}
+            onLoopToggle={(loop) => onParamChange('vowelLoopSingle', loop ? 1 : 0)}
+            accentColor={accentColor}
+          />
         </div>
       );
     }
@@ -333,7 +352,8 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
   const hasOperators = chipDef.operatorCount != null && chipDef.operatorCount > 0 && chipDef.operatorParams;
 
   return (
-    <div style={{ padding: '8px 0' }}>
+    <ScrollLockContainer>
+      <div style={{ padding: '8px 0' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: accentColor }}>
@@ -379,8 +399,8 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
           <div style={{ fontSize: 9, color: mutedColor, marginBottom: 8 }}>
             Expects: <span style={{ fontFamily: 'Monaco, Menlo, monospace', color: accentColor }}>{chipDef.romConfig.requiredZip}</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{
+          <div className="flex flex-wrap gap-2 items-center">
+            <label className="w-full sm:w-auto" style={{
               fontSize: 10, fontWeight: 600,
               padding: '4px 10px',
               borderRadius: 4,
@@ -389,6 +409,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               color: accentColor,
               cursor: 'pointer',
               transition: 'background 0.15s',
+              textAlign: 'center',
             }}>
               UPLOAD ZIP
               <input
@@ -516,7 +537,8 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
           renderGroup(group, params, `op${activeOpTab}_`)
         );
       })()}
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };
 

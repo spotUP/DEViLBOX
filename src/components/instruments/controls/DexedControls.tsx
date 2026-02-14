@@ -3,6 +3,8 @@ import { Knob } from '@components/controls/Knob';
 import { Zap, Waves, Settings, Music } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import type { DexedConfig, DexedOperatorConfig } from '@typedefs/instrument';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
+import { useBreakpoint } from '@hooks/useBreakpoint';
 
 // DX7 Algorithm visualizations (simplified text representations)
 const DX7_ALGORITHMS = [
@@ -31,7 +33,9 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   onChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DexedTab>('global');
-  
+  const { isMobile, isTablet } = useBreakpoint();
+  const useMobileLayout = isMobile || isTablet;
+
   // Use ref to prevent stale closures in callbacks
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
@@ -323,24 +327,42 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab Bar */}
-      <div className="flex border-b border-gray-800 bg-gray-900/50">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-              activeTab === tab.id
-                ? 'border-b-2 text-blue-400'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-            style={activeTab === tab.id ? { borderColor: accentColor, color: accentColor } : {}}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <ScrollLockContainer>
+      <div className="flex flex-col h-full">
+        {/* Tab Bar (Desktop) or Dropdown (Mobile/Tablet) */}
+        {useMobileLayout ? (
+          <div className="p-2 border-b border-gray-800 bg-gray-900/50">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as DexedTab)}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-bold uppercase"
+              style={{ color: accentColor }}
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id} className="bg-gray-800">
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex border-b border-gray-800 bg-gray-900/50">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  activeTab === tab.id
+                    ? 'border-b-2 text-blue-400'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                style={activeTab === tab.id ? { borderColor: accentColor, color: accentColor } : {}}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
@@ -352,6 +374,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         {activeTab === 'op5' && renderOperatorTab(4)}
         {activeTab === 'op6' && renderOperatorTab(5)}
       </div>
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };

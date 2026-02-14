@@ -5,6 +5,8 @@ import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } fro
 import { useThemeStore } from '@stores';
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
+import { VowelEditor } from './VowelEditor';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface V2SpeechControlsProps {
   config: V2SpeechConfig;
@@ -54,7 +56,8 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
+    <ScrollLockContainer>
+      <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
@@ -95,6 +98,17 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
         </p>
       </div>
 
+      {/* Vowel Editor (when sing mode enabled) */}
+      {config.singMode && (
+        <VowelEditor
+          vowelSequence={config.vowelSequence ?? []}
+          loopSingle={config.vowelLoopSingle ?? true}
+          onChange={(seq) => onChange({ vowelSequence: seq })}
+          onLoopToggle={(loop) => onChange({ vowelLoopSingle: loop })}
+          accentColor={knobColor}
+        />
+      )}
+
       {/* Voice Parameters */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
@@ -102,7 +116,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE PARAMETERS</h3>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
           <Knob
             value={config.speed}
             min={0}
@@ -163,6 +177,7 @@ export const V2SpeechControls: React.FC<V2SpeechControlsProps> = ({
           </p>
         </div>
       </div>
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };
