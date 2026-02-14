@@ -4,8 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock } from 'lucide-react';
+import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
+import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 
 interface MobileMenuProps {
   onShowSettings?: () => void;
@@ -39,6 +40,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
   onShowGrooveSettings,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   const handleMenuClick = (action?: () => void) => {
     if (action) action();
@@ -206,6 +208,18 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 Options
               </h3>
 
+              {/* Add to Home Screen */}
+              <button
+                onClick={() => {
+                  setShowInstallModal(true);
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+              >
+                <Smartphone size={20} className="text-accent-primary" />
+                <span className="text-text-primary font-medium">Add to Home Screen</span>
+              </button>
+
               {onShowGrooveSettings && (
                 <button
                   onClick={() => handleMenuClick(onShowGrooveSettings)}
@@ -239,6 +253,12 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
           </div>
         </>
       )}
+
+      {/* Add to Home Screen Modal */}
+      <AddToHomeScreenModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+      />
     </>
   );
 };
