@@ -2,20 +2,20 @@
   "name": "DEViLBOX",
   "short_name": "DEViLBOX",
   "description": "TB-303 Acid Tracker with Devil Fish Mod",
-  "start_url": "/",
+  "start_url": "/devilbox/",
   "display": "standalone",
   "background_color": "#0a0a0b",
   "theme_color": "#ef4444",
   "orientation": "any",
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "/devilbox/vite.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
   "categories": ["music", "entertainment"],
-  "scope": "/",
+  "scope": "/devilbox/",
   "prefer_related_applications": false
 }
