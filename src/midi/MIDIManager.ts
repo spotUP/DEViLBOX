@@ -9,6 +9,7 @@
  */
 
 import type { MIDIDeviceInfo, MIDIMessage, MIDIMessageHandler, MIDIMessageType } from './types';
+import { isMobileDevice } from './BluetoothMIDIManager';
 
 class MIDIManager {
   private static instance: MIDIManager | null = null;
@@ -75,21 +76,30 @@ class MIDIManager {
     }
 
     try {
-      // Request MIDI access with SysEx support
-      this.midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+      // On mobile, use sysex: false for better compatibility
+      // Desktop can use sysex: true for full device support
+      const isMobile = isMobileDevice();
+      console.log(`[MIDIManager] Initializing MIDI (mobile: ${isMobile}, sysex: ${!isMobile})`);
+
+      this.midiAccess = await navigator.requestMIDIAccess({ sysex: !isMobile });
 
       // Set up device tracking
       this.updateDevices();
 
       // Listen for device changes
       this.midiAccess.onstatechange = () => {
+        console.log('[MIDIManager] Device state changed, updating devices...');
         this.updateDevices();
         this.notifyDeviceChange();
       };
 
+      console.log(`[MIDIManager] MIDI initialized successfully (${this.inputs.size} inputs, ${this.outputs.size} outputs)`);
       return true;
     } catch (error) {
       console.error('[MIDIManager] Failed to initialize:', error);
+      if (error instanceof DOMException) {
+        console.error(`[MIDIManager] Error type: ${error.name}, message: ${error.message}`);
+      }
       return false;
     }
   }
@@ -212,10 +222,13 @@ class MIDIManager {
    * Select input device
    */
   async selectInput(deviceId: string | null): Promise<void> {
+    console.log(`[MIDIManager] selectInput called with deviceId: ${deviceId}`);
+
     // Disconnect from previous input
     if (this.selectedInputId) {
       const prevInput = this.inputs.get(this.selectedInputId);
       if (prevInput) {
+        console.log(`[MIDIManager] Disconnecting from previous input: ${prevInput.name}`);
         prevInput.onmidimessage = null;
         try {
           await prevInput.close();
@@ -231,16 +244,19 @@ class MIDIManager {
     if (deviceId) {
       const input = this.inputs.get(deviceId);
       if (input) {
+        console.log(`[MIDIManager] Connecting to input: ${input.name} (state: ${input.state}, connection: ${input.connection})`);
         try {
           // Explicitly open the port first
           await input.open();
+          console.log(`[MIDIManager] Input port opened successfully: ${input.name}`);
 
           // Attach message handler (use onmidimessage for simplicity)
           this.boundMessageHandler = this.handleMIDIMessage.bind(this);
           input.onmidimessage = this.boundMessageHandler;
+          console.log(`[MIDIManager] Message handler attached to: ${input.name}`);
 
         } catch (error) {
-          console.error(`[MIDI] Failed to open input ${input.name}:`, error);
+          console.error(`[MIDIManager] Failed to open input ${input.name}:`, error);
         }
       }
     }

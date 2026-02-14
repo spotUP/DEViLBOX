@@ -731,7 +731,12 @@ function App() {
   // Show welcome screen if audio context hasn't been started
   if (showWelcome && contextState !== 'running') {
     return (
-      <AppLayout>
+      <AppLayout
+        onShowExport={() => setShowExport(true)}
+        onShowHelp={() => setShowHelp(true)}
+        onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
+        onShowPatterns={() => setShowPatterns(!showPatterns)}
+      >
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <div className="text-center max-w-2xl">
             {/* Logo */}
@@ -819,7 +824,12 @@ function App() {
   // Show main tracker interface
   return (
     <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
-      <AppLayout>
+      <AppLayout
+        onShowExport={() => setShowExport(true)}
+        onShowHelp={() => setShowHelp(true)}
+        onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
+        onShowPatterns={() => setShowPatterns(!showPatterns)}
+      >
         <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
         <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">

@@ -10,9 +10,7 @@ import type { ModularPatchConfig, ModularModuleInstance, ModularConnection } fro
 import { ModularVoice } from './ModularVoice';
 import { ModularConnectionManager } from './ModularConnectionManager';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
-
-// Import built-in modules (registers them with ModuleRegistry)
-import './modules';
+import { registerBuiltInModules } from './modules';
 
 export class ModularSynth implements DevilboxSynth {
   readonly name = 'ModularSynth';
@@ -28,6 +26,9 @@ export class ModularSynth implements DevilboxSynth {
     this.output = this.ctx.createGain();
     this.config = config;
     this.connectionManager = new ModularConnectionManager();
+
+    // Ensure built-in modules are registered
+    registerBuiltInModules();
 
     // Initialize voices
     this.initializeVoices();

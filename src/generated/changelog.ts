@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T16:26:29.213Z
+ * Generated: 2026-02-14T17:24:45.123Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '527';
-export const BUILD_HASH = '6275c7e';
+export const BUILD_NUMBER = '529';
+export const BUILD_HASH = 'de46a41';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Convert HARMONIC_PRESETS to InstrumentPreset['config'][] format"
+      },
+      {
+        type: 'feature',
+        "description": "Mobile MIDI support, harmonic presets, and modular synth UI"
+      },
       {
         type: 'fix',
         "description": "Resolve 8 type errors across modular synth and hooks"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Prevent duplicate instrument IDs and stale instrument warnings"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve Web Audio API type compatibility issue"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript buffer type error"
       }
     ]
   }
