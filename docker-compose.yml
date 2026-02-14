@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    container_name: devilbox-backend
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGIN=https://devilbox.uprough.net
+      - DATA_ROOT=/data
+      - DB_DIR=/data/db
+    volumes:
+      # Persistent data volume for user files and database
+      - devilbox-data:/data
+    networks:
+      - devilbox-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Frontend (Nginx)
+  frontend:
+    container_name: devilbox-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - VITE_API_URL=https://devilbox.uprough.net/api
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # SSL certificates (Let's Encrypt)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Nginx SSL config (will be created later)
+      - ./nginx/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - devilbox-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  # Named volume for persistent data
+  devilbox-data:
+    driver: local
+
+networks:
+  devilbox-network:
+    driver: bridge
