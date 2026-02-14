@@ -37,13 +37,7 @@ services:
         - VITE_API_URL=https://devilbox.uprough.net/api
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      # SSL certificates (Let's Encrypt)
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      # Nginx SSL config (will be created later)
-      - ./nginx/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - "8080:80"  # Host:Container - Changed to 8080 to avoid conflict
     depends_on:
       backend:
         condition: service_healthy
