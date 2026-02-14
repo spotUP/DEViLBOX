@@ -122,6 +122,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Waves',
     color: 'text-pink-400',
   },
+  HarmonicSynth: {
+    type: 'HarmonicSynth',
+    name: 'Harmonic Synth',
+    shortName: 'Harmonic',
+    description: 'Additive/spectral synth with 32-harmonic editor',
+    bestFor: ['Organ tones', 'Bells', 'Custom timbres', 'Spectral design'],
+    icon: 'BarChart3',
+    color: 'text-emerald-400',
+  },
   Sampler: {
     type: 'Sampler',
     name: 'Sampler',
