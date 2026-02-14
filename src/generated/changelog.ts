@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T19:23:52.485Z
+ * Generated: 2026-02-14T19:33:52.461Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '543';
-export const BUILD_HASH = '28debe0';
+export const BUILD_NUMBER = '544';
+export const BUILD_HASH = '0571ee2';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Lock viewport and prevent unwanted scrolling behavior"
+      },
       {
         type: 'fix',
         "description": "Prevent preset modal footer from causing horizontal scroll"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add mobile pattern editor with context-aware input"
-      },
-      {
-        type: 'feature',
-        "description": "Add mobile UX infrastructure"
       }
     ]
   }
