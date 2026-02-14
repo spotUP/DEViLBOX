@@ -193,11 +193,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Move cursor to tapped position
     console.log(`[PatternCanvas] Tap detected: row=${validRow}, channel=${channelIndex}`);
-    useTrackerStore.getState().setCursor({
-      rowIndex: validRow,
-      channelIndex,
-      columnType,
-    });
+    const store = useTrackerStore.getState();
+    store.moveCursorToRow(validRow);
+    store.moveCursorToChannel(channelIndex);
   }, [pattern, isMobile, scrollLeft, cursor.columnType]);
 
   const patternGestures = useMobilePatternGestures({
