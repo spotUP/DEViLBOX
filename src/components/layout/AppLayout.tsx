@@ -14,6 +14,14 @@ interface AppLayoutProps {
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
   onShowPatterns?: () => void;
+  onLoad?: () => void;
+  onSave?: () => void;
+  onNew?: () => void;
+  onClear?: () => void;
+  onShowInstruments?: () => void;
+  onShowPatternOrder?: () => void;
+  onShowDrumpads?: () => void;
+  onShowGrooveSettings?: () => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -23,6 +31,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onShowHelp,
   onShowMasterFX,
   onShowPatterns,
+  onLoad,
+  onSave,
+  onNew,
+  onClear,
+  onShowInstruments,
+  onShowPatternOrder,
+  onShowDrumpads,
+  onShowGrooveSettings,
 }) => {
   const { isMobile } = useResponsive();
 
@@ -41,6 +57,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           onShowHelp={onShowHelp}
           onShowMasterFX={onShowMasterFX}
           onShowPatterns={onShowPatterns}
+          onLoad={onLoad}
+          onSave={onSave}
+          onNew={onNew}
+          onClear={onClear}
+          onShowInstruments={onShowInstruments}
+          onShowPatternOrder={onShowPatternOrder}
+          onShowDrumpads={onShowDrumpads}
+          onShowGrooveSettings={onShowGrooveSettings}
         />
       )}
 
