@@ -35,7 +35,7 @@ function generateVersionFile() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), generateVersionFile()],
-  base: '/devilbox/',
+  base: '/DEViLBOX/',
   test: {
     // Vitest configuration
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
