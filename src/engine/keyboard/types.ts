@@ -18,3 +18,10 @@ export interface Command {
   description: string;
   undoable?: boolean;
 }
+
+export interface KeyboardScheme {
+  name: string;
+  id: string;
+  version: string;
+  mappings: Record<string, { pc: string; mac: string }>;
+}
