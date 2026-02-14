@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap } from 'lucide-react';
+import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 
 interface MobileMenuProps {
@@ -13,6 +13,14 @@ interface MobileMenuProps {
   onShowHelp?: () => void;
   onShowMasterFX?: () => void;
   onShowPatterns?: () => void;
+  onLoad?: () => void;
+  onSave?: () => void;
+  onNew?: () => void;
+  onClear?: () => void;
+  onShowInstruments?: () => void;
+  onShowPatternOrder?: () => void;
+  onShowDrumpads?: () => void;
+  onShowGrooveSettings?: () => void;
 }
 
 export const MobileMenu: React.FC<MobileMenuProps> = ({
@@ -21,6 +29,14 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
   onShowHelp,
   onShowMasterFX,
   onShowPatterns,
+  onLoad,
+  onSave,
+  onNew,
+  onClear,
+  onShowInstruments,
+  onShowPatternOrder,
+  onShowDrumpads,
+  onShowGrooveSettings,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -75,18 +91,93 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* File Operations */}
               <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
-                Actions
+                File
               </h3>
 
-              {onShowMasterFX && (
+              {onLoad && (
                 <button
-                  onClick={() => handleMenuClick(onShowMasterFX)}
+                  onClick={() => handleMenuClick(onLoad)}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
                 >
-                  <Sliders size={20} className="text-accent-primary" />
-                  <span className="text-text-primary font-medium">Master Effects</span>
+                  <FolderOpen size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Load</span>
+                </button>
+              )}
+
+              {onSave && (
+                <button
+                  onClick={() => handleMenuClick(onSave)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Save size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Save / Download</span>
+                </button>
+              )}
+
+              {onNew && (
+                <button
+                  onClick={() => handleMenuClick(onNew)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <FilePlus size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">New</span>
+                </button>
+              )}
+
+              {onClear && (
+                <button
+                  onClick={() => handleMenuClick(onClear)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Trash2 size={20} className="text-accent-warning" />
+                  <span className="text-text-primary font-medium">Clear</span>
+                </button>
+              )}
+
+              {onShowExport && (
+                <button
+                  onClick={() => handleMenuClick(onShowExport)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Download size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Export / Import</span>
+                </button>
+              )}
+
+              {/* View / Panels */}
+              <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
+                View
+              </h3>
+
+              {onShowPatternOrder && (
+                <button
+                  onClick={() => handleMenuClick(onShowPatternOrder)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <List size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Pattern Order</span>
+                </button>
+              )}
+
+              {onShowInstruments && (
+                <button
+                  onClick={() => handleMenuClick(onShowInstruments)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Music size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Instruments</span>
+                </button>
+              )}
+
+              {onShowDrumpads && (
+                <button
+                  onClick={() => handleMenuClick(onShowDrumpads)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Grid3x3 size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Drum Pads</span>
                 </button>
               )}
 
@@ -100,13 +191,28 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 </button>
               )}
 
-              {onShowExport && (
+              {onShowMasterFX && (
                 <button
-                  onClick={() => handleMenuClick(onShowExport)}
+                  onClick={() => handleMenuClick(onShowMasterFX)}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
                 >
-                  <Download size={20} className="text-accent-primary" />
-                  <span className="text-text-primary font-medium">Export / Import</span>
+                  <Sliders size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Master Effects</span>
+                </button>
+              )}
+
+              {/* Options */}
+              <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
+                Options
+              </h3>
+
+              {onShowGrooveSettings && (
+                <button
+                  onClick={() => handleMenuClick(onShowGrooveSettings)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors text-left"
+                >
+                  <Clock size={20} className="text-accent-primary" />
+                  <span className="text-text-primary font-medium">Groove Settings</span>
                 </button>
               )}
 
