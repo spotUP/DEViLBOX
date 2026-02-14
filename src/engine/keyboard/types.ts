@@ -8,3 +8,13 @@ export interface NormalizedKeyEvent {
 }
 
 export type PlatformType = 'mac' | 'pc';
+
+export type CommandContext = 'pattern' | 'sample' | 'dialog' | 'global';
+
+export interface Command {
+  name: string;
+  contexts: CommandContext[];
+  handler: () => boolean;
+  description: string;
+  undoable?: boolean;
+}
