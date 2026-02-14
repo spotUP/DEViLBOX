@@ -60,9 +60,15 @@ const builtInModules = [
   MIDIInDescriptor,
 ];
 
-builtInModules.forEach((descriptor) => {
-  ModuleRegistry.register(descriptor);
-});
+// Register all built-in modules
+export function registerBuiltInModules() {
+  builtInModules.forEach((descriptor) => {
+    ModuleRegistry.register(descriptor);
+  });
+}
+
+// Auto-register on import
+registerBuiltInModules();
 
 export {
   // Source modules

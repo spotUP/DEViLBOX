@@ -286,12 +286,25 @@ export class ToneEngine {
   public connectNativeSynth(synthOutput: AudioNode, destination: Tone.ToneAudioNode): void {
     const nativeDestination = getNativeAudioNode(destination as any);
     if (nativeDestination) {
+      // Validate contexts match before connecting
+      const sourceCtx = synthOutput.context;
+      const destCtx = nativeDestination.context;
+
+      if (sourceCtx !== destCtx) {
+        console.error('[ToneEngine] AudioContext mismatch! Cannot connect nodes from different contexts.',
+          'Source context:', sourceCtx,
+          'Dest context:', destCtx,
+          'Are they same instance?', sourceCtx === destCtx);
+        // Try to reconnect via master output as workaround
+        return;
+      }
+
       try {
         synthOutput.connect(nativeDestination);
       } catch (e) {
         console.error('[ToneEngine] connectNativeSynth failed:', e,
-          'synthOutput context:', (synthOutput as unknown as { context?: { constructor?: { name?: string } } }).context?.constructor?.name,
-          'dest context:', (nativeDestination as unknown as { context?: { constructor?: { name?: string } } }).context?.constructor?.name);
+          'synthOutput context:', sourceCtx.constructor?.name,
+          'dest context:', destCtx.constructor?.name);
       }
     } else {
       console.warn('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');

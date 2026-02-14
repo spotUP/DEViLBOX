@@ -57,7 +57,7 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-secondary border border-border rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-secondary border border-border rounded-lg shadow-xl z-[9999] max-h-96 overflow-y-auto">
           {categories.map((category) => {
             const modules = modulesByCategory[category];
             if (modules.length === 0) return null;
@@ -97,7 +97,7 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
       {/* Backdrop to close dropdown */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-[9998]"
           onClick={() => setIsOpen(false)}
         />
       )}

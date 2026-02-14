@@ -206,6 +206,7 @@ export class FurnaceRegisterMapper {
    * Map PSG (SN76489) registers
    */
   public static mapPSG(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
+    void channel; void config;
     const chip = FurnaceChipType.PSG;
 
     // === INIT REGISTERS (from sms.cpp reset()) ===
@@ -217,10 +218,9 @@ export class FurnaceRegisterMapper {
     // PSG uses a simple 8-bit latch system
     // 1ccc vvvv -> c=channel, v=value
 
-    // Volume (Attenuation) mapping: 0-15 (0 is loudest)
-    // Furnace TL is 0-127, map to 0-15
-    const atten = Math.min(15, Math.floor(config.operators[0].tl / 8));
-    const volLatch = 0x90 | ((channel & 3) << 5) | (atten & 0x0F);
+    // Set volume to silent (max attenuation = 0x0F) to prevent init beep
+    // Volume will be set properly in writeKeyOn()
+    const volLatch = 0x90 | ((channel & 3) << 5) | 0x0F; // 0x0F = max attenuation (silent)
     engine.write(chip, 0, volLatch);
   }
 
@@ -233,17 +233,19 @@ export class FurnaceRegisterMapper {
   public static mapGB(engine: FurnaceChipEngine, _channel: number, _config: FurnaceConfig): void {
     void _channel; void _config;
     const chip = FurnaceChipType.GB;
-    console.log('[mapGB] Writing GB init registers: NR10=0x00, NR52=0x8F, NR51=0xFF, NR50=0xFF');
 
     // Furnace reset sequence (gb.cpp lines 656-660):
     // immWrite(0x10,0);      // NR10 sweep = 0
     // immWrite(0x26,0x8f);   // NR52 master enable + channel status
     // immWrite(0x25,procMute());  // NR51 panning
     // immWrite(0x24,0xff);   // NR50 master volume
+    
+    // MODIFIED: Disable all channels initially to prevent init beeps
+    // Channels will be enabled properly in writeKeyOn()
     engine.write(chip, 0x10, 0x00);   // NR10: Sweep = 0
-    engine.write(chip, 0x26, 0x8F);   // NR52: Master enable (0x80) + all channels on (0x0F)
-    engine.write(chip, 0x25, 0xFF);   // NR51: All channels to both L+R outputs
-    engine.write(chip, 0x24, 0xFF);   // NR50: Max volume both outputs
+    engine.write(chip, 0x26, 0x80);   // NR52: Master enable (0x80), channels OFF (0x00)
+    engine.write(chip, 0x25, 0x00);   // NR51: No panning initially (silent)
+    engine.write(chip, 0x24, 0x00);   // NR50: Volume = 0 initially (silent)
 
     // NOTE: Furnace does NOT write envelope/duty in mapGB equivalent
     // Those are written during keyOn in tick()
@@ -306,8 +308,9 @@ export class FurnaceRegisterMapper {
       } else {
         control = 0x40; // Default pulse wave
       }
-      // Gate off initially
-      engine.write(chip, voiceBase + 4, control);
+      // Gate off initially - also DISABLE waveform to prevent click/beep at init
+      // The waveform will be enabled properly in writeKeyOn() when the note is triggered
+      engine.write(chip, voiceBase + 4, 0x00); // All bits cleared (no waveform, no gate)
 
       // Global filter/volume register (0x18)
       // Reference: c64.cpp line 874: rWrite(0x18,0x0f) -> volume=15
@@ -402,12 +405,12 @@ export class FurnaceRegisterMapper {
     // === Initialize ALL channels with valid defaults to prevent WASM crashes ===
 
     // Pulse 1 (channel 0): Set to silent but valid state
-    engine.write(chip, 0x4000, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x4000, 0x30 | 0x00);    // Constant volume mode, volume 0 (already 0)
     engine.write(chip, 0x4002, 0x00);    // Period low
     engine.write(chip, 0x4003, 0x08);    // Period high + length counter load
 
     // Pulse 2 (channel 1): Set to silent but valid state
-    engine.write(chip, 0x4004, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x4004, 0x30 | 0x00);    // Constant volume mode, volume 0 (already 0)
     engine.write(chip, 0x4006, 0x00);    // Period low
     engine.write(chip, 0x4007, 0x08);    // Period high + length counter load
 
@@ -417,7 +420,7 @@ export class FurnaceRegisterMapper {
     engine.write(chip, 0x400B, 0x08);    // Period high + length counter load
 
     // Noise (channel 3): CRITICAL - must have valid period to avoid nfreq=0 assertion
-    engine.write(chip, 0x400C, 0x30);    // Constant volume mode, volume 0
+    engine.write(chip, 0x400C, 0x30 | 0x00);    // Constant volume mode, volume 0 (already 0)
     engine.write(chip, 0x400E, 0x08);    // Period index 8 (middle range, valid value)
     engine.write(chip, 0x400F, 0x08);    // Length counter load
 
@@ -430,20 +433,18 @@ export class FurnaceRegisterMapper {
     // 4: DMC (0x4010-0x4013)
 
     if (channel < 2) {
-      // Pulse channels
+      // Pulse channels - set to silent (volume 0) until note triggered
       const base = channel * 4;
       const duty = Math.floor((config.operators[0]?.mult ?? 2) / 4) & 3;
-      const vol = Math.max(0, 15 - Math.floor(config.operators[0].tl / 8));
-      engine.write(chip, 0x4000 + base, (duty << 6) | 0x30 | (vol & 0x0F));
+      engine.write(chip, 0x4000 + base, (duty << 6) | 0x30 | 0x00); // Volume 0
 
     } else if (channel === 2) {
       // Triangle
       engine.write(chip, 0x4008, 0xFF); // Max length
 
     } else if (channel === 3) {
-      // Noise
-      const vol = Math.max(0, 15 - Math.floor(config.operators[0].tl / 8));
-      engine.write(chip, 0x400C, 0x30 | (vol & 0x0F));
+      // Noise - set to silent (volume 0) until note triggered
+      engine.write(chip, 0x400C, 0x30 | 0x00); // Volume 0
     }
   }
 
@@ -470,8 +471,9 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.PCE;
     // Reference: pce.cpp line 390-391
+    // MODIFIED: Set master volume to 0 initially to prevent init beep
     engine.write(chip, 0x00, 0x00);  // Channel select = global
-    engine.write(chip, 0x01, 0xFF);  // Master volume = max (both L+R)
+    engine.write(chip, 0x01, 0x00);  // Master volume = 0 (silent) - set in writeKeyOn
   }
 
   /**
@@ -796,9 +798,13 @@ export class FurnaceRegisterMapper {
     void _channel; void _config;
     const chip = FurnaceChipType.TIA;
     // Reference: tia.cpp - TIA is very simple, mostly self-initializing
-    // Ensure volume is max
-    engine.write(chip, 0x19, 0x0F);  // AUDV0 (ch0 volume)
-    engine.write(chip, 0x1A, 0x0F);  // AUDV1 (ch1 volume)
+    // Clear registers to prevent glitchy sounds at init (volume=0, control=0, freq=0)
+    engine.write(chip, 0x15, 0x00);  // AUDC0 (ch0 audio control/waveform) - off
+    engine.write(chip, 0x16, 0x00);  // AUDC1 (ch1 audio control/waveform) - off
+    engine.write(chip, 0x17, 0x00);  // AUDF0 (ch0 frequency)
+    engine.write(chip, 0x18, 0x00);  // AUDF1 (ch1 frequency)
+    engine.write(chip, 0x19, 0x00);  // AUDV0 (ch0 volume) - silent until note triggered
+    engine.write(chip, 0x1A, 0x00);  // AUDV1 (ch1 volume) - silent until note triggered
   }
 
   /**

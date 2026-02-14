@@ -1538,6 +1538,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.ChipSynth,
       SYNTH_INFO.PWMSynth,
       SYNTH_INFO.FormantSynth,
+      SYNTH_INFO.ModularSynth,
       SYNTH_INFO.V2,
     ],
   },
