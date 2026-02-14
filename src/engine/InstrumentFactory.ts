@@ -413,10 +413,9 @@ export class InstrumentFactory {
    * Create a synth instance based on InstrumentConfig.
    * Returns a Tone.ToneAudioNode for Tone.js synths, or a DevilboxSynth for native synths (e.g. WAM).
    */
-  public static async createInstrument(config: InstrumentConfig): Promise<Tone.ToneAudioNode | DevilboxSynth> {
+  public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode | DevilboxSynth {
     // Try SynthRegistry first (new registry architecture)
-    // Use ensure() to trigger lazy loading if needed
-    const registryDesc = await SynthRegistry.ensure(config.synthType);
+    const registryDesc = SynthRegistry.get(config.synthType);
     if (registryDesc) {
       const instrument = registryDesc.create(config);
       // Apply volume offset for Furnace WASM synths via setVolumeOffset
