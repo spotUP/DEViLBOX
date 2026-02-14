@@ -1,3 +1,5 @@
+import { NormalizedKeyEvent } from './types';
+
 export class KeyboardNormalizer {
   static isMac(): boolean {
     // Try modern API first (Chrome 90+, Edge 90+)
@@ -9,5 +11,18 @@ export class KeyboardNormalizer {
     // Fallback to legacy API (all browsers)
     const platform = navigator.platform;
     return platform.toUpperCase().indexOf('MAC') >= 0;
+  }
+
+  static normalize(e: KeyboardEvent): NormalizedKeyEvent {
+    const isMac = this.isMac();
+
+    return {
+      key: e.key,
+      ctrl: e.ctrlKey || (isMac && e.metaKey),
+      alt: e.altKey,
+      shift: e.shiftKey,
+      meta: e.metaKey,
+      code: e.code,
+    };
   }
 }

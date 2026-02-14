@@ -40,6 +40,7 @@ export default defineConfig({
     // Vitest configuration
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'Reference Code/**', 'dist'],
+    environment: 'happy-dom',
   },
   resolve: {
     alias: {
