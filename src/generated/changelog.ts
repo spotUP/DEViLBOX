@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T19:33:52.461Z
+ * Generated: 2026-02-14T19:39:20.523Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '544';
-export const BUILD_HASH = '0571ee2';
+export const BUILD_NUMBER = '545';
+export const BUILD_HASH = 'ff9d734';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add PWA install-to-home-screen option"
+      },
       {
         type: 'fix',
         "description": "Lock viewport and prevent unwanted scrolling behavior"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Solve knob scroll conflict with touch-action CSS"
-      },
-      {
-        type: 'feature',
-        "description": "Add mobile pattern editor with context-aware input"
       }
     ]
   }

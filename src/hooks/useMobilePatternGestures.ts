@@ -160,6 +160,11 @@ export function useMobilePatternGestures({
         const absX = Math.abs(deltaX);
         const absY = Math.abs(deltaY);
 
+        // Prevent default horizontal scrolling when we detect any meaningful touch movement
+        if (absX > 5 || absY > 5) {
+          e.preventDefault();
+        }
+
         // Only trigger scroll if this is significantly more vertical than horizontal
         // Use 1.5x ratio to allow some horizontal drift while scrolling
         if (absY > absX * 1.5 && Math.abs(deltaY) > 1) {
@@ -209,7 +214,8 @@ export function useMobilePatternGestures({
 
         // Determine swipe direction (favor the dominant axis)
         if (absX > absY && absX > swipeThreshold) {
-          // Horizontal swipe
+          // Horizontal swipe - prevent default scrolling
+          e.preventDefault();
           haptics.selection();
           if (deltaX > 0 && onSwipeRight) {
             onSwipeRight();
