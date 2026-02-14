@@ -201,8 +201,10 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
     ToneEngine.getInstance().invalidateInstrument(currentInstrument.id);
 
     // Build the update with new synth type and appropriate config
+    const synthInfo = getSynthInfo(synthType);
     const updates: Partial<InstrumentConfig> = {
       synthType,
+      name: synthInfo.name, // Update name to match new synth type
       // Clear all synth-specific configs
       tb303: undefined,
       drumMachine: undefined,
