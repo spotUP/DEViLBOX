@@ -258,6 +258,19 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
 
+  // Mobile swipe handlers for cursor navigation
+  const handleSwipeLeft = useCallback(() => {
+    if (!isMobile) return;
+    const store = useTrackerStore.getState();
+    store.moveCursor('left');
+  }, [isMobile]);
+
+  const handleSwipeRight = useCallback(() => {
+    if (!isMobile) return;
+    const store = useTrackerStore.getState();
+    store.moveCursor('right');
+  }, [isMobile]);
+
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
   const setShowImportModule = onShowImportModule ?? setInternalShowImportModule;
@@ -944,7 +957,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            <PatternEditorCanvas onAcidGenerator={handleAcidGenerator} />
+            <PatternEditorCanvas
+              onAcidGenerator={handleAcidGenerator}
+              onSwipeLeft={handleSwipeLeft}
+              onSwipeRight={handleSwipeRight}
+            />
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
           ) : viewMode === 'pianoroll' ? (
