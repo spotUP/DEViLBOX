@@ -1555,7 +1555,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'pads',
     name: 'Pads',
     description: 'Evolving textures and pads',
-    synths: [SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth, SYNTH_INFO.PolySynth, SYNTH_INFO.StringMachine, SYNTH_INFO.V2],
+    synths: [SYNTH_INFO.Wavetable, SYNTH_INFO.GranularSynth, SYNTH_INFO.PolySynth, SYNTH_INFO.StringMachine, SYNTH_INFO.HarmonicSynth, SYNTH_INFO.V2],
   },
   {
     id: 'dub',
