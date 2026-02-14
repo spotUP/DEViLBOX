@@ -62,3 +62,9 @@ SynthRegistry.registerLazy(
   ],
   () => import('./misc').then(() => {}),
 );
+
+// ── ModularSynth (modular synthesis with patch editor) ───────────────────────
+SynthRegistry.registerLazy(
+  ['ModularSynth'],
+  () => import('./modularsynth').then(() => {}),
+);

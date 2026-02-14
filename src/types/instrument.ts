@@ -186,7 +186,9 @@ export type SynthType =
   | 'Monique'         // Monique Morphing Monosynth (VSTBridge)
   // Virtual instruments (aliased MAME)
   | 'VFX'             // Ensoniq VFX (alias for MAMEVFX)
-  | 'D50';            // Roland D-50 (virtual analog)
+  | 'D50'            // Roland D-50 (virtual analog)
+  // Modular Synthesis
+  | 'ModularSynth';   // Modular synthesizer with patch editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -2880,6 +2882,8 @@ export interface InstrumentConfig {
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
   chiptuneModule?: ChiptuneModuleConfig;
+  // Modular Synthesis
+  modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
   sample?: SampleConfig;
   effects: EffectConfig[];

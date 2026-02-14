@@ -255,13 +255,13 @@ function convertFurnaceInstrument(
 
     // Namco 163 (DIV_INS_N163)
     if (cc.n163) {
-      const n163 = cc.n163 as { wave: number; wavePos: number; waveLen: number; waveMode: number };
+      const n163 = cc.n163 as { wave: number; wavePos: number; waveLen: number; waveMode: number; perChanPos?: boolean };
       furnaceConfig.n163 = {
         wave: n163.wave,
         wavePos: n163.wavePos,
         waveLen: n163.waveLen,
         waveMode: n163.waveMode,
-        perChPos: false,
+        perChPos: n163.perChanPos ?? false,
       };
     }
 
