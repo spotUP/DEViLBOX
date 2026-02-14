@@ -270,14 +270,40 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
       {/* Piano keys - single octave with scroll */}
       <div className="relative h-[120px] bg-dark-bg rounded-lg overflow-hidden">
         <div className="absolute inset-0 flex">
+          {/* Render white keys first */}
           {NOTE_NAMES.map((name, semitone) => {
             const isBlackKey = BLACK_KEYS.includes(semitone);
+            if (isBlackKey) return null;
             return (
               <button
                 key={semitone}
                 onTouchStart={(e) => handleKeyTouch(semitone, e)}
                 onClick={() => onNotePress(semitone)}
-                className={`piano-key ${isBlackKey ? 'piano-key-black' : 'piano-key-white'}`}
+                className="piano-key piano-key-white"
+                aria-label={`${name}${currentOctave}`}
+              >
+                <span className="piano-key-label">
+                  {name}
+                  <span className="text-[10px] opacity-60">{currentOctave}</span>
+                </span>
+              </button>
+            );
+          })}
+          {/* Render black keys on top */}
+          {NOTE_NAMES.map((name, semitone) => {
+            const isBlackKey = BLACK_KEYS.includes(semitone);
+            if (!isBlackKey) return null;
+            // Calculate position based on white key positions
+            const whiteKeysBefore = NOTE_NAMES.slice(0, semitone).filter((_, i) => !BLACK_KEYS.includes(i)).length;
+            const whiteKeyWidth = 100 / 7; // 7 white keys per octave
+            const leftPos = (whiteKeysBefore * whiteKeyWidth) - 3; // Position between white keys
+            return (
+              <button
+                key={semitone}
+                onTouchStart={(e) => handleKeyTouch(semitone, e)}
+                onClick={() => onNotePress(semitone)}
+                className="piano-key piano-key-black"
+                style={{ left: `${leftPos}%` }}
                 aria-label={`${name}${currentOctave}`}
               >
                 <span className="piano-key-label">
